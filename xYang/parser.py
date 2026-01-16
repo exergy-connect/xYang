@@ -24,6 +24,22 @@ class YangParser:
         self.lines: List[str] = []
         self.token_positions: List[Tuple[int, int]] = []  # (line_num, char_pos) for each token
         self.filename: Optional[str] = None
+        
+        # Module parse handlers - created once per instance
+        self._module_parse_handlers: dict[str, Any] = {
+            'description': self._parse_description,
+            'container': self._parse_container,
+            'list': self._parse_list,
+            'leaf': self._parse_leaf,
+            'typedef': self._parse_typedef,
+            'revision': self._parse_revision,
+            'leaf-list': self._parse_leaf_list,
+            'yang-version': self._parse_yang_version,
+            'namespace': self._parse_namespace,
+            'prefix': self._parse_prefix,
+            'organization': self._parse_organization,
+            'contact': self._parse_contact,
+        }
 
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file."""
@@ -190,31 +206,11 @@ class YangParser:
         self.current_module.name = module_name
 
         # Parse module body
+        # Use dict lookup for O(1) token dispatch (created once per instance)
         while pos < len(tokens) and tokens[pos] != '}':
-            if tokens[pos] == 'yang-version':
-                pos = self._parse_yang_version(tokens, pos)
-            elif tokens[pos] == 'namespace':
-                pos = self._parse_namespace(tokens, pos)
-            elif tokens[pos] == 'prefix':
-                pos = self._parse_prefix(tokens, pos)
-            elif tokens[pos] == 'organization':
-                pos = self._parse_organization(tokens, pos)
-            elif tokens[pos] == 'contact':
-                pos = self._parse_contact(tokens, pos)
-            elif tokens[pos] == 'description':
-                pos = self._parse_description(tokens, pos)
-            elif tokens[pos] == 'revision':
-                pos = self._parse_revision(tokens, pos)
-            elif tokens[pos] == 'typedef':
-                pos = self._parse_typedef(tokens, pos)
-            elif tokens[pos] == 'container':
-                pos = self._parse_container(tokens, pos)
-            elif tokens[pos] == 'list':
-                pos = self._parse_list(tokens, pos)
-            elif tokens[pos] == 'leaf':
-                pos = self._parse_leaf(tokens, pos)
-            elif tokens[pos] == 'leaf-list':
-                pos = self._parse_leaf_list(tokens, pos)
+            handler = self._module_parse_handlers.get(tokens[pos])
+            if handler:
+                pos = handler(tokens, pos)
             else:
                 pos += 1  # Skip unknown statements for now
 
