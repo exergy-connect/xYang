@@ -52,6 +52,17 @@ class YangParser:
             'require-instance': self._parse_type_require_instance,
             'type': self._parse_type_nested,
         }
+        
+        # Container body parse handlers - created once per instance
+        self._container_body_handlers: dict[str, Any] = {
+            'description': self._parse_description_with_parent,
+            'presence': self._parse_presence,
+            'when': self._parse_when,
+            'leaf': self._parse_leaf,
+            'container': self._parse_container,
+            'list': self._parse_list,
+            'leaf-list': self._parse_leaf_list,
+        }
 
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file."""
@@ -283,13 +294,24 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_description(self, tokens: List[str], pos: int) -> int:
+    def _parse_description(self, tokens: List[str], pos: int, parent: Optional[Any] = None) -> int:
         """Parse description statement."""
-        pos += 1
+        if pos >= len(tokens) or tokens[pos] != 'description':
+            return pos
+        pos += 1  # Skip 'description' keyword
+        
         if pos < len(tokens):
+            # The tokenizer handles quoted strings, so the description is a single token
             desc = tokens[pos].strip('"\'')
-            # Handle multi-line descriptions
-            pos += 1
+            # Store description in parent if provided
+            if parent:
+                parent.description = desc
+            elif self.current_module:
+                # For module-level descriptions
+                self.current_module.description = desc
+            pos += 1  # Skip description value
+        
+        # Skip semicolon if present
         if pos < len(tokens) and tokens[pos] == ';':
             pos += 1
         return pos
@@ -338,7 +360,7 @@ class YangParser:
                 if tokens[pos] == 'type':
                     pos = self._parse_type(tokens, pos, typedef_stmt)
                 elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
+                    pos = self._parse_description(tokens, pos, typedef_stmt)
                 else:
                     pos += 1
 
@@ -376,11 +398,7 @@ class YangParser:
                 if brace_depth == 1:  # Only process at the current level
                     handler = self._type_constraint_handlers.get(tokens[pos])
                     if handler:
-                        result = handler(tokens, pos, type_stmt)
-                        if result is None:
-                            # Special case: 'type' handler returns None to signal continue
-                            continue
-                        pos = result
+                        pos = handler(tokens, pos, type_stmt)
                     else:
                         pos += 1
                 else:
@@ -469,15 +487,27 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_type_nested(self, tokens: List[str], pos: int, type_stmt: Any) -> Optional[int]:
-        """Parse nested type statement (for union types). Returns None to signal continue."""
+    def _parse_type_nested(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse nested type statement (for union types)."""
         # Handle nested type statements (for union types)
         nested_type_stmt = YangTypeStmt(name="")
-        pos = self._parse_type(tokens, pos, nested_type_stmt)
+        new_pos = self._parse_type(tokens, pos, nested_type_stmt)
         if not hasattr(type_stmt, 'types'):
             type_stmt.types = []
         type_stmt.types.append(nested_type_stmt)
-        return None  # Signal to continue without incrementing pos
+        return new_pos  # Return the new position after parsing the nested type
+
+    def _parse_description_with_parent(self, tokens: List[str], pos: int, parent: Any) -> int:
+        """Wrapper for _parse_description that accepts parent parameter."""
+        return self._parse_description(tokens, pos, parent)
+
+    def _parse_presence(self, tokens: List[str], pos: int, parent: Any) -> int:
+        """Parse presence statement for container."""
+        pos += 1
+        if pos < len(tokens):
+            parent.presence = tokens[pos].strip('"\'')
+            pos += 1
+        return pos
 
     def _parse_container(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
         """Parse container statement."""
@@ -492,24 +522,18 @@ class YangParser:
 
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
+            prev_pos = -1
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
-                elif tokens[pos] == 'presence':
-                    pos += 1
-                    if pos < len(tokens):
-                        container_stmt.presence = tokens[pos].strip('"\'')
-                        pos += 1
-                elif tokens[pos] == 'when':
-                    pos = self._parse_when(tokens, pos, container_stmt)
-                elif tokens[pos] == 'leaf':
-                    pos = self._parse_leaf(tokens, pos, container_stmt)
-                elif tokens[pos] == 'container':
-                    pos = self._parse_container(tokens, pos, container_stmt)
-                elif tokens[pos] == 'list':
-                    pos = self._parse_list(tokens, pos, container_stmt)
-                elif tokens[pos] == 'leaf-list':
-                    pos = self._parse_leaf_list(tokens, pos, container_stmt)
+                # Safety check to prevent infinite loops
+                if pos == prev_pos:
+                    raise self._make_error(f"Infinite loop detected at position {pos}, token: {tokens[pos] if pos < len(tokens) else 'EOF'}", pos)
+                prev_pos = pos
+                handler = self._container_body_handlers.get(tokens[pos])
+                if handler:
+                    new_pos = handler(tokens, pos, container_stmt)
+                    if new_pos <= pos:
+                        raise self._make_error(f"Handler for '{tokens[pos]}' did not advance position (was {pos}, now {new_pos})", pos)
+                    pos = new_pos
                 else:
                     pos += 1
 
@@ -560,7 +584,7 @@ class YangParser:
                         list_stmt.max_elements = int(tokens[pos])
                         pos += 1
                 elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
+                    pos = self._parse_description(tokens, pos, list_stmt)
                 elif tokens[pos] == 'when':
                     pos = self._parse_when(tokens, pos, list_stmt)
                 elif tokens[pos] == 'leaf':
@@ -625,7 +649,7 @@ class YangParser:
                         leaf_stmt.default = tokens[pos].strip('"\'')
                         pos += 1
                 elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
+                    pos = self._parse_description(tokens, pos, leaf_stmt)
                 elif tokens[pos] == 'must':
                     must_stmt = YangMustStmt(expression="")
                     pos = self._parse_must(tokens, pos)
@@ -679,7 +703,7 @@ class YangParser:
                         leaf_list_stmt.max_elements = int(tokens[pos])
                         pos += 1
                 elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
+                    pos = self._parse_description(tokens, pos, leaf_list_stmt)
                 elif tokens[pos] == 'must':
                     pos = self._parse_must(tokens, pos)
                 else:
@@ -729,7 +753,7 @@ class YangParser:
                         must_stmt.error_message = tokens[pos].strip('"\'')
                         pos += 1
                 elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos)
+                    pos = self._parse_description(tokens, pos, must_stmt)
                 else:
                     pos += 1
 
