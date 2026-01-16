@@ -4,7 +4,7 @@ YANG parser implementation.
 Parses YANG module files and builds an in-memory representation.
 """
 
-from typing import List, Optional, Any, Tuple, Union
+from typing import List, Optional, Any, Tuple
 from pathlib import Path
 
 from .module import YangModule
@@ -24,7 +24,7 @@ class YangParser:
         self.lines: List[str] = []
         self.token_positions: List[Tuple[int, int]] = []  # (line_num, char_pos) for each token
         self.filename: Optional[str] = None
-        
+
         # Module parse handlers - created once per instance
         self._module_parse_handlers: dict[str, Any] = {
             'description': self._parse_description,
@@ -40,7 +40,7 @@ class YangParser:
             'organization': self._parse_organization,
             'contact': self._parse_contact,
         }
-        
+
         # Type constraint parse handlers - created once per instance
         self._type_constraint_handlers: dict[str, Any] = {
             'pattern': self._parse_type_pattern,
@@ -52,7 +52,7 @@ class YangParser:
             'require-instance': self._parse_type_require_instance,
             'type': self._parse_type_nested,
         }
-        
+
         # Container body parse handlers - created once per instance
         self._container_body_handlers: dict[str, Any] = {
             'description': self._parse_description_with_parent,
@@ -63,18 +63,18 @@ class YangParser:
             'list': self._parse_list,
             'leaf-list': self._parse_leaf_list,
         }
-        
+
         # Revision body parse handlers - created once per instance
         self._revision_body_handlers: dict[str, Any] = {
             'description': self._parse_revision_description,
         }
-        
+
         # Typedef body parse handlers - created once per instance
         self._typedef_body_handlers: dict[str, Any] = {
             'type': self._parse_typedef_type,
             'description': self._parse_description_with_parent,
         }
-        
+
         # List body parse handlers - created once per instance
         self._list_body_handlers: dict[str, Any] = {
             'key': self._parse_list_key,
@@ -88,7 +88,7 @@ class YangParser:
             'leaf-list': self._parse_leaf_list,
             'must': self._parse_list_must,
         }
-        
+
         # Leaf body parse handlers - created once per instance
         self._leaf_body_handlers: dict[str, Any] = {
             'type': self._parse_leaf_type,
@@ -98,7 +98,7 @@ class YangParser:
             'must': self._parse_leaf_must,
             'when': self._parse_when,
         }
-        
+
         # Leaf-list body parse handlers - created once per instance
         self._leaf_list_body_handlers: dict[str, Any] = {
             'type': self._parse_leaf_list_type,
@@ -107,7 +107,7 @@ class YangParser:
             'description': self._parse_description_with_parent,
             'must': self._parse_leaf_list_must,
         }
-        
+
         # Must body parse handlers - created once per instance
         self._must_body_handlers: dict[str, Any] = {
             'error-message': self._parse_must_error_message,
@@ -157,7 +157,7 @@ class YangParser:
         i = 0
         content_len = len(content)
         special_chars = {'{', '}', ';', '=', '+'}
-        
+
         # Build line map for position tracking
         line_map = [0]  # Character position of start of each line
         for j, char in enumerate(content):
@@ -233,16 +233,15 @@ class YangParser:
     def _make_error(self, message: str, token_pos: int, context_lines: int = 3) -> YangSyntaxError:
         """Create a syntax error with line number and context."""
         if token_pos < len(self.token_positions):
-            line_num, char_pos = self.token_positions[token_pos]
+            line_num, _ = self.token_positions[token_pos]
         else:
             line_num = len(self.lines)
-            char_pos = 0
 
         # Get context lines
         context = []
         start_line = max(1, line_num - context_lines)
         end_line = min(len(self.lines), line_num + context_lines)
-        
+
         for ctx_line_num in range(start_line, end_line + 1):
             if ctx_line_num <= len(self.lines):
                 context.append((ctx_line_num, self.lines[ctx_line_num - 1]))
@@ -265,13 +264,15 @@ class YangParser:
         pos += 1
         if pos >= len(tokens):
             raise self._make_error("Unexpected end of file after 'module'", pos - 1)
-        
+
         module_name = tokens[pos]
         pos += 1
 
         if pos >= len(tokens):
-            raise self._make_error(f"Unexpected end of file after module name '{module_name}'", pos - 1)
-        
+            raise self._make_error(
+                f"Unexpected end of file after module name '{module_name}'", pos - 1
+            )
+
         if tokens[pos] != '{':
             raise self._make_error(f"Expected '{{' after module name '{module_name}'", pos)
         pos += 1
@@ -349,7 +350,7 @@ class YangParser:
         if pos >= len(tokens) or tokens[pos] != 'description':
             return pos
         pos += 1  # Skip 'description' keyword
-        
+
         if pos < len(tokens):
             # The tokenizer handles quoted strings, so the description is a single token
             desc = tokens[pos].strip('"\'')
@@ -360,7 +361,7 @@ class YangParser:
                 # For module-level descriptions
                 self.current_module.description = desc
             pos += 1  # Skip description value
-        
+
         # Skip semicolon if present
         if pos < len(tokens) and tokens[pos] == ';':
             pos += 1
@@ -443,7 +444,7 @@ class YangParser:
                     brace_depth -= 1
                     if brace_depth == 0:
                         break
-                
+
                 if brace_depth == 1:  # Only process at the current level
                     handler = self._type_constraint_handlers.get(tokens[pos])
                     if handler:
@@ -627,7 +628,9 @@ class YangParser:
         """Parse type in leaf-list statement."""
         return self._parse_type(tokens, pos, leaf_list_stmt)
 
-    def _parse_leaf_list_min_elements(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+    def _parse_leaf_list_min_elements(
+        self, tokens: List[str], pos: int, leaf_list_stmt: Any
+    ) -> int:
         """Parse min-elements in leaf-list statement."""
         pos += 1
         if pos < len(tokens):
@@ -635,7 +638,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_leaf_list_max_elements(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+    def _parse_leaf_list_max_elements(
+        self, tokens: List[str], pos: int, leaf_list_stmt: Any
+    ) -> int:
         """Parse max-elements in leaf-list statement."""
         pos += 1
         if pos < len(tokens):
@@ -643,7 +648,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_leaf_list_must(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+    def _parse_leaf_list_must(
+        self, tokens: List[str], pos: int, leaf_list_stmt: Any  # pylint: disable=unused-argument
+    ) -> int:
         """Parse must in leaf-list statement."""
         return self._parse_must(tokens, pos)
 
@@ -663,7 +670,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_container(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
+    def _parse_container(
+        self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None
+    ) -> int:
         """Parse container statement."""
         pos += 1
         if pos >= len(tokens):
@@ -680,13 +689,21 @@ class YangParser:
             while pos < len(tokens) and tokens[pos] != '}':
                 # Safety check to prevent infinite loops
                 if pos == prev_pos:
-                    raise self._make_error(f"Infinite loop detected at position {pos}, token: {tokens[pos] if pos < len(tokens) else 'EOF'}", pos)
+                    token_str = tokens[pos] if pos < len(tokens) else 'EOF'
+                    raise self._make_error(
+                        f"Infinite loop detected at position {pos}, token: {token_str}",
+                        pos
+                    )
                 prev_pos = pos
                 handler = self._container_body_handlers.get(tokens[pos])
                 if handler:
                     new_pos = handler(tokens, pos, container_stmt)
                     if new_pos <= pos:
-                        raise self._make_error(f"Handler for '{tokens[pos]}' did not advance position (was {pos}, now {new_pos})", pos)
+                        raise self._make_error(
+                            f"Handler for '{tokens[pos]}' did not advance position "
+                            f"(was {pos}, now {new_pos})",
+                            pos
+                        )
                     pos = new_pos
                 else:
                     pos += 1
@@ -708,7 +725,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_list(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
+    def _parse_list(
+        self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None
+    ) -> int:
         """Parse list statement."""
         pos += 1
         if pos >= len(tokens):
@@ -745,7 +764,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_leaf(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
+    def _parse_leaf(
+        self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None
+    ) -> int:
         """Parse leaf statement."""
         pos += 1
         if pos >= len(tokens):
@@ -782,7 +803,9 @@ class YangParser:
             pos += 1
         return pos
 
-    def _parse_leaf_list(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
+    def _parse_leaf_list(
+        self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None
+    ) -> int:
         """Parse leaf-list statement."""
         pos += 1
         if pos >= len(tokens):
@@ -851,7 +874,9 @@ class YangParser:
 
         return pos
 
-    def _parse_when(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
+    def _parse_when(
+        self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None
+    ) -> int:
         """Parse when statement."""
         pos += 1
         if pos >= len(tokens):

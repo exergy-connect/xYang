@@ -38,7 +38,10 @@ class YangValidator:
 
         return len(self.errors) == 0, self.errors, self.warnings
 
-    def _validate_structure(self, data: Dict[str, Any], statements: List[YangStatement], context_path: List[str] = None):
+    def _validate_structure(
+        self, data: Dict[str, Any], statements: List[YangStatement],
+        context_path: List[str] = None
+    ):
         """Validate data structure against statements."""
         if context_path is None:
             context_path = []
@@ -61,18 +64,27 @@ class YangValidator:
                 # Container or other composite statement
                 if stmt.name in data:
                     new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
-                    self._validate_structure(data[stmt.name], stmt.statements, context_path=new_path)
-                elif isinstance(stmt, YangContainerStmt) and hasattr(stmt, 'presence') and stmt.presence:
+                    self._validate_structure(
+                        data[stmt.name], stmt.statements, context_path=new_path
+                    )
+                elif (isinstance(stmt, YangContainerStmt) and
+                      hasattr(stmt, 'presence') and stmt.presence):
                     # Presence container - if present in data, validate it
                     if stmt.name in data:
-                        new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
-                        self._validate_structure(data[stmt.name], stmt.statements, context_path=new_path)
+                        new_path = (context_path + [stmt.name]
+                                     if hasattr(stmt, 'name') else context_path)
+                        self._validate_structure(
+                            data[stmt.name], stmt.statements, context_path=new_path
+                        )
 
-    def _validate_leaf(self, data: Dict[str, Any], leaf: YangLeafStmt, context_path: List[str] = None):
+    def _validate_leaf(
+        self, data: Dict[str, Any], leaf: YangLeafStmt,
+        context_path: List[str] = None
+    ):
         """Validate a leaf."""
         if context_path is None:
             context_path = []
-            
+
         if leaf.name not in data:
             if leaf.mandatory:
                 self.errors.append(f"Missing mandatory leaf: {leaf.name}")
@@ -90,28 +102,38 @@ class YangValidator:
                     if not is_valid:
                         self.errors.append(f"Invalid value for leaf {leaf.name}: {error_msg}")
 
-    def _validate_list(self, data: Dict[str, Any], list_stmt: YangListStmt, context_path: List[str] = None):
+    def _validate_list(
+        self, data: Dict[str, Any], list_stmt: YangListStmt,
+        context_path: List[str] = None
+    ):
         """Validate a list."""
         if context_path is None:
             context_path = []
-            
+
         if list_stmt.name in data:
             items = data[list_stmt.name]
             if not isinstance(items, list):
-                self.errors.append(f"Expected list for {list_stmt.name}, got {type(items).__name__}")
+                self.errors.append(
+                    f"Expected list for {list_stmt.name}, got {type(items).__name__}"
+                )
                 return
 
             if list_stmt.min_elements is not None and len(items) < list_stmt.min_elements:
-                self.errors.append(f"List {list_stmt.name} has fewer than {list_stmt.min_elements} elements")
+                self.errors.append(
+                    f"List {list_stmt.name} has fewer than {list_stmt.min_elements} elements"
+                )
 
             if list_stmt.max_elements is not None and len(items) > list_stmt.max_elements:
-                self.errors.append(f"List {list_stmt.name} has more than {list_stmt.max_elements} elements")
+                self.errors.append(
+                    f"List {list_stmt.name} has more than {list_stmt.max_elements} elements"
+                )
 
             # Validate each item
             for item in items:
                 if isinstance(item, dict):
                     # Pass context path for nested validation
-                    item_path = context_path + [list_stmt.name] if context_path else [list_stmt.name]
+                    item_path = (context_path + [list_stmt.name]
+                                  if context_path else [list_stmt.name])
                     self._validate_structure(item, list_stmt.statements, context_path=item_path)
 
     def _validate_leaf_list(self, data: Dict[str, Any], leaf_list: YangLeafListStmt):
@@ -119,21 +141,31 @@ class YangValidator:
         if leaf_list.name in data:
             items = data[leaf_list.name]
             if not isinstance(items, list):
-                self.errors.append(f"Expected list for {leaf_list.name}, got {type(items).__name__}")
+                self.errors.append(
+                    f"Expected list for {leaf_list.name}, got {type(items).__name__}"
+                )
                 return
 
             if leaf_list.min_elements is not None and len(items) < leaf_list.min_elements:
-                self.errors.append(f"Leaf-list {leaf_list.name} has fewer than {leaf_list.min_elements} elements")
+                self.errors.append(
+                    f"Leaf-list {leaf_list.name} has fewer than "
+                    f"{leaf_list.min_elements} elements"
+                )
 
             if leaf_list.max_elements is not None and len(items) > leaf_list.max_elements:
-                self.errors.append(f"Leaf-list {leaf_list.name} has more than {leaf_list.max_elements} elements")
+                self.errors.append(
+                    f"Leaf-list {leaf_list.name} has more than "
+                    f"{leaf_list.max_elements} elements"
+                )
 
             # Validate each item type
             if leaf_list.type:
                 for item in items:
                     is_valid, error_msg = self.type_system.validate(item, leaf_list.type.name)
                     if not is_valid:
-                        self.errors.append(f"Invalid value in leaf-list {leaf_list.name}: {error_msg}")
+                        self.errors.append(
+                            f"Invalid value in leaf-list {leaf_list.name}: {error_msg}"
+                        )
 
     def _validate_must_statements(self, data: Dict[str, Any]):
         """Validate must statements using XPath evaluator."""
@@ -181,17 +213,21 @@ class YangValidator:
             for child in stmt.statements:
                 self._validate_must_in_statement(data, child, evaluator, current_path)
 
-    def _validate_leafref(self, leaf: YangLeafStmt, value: Any, data: Dict[str, Any], context_path: List[str]):
+    def _validate_leafref(
+        self, leaf: YangLeafStmt, value: Any, data: Dict[str, Any],
+        context_path: List[str]
+    ):
         """Validate a leafref value."""
         if not leaf.type or leaf.type.name != 'leafref' or not leaf.type.path:
             return
 
         path = leaf.type.path
-        require_instance = leaf.type.require_instance if hasattr(leaf.type, 'require_instance') else True
+        require_instance = (leaf.type.require_instance
+                             if hasattr(leaf.type, 'require_instance') else True)
 
         # Resolve the path to find the target node in the schema
         target_node = self._resolve_leafref_path(path, context_path)
-        
+
         if target_node is None:
             self.errors.append(
                 f"Invalid leafref value \"{value}\" - no target instance \"{path}\" found in schema"
@@ -206,7 +242,8 @@ class YangValidator:
             target_values = self._get_leafref_target_values(path, validation_data)
             if value not in target_values:
                 self.errors.append(
-                    f"Invalid leafref value \"{value}\" - no target instance \"{path}\" with value \"{value}\""
+                    f"Invalid leafref value \"{value}\" - no target instance "
+                    f"\"{path}\" with value \"{value}\""
                 )
 
     def _resolve_leafref_path(self, path: str, context_path: List[str]) -> Any:
@@ -214,11 +251,11 @@ class YangValidator:
         # Handle absolute paths starting with /
         if path.startswith('/'):
             return self._resolve_absolute_path(path)
-        
+
         # Handle relative paths starting with ../
         if path.startswith('../'):
             return self._resolve_relative_path(path, context_path)
-        
+
         # Handle simple field names (relative to current context)
         return self._resolve_simple_path(path, context_path)
 
@@ -226,14 +263,14 @@ class YangValidator:
         """Resolve an absolute path like /data-model/entities/name."""
         # Remove leading /
         parts = [p for p in path.split('/') if p]
-        
+
         if not parts:
             return None
-        
+
         # Start from module statements
         current_statements = self.module.statements
         last_stmt = None
-        
+
         for i, part in enumerate(parts):
             found = False
             for stmt in current_statements:
@@ -249,19 +286,23 @@ class YangValidator:
                         break
             if not found:
                 return None
-        
+
         return last_stmt
 
-    def _resolve_relative_path(self, path: str, context_path: List[str]) -> Any:
+    def _resolve_relative_path(
+        self, path: str, context_path: List[str]  # pylint: disable=unused-argument
+    ) -> Any:
         """Resolve a relative path like ../field."""
         # For now, simplified - would need full context tracking
         # This is a basic implementation
-        parts = [p for p in path.split('/') if p and p != '..']
+        _ = [p for p in path.split('/') if p and p != '..']  # pylint: disable=unused-variable
         # Navigate up from context_path and then down
         # Simplified: just try to find in current context
         return None  # TODO: Implement full relative path resolution
 
-    def _resolve_simple_path(self, path: str, context_path: List[str]) -> Any:
+    def _resolve_simple_path(
+        self, path: str, context_path: List[str]  # pylint: disable=unused-argument
+    ) -> Any:
         """Resolve a simple path relative to current context."""
         # Try to find in current context statements
         # This is simplified - full implementation would track context
@@ -271,26 +312,24 @@ class YangValidator:
         """Get all values at the target path in the data."""
         # Remove leading /
         parts = [p for p in path.split('/') if p]
-        
+
         if not parts:
             return []
-        
+
         current_data = data
-        values = []
-        
         def collect_values(data_obj: Any, remaining_parts: List[str]) -> List[Any]:
             """Recursively collect values from nested structures."""
             if not remaining_parts:
                 # We've reached the target - collect the value
                 if isinstance(data_obj, list):
                     return data_obj
-                elif data_obj is not None:
+                if data_obj is not None:
                     return [data_obj]
                 return []
-            
+
             part = remaining_parts[0]
             rest = remaining_parts[1:]
-            
+
             if isinstance(data_obj, dict):
                 if part in data_obj:
                     return collect_values(data_obj[part], rest)
@@ -306,7 +345,7 @@ class YangValidator:
                             if key == part:
                                 result.extend(collect_values(value, rest))
                 return result
-            
+
             return []
-        
+
         return collect_values(current_data, parts)

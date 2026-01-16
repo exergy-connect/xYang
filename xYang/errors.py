@@ -6,7 +6,7 @@ Custom exception classes for YANG parsing and validation errors.
 class YangSyntaxError(SyntaxError):
     """YANG syntax error with line number and context."""
 
-    def __init__(self, message: str, line_num: int = None, line: str = None, 
+    def __init__(self, message: str, line_num: int = None, line: str = None,
                  context_lines: list = None, filename: str = None):
         """
         Initialize syntax error.
