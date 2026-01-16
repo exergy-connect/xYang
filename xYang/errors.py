@@ -89,3 +89,14 @@ class XPathSyntaxError(ValueError):
 
     def __str__(self):
         return self.message
+
+
+class XPathEvaluationError(ValueError):
+    """XPath evaluation error."""
+    
+    def __init__(self, message: str):
+        self.message = message
+        super().__init__(message)
+    
+    def __str__(self):
+        return self.message

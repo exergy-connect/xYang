@@ -3,8 +3,9 @@ YANG type system implementation.
 """
 
 import re
-from typing import Any, Optional, Dict, List
+from typing import Any, Optional, Dict, List, Callable
 from dataclasses import dataclass
+from functools import lru_cache
 
 
 @dataclass
@@ -27,21 +28,44 @@ class TypeSystem:
     def __init__(self):
         self.typedefs: Dict[str, 'TypeDefinition'] = {}
         self._pattern_cache: Dict[str, re.Pattern] = {}  # Cache compiled regex patterns
+        self._validators: Dict[str, Callable] = {}
         self._init_builtin_types()
+        # Register built-in validators after all methods are defined
+        # This is done lazily on first use to avoid forward reference issues
+        if not self._validators:
+            self._register_builtin_validators()
 
     def _init_builtin_types(self):
         """Initialize built-in YANG types."""
-        # Built-in types are handled directly
+        # Register built-in type validators
+        # Note: These are registered after class definition to avoid forward reference issues
         pass
+    
+    def _register_builtin_validators(self):
+        """Register built-in type validators (called after all methods are defined)."""
+        self.register_type('string', self._validate_string)
+        self.register_type('int32', self._validate_int32)
+        self.register_type('uint8', self._validate_uint8)
+        self.register_type('boolean', self._validate_boolean)
+        self.register_type('decimal64', self._validate_decimal64)
+    
+    def register_type(self, name: str, validator: Callable):
+        """
+        Register a type validator.
+        
+        Args:
+            name: Type name
+            validator: Validator function that takes (value, constraints) and returns (bool, Optional[str])
+        """
+        self._validators[name] = validator
 
+    @lru_cache(maxsize=128)
     def _get_compiled_pattern(self, pattern: str) -> Optional[re.Pattern]:
         """Get or compile a regex pattern with caching."""
-        if pattern not in self._pattern_cache:
-            try:
-                self._pattern_cache[pattern] = re.compile(pattern)
-            except re.error:
-                return None
-        return self._pattern_cache.get(pattern)
+        try:
+            return re.compile(pattern)
+        except re.error:
+            return None
 
     def register_typedef(self, name: str, base_type: str, constraints: Optional[TypeConstraint] = None):
         """Register a typedef."""
@@ -59,19 +83,12 @@ class TypeSystem:
             typedef = self.typedefs[type_name]
             return self.validate(value, typedef.base_type, typedef.constraints)
 
-        # Validate based on base type
-        if type_name == 'string':
-            return self._validate_string(value, constraints)
-        elif type_name == 'int32':
-            return self._validate_int32(value, constraints)
-        elif type_name == 'uint8':
-            return self._validate_uint8(value, constraints)
-        elif type_name == 'boolean':
-            return self._validate_boolean(value, constraints)
-        elif type_name == 'decimal64':
-            return self._validate_decimal64(value, constraints)
-        else:
-            return True, None  # Unknown type, assume valid
+        # Use registered validator if available
+        if type_name in self._validators:
+            return self._validators[type_name](value, constraints)
+        
+        # Unknown type - fail closed instead of assuming valid
+        return False, f"Unknown type: {type_name}"
 
     def _validate_string(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
         """Validate string value."""

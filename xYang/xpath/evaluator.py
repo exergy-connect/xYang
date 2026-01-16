@@ -14,6 +14,7 @@ from typing import Any, Dict, List
 
 from .parser import XPathTokenizer, XPathParser
 from .ast import PathNode, FunctionCallNode, BinaryOpNode, UnaryOpNode
+from ..errors import XPathSyntaxError
 
 
 class XPathEvaluator:
@@ -45,9 +46,13 @@ class XPathEvaluator:
             if isinstance(result, str):
                 return bool(result)
             return False
-        except Exception:  # pylint: disable=broad-except
-            # If evaluation fails, return False (constraint not satisfied)
-            return False
+        except XPathSyntaxError:
+            # Re-raise syntax errors
+            raise
+        except Exception as e:
+            # For other errors, raise a more specific exception
+            from ..errors import XPathEvaluationError
+            raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
 
     def evaluate_value(self, expression: str) -> Any:
         """Evaluate an XPath expression and return the raw value."""
@@ -60,9 +65,13 @@ class XPathEvaluator:
 
             # Evaluate AST
             return ast.evaluate(self)
-        except Exception:  # pylint: disable=broad-except
-            # If evaluation fails, return None
-            return None
+        except XPathSyntaxError:
+            # Re-raise syntax errors
+            raise
+        except Exception as e:
+            # For other errors, raise a more specific exception
+            from ..errors import XPathEvaluationError
+            raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
 
 
     def _evaluate_function_node(self, node: FunctionCallNode) -> Any:
