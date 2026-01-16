@@ -63,6 +63,56 @@ class YangParser:
             'list': self._parse_list,
             'leaf-list': self._parse_leaf_list,
         }
+        
+        # Revision body parse handlers - created once per instance
+        self._revision_body_handlers: dict[str, Any] = {
+            'description': self._parse_revision_description,
+        }
+        
+        # Typedef body parse handlers - created once per instance
+        self._typedef_body_handlers: dict[str, Any] = {
+            'type': self._parse_typedef_type,
+            'description': self._parse_description_with_parent,
+        }
+        
+        # List body parse handlers - created once per instance
+        self._list_body_handlers: dict[str, Any] = {
+            'key': self._parse_list_key,
+            'min-elements': self._parse_list_min_elements,
+            'max-elements': self._parse_list_max_elements,
+            'description': self._parse_description_with_parent,
+            'when': self._parse_when,
+            'leaf': self._parse_leaf,
+            'container': self._parse_container,
+            'list': self._parse_list,
+            'leaf-list': self._parse_leaf_list,
+            'must': self._parse_list_must,
+        }
+        
+        # Leaf body parse handlers - created once per instance
+        self._leaf_body_handlers: dict[str, Any] = {
+            'type': self._parse_leaf_type,
+            'mandatory': self._parse_leaf_mandatory,
+            'default': self._parse_leaf_default,
+            'description': self._parse_description_with_parent,
+            'must': self._parse_leaf_must,
+            'when': self._parse_when,
+        }
+        
+        # Leaf-list body parse handlers - created once per instance
+        self._leaf_list_body_handlers: dict[str, Any] = {
+            'type': self._parse_leaf_list_type,
+            'min-elements': self._parse_leaf_list_min_elements,
+            'max-elements': self._parse_leaf_list_max_elements,
+            'description': self._parse_description_with_parent,
+            'must': self._parse_leaf_list_must,
+        }
+        
+        # Must body parse handlers - created once per instance
+        self._must_body_handlers: dict[str, Any] = {
+            'error-message': self._parse_must_error_message,
+            'description': self._parse_description_with_parent,
+        }
 
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file."""
@@ -357,10 +407,9 @@ class YangParser:
             typedef_stmt = YangTypedefStmt(name=typedef_name)
 
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'type':
-                    pos = self._parse_type(tokens, pos, typedef_stmt)
-                elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos, typedef_stmt)
+                handler = self._typedef_body_handlers.get(tokens[pos])
+                if handler:
+                    pos = handler(tokens, pos, typedef_stmt)
                 else:
                     pos += 1
 
@@ -501,6 +550,111 @@ class YangParser:
         """Wrapper for _parse_description that accepts parent parameter."""
         return self._parse_description(tokens, pos, parent)
 
+    def _parse_revision_description(self, tokens: List[str], pos: int, revision: dict) -> int:
+        """Parse description in revision statement."""
+        pos += 1
+        if pos < len(tokens):
+            revision['description'] = tokens[pos].strip('"\'')
+            pos += 1
+        return pos
+
+    def _parse_typedef_type(self, tokens: List[str], pos: int, typedef_stmt: Any) -> int:
+        """Parse type in typedef statement."""
+        return self._parse_type(tokens, pos, typedef_stmt)
+
+    def _parse_list_key(self, tokens: List[str], pos: int, list_stmt: Any) -> int:
+        """Parse key in list statement."""
+        pos += 1
+        if pos < len(tokens):
+            list_stmt.key = tokens[pos].strip('"\'')
+            pos += 1
+        return pos
+
+    def _parse_list_min_elements(self, tokens: List[str], pos: int, list_stmt: Any) -> int:
+        """Parse min-elements in list statement."""
+        pos += 1
+        if pos < len(tokens):
+            list_stmt.min_elements = int(tokens[pos])
+            pos += 1
+        return pos
+
+    def _parse_list_max_elements(self, tokens: List[str], pos: int, list_stmt: Any) -> int:
+        """Parse max-elements in list statement."""
+        pos += 1
+        if pos < len(tokens):
+            list_stmt.max_elements = int(tokens[pos])
+            pos += 1
+        return pos
+
+    def _parse_list_must(self, tokens: List[str], pos: int, list_stmt: Any) -> int:
+        """Parse must in list statement."""
+        must_stmt = YangMustStmt(expression="")
+        pos = self._parse_must(tokens, pos)
+        if not hasattr(list_stmt, 'must_statements'):
+            list_stmt.must_statements = []
+        list_stmt.must_statements.append(must_stmt)
+        return pos
+
+    def _parse_leaf_type(self, tokens: List[str], pos: int, leaf_stmt: Any) -> int:
+        """Parse type in leaf statement."""
+        return self._parse_type(tokens, pos, leaf_stmt)
+
+    def _parse_leaf_mandatory(self, tokens: List[str], pos: int, leaf_stmt: Any) -> int:
+        """Parse mandatory in leaf statement."""
+        pos += 1
+        if pos < len(tokens):
+            mandatory_val = tokens[pos]
+            leaf_stmt.mandatory = mandatory_val == 'true'
+            pos += 1
+        return pos
+
+    def _parse_leaf_default(self, tokens: List[str], pos: int, leaf_stmt: Any) -> int:
+        """Parse default in leaf statement."""
+        pos += 1
+        if pos < len(tokens):
+            leaf_stmt.default = tokens[pos].strip('"\'')
+            pos += 1
+        return pos
+
+    def _parse_leaf_must(self, tokens: List[str], pos: int, leaf_stmt: Any) -> int:
+        """Parse must in leaf statement."""
+        must_stmt = YangMustStmt(expression="")
+        pos = self._parse_must(tokens, pos)
+        leaf_stmt.must_statements.append(must_stmt)
+        return pos
+
+    def _parse_leaf_list_type(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+        """Parse type in leaf-list statement."""
+        return self._parse_type(tokens, pos, leaf_list_stmt)
+
+    def _parse_leaf_list_min_elements(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+        """Parse min-elements in leaf-list statement."""
+        pos += 1
+        if pos < len(tokens):
+            leaf_list_stmt.min_elements = int(tokens[pos])
+            pos += 1
+        return pos
+
+    def _parse_leaf_list_max_elements(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+        """Parse max-elements in leaf-list statement."""
+        pos += 1
+        if pos < len(tokens):
+            leaf_list_stmt.max_elements = int(tokens[pos])
+            pos += 1
+        return pos
+
+    def _parse_leaf_list_must(self, tokens: List[str], pos: int, leaf_list_stmt: Any) -> int:
+        """Parse must in leaf-list statement."""
+        return self._parse_must(tokens, pos)
+
+    def _parse_must_error_message(self, tokens: List[str], pos: int, must_stmt: Any) -> int:
+        """Parse error-message in must statement."""
+        pos += 1
+        if pos < len(tokens):
+            must_stmt.error_message = tokens[pos].strip('"\'')
+            pos += 1
+        return pos
+
     def _parse_presence(self, tokens: List[str], pos: int, parent: Any) -> int:
         """Parse presence statement for container."""
         pos += 1
@@ -568,39 +722,9 @@ class YangParser:
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'key':
-                    pos += 1
-                    if pos < len(tokens):
-                        list_stmt.key = tokens[pos].strip('"\'')
-                        pos += 1
-                elif tokens[pos] == 'min-elements':
-                    pos += 1
-                    if pos < len(tokens):
-                        list_stmt.min_elements = int(tokens[pos])
-                        pos += 1
-                elif tokens[pos] == 'max-elements':
-                    pos += 1
-                    if pos < len(tokens):
-                        list_stmt.max_elements = int(tokens[pos])
-                        pos += 1
-                elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos, list_stmt)
-                elif tokens[pos] == 'when':
-                    pos = self._parse_when(tokens, pos, list_stmt)
-                elif tokens[pos] == 'leaf':
-                    pos = self._parse_leaf(tokens, pos, list_stmt)
-                elif tokens[pos] == 'container':
-                    pos = self._parse_container(tokens, pos, list_stmt)
-                elif tokens[pos] == 'list':
-                    pos = self._parse_list(tokens, pos, list_stmt)
-                elif tokens[pos] == 'leaf-list':
-                    pos = self._parse_leaf_list(tokens, pos, list_stmt)
-                elif tokens[pos] == 'must':
-                    must_stmt = YangMustStmt(expression="")
-                    pos = self._parse_must(tokens, pos)
-                    if not hasattr(list_stmt, 'must_statements'):
-                        list_stmt.must_statements = []
-                    list_stmt.must_statements.append(must_stmt)
+                handler = self._list_body_handlers.get(tokens[pos])
+                if handler:
+                    pos = handler(tokens, pos, list_stmt)
                 else:
                     pos += 1
 
@@ -635,27 +759,9 @@ class YangParser:
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'type':
-                    pos = self._parse_type(tokens, pos, leaf_stmt)
-                elif tokens[pos] == 'mandatory':
-                    pos += 1
-                    if pos < len(tokens):
-                        mandatory_val = tokens[pos]
-                        leaf_stmt.mandatory = mandatory_val == 'true'
-                        pos += 1
-                elif tokens[pos] == 'default':
-                    pos += 1
-                    if pos < len(tokens):
-                        leaf_stmt.default = tokens[pos].strip('"\'')
-                        pos += 1
-                elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos, leaf_stmt)
-                elif tokens[pos] == 'must':
-                    must_stmt = YangMustStmt(expression="")
-                    pos = self._parse_must(tokens, pos)
-                    leaf_stmt.must_statements.append(must_stmt)
-                elif tokens[pos] == 'when':
-                    pos = self._parse_when(tokens, pos, leaf_stmt)
+                handler = self._leaf_body_handlers.get(tokens[pos])
+                if handler:
+                    pos = handler(tokens, pos, leaf_stmt)
                 else:
                     pos += 1
 
@@ -690,22 +796,9 @@ class YangParser:
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'type':
-                    pos = self._parse_type(tokens, pos, leaf_list_stmt)
-                elif tokens[pos] == 'min-elements':
-                    pos += 1
-                    if pos < len(tokens):
-                        leaf_list_stmt.min_elements = int(tokens[pos])
-                        pos += 1
-                elif tokens[pos] == 'max-elements':
-                    pos += 1
-                    if pos < len(tokens):
-                        leaf_list_stmt.max_elements = int(tokens[pos])
-                        pos += 1
-                elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos, leaf_list_stmt)
-                elif tokens[pos] == 'must':
-                    pos = self._parse_must(tokens, pos)
+                handler = self._leaf_list_body_handlers.get(tokens[pos])
+                if handler:
+                    pos = handler(tokens, pos, leaf_list_stmt)
                 else:
                     pos += 1
 
@@ -747,13 +840,9 @@ class YangParser:
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
             while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'error-message':
-                    pos += 1
-                    if pos < len(tokens):
-                        must_stmt.error_message = tokens[pos].strip('"\'')
-                        pos += 1
-                elif tokens[pos] == 'description':
-                    pos = self._parse_description(tokens, pos, must_stmt)
+                handler = self._must_body_handlers.get(tokens[pos])
+                if handler:
+                    pos = handler(tokens, pos, must_stmt)
                 else:
                     pos += 1
 
