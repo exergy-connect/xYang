@@ -4,7 +4,7 @@ YANG parser implementation.
 Parses YANG module files and builds an in-memory representation.
 """
 
-from typing import List, Optional, Any, Tuple
+from typing import List, Optional, Any, Tuple, Union
 from pathlib import Path
 
 from .module import YangModule
@@ -39,6 +39,18 @@ class YangParser:
             'prefix': self._parse_prefix,
             'organization': self._parse_organization,
             'contact': self._parse_contact,
+        }
+        
+        # Type constraint parse handlers - created once per instance
+        self._type_constraint_handlers: dict[str, Any] = {
+            'pattern': self._parse_type_pattern,
+            'length': self._parse_type_length,
+            'range': self._parse_type_range,
+            'fraction-digits': self._parse_type_fraction_digits,
+            'enum': self._parse_type_enum,
+            'path': self._parse_type_path,
+            'require-instance': self._parse_type_require_instance,
+            'type': self._parse_type_nested,
         }
 
     def parse_file(self, file_path: Path) -> YangModule:
@@ -362,55 +374,13 @@ class YangParser:
                         break
                 
                 if brace_depth == 1:  # Only process at the current level
-                    if tokens[pos] == 'pattern':
-                        pos += 1
-                        if pos < len(tokens):
-                            pattern = tokens[pos].strip('"\'')
-                            type_stmt.pattern = pattern
-                            pos += 1
-                    elif tokens[pos] == 'length':
-                        pos += 1
-                        if pos < len(tokens):
-                            length = tokens[pos].strip('"\'')
-                            type_stmt.length = length
-                            pos += 1
-                    elif tokens[pos] == 'range':
-                        pos += 1
-                        if pos < len(tokens):
-                            range_val = tokens[pos].strip('"\'')
-                            type_stmt.range = range_val
-                            pos += 1
-                    elif tokens[pos] == 'fraction-digits':
-                        pos += 1
-                        if pos < len(tokens):
-                            type_stmt.fraction_digits = int(tokens[pos])
-                            pos += 1
-                    elif tokens[pos] == 'enum':
-                        pos += 1
-                        enum_name = tokens[pos] if pos < len(tokens) else None
-                        if enum_name:
-                            type_stmt.enums.append(enum_name)
-                            pos += 1
-                    elif tokens[pos] == 'path':
-                        pos += 1
-                        if pos < len(tokens):
-                            path = tokens[pos].strip('"\'')
-                            type_stmt.path = path
-                            pos += 1
-                    elif tokens[pos] == 'require-instance':
-                        pos += 1
-                        if pos < len(tokens):
-                            require_instance = tokens[pos].strip('"\'')
-                            type_stmt.require_instance = require_instance == 'true'
-                            pos += 1
-                    elif tokens[pos] == 'type':
-                        # Handle nested type statements (for union types)
-                        nested_type_stmt = YangTypeStmt(name="")
-                        pos = self._parse_type(tokens, pos, nested_type_stmt)
-                        if not hasattr(type_stmt, 'types'):
-                            type_stmt.types = []
-                        type_stmt.types.append(nested_type_stmt)
-                        continue  # Don't increment pos again
+                    handler = self._type_constraint_handlers.get(tokens[pos])
+                    if handler:
+                        result = handler(tokens, pos, type_stmt)
+                        if result is None:
+                            # Special case: 'type' handler returns None to signal continue
+                            continue
+                        pos = result
                     else:
                         pos += 1
                 else:
@@ -436,6 +406,78 @@ class YangParser:
         if pos < len(tokens) and tokens[pos] == ';':
             pos += 1
         return pos
+
+    def _parse_type_pattern(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse pattern constraint."""
+        pos += 1
+        if pos < len(tokens):
+            pattern = tokens[pos].strip('"\'')
+            type_stmt.pattern = pattern
+            pos += 1
+        return pos
+
+    def _parse_type_length(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse length constraint."""
+        pos += 1
+        if pos < len(tokens):
+            length = tokens[pos].strip('"\'')
+            type_stmt.length = length
+            pos += 1
+        return pos
+
+    def _parse_type_range(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse range constraint."""
+        pos += 1
+        if pos < len(tokens):
+            range_val = tokens[pos].strip('"\'')
+            type_stmt.range = range_val
+            pos += 1
+        return pos
+
+    def _parse_type_fraction_digits(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse fraction-digits constraint."""
+        pos += 1
+        if pos < len(tokens):
+            type_stmt.fraction_digits = int(tokens[pos])
+            pos += 1
+        return pos
+
+    def _parse_type_enum(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse enum constraint."""
+        pos += 1
+        enum_name = tokens[pos] if pos < len(tokens) else None
+        if enum_name:
+            type_stmt.enums.append(enum_name)
+            pos += 1
+        return pos
+
+    def _parse_type_path(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse path constraint (for leafref)."""
+        pos += 1
+        if pos < len(tokens):
+            path = tokens[pos].strip('"\'')
+            type_stmt.path = path
+            pos += 1
+        return pos
+
+    def _parse_type_require_instance(self, tokens: List[str], pos: int, type_stmt: Any) -> int:
+        """Parse require-instance constraint (for leafref)."""
+        pos += 1
+        if pos < len(tokens):
+            require_instance = tokens[pos].strip('"\'')
+            type_stmt.require_instance = require_instance == 'true'
+            pos += 1
+        return pos
+
+    def _parse_type_nested(self, tokens: List[str], pos: int, type_stmt: Any) -> Optional[int]:
+        """Parse nested type statement (for union types). Returns None to signal continue."""
+        # Handle nested type statements (for union types)
+        nested_type_stmt = YangTypeStmt(name="")
+        pos = self._parse_type(tokens, pos, nested_type_stmt)
+        if not hasattr(type_stmt, 'types'):
+            type_stmt.types = []
+        type_stmt.types.append(nested_type_stmt)
+        return None  # Signal to continue without incrementing pos
 
     def _parse_container(self, tokens: List[str], pos: int, parent: Optional[YangStatement] = None) -> int:
         """Parse container statement."""
