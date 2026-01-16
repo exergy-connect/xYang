@@ -356,35 +356,66 @@ class YangParser:
 
         if pos < len(tokens) and tokens[pos] == '{':
             pos += 1
-            while pos < len(tokens) and tokens[pos] != '}':
-                if tokens[pos] == 'pattern':
-                    pos += 1
-                    if pos < len(tokens):
-                        pattern = tokens[pos].strip('"\'')
-                        type_stmt.pattern = pattern
+            brace_depth = 1  # Track nested braces for union types
+            while pos < len(tokens) and brace_depth > 0:
+                if tokens[pos] == '{':
+                    brace_depth += 1
+                elif tokens[pos] == '}':
+                    brace_depth -= 1
+                    if brace_depth == 0:
+                        break
+                
+                if brace_depth == 1:  # Only process at the current level
+                    if tokens[pos] == 'pattern':
                         pos += 1
-                elif tokens[pos] == 'length':
-                    pos += 1
-                    if pos < len(tokens):
-                        length = tokens[pos].strip('"\'')
-                        type_stmt.length = length
+                        if pos < len(tokens):
+                            pattern = tokens[pos].strip('"\'')
+                            type_stmt.pattern = pattern
+                            pos += 1
+                    elif tokens[pos] == 'length':
                         pos += 1
-                elif tokens[pos] == 'range':
-                    pos += 1
-                    if pos < len(tokens):
-                        range_val = tokens[pos].strip('"\'')
-                        type_stmt.range = range_val
+                        if pos < len(tokens):
+                            length = tokens[pos].strip('"\'')
+                            type_stmt.length = length
+                            pos += 1
+                    elif tokens[pos] == 'range':
                         pos += 1
-                elif tokens[pos] == 'fraction-digits':
-                    pos += 1
-                    if pos < len(tokens):
-                        type_stmt.fraction_digits = int(tokens[pos])
+                        if pos < len(tokens):
+                            range_val = tokens[pos].strip('"\'')
+                            type_stmt.range = range_val
+                            pos += 1
+                    elif tokens[pos] == 'fraction-digits':
                         pos += 1
-                elif tokens[pos] == 'enum':
-                    pos += 1
-                    enum_name = tokens[pos] if pos < len(tokens) else None
-                    if enum_name:
-                        type_stmt.enums.append(enum_name)
+                        if pos < len(tokens):
+                            type_stmt.fraction_digits = int(tokens[pos])
+                            pos += 1
+                    elif tokens[pos] == 'enum':
+                        pos += 1
+                        enum_name = tokens[pos] if pos < len(tokens) else None
+                        if enum_name:
+                            type_stmt.enums.append(enum_name)
+                            pos += 1
+                    elif tokens[pos] == 'path':
+                        pos += 1
+                        if pos < len(tokens):
+                            path = tokens[pos].strip('"\'')
+                            type_stmt.path = path
+                            pos += 1
+                    elif tokens[pos] == 'require-instance':
+                        pos += 1
+                        if pos < len(tokens):
+                            require_instance = tokens[pos].strip('"\'')
+                            type_stmt.require_instance = require_instance == 'true'
+                            pos += 1
+                    elif tokens[pos] == 'type':
+                        # Handle nested type statements (for union types)
+                        nested_type_stmt = YangTypeStmt(name="")
+                        pos = self._parse_type(tokens, pos, nested_type_stmt)
+                        if not hasattr(type_stmt, 'types'):
+                            type_stmt.types = []
+                        type_stmt.types.append(nested_type_stmt)
+                        continue  # Don't increment pos again
+                    else:
                         pos += 1
                 else:
                     pos += 1
@@ -392,10 +423,19 @@ class YangParser:
             if pos < len(tokens) and tokens[pos] == '}':
                 pos += 1
 
-        if hasattr(parent, 'type'):
+        if hasattr(parent, 'type') and not parent.type:
             parent.type = type_stmt
         elif hasattr(parent, 'types'):
+            if not hasattr(parent, 'types') or parent.types is None:
+                parent.types = []
             parent.types.append(type_stmt)
+        elif hasattr(parent, 'type'):
+            # For union types, add to types list
+            if not hasattr(type_stmt, 'types'):
+                type_stmt.types = []
+            if not hasattr(parent.type, 'types'):
+                parent.type.types = []
+            parent.type.types.append(type_stmt)
 
         if pos < len(tokens) and tokens[pos] == ';':
             pos += 1
