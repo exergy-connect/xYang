@@ -12,8 +12,8 @@ xYang implements only the YANG features actually used in `meta-model.yang`:
 - **Derived Types**: enumeration, union
 - **Data Structures**: Container, list, leaf, and leaf-list statements
 - **Constraints**: 
-  - `must` statements (parsed but not evaluated - requires full XPath engine)
-  - `when` conditions (parsed but not evaluated)
+  - `must` statements (evaluated using XPath)
+  - `when` conditions (evaluated using XPath)
   - `mandatory`, `default`, `min-elements`, `max-elements`
   - Type constraints: `pattern`, `length`, `range`, `fraction-digits`
 - **Type References**: Leafref with path and require-instance
@@ -33,7 +33,7 @@ pip install -e .
 from xYang import parse_yang_file, parse_yang_string
 
 # Parse from file
-module = parse_yang_file("test/meta-model.yang")
+module = parse_yang_file("examples/meta-model.yang")
 
 # Parse from string
 yang_content = """
@@ -63,7 +63,7 @@ print(f"Prefix: {module.prefix}")
 from xYang import parse_yang_file, YangValidator
 
 # Parse module
-module = parse_yang_file("test/meta-model.yang")
+module = parse_yang_file("examples/meta-model.yang")
 
 # Create validator
 validator = YangValidator(module)
@@ -92,7 +92,8 @@ if not is_valid:
 ### Working with Types
 
 ```python
-from xYang import TypeSystem, TypeConstraint
+from xYang import TypeSystem
+from xYang.types import TypeConstraint
 
 # Create type system
 type_system = TypeSystem()
@@ -119,9 +120,19 @@ xYang/
 │   ├── module.py        # Module representation
 │   ├── ast.py           # Abstract syntax tree nodes
 │   ├── types.py         # Type system
-│   └── validator.py     # Validation engine
-├── test/
+│   ├── validator.py     # Validation engine
+│   ├── xpath.py         # XPath evaluator
+│   ├── errors.py        # Error classes
+│   └── xpath/           # XPath implementation
+│       ├── __init__.py
+│       ├── parser.py    # XPath parser
+│       ├── ast.py       # XPath AST nodes
+│       └── evaluator.py # XPath evaluator
+├── examples/
+│   ├── basic_usage.py   # Usage examples
 │   └── meta-model.yang  # Example YANG module
+├── tests/               # Test suite
+├── benchmarks/          # Performance benchmarks
 ├── setup.py
 └── README.md
 ```
@@ -153,7 +164,22 @@ container item_type {
 }
 ```
 
-If `../type = 'array'` is false, the `item_type` container is not validated and is treated as optional.
+If `../type = 'array'` is false, the `item_type` container is not validated and is treated as optional. The `when` conditions are evaluated using the XPath evaluator.
+
+## Must Statements
+
+xYang supports `must` statements for constraint validation. `must` statements are evaluated using XPath and validation fails if any `must` constraint evaluates to `false`:
+
+```yang
+leaf minDate {
+  type date;
+  must "not(../maxDate) or . <= ../maxDate" {
+    error-message "minDate must be less than or equal to maxDate";
+  }
+}
+```
+
+If a `must` constraint fails, validation returns an error with the specified error message.
 
 ## Limitations
 
