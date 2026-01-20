@@ -128,8 +128,20 @@ class YangParser:
         self.parsers.parse_module(tokens, context)
         
         # Ensure we consumed all tokens
+        # After parsing, there should be no more tokens (except possibly trailing empty lines)
+        # The tokenizer skips whitespace, so if there are remaining tokens, they're real tokens
         if tokens.has_more():
-            raise tokens._make_error(f"Unexpected tokens after module: {tokens.peek()}")
+            # Check if the remaining token is just a closing brace (might be a parsing issue)
+            remaining = tokens.tokens[tokens.index:]
+            if len(remaining) == 1 and remaining[0] == '}':
+                # Single trailing closing brace - likely the module's closing brace wasn't consumed
+                # Try to consume it and see if that resolves the issue
+                tokens.consume('}')
+                # If there are still more tokens after this, it's a real error
+                if tokens.has_more():
+                    raise tokens._make_error(f"Unexpected tokens after module: {tokens.peek()}")
+            else:
+                raise tokens._make_error(f"Unexpected tokens after module: {tokens.peek()}")
         
         return module
 

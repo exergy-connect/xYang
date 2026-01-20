@@ -355,6 +355,12 @@ class XPathParser:
             operand = self._parse_unary()
             return UnaryOpNode('-', operand)
 
+        # Unary plus (explicit positive, usually no-op but we support it)
+        if token.type == TokenType.OPERATOR and token.value == '+':
+            self._consume()
+            operand = self._parse_unary()
+            return operand  # Unary + is a no-op, just return the operand
+
         # Unary not
         if token.type == TokenType.IDENTIFIER and token.value.lower() == 'not':
             self._consume()

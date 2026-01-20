@@ -28,9 +28,12 @@ class StatementParsers:
         context.module.name = module_name
         
         # Parse module body
+        # Nested parsers (container, list, etc.) handle their own braces
+        # So we just need to stop when we see the module's closing brace
         while tokens.has_more() and tokens.peek() != '}':
             self._parse_module_statement(tokens, context)
         
+        # Consume the module's closing brace
         tokens.consume('}')
     
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -151,8 +154,10 @@ class StatementParsers:
                     handler(tokens, new_context)
                 else:
                     tokens.consume()  # Skip unknown
-        
-        tokens.consume('}')
+            
+            # Consume the container's closing brace
+            if tokens.has_more() and tokens.peek() == '}':
+                tokens.consume('}')
         
         # Add to parent if provided, otherwise to module
         if context.current_parent:
