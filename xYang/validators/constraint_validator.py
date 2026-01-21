@@ -65,11 +65,17 @@ class ConstraintValidator:
         
         # Update evaluator context
         evaluator.context_path = current_path
+        # Preserve original context for current() function
+        if not hasattr(evaluator, 'original_context_path') or not evaluator.original_context_path:
+            evaluator.original_context_path = current_path
+            evaluator.original_data = data
         if current_path:
             # Try to get current data context
             current_data = data
             for p in current_path:
                 if isinstance(current_data, dict) and p in current_data:
+                    current_data = current_data[p]
+                elif isinstance(current_data, list) and isinstance(p, int) and 0 <= p < len(current_data):
                     current_data = current_data[p]
                 else:
                     current_data = None
@@ -91,6 +97,11 @@ class ConstraintValidator:
             
             for must in stmt.must_statements:
                 try:
+                    # Preserve original context for current() function before evaluation
+                    # This ensures current() refers to the field being validated, not the predicate context
+                    evaluator.original_context_path = evaluator.context_path.copy() if evaluator.context_path else []
+                    # Use root_data for original_data so current() can resolve correctly
+                    evaluator.original_data = evaluator.root_data if hasattr(evaluator, 'root_data') else (evaluator.data if hasattr(evaluator, 'data') else data)
                     result = evaluator.evaluate(must.expression)
                     if not result:
                         error_msg = must.error_message or f"Must constraint failed for {stmt.name}"

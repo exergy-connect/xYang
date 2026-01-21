@@ -33,6 +33,8 @@ class XPathEvaluator:
         self.root_data = data  # Store root data for absolute path resolution
         self.module = module
         self.context_path = context_path or []
+        self.original_context_path = context_path or []  # Preserve original context for current()
+        self.original_data = data  # Preserve original data for current()
         self.leafref_cache: Dict[str, Any] = {}  # Cache for deref() results
 
     def evaluate(self, expression: str) -> bool:
@@ -95,6 +97,24 @@ class XPathEvaluator:
                     return len(arg_value)
                 return 0
 
+        # For deref(), we need the path expression, not the evaluated value
+        if func_name == 'deref':
+            if len(node.args) == 1:
+                arg_node = node.args[0]
+                # Extract path string from PathNode before evaluating
+                if isinstance(arg_node, PathNode):
+                    # It's a PathNode - build path string from steps
+                    if arg_node.is_absolute:
+                        path = '/' + '/'.join(arg_node.steps)
+                    else:
+                        path = '/'.join(arg_node.steps)
+                else:
+                    # Evaluate to get the path value, then use as path string
+                    arg_value = arg_node.evaluate(self) if hasattr(arg_node, 'evaluate') else str(arg_node)
+                    path = str(arg_value) if arg_value is not None else ''
+                return self._evaluate_deref(path)
+            return None
+
         # For other functions, evaluate arguments normally
         args = [arg.evaluate(self) for arg in node.args]
 
@@ -124,11 +144,6 @@ class XPathEvaluator:
                     result = result.translate(trans_dict)
                 return result
 
-        elif func_name == 'deref':
-            if len(args) == 1:
-                path = str(args[0] or '')
-                return self._evaluate_deref(path)
-            return None
 
         if func_name == 'current':
             return self._get_current_value()
@@ -184,8 +199,112 @@ class XPathEvaluator:
     def _evaluate_binary_op(self, node: BinaryOpNode) -> Any:
         """Evaluate a binary operator node."""
         left = node.left.evaluate(self)
-        right = node.right.evaluate(self)
         op = node.operator
+
+        # Special case: if left is a dict and op is '/', treat as path navigation
+        # Extract the full path from nested BinaryOpNodes and evaluate as a single path
+        if op == '/' and isinstance(left, dict):
+            old_data = self.data
+            old_context = self.context_path
+            try:
+                # Set the node as the current data context
+                self.data = left
+                self.context_path = []
+                # Extract path from nested binary ops or evaluate as path node
+                if isinstance(node.right, BinaryOpNode) and node.right.operator == '/':
+                    # Nested path - extract all path parts from the right side
+                    path_parts = self._extract_path_from_binary_op(node.right)
+                    if path_parts:
+                        # Build path string, handling PathNode objects
+                        path_str_parts = []
+                        for part in path_parts:
+                            if isinstance(part, str):
+                                path_str_parts.append(part)
+                            elif hasattr(part, 'steps'):
+                                # It's a PathNode
+                                path_str_parts.extend(part.steps)
+                            else:
+                                # Try to evaluate
+                                try:
+                                    val = part.evaluate(self) if hasattr(part, 'evaluate') else str(part)
+                                    if val:
+                                        path_str_parts.append(str(val))
+                                except:
+                                    pass
+                        if path_str_parts:
+                            path_str = '/'.join(path_str_parts)
+                            result = self._evaluate_path(path_str)
+                        else:
+                            result = None
+                    else:
+                        result = None
+                elif hasattr(node.right, 'steps'):
+                    # It's a PathNode - evaluate it directly
+                    result = node.right.evaluate(self)
+                else:
+                    # Try to evaluate and treat as path
+                    right_val = node.right.evaluate(self)
+                    if isinstance(right_val, str):
+                        result = self._evaluate_path(right_val)
+                    else:
+                        result = right_val
+                return result
+            finally:
+                self.data = old_data
+                self.context_path = old_context
+        
+        # Also handle nested BinaryOpNodes: if left is a BinaryOpNode that evaluates to a dict
+        if op == '/' and isinstance(node.left, BinaryOpNode):
+            # Evaluate left first to see if it's a dict
+            left_result = node.left.evaluate(self)
+            if isinstance(left_result, dict):
+                # Left evaluated to a dict (node), treat / as path navigation
+                old_data = self.data
+                old_context = self.context_path
+                try:
+                    self.data = left_result
+                    self.context_path = []
+                    # Extract path from right side - handle nested BinaryOpNodes
+                    if isinstance(node.right, BinaryOpNode) and node.right.operator == '/':
+                        # Build full path by extracting from nested structure
+                        path_parts = self._extract_path_from_binary_op(node.right)
+                        # Convert path parts to string steps
+                        path_steps = []
+                        for part in path_parts:
+                            if isinstance(part, str):
+                                path_steps.append(part)
+                            elif hasattr(part, 'steps'):
+                                path_steps.extend(part.steps)
+                            elif hasattr(part, 'evaluate'):
+                                # Evaluate in current context
+                                try:
+                                    val = part.evaluate(self)
+                                    if val is not None:
+                                        path_steps.append(str(val))
+                                except:
+                                    pass
+                        if path_steps:
+                            path_str = '/'.join(path_steps)
+                            result = self._evaluate_path(path_str)
+                        else:
+                            result = None
+                    elif hasattr(node.right, 'steps'):
+                        # It's a PathNode - evaluate it directly
+                        result = node.right.evaluate(self)
+                    else:
+                        # Try to evaluate and treat as path
+                        right_val = node.right.evaluate(self)
+                        if isinstance(right_val, str):
+                            result = self._evaluate_path(right_val)
+                        else:
+                            result = right_val
+                    return result
+                finally:
+                    self.data = old_data
+                    self.context_path = old_context
+        
+        # For other operations, evaluate right normally
+        right = node.right.evaluate(self)
 
         if op == 'or':
             return bool(left) or bool(right)
@@ -220,6 +339,7 @@ class XPathEvaluator:
             except (ValueError, TypeError):
                 return None
         if op == '/':
+            # Normal division (left is not a dict, already handled above)
             try:
                 return float(left) / float(right)
             except (ValueError, TypeError, ZeroDivisionError):
@@ -252,6 +372,15 @@ class XPathEvaluator:
             # This is a relative path, evaluate it directly
             up_levels = sum(1 for step in node.steps if step == '..')
             field_parts = [step for step in node.steps if step != '..']
+
+            # Special case: if we're at a node level (context_path is empty) and path starts with ..,
+            # treat it as direct field access or return current node if no fields
+            if up_levels > 0 and len(self.context_path) == 0 and isinstance(self.data, dict):
+                if len(field_parts) == 0:
+                    # Just ".." means stay at current node
+                    return self.data
+                # ../field means access 'field' from current node
+                return self._get_path_value(field_parts)
 
             # Navigate up the context path
             if up_levels <= len(self.context_path):
@@ -318,42 +447,176 @@ class XPathEvaluator:
         """Evaluate deref() - resolve a leafref path.
         
         In YANG, deref() takes a leafref path and returns the node it references.
-        This implementation evaluates the path to get the leafref value, then finds
-        the referenced node. For simplicity, we return the value directly.
+        This allows further path navigation from that node.
+        
+        For example: deref(../entity)/../fields/field[name = current()]
+        - deref(../entity) should return the entity node (not just the value "parent")
+        - Then /../fields/... can navigate from that entity node
         """
         try:
             # Check cache first
-            if path in self.leafref_cache:
-                return self.leafref_cache[path]
+            cache_key = f"{path}:{self.context_path}"
+            if cache_key in self.leafref_cache:
+                return self.leafref_cache[cache_key]
             
-            # Evaluate the path to get the leafref value
+            # Evaluate the path to get the leafref value (e.g., "parent")
             ref_value = self._evaluate_path(path)
             
-            # If we got a value, cache and return it
-            # In YANG, deref() returns the referenced node, but for validation purposes
-            # we can return the value directly
-            if ref_value is not None:
-                self.leafref_cache[path] = ref_value
-                return ref_value
+            if ref_value is None:
+                # Referenced node doesn't exist - acceptable for optional references
+                return None
             
-            # Try to evaluate the path as an absolute or relative path
-            if path.startswith('/'):
-                result = self._evaluate_absolute_path(path)
-                if result is not None:
-                    self.leafref_cache[path] = result
-                return result
+            # Now find the node that contains this value
+            # The path tells us where to look (e.g., ../entity means look in parent's entity field)
+            # We need to find the node that has this value
+            
+            # Parse the path to understand the structure
+            # For ../entity, we need to:
+            # 1. Go up one level from current context
+            # 2. Find the entity list/container
+            # 3. Find the entity node with name == ref_value
+            
+            # Handle relative paths like ../entity
             if path.startswith('../'):
-                result = self._evaluate_relative_path(path)
-                if result is not None:
-                    self.leafref_cache[path] = result
-                return result
+                # Get the path parts
+                parts = path.split('/')
+                up_levels = sum(1 for p in parts if p == '..')
+                field_parts = [p for p in parts if p and p != '..']
+                
+                # Navigate up from current context to get the leafref value (e.g., "parent")
+                if up_levels <= len(self.context_path):
+                    value_path = self.context_path[:-up_levels] + field_parts
+                    ref_value = self._get_path_value(value_path)
+                    
+                    if ref_value is not None:
+                        # Find the node that contains this value
+                        # The field name (e.g., "entity") tells us what type of node to find
+                        # Common pattern: if field is "entity", look in entities.entity list
+                        field_name = field_parts[-1] if field_parts else None
+                        
+                        if field_name == "entity":
+                            # Look in /data-model/entities/entity for entity with name == ref_value
+                            # Use root_data to ensure we search from the root
+                            old_data = self.data
+                            try:
+                                self.data = self.root_data
+                                entities_list = self._get_path_value(["data-model", "entities", "entity"])
+                                if isinstance(entities_list, list):
+                                    for entity in entities_list:
+                                        if isinstance(entity, dict) and "name" in entity:
+                                            if entity["name"] == ref_value:
+                                                result = entity
+                                                self.leafref_cache[cache_key] = result
+                                                return result
+                            finally:
+                                self.data = old_data
+                        
+                        # Generic fallback: search for any node with field_name == ref_value
+                        # Use "name" as the key field (common pattern)
+                        result = self._find_node_by_key(self.root_data, "name", ref_value, field_name)
+                        if result is not None:
+                            self.leafref_cache[cache_key] = result
+                            return result
             
-            # If path evaluation returns None, deref() returns None
-            # (referenced node doesn't exist - this is acceptable for optional references)
+            # Handle absolute paths like /data-model/entities/entity/name
+            elif path.startswith('/'):
+                # Remove leading /
+                abs_path = path.lstrip('/')
+                parts = abs_path.split('/')
+                
+                # Navigate to the container that should contain the value
+                # The last part is usually the key field (e.g., "name")
+                if len(parts) >= 2:
+                    container_path = parts[:-1]  # All but last
+                    key_field = parts[-1]  # Last part is the key field
+                    
+                    container = self._evaluate_absolute_path('/' + '/'.join(container_path))
+                    
+                    if container is not None:
+                        # Find the node in the container
+                        if isinstance(container, list):
+                            for item in container:
+                                if isinstance(item, dict) and key_field in item:
+                                    if item[key_field] == ref_value:
+                                        result = item
+                                        self.leafref_cache[cache_key] = result
+                                        return result
+                        elif isinstance(container, dict):
+                            # Check if it's a dict keyed by the value
+                            if key_field in container and container[key_field] == ref_value:
+                                result = container
+                                self.leafref_cache[cache_key] = result
+                                return result
+                            # Or check nested lists
+                            for key, value in container.items():
+                                if isinstance(value, list):
+                                    for item in value:
+                                        if isinstance(item, dict) and key_field in item:
+                                            if item[key_field] == ref_value:
+                                                result = item
+                                                self.leafref_cache[cache_key] = result
+                                                return result
+            
+            # Fallback: if we can't find the node, return None
+            # This is acceptable for optional references
             return None
         except Exception:
             # If path evaluation fails, deref() returns None (referenced node doesn't exist)
             return None
+    
+    def _extract_path_from_binary_op(self, node: Any) -> List:
+        """Extract path steps from a nested BinaryOpNode tree with / operators.
+        
+        Returns a list that can contain strings (path steps) or PathNode objects.
+        """
+        from .ast import BinaryOpNode, PathNode
+        steps = []
+        
+        def traverse(n):
+            if isinstance(n, PathNode):
+                # Add all steps from the path node
+                steps.extend(n.steps)
+            elif isinstance(n, BinaryOpNode) and n.operator == '/':
+                # Recursively traverse left and right
+                traverse(n.left)
+                traverse(n.right)
+            elif hasattr(n, 'evaluate'):
+                # For other nodes, we'll evaluate them in context
+                # For now, add the node itself so we can evaluate it later
+                steps.append(n)
+        
+        traverse(node)
+        return steps
+    
+    def _find_node_by_key(self, data: Any, key_field: str, key_value: Any, node_type: str = None) -> Any:
+        """Recursively find a node where key_field == key_value.
+        
+        If node_type is provided, only search in containers/lists with that name.
+        """
+        if isinstance(data, dict):
+            # Check if this dict has the key_field with matching value
+            if key_field in data and data[key_field] == key_value:
+                # If node_type specified, check if this is the right type
+                if node_type is None or node_type in str(data):
+                    return data
+            # Recursively search in values
+            for key, value in data.items():
+                # If node_type specified, prioritize searching in matching containers
+                if node_type and key == node_type and isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict) and key_field in item:
+                            if item[key_field] == key_value:
+                                return item
+                result = self._find_node_by_key(value, key_field, key_value, node_type)
+                if result is not None:
+                    return result
+        elif isinstance(data, list):
+            # Search in list items
+            for item in data:
+                result = self._find_node_by_key(item, key_field, key_value, node_type)
+                if result is not None:
+                    return result
+        return None
 
     def _evaluate_path(self, path: str) -> Any:
         """Evaluate a path expression."""
@@ -395,6 +658,18 @@ class XPathEvaluator:
             elif part:
                 field_parts.append(part)
 
+        # Special case: if we're at a node level (context_path is empty) and path starts with ..,
+        # treat it as direct field access (the .. is a quirk of YANG path syntax)
+        # This handles: deref(../entity)/../fields where we're already at the entity node
+        if up_levels > 0 and len(self.context_path) == 0 and isinstance(self.data, dict):
+            # We're at a node, and path wants to go up then down
+            # In this case, just access the field directly from the node
+            if len(field_parts) == 1:
+                # Simple case: ../field means just access 'field' from current node
+                return self.data.get(field_parts[0])
+            # Multi-level: ../fields/field means access fields.field from current node
+            return self._get_path_value(field_parts)
+
         # Navigate up the context path
         if up_levels <= len(self.context_path):
             new_path = self.context_path[:-up_levels] + field_parts
@@ -434,16 +709,28 @@ class XPathEvaluator:
         finally:
             self.data = old_data
 
-    def _get_path_value(self, parts: List[str]) -> Any:
-        """Get value at path in data structure."""
+    def _get_path_value(self, parts: List) -> Any:
+        """Get value at path in data structure.
+        
+        Args:
+            parts: List of path parts (strings for dict keys, ints for list indices)
+        """
         current = self.data
 
         for part in parts:
             if part == '.' or part == 'current()':
                 continue
 
+            # Handle integer list indices
+            if isinstance(part, int):
+                if isinstance(current, list) and 0 <= part < len(current):
+                    current = current[part]
+                else:
+                    return None
+                continue
+
             # Handle filtering
-            if '[' in part:
+            if isinstance(part, str) and '[' in part:
                 base_part = part[:part.index('[')]
                 predicate = part[part.index('['):]
 
@@ -535,24 +822,29 @@ class XPathEvaluator:
         return result
 
     def _get_current_value(self) -> Any:
-        """Get the current node value."""
-        # Navigate through context_path in data
-        if self.context_path and isinstance(self.data, dict):
-            current = self.data
-            for part in self.context_path:
-                if isinstance(current, dict) and part in current:
-                    current = current[part]
-                else:
-                    return None
-            return current
-
-        # Fallback: if no context path, try to get from data directly
-        if isinstance(self.data, dict):
-            # If we have a single value, return it
-            if len(self.data) == 1:
-                return list(self.data.values())[0]
-
-        return None
+        """Get the current value from the context path.
+        
+        In XPath, current() always refers to the original context node where
+        the expression is being evaluated, not the current iteration context.
+        """
+        # Always use original context for current()
+        if self.original_context_path:
+            # Temporarily use original data and context
+            old_data = self.data
+            old_context = self.context_path
+            try:
+                self.data = self.original_data
+                self.context_path = self.original_context_path
+                value = self._get_path_value(self.original_context_path)
+                # Return empty string if None (XPath spec for current())
+                return value if value is not None else ""
+            finally:
+                self.data = old_data
+                self.context_path = old_context
+        # If no original context path, try to get value from current data
+        if isinstance(self.data, (str, int, float, bool)):
+            return self.data
+        return ""
 
     def _compare_equal(self, left: Any, right: Any) -> bool:
         """Compare two values for equality."""

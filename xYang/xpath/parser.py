@@ -336,6 +336,16 @@ class XPathParser:
                 # Merge paths
                 left.steps.extend(right_path.steps)
                 left.predicate = right_path.predicate
+            # Also handle / after function calls (like deref()) as path navigation
+            elif (token.type == TokenType.OPERATOR and token.value == '/' and
+                  isinstance(left, FunctionCallNode) and left.name == 'deref'):
+                # deref() followed by / is path navigation, not division
+                # Create a special node that evaluates deref() then navigates the path
+                self._consume()  # Consume the /
+                right_path = self._parse_path()
+                # Create a BinaryOpNode with '/' but mark it as path navigation
+                # The evaluator will handle this specially
+                left = BinaryOpNode('/', left, right_path)
             elif token.type == TokenType.OPERATOR and token.value in ('*', '/'):
                 op = self._consume().value
                 right = self._parse_unary()
