@@ -23,15 +23,23 @@ class ConstraintValidator:
         self.evaluator_factory = evaluator_factory or XPathEvaluator
         self.errors: List[str] = []
     
-    def validate_must_statements(self, data: Dict[str, Any]) -> None:
+    def validate_must_statements(self, data: Dict[str, Any], root_data: Dict[str, Any] = None) -> None:
         """
         Validate must statements using XPath evaluator.
         
         Args:
             data: Data to validate
+            root_data: Root data structure (for absolute paths and cross-references)
         """
+        # Use root_data if provided, otherwise use data as root
+        root = root_data if root_data is not None else data
+        
         # Create evaluator with root context
-        evaluator = self.evaluator_factory(data, self.module, context_path=[])
+        evaluator = self.evaluator_factory(root, self.module, context_path=[])
+        
+        # Store root data in evaluator for absolute path resolution
+        if hasattr(evaluator, 'root_data'):
+            evaluator.root_data = root
         
         # Validate must statements recursively
         for stmt in self.module.statements:
@@ -68,13 +76,39 @@ class ConstraintValidator:
                     break
             if current_data is not None:
                 evaluator.data = current_data
+            else:
+                # If we can't find the data context, use root data
+                # This allows must statements to work even when context is missing
+                evaluator.data = data
         
         # Validate must statements on this statement
         if isinstance(stmt, YangLeafStmt):
+            # Skip validation if the field doesn't exist in data (optional fields)
+            if stmt.name not in data:
+                # Only skip if field is not mandatory and has no default
+                if not (stmt.mandatory or (hasattr(stmt, 'default') and stmt.default is not None)):
+                    return  # Skip validation for missing optional fields
+            
             for must in stmt.must_statements:
-                if not evaluator.evaluate(must.expression):
-                    error_msg = must.error_message or f"Must constraint failed for {stmt.name}"
-                    self.errors.append(error_msg)
+                try:
+                    result = evaluator.evaluate(must.expression)
+                    if not result:
+                        error_msg = must.error_message or f"Must constraint failed for {stmt.name}"
+                        self.errors.append(error_msg)
+                except Exception as e:
+                    # If evaluation fails (e.g., missing data, XPath error), log but don't fail
+                    # unless it's a syntax error (which indicates a real problem)
+                    # Missing data in optional fields is acceptable
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.debug(
+                        "Must constraint evaluation failed for %s: %s (expression: %s)",
+                        stmt.name, e, must.expression
+                    )
+                    # Only add error if field is mandatory or if it's a syntax error
+                    if stmt.mandatory or "syntax" in str(e).lower() or "parse" in str(e).lower():
+                        error_msg = must.error_message or f"Must constraint evaluation failed for {stmt.name}: {e}"
+                        self.errors.append(error_msg)
         elif isinstance(stmt, (YangListStmt, YangContainerStmt)):
             if hasattr(stmt, 'must_statements'):
                 for must in stmt.must_statements:

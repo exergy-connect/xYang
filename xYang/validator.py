@@ -36,6 +36,9 @@ class YangValidator:
         self.evaluator_factory = evaluator_factory or XPathEvaluator
         self.type_system = type_system or TypeSystem()
         
+        # Register typedefs from module into type system
+        self._register_typedefs()
+        
         # Create focused validators
         self.structure_validator = StructureValidator(module, evaluator_factory)
         self.type_validator = TypeValidator(self.type_system)
@@ -64,8 +67,8 @@ class YangValidator:
         # 2. Validate types (including leafref preparation)
         self._validate_types(data, self.module.statements, root_data)
         
-        # 3. Validate must statements
-        self.constraint_validator.validate_must_statements(data)
+        # 3. Validate must statements (pass root data for absolute paths)
+        self.constraint_validator.validate_must_statements(data, root_data=data)
         
         # Collect all errors and warnings
         errors = (
@@ -77,6 +80,27 @@ class YangValidator:
         warnings = self.structure_validator.warnings
         
         return len(errors) == 0, errors, warnings
+    
+    def _register_typedefs(self) -> None:
+        """Register typedefs from module into type system."""
+        from .types import TypeConstraint
+        
+        for typedef_name, typedef_stmt in self.module.typedefs.items():
+            if typedef_stmt.type:
+                base_type = typedef_stmt.type.name
+                
+                # Extract constraints from typedef
+                constraints = None
+                if typedef_stmt.type.pattern or typedef_stmt.type.length or typedef_stmt.type.range:
+                    constraints = TypeConstraint(
+                        pattern=typedef_stmt.type.pattern,
+                        length=typedef_stmt.type.length,
+                        range=typedef_stmt.type.range,
+                        enums=typedef_stmt.type.enums if typedef_stmt.type.enums else []
+                    )
+                
+                # Register the typedef
+                self.type_system.register_typedef(typedef_name, base_type, constraints)
     
     def _validate_types(
         self,

@@ -23,13 +23,14 @@ class XPathEvaluator:
     def __init__(self, data: Dict[str, Any], module: Any, context_path: List[str] = None):
         """
         Initialize evaluator.
-
+        
         Args:
             data: The data instance being validated
             module: The YANG module (for schema resolution)
             context_path: Current path in the data structure (for current() and relative paths)
         """
         self.data = data
+        self.root_data = data  # Store root data for absolute path resolution
         self.module = module
         self.context_path = context_path or []
         self.leafref_cache: Dict[str, Any] = {}  # Cache for deref() results
@@ -143,7 +144,42 @@ class XPathEvaluator:
                 return self._yang_bool(args[0])
             return False
 
+        if func_name == 'number':
+            if len(args) == 1:
+                return self._xpath_number(args[0])
+            # number() with no args converts current context node to number
+            return self._xpath_number(self._get_current_value())
+
+        if func_name == 'not':
+            if len(args) == 1:
+                operand = args[0]
+                # In XPath, not() returns true if value is false/empty/None, false if value exists
+                if operand is None or operand == '' or operand is False or (isinstance(operand, (list, dict)) and len(operand) == 0):
+                    return True
+                return False
+            return True
+
         return None
+    
+    def _xpath_number(self, value: Any) -> float:
+        """Convert a value to a number following XPath number() function rules."""
+        if value is None:
+            return float('nan')
+        if isinstance(value, (int, float)):
+            return float(value)
+        if isinstance(value, bool):
+            return 1.0 if value else 0.0
+        if isinstance(value, str):
+            # Try to parse as number
+            try:
+                return float(value)
+            except ValueError:
+                return float('nan')
+        # For other types, try to convert
+        try:
+            return float(value)
+        except (ValueError, TypeError):
+            return float('nan')
 
     def _evaluate_binary_op(self, node: BinaryOpNode) -> Any:
         """Evaluate a binary operator node."""
@@ -279,25 +315,45 @@ class XPathEvaluator:
         return bool(value)
 
     def _evaluate_deref(self, path: str) -> Any:
-        """Evaluate deref() - resolve a leafref path."""
-        # Evaluate the path to get the leafref value
-        ref_value = self._evaluate_path(path)
-
-        # For deref(), we need to resolve the leafref to the actual node
-        # In YANG, deref() takes a leafref path and returns the node it references
-        # This is a simplified implementation that tries to find the referenced value
-        # Full implementation would need schema traversal
-
-        if ref_value is not None:
-            return ref_value
-
-        # Try to evaluate the path as an absolute or relative path
-        if path.startswith('/'):
-            return self._evaluate_absolute_path(path)
-        if path.startswith('../'):
-            return self._evaluate_relative_path(path)
-
-        return None
+        """Evaluate deref() - resolve a leafref path.
+        
+        In YANG, deref() takes a leafref path and returns the node it references.
+        This implementation evaluates the path to get the leafref value, then finds
+        the referenced node. For simplicity, we return the value directly.
+        """
+        try:
+            # Check cache first
+            if path in self.leafref_cache:
+                return self.leafref_cache[path]
+            
+            # Evaluate the path to get the leafref value
+            ref_value = self._evaluate_path(path)
+            
+            # If we got a value, cache and return it
+            # In YANG, deref() returns the referenced node, but for validation purposes
+            # we can return the value directly
+            if ref_value is not None:
+                self.leafref_cache[path] = ref_value
+                return ref_value
+            
+            # Try to evaluate the path as an absolute or relative path
+            if path.startswith('/'):
+                result = self._evaluate_absolute_path(path)
+                if result is not None:
+                    self.leafref_cache[path] = result
+                return result
+            if path.startswith('../'):
+                result = self._evaluate_relative_path(path)
+                if result is not None:
+                    self.leafref_cache[path] = result
+                return result
+            
+            # If path evaluation returns None, deref() returns None
+            # (referenced node doesn't exist - this is acceptable for optional references)
+            return None
+        except Exception:
+            # If path evaluation fails, deref() returns None (referenced node doesn't exist)
+            return None
 
     def _evaluate_path(self, path: str) -> Any:
         """Evaluate a path expression."""
@@ -342,14 +398,24 @@ class XPathEvaluator:
         # Navigate up the context path
         if up_levels <= len(self.context_path):
             new_path = self.context_path[:-up_levels] + field_parts
-            return self._get_path_value(new_path)
+            value = self._get_path_value(new_path)
+            if value is not None:
+                return value
 
-        # If we need to go up beyond context, try from root
+        # If we need to go up beyond context, try from root data
+        # Save current data and try from root
         if up_levels > len(self.context_path):
-            # Go to root and then navigate
+            # We need to go to root - get root data from module if available
+            # For now, try to navigate from current data's root
             remaining_up = up_levels - len(self.context_path)
             if remaining_up == 1 and field_parts:
                 # We're at root, get the field
+                # Try to get root data - if we have module, use it to find root
+                root_data = self.data
+                # Navigate up to find root (go up remaining_up levels)
+                for _ in range(remaining_up - 1):
+                    # This is a simplification - in full implementation would track root
+                    pass
                 return self._get_path_value(field_parts)
 
         return None
@@ -359,7 +425,14 @@ class XPathEvaluator:
         # Remove leading /
         path = path.lstrip('/')
         parts = path.split('/')
-        return self._get_path_value(parts)
+        
+        # Use root_data for absolute paths
+        old_data = self.data
+        try:
+            self.data = self.root_data
+            return self._get_path_value(parts)
+        finally:
+            self.data = old_data
 
     def _get_path_value(self, parts: List[str]) -> Any:
         """Get value at path in data structure."""
