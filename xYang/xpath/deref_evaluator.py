@@ -335,11 +335,15 @@ class DerefEvaluator:
         Returns:
             List of schema node names representing the full path from module root, or None
         """
+        # Use original_context_path if available (for current() support in predicates)
+        context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+        context_len = len(context_to_use) if context_to_use else 0
+        
         # Handle current() or .
         if path == 'current()' or path == '.':
-            # Use current context path, but convert data path to schema path
+            # Use original context path, but convert data path to schema path
             # Schema path is similar but may need adjustment
-            return self.data_path_to_schema_path(self.evaluator.context_path)
+            return self.data_path_to_schema_path(context_to_use)
         
         # Handle relative paths
         if path.startswith('../') or path.startswith('./'):
@@ -353,14 +357,13 @@ class DerefEvaluator:
                 elif p and p != '.':
                     field_parts.append(p)
             
-            # Navigate up from context - use cached length
-            context_len = self.evaluator._context_path_len
+            # Navigate up from context
             if up_levels == 0:
                 # No navigation up - use current context + field parts
-                data_path = self.evaluator.context_path + field_parts
+                data_path = context_to_use + field_parts
             elif up_levels <= context_len:
                 # Navigate up 'up_levels' steps
-                data_path = self.evaluator.context_path[:-up_levels] + field_parts
+                data_path = context_to_use[:-up_levels] + field_parts
             else:
                 return None
             
@@ -373,7 +376,7 @@ class DerefEvaluator:
         
         # Simple field name
         if path and not path.startswith('/'):
-            data_path = self.evaluator.context_path + [path]
+            data_path = context_to_use + [path]
             return self.data_path_to_schema_path(data_path)
         
         # Handle absolute paths
@@ -455,7 +458,10 @@ class DerefEvaluator:
             # Absolute path - walk from root
             target_path = [p for p in leafref_path.split('/') if p]
         else:
-            # Relative path - resolve relative to current context
+            # Relative path - resolve relative to original context (for current() support in predicates)
+            # Use original_context_path if available, otherwise use context_path
+            context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+            
             # Parse the relative path - optimized single pass
             parts = leafref_path.split('/')
             up_levels = 0
@@ -467,13 +473,13 @@ class DerefEvaluator:
                     field_parts.append(p)
             
             # Build target path by going up from context, then adding field parts
-            context_len = self.evaluator._context_path_len
+            context_len = len(context_to_use)
             if up_levels > context_len:
                 return None
             
             # Remove list indices when going up (they're not part of schema structure)
             # Optimized: single pass to filter and count
-            context_without_indices = [p for p in self.evaluator.context_path if not isinstance(p, int)]
+            context_without_indices = [p for p in context_to_use if not isinstance(p, int)]
             if up_levels > len(context_without_indices):
                 return None
             
@@ -529,13 +535,15 @@ class DerefEvaluator:
             return self.evaluator.root_data
         
         # Extract entity index from context if available and requested
+        # Use original_context_path if available (for current() support in predicates)
+        context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
         entity_idx = None
-        if use_context_index and self.evaluator.context_path:
-            context_len = len(self.evaluator.context_path)
+        if use_context_index and context_to_use:
+            context_len = len(context_to_use)
             # Optimized: iterate with explicit bounds check
             for j in range(context_len - 1):
-                if self.evaluator.context_path[j] == "entities":
-                    next_item = self.evaluator.context_path[j + 1]
+                if context_to_use[j] == "entities":
+                    next_item = context_to_use[j + 1]
                     if isinstance(next_item, int):
                         entity_idx = next_item
                         break

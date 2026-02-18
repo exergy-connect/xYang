@@ -81,16 +81,26 @@ class PredicateEvaluator:
         return items
     
     def evaluate_value_in_context(self, expr: str, context: Any) -> Any:
-        """Evaluate a value expression in a specific context."""
+        """Evaluate a value expression in a specific context.
+        
+        Note: current() should always refer to the original context, not the predicate context.
+        So we preserve original_context_path and original_data while setting data and context_path
+        to the item being tested (so paths like 'name' evaluate from the item).
+        """
         # Save current context
         old_data = self.evaluator.data
         old_context_path = self.evaluator.context_path
+        old_original_context_path = self.evaluator.original_context_path
+        old_original_data = self.evaluator.original_data
+        
         # Set context - if it's a dict, use it directly; otherwise wrap it
         if isinstance(context, dict):
             self.evaluator.data = context
         else:
             self.evaluator.data = {'value': context}
-        self.evaluator._set_context_path([])  # Reset context path for item evaluation
+        # Set context_path to empty so paths like 'name' evaluate from the item root
+        # But preserve original_context_path and original_data so current() still works
+        self.evaluator._set_context_path([])
 
         try:
             # Parse and evaluate using AST
@@ -102,5 +112,7 @@ class PredicateEvaluator:
         finally:
             self.evaluator.data = old_data
             self.evaluator._set_context_path(old_context_path)
+            self.evaluator.original_context_path = old_original_context_path
+            self.evaluator.original_data = old_original_data
 
         return result
