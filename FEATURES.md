@@ -51,7 +51,7 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `fraction-digits` - Decimal fraction digits (2 occurrences)
 
 ### Type References
-- ✅ `leafref` - Leaf references (11 occurrences) - **Parsed but not resolved**
+- ✅ `leafref` - Leaf references (11 occurrences) - **Parsed and resolved via deref()**
 - ✅ `path` - Leafref paths
 - ✅ `require-instance` - Leafref require-instance
 
@@ -89,31 +89,55 @@ If `../type = 'array'` evaluates to false, the `item_type` container is not vali
 
 ## XPath Implementation
 
-xYang implements a minimal XPath evaluator that handles all the XPath expressions used in `meta-model.yang`:
+xYang implements a comprehensive XPath evaluator that handles all the XPath expressions used in `meta-model.yang`:
 
-1. **Path Navigation**: Supports relative paths (`../field`, `../../field`) and absolute paths (`/data-model/entities`)
+### Path Navigation
+- ✅ **Relative paths**: `../field`, `../../field`, `../../name` - Supports going up multiple levels with proper list index handling
+- ✅ **Absolute paths**: `/data-model/entities` - Navigation from root
+- ✅ **Current node**: `.` and `current()` - Access current context value
+- ✅ **Path continuation**: `fields[name = "x"]/type` - Navigate from predicate results
 
-2. **Functions**: 
-   - `string-length(.)` - Get length of current node value
-   - `translate(., '_', '')` - Translate/remove characters
-   - `count(...)` - Count elements in a list
-   - `deref(...)` - Resolve leafref (simplified implementation)
-   - `current()` - Get current node value
-   - `not(...)` - Logical negation
-   - `true()`, `false()` - Boolean literals
-   - `bool(...)` - Convert value to boolean following YANG rules
+### Functions
+- ✅ `string-length(.)` - Get length of current node value
+- ✅ `translate(., '_', '')` - Translate/remove characters
+- ✅ `count(...)` - Count elements in a list
+- ✅ `deref(...)` - **Resolve leafref with full support for nested paths**
+  - Supports: `deref(../entity)`, `deref(current())`, `deref(deref(...)/../foreignKey/entity)`
+  - Handles relative paths from any context
+  - Resolves entity and field references correctly
+- ✅ `current()` - Get current node value (preserved in predicate contexts)
+- ✅ `not(...)` - Logical negation
+- ✅ `true()`, `false()` - Boolean literals
+- ✅ `bool(...)` - Convert value to boolean following YANG rules
+- ✅ `number(...)` - Convert value to number following XPath rules
 
-3. **Comparisons**: `=`, `!=`, `<=`, `>=`, `<`, `>`
+### Comparisons
+- ✅ `=`, `!=`, `<=`, `>=`, `<`, `>` - All comparison operators with proper type coercion
 
-4. **Logical Operators**: `or`, `and`
+### Logical Operators
+- ✅ `or` - Logical OR
+- ✅ `and` - Logical AND
 
-5. **Filtering**: `[name = current()]`, `[type != 'array']`, `[id = current()]`, `[1]`
+### Filtering and Predicates
+- ✅ **Index predicates**: `[1]`, `[2]` - Access elements by 1-indexed position
+- ✅ **Comparison predicates**: `[name = current()]`, `[type != 'array']` - Filter lists by field values
+- ✅ **Complex predicates**: `[name = deref(current())/../foreignKey/field]` - Predicates with function calls
+- ✅ **Navigation from predicates**: `fields[name = "x"]/type` - Navigate from filtered results
 
-6. **String Concatenation**: `+` operator for string concatenation
+### String Operations
+- ✅ **String concatenation**: `+` operator for string concatenation
 
-7. **Arithmetic Operations**: `+`, `-`, `*`, `/` operators
+### Arithmetic Operations
+- ✅ `+`, `-`, `*`, `/` - Arithmetic operators (with `/` treated as path navigation when appropriate)
 
-The XPath evaluator uses proper tokenization and AST-based parsing (not string-based), making it more robust and maintainable.
+### Advanced Features
+- ✅ **Nested deref()**: `deref(deref(current())/../foreignKey/entity)` - Multiple levels of dereferencing
+- ✅ **Path navigation from nodes**: `deref(...)/../fields` - Navigate from dereferenced nodes
+- ✅ **Leaf-list indexing**: `primary_key[1]` - Access first element of leaf-list
+- ✅ **Type matching**: `deref(current())/../type = deref(...)/../fields[...]/type` - Complex type comparisons
+- ✅ **Cross-entity validation**: Full support for validating foreign key relationships across entities
+
+The XPath evaluator uses proper tokenization and AST-based parsing (not string-based), making it robust and maintainable. The implementation has been optimized and refactored for better performance and code organization.
 
 ## Error Reporting
 
@@ -145,28 +169,51 @@ xYang provides enhanced error reporting with line numbers and context:
 
 ## Code Organization
 
-The XPath implementation is organized in a dedicated subfolder for better modularity:
+The XPath implementation is organized in a modular architecture for better maintainability:
 
 ```
 xYang/
 ├── xpath/
-│   ├── __init__.py      # Exports XPathEvaluator
-│   ├── evaluator.py     # Main XPath evaluator
-│   ├── parser.py         # Tokenizer and recursive descent parser
-│   └── ast.py           # AST node definitions
-├── errors.py            # Custom exception classes
-├── parser.py            # YANG parser
-├── validator.py         # Validation engine
+│   ├── __init__.py              # Exports XPathEvaluator
+│   ├── evaluator.py             # Main XPath evaluator (orchestrator)
+│   ├── parser.py                # Tokenizer and recursive descent parser
+│   ├── ast.py                   # AST node definitions
+│   ├── path_evaluator.py        # Path navigation logic
+│   ├── deref_evaluator.py       # deref() function implementation
+│   ├── predicate_evaluator.py   # Predicate filtering logic
+│   ├── function_evaluator.py    # XPath function implementations
+│   ├── comparison_evaluator.py  # Comparison operations
+│   └── utils.py                 # Utility functions (yang_bool, etc.)
+├── errors.py                    # Custom exception classes
+├── parser.py                    # YANG parser
+├── validator.py                 # Validation engine
 └── ...
 ```
 
+The modular architecture separates concerns:
+- **Path evaluation**: Handles all path navigation and context management
+- **Deref resolution**: Specialized logic for resolving leafref paths
+- **Predicate evaluation**: Handles filtering and indexing of lists
+- **Function evaluation**: Dictionary-based dispatch for XPath functions
+- **Comparison operations**: Type-coercion aware comparisons
+
 ## Limitations
 
-1. **Leafref Resolution**: `deref()` is implemented with simplified resolution. Full resolution would require complete schema traversal and instance data mapping.
+1. **Leafref Resolution**: `deref()` is implemented with full support for nested paths and cross-entity references. It correctly resolves:
+   - Simple leafrefs: `deref(../entity)`
+   - Nested leafrefs: `deref(deref(current())/../foreignKey/entity)`
+   - Relative paths from any context
+   - Entity and field lookups in the schema
 
-2. **XPath Scope**: Only the XPath features actually used in `meta-model.yang` are implemented. More complex XPath features (e.g., axes, complex predicates, namespaces) are not supported.
+2. **XPath Scope**: Only the XPath features actually used in `meta-model.yang` are implemented. More complex XPath features (e.g., axes, namespaces, complex location paths) are not supported.
 
-3. **Error Handling**: The XPath evaluator catches all exceptions during evaluation and returns `False` or `None` for constraint validation. This ensures validation doesn't crash on invalid expressions, but detailed error information may be lost in constraint evaluation contexts.
+3. **Error Handling**: The XPath evaluator catches exceptions during evaluation and returns `False` or `None` for constraint validation. This ensures validation doesn't crash on invalid expressions, but detailed error information may be lost in constraint evaluation contexts.
+
+4. **Performance**: The evaluator includes optimizations such as:
+   - Expression caching for short expressions
+   - Efficient context path management
+   - Set-based operator lookups
+   - Early returns for common cases
 
 ## Usage Statistics from meta-model.yang
 
@@ -184,3 +231,13 @@ xYang/
 - `fraction-digits`: 2 occurrences
 - `when`: 1 occurrence
 - `range`: 1 occurrence
+
+## Recent Improvements
+
+### XPath Evaluator Enhancements (2026)
+- ✅ **Nested deref() support**: Full implementation of nested `deref()` calls for complex cross-entity validation
+- ✅ **Path navigation fixes**: Proper handling of `../../name` and other multi-level relative paths
+- ✅ **Predicate navigation**: Support for navigating from predicate results (e.g., `fields[...]/type`)
+- ✅ **Leaf-list indexing**: Correct handling of `primary_key[1]` and other numeric indices
+- ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
+- ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
