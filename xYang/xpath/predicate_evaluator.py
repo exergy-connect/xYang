@@ -34,8 +34,8 @@ class PredicateEvaluator:
         pred_expr = predicate[1:-1]
 
         # Handle index access [1] - return the element directly, not a list
-        # Optimized: check if all digits before converting
-        if pred_expr and pred_expr.isdigit():
+        # Optimized: isdigit() returns False for empty strings, so no need for 'and pred_expr'
+        if pred_expr.isdigit():
             idx = int(pred_expr) - 1  # XPath is 1-indexed
             items_len = len(items)
             if 0 <= idx < items_len:
@@ -53,32 +53,32 @@ class PredicateEvaluator:
         else:
             return items
         
-        if len(parts) == 2:
-            left_expr = parts[0].strip()
-            right_expr = parts[1].strip()
+        if len(parts) != 2:
+            return items
+        
+        # Optimized: strip only if needed (most expressions don't need it)
+        left_expr = parts[0]
+        right_expr = parts[1]
+        if left_expr and (left_expr[0].isspace() or left_expr[-1].isspace()):
+            left_expr = left_expr.strip()
+        if right_expr and (right_expr[0].isspace() or right_expr[-1].isspace()):
+            right_expr = right_expr.strip()
+        
+        # Optimized: initialize empty list (Python lists grow efficiently)
+        filtered = []
+        
+        # Optimized: combine comparison logic to avoid duplicate code
+        is_equal_op = (op == '=')
+        for item in items:
+            # Evaluate in the context of this item
+            left_val = self.evaluate_value_in_context(left_expr, item)
+            right_val = self.evaluate_value_in_context(right_expr, item)
             
-            # Optimized: pre-allocate list if we know approximate size
-            items_len = len(items)
-            filtered = []
-            # Reserve space for common case (most items match)
-            if items_len > 10:
-                filtered = []
+            # Single comparison check
+            if compare_equal(left_val, right_val) == is_equal_op:
+                filtered.append(item)
 
-            for item in items:
-                # Evaluate in the context of this item
-                left_val = self.evaluate_value_in_context(left_expr, item)
-                right_val = self.evaluate_value_in_context(right_expr, item)
-
-                if op == '=':
-                    if compare_equal(left_val, right_val):
-                        filtered.append(item)
-                else:  # !=
-                    if not compare_equal(left_val, right_val):
-                        filtered.append(item)
-
-            return filtered
-
-        return items
+        return filtered
     
     def evaluate_value_in_context(self, expr: str, context: Any) -> Any:
         """Evaluate a value expression in a specific context.
@@ -93,7 +93,7 @@ class PredicateEvaluator:
         old_original_context_path = self.evaluator.original_context_path
         old_original_data = self.evaluator.original_data
         
-        # Set context - if it's a dict, use it directly; otherwise wrap it
+        # Set context - optimized: isinstance check is fast, dict is common case
         if isinstance(context, dict):
             self.evaluator.data = context
         else:
@@ -103,13 +103,29 @@ class PredicateEvaluator:
         self.evaluator._set_context_path([])
 
         try:
-            # Parse and evaluate using AST
-            tokenizer = XPathTokenizer(expr)
-            tokens = tokenizer.tokenize()
-            parser = XPathParser(tokens)
-            ast = parser.parse()
+            # Optimized: use evaluator's expression cache if available
+            # Check cache first (only for short expressions to avoid memory bloat)
+            if len(expr) < 100 and hasattr(self.evaluator, '_expression_cache'):
+                if expr in self.evaluator._expression_cache:
+                    ast = self.evaluator._expression_cache[expr]
+                else:
+                    # Parse expression into AST
+                    tokenizer = XPathTokenizer(expr)
+                    tokens = tokenizer.tokenize()
+                    parser = XPathParser(tokens)
+                    ast = parser.parse()
+                    # Cache only short expressions
+                    self.evaluator._expression_cache[expr] = ast
+            else:
+                # Parse and evaluate using AST (no caching for long expressions)
+                tokenizer = XPathTokenizer(expr)
+                tokens = tokenizer.tokenize()
+                parser = XPathParser(tokens)
+                ast = parser.parse()
+            
             result = ast.evaluate(self.evaluator)
         finally:
+            # Restore context
             self.evaluator.data = old_data
             self.evaluator._set_context_path(old_context_path)
             self.evaluator.original_context_path = old_original_context_path
