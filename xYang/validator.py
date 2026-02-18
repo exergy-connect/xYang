@@ -7,6 +7,7 @@ from .module import YangModule
 from .ast import YangStatement, YangLeafStmt, YangLeafListStmt
 from .types import TypeSystem
 from .xpath import XPathEvaluator
+from .errors import YangCrossReferenceError
 from .validators import (
     StructureValidator,
     TypeValidator,
@@ -78,6 +79,14 @@ class YangValidator:
             self.leafref_resolver.errors
         )
         warnings = self.structure_validator.warnings
+        
+        # Check if all errors are cross-reference related
+        if errors and self._are_all_cross_reference_errors(errors):
+            error_msg = "; ".join(errors)
+            raise YangCrossReferenceError(
+                f"YANG validation failed due to cross-reference issues: {error_msg}",
+                errors=errors
+            )
         
         return len(errors) == 0, errors, warnings
     
@@ -158,3 +167,30 @@ class YangValidator:
         self.type_validator.errors = []
         self.constraint_validator.errors = []
         self.leafref_resolver.errors = []
+    
+    def _are_all_cross_reference_errors(self, errors: List[str]) -> bool:
+        """Check if all errors are cross-reference related.
+        
+        Cross-reference errors occur when validating individual files that reference
+        entities or fields defined in other files. These are expected and should
+        not trigger individual file validation.
+        
+        Args:
+            errors: List of error messages
+            
+        Returns:
+            True if all errors are cross-reference related, False otherwise
+        """
+        # Cross-reference error patterns (entity/field doesn't exist in another file)
+        cross_ref_patterns = [
+            "Foreign key entity must exist in the data model",
+            "Foreign key field must exist in the referenced entity's fields",
+            "Foreign key field must reference one of the parent entity's primary key fields",
+            "Parent entity must have a primary key defined",
+        ]
+        
+        # Check if ALL errors match cross-reference patterns
+        return all(
+            any(pattern in error for pattern in cross_ref_patterns)
+            for error in errors
+        )

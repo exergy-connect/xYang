@@ -100,3 +100,32 @@ class XPathEvaluationError(ValueError):
     
     def __str__(self):
         return self.message
+
+
+class YangCrossReferenceError(ValueError):
+    """YANG validation error indicating cross-reference issues.
+    
+    This error is raised when validation fails due to cross-reference issues
+    (e.g., entities or fields defined in other files). This is expected when
+    validating individual files that reference entities in other files, and
+    should not trigger individual file validation.
+    
+    Attributes:
+        message: Error message
+        errors: List of error strings
+    """
+    
+    def __init__(self, message: str, errors: list[str] = None):
+        """
+        Initialize cross-reference error.
+        
+        Args:
+            message: Error message
+            errors: List of error strings (optional)
+        """
+        self.message = message
+        self.errors = errors or []
+        super().__init__(message)
+    
+    def __str__(self):
+        return self.message
