@@ -113,6 +113,51 @@ class ConstraintValidator:
             # Path doesn't exist - use root_data as fallback
             evaluator.data = root_data
     
+    def _validate_child_in_list_item(
+        self,
+        root_data: Dict[str, Any],
+        child_stmt: YangStatement,
+        evaluator: XPathEvaluator,
+        item_path: List[str]
+    ) -> None:
+        """Validate a child statement within a list item (without recursion).
+        
+        This is used when iterating through list items to validate child statements
+        for each item. It only validates the immediate child's constraints, not grandchildren.
+        """
+        child_path = item_path + [child_stmt.name] if hasattr(child_stmt, 'name') else item_path
+        
+        # Set up evaluator context
+        self._setup_evaluator_context(evaluator, child_path, root_data)
+        
+        # Validate must statements on this child statement only
+        if isinstance(child_stmt, YangLeafStmt):
+            # Check if field exists in current data context
+            field_exists = (
+                isinstance(evaluator.data, dict) and child_stmt.name in evaluator.data
+            )
+            
+            # Skip validation if the field doesn't exist (optional fields)
+            if not field_exists:
+                if not (child_stmt.mandatory or (hasattr(child_stmt, 'default') and child_stmt.default is not None)):
+                    return  # Skip validation for missing optional fields
+            
+            # Evaluate must constraints
+            for must in child_stmt.must_statements:
+                evaluator.original_data = root_data
+                evaluator.original_context_path = child_path.copy() if child_path else []
+                self._evaluate_must_constraint(evaluator, must, child_stmt.name, child_stmt.mandatory)
+        
+        elif isinstance(child_stmt, (YangListStmt, YangContainerStmt)):
+            if hasattr(child_stmt, 'must_statements'):
+                for must in child_stmt.must_statements:
+                    evaluator.original_data = root_data
+                    evaluator.original_context_path = child_path.copy() if child_path else []
+                    self._evaluate_must_constraint(evaluator, must, child_stmt.name, False)
+        
+        # Do NOT recurse - grandchildren will be handled by the normal recursion path
+        # when _validate_must_in_statement is called for the list statement itself
+    
     def _evaluate_must_constraint(
         self,
         evaluator: XPathEvaluator,
@@ -196,9 +241,31 @@ class ConstraintValidator:
         
         # Recurse into child statements
         if hasattr(stmt, 'statements'):
-            for child in stmt.statements:
-                # Navigate to child data from root_data
-                child_data = self._navigate_path(root_data, current_path)
-                if child_data is None:
-                    child_data = root_data
-                self._validate_must_in_statement(child_data, child, evaluator, current_path)
+            # For list statements, iterate through actual list items in data
+            if isinstance(stmt, YangListStmt):
+                list_data = self._navigate_path(root_data, current_path)
+                if isinstance(list_data, list):
+                    # Validate each list item with its index in the path
+                    for idx, item in enumerate(list_data):
+                        item_path = current_path + [idx]
+                        # Set up evaluator context for this list item
+                        self._setup_evaluator_context(evaluator, item_path, root_data)
+                        # Validate child statements for this list item
+                        # Use a helper to validate children without double recursion
+                        for child in stmt.statements:
+                            self._validate_child_in_list_item(root_data, child, evaluator, item_path)
+                else:
+                    # List doesn't exist or is not a list - validate child statements normally
+                    for child in stmt.statements:
+                        child_data = self._navigate_path(root_data, current_path)
+                        if child_data is None:
+                            child_data = root_data
+                        self._validate_must_in_statement(child_data, child, evaluator, current_path)
+            else:
+                # For non-list statements, validate child statements normally
+                for child in stmt.statements:
+                    # Navigate to child data from root_data
+                    child_data = self._navigate_path(root_data, current_path)
+                    if child_data is None:
+                        child_data = root_data
+                    self._validate_must_in_statement(child_data, child, evaluator, current_path)

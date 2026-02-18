@@ -310,7 +310,30 @@ class DerefEvaluator:
         schema_node = self.find_schema_node(schema_path)
         
         if not schema_node:
-            return None
+            # If we can't find the schema node, try alternative approaches
+            # For current(), the path might need adjustment
+            if path == 'current()':
+                # Try to find the schema node by looking at the current context
+                # and finding the corresponding schema element
+                context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+                if context_to_use:
+                    # Try to find the schema node by matching the last element of the context
+                    # This handles cases where the schema structure doesn't exactly match the data path
+                    last_part = context_to_use[-1] if context_to_use else None
+                    if last_part and not isinstance(last_part, int):
+                        # Try to find a schema node with this name in the parent context
+                        parent_schema_path = self.data_path_to_schema_path(context_to_use[:-1])
+                        if parent_schema_path:
+                            parent_node = self.find_schema_node(parent_schema_path)
+                            if parent_node:
+                                # Search for a child with the matching name
+                                for stmt in getattr(parent_node, 'statements', []):
+                                    if getattr(stmt, 'name', None) == last_part:
+                                        schema_node = stmt
+                                        break
+            
+            if not schema_node:
+                return None
         
         # Check if it's a leaf with leafref type
         from ..ast import YangLeafStmt
