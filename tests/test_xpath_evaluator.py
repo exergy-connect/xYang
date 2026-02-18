@@ -585,6 +585,44 @@ class TestPredicateFiltering:
         # Should return empty list since field name "id" != "company"
         assert isinstance(result, list)
 
+    def test_predicate_with_not_equal_operator(self):
+        """Test predicate with != operator to ensure it's correctly identified."""
+        data = {
+            "data-model": {
+                "entities": [
+                    {
+                        "name": "company",
+                        "fields": [
+                            {"name": "id", "type": "string"},
+                            {"name": "name", "type": "string"},
+                            {"name": "code", "type": "integer"}
+                        ]
+                    }
+                ]
+            }
+        }
+        module = parse_yang_string(SAMPLE_YANG)
+        # Set data to the entity node for predicate to work
+        entity_data = data["data-model"]["entities"][0]
+        evaluator = XPathEvaluator(entity_data, module, context_path=[])
+        
+        # Filter fields where type != 'string' - should return only the integer field
+        result = evaluator.evaluate_value("fields[type != 'string']")
+        assert isinstance(result, list)
+        assert len(result) == 1
+        assert result[0]["name"] == "code"
+        assert result[0]["type"] == "integer"
+        
+        # Also test that != is correctly identified when '=' appears in the value
+        # Filter fields where name != 'id' - should return name and code fields
+        result2 = evaluator.evaluate_value("fields[name != 'id']")
+        assert isinstance(result2, list)
+        assert len(result2) == 2
+        assert all(field["name"] != "id" for field in result2)
+        
+        # Verify that fields with name = 'id' are excluded
+        assert not any(field["name"] == "id" for field in result2)
+
 
 class TestBooleanEvaluation:
     """Test boolean evaluation."""

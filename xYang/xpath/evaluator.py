@@ -41,12 +41,10 @@ class XPathEvaluator:
         """Evaluate an XPath expression and return boolean result."""
         try:
             result = self.evaluate_value(expression)
-            # Convert to boolean
+            # Convert to boolean - optimized type checking
             if isinstance(result, bool):
                 return result
-            if isinstance(result, (int, float)):
-                return bool(result)
-            if isinstance(result, str):
+            if isinstance(result, (int, float, str)):
                 return bool(result)
             return False
         except XPathSyntaxError:
@@ -143,21 +141,20 @@ class XPathEvaluator:
                 source = str(args[0] or '')
                 from_chars = str(args[1] or '').strip("'\"")
                 to_chars = str(args[2] or '').strip("'\"")
-                result = source
                 # In XPath translate(), if to_chars is shorter, extra from_chars are deleted
                 if not to_chars:
-                    # Delete all from_chars
-                    for char in from_chars:
-                        result = result.replace(char, '')
+                    # Delete all from_chars - use set for faster lookup
+                    if from_chars:
+                        result = ''.join(c for c in source if c not in from_chars)
+                    else:
+                        result = source
                 else:
                     # Map from_chars to to_chars, delete extras
                     trans_dict = {}
+                    to_len = len(to_chars)
                     for i, char in enumerate(from_chars):
-                        if i < len(to_chars):
-                            trans_dict[ord(char)] = to_chars[i]
-                        else:
-                            trans_dict[ord(char)] = None  # Delete
-                    result = result.translate(trans_dict)
+                        trans_dict[ord(char)] = to_chars[i] if i < to_len else None
+                    result = source.translate(trans_dict)
                 return result
 
 
@@ -185,8 +182,11 @@ class XPathEvaluator:
             if len(args) == 1:
                 operand = args[0]
                 # In XPath, not() returns true if value is false/empty/None, false if value exists
-                if operand is None or operand == '' or operand is False or (isinstance(operand, (list, dict)) and len(operand) == 0):
+                # Optimized: check most common cases first
+                if operand is None or operand is False or operand == '':
                     return True
+                if isinstance(operand, (list, dict)):
+                    return len(operand) == 0
                 return False
             return True
 
@@ -370,8 +370,11 @@ class XPathEvaluator:
 
         if op == 'not':
             # In XPath, not() returns true if value is false/empty/None, false if value exists
-            if operand is None or operand == '' or operand is False or (isinstance(operand, (list, dict)) and len(operand) == 0):
+            # Optimized: check most common cases first
+            if operand is None or operand is False or operand == '':
                 return True
+            if isinstance(operand, (list, dict)):
+                return len(operand) == 0
             return False
         if op == '-':
             try:
@@ -386,8 +389,14 @@ class XPathEvaluator:
         # Handle relative paths with .. steps
         if node.steps and node.steps[0] == '..':
             # This is a relative path, evaluate it directly
-            up_levels = sum(1 for step in node.steps if step == '..')
-            field_parts = [step for step in node.steps if step != '..']
+            # Optimized: single pass through steps
+            up_levels = 0
+            field_parts = []
+            for step in node.steps:
+                if step == '..':
+                    up_levels += 1
+                else:
+                    field_parts.append(step)
 
             # Special case: if we're at a node level (context_path is empty) and path starts with ..,
             # treat it as direct field access or return current node if no fields
@@ -449,10 +458,16 @@ class XPathEvaluator:
         if isinstance(value, bool):
             return value
         if isinstance(value, str):
-            # YANG/JSON boolean strings
-            if value.lower() == 'true':
+            # YANG/JSON boolean strings - optimized comparison
+            if value == 'true' or value == 'True':
                 return True
-            if value.lower() == 'false':
+            if value == 'false' or value == 'False':
+                return False
+            # Use lower() only if needed
+            lower_val = value.lower()
+            if lower_val == 'true':
+                return True
+            if lower_val == 'false':
                 return False
             # Other strings are truthy
             return bool(value)
@@ -560,8 +575,14 @@ class XPathEvaluator:
         # Handle relative paths
         if path.startswith('../') or path.startswith('./'):
             parts = path.split('/')
-            up_levels = sum(1 for p in parts if p == '..')
-            field_parts = [p for p in parts if p and p != '..' and p != '.']
+            # Optimized: single pass through parts
+            up_levels = 0
+            field_parts = []
+            for p in parts:
+                if p == '..':
+                    up_levels += 1
+                elif p and p != '.':
+                    field_parts.append(p)
             
             # Navigate up from context
             if up_levels == 0:
@@ -662,10 +683,15 @@ class XPathEvaluator:
             target_path = [p for p in leafref_path.split('/') if p]
         else:
             # Relative path - resolve relative to current context
-            # Parse the relative path
+            # Parse the relative path - optimized single pass
             parts = leafref_path.split('/')
-            up_levels = sum(1 for p in parts if p == '..')
-            field_parts = [p for p in parts if p and p != '..']
+            up_levels = 0
+            field_parts = []
+            for p in parts:
+                if p == '..':
+                    up_levels += 1
+                elif p:
+                    field_parts.append(p)
             
             # Build target path by going up from context, then adding field parts
             if up_levels > len(self.context_path):
@@ -728,11 +754,13 @@ class XPathEvaluator:
         
         # Extract entity index from context if available and requested
         entity_idx = None
-        if use_context_index:
+        if use_context_index and self.context_path:
+            context_len = len(self.context_path)
             for j, p in enumerate(self.context_path):
-                if p == "entities" and j + 1 < len(self.context_path):
-                    if isinstance(self.context_path[j + 1], int):
-                        entity_idx = self.context_path[j + 1]
+                if p == "entities" and j + 1 < context_len:
+                    next_item = self.context_path[j + 1]
+                    if isinstance(next_item, int):
+                        entity_idx = next_item
                         break
         
         current = self.root_data
@@ -759,11 +787,14 @@ class XPathEvaluator:
             elif isinstance(current, list):
                 # For lists, check if context has an index for this list part
                 list_idx = None
-                for j, p in enumerate(self.context_path):
-                    if p == part and j + 1 < len(self.context_path):
-                        if isinstance(self.context_path[j + 1], int):
-                            list_idx = self.context_path[j + 1]
-                            break
+                if self.context_path:
+                    context_len = len(self.context_path)
+                    for j, p in enumerate(self.context_path):
+                        if p == part and j + 1 < context_len:
+                            next_item = self.context_path[j + 1]
+                            if isinstance(next_item, int):
+                                list_idx = next_item
+                                break
                 
                 if list_idx is not None and 0 <= list_idx < len(current):
                     # Use the specific list item from context
@@ -908,8 +939,14 @@ class XPathEvaluator:
         # Handle relative paths
         if path.startswith('../') or path.startswith('./') or path == 'current()' or path == '.':
             parts = path.split('/')
-            up_levels = sum(1 for p in parts if p == '..')
-            field_parts = [p for p in parts if p and p != '..' and p != '.' and p != 'current()']
+            # Optimized: single pass through parts
+            up_levels = 0
+            field_parts = []
+            for p in parts:
+                if p == '..':
+                    up_levels += 1
+                elif p and p != '.' and p != 'current()':
+                    field_parts.append(p)
             
             # Build absolute path from context_path
             if up_levels == 0:
@@ -1019,28 +1056,35 @@ class XPathEvaluator:
             return self._evaluate_absolute_path(path)
 
         # Handle filtering [predicate]
-        if '[' in path:
-            base_path = path[:path.index('[')]
-            predicate = path[path.index('['):]
+        bracket_idx = path.find('[')
+        if bracket_idx >= 0:
+            base_path = path[:bracket_idx]
+            predicate = path[bracket_idx:]
             value = self._evaluate_path(base_path)
             if isinstance(value, list):
                 return self._apply_predicate(value, predicate)
             return value
 
-        # Simple field access
+        # Simple field access - cache split result if path is simple
+        if '/' not in path:
+            return self._get_path_value([path])
         return self._get_path_value(path.split('/'))
 
     def _evaluate_relative_path(self, path: str) -> Any:
         """Evaluate a relative path like ../field or ../../field."""
-        parts = path.split('/')
-        up_levels = 0
-        field_parts = []
-
-        for part in parts:
-            if part == '..':
-                up_levels += 1
-            elif part:
-                field_parts.append(part)
+        # Optimized: avoid split if path is simple
+        if path == '..':
+            up_levels = 1
+            field_parts = []
+        else:
+            parts = path.split('/')
+            up_levels = 0
+            field_parts = []
+            for part in parts:
+                if part == '..':
+                    up_levels += 1
+                elif part:
+                    field_parts.append(part)
 
         # Special case: if we're at a node level (context_path is empty) and path starts with ..,
         # treat it as direct field access (the .. is a quirk of YANG path syntax)
@@ -1114,16 +1158,18 @@ class XPathEvaluator:
                 continue
 
             # Handle filtering
-            if isinstance(part, str) and '[' in part:
-                base_part = part[:part.index('[')]
-                predicate = part[part.index('['):]
+            if isinstance(part, str):
+                bracket_idx = part.find('[')
+                if bracket_idx >= 0:
+                    base_part = part[:bracket_idx]
+                    predicate = part[bracket_idx:]
 
-                if isinstance(current, dict) and base_part in current:
-                    value = current[base_part]
-                    if isinstance(value, list):
-                        return self._apply_predicate(value, predicate)
-                    return value
-                return None
+                    if isinstance(current, dict) and base_part in current:
+                        value = current[base_part]
+                        if isinstance(value, list):
+                            return self._apply_predicate(value, predicate)
+                        return value
+                    return None
 
             if isinstance(current, dict):
                 if part in current:
@@ -1157,7 +1203,7 @@ class XPathEvaluator:
 
         # Handle comparisons like [name = current()] or [type != 'array']
         if '=' in pred_expr or '!=' in pred_expr:
-            op = '=' if '=' in pred_expr else '!='
+            op = '!=' if '!=' in pred_expr else '='
             parts = pred_expr.split(op, 1)
             if len(parts) == 2:
                 left_expr = parts[0].strip()
@@ -1232,12 +1278,14 @@ class XPathEvaluator:
 
     def _compare_equal(self, left: Any, right: Any) -> bool:
         """Compare two values for equality."""
+        # Fast path for same types
+        if type(left) is type(right):
+            return left == right
         # Handle string comparison with type coercion
         if isinstance(left, str) and isinstance(right, (int, float, bool)):
-            right = str(right)
-        elif isinstance(right, str) and isinstance(left, (int, float, bool)):
-            left = str(left)
-
+            return left == str(right)
+        if isinstance(right, str) and isinstance(left, (int, float, bool)):
+            return str(left) == right
         return left == right
 
     def _compare_less_equal(self, left: Any, right: Any) -> bool:

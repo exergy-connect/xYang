@@ -404,7 +404,7 @@ class XPathEvaluator:
 
         # Handle comparisons like [name = current()] or [type != 'array']
         if '=' in pred_expr or '!=' in pred_expr:
-            op = '=' if '=' in pred_expr else '!='
+            op = '!=' if '!=' in pred_expr else '='
             parts = pred_expr.split(op, 1)
             if len(parts) == 2:
                 left_expr = parts[0].strip()
