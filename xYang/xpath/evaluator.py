@@ -115,6 +115,31 @@ class XPathEvaluator:
         left = node.left.evaluate(self)
         op = node.operator
 
+        # Special case: if left is a dict or list and op is '/', treat as path navigation
+        # For lists, navigate from first element
+        if op == '/' and isinstance(left, list) and len(left) > 0:
+            # Left is a list - navigate from first element
+            old_data = self.data
+            old_context = self.context_path
+            try:
+                self.data = left[0] if isinstance(left[0], dict) else {'value': left[0]}
+                self._set_context_path([])
+                # Evaluate right side as path
+                if hasattr(node.right, 'steps'):
+                    # It's a PathNode
+                    result = node.right.evaluate(self)
+                else:
+                    # Try to evaluate and treat as path
+                    right_val = node.right.evaluate(self)
+                    if isinstance(right_val, str):
+                        result = self.path_evaluator.evaluate_path(right_val)
+                    else:
+                        result = right_val
+                return result
+            finally:
+                self.data = old_data
+                self._set_context_path(old_context)
+        
         # Special case: if left is a dict and op is '/', treat as path navigation
         # Extract the full path from nested BinaryOpNodes and evaluate as a single path
         if op == '/' and isinstance(left, dict):

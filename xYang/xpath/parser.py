@@ -2,13 +2,23 @@
 XPath expression tokenizer and parser.
 """
 
-from typing import List, Optional
+from typing import List, Optional, Set
 
 from .ast import (
     Token, TokenType, XPathNode, LiteralNode, PathNode, CurrentNode,
     FunctionCallNode, BinaryOpNode, UnaryOpNode
 )
 from ..errors import XPathSyntaxError
+
+
+# Constants for operator sets
+COMPARISON_OPS: Set[str] = {'=', '!=', '<', '>', '<=', '>='}
+ADDITIVE_OPS: Set[str] = {'+', '-'}
+MULTIPLICATIVE_OPS: Set[str] = {'*', '/'}
+BOOLEAN_KEYWORDS: Set[str] = {'true', 'false'}
+LOGICAL_KEYWORDS: Set[str] = {'or', 'and', 'not'}
+QUOTE_CHARS: Set[str] = {'"', "'"}
+OPERATOR_CHARS: Set[str] = {'=', '<', '>', '!', '+', '-', '*', '/'}
 
 
 class XPathTokenizer:
@@ -33,58 +43,48 @@ class XPathTokenizer:
         self.tokens = []
 
         while self.position < len(self.expression):
-            # Skip whitespace
             if self._skip_whitespace():
                 continue
 
-            # Check for end of input
             if self.position >= len(self.expression):
                 break
 
             char = self.expression[self.position]
-
-            # String literals
-            if char in ('"', "'"):
+            
+            # Dispatch to appropriate tokenizer
+            if char in QUOTE_CHARS:
                 self._tokenize_string()
-            # Numbers
             elif char.isdigit() or (char == '-' and self._is_next_digit()):
                 self._tokenize_number()
-            # Identifiers and keywords
             elif char.isalpha() or char == '_':
                 self._tokenize_identifier()
-            # Operators
-            elif char in ('=', '<', '>', '!', '+', '-', '*', '/'):
+            elif char in OPERATOR_CHARS:
                 self._tokenize_operator()
-            # Parentheses
             elif char == '(':
-                self.tokens.append(Token(TokenType.PAREN_OPEN, '(', self.position))
-                self.position += 1
+                self._add_simple_token(TokenType.PAREN_OPEN, '(', 1)
             elif char == ')':
-                self.tokens.append(Token(TokenType.PAREN_CLOSE, ')', self.position))
-                self.position += 1
-            # Brackets
+                self._add_simple_token(TokenType.PAREN_CLOSE, ')', 1)
             elif char == '[':
-                self.tokens.append(Token(TokenType.BRACKET_OPEN, '[', self.position))
-                self.position += 1
+                self._add_simple_token(TokenType.BRACKET_OPEN, '[', 1)
             elif char == ']':
-                self.tokens.append(Token(TokenType.BRACKET_CLOSE, ']', self.position))
-                self.position += 1
-            # Dot
+                self._add_simple_token(TokenType.BRACKET_CLOSE, ']', 1)
             elif char == '.':
                 self._tokenize_dot()
-            # Slash
             elif char == '/':
                 self._tokenize_slash()
-            # Comma
             elif char == ',':
-                self.tokens.append(Token(TokenType.COMMA, ',', self.position))
-                self.position += 1
+                self._add_simple_token(TokenType.COMMA, ',', 1)
             else:
                 # Unknown character, skip
                 self.position += 1
 
         self.tokens.append(Token(TokenType.EOF, '', self.position))
         return self.tokens
+
+    def _add_simple_token(self, token_type: TokenType, value: str, advance: int):
+        """Add a simple single-character token and advance position."""
+        self.tokens.append(Token(token_type, value, self.position))
+        self.position += advance
 
     def _skip_whitespace(self) -> bool:
         """Skip whitespace characters. Returns True if whitespace was found."""
@@ -98,6 +98,11 @@ class XPathTokenizer:
         """Check if next character is a digit."""
         return (self.position + 1 < len(self.expression) and
                 self.expression[self.position + 1].isdigit())
+
+    def _peek_char(self, offset: int = 0) -> Optional[str]:
+        """Peek at character at position + offset."""
+        pos = self.position + offset
+        return self.expression[pos] if 0 <= pos < len(self.expression) else None
 
     def _tokenize_string(self):
         """Tokenize a string literal."""
@@ -137,10 +142,8 @@ class XPathTokenizer:
             self.position += 1
 
         # Decimal point and fractional part
-        if (self.position < len(self.expression) and
-            self.expression[self.position] == '.' and
-            self.position + 1 < len(self.expression) and
-            self.expression[self.position + 1].isdigit()):
+        if (self._peek_char() == '.' and self._peek_char(1) and 
+            self._peek_char(1).isdigit()):
             value.append('.')
             self.position += 1
             while self.position < len(self.expression) and self.expression[self.position].isdigit():
@@ -156,7 +159,7 @@ class XPathTokenizer:
 
         while self.position < len(self.expression):
             char = self.expression[self.position]
-            if char.isalnum() or char == '_' or char == '-':
+            if char.isalnum() or char in ('_', '-'):
                 value.append(char)
                 self.position += 1
             else:
@@ -183,12 +186,11 @@ class XPathTokenizer:
         self.position += 1
 
     def _tokenize_dot(self):
-        """Tokenize a dot (could be . or .. or part of a number)."""
+        """Tokenize a dot (could be . or ..)."""
         start_pos = self.position
 
         # Check for .. (parent path)
-        if (self.position + 1 < len(self.expression) and
-            self.expression[self.position + 1] == '.'):
+        if self._peek_char(1) == '.':
             self.tokens.append(Token(TokenType.IDENTIFIER, '..', start_pos))
             self.position += 2
         else:
@@ -201,8 +203,7 @@ class XPathTokenizer:
         start_pos = self.position
 
         # Check for // (descendant-or-self)
-        if (self.position + 1 < len(self.expression) and
-            self.expression[self.position + 1] == '/'):
+        if self._peek_char(1) == '/':
             self.tokens.append(Token(TokenType.OPERATOR, '//', start_pos))
             self.position += 2
         else:
@@ -230,8 +231,8 @@ class XPathParser:
 
         node = self._parse_expression()
 
-        if self._current_token().type != TokenType.EOF:
-            token = self._current_token()
+        token = self._current_token()
+        if token.type != TokenType.EOF:
             raise XPathSyntaxError(
                 f"Unexpected token: {token.type.name} ({token.value!r})",
                 position=token.position,
@@ -246,9 +247,11 @@ class XPathParser:
             return self.tokens[self.position]
         return Token(TokenType.EOF, '', 0)
 
-    def _consume(self, expected_type: Optional[TokenType] = None, expected_value: Optional[str] = None) -> Token:
-        """Consume current token."""
+    def _consume(self, expected_type: Optional[TokenType] = None, 
+                 expected_value: Optional[str] = None) -> Token:
+        """Consume current token with optional validation."""
         token = self._current_token()
+        
         if expected_type and token.type != expected_type:
             raise XPathSyntaxError(
                 f"Expected {expected_type.name}, got {token.type.name} ({token.value!r})",
@@ -261,8 +264,15 @@ class XPathParser:
                 position=token.position,
                 expression=self._get_expression()
             )
+        
         self.position += 1
         return token
+
+    def _is_keyword(self, keyword: str) -> bool:
+        """Check if current token is a specific keyword (case-insensitive)."""
+        token = self._current_token()
+        return (token.type == TokenType.IDENTIFIER and 
+                token.value.lower() == keyword.lower())
 
     def _parse_expression(self) -> XPathNode:
         """Parse an expression (lowest precedence)."""
@@ -272,8 +282,7 @@ class XPathParser:
         """Parse logical OR (lowest precedence)."""
         left = self._parse_logical_and()
 
-        while (self._current_token().type == TokenType.IDENTIFIER and
-               self._current_token().value.lower() == 'or'):
+        while self._is_keyword('or'):
             self._consume()  # Consume 'or'
             right = self._parse_logical_and()
             left = BinaryOpNode('or', left, right)
@@ -284,8 +293,7 @@ class XPathParser:
         """Parse logical AND."""
         left = self._parse_comparison()
 
-        while (self._current_token().type == TokenType.IDENTIFIER and
-               self._current_token().value.lower() == 'and'):
+        while self._is_keyword('and'):
             self._consume()  # Consume 'and'
             right = self._parse_comparison()
             left = BinaryOpNode('and', left, right)
@@ -297,7 +305,7 @@ class XPathParser:
         left = self._parse_additive()
 
         token = self._current_token()
-        if token.type == TokenType.OPERATOR and token.value in ('=', '!=', '<', '>', '<=', '>='):
+        if token.type == TokenType.OPERATOR and token.value in COMPARISON_OPS:
             op = self._consume().value
             right = self._parse_additive()
             return BinaryOpNode(op, left, right)
@@ -310,7 +318,7 @@ class XPathParser:
 
         while True:
             token = self._current_token()
-            if token.type == TokenType.OPERATOR and token.value in ('+', '-'):
+            if token.type == TokenType.OPERATOR and token.value in ADDITIVE_OPS:
                 op = self._consume().value
                 right = self._parse_multiplicative()
                 left = BinaryOpNode(op, left, right)
@@ -325,33 +333,35 @@ class XPathParser:
 
         while True:
             token = self._current_token()
-            # Don't treat / as division if left is a path node (it's a path separator)
-            if (token.type == TokenType.OPERATOR and token.value == '/' and
-                isinstance(left, PathNode)):
-                # This is a path continuation, not division
-                # Parse the rest as a path and merge
-                self._consume()  # Consume the /
-                # Continue parsing path steps
+            if not (token.type == TokenType.OPERATOR and token.value == '/'):
+                # Not a slash, check for other multiplicative ops
+                if token.type == TokenType.OPERATOR and token.value == '*':
+                    op = self._consume().value
+                    right = self._parse_unary()
+                    left = BinaryOpNode(op, left, right)
+                else:
+                    break
+                continue
+
+            # Handle / operator - could be division or path navigation
+            if isinstance(left, PathNode):
+                # Path continuation - merge paths
+                self._consume()
                 right_path = self._parse_path()
-                # Merge paths
                 left.steps.extend(right_path.steps)
-                left.predicate = right_path.predicate
-            # Also handle / after function calls (like deref()) as path navigation
-            elif (token.type == TokenType.OPERATOR and token.value == '/' and
-                  isinstance(left, FunctionCallNode) and left.name == 'deref'):
-                # deref() followed by / is path navigation, not division
-                # Create a special node that evaluates deref() then navigates the path
-                self._consume()  # Consume the /
+                # Only overwrite predicate if right has one
+                if right_path.predicate is not None:
+                    left.predicate = right_path.predicate
+            elif isinstance(left, FunctionCallNode) and left.name == 'deref':
+                # deref() followed by / is path navigation
+                self._consume()
                 right_path = self._parse_path()
-                # Create a BinaryOpNode with '/' but mark it as path navigation
-                # The evaluator will handle this specially
                 left = BinaryOpNode('/', left, right_path)
-            elif token.type == TokenType.OPERATOR and token.value in ('*', '/'):
+            else:
+                # Regular division
                 op = self._consume().value
                 right = self._parse_unary()
                 left = BinaryOpNode(op, left, right)
-            else:
-                break
 
         return left
 
@@ -362,17 +372,15 @@ class XPathParser:
         # Unary minus
         if token.type == TokenType.OPERATOR and token.value == '-':
             self._consume()
-            operand = self._parse_unary()
-            return UnaryOpNode('-', operand)
+            return UnaryOpNode('-', self._parse_unary())
 
-        # Unary plus (explicit positive, usually no-op but we support it)
+        # Unary plus (no-op)
         if token.type == TokenType.OPERATOR and token.value == '+':
             self._consume()
-            operand = self._parse_unary()
-            return operand  # Unary + is a no-op, just return the operand
+            return self._parse_unary()  # Unary + is a no-op
 
         # Unary not
-        if token.type == TokenType.IDENTIFIER and token.value.lower() == 'not':
+        if self._is_keyword('not'):
             self._consume()
             self._consume(TokenType.PAREN_OPEN)
             operand = self._parse_expression()
@@ -381,48 +389,58 @@ class XPathParser:
 
         return self._parse_primary()
 
+    def _parse_boolean_literal(self, value: bool) -> XPathNode:
+        """Parse a boolean literal (true/false), handling function call syntax."""
+        self._consume()
+        # Check if it's a function call
+        if self._current_token().type == TokenType.PAREN_OPEN:
+            self._consume(TokenType.PAREN_OPEN)
+            self._consume(TokenType.PAREN_CLOSE)
+            return FunctionCallNode(str(value).lower(), [])
+        return LiteralNode(value)
+
+    def _parse_number_literal(self) -> XPathNode:
+        """Parse a number literal."""
+        value = self._consume().value
+        try:
+            return LiteralNode(float(value) if '.' in value else int(value))
+        except ValueError:
+            token = self._current_token()
+            raise XPathSyntaxError(
+                f"Invalid number: {value}",
+                position=token.position,
+                expression=self._get_expression()
+            )
+
+    def _parse_function_call(self) -> XPathNode:
+        """Parse a function call."""
+        name = self._consume().value
+        self._consume(TokenType.PAREN_OPEN)
+        args = []
+        if self._current_token().type != TokenType.PAREN_CLOSE:
+            args = self._parse_argument_list()
+        self._consume(TokenType.PAREN_CLOSE)
+        return FunctionCallNode(name, args)
+
     def _parse_primary(self) -> XPathNode:
         """Parse primary expressions."""
         token = self._current_token()
 
-        # Literals
+        # String literals
         if token.type == TokenType.STRING:
             value = self._consume().value
             return LiteralNode(value)
 
+        # Number literals
         if token.type == TokenType.NUMBER:
-            value = self._consume().value
-            try:
-                if '.' in value:
-                    return LiteralNode(float(value))
-                return LiteralNode(int(value))
-            except ValueError:
-                token = self._current_token()
-                raise XPathSyntaxError(
-                    f"Invalid number: {value}",
-                    position=token.position,
-                    expression=self._get_expression()
-                )
+            return self._parse_number_literal()
 
         # Boolean literals
         if token.type == TokenType.IDENTIFIER:
-            if token.value.lower() == 'true':
-                self._consume()
-                # Check if it's a function call
-                if self._current_token().type == TokenType.PAREN_OPEN:
-                    self._consume(TokenType.PAREN_OPEN)
-                    self._consume(TokenType.PAREN_CLOSE)
-                    return FunctionCallNode('true', [])
-                return LiteralNode(True)
-
-            if token.value.lower() == 'false':
-                self._consume()
-                # Check if it's a function call
-                if self._current_token().type == TokenType.PAREN_OPEN:
-                    self._consume(TokenType.PAREN_OPEN)
-                    self._consume(TokenType.PAREN_CLOSE)
-                    return FunctionCallNode('false', [])
-                return LiteralNode(False)
+            if self._is_keyword('true'):
+                return self._parse_boolean_literal(True)
+            if self._is_keyword('false'):
+                return self._parse_boolean_literal(False)
 
         # Current node
         if token.type == TokenType.DOT:
@@ -431,7 +449,6 @@ class XPathParser:
             if self._current_token().type == TokenType.PAREN_OPEN:
                 self._consume(TokenType.PAREN_OPEN)
                 self._consume(TokenType.PAREN_CLOSE)
-                return CurrentNode()
             return CurrentNode()
 
         # Function calls - check if identifier is followed by (
@@ -439,13 +456,7 @@ class XPathParser:
             # Peek ahead to see if it's a function call
             if (self.position + 1 < len(self.tokens) and
                 self.tokens[self.position + 1].type == TokenType.PAREN_OPEN):
-                name = self._consume().value
-                self._consume(TokenType.PAREN_OPEN)
-                args = []
-                if self._current_token().type != TokenType.PAREN_CLOSE:
-                    args = self._parse_argument_list()
-                self._consume(TokenType.PAREN_CLOSE)
-                return FunctionCallNode(name, args)
+                return self._parse_function_call()
             # Otherwise, it's a path (could be .. or field name)
             return self._parse_path()
 
