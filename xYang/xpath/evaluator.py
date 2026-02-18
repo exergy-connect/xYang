@@ -108,10 +108,26 @@ class XPathEvaluator:
                         path = '/' + '/'.join(arg_node.steps)
                     else:
                         path = '/'.join(arg_node.steps)
+                elif isinstance(arg_node, FunctionCallNode):
+                    # It's a function call like current() - use the function name and args as path
+                    # For current(), we want to pass "current()" as the path
+                    if arg_node.name == 'current' and len(arg_node.args) == 0:
+                        path = 'current()'
+                    else:
+                        # For other functions, build the path representation
+                        path = f"{arg_node.name}()"
                 else:
-                    # Evaluate to get the path value, then use as path string
-                    arg_value = arg_node.evaluate(self) if hasattr(arg_node, 'evaluate') else str(arg_node)
-                    path = str(arg_value) if arg_value is not None else ''
+                    # For other node types, try to get a string representation
+                    # This handles cases where the path is a simple value
+                    if hasattr(arg_node, 'evaluate'):
+                        # Evaluate to get the value, but we need the path expression
+                        # For deref(), we actually want to evaluate the path to get the value,
+                        # then find the schema node at that location to get its leafref path
+                        # So we need to pass the path expression, not the value
+                        # For now, try to reconstruct the path from the node
+                        path = str(arg_node) if hasattr(arg_node, '__str__') else ''
+                    else:
+                        path = str(arg_node)
                 return self._evaluate_deref(path)
             return None
 
@@ -447,11 +463,17 @@ class XPathEvaluator:
         """Evaluate deref() - resolve a leafref path.
         
         In YANG, deref() takes a leafref path and returns the node it references.
-        This allows further path navigation from that node.
+        This follows the YANG specification strictly:
+        1. Evaluate the path to get the leafref value
+        2. Find the schema node for the field at that path
+        3. Get the leafref path definition from the schema
+        4. Use that path to find the referenced node in the data
         
-        For example: deref(../entity)/../fields/field[name = current()]
-        - deref(../entity) should return the entity node (not just the value "parent")
-        - Then /../fields/... can navigate from that entity node
+        For example: deref(../entity)
+        - Evaluates ../entity to get value (e.g., "company")
+        - Finds the schema leaf for "entity" field
+        - Gets its leafref path (e.g., "/data-model/entities/name")
+        - Uses that path to find the node where name="company"
         """
         try:
             # Check cache first
@@ -459,110 +481,459 @@ class XPathEvaluator:
             if cache_key in self.leafref_cache:
                 return self.leafref_cache[cache_key]
             
-            # Evaluate the path to get the leafref value (e.g., "parent")
+            # Step 1: Evaluate the path to get the leafref value
             ref_value = self._evaluate_path(path)
             
             if ref_value is None:
                 # Referenced node doesn't exist - acceptable for optional references
                 return None
             
-            # Now find the node that contains this value
-            # The path tells us where to look (e.g., ../entity means look in parent's entity field)
-            # We need to find the node that has this value
+            # Step 2: Find the schema node for the field at this path
+            leafref_path = self._get_leafref_path_from_schema(path)
             
-            # Parse the path to understand the structure
-            # For ../entity, we need to:
-            # 1. Go up one level from current context
-            # 2. Find the entity list/container
-            # 3. Find the entity node with name == ref_value
+            if not leafref_path:
+                # No leafref definition found - cannot resolve
+                return None
             
-            # Handle relative paths like ../entity
-            if path.startswith('../'):
-                # Get the path parts
-                parts = path.split('/')
-                up_levels = sum(1 for p in parts if p == '..')
-                field_parts = [p for p in parts if p and p != '..']
-                
-                # Navigate up from current context to get the leafref value (e.g., "parent")
-                if up_levels <= len(self.context_path):
-                    value_path = self.context_path[:-up_levels] + field_parts
-                    ref_value = self._get_path_value(value_path)
-                    
-                    if ref_value is not None:
-                        # Find the node that contains this value
-                        # The field name (e.g., "entity") tells us what type of node to find
-                        # Common pattern: if field is "entity", look in entities.entity list
-                        field_name = field_parts[-1] if field_parts else None
-                        
-                        if field_name == "entity":
-                            # Look in /data-model/entities/entity for entity with name == ref_value
-                            # Use root_data to ensure we search from the root
-                            old_data = self.data
-                            try:
-                                self.data = self.root_data
-                                entities_list = self._get_path_value(["data-model", "entities", "entity"])
-                                if isinstance(entities_list, list):
-                                    for entity in entities_list:
-                                        if isinstance(entity, dict) and "name" in entity:
-                                            if entity["name"] == ref_value:
-                                                result = entity
-                                                self.leafref_cache[cache_key] = result
-                                                return result
-                            finally:
-                                self.data = old_data
-                        
-                        # Generic fallback: search for any node with field_name == ref_value
-                        # Use "name" as the key field (common pattern)
-                        result = self._find_node_by_key(self.root_data, "name", ref_value, field_name)
-                        if result is not None:
-                            self.leafref_cache[cache_key] = result
-                            return result
+            # Step 3: Use the leafref path to find the referenced node
+            result = self._find_node_by_leafref_path(leafref_path, ref_value)
             
-            # Handle absolute paths like /data-model/entities/entity/name
-            elif path.startswith('/'):
-                # Remove leading /
-                abs_path = path.lstrip('/')
-                parts = abs_path.split('/')
-                
-                # Navigate to the container that should contain the value
-                # The last part is usually the key field (e.g., "name")
-                if len(parts) >= 2:
-                    container_path = parts[:-1]  # All but last
-                    key_field = parts[-1]  # Last part is the key field
-                    
-                    container = self._evaluate_absolute_path('/' + '/'.join(container_path))
-                    
-                    if container is not None:
-                        # Find the node in the container
-                        if isinstance(container, list):
-                            for item in container:
-                                if isinstance(item, dict) and key_field in item:
-                                    if item[key_field] == ref_value:
-                                        result = item
-                                        self.leafref_cache[cache_key] = result
-                                        return result
-                        elif isinstance(container, dict):
-                            # Check if it's a dict keyed by the value
-                            if key_field in container and container[key_field] == ref_value:
-                                result = container
-                                self.leafref_cache[cache_key] = result
-                                return result
-                            # Or check nested lists
-                            for key, value in container.items():
-                                if isinstance(value, list):
-                                    for item in value:
-                                        if isinstance(item, dict) and key_field in item:
-                                            if item[key_field] == ref_value:
-                                                result = item
-                                                self.leafref_cache[cache_key] = result
-                                                return result
+            if result is not None:
+                self.leafref_cache[cache_key] = result
             
-            # Fallback: if we can't find the node, return None
-            # This is acceptable for optional references
-            return None
+            return result
         except Exception:
             # If path evaluation fails, deref() returns None (referenced node doesn't exist)
             return None
+    
+    def _get_leafref_path_from_schema(self, path: str) -> str:
+        """Get the leafref path definition from the schema for the field at the given path.
+        
+        Args:
+            path: XPath expression pointing to a leafref field (e.g., "../entity", "current()")
+            
+        Returns:
+            The leafref path string, or None if not found
+        """
+        # Resolve the path to find the schema node
+        # First, resolve the path to an absolute schema path
+        schema_path = self._resolve_path_to_schema_location(path)
+        
+        if not schema_path:
+            return None
+        
+        # Find the schema node at that path
+        schema_node = self._find_schema_node(schema_path)
+        
+        if not schema_node:
+            return None
+        
+        # Check if it's a leaf with leafref type
+        from ..ast import YangLeafStmt
+        if not isinstance(schema_node, YangLeafStmt):
+            return None
+        
+        if not schema_node.type or schema_node.type.name != 'leafref':
+            return None
+        
+        # Get the leafref path
+        if hasattr(schema_node.type, 'path') and schema_node.type.path:
+            return schema_node.type.path
+        
+        return None
+    
+    def _resolve_path_to_schema_location(self, path: str) -> List[str]:
+        """Resolve an XPath expression to a schema location path.
+        
+        Args:
+            path: XPath expression (e.g., "../entity", "current()", "./field")
+            
+        Returns:
+            List of schema node names representing the full path from module root, or None
+        """
+        # Handle current() or .
+        if path == 'current()' or path == '.':
+            # Use current context path, but convert data path to schema path
+            # Schema path is similar but may need adjustment
+            return self._data_path_to_schema_path(self.context_path)
+        
+        # Handle relative paths
+        if path.startswith('../') or path.startswith('./'):
+            parts = path.split('/')
+            up_levels = sum(1 for p in parts if p == '..')
+            field_parts = [p for p in parts if p and p != '..' and p != '.']
+            
+            # Navigate up from context
+            if up_levels == 0:
+                # No navigation up - use current context + field parts
+                data_path = self.context_path + field_parts
+            elif up_levels <= len(self.context_path):
+                # Navigate up 'up_levels' steps
+                data_path = self.context_path[:-up_levels] + field_parts
+            else:
+                return None
+            
+            schema_path = self._data_path_to_schema_path(data_path)
+            # Ensure we have the full path from root (should start with data-model)
+            if schema_path and schema_path[0] != "data-model":
+                # Prepend data-model if not present
+                schema_path = ["data-model"] + schema_path
+            return schema_path
+        
+        # Simple field name
+        if path and not path.startswith('/'):
+            data_path = self.context_path + [path]
+            return self._data_path_to_schema_path(data_path)
+        
+        # Handle absolute paths
+        if path.startswith('/'):
+            # Remove leading / and convert to schema path
+            parts = [p for p in path.split('/') if p]
+            return parts
+        
+        return None
+    
+    def _data_path_to_schema_path(self, data_path: List) -> List[str]:
+        """Convert a data structure path to a schema path.
+        
+        Removes list indices and converts to schema node names.
+        
+        Args:
+            data_path: Path in data structure (may contain integers for list indices)
+            
+        Returns:
+            Schema path (list of node names, no indices)
+        """
+        schema_path = []
+        for part in data_path:
+            # Skip list indices (integers)
+            if isinstance(part, int):
+                continue
+            # Skip special XPath parts
+            if part in ('.', '..', 'current()'):
+                continue
+            schema_path.append(str(part))
+        return schema_path
+    
+    def _find_schema_node(self, schema_path: List[str]) -> Any:
+        """Find a schema node at the given path.
+        
+        Args:
+            schema_path: List of schema node names
+            
+        Returns:
+            The schema node (YangStatement), or None if not found
+        """
+        if not self.module or not schema_path:
+            return None
+        
+        current_statements = self.module.statements
+        last_node = None
+        
+        for part in schema_path:
+            found = False
+            for stmt in current_statements:
+                if hasattr(stmt, 'name') and stmt.name == part:
+                    last_node = stmt
+                    if hasattr(stmt, 'statements'):
+                        current_statements = stmt.statements
+                    else:
+                        current_statements = []
+                    found = True
+                    break
+            if not found:
+                return None
+        
+        return last_node
+    
+    def _find_node_by_leafref_path(self, leafref_path: str, ref_value: Any) -> Any:
+        """Find a node in the data using a leafref path by recursively walking the tree.
+        
+        Args:
+            leafref_path: The leafref path (e.g., "/data-model/entities/name" or "../../fields/name")
+            ref_value: The value to search for
+            
+        Returns:
+            The node containing the value, or None if not found
+        """
+        # Resolve relative paths to determine the target location
+        if leafref_path.startswith('/'):
+            # Absolute path - walk from root
+            target_path = [p for p in leafref_path.split('/') if p]
+        else:
+            # Relative path - resolve relative to current context
+            # Parse the relative path
+            parts = leafref_path.split('/')
+            up_levels = sum(1 for p in parts if p == '..')
+            field_parts = [p for p in parts if p and p != '..']
+            
+            # Build target path by going up from context, then adding field parts
+            if up_levels > len(self.context_path):
+                return None
+            
+            # Remove list indices when going up (they're not part of schema structure)
+            context_without_indices = [p for p in self.context_path if not isinstance(p, int)]
+            if up_levels > len(context_without_indices):
+                return None
+            
+            # Go up 'up_levels' schema levels, then add field parts
+            base_path = context_without_indices[:-up_levels] if up_levels > 0 else context_without_indices
+            target_path = base_path + field_parts
+        
+        if not target_path:
+            return None
+        
+        # The last part is the key field name
+        # Everything before it is the container/list path
+        if len(target_path) < 2:
+            return None
+        
+        key_field = target_path[-1]
+        container_path_parts = target_path[:-1]
+        
+        # Recursively walk down the tree from root to find the container
+        # Then search for the node with key_field == ref_value
+        old_data = self.data
+        try:
+            self.data = self.root_data
+            # For absolute paths, don't use context index (search in all entities)
+            # For relative paths, use context index (search in specific entity)
+            use_context_index = not leafref_path.startswith('/')
+            container = self._walk_path_to_container(container_path_parts, use_context_index=use_context_index)
+            
+            if container is None:
+                return None
+            
+            # Search for the node with key_field == ref_value
+            return self._search_for_node(container, key_field, ref_value)
+        finally:
+            self.data = old_data
+    
+    def _walk_path_to_container(self, path_parts: List[str], use_context_index: bool = True) -> Any:
+        """Recursively walk down the tree following the path to find the container.
+        
+        This method uses context information (like entity indices) to navigate
+        through lists when possible. For example, when walking to "entities/fields",
+        it uses the entity index from the current context to find the specific entity.
+        
+        Args:
+            path_parts: List of path parts (schema node names, no indices)
+            use_context_index: If False, don't use entity index from context (for absolute paths)
+            
+        Returns:
+            The container at that path, or None if not found
+        """
+        if not path_parts:
+            return self.root_data
+        
+        # Extract entity index from context if available and requested
+        entity_idx = None
+        if use_context_index:
+            for j, p in enumerate(self.context_path):
+                if p == "entities" and j + 1 < len(self.context_path):
+                    if isinstance(self.context_path[j + 1], int):
+                        entity_idx = self.context_path[j + 1]
+                        break
+        
+        current = self.root_data
+        
+        for i, part in enumerate(path_parts):
+            if current is None:
+                return None
+            
+            if isinstance(current, dict):
+                if part in current:
+                    next_value = current[part]
+                    # Special handling: if we're navigating to "entities" and it's a list,
+                    # and we have an entity index from context AND use_context_index is True, use it
+                    if (part == "entities" and isinstance(next_value, list) and 
+                        entity_idx is not None and use_context_index):
+                        if 0 <= entity_idx < len(next_value):
+                            current = next_value[entity_idx]
+                        else:
+                            return None
+                    else:
+                        current = next_value
+                else:
+                    return None
+            elif isinstance(current, list):
+                # For lists, check if context has an index for this list part
+                list_idx = None
+                for j, p in enumerate(self.context_path):
+                    if p == part and j + 1 < len(self.context_path):
+                        if isinstance(self.context_path[j + 1], int):
+                            list_idx = self.context_path[j + 1]
+                            break
+                
+                if list_idx is not None and 0 <= list_idx < len(current):
+                    # Use the specific list item from context
+                    current = current[list_idx]
+                else:
+                    # Search through items to find one with the next part
+                    # This handles cases where we need to search across list items
+                    found = False
+                    remaining_parts = path_parts[i:]
+                    for item in current:
+                        if isinstance(item, dict):
+                            # Check if this item has the next part in the path
+                            if remaining_parts and remaining_parts[0] in item:
+                                # Recursively continue from this item
+                                result = self._walk_path_from_node(item, remaining_parts)
+                                if result is not None:
+                                    return result
+                    return None
+            else:
+                return None
+        
+        return current
+    
+    def _walk_path_from_node(self, node: Any, path_parts: List[str]) -> Any:
+        """Recursively walk down from a specific node following the path.
+        
+        Args:
+            node: Starting node
+            path_parts: Remaining path parts to follow
+            
+        Returns:
+            The node at the end of the path, or None if not found
+        """
+        if not path_parts:
+            return node
+        
+        current = node
+        for part in path_parts:
+            if current is None:
+                return None
+            
+            if isinstance(current, dict):
+                if part in current:
+                    current = current[part]
+                else:
+                    return None
+            elif isinstance(current, list):
+                # For lists, collect all matching items from all list elements
+                # This is used when searching for fields across entities
+                results = []
+                for item in current:
+                    if isinstance(item, dict) and part in item:
+                        value = item[part]
+                        if isinstance(value, list):
+                            results.extend(value)
+                        else:
+                            results.append(value)
+                if not results:
+                    return None
+                # If there's only one result and no more path parts, return it
+                if len(path_parts) == 1 and len(results) == 1:
+                    return results[0] if isinstance(results[0], dict) else None
+                # Otherwise, we need to continue searching
+                # For now, return the first list if it's a list of dicts
+                if results and isinstance(results[0], list):
+                    current = results[0]
+                elif results:
+                    # If we have multiple results, we need to search through them
+                    # This is a simplified approach - in practice, we'd need more context
+                    return None
+                else:
+                    return None
+            else:
+                return None
+        
+        return current
+    
+    def _search_for_node(self, container: Any, key_field: str, ref_value: Any) -> Any:
+        """Search for a node in the container where key_field == ref_value.
+        
+        Args:
+            container: The container to search in (dict, list, or nested structure)
+            key_field: The field name to match
+            ref_value: The value to search for
+            
+        Returns:
+            The node containing the value, or None if not found
+        """
+        if container is None:
+            return None
+        
+        if isinstance(container, list):
+            # Search in list items
+            for item in container:
+                if isinstance(item, dict) and key_field in item:
+                    if item[key_field] == ref_value:
+                        return item
+                # Also search recursively in nested structures
+                result = self._search_for_node(item, key_field, ref_value)
+                if result is not None:
+                    return result
+        elif isinstance(container, dict):
+            # Check if container itself matches
+            if key_field in container and container[key_field] == ref_value:
+                return container
+            # Search in nested structures
+            for key, value in container.items():
+                if isinstance(value, list):
+                    for item in value:
+                        if isinstance(item, dict) and key_field in item:
+                            if item[key_field] == ref_value:
+                                return item
+                        # Recursively search nested structures
+                        result = self._search_for_node(item, key_field, ref_value)
+                        if result is not None:
+                            return result
+                elif isinstance(value, dict):
+                    # Recursively search in nested dicts
+                    result = self._search_for_node(value, key_field, ref_value)
+                    if result is not None:
+                        return result
+        
+        return None
+    
+    def _resolve_leafref_path_to_absolute(self, path: str) -> str:
+        """Resolve a relative leafref path to an absolute path.
+        
+        This attempts to resolve the path to understand where in the data
+        structure the referenced node should be found. For generic implementation,
+        this uses heuristics based on the path structure.
+        
+        Args:
+            path: Leafref path (relative or absolute)
+            
+        Returns:
+            Absolute path string (without leading /), or None if cannot be resolved
+        """
+        # If already absolute, return as-is (without leading /)
+        if path.startswith('/'):
+            return path.lstrip('/')
+        
+        # Handle relative paths
+        if path.startswith('../') or path.startswith('./') or path == 'current()' or path == '.':
+            parts = path.split('/')
+            up_levels = sum(1 for p in parts if p == '..')
+            field_parts = [p for p in parts if p and p != '..' and p != '.' and p != 'current()']
+            
+            # Build absolute path from context_path
+            if up_levels == 0:
+                # No navigation up - use current context + field_parts
+                absolute_parts = self.context_path + field_parts
+                return '/'.join(str(p) for p in absolute_parts) if absolute_parts else None
+            elif up_levels <= len(self.context_path):
+                # Navigate up from context_path
+                absolute_parts = self.context_path[:-up_levels] + field_parts
+                return '/'.join(str(p) for p in absolute_parts) if absolute_parts else None
+            elif field_parts:
+                # Try relative to current context
+                absolute_parts = self.context_path + field_parts
+                return '/'.join(str(p) for p in absolute_parts) if absolute_parts else None
+            else:
+                # Path is just current() or . - use current context
+                return '/'.join(str(p) for p in self.context_path) if self.context_path else None
+        
+        # Simple field name - relative to current context
+        if path and not path.startswith('/'):
+            absolute_parts = self.context_path + [path]
+            return '/'.join(str(p) for p in absolute_parts)
+        
+        return None
     
     def _extract_path_from_binary_op(self, node: Any) -> List:
         """Extract path steps from a nested BinaryOpNode tree with / operators.
@@ -625,6 +996,19 @@ class XPathEvaluator:
             val = self._get_current_value()
             if val is not None:
                 return val
+
+        # Handle relative paths starting with ./
+        if path.startswith('./'):
+            # Remove leading ./ and evaluate relative to current context
+            remaining_path = path[2:]  # Remove './'
+            if remaining_path:
+                # Build path from current context
+                parts = remaining_path.split('/')
+                full_path = self.context_path + parts
+                return self._get_path_value(full_path)
+            else:
+                # Just './' means current node
+                return self._get_current_value()
 
         # Handle relative paths
         if path.startswith('../'):
