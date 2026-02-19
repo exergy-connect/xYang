@@ -77,6 +77,7 @@ class YangMustStmt:
     expression: str
     error_message: str = ""
     description: str = ""
+    ast: Optional[Any] = None  # Parsed XPath AST for reuse
 
 
 @dataclass
@@ -84,6 +85,7 @@ class YangWhenStmt:
     """When statement (conditional)."""
     condition: str
     description: str = ""
+    ast: Optional[Any] = None  # Parsed XPath AST for reuse
 
 
 @dataclass

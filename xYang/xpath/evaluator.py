@@ -10,10 +10,10 @@ Implements only the XPath features used in meta-model.yang:
 - String concatenation: +
 """
 
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from .parser import XPathTokenizer, XPathParser
-from .ast import PathNode, FunctionCallNode, BinaryOpNode, UnaryOpNode
+from .ast import PathNode, FunctionCallNode, BinaryOpNode, UnaryOpNode, XPathNode
 from ..errors import XPathSyntaxError
 
 from .path_evaluator import PathEvaluator
@@ -51,7 +51,7 @@ class XPathEvaluator:
         self.function_evaluator = FunctionEvaluator(self)
         self.deref_evaluator = DerefEvaluator(self)
         self.predicate_evaluator = PredicateEvaluator(self)
-        self.comparison_evaluator = ComparisonEvaluator()
+        self.comparison_evaluator = ComparisonEvaluator(self)
     
     def _set_context_path(self, path: List[str]) -> None:
         """Set context path and update cached length.
@@ -62,10 +62,16 @@ class XPathEvaluator:
         self.context_path = path
         self._context_path_len = len(path) if path else 0
 
-    def evaluate(self, expression: str) -> bool:
-        """Evaluate an XPath expression and return boolean result."""
+    def evaluate(self, expression: str, ast: Optional[XPathNode] = None) -> bool:
+        """
+        Evaluate an XPath expression and return boolean result.
+        
+        Args:
+            expression: The XPath expression string (used for caching if ast not provided)
+            ast: Optional pre-parsed AST node to reuse (avoids double parsing)
+        """
         try:
-            result = self.evaluate_value(expression)
+            result = self.evaluate_value(expression, ast)
             # Convert to boolean - optimized type checking
             if isinstance(result, bool):
                 return result
@@ -80,9 +86,19 @@ class XPathEvaluator:
             from ..errors import XPathEvaluationError
             raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
 
-    def evaluate_value(self, expression: str) -> Any:
-        """Evaluate an XPath expression and return the raw value."""
+    def evaluate_value(self, expression: str, ast: Optional[XPathNode] = None) -> Any:
+        """
+        Evaluate an XPath expression and return the raw value.
+        
+        Args:
+            expression: The XPath expression string (used for caching if ast not provided)
+            ast: Optional pre-parsed AST node to reuse (avoids double parsing)
+        """
         try:
+            # Use provided AST if available
+            if ast is not None:
+                return ast.evaluate(self)
+            
             # Check cache first (only for simple expressions to avoid memory bloat)
             if len(expression) < 100 and expression in self._expression_cache:
                 ast = self._expression_cache[expression]
@@ -267,18 +283,21 @@ class XPathEvaluator:
             return bool(left) or bool(right)
         if op == 'and':
             return bool(left) and bool(right)
+        # Get type context for coercion
+        type_context = self._get_type_context()
+        
         if op == '=':
-            return self.comparison_evaluator.evaluate_comparison('=', left, right)
+            return self.comparison_evaluator.evaluate_comparison('=', left, right, type_context)
         if op == '!=':
-            return self.comparison_evaluator.evaluate_comparison('!=', left, right)
+            return self.comparison_evaluator.evaluate_comparison('!=', left, right, type_context)
         if op == '<=':
-            return self.comparison_evaluator.evaluate_comparison('<=', left, right)
+            return self.comparison_evaluator.evaluate_comparison('<=', left, right, type_context)
         if op == '>=':
-            return self.comparison_evaluator.evaluate_comparison('>=', left, right)
+            return self.comparison_evaluator.evaluate_comparison('>=', left, right, type_context)
         if op == '<':
-            return self.comparison_evaluator.evaluate_comparison('<', left, right)
+            return self.comparison_evaluator.evaluate_comparison('<', left, right, type_context)
         if op == '>':
-            return self.comparison_evaluator.evaluate_comparison('>', left, right)
+            return self.comparison_evaluator.evaluate_comparison('>', left, right, type_context)
         if op == '+':
             # String concatenation or arithmetic
             try:
@@ -373,3 +392,41 @@ class XPathEvaluator:
         if isinstance(self.data, (str, int, float, bool)):
             return self.data
         return ""
+    
+    def _get_type_context(self) -> Optional[Any]:
+        """
+        Get the schema type for the current context.
+        
+        Returns:
+            YangTypeStmt if type can be resolved, None otherwise
+        """
+        if not self.module or not self.original_context_path:
+            return None
+        
+        try:
+            # Navigate schema to find the type for the current context
+            statements = self.module.statements
+            path = self.original_context_path.copy()
+            
+            # Remove list indices from path (they're not in schema)
+            schema_path = [p for p in path if not isinstance(p, int)]
+            
+            # Navigate schema
+            for step in schema_path:
+                found = False
+                for stmt in statements:
+                    if hasattr(stmt, 'name') and stmt.name == step:
+                        if hasattr(stmt, 'type') and stmt.type:
+                            # Found a leaf or leaf-list with a type
+                            return stmt.type
+                        elif hasattr(stmt, 'statements'):
+                            # Recurse into composite statement
+                            statements = stmt.statements
+                            found = True
+                            break
+                if not found:
+                    return None
+            
+            return None
+        except Exception:
+            return None

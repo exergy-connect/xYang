@@ -47,7 +47,9 @@ class StructureValidator:
             # Check when condition - skip if condition is false
             if hasattr(stmt, 'when') and stmt.when:
                 evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                if not evaluator.evaluate(stmt.when.condition):
+                # Use pre-parsed AST if available to avoid double parsing
+                ast = getattr(stmt.when, 'ast', None)
+                if not evaluator.evaluate(stmt.when.condition, ast=ast):
                     # When condition is false, skip this statement
                     continue
             

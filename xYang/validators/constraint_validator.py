@@ -5,7 +5,7 @@ Constraint validator for YANG must/when statements.
 import logging
 from typing import Any, Dict, List
 from ..module import YangModule
-from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt
+from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt, YangLeafListStmt
 from ..xpath import XPathEvaluator
 
 logger = logging.getLogger(__name__)
@@ -261,7 +261,9 @@ class ConstraintValidator:
         )
         
         try:
-            result = evaluator.evaluate(must_expr.expression)
+            # Use pre-parsed AST if available to avoid double parsing
+            ast = getattr(must_expr, 'ast', None)
+            result = evaluator.evaluate(must_expr.expression, ast=ast)
             logger.info(
                 "Must constraint result for %s: %s (expression: %s)",
                 field_name, result, must_expr.expression
@@ -305,9 +307,12 @@ class ConstraintValidator:
         
         # Validate must statements on this statement
         if isinstance(stmt, YangLeafStmt):
-            # Check if field exists in current data context
+            # Check if field exists - need to check parent data, not current data
+            # (current data might be the field value itself after navigation)
+            parent_path = current_path[:-1] if len(current_path) > 0 else []
+            parent_data = self._navigate_path(root_data, parent_path) if parent_path else root_data
             field_exists = (
-                isinstance(evaluator.data, dict) and stmt.name in evaluator.data
+                isinstance(parent_data, dict) and stmt.name in parent_data
             )
             
             logger.debug(
@@ -328,6 +333,54 @@ class ConstraintValidator:
                 evaluator.original_data = root_data
                 evaluator.original_context_path = current_path.copy() if current_path else []
                 self._evaluate_must_constraint(evaluator, must, stmt.name, stmt.mandatory)
+        
+        elif isinstance(stmt, YangLeafListStmt):
+            # Leaf-list: evaluate must constraints per-element with current() bound to each value
+            # Get the leaf-list values from root_data
+            leaf_list_data = self._navigate_path(root_data, current_path)
+            
+            # Check if field exists - navigate to parent and check
+            parent_path = current_path[:-1] if len(current_path) > 0 else []
+            parent_data = self._navigate_path(root_data, parent_path) if parent_path else root_data
+            field_exists = (
+                isinstance(parent_data, dict) and stmt.name in parent_data
+            )
+            
+            logger.debug(
+                "Validating leaf-list %s: field_exists=%s, has_must=%s, path=%s, leaf_list_data=%s",
+                stmt.name, field_exists, len(stmt.must_statements) > 0, current_path, 
+                type(leaf_list_data).__name__ if leaf_list_data is not None else "None"
+            )
+            
+            # Skip validation if the field doesn't exist (optional fields)
+            if not field_exists:
+                logger.debug("Skipping validation for optional missing leaf-list: %s", stmt.name)
+                return  # Skip validation for missing optional fields
+            
+            # Verify leaf-list data is actually a list
+            if not isinstance(leaf_list_data, list):
+                logger.debug("Leaf-list %s data is not a list (type: %s), skipping must validation", 
+                           stmt.name, type(leaf_list_data).__name__ if leaf_list_data is not None else "None")
+                return
+            
+            # Evaluate must constraints once per value with current() bound to each value
+            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
+                        len(stmt.must_statements), stmt.name, len(leaf_list_data))
+            for value_idx, value in enumerate(leaf_list_data):
+                # Set up evaluator context for this specific value
+                # current() should be bound to this value
+                value_path = current_path + [value_idx]
+                self._setup_evaluator_context(evaluator, value_path, root_data)
+                
+                # Set original context so current() returns this value
+                evaluator.original_data = root_data
+                evaluator.original_context_path = value_path.copy() if value_path else []
+                
+                # Evaluate each must constraint for this value
+                for must in stmt.must_statements:
+                    logger.debug("Evaluating must constraint for leaf-list %s value[%d]=%s", 
+                               stmt.name, value_idx, value)
+                    self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False)
                 
         elif isinstance(stmt, (YangListStmt, YangContainerStmt)):
             if hasattr(stmt, 'must_statements'):

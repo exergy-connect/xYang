@@ -8,6 +8,7 @@ from .ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt
 )
+from .xpath.validator import XPathValidator
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -18,6 +19,7 @@ class StatementParsers:
     
     def __init__(self, registry):
         self.registry = registry
+        self.xpath_validator = XPathValidator()
     
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
@@ -453,7 +455,12 @@ class StatementParsers:
             while tokens.has_more() and tokens.peek() not in (';', '{'):
                 expr_parts.append(tokens.consume())
         
-        must_stmt = YangMustStmt(expression=' '.join(expr_parts))
+        expression = ' '.join(expr_parts)
+        
+        # Validate XPath expression at parse time and get parsed AST
+        ast = self.xpath_validator.validate(expression)
+        
+        must_stmt = YangMustStmt(expression=expression, ast=ast)
         
         if tokens.consume_if('{'):
             new_context = context.push_parent(must_stmt)
@@ -502,7 +509,12 @@ class StatementParsers:
             while tokens.has_more() and tokens.peek() not in (';', '{'):
                 expr_parts.append(tokens.consume())
         
-        when_stmt = YangWhenStmt(condition=' '.join(expr_parts))
+        condition = ' '.join(expr_parts)
+        
+        # Validate XPath expression at parse time and get parsed AST
+        ast = self.xpath_validator.validate(condition)
+        
+        when_stmt = YangWhenStmt(condition=condition, ast=ast)
         
         # Store in parent statement
         if context.current_parent:

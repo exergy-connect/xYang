@@ -102,6 +102,35 @@ class XPathEvaluationError(ValueError):
         return self.message
 
 
+class UnsupportedXPathError(ValueError):
+    """XPath expression contains unsupported constructs."""
+    
+    def __init__(self, message: str, expression: str = None, construct: str = None):
+        """
+        Initialize unsupported XPath error.
+        
+        Args:
+            message: Error message
+            expression: The XPath expression that contains unsupported constructs
+            construct: The specific unsupported construct (optional)
+        """
+        self.message = message
+        self.expression = expression
+        self.construct = construct
+        
+        # Build detailed error message
+        parts = [message]
+        if construct:
+            parts.append(f"Unsupported construct: {construct}")
+        if expression:
+            parts.append(f"Expression: {expression}")
+        
+        super().__init__("\n".join(parts))
+    
+    def __str__(self):
+        return self.message
+
+
 class YangCrossReferenceError(ValueError):
     """YANG validation error indicating cross-reference issues.
     

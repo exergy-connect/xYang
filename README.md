@@ -1,6 +1,6 @@
 # xYang
 
-A minimal Python library implementing the YANG features used in `examples/meta-model.yang`.
+xYang implements exactly the YANG and XPath features required to correctly validate `examples/meta-model.yang`. This is a narrower scope than full YANG 1.1 compliance, but a deeper implementation than a generic subset library — particularly around `deref()` chaining, union type coercion, and `current()` scoping in leaf-list constraints.
 
 ## Features
 
@@ -69,6 +69,10 @@ module = parse_yang_file("examples/meta-model.yang")
 validator = YangValidator(module)
 
 # Validate data
+# Note: The validator accepts raw consolidated JSON. Type coercion happens
+# inline during XPath evaluation - comparison operators receive schema-type
+# context and perform coercion automatically (e.g., string "true" -> bool True
+# for boolean comparisons, string digits -> int for int32 comparisons).
 data = {
     "data-model": {
         "name": "example",
@@ -139,7 +143,7 @@ xYang/
 
 ## XPath Support
 
-xYang implements a minimal XPath evaluator for the expressions used in `meta-model.yang`:
+xYang implements exactly the XPath features required to correctly validate `meta-model.yang`:
 
 - **Path navigation**: `../field`, `../../field`, absolute paths `/data-model/entities`
 - **Functions**: `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `bool()`
@@ -148,7 +152,7 @@ xYang implements a minimal XPath evaluator for the expressions used in `meta-mod
 - **Filtering**: `[name = current()]`, `[type != 'array']`, `[id = current()]`, `[1]`
 - **String concatenation**: `+` operator
 
-The evaluator handles the specific XPath patterns used in `meta-model.yang` without requiring a full XPath engine.
+The evaluator implements the specific XPath patterns used in `meta-model.yang` with schema-aware evaluation, particularly for `deref()` chaining and `current()` scoping.
 
 ## When Conditions
 
@@ -183,9 +187,14 @@ If a `must` constraint fails, validation returns an error with the specified err
 
 ## Limitations
 
-- **Leafref resolution**: `deref()` is implemented but uses simplified resolution (full implementation would require complete schema traversal)
-- **Complex XPath**: Only the XPath features used in `meta-model.yang` are supported
-- **No dependencies**: Pure Python, no external libraries required
+- **Input contract**: The validator receives a consolidated JSON document. All data must be provided in a single, complete structure — there is no support for validating against source documents or handling partial/incremental data.
+- **Type-aware coercion**: The XPath evaluator's comparison operators receive schema-type context and perform coercion inline. This ensures `bool()` in XPath sees actual booleans, not strings (e.g., string `"true"` is coerced to `True` during boolean comparisons). For union types, coercion is attempted in declared order, using the first success. The validator accepts raw consolidated JSON - type awareness is pushed to exactly where it's needed (the evaluator).
+- **XPath scope**: Only the XPath features used in `meta-model.yang` are supported. Unsupported expressions will raise `UnsupportedXPathError` at parse time.
+- **deref() implementation**: `deref()` is fully implemented for the patterns used in `meta-model.yang`, including two-level chaining. It requires schema-aware XPath evaluation and is not a general-purpose implementation.
+
+## Design Rationale
+
+**Zero dependencies**: xYang is implemented in pure Python with no external libraries. Full XPath 1.0 coverage was available via `elementpath` but was excluded to keep the dependency footprint zero. Users who need expressions outside the supported subset will need to extend the evaluator.
 
 ## Development
 

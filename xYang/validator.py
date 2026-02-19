@@ -69,6 +69,7 @@ class YangValidator:
         self._validate_types(data, self.module.statements, root_data)
         
         # 3. Validate must statements (pass root data for absolute paths)
+        # XPath evaluator performs type-aware coercion inline during comparisons
         self.constraint_validator.validate_must_statements(data, root_data=data)
         
         # Collect all errors and warnings
@@ -134,7 +135,9 @@ class YangValidator:
             # Check when condition
             if hasattr(stmt, 'when') and stmt.when:
                 evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                if not evaluator.evaluate(stmt.when.condition):
+                # Use pre-parsed AST if available to avoid double parsing
+                ast = getattr(stmt.when, 'ast', None)
+                if not evaluator.evaluate(stmt.when.condition, ast=ast):
                     continue
             
             if isinstance(stmt, YangLeafStmt):
