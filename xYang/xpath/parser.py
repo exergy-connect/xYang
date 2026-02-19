@@ -58,6 +58,12 @@ class XPathTokenizer:
                 self._tokenize_number()
             elif char.isalpha() or char == '_':
                 self._tokenize_identifier()
+            elif char == '/':
+                # Check / before OPERATOR_CHARS to tokenize as SLASH, not OPERATOR
+                self._tokenize_slash()
+            elif char == '.':
+                # Check . before OPERATOR_CHARS
+                self._tokenize_dot()
             elif char in OPERATOR_CHARS:
                 self._tokenize_operator()
             elif char == '(':
@@ -68,10 +74,6 @@ class XPathTokenizer:
                 self._add_simple_token(TokenType.BRACKET_OPEN, '[', 1)
             elif char == ']':
                 self._add_simple_token(TokenType.BRACKET_CLOSE, ']', 1)
-            elif char == '.':
-                self._tokenize_dot()
-            elif char == '/':
-                self._tokenize_slash()
             elif char == ',':
                 self._add_simple_token(TokenType.COMMA, ',', 1)
             else:
@@ -333,7 +335,10 @@ class XPathParser:
 
         while True:
             token = self._current_token()
-            if not (token.type == TokenType.OPERATOR and token.value == '/'):
+            # Check for / operator (can be SLASH or OPERATOR token type)
+            is_slash = (token.type == TokenType.SLASH) or (token.type == TokenType.OPERATOR and token.value == '/')
+            
+            if not is_slash:
                 # Not a slash, check for other multiplicative ops
                 if token.type == TokenType.OPERATOR and token.value == '*':
                     op = self._consume().value

@@ -125,7 +125,8 @@ class PathEvaluator:
         """Navigate up the context path by the specified number of levels.
         
         Handles list indices properly: when going up from a list element,
-        removes both the index and the list name.
+        removes only the index (not the list name). When going up from a
+        list container, removes the list name.
         
         Args:
             up_levels: Number of levels to go up
@@ -138,9 +139,10 @@ class PathEvaluator:
             if not new_path:
                 break
             removed = new_path.pop()
-            # If it was a list index, also remove the list name
-            if isinstance(removed, int) and new_path:
-                new_path.pop()
+            # If it was a list index, we've already removed it - that's one level up
+            # The list name stays (we're still in that list, just not at a specific element)
+            # If it was a list name (string), we've removed it - that's one level up
+            # No need to remove anything else
         return new_path
     
     def evaluate_path(self, path: str) -> Any:
@@ -297,25 +299,38 @@ class PathEvaluator:
         Returns:
             Evaluated result
         """
-        # Try first step first (most common case)
-        first_value = self.evaluate_path(node.steps[0])
-        if isinstance(first_value, list):
-            filtered = self._apply_predicate_to_list(first_value, node.predicate)
-            remaining_steps = node.steps[1:]
-            if remaining_steps:
-                return self._navigate_from_result(filtered, '/'.join(remaining_steps))
-            return filtered
+        # Handle paths starting with .. when navigating from a node
+        # In this case, .. means "stay at current node", so we skip it
+        steps = list(node.steps)
+        if steps and steps[0] == '..' and self.evaluator.context_path == []:
+            # We're navigating from a node (empty context_path), so .. means stay here
+            steps = steps[1:]
+            if not steps:
+                # Just .. with predicate - apply predicate to current data if it's a list
+                if isinstance(self.evaluator.data, list):
+                    return self._apply_predicate_to_list(self.evaluator.data, node.predicate)
+                return None
         
-        # Try other steps if first didn't return a list
-        for i in range(1, len(node.steps)):
-            partial_path = '/'.join(node.steps[:i+1])
-            partial_value = self.evaluate_path(partial_path)
-            if isinstance(partial_value, list):
-                filtered = self._apply_predicate_to_list(partial_value, node.predicate)
-                remaining_steps = node.steps[i+1:]
+        # Try first step first (most common case)
+        if steps:
+            first_value = self.evaluate_path(steps[0])
+            if isinstance(first_value, list):
+                filtered = self._apply_predicate_to_list(first_value, node.predicate)
+                remaining_steps = steps[1:]
                 if remaining_steps:
                     return self._navigate_from_result(filtered, '/'.join(remaining_steps))
                 return filtered
+            
+            # Try other steps if first didn't return a list
+            for i in range(1, len(steps)):
+                partial_path = '/'.join(steps[:i+1])
+                partial_value = self.evaluate_path(partial_path)
+                if isinstance(partial_value, list):
+                    filtered = self._apply_predicate_to_list(partial_value, node.predicate)
+                    remaining_steps = steps[i+1:]
+                    if remaining_steps:
+                        return self._navigate_from_result(filtered, '/'.join(remaining_steps))
+                    return filtered
         
         # No step returned a list, evaluate as normal path
         path = '/'.join(node.steps)

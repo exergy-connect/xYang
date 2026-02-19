@@ -195,25 +195,25 @@ class XPathEvaluator:
                         result = None
                 elif hasattr(node.right, 'steps'):
                     # It's a PathNode - evaluate it directly
-                    # Handle .. at the start - when navigating from a node, .. means stay at the node
-                    steps = list(node.right.steps)
-                    if steps and steps[0] == '..':
-                        # Remove leading .. when navigating from a node (we're already at the node)
-                        steps = steps[1:]
-                        if steps:
-                            # Build path string without the leading ..
-                            # Include predicate if present
-                            path_str = '/'.join(steps)
-                            if hasattr(node.right, 'predicate') and node.right.predicate:
-                                # Add predicate to path string
-                                pred_str = str(node.right.predicate)
-                                path_str += pred_str
-                            result = self.path_evaluator.evaluate_path(path_str)
-                        else:
-                            # Just .. means the current node
-                            result = self.data
-                    else:
+                    # If it has a predicate, we need to evaluate it properly (not convert to string)
+                    if hasattr(node.right, 'predicate') and node.right.predicate:
+                        # PathNode with predicate - evaluate directly to handle predicate correctly
                         result = node.right.evaluate(self)
+                    else:
+                        # Handle .. at the start - when navigating from a node, .. means stay at the node
+                        steps = list(node.right.steps)
+                        if steps and steps[0] == '..':
+                            # Remove leading .. when navigating from a node (we're already at the node)
+                            steps = steps[1:]
+                            if steps:
+                                # Build path string without the leading ..
+                                path_str = '/'.join(steps)
+                                result = self.path_evaluator.evaluate_path(path_str)
+                            else:
+                                # Just .. means the current node
+                                result = self.data
+                        else:
+                            result = node.right.evaluate(self)
                 else:
                     # Try to evaluate and treat as path
                     right_val = node.right.evaluate(self)
