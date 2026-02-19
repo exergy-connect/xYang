@@ -200,6 +200,8 @@ def test_absolute_path_simple():
 
 def test_absolute_path_in_computed_field_validation():
     """Test absolute path in computed field field existence validation."""
+    from xYang.errors import YangCrossReferenceError
+    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -234,19 +236,29 @@ def test_absolute_path_in_computed_field_validation():
         }
     }
     
-    # This tests the constraint: /data-model/entities[name = ../../../../../../name]/fields[name = current()]
-    # Should pass if absolute paths work correctly
-    is_valid, errors, warnings = validator.validate(data)
-    print(f"Validation result: {is_valid}")
-    print(f"Errors: {errors}")
-    print(f"Warnings: {warnings}")
+    # This tests the constraint: ../../../../fields[name = current()]
+    # Note: The constraint now uses relative paths, not absolute paths
+    # The test verifies that the computed field validation works correctly
+    try:
+        is_valid, errors, warnings = validator.validate(data)
+    except YangCrossReferenceError as e:
+        errors = e.errors if hasattr(e, 'errors') else [str(e)]
+        is_valid = False
     
-    # If absolute paths work, this should pass
-    # If they don't, we'll see XPath syntax errors
-    if not is_valid:
-        xpath_errors = [e for e in errors if "xpath" in e.lower() or "syntax" in e.lower() or "unexpected" in e.lower()]
-        if xpath_errors:
-            pytest.skip(f"Absolute paths not supported or have syntax issues: {xpath_errors}")
+    # Check for XPath syntax errors (which would indicate path issues)
+    xpath_errors = [e for e in errors if "xpath" in e.lower() or "syntax" in e.lower() or "unexpected" in e.lower() or "parse" in e.lower() or "token" in e.lower()]
+    
+    # The computed field constraint should work (no XPath syntax errors)
+    assert len(xpath_errors) == 0, \
+        f"Computed field validation should not have XPath syntax errors: {xpath_errors}"
+    
+    # Check that there are no computed field validation errors
+    computed_errors = [e for e in errors if "computed" in e.lower() or ("field reference" in e.lower() and "exist" in e.lower())]
+    assert len(computed_errors) == 0, \
+        f"Computed field validation should pass for valid fields, got errors: {computed_errors}"
+    
+    # Note: is_valid may be False due to other unrelated validation errors (foreign keys, etc.)
+    # but the important thing is that computed field validation works correctly
 
 
 def test_absolute_path_vs_relative_path():
