@@ -294,18 +294,18 @@ class PathEvaluator:
         context_path = self.evaluator.context_path
         current = self.evaluator.data
         
-        # Only apply special logic if:
-        # 1. We're in a list item context (context_path has integers)
-        # 2. Path is at least as long as context_path
-        # 3. Path starts with context_path
-        # 4. First part of path is not navigable from current data (indicating path was built from context_path)
+        # Special case: when in a list item context and path was built from context_path,
+        # navigate from root_data instead of evaluator.data
+        # This handles paths like: context_path=['data-model', 'entities', 0, 'fields', 2, ...], 
+        # path=['data-model', 'entities', 0, 'fields'] (from _go_up_context_path)
         if (context_path and 
             any(isinstance(p, int) for p in context_path) and
-            len(parts) >= len(context_path)):
-            # Check if path starts with context path
-            path_matches_context = all(
-                i < len(parts) and parts[i] == context_path[i]
-                for i in range(len(context_path))
+            len(parts) > 0 and
+            isinstance(self.evaluator.root_data, dict)):
+            # Check if path starts with context path prefix (path can be shorter than context_path)
+            min_len = min(len(parts), len(context_path))
+            path_matches_context = min_len > 0 and all(
+                parts[i] == context_path[i] for i in range(min_len)
             )
             
             if path_matches_context:
@@ -319,16 +319,27 @@ class PathEvaluator:
                 # If we can't navigate from current, path was likely built from context_path
                 if not can_navigate_from_current:
                     current = self.evaluator.root_data
-                    remaining_parts = parts[len(context_path):]
-                    # Skip first part of full path if root_data is at container level (e.g., data['data-model'])
-                    # But keep the context path parts for navigation
-                    if (parts and isinstance(parts[0], str) and
-                        isinstance(current, dict) and parts[0] not in current):
-                        # root_data is at container level, skip first part and navigate with context_path + remaining
-                        parts = context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
-                    else:
-                        # Navigate with full path from root_data
-                        parts = parts
+                    # If root_data is at container level (e.g., root_data is data['data-model']),
+                    # and the path starts with that container name, skip it
+                    if (parts and isinstance(parts[0], str) and parts[0] not in current):
+                        # root_data is at container level, skip first part
+                        parts = parts[1:]
+                    elif len(parts) < len(context_path):
+                        # Path is a prefix of context_path - use corresponding slice from context_path[1:]
+                        # Skip context_path[0] if it's not in root_data
+                        if (context_path and isinstance(context_path[0], str) and 
+                            context_path[0] not in current):
+                            # Use context_path[1:len(parts)+1] to get the corresponding path from root_data
+                            parts = context_path[1:len(parts)+1] if len(context_path) > 1 and len(parts) > 0 else []
+                    elif len(parts) > len(context_path):
+                        # Path extends beyond context_path
+                        remaining_parts = parts[len(context_path):]
+                        # Skip context_path[0] if it's not in root_data
+                        if (context_path and isinstance(context_path[0], str) and 
+                            context_path[0] not in current):
+                            parts = context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
+                        else:
+                            parts = remaining_parts
         
         for part in parts:
             if part in ('.', 'current()'):
@@ -398,6 +409,31 @@ class PathEvaluator:
                 if isinstance(self.evaluator.data, list):
                     return self._apply_predicate_to_list(self.evaluator.data, node.predicate)
                 return None
+        
+        # Special case: if all steps are .., use _go_up_context_path
+        if steps and all(step == '..' for step in steps):
+            up_levels = len(steps)
+            context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
+            if up_levels <= context_len:
+                new_path = self._go_up_context_path(up_levels)
+                # Ensure get_path_value uses root_data
+                old_data = self.evaluator.data
+                try:
+                    if (new_path and isinstance(new_path[0], str) and
+                        isinstance(self.evaluator.data, dict) and
+                        new_path[0] not in self.evaluator.data and
+                        isinstance(self.evaluator.root_data, dict)):
+                        self.evaluator.data = self.evaluator.root_data
+                    value = self.get_path_value(new_path)
+                    if isinstance(value, list) and node.predicate:
+                        # Apply predicate to the list
+                        numeric_result = self._apply_numeric_predicate(value, node.predicate)
+                        if numeric_result is not None:
+                            return numeric_result
+                        return self._apply_filter_predicate(value, node.predicate)
+                    return value
+                finally:
+                    self.evaluator.data = old_data
         
         # Try first step first (most common case)
         if steps:
@@ -495,7 +531,7 @@ class PathEvaluator:
             up_levels = sum(1 for step in node.steps if step == '..')
             field_parts = [step for step in node.steps if step != '..']
             
-            context_len = self.evaluator._context_path_len
+            context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
             if up_levels > 0 and context_len == 0 and isinstance(self.evaluator.data, dict):
                 if not field_parts:
                     value = self.evaluator.data
@@ -503,7 +539,19 @@ class PathEvaluator:
                     value = self.get_path_value(field_parts)
             elif up_levels <= context_len:
                 new_path = self._go_up_context_path(up_levels) + field_parts
-                value = self.get_path_value(new_path)
+                # When navigating from a path built with _go_up_context_path, ensure
+                # get_path_value uses root_data if the path starts with context_path elements
+                old_data = self.evaluator.data
+                try:
+                    if (new_path and isinstance(new_path[0], str) and
+                        isinstance(self.evaluator.data, dict) and
+                        new_path[0] not in self.evaluator.data and
+                        isinstance(self.evaluator.root_data, dict)):
+                        # Path starts with a context path element, use root_data
+                        self.evaluator.data = self.evaluator.root_data
+                    value = self.get_path_value(new_path)
+                finally:
+                    self.evaluator.data = old_data
             else:
                 value = None
         elif node.is_absolute:

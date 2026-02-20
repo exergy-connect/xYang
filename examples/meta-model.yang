@@ -452,7 +452,7 @@ module meta-model {
           type field-name;
           mandatory true;
           description "Field name to reference.";
-          must "(not(../entity) and count(../../../../fields[name = current()]) > 0) or (../entity and count(deref(../entity)/../fields[name = current()]) > 0)" {
+          must "(not(../entity) and count(../../../../..[name = current()]) > 0) or (../entity and count(deref(../entity)/../fields[name = current()]) > 0)" {
             error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified";
           }
