@@ -68,8 +68,6 @@ def test_computed_field_missing_field_same_entity():
 
 def test_computed_field_valid_same_entity():
     """Test 2: Valid computed field with fields in same entity should pass."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -104,16 +102,9 @@ def test_computed_field_valid_same_entity():
         }
     }
     
-    try:
-        is_valid, errors, warnings = validator.validate(valid_data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(valid_data)
     
-    # Check that there are no computed field validation errors
-    computed_errors = [e for e in errors if "computed" in e.lower() or "field reference" in e.lower() and "exist" in e.lower()]
-    assert len(computed_errors) == 0, \
-        f"Computed field validation should pass for valid fields, got errors: {computed_errors}"
+    assert is_valid, f"Valid data should pass validation. Errors: {errors}"
 
 
 def test_computed_field_missing_field_cross_entity():
@@ -174,8 +165,6 @@ def test_computed_field_missing_field_cross_entity():
 
 def test_computed_field_cross_entity_no_foreign_key():
     """Test 4: Cross-entity computed field reference without foreign key should fail."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -217,11 +206,7 @@ def test_computed_field_cross_entity_no_foreign_key():
         }
     }
     
-    try:
-        is_valid, errors, warnings = validator.validate(invalid_data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(invalid_data)
     
     assert not is_valid, "Validation should fail for cross-entity reference without foreign key"
     # The constraint on entity leaf checks for foreign key requirement
@@ -239,8 +224,6 @@ def test_computed_field_cross_entity_no_foreign_key():
 
 def test_computed_field_cross_entity_with_foreign_key():
     """Test 5: Valid cross-entity computed field with foreign key should pass."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -289,16 +272,9 @@ def test_computed_field_cross_entity_with_foreign_key():
         }
     }
     
-    try:
-        is_valid, errors, warnings = validator.validate(valid_data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(valid_data)
     
-    # Check that there are no computed field validation errors
-    computed_errors = [e for e in errors if "computed" in e.lower() or ("field reference" in e.lower() and "exist" in e.lower()) or ("foreign key" in e.lower() and "computed" in str(errors).lower())]
-    assert len(computed_errors) == 0, \
-        f"Computed field validation should pass for valid cross-entity field with FK, got errors: {computed_errors}"
+    assert is_valid, f"Valid data should pass validation. Errors: {errors}"
 
 
 def test_computed_field_wrong_field_count_binary():
@@ -343,8 +319,6 @@ def test_computed_field_wrong_field_count_binary():
 
 def test_computed_field_valid_aggregation():
     """Test 7: Valid aggregation operation with multiple fields should pass."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -381,13 +355,6 @@ def test_computed_field_valid_aggregation():
         }
     }
     
-    try:
-        is_valid, errors, warnings = validator.validate(valid_data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(valid_data)
     
-    # Check that there are no computed field validation errors
-    computed_errors = [e for e in errors if "computed" in e.lower() or ("field reference" in e.lower() and "exist" in e.lower())]
-    assert len(computed_errors) == 0, \
-        f"Computed field validation should pass for valid aggregation, got errors: {computed_errors}"
+    assert is_valid, f"Valid data should pass validation. Errors: {errors}"

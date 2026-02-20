@@ -7,7 +7,6 @@ from .module import YangModule
 from .ast import YangStatement, YangLeafStmt, YangLeafListStmt
 from .types import TypeSystem
 from .xpath import XPathEvaluator
-from .errors import YangCrossReferenceError
 from .validators import (
     StructureValidator,
     TypeValidator,
@@ -81,14 +80,8 @@ class YangValidator:
         )
         warnings = self.structure_validator.warnings
         
-        # Check if all errors are cross-reference related
-        if errors and self._are_all_cross_reference_errors(errors):
-            error_msg = "; ".join(errors)
-            raise YangCrossReferenceError(
-                f"YANG validation failed due to cross-reference issues: {error_msg}",
-                errors=errors
-            )
-        
+        # Always return tuple - never raise exceptions
+        # Cross-reference errors are included in the errors list
         return len(errors) == 0, errors, warnings
     
     def _register_typedefs(self) -> None:

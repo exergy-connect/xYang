@@ -25,8 +25,6 @@ def get_meta_model_path():
 
 def test_absolute_path_entities_list():
     """Test that absolute path /data-model/entities can be used in must constraints."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -61,13 +59,7 @@ def test_absolute_path_entities_list():
     
     # This should fail because entity has more than 7 non-array fields
     # and the constraint uses absolute path: /data-model/entities[...]
-    try:
-        is_valid, errors, warnings = validator.validate(data)
-    except YangCrossReferenceError as e:
-        # This is expected - validation fails due to cross-reference issues
-        # Extract errors from the exception
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(data)
     
     # Check if absolute path constraint is working
     # If we get XPath syntax errors, absolute paths aren't working
@@ -157,8 +149,6 @@ def test_absolute_path_with_relative_navigation():
 
 def test_absolute_path_simple():
     """Test simple absolute path navigation."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -181,15 +171,7 @@ def test_absolute_path_simple():
     }
     
     # Basic validation to ensure absolute paths don't cause syntax errors
-    try:
-        is_valid, errors, warnings = validator.validate(data)
-    except YangCrossReferenceError as e:
-        # Even valid data might have cross-reference errors from optional fields
-        # Check if there are XPath syntax errors (which would indicate absolute path issues)
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        xpath_errors = [e for e in errors if "xpath" in e.lower() or "syntax" in e.lower() or "unexpected" in e.lower() or "parse" in e.lower() or "token" in e.lower()]
-        assert len(xpath_errors) == 0, f"Absolute paths should not cause XPath syntax errors: {xpath_errors}"
-        return  # Test passed - no XPath syntax errors
+    is_valid, errors, warnings = validator.validate(data)
     
     # Should pass for valid data (or at least not have XPath syntax errors)
     xpath_errors = [e for e in errors if "xpath" in e.lower() or "syntax" in e.lower() or "unexpected" in e.lower() or "parse" in e.lower() or "token" in e.lower()]
@@ -200,8 +182,6 @@ def test_absolute_path_simple():
 
 def test_absolute_path_in_computed_field_validation():
     """Test absolute path in computed field field existence validation."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -239,11 +219,7 @@ def test_absolute_path_in_computed_field_validation():
     # This tests the constraint: ../../../../fields[name = current()]
     # Note: The constraint now uses relative paths, not absolute paths
     # The test verifies that the computed field validation works correctly
-    try:
-        is_valid, errors, warnings = validator.validate(data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(data)
     
     # Check for XPath syntax errors (which would indicate path issues)
     xpath_errors = [e for e in errors if "xpath" in e.lower() or "syntax" in e.lower() or "unexpected" in e.lower() or "parse" in e.lower() or "token" in e.lower()]
@@ -263,8 +239,6 @@ def test_absolute_path_in_computed_field_validation():
 
 def test_absolute_path_vs_relative_path():
     """Compare absolute path vs relative path behavior."""
-    from xYang.errors import YangCrossReferenceError
-    
     meta_model_path = get_meta_model_path()
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
@@ -289,11 +263,7 @@ def test_absolute_path_vs_relative_path():
     }
     
     # This uses relative path: ../fields[name = current()]
-    try:
-        is_valid, errors, warnings = validator.validate(data)
-    except YangCrossReferenceError as e:
-        errors = e.errors if hasattr(e, 'errors') else [str(e)]
-        is_valid = False
+    is_valid, errors, warnings = validator.validate(data)
     
     assert not is_valid, "Validation should fail for non-existent field in primary_key"
     # The primary_key constraint should catch this (uses relative path)
