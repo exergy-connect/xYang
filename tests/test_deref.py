@@ -326,35 +326,6 @@ def test_deref_parents_parent_array():
     assert departments_field.get("type") == "array"
 
 
-def test_deref_absolute_path():
-    """Test deref() with absolute paths."""
-    data = {
-        "data-model": {
-            "entities": [
-                {
-                    "name": "company",
-                    "primary_key": ["company_id"]
-                }
-            ]
-        }
-    }
-    module = parse_yang_string(DATA_MODEL_YANG)
-    
-    evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=[]
-    )
-    
-    # Test deref with absolute path
-    # deref(/data-model/entities/name) should find entity with name matching the value
-    # But this is tricky - we need a leafref value first
-    # For now, test that absolute paths work
-    result = evaluator.evaluate_value('deref("/data-model/entities/name")')
-    # This should return None or the first entity, depending on implementation
-    assert result is None or isinstance(result, dict)
-
-
 def test_deref_self_referential():
     """Test deref() with self-referential foreign keys."""
     data = {
@@ -514,29 +485,34 @@ def test_deref_field_type_matching():
     
     # Test constraint: child FK field type must match parent PK field type
     # deref(current())/../type = deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]/type
-    # Context: department.fields[0] (company_id field)
-    field_context = ["data-model", "entities", 1, "fields", 0]
-    evaluator = XPathEvaluator(
+    # Context: department.fields[0].foreignKey.entity (the leafref leaf)
+    entity_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=field_context
+        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     )
     
-    # Get child field type
-    child_type = evaluator.evaluate_value('deref(current())/../type')
-    if child_type is None:
-        pytest.skip("deref() on field node not fully implemented - this is a known limitation")
+    # Verify we're at the entity leafref
+    entity_name = entity_evaluator.evaluate_value('current()')
+    assert entity_name == "company"
+    
+    # Get parent entity via deref
+    parent_entity = entity_evaluator.evaluate_value('deref(current())')
+    assert parent_entity is not None
+    assert isinstance(parent_entity, dict)
+    assert parent_entity.get("name") == "company"
+    
+    # Get the child field (company_id field in department)
+    # Navigate back to the field node to get its type
+    child_field = entity_evaluator.evaluate_value('../..')
+    assert child_field is not None
+    assert isinstance(child_field, dict)
+    child_type = child_field.get("type")
     assert child_type == "string"
     
-    # Get parent entity
-    parent_entity = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
-    if parent_entity is None:
-        pytest.skip("Nested deref() not fully implemented - this is a known limitation")
-    assert parent_entity is not None
-    
     # Get parent field type
-    # This is complex: find field in parent entity where name matches foreignKey.field
-    fk_field = evaluator.evaluate_value('deref(current())/../foreignKey/field')
+    # Find field in parent entity where name matches foreignKey.field
+    fk_field = entity_evaluator.evaluate_value('../field')
     assert fk_field == "company_id"
     
     # Find the field in parent entity
@@ -616,26 +592,30 @@ def test_deref_cache():
     }
     module = parse_yang_string(DATA_MODEL_YANG)
     
-    field_context = ["data-model", "entities", 1, "fields", 0]
-    evaluator = XPathEvaluator(
+    # Context: department.fields[0].foreignKey.entity (the leafref leaf)
+    entity_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=field_context
+        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     )
     
+    # Verify we're at the entity leafref
+    entity_name = entity_evaluator.evaluate_value('current()')
+    assert entity_name == "company"
+    
     # First call should populate cache
-    result1 = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
-    if result1 is None:
-        pytest.skip("Nested deref() not fully implemented - this is a known limitation")
+    result1 = entity_evaluator.evaluate_value('deref(current())')
     assert result1 is not None
+    assert isinstance(result1, dict)
+    assert result1.get("name") == "company"
     
     # Second call should use cache
-    result2 = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    result2 = entity_evaluator.evaluate_value('deref(current())')
     assert result2 is not None
     assert result1 == result2
     
     # Cache should be populated
-    assert len(evaluator.leafref_cache) > 0
+    assert len(entity_evaluator.leafref_cache) > 0
 
 
 def test_deref_physics_array_foreignkey():
@@ -1030,18 +1010,13 @@ def test_deref_physics_nested_deref_validation():
     assert child_fk_value == "anomaly_id"
     
     # deref(current()) should resolve "anomaly_id" to the field node
-    # But since we're at a leafref, we need to navigate to the field first
-    # The leafref path is "../../fields/name", so we need to go up and find the field
-    # Actually, deref() on a field name should find the field node in the same entity
+    # The leafref path is "../../fields/name", so deref() should find the field in the same entity
     field_node = evaluator.evaluate_value('deref(current())')
-    # If deref() works on field names, it should return the field node
-    # Otherwise, we navigate manually
-    if field_node is None:
-        # Navigate manually: go up to entity, then to fields, find field with name="anomaly_id"
-        # This is what the YANG validator does internally
-        pass
+    assert field_node is not None, "deref() should resolve child_fk to field node"
+    assert isinstance(field_node, dict), "Should return field node"
+    assert field_node.get("name") == "anomaly_id", "Should resolve to anomaly_id field"
     
-    # Better approach: test from the field's foreignKey.entity directly
+    # Test from the field's foreignKey.entity directly
     # Context: violated_assumption.fields[1].foreignKey.entity
     entity_evaluator = XPathEvaluator(
         data,
@@ -1390,26 +1365,7 @@ def test_deref_circular_reference():
     assert a_entity_again is not None
     assert a_entity_again.get("name") == "entity_a"
     
-    # Test 3: Nested deref with potential circular reference
-    # deref(deref(...)/../foreignKey/entity) where the entity might reference itself
-    # Context: employee.fields[1] (manager_id field)
-    employee_field_evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=["data-model", "entities", 0, "fields", 1]
-    )
-    
-    # Test nested deref: deref(deref(current())/../foreignKey/entity)
-    # This should resolve manager_id field -> foreignKey.entity ("employee") -> employee entity
-    # Note: This may fail if nested deref() is not fully implemented
-    nested_result = employee_field_evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
-    if nested_result is None:
-        pytest.skip("Nested deref() not fully implemented - this is a known limitation")
-    assert nested_result is not None
-    assert isinstance(nested_result, dict)
-    assert nested_result.get("name") == "employee"
-    
-    # Test 4: Deeply nested circular deref
+    # Test 3: Deeply nested circular deref
     # This tests that deref() can handle multiple levels of nesting without infinite loops
     # Context: employee.fields[1].foreignKey.entity
     deep_evaluator = XPathEvaluator(
@@ -1428,7 +1384,7 @@ def test_deref_circular_reference():
     assert isinstance(deep_result, dict)
     assert deep_result.get("name") == "employee"
     
-    # Test 5: Circular reference in parents relationship
+    # Test 4: Circular reference in parents relationship
     # Entity with self-referential parent relationship
     data_self_parent = {
         "data-model": {
@@ -1788,7 +1744,8 @@ def test_deref_relative_vs_absolute_leafref_paths():
                     "name": "company",
                     "primary_key": ["company_id"],
                     "fields": [
-                        {"name": "company_id", "type": "string"}
+                        {"name": "company_id", "type": "string"},
+                        {"name": "departments", "type": "array", "item_type": {"entity": "department"}}
                     ]
                 },
                 {
@@ -1806,7 +1763,8 @@ def test_deref_relative_vs_absolute_leafref_paths():
                     ],
                     "parents": [
                         {
-                            "child_fk": "company_id"  # Uses relative path: ../../fields/name
+                            "child_fk": "company_id",  # Uses relative path: ../../fields/name
+                            "parent_array": "departments"  # Uses absolute path: /data-model/entities/fields/name
                         }
                     ]
                 }
