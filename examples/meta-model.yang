@@ -10,7 +10,7 @@ module meta-model {
   revision "2026-01-15" {
     description "Initial version";
   }
-  
+
   // Type definitions
   typedef date {
     type string {
@@ -23,7 +23,7 @@ module meta-model {
     type string {
       pattern '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+-]\d{2}:\d{2})?';
     }
-    description "Date and time in ISO 8601 format (YYYY-MM-DDTHH:mm:ss[.sss][Z|±HH:mm])";
+    description "ISO 8601 date and time in format YYYY-MM-DDTHH:mm:ss[.sss][Z|±HH:mm]";
   }
 
   typedef entity-name {
@@ -225,8 +225,10 @@ module meta-model {
       // Count non-array fields and check against limit when allow_unlimited_fields is false
       // Path: ../allow_unlimited_fields goes from entity to data-model container
       // Path: fields[type != 'array'] filters to count only non-array fields
-      // Note: bool() handles both boolean true and string 'true' values
-      must "bool(../allow_unlimited_fields) = true() or count(fields[type != 'array']) <= 7" {
+      // Note: Check if allow_unlimited_fields exists and is true (boolean or string), otherwise enforce limit
+      // When allow_unlimited_fields is not present, it defaults to false, so we check if it's not true
+      // Handle both boolean true and string 'true' values in XPath
+      must "../allow_unlimited_fields = 'true' or ../allow_unlimited_fields = true() or count(fields[type != 'array']) <= 7" {
         error-message "Entity has more than 7 non-array fields. Array fields are excluded from this count as they represent relationships to child entities. Consider splitting into multiple entities with foreign key relationships, or set allow_unlimited_fields: true to bypass this limit.";
         description "Validates that entity has at most 7 non-array fields, unless allow_unlimited_fields is true. Array fields are excluded from the count.";
       }
@@ -310,7 +312,7 @@ module meta-model {
         error-message "minDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that minDate is only specified for date or datetime fields";
       }
-      must "not(../maxDate) or . <= ../maxDate" {
+      must "not(../maxDate) or number(.) <= number(../maxDate)" {
         error-message "minDate must be less than or equal to maxDate when both are specified";
         description "Validates that minDate is not greater than maxDate when both date constraints are present";
       }
@@ -322,7 +324,7 @@ module meta-model {
         error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that maxDate is only specified for date or datetime fields";
       }
-      must "not(../minDate) or . >= ../minDate" {
+      must "not(../minDate) or number(.) >= number(../minDate)" {
         error-message "maxDate must be greater than or equal to minDate when both are specified";
         description "Validates that maxDate is not less than minDate when both date constraints are present";
       }
@@ -452,7 +454,7 @@ module meta-model {
           type field-name;
           mandatory true;
           description "Field name to reference.";
-          must "(not(../entity) and count(../../../../..[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1)" {
+          must "(not(../entity) and count(../../../../fields[name = current()]) > 0) or (../entity and count(deref(../entity)/../fields[name = current()]) > 0)" {
             error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified";
           }
@@ -463,9 +465,9 @@ module meta-model {
             require-instance true;
           }
           description "Entity name for cross-entity field reference (optional).";
-          must "count(../../../../fields[foreignKey/entity = current()]) = 1" {
+          must "count(../../../../fields[foreignKey/entity = current()]) > 0" {
             error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
-            description "When entity is specified, there must be exactly one field in the current entity with a foreignKey referencing this entity";
+            description "When entity is specified, there must be at least one field in the current entity with a foreignKey referencing this entity";
           }
         }
       }
@@ -481,8 +483,7 @@ module meta-model {
         description "Validates that aggregation operations have at least 2 field references";
       }
     }
-    }
-      list parents {
+    list parents {
         key child_fk;
         max-elements 3;
         description "List of parent relationships for hierarchical normalization. YANG constraints validate: (1) child_fk field exists and has foreignKey, (2) parent entity exists and has primary key, (3) foreign key references parent's primary key, (4) cross-entity field name matches parent PK, (5) field types match.";
@@ -629,3 +630,4 @@ module meta-model {
     }
   }
 }
+
