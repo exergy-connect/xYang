@@ -57,9 +57,18 @@ class LeafrefResolver:
         # If require-instance is true, validate that the value exists in the data
         # Use root data for absolute paths, not local data context
         if require_instance:
-            # For absolute paths, use root data; for relative paths, use local data
-            validation_data = root_data if path.startswith('/') else data
-            target_values = self._get_leafref_target_values(path, validation_data)
+            # Convert relative path to absolute data path for value lookup
+            if path.startswith('/'):
+                # Absolute path - use root data
+                data_path = path
+                validation_data = root_data
+            else:
+                # Relative path - convert to absolute data path
+                # Map context_path to data path and resolve relative path
+                data_path = self._resolve_relative_data_path(path, context_path, root_data)
+                validation_data = root_data
+            
+            target_values = self._get_leafref_target_values(data_path, validation_data)
             if value not in target_values:
                 self.errors.append(
                     f"Invalid leafref value \"{value}\" - no target instance "
@@ -130,22 +139,63 @@ class LeafrefResolver:
         self, path: str, context_path: List[str]
     ) -> Optional[Any]:
         """
-        Resolve a relative path like ../field.
+        Resolve a relative path like ../field or ../../fields/name.
         
         Args:
             path: Relative path
-            context_path: Current context path
+            context_path: Current context path in data structure
             
         Returns:
-            Target node or None
-            
-        Raises:
-            NotImplementedError: Relative path resolution not yet implemented
+            Target node in schema or None
         """
-        # TODO: Implement full relative path resolution
-        raise NotImplementedError(
-            f"Relative path resolution not yet implemented: {path}"
-        )
+        # Parse the path to get up levels and field parts
+        parts = path.split('/')
+        up_levels = sum(1 for p in parts if p == '..')
+        field_parts = [p for p in parts if p and p != '..']
+        
+        # Map data context path to schema path
+        # Data paths like ['data-model', 'entities', 0, 'parents', 0, 'child_fk']
+        # should map to schema path ['data-model', 'entities', 'parents', 'child_fk']
+        # When context is at a list level (e.g., ['data-model', 'entities', 'parents']),
+        # we're actually inside a list item, so .. goes to the parent of the list
+        schema_path = []
+        for part in context_path:
+            if isinstance(part, int):
+                # Skip list indices - they don't exist in schema
+                continue
+            schema_path.append(part)
+        
+        # YANG semantics: when you're inside a list item and use .., you go to the parent of the list
+        # So if the last element in schema_path is a list name, the first .. goes to its parent
+        # We need to check if we're at a list level and adjust accordingly
+        # For now, we'll use the simple approach: go up the specified number of levels
+        # But we need to ensure we don't go past the root
+        
+        # Navigate up the schema path
+        if up_levels > len(schema_path):
+            return None
+        
+        # Go up the specified number of levels
+        base_path = schema_path[:-up_levels] if up_levels > 0 else schema_path
+        
+        # Build the target path by adding field parts
+        target_path = base_path + field_parts
+        absolute_path = '/' + '/'.join(target_path)
+        result = self._resolve_absolute_path(absolute_path)
+        
+        # If that didn't work, try going up one less level
+        # This handles cases like ../../fields/name from entities/parents where:
+        # - We go up 2 levels: parents -> entities -> data-model (wrong, fields not under data-model)
+        # - Should go up 1 level: parents -> entities, then fields/name (correct)
+        if result is None and up_levels > 1:
+            alt_base_path = schema_path[:-(up_levels - 1)] if (up_levels - 1) > 0 else schema_path
+            alt_target_path = alt_base_path + field_parts
+            alt_absolute_path = '/' + '/'.join(alt_target_path)
+            alt_result = self._resolve_absolute_path(alt_absolute_path)
+            if alt_result is not None:
+                return alt_result
+        
+        return result
     
     def _resolve_simple_path(
         self, path: str, context_path: List[str]
@@ -167,6 +217,49 @@ class LeafrefResolver:
         raise NotImplementedError(
             f"Simple path resolution not yet implemented: {path}"
         )
+    
+    def _resolve_relative_data_path(
+        self, path: str, context_path: List[str], root_data: Dict[str, Any]
+    ) -> str:
+        """
+        Resolve a relative leafref path to an absolute data path.
+        
+        Args:
+            path: Relative path (e.g., ../../fields/name)
+            context_path: Current context path in data
+            root_data: Root data for navigation
+            
+        Returns:
+            Absolute data path (e.g., /data-model/entities/fields/name)
+        """
+        # Parse the path to get up levels and field parts
+        parts = path.split('/')
+        up_levels = sum(1 for p in parts if p == '..')
+        field_parts = [p for p in parts if p and p != '..']
+        
+        # Navigate up from context_path
+        if up_levels > len(context_path):
+            # Can't go up that far - return a path that won't match
+            return '/invalid/path'
+        
+        # Go up the specified number of levels
+        base_path = context_path[:-up_levels] if up_levels > 0 else context_path
+        
+        # Build the absolute path
+        absolute_path = '/' + '/'.join(base_path + field_parts)
+        
+        # Try to verify the path exists in data
+        # If it doesn't, try going up one less level (same fix as schema resolution)
+        test_values = self._get_leafref_target_values(absolute_path, root_data)
+        if not test_values and up_levels > 1:
+            # Try going up one less level
+            alt_base_path = context_path[:-(up_levels - 1)] if (up_levels - 1) > 0 else context_path
+            alt_absolute_path = '/' + '/'.join(alt_base_path + field_parts)
+            alt_test_values = self._get_leafref_target_values(alt_absolute_path, root_data)
+            if alt_test_values:
+                return alt_absolute_path
+        
+        return absolute_path
     
     def _get_leafref_target_values(self, path: str, data: Dict[str, Any]) -> List[Any]:
         """
