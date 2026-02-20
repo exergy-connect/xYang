@@ -48,6 +48,7 @@ class TypeSystem:
         self.register_type('uint8', self._validate_uint8)
         self.register_type('boolean', self._validate_boolean)
         self.register_type('decimal64', self._validate_decimal64)
+        self.register_type('enumeration', self._validate_enumeration)
     
     def register_type(self, name: str, validator: Callable):
         """
@@ -78,10 +79,35 @@ class TypeSystem:
         Returns:
             (is_valid, error_message)
         """
+        # Check enum constraints first (applies to any type with enum constraints)
+        if constraints and constraints.enums:
+            if isinstance(value, str):
+                if value not in constraints.enums:
+                    return False, f"Invalid enum value '{value}'. Must be one of: {', '.join(constraints.enums)}"
+            else:
+                # Convert to string for comparison
+                str_value = str(value)
+                if str_value not in constraints.enums:
+                    return False, f"Invalid enum value '{str_value}'. Must be one of: {', '.join(constraints.enums)}"
+        
         # Check if it's a typedef
         if type_name in self.typedefs:
             typedef = self.typedefs[type_name]
-            return self.validate(value, typedef.base_type, typedef.constraints)
+            # Merge constraints: typedef constraints override base type constraints
+            merged_constraints = constraints
+            if typedef.constraints:
+                if merged_constraints:
+                    # Merge: use typedef constraints, but keep enum list from constraints if present
+                    merged_constraints = TypeConstraint(
+                        pattern=typedef.constraints.pattern or merged_constraints.pattern,
+                        length=typedef.constraints.length or merged_constraints.length,
+                        range=typedef.constraints.range or merged_constraints.range,
+                        fraction_digits=typedef.constraints.fraction_digits or merged_constraints.fraction_digits,
+                        enums=typedef.constraints.enums if typedef.constraints.enums else merged_constraints.enums
+                    )
+                else:
+                    merged_constraints = typedef.constraints
+            return self.validate(value, typedef.base_type, merged_constraints)
 
         # Use registered validator if available
         if type_name in self._validators:
@@ -167,6 +193,24 @@ class TypeSystem:
             return True, None
         except (ValueError, TypeError):
             return False, f"Expected decimal64, got {type(value).__name__}"
+
+    def _validate_enumeration(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
+        """Validate enumeration value."""
+        # Enum constraints are checked at the beginning of validate() method
+        # If we get here and constraints.enums is empty, it means the enum check already passed
+        # (enums were checked at typedef level or constraints weren't provided)
+        # For enumeration type, we require enum constraints to be present
+        if not constraints or not constraints.enums:
+            # This can happen if enumeration type is used without enum constraints
+            # In this case, we can't validate, so we allow it (enum check should have happened earlier)
+            return True, None
+        
+        # Convert value to string for comparison
+        str_value = str(value)
+        if str_value not in constraints.enums:
+            return False, f"Invalid enum value '{str_value}'. Must be one of: {', '.join(constraints.enums)}"
+        
+        return True, None
 
     def _validate_length(self, length: int, length_spec: str) -> tuple[bool, Optional[str]]:
         """Validate length constraint."""

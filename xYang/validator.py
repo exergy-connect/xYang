@@ -4,7 +4,7 @@ YANG validation engine (refactored).
 
 from typing import Any, Dict, List, Tuple, Callable, Optional
 from .module import YangModule
-from .ast import YangStatement, YangLeafStmt, YangLeafListStmt
+from .ast import YangStatement, YangLeafStmt, YangLeafListStmt, YangContainerStmt, YangListStmt
 from .types import TypeSystem
 from .xpath import XPathEvaluator
 from .validators import (
@@ -148,8 +148,21 @@ class YangValidator:
                 # Validate leaf-list type
                 self.type_validator.validate_leaf_list(data, stmt)
             
+            elif isinstance(stmt, YangListStmt):
+                # Validate list items
+                if stmt.name in data:
+                    items = data[stmt.name]
+                    if isinstance(items, list):
+                        # Validate each list item
+                        for item in items:
+                            if isinstance(item, dict):
+                                new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
+                                self._validate_types(
+                                    item, stmt.statements, root_data, context_path=new_path
+                                )
+            
             elif hasattr(stmt, 'statements'):
-                # Recurse into composite statements
+                # Recurse into composite statements (containers, etc.)
                 if stmt.name in data:
                     new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
                     self._validate_types(
