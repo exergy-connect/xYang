@@ -14,15 +14,11 @@ from pathlib import Path
 
 def get_meta_model_path():
     """Get path to meta-model.yang file."""
-    # Try xFrame's meta-model first
-    xframe_path = Path(__file__).parent.parent.parent / "xFrame" / "src" / "xframe" / "yang" / "meta-model.yang"
-    if xframe_path.exists():
-        return xframe_path
-    # Fallback to examples
+    # Use examples/meta-model.yang (self-contained test)
     examples_path = Path(__file__).parent.parent / "examples" / "meta-model.yang"
     if examples_path.exists():
         return examples_path
-    raise FileNotFoundError("Could not find meta-model.yang")
+    raise FileNotFoundError(f"Could not find meta-model.yang at {examples_path}")
 
 
 def test_computed_field_missing_field_same_entity():

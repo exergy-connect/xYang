@@ -380,6 +380,13 @@ class XPathEvaluator:
                 self.data = self.original_data
                 self._set_context_path(self.original_context_path)
                 value = self.path_evaluator.get_path_value(self.original_context_path)
+                # If value is None, try to get it from the current data if it's a dict/list
+                # This handles cases where the path ends at a leaf in a list item
+                if value is None and isinstance(self.data, dict) and self.original_context_path:
+                    # Check if the last part of the path is a key in the current data
+                    last_part = self.original_context_path[-1]
+                    if isinstance(last_part, str) and last_part in self.data:
+                        value = self.data[last_part]
                 # Return empty string if None (XPath spec for current())
                 return value if value is not None else ""
             finally:
@@ -388,6 +395,11 @@ class XPathEvaluator:
         # If no original context path, try to get value from current data
         if isinstance(self.data, (str, int, float, bool)):
             return self.data
+        # If data is a dict and we're at a leaf, try to get the value
+        if isinstance(self.data, dict) and self.context_path:
+            last_part = self.context_path[-1]
+            if isinstance(last_part, str) and last_part in self.data:
+                return self.data[last_part]
         return ""
     
     def _get_type_context(self) -> Optional[Any]:

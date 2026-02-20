@@ -404,17 +404,27 @@ class ConstraintValidator:
             # Get context path to check if we're in computed.fields
             context_path = getattr(evaluator, 'original_context_path', None) or getattr(evaluator, 'context_path', [])
             
-            # First check: if we're in computed.fields, never apply deref() constraints
-            # (computed.fields[].field has type field-name, not leafref)
+            # First check: if we're in computed.fields, check if deref() is used on the field itself
+            # (computed.fields[].field has type field-name, not leafref, so deref() on field is invalid)
+            # But deref() on entity is valid (entity is a leafref)
             if 'computed' in context_path:
                 try:
                     computed_idx = context_path.index("computed")
                     if computed_idx + 1 < len(context_path) and context_path[computed_idx + 1] == "fields":
-                        logger.debug(
-                            "Skipping deref() constraint for field %s inside computed.fields (path: %s)",
-                            field_name, context_path
-                        )
-                        return
+                        # Check if deref() is used on the field itself (deref(current()) or deref(.))
+                        # If deref() is only used on entity (deref(../entity)), it's valid - don't skip
+                        # Only skip if deref() is used directly on current() or . (the field value)
+                        expr_lower = expression.lower()
+                        if 'deref(current())' in expr_lower or 'deref(.)' in expr_lower:
+                            # But allow deref(../entity) - check if it's specifically deref on entity
+                            # Allow any deref that references ../entity
+                            if '../entity' not in expression:
+                                logger.debug(
+                                    "Skipping deref() constraint on field %s inside computed.fields (path: %s)",
+                                    field_name, context_path
+                                )
+                                return
+                        # If deref() is used on ../entity, it's valid - don't skip
                 except (ValueError, AttributeError):
                     pass
             
@@ -423,13 +433,16 @@ class ConstraintValidator:
                 if isinstance(stmt, YangLeafStmt):
                     stmt_type_name = stmt.type.name if stmt.type else None
                     if stmt_type_name != 'leafref':
-                        # Skip deref() constraints for non-leafref leaves
+                        # Skip deref() constraints for non-leafref leaves, UNLESS deref() is used on ../entity
+                        # (entity is a leafref, so deref(../entity) is valid even for non-leafref fields)
                         # This prevents foreign key constraints from being applied to computed.fields[].field
-                        logger.debug(
-                            "Skipping deref() constraint for non-leafref leaf %s (type: %s, path: %s)",
-                            field_name, stmt_type_name, context_path
-                        )
-                        return
+                        # but allows constraints that reference the entity leafref
+                        if '../entity' not in expression:
+                            logger.debug(
+                                "Skipping deref() constraint for non-leafref leaf %s (type: %s, path: %s)",
+                                field_name, stmt_type_name, context_path
+                            )
+                            return
                 # For containers/lists, deref() constraints are allowed (they may reference leafref children)
                 # So we don't skip them here
             else:

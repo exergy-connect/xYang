@@ -451,14 +451,22 @@ module meta-model {
         leaf field {
           type field-name;
           mandatory true;
-          description "Field name to reference. If entity is omitted, checks same entity first, then parent entity via parent FK if available.";
+          description "Field name to reference.";
+          must "(not(../entity) and count(../../../../fields[name = current()]) > 0) or (../entity and count(deref(../entity)/../fields[name = current()]) > 0)" {
+            error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
+            description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified";
+          }
         }
         leaf entity {
           type leafref {
             path "/data-model/entities/name";
             require-instance true;
           }
-          description "Entity name for cross-entity field reference (optional). Resolution order: (1) If omitted, first checks if field exists in the same entity. (2) If not found and the current entity has a parent relationship (via 'parents' array), uses the first parent's foreign key to reference the parent entity. (3) If specified, there must be exactly one foreign key field in the current entity that references the target entity.";
+          description "Entity name for cross-entity field reference (optional).";
+          must "count(../../../../fields[foreignKey/entity = current()]) > 0" {
+            error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
+            description "When entity is specified, there must be at least one field in the current entity with a foreignKey referencing this entity";
+          }
         }
       }
       // Validate field count based on operation type
