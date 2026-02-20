@@ -489,16 +489,14 @@ class DerefEvaluator:
             
             # Step 3: Use the leafref path to find the referenced node
             result_tuple = self.find_node_by_leafref_path(leafref_path, ref_value)
-            
             if result_tuple:
                 result, node_path = result_tuple
                 if node_path:
                     self.evaluator._deref_node_paths[id(result)] = node_path
                 self.evaluator.leafref_cache[cache_key] = result
                 return result
-            else:
-                self.evaluator.leafref_cache[cache_key] = None
-                return None
+            self.evaluator.leafref_cache[cache_key] = None
+            return None
         except Exception:
             # If path evaluation fails, deref() returns None (referenced node doesn't exist)
             return None
@@ -524,7 +522,7 @@ class DerefEvaluator:
             return f"{node.name}()"
         
         if isinstance(node, BinaryOpNode) and node.operator == '/':
-            # Build path from binary op (optimized: avoid multiple f-string operations)
+            # Build path from binary op
             left_path = self.build_path_from_node(node.left)
             right_path = self.build_path_from_node(node.right)
             if left_path and right_path:

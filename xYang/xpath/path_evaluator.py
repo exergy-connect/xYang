@@ -225,13 +225,9 @@ class PathEvaluator:
                 # If it's a wrapped value (from predicate evaluator), return the value
                 if 'value' in self.evaluator.data and len(self.evaluator.data) == 1:
                     return self.evaluator.data['value']
-                # Otherwise return the dict itself
                 return self.evaluator.data
-            # Otherwise, get value from current context path
-            if self.evaluator.context_path:
-                return self.get_path_value(self.evaluator.context_path)
-            # Fallback to current() if no context
-            return self.evaluator._get_current_value()
+            # Get value from current context path or fallback to current()
+            return self.get_path_value(self.evaluator.context_path) if self.evaluator.context_path else self.evaluator._get_current_value()
         
         # Handle relative paths with ..
         if path.startswith('../'):
@@ -661,18 +657,15 @@ class PathEvaluator:
             # Also check statements for default keyword
             if hasattr(current, 'statements'):
                 for stmt in current.statements:
-                    if hasattr(stmt, 'keyword') and stmt.keyword == 'default':
-                        if hasattr(stmt, 'value'):
-                            value = stmt.value
-                            # Convert string numbers to int/float
-                            if isinstance(value, str):
-                                try:
-                                    if '.' in value:
-                                        return float(value)
-                                    return int(value)
-                                except ValueError:
-                                    return value
-                            return value
+                    if hasattr(stmt, 'keyword') and stmt.keyword == 'default' and hasattr(stmt, 'value'):
+                        value = stmt.value
+                        # Convert string numbers to int/float
+                        if isinstance(value, str):
+                            try:
+                                return float(value) if '.' in value else int(value)
+                            except ValueError:
+                                return value
+                        return value
             return None
         except (AttributeError, IndexError, ValueError):
             return None
