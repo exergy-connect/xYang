@@ -37,6 +37,24 @@ class PathEvaluator:
             self.evaluator.data = old_data
             self.evaluator._set_context_path(old_context)
     
+    @contextmanager
+    def _temporary_root_data(self, path: List):
+        """Context manager for temporarily switching to root_data when needed.
+        
+        Args:
+            path: Path that may require root_data navigation
+        """
+        old_data = self.evaluator.data
+        try:
+            if (path and isinstance(path[0], str) and
+                isinstance(self.evaluator.data, dict) and
+                path[0] not in self.evaluator.data and
+                isinstance(self.evaluator.root_data, dict)):
+                self.evaluator.data = self.evaluator.root_data
+            yield
+        finally:
+            self.evaluator.data = old_data
+    
     def _navigate_from_result(self, result: Any, remaining_path: str) -> Any:
         """Navigate a path from a predicate result.
         
@@ -47,6 +65,9 @@ class PathEvaluator:
         Returns:
             Value at the navigated path, or None
         """
+        if not remaining_path:
+            return result
+        
         if isinstance(result, list) and len(result) > 0:
             with self._temporary_context(result[0]):
                 return self.evaluate_path(remaining_path)
@@ -54,6 +75,26 @@ class PathEvaluator:
             with self._temporary_context(result):
                 return self.evaluate_path(remaining_path)
         return None
+    
+    def _evaluate_path_and_apply_predicate(self, path: str, predicate: Any, remaining_steps: List[str] = None) -> Any:
+        """Evaluate a path, apply predicate if value is a list, then navigate remaining steps.
+        
+        Args:
+            path: Path to evaluate
+            predicate: Predicate to apply (if value is list)
+            remaining_steps: Additional path steps to navigate after predicate
+            
+        Returns:
+            Evaluated result after predicate and navigation
+        """
+        value = self.evaluate_path(path)
+        if isinstance(value, list) and predicate:
+            result = self._apply_predicate_to_value(value, predicate)
+            if remaining_steps:
+                remaining_path = '/'.join(remaining_steps)
+                return self._navigate_from_result(result, remaining_path)
+            return result
+        return value
     
     def _apply_predicate_to_list(self, items: List[Any], predicate_node: Any) -> List[Any]:
         """Apply a predicate node to a list of items.
@@ -282,64 +323,77 @@ class PathEvaluator:
         finally:
             self.evaluator.data = old_data
     
+    def _should_use_root_data(self, parts: List, context_path: List) -> bool:
+        """Determine if navigation should use root_data instead of current data.
+        
+        Args:
+            parts: Path parts to navigate
+            context_path: Current context path
+            
+        Returns:
+            True if root_data should be used
+        """
+        if not (context_path and any(isinstance(p, int) for p in context_path) and
+                len(parts) > 0 and isinstance(self.evaluator.root_data, dict)):
+            return False
+        
+        # Check if path starts with context path prefix
+        min_len = min(len(parts), len(context_path))
+        if min_len == 0:
+            return False
+        
+        path_matches_context = all(parts[i] == context_path[i] for i in range(min_len))
+        if not path_matches_context:
+            return False
+        
+        # Check if we can navigate from current data
+        first_part = parts[0] if parts else None
+        return not (first_part and isinstance(first_part, str) and
+                   isinstance(self.evaluator.data, dict) and first_part in self.evaluator.data)
+    
+    def _adjust_parts_for_root_data(self, parts: List, context_path: List) -> List:
+        """Adjust path parts when navigating from root_data.
+        
+        Args:
+            parts: Original path parts
+            context_path: Current context path
+            
+        Returns:
+            Adjusted path parts for root_data navigation
+        """
+        # If root_data is at container level, skip first part if not in root_data
+        if (parts and isinstance(parts[0], str) and parts[0] not in self.evaluator.root_data):
+            return parts[1:]
+        
+        if len(parts) < len(context_path):
+            # Path is a prefix of context_path
+            if (context_path and isinstance(context_path[0], str) and
+                context_path[0] not in self.evaluator.root_data):
+                return context_path[1:len(parts)+1] if len(context_path) > 1 and len(parts) > 0 else []
+        elif len(parts) > len(context_path):
+            # Path extends beyond context_path
+            remaining_parts = parts[len(context_path):]
+            if (context_path and isinstance(context_path[0], str) and
+                context_path[0] not in self.evaluator.root_data):
+                return context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
+            return remaining_parts
+        
+        return parts
+    
     def get_path_value(self, parts: List) -> Any:
         """Get value at path in data structure.
         
         Args:
             parts: List of path parts (strings for dict keys, ints for list indices)
         """
-        # Special case: when in a list item context and path includes context path prefix,
-        # navigate from root_data instead of evaluator.data
-        # This handles: context_path=['data-model', 'entities', 0], path=['data-model', 'entities', 0, 'fields']
         context_path = self.evaluator.context_path
         current = self.evaluator.data
         
         # Special case: when in a list item context and path was built from context_path,
         # navigate from root_data instead of evaluator.data
-        # This handles paths like: context_path=['data-model', 'entities', 0, 'fields', 2, ...], 
-        # path=['data-model', 'entities', 0, 'fields'] (from _go_up_context_path)
-        if (context_path and 
-            any(isinstance(p, int) for p in context_path) and
-            len(parts) > 0 and
-            isinstance(self.evaluator.root_data, dict)):
-            # Check if path starts with context path prefix (path can be shorter than context_path)
-            min_len = min(len(parts), len(context_path))
-            path_matches_context = min_len > 0 and all(
-                parts[i] == context_path[i] for i in range(min_len)
-            )
-            
-            if path_matches_context:
-                # Try to navigate first part from current data to see if path was built from context_path
-                first_part = parts[0] if parts else None
-                can_navigate_from_current = (
-                    first_part and isinstance(first_part, str) and
-                    isinstance(current, dict) and first_part in current
-                )
-                
-                # If we can't navigate from current, path was likely built from context_path
-                if not can_navigate_from_current:
-                    current = self.evaluator.root_data
-                    # If root_data is at container level (e.g., root_data is data['data-model']),
-                    # and the path starts with that container name, skip it
-                    if (parts and isinstance(parts[0], str) and parts[0] not in current):
-                        # root_data is at container level, skip first part
-                        parts = parts[1:]
-                    elif len(parts) < len(context_path):
-                        # Path is a prefix of context_path - use corresponding slice from context_path[1:]
-                        # Skip context_path[0] if it's not in root_data
-                        if (context_path and isinstance(context_path[0], str) and 
-                            context_path[0] not in current):
-                            # Use context_path[1:len(parts)+1] to get the corresponding path from root_data
-                            parts = context_path[1:len(parts)+1] if len(context_path) > 1 and len(parts) > 0 else []
-                    elif len(parts) > len(context_path):
-                        # Path extends beyond context_path
-                        remaining_parts = parts[len(context_path):]
-                        # Skip context_path[0] if it's not in root_data
-                        if (context_path and isinstance(context_path[0], str) and 
-                            context_path[0] not in current):
-                            parts = context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
-                        else:
-                            parts = remaining_parts
+        if self._should_use_root_data(parts, context_path):
+            current = self.evaluator.root_data
+            parts = self._adjust_parts_for_root_data(parts, context_path)
         
         for part in parts:
             if part in ('.', 'current()'):
@@ -399,7 +453,6 @@ class PathEvaluator:
             Evaluated result
         """
         # Handle paths starting with .. when navigating from a node
-        # In this case, .. means "stay at current node", so we skip it
         steps = list(node.steps)
         if steps and steps[0] == '..' and self.evaluator.context_path == []:
             # We're navigating from a node (empty context_path), so .. means stay here
@@ -407,7 +460,7 @@ class PathEvaluator:
             if not steps:
                 # Just .. with predicate - apply predicate to current data if it's a list
                 if isinstance(self.evaluator.data, list):
-                    return self._apply_predicate_to_list(self.evaluator.data, node.predicate)
+                    return self._apply_predicate_to_value(self.evaluator.data, node.predicate)
                 return None
         
         # Special case: if all steps are .., use _go_up_context_path
@@ -416,67 +469,53 @@ class PathEvaluator:
             context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
             if up_levels <= context_len:
                 new_path = self._go_up_context_path(up_levels)
-                # Ensure get_path_value uses root_data
-                old_data = self.evaluator.data
-                try:
-                    if (new_path and isinstance(new_path[0], str) and
-                        isinstance(self.evaluator.data, dict) and
-                        new_path[0] not in self.evaluator.data and
-                        isinstance(self.evaluator.root_data, dict)):
-                        self.evaluator.data = self.evaluator.root_data
+                with self._temporary_root_data(new_path):
                     value = self.get_path_value(new_path)
                     if isinstance(value, list) and node.predicate:
-                        # Apply predicate to the list
-                        numeric_result = self._apply_numeric_predicate(value, node.predicate)
-                        if numeric_result is not None:
-                            return numeric_result
-                        return self._apply_filter_predicate(value, node.predicate)
+                        return self._apply_predicate_to_value(value, node.predicate)
                     return value
-                finally:
-                    self.evaluator.data = old_data
         
-        # Try first step first (most common case)
+        # Try each step to find first that returns a list
         if steps:
-            first_value = self.evaluate_path(steps[0])
-            if isinstance(first_value, list):
-                # Check if predicate is numeric (index) or filter
-                numeric_result = self._apply_numeric_predicate(first_value, node.predicate)
-                if numeric_result is not None:
-                    # Numeric predicate returned a single element
-                    remaining_steps = steps[1:]
-                    if remaining_steps:
-                        return self._navigate_from_result(numeric_result, '/'.join(remaining_steps))
-                    return numeric_result
-                # Filter predicate - apply to list
-                filtered = self._apply_predicate_to_list(first_value, node.predicate)
-                remaining_steps = steps[1:]
-                if remaining_steps:
-                    return self._navigate_from_result(filtered, '/'.join(remaining_steps))
-                return filtered
+            # Try first step first (most common case)
+            result = self._evaluate_path_and_apply_predicate(
+                steps[0], node.predicate, steps[1:] if len(steps) > 1 else None
+            )
+            if result is not None:
+                return result
             
             # Try other steps if first didn't return a list
             for i in range(1, len(steps)):
                 partial_path = '/'.join(steps[:i+1])
-                partial_value = self.evaluate_path(partial_path)
-                if isinstance(partial_value, list):
-                    # Check if predicate is numeric (index) or filter
-                    numeric_result = self._apply_numeric_predicate(partial_value, node.predicate)
-                    if numeric_result is not None:
-                        # Numeric predicate returned a single element
-                        remaining_steps = steps[i+1:]
-                        if remaining_steps:
-                            return self._navigate_from_result(numeric_result, '/'.join(remaining_steps))
-                        return numeric_result
-                    # Filter predicate - apply to list
-                    filtered = self._apply_predicate_to_list(partial_value, node.predicate)
-                    remaining_steps = steps[i+1:]
-                    if remaining_steps:
-                        return self._navigate_from_result(filtered, '/'.join(remaining_steps))
-                    return filtered
+                result = self._evaluate_path_and_apply_predicate(
+                    partial_path, node.predicate, steps[i+1:] if i+1 < len(steps) else None
+                )
+                if result is not None:
+                    return result
         
         # No step returned a list, evaluate as normal path
-        path = '/'.join(node.steps)
-        return self.evaluate_path(path)
+        return self.evaluate_path('/'.join(node.steps))
+    
+    def _apply_predicate_to_value(self, value: List[Any], predicate: Any) -> Any:
+        """Apply a predicate to a list value, handling both numeric and filter predicates.
+        
+        This method tries numeric index first (fast path), then falls back to filter.
+        
+        Args:
+            value: List to apply predicate to
+            predicate: Predicate AST node
+            
+        Returns:
+            For numeric predicates: single element or None
+            For filter predicates: filtered list
+        """
+        # Try numeric index first (fast path)
+        numeric_result = self._apply_numeric_predicate(value, predicate)
+        if numeric_result is not None:
+            return numeric_result
+        
+        # Apply filter predicate
+        return self._apply_predicate_to_list(value, predicate)
     
     def _apply_numeric_predicate(self, value: List[Any], predicate: Any) -> Optional[Any]:
         """Apply a numeric index predicate to a list.
@@ -506,25 +545,11 @@ class PathEvaluator:
                         return value[idx]
         return None
     
-    def _apply_filter_predicate(self, value: List[Any], predicate: Any) -> List[Any]:
-        """Apply a filter predicate to a list.
-        
-        Args:
-            value: List to filter
-            predicate: Predicate AST node
-            
-        Returns:
-            Filtered list
-        """
-        return self._apply_predicate_to_list(value, predicate)
-    
     def evaluate_path_node(self, node: PathNode) -> Any:
         """Evaluate a path node."""
         # Check for predicate with multiple steps first (before handling ..)
         if node.predicate and len(node.steps) > 1:
-            value = self._evaluate_path_with_predicate(node)
-            # _evaluate_path_with_predicate already applies the predicate, so return directly
-            return value
+            return self._evaluate_path_with_predicate(node)
         
         # Handle relative paths with .. steps
         if node.steps and node.steps[0] == '..':
@@ -533,43 +558,21 @@ class PathEvaluator:
             
             context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
             if up_levels > 0 and context_len == 0 and isinstance(self.evaluator.data, dict):
-                if not field_parts:
-                    value = self.evaluator.data
-                else:
-                    value = self.get_path_value(field_parts)
+                value = self.evaluator.data if not field_parts else self.get_path_value(field_parts)
             elif up_levels <= context_len:
                 new_path = self._go_up_context_path(up_levels) + field_parts
-                # When navigating from a path built with _go_up_context_path, ensure
-                # get_path_value uses root_data if the path starts with context_path elements
-                old_data = self.evaluator.data
-                try:
-                    if (new_path and isinstance(new_path[0], str) and
-                        isinstance(self.evaluator.data, dict) and
-                        new_path[0] not in self.evaluator.data and
-                        isinstance(self.evaluator.root_data, dict)):
-                        # Path starts with a context path element, use root_data
-                        self.evaluator.data = self.evaluator.root_data
+                with self._temporary_root_data(new_path):
                     value = self.get_path_value(new_path)
-                finally:
-                    self.evaluator.data = old_data
             else:
                 value = None
         elif node.is_absolute:
-            path = '/' + '/'.join(node.steps)
-            value = self.evaluate_path(path)
+            value = self.evaluate_path('/' + '/'.join(node.steps))
         else:
-            path = '/'.join(node.steps)
-            value = self.evaluate_path(path)
+            value = self.evaluate_path('/'.join(node.steps))
         
         # Apply predicate if present and value is a list
         if node.predicate and isinstance(value, list):
-            # Try numeric index first (fast path)
-            numeric_result = self._apply_numeric_predicate(value, node.predicate)
-            if numeric_result is not None:
-                return numeric_result
-            
-            # Apply filter predicate
-            return self._apply_filter_predicate(value, node.predicate)
+            return self._apply_predicate_to_value(value, node.predicate)
         
         return value
     
