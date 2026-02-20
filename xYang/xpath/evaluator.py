@@ -72,12 +72,9 @@ class XPathEvaluator:
         """
         try:
             result = self.evaluate_value(expression, ast)
-            # Convert to boolean - optimized type checking
-            if isinstance(result, bool):
-                return result
-            if isinstance(result, (int, float, str)):
-                return bool(result)
-            return False
+            # Convert to boolean using yang_bool for proper XPath truthiness
+            from .utils import yang_bool
+            return yang_bool(result)
         except XPathSyntaxError:
             # Re-raise syntax errors
             raise

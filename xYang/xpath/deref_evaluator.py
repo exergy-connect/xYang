@@ -88,32 +88,70 @@ class DerefEvaluator:
             
             # Handle simple path expressions
             if isinstance(arg_node, PathNode):
-                # It's a PathNode - build path string from steps
+                # Evaluate the path first to get the value
+                path_value = arg_node.evaluate(self.evaluator)
+                # If it's a string value, try to find field/node by name
+                if isinstance(path_value, str) and path_value:
+                    # Try to find as field name
+                    result = self.find_field_by_name(path_value)
+                    if result is not None:
+                        return result
+                    # Try to find as entity name
+                    result = self.find_entity_by_name(path_value)
+                    if result is not None:
+                        return result
+                    # If not found, try deref_value
+                    result = self.deref_value(path_value)
+                    if result is not None:
+                        return result
+                # If not a string or not found, try as path expression
                 if arg_node.is_absolute:
                     path = '/' + '/'.join(arg_node.steps)
                 else:
                     path = '/'.join(arg_node.steps)
             elif isinstance(arg_node, FCN):
-                # It's a function call like current() - use the function name and args as path
-                # For current(), we want to pass "current()" as the path
+                # It's a function call like current() - evaluate it first to get the value
+                # For current(), evaluate to get the value, then find the field/node by that value
                 if arg_node.name == 'current' and len(arg_node.args) == 0:
+                    # Evaluate current() to get the value
+                    value = arg_node.evaluate(self.evaluator)
+                    # If we have a value, try to find the field/node by that value
+                    if value is not None:
+                        # Try to find as field name in current entity
+                        result = self.find_field_by_name(value)
+                        if result is not None:
+                            return result
+                        # Try to find as entity name
+                        result = self.find_entity_by_name(value)
+                        if result is not None:
+                            return result
+                        # If not found, try deref_value which handles both cases
+                        return self.deref_value(value)
+                    # If current() returns None, try as path
                     path = 'current()'
                 else:
                     # For other functions, build the path representation
                     path = f"{arg_node.name}()"
+                    return self.evaluate_deref(path)
             else:
                 # For other node types, try to get a string representation
                 # This handles cases where the path is a simple value
                 if hasattr(arg_node, 'evaluate'):
-                    # Evaluate to get the value, but we need the path expression
-                    # For deref(), we actually want to evaluate the path to get the value,
-                    # then find the schema node at that location to get its leafref path
-                    # So we need to pass the path expression, not the value
-                    # For now, try to reconstruct the path from the node
+                    # Evaluate to get the value first
+                    value = arg_node.evaluate(self.evaluator)
+                    # If it's a string value, try to find field/node by name
+                    if isinstance(value, str) and value:
+                        result = self.find_field_by_name(value)
+                        if result is not None:
+                            return result
+                        result = self.find_entity_by_name(value)
+                        if result is not None:
+                            return result
+                    # Otherwise, try as path expression
                     path = str(arg_node) if hasattr(arg_node, '__str__') else ''
                 else:
                     path = str(arg_node)
-            return self.evaluate_deref(path)
+                return self.evaluate_deref(path)
         return None
     
     def evaluate_deref(self, path: str) -> Any:
@@ -220,7 +258,7 @@ class DerefEvaluator:
         return None
     
     def find_field_by_name(self, name: str) -> Any:
-        """Find a field node by name in the current entity.
+        """Find a field node by name in the current entity or any entity.
         
         Args:
             name: Field name to search for
@@ -229,34 +267,55 @@ class DerefEvaluator:
             Field node (dict), or None if not found
         """
         # Optimized: early return for invalid inputs
-        if not isinstance(name, str) or not self.evaluator.context_path:
+        if not isinstance(name, str) or not self.evaluator.root_data:
             return None
         
         # Find the entity index from context - optimized single pass
         entity_idx = None
-        context_len = len(self.evaluator.context_path)
-        for i, part in enumerate(self.evaluator.context_path):
-            if part == "entities" and i + 1 < context_len:
-                next_part = self.evaluator.context_path[i + 1]
-                if isinstance(next_part, int):
-                    entity_idx = next_part
-                    break
+        if self.evaluator.context_path:
+            context_len = len(self.evaluator.context_path)
+            for i, part in enumerate(self.evaluator.context_path):
+                if part == "entities" and i + 1 < context_len:
+                    next_part = self.evaluator.context_path[i + 1]
+                    if isinstance(next_part, int):
+                        entity_idx = next_part
+                        break
         
-        if entity_idx is not None and self.evaluator.root_data:
-            data_model = self.evaluator.root_data.get("data-model")
-            if data_model:
-                entities = data_model.get("entities")
-                if entities and entity_idx < len(entities):
-                    entity = entities[entity_idx]
-                    if isinstance(entity, dict):
-                        fields = entity.get("fields")
-                        if fields:
-                            # Optimized: iterate directly
-                            for field in fields:
-                                if isinstance(field, dict):
-                                    field_name = field.get("name")
-                                    if field_name == name:
-                                        return field
+        data_model = self.evaluator.root_data.get("data-model")
+        if not data_model:
+            return None
+        
+        entities = data_model.get("entities")
+        if not entities:
+            return None
+        
+        # If we have an entity index, search in that entity first
+        if entity_idx is not None and entity_idx < len(entities):
+            entity = entities[entity_idx]
+            if isinstance(entity, dict):
+                fields = entity.get("fields")
+                if fields:
+                    # Handle both dict and list formats
+                    field_list = fields.get("field") if isinstance(fields, dict) else fields
+                    if isinstance(field_list, list):
+                        for field in field_list:
+                            if isinstance(field, dict):
+                                field_name = field.get("name")
+                                if field_name == name:
+                                    return field
+        
+        # If not found in current entity, search all entities
+        for entity in entities:
+            if isinstance(entity, dict):
+                fields = entity.get("fields")
+                if fields:
+                    field_list = fields.get("field") if isinstance(fields, dict) else fields
+                    if isinstance(field_list, list):
+                        for field in field_list:
+                            if isinstance(field, dict):
+                                field_name = field.get("name")
+                                if field_name == name:
+                                    return field
         
         return None
     

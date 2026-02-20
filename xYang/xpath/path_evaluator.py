@@ -315,6 +315,15 @@ class PathEvaluator:
         if steps:
             first_value = self.evaluate_path(steps[0])
             if isinstance(first_value, list):
+                # Check if predicate is numeric (index) or filter
+                numeric_result = self._apply_numeric_predicate(first_value, node.predicate)
+                if numeric_result is not None:
+                    # Numeric predicate returned a single element
+                    remaining_steps = steps[1:]
+                    if remaining_steps:
+                        return self._navigate_from_result(numeric_result, '/'.join(remaining_steps))
+                    return numeric_result
+                # Filter predicate - apply to list
                 filtered = self._apply_predicate_to_list(first_value, node.predicate)
                 remaining_steps = steps[1:]
                 if remaining_steps:
@@ -326,6 +335,15 @@ class PathEvaluator:
                 partial_path = '/'.join(steps[:i+1])
                 partial_value = self.evaluate_path(partial_path)
                 if isinstance(partial_value, list):
+                    # Check if predicate is numeric (index) or filter
+                    numeric_result = self._apply_numeric_predicate(partial_value, node.predicate)
+                    if numeric_result is not None:
+                        # Numeric predicate returned a single element
+                        remaining_steps = steps[i+1:]
+                        if remaining_steps:
+                            return self._navigate_from_result(numeric_result, '/'.join(remaining_steps))
+                        return numeric_result
+                    # Filter predicate - apply to list
                     filtered = self._apply_predicate_to_list(partial_value, node.predicate)
                     remaining_steps = steps[i+1:]
                     if remaining_steps:
@@ -378,6 +396,12 @@ class PathEvaluator:
     
     def evaluate_path_node(self, node: PathNode) -> Any:
         """Evaluate a path node."""
+        # Check for predicate with multiple steps first (before handling ..)
+        if node.predicate and len(node.steps) > 1:
+            value = self._evaluate_path_with_predicate(node)
+            # _evaluate_path_with_predicate already applies the predicate, so return directly
+            return value
+        
         # Handle relative paths with .. steps
         if node.steps and node.steps[0] == '..':
             up_levels = sum(1 for step in node.steps if step == '..')
@@ -386,10 +410,10 @@ class PathEvaluator:
             context_len = self.evaluator._context_path_len
             if up_levels > 0 and context_len == 0 and isinstance(self.evaluator.data, dict):
                 if not field_parts:
-                    return self.evaluator.data
-                return self.get_path_value(field_parts)
-            
-            if up_levels <= context_len:
+                    value = self.evaluator.data
+                else:
+                    value = self.get_path_value(field_parts)
+            elif up_levels <= context_len:
                 new_path = self._go_up_context_path(up_levels) + field_parts
                 value = self.get_path_value(new_path)
             else:
@@ -398,12 +422,8 @@ class PathEvaluator:
             path = '/' + '/'.join(node.steps)
             value = self.evaluate_path(path)
         else:
-            # Check for predicate with multiple steps
-            if node.predicate and len(node.steps) > 1:
-                value = self._evaluate_path_with_predicate(node)
-            else:
-                path = '/'.join(node.steps)
-                value = self.evaluate_path(path)
+            path = '/'.join(node.steps)
+            value = self.evaluate_path(path)
         
         # Apply predicate if present and value is a list
         if node.predicate and isinstance(value, list):
