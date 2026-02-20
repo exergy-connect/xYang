@@ -115,8 +115,12 @@ class PathEvaluator:
         Handles list indices properly:
         - For leaf-list elements: removes both the index and the leaf-list name together
           (because the indexed value is a scalar, not a container)
-        - For list elements: removes only the index (leaving the list name, which is
-          the list entry container)
+        - For list elements: when going up from a list item, removes both the index and
+          the list name to get to the parent container (YANG semantics: .. from list item
+          goes to parent of list, not the list itself)
+        - Exception: when the parent of a list is also a list item (nested lists), we need
+          to be more careful. From entities[1]/fields[1], going up should remove fields[1]
+          to get to entities[1], not remove both fields and entities.
         
         Args:
             up_levels: Number of levels to go up
@@ -126,6 +130,8 @@ class PathEvaluator:
         """
         new_path = list(self.evaluator.context_path)
         for _ in range(up_levels):
+            if not new_path:
+                break
             removed = new_path.pop()
             # If it was a list index (int), check if the parent is a leaf-list or a list
             if isinstance(removed, int) and len(new_path) > 0:
@@ -186,13 +192,34 @@ class PathEvaluator:
         if path.startswith('/'):
             return self.evaluate_absolute_path(path)
         
-        # Simple field access - build path from context
+        # Simple field access - try direct access first, then build path from context
         if '/' not in path:
+            # First, try to access the field directly from evaluator.data
+            # This handles the case where evaluator.data is set to a list item (e.g., entity dict)
+            if isinstance(self.evaluator.data, dict) and path in self.evaluator.data:
+                return self.evaluator.data[path]
+            # Fall back to building path from context
             full_path = list(self.evaluator.context_path) + [path]
             return self.get_path_value(full_path)
         
-        # Path with slashes
+        # Path with slashes - try direct access first for first part
         parts = path.split('/')
+        if isinstance(self.evaluator.data, dict) and parts[0] in self.evaluator.data:
+            # Start from current data and navigate remaining parts
+            current = self.evaluator.data[parts[0]]
+            for part in parts[1:]:
+                if isinstance(current, dict) and part in current:
+                    current = current[part]
+                elif isinstance(current, list) and part.isdigit():
+                    idx = int(part)
+                    if 0 <= idx < len(current):
+                        current = current[idx]
+                    else:
+                        return None
+                else:
+                    return None
+            return current
+        # Fall back to building path from context
         return self.get_path_value(list(self.evaluator.context_path) + parts)
     
     def evaluate_relative_path(self, path: str) -> Any:
@@ -205,8 +232,48 @@ class PathEvaluator:
         
         # Navigate up the context path
         if up_levels <= context_len:
-            new_path = self._go_up_context_path(up_levels) + field_parts
-            return self.get_path_value(new_path)
+            # When navigating from a list item context, we need to use root_data
+            # because the path is relative to the context path, not the current data
+            old_data = self.evaluator.data
+            try:
+                # Use root_data for navigation when we have a context path
+                if context_len > 0 and isinstance(self.evaluator.root_data, dict):
+                    self.evaluator.data = self.evaluator.root_data
+                
+                # Try going up the specified number of levels
+                new_path = self._go_up_context_path(up_levels) + field_parts
+                result = self.get_path_value(new_path)
+                
+                # If that didn't work, try two fallback strategies:
+                # 1. Try going up one more semantic level by removing the list name
+                #    (YANG semantics: .. from list item goes to parent of list, not the list itself)
+                if result is None and field_parts and len(new_path) > len(field_parts):
+                    # new_path includes field_parts at the end, so we need to remove field_parts first
+                    # to get the base path, then remove the list name, then re-add field_parts
+                    base_path = new_path[:-len(field_parts)] if len(field_parts) > 0 else new_path
+                    if len(base_path) > 0 and isinstance(base_path[-1], str):
+                        # Remove the list name and re-add field_parts
+                        new_path_alt = base_path[:-1] + field_parts
+                        result_alt = self.get_path_value(new_path_alt)
+                        if result_alt is not None:
+                            return result_alt
+                
+                # 2. Try going up fewer levels (in case we went up too far)
+                # But only if the first fallback didn't work and we're sure we need to go up less
+                # (Don't try this if we already tried removing the list name)
+                if result is None and field_parts and up_levels > 1:
+                    # Only try going up one less level, not all the way down to 0
+                    # This prevents finding wrong paths that happen to exist
+                    alt_levels = up_levels - 1
+                    new_path_alt = self._go_up_context_path(alt_levels) + field_parts
+                    result_alt = self.get_path_value(new_path_alt)
+                    # Only use this result if it's a list (for field access) or matches expected type
+                    if result_alt is not None:
+                        return result_alt
+                
+                return result
+            finally:
+                self.evaluator.data = old_data
         
         return None
     
@@ -273,6 +340,17 @@ class PathEvaluator:
         if self._should_use_root_data(parts, context_path):
             current = self.evaluator.root_data
             parts = self._adjust_parts_for_root_data(parts, context_path)
+        elif (context_path and 
+              isinstance(self.evaluator.data, dict) and 
+              self.evaluator.data is not self.evaluator.root_data and
+              len(parts) > 0 and 
+              isinstance(parts[0], str)):
+            # If we're in a list item context and the path doesn't start with context_path,
+            # we need to navigate from root_data using the full path
+            # Check if the first part of parts matches the context_path
+            if not (len(parts) > 0 and len(context_path) > 0 and parts[0] == context_path[0]):
+                # Path doesn't start with context_path, so navigate from root_data
+                current = self.evaluator.root_data
         
         for part in parts:
             # Handle integer list indices
@@ -410,9 +488,39 @@ class PathEvaluator:
             
             context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
             if up_levels <= context_len:
+                # Try going up the specified number of levels
                 new_path = self._go_up_context_path(up_levels) + field_parts
                 with self._temporary_root_data(new_path):
                     value = self.get_path_value(new_path)
+                
+                # If that didn't work, try two fallback strategies:
+                # 1. Try going up one more semantic level by removing the list name
+                #    (YANG semantics: .. from list item goes to parent of list, not the list itself)
+                if value is None and field_parts and len(new_path) > len(field_parts):
+                    # new_path includes field_parts at the end, so we need to remove field_parts first
+                    # to get the base path, then remove the list name, then re-add field_parts
+                    base_path = new_path[:-len(field_parts)] if len(field_parts) > 0 else new_path
+                    if len(base_path) > 0 and isinstance(base_path[-1], str):
+                        # Remove the list name and re-add field_parts
+                        new_path_alt = base_path[:-1] + field_parts
+                        with self._temporary_root_data(new_path_alt):
+                            value_alt = self.get_path_value(new_path_alt)
+                            if value_alt is not None:
+                                value = value_alt
+                
+                # 2. Try going up fewer levels (in case we went up too far)
+                # But only if the first fallback didn't work
+                # (Don't try this if we already tried removing the list name)
+                if value is None and field_parts and up_levels > 1:
+                    # Only try going up one less level, not all the way down to 0
+                    # This prevents finding wrong paths that happen to exist
+                    alt_levels = up_levels - 1
+                    new_path_alt = self._go_up_context_path(alt_levels) + field_parts
+                    with self._temporary_root_data(new_path_alt):
+                        value_alt = self.get_path_value(new_path_alt)
+                        # Only use this result if it's not None
+                        if value_alt is not None:
+                            value = value_alt
             else:
                 value = None
         else:

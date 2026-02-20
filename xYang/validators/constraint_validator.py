@@ -100,7 +100,7 @@ class ConstraintValidator:
             context_path: Current path in data structure
             root_data: Root data structure
         """
-        evaluator.context_path = context_path
+        evaluator._set_context_path(context_path)  # Use _set_context_path to update cached length
         evaluator.original_context_path = context_path.copy() if context_path else []
         evaluator.original_data = root_data
         
