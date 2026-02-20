@@ -71,9 +71,38 @@ class DerefEvaluator:
                     old_context = context_path
                     old_original_context = original_context_path
                     
-                    # Pre-compute context parts (filtered) for later use
-                    if old_original_context:
-                        context_parts = [str(p) for p in old_original_context if not isinstance(p, int)]
+                    # CRITICAL: When left_result is a node from deref(), we need to find where it came from
+                    # Try to determine the context where left_result came from
+                    left_node = arg_node.left
+                    left_node_context = None
+                    
+                    # If left side is a deref() call, try to find where the node came from
+                    if isinstance(left_node, FCN) and left_node.name == 'deref' and len(left_node.args) == 1:
+                        # The node came from a deref() call - find its location in the data
+                        # We can search for the node in the data structure
+                        left_node_context = self._find_node_location_in_data(left_result, old_original_context or old_context)
+                    
+                    # If we couldn't determine left_node_context, try to infer from the node structure
+                    if left_node_context is None and isinstance(left_result, dict):
+                        # If the node has a 'name' field, it might be a field node
+                        # Try to find it in the entity's fields
+                        if 'name' in left_result:
+                            # Search for the field in the current entity context
+                            entity_context = self._find_entity_context(old_original_context or old_context)
+                            if entity_context:
+                                # Try to find the field in this entity's fields
+                                field_name = left_result.get('name')
+                                field_context = entity_context + ['fields']
+                                # Check if we can find this field
+                                left_node_context = self._find_field_context(field_context, field_name, old_original_context or old_context)
+                    
+                    # If we still couldn't determine left_node_context, use original context
+                    if left_node_context is None:
+                        left_node_context = old_original_context or old_context
+                    
+                    # Pre-compute context parts (filtered) for later use - use left_node_context
+                    if left_node_context:
+                        context_parts = [str(p) for p in left_node_context if not isinstance(p, int)]
                         context_str = '/'.join(context_parts)
                     else:
                         context_parts = []
@@ -81,8 +110,12 @@ class DerefEvaluator:
                     
                     try:
                         # Set the node as current data context
+                        # CRITICAL: When deref() returns a node, that node becomes the new context
+                        # For path navigation from the node, we need context_path to be empty
+                        # so that .. navigates within the node structure, not up the global context path
+                        # However, we still need left_node_context for schema resolution later
                         self.evaluator.data = left_result
-                        self.evaluator._set_context_path([])
+                        self.evaluator._set_context_path([])  # Empty context so .. works within the node
                         # Preserve original context for schema resolution
                         
                         # Evaluate right side (path navigation)
@@ -112,45 +145,35 @@ class DerefEvaluator:
                         
                         # Now deref() the resulting value
                         # CRITICAL: deref() requires schema context - check if the path points to a leafref
+                        # When navigating from a node (left_result), paths with .. are evaluated within the node
+                        # (due to empty context_path), but for schema resolution we need the path relative to
+                        # where the node is located (left_node_context)
                         if path_value is not None and right_path:
-                            # Build full path relative to original context
-                            # Handle .. by navigating up from original context
+                            # Convert the path for schema resolution:
+                            # - If path starts with .., it was evaluated within the node (empty context_path)
+                            # - For schema resolution, we need it relative to left_node_context
+                            # - From a field node, ../foreignKey/entity should be ./foreignKey/entity
                             if right_path.startswith('../'):
-                                # Count .. levels (optimized: count occurrences)
-                                up_levels = right_path.count('../')
-                                # Extract remaining path after .. (optimized: split once, filter)
+                                # Extract remaining path after ..
                                 path_parts = right_path.split('/')
                                 remaining_path = '/'.join(p for p in path_parts if p and p != '..')
-                                if old_original_context and up_levels <= len(context_parts):
-                                    # Navigate up from original context
-                                    base_parts = context_parts[:-up_levels] if up_levels > 0 else context_parts
-                                    if remaining_path:
-                                        full_path_parts = base_parts + [remaining_path]
-                                    else:
-                                        full_path_parts = base_parts
-                                    # Convert to relative path format for schema checking
-                                    start_idx = len(context_parts) - up_levels
-                                    if len(full_path_parts) > start_idx:
-                                        full_relative_path = './' + '/'.join(full_path_parts[start_idx:])
-                                    else:
-                                        full_relative_path = '.'
-                                else:
-                                    full_relative_path = right_path
-                            elif right_path.startswith('./'):
-                                # Remove ./ prefix - path is relative to original context
-                                remaining_path = right_path[2:]
-                                full_relative_path = './' + remaining_path if remaining_path else '.'
+                                # Convert to relative path from the node's location
+                                schema_path = './' + remaining_path if remaining_path else '.'
+                            elif not right_path.startswith('./') and not right_path.startswith('/'):
+                                # Make it explicitly relative
+                                schema_path = './' + right_path
                             else:
-                                # Simple relative path - append to original context position
-                                full_relative_path = './' + right_path
+                                schema_path = right_path
                             
-                            # Check if this path is a leafref in the original context
-                            # Restore original context temporarily to check schema
+                            # Check if this path is a leafref in the left_node_context
+                            # Restore left_node_context temporarily to check schema
+                            # CRITICAL: Also set original_context_path to left_node_context so schema resolution uses it
                             temp_context = self.evaluator.context_path
                             temp_original = self.evaluator.original_context_path
                             try:
-                                self.evaluator.context_path = old_original_context if old_original_context else old_context
-                                leafref_path = self.get_leafref_path_from_schema(full_relative_path)
+                                self.evaluator.context_path = left_node_context if left_node_context else old_context
+                                self.evaluator.original_context_path = left_node_context if left_node_context else old_original_context
+                                leafref_path = self.get_leafref_path_from_schema(schema_path)
                                 if leafref_path:
                                     # This is a leafref - use schema-aware resolution
                                     result = self.find_node_by_leafref_path(leafref_path, path_value)
@@ -798,4 +821,83 @@ class DerefEvaluator:
                     if result is not None:
                         return result
         
+        return None
+    
+    def _find_node_location_in_data(self, node: dict, search_context: List) -> List:
+        """Find the location of a node in the data structure.
+        
+        Args:
+            node: The node dict to find
+            search_context: Context to start searching from (unused, but kept for API consistency)
+            
+        Returns:
+            The context path where the node was found, or None
+        """
+        # Search recursively in the data structure
+        # Start from root and search for the node
+        root_data = self.evaluator.root_data
+        if not root_data:
+            return None
+        
+        # Use a helper to recursively search
+        def search_recursive(data, path, target_node):
+            if data is target_node or (isinstance(data, dict) and isinstance(target_node, dict) and 
+                                      data == target_node):
+                return path
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    result = search_recursive(value, path + [key], target_node)
+                    if result:
+                        return result
+            elif isinstance(data, list):
+                for i, item in enumerate(data):
+                    result = search_recursive(item, path + [i], target_node)
+                    if result:
+                        return result
+            return None
+        
+        result_path = search_recursive(root_data, [], node)
+        return result_path if result_path else None
+    
+    def _find_entity_context(self, context: List) -> List:
+        """Find the entity context from a given context path.
+        
+        Args:
+            context: Current context path
+            
+        Returns:
+            Context path up to and including the entity, or None
+        """
+        # Find where "entities" is in the context
+        try:
+            entities_idx = context.index("entities")
+            if entities_idx + 1 < len(context):
+                # Return context up to and including the entity index
+                return context[:entities_idx + 2]
+        except ValueError:
+            pass
+        return None
+    
+    def _find_field_context(self, field_base_context: List, field_name: str, search_context: List) -> List:
+        """Find the context for a specific field.
+        
+        Args:
+            field_base_context: Base context (e.g., ['data-model', 'entities', 1, 'fields'])
+            field_name: Name of the field to find
+            search_context: Context to use for searching (unused, but kept for API consistency)
+            
+        Returns:
+            Context path to the field, or None
+        """
+        # Try to navigate to the field using the base context
+        try:
+            # Get the data at field_base_context
+            field_list = self.evaluator.path_evaluator.get_path_value(field_base_context)
+            if isinstance(field_list, list):
+                # Search for the field with matching name
+                for i, field in enumerate(field_list):
+                    if isinstance(field, dict) and field.get('name') == field_name:
+                        return field_base_context + [i]
+        except Exception:
+            pass
         return None
