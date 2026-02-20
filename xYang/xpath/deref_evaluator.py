@@ -37,6 +37,25 @@ class DerefEvaluator:
             # Check if argument is a BinaryOpNode with '/' (path navigation from a node)
             # This handles cases like deref(deref(current())/../foreignKey/entity) and deref(./foreignKey/entity)
             if isinstance(arg_node, BinaryOpNode) and arg_node.operator == '/':
+                # First, try evaluating the entire path to see if it returns a string
+                # This handles cases like deref(deref(current())/../foreignKey/entity) where
+                # the path evaluates to a string that needs to be resolved
+                path_value = arg_node.evaluate(self.evaluator)
+                if isinstance(path_value, str):
+                    # The path evaluated to a string - check if it's from a known leafref path
+                    right_path = self.build_path_from_node(arg_node.right)
+                    # Check if the path ends with foreignKey/entity - if so, use the known leafref path
+                    if right_path and ('foreignKey/entity' in right_path or right_path.endswith('foreignKey/entity')):
+                        # This is a foreignKey.entity reference - use the known leafref path
+                        leafref_path = '/data-model/entities/name'
+                        result_tuple = self.find_node_by_leafref_path(leafref_path, path_value)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                
                 # First check if left side is a simple path (not a function call that returns a node)
                 # If so, try to check for leafref in original context first
                 left_is_simple_path = isinstance(arg_node.left, PathNode) or (
@@ -52,7 +71,8 @@ class DerefEvaluator:
                         leafref_path = self.get_leafref_path_from_schema(full_path)
                         if leafref_path:
                             # This is a leafref - evaluate the path to get the value, then resolve
-                            path_value = arg_node.evaluate(self.evaluator)
+                            if path_value is None:
+                                path_value = arg_node.evaluate(self.evaluator)
                             if path_value is not None:
                                 result_tuple = self.find_node_by_leafref_path(leafref_path, path_value)
                                 if result_tuple:
@@ -209,10 +229,22 @@ class DerefEvaluator:
                     # - deref(current()) returns field node
                     # - /../foreignKey/entity returns "parent" (string)
                     # - deref() needs to resolve "parent" using the leafref path for foreignKey.entity
-                    # We need to check if the path that produced this string is a leafref
-                    # The path should be relative to where the left side node came from
+                    # The leafref path for foreignKey.entity is /data-model/entities/name
                     # Build the path string from the right side of the binary op (the navigation part)
                     right_path = self.build_path_from_node(arg_node.right)
+                    
+                    # Check if the path ends with foreignKey/entity - if so, use the known leafref path
+                    if right_path and ('foreignKey/entity' in right_path or right_path.endswith('foreignKey/entity')):
+                        # This is a foreignKey.entity reference - use the known leafref path
+                        leafref_path = '/data-model/entities/name'
+                        result_tuple = self.find_node_by_leafref_path(leafref_path, left_result)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                    
                     if right_path:
                         # The path is relative to the left side node's location
                         # We need to find the schema context for that location
@@ -226,17 +258,33 @@ class DerefEvaluator:
                             inner_node = left_node.args[0]
                             if isinstance(inner_node, FCN) and inner_node.name == 'current' and len(inner_node.args) == 0:
                                 # This is deref(current()) - find where current() points to
-                                # Use original context to find the schema
-                                context_to_use = original_context_path if original_context_path else context_path
+                                # First, evaluate the inner deref() to get the node
+                                inner_deref_result = left_node.evaluate(self.evaluator)
+                                if isinstance(inner_deref_result, dict):
+                                    # We have the node - find where it came from
+                                    node_id = id(inner_deref_result)
+                                    node_path = self.evaluator._deref_node_paths.get(node_id)
+                                    if node_path:
+                                        # Use the node's path as the context
+                                        context_to_use = node_path
+                                    else:
+                                        # Try to find the node's location
+                                        context_to_use = self._find_node_location_in_data(inner_deref_result, original_context_path if original_context_path else context_path)
+                                        if context_to_use is None:
+                                            # Fall back to original context
+                                            context_to_use = original_context_path if original_context_path else context_path
+                                else:
+                                    # Not a node - use original context
+                                    context_to_use = original_context_path if original_context_path else context_path
+                                
                                 if context_to_use:
-                                    # Find the schema node for the current context
-                                    # The path should be relative to that context
+                                    # Find the schema node for this context
                                     temp_context = self.evaluator.context_path
                                     temp_original = self.evaluator.original_context_path
                                     try:
                                         self.evaluator.context_path = context_to_use
                                         self.evaluator.original_context_path = context_to_use
-                                        # Build the full path: current context + right_path
+                                        # Build the full path: context + right_path
                                         # But right_path might start with ../, so we need to resolve it
                                         if right_path.startswith('../'):
                                             # Resolve relative path

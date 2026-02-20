@@ -104,12 +104,40 @@ class PathEvaluator:
         """
         from .utils import yang_bool
         
+        # Preserve original context for current() to work correctly in predicates
+        old_data = self.evaluator.data
+        old_context_path = self.evaluator.context_path
+        # Save original context values (these should be preserved throughout predicate evaluation)
+        saved_original_context_path = self.evaluator.original_context_path
+        saved_original_data = self.evaluator.original_data
+        
         filtered = []
-        for item in items:
-            with self._temporary_context(item):
-                pred_result = predicate_node.evaluate(self.evaluator)
-                if yang_bool(pred_result):
-                    filtered.append(item)
+        try:
+            for item in items:
+                # Set context to the item being tested (so paths like 'name' evaluate from the item)
+                if isinstance(item, dict):
+                    self.evaluator.data = item
+                else:
+                    self.evaluator.data = {'value': item}
+                self.evaluator._set_context_path([])
+                # Preserve original_context_path and original_data so current() works correctly
+                # These should already be set, but ensure they're preserved
+                self.evaluator.original_context_path = saved_original_context_path
+                self.evaluator.original_data = saved_original_data
+                
+                try:
+                    pred_result = predicate_node.evaluate(self.evaluator)
+                    if yang_bool(pred_result):
+                        filtered.append(item)
+                finally:
+                    # Restore context (but keep original_context_path and original_data)
+                    self.evaluator.data = old_data
+                    self.evaluator._set_context_path(old_context_path)
+        finally:
+            # Restore original context values at the end
+            self.evaluator.original_context_path = saved_original_context_path
+            self.evaluator.original_data = saved_original_data
+        
         return filtered
     
     

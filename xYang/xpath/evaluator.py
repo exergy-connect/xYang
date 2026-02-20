@@ -233,13 +233,21 @@ class XPathEvaluator:
                                 # Try evaluating from the node itself as data first
                                 old_data_temp = self.data
                                 old_context_temp = self.context_path
+                                # Preserve original context for current() in predicates
+                                old_original_context_path = self.original_context_path
+                                old_original_data = self.original_data
                                 try:
                                     self.data = left
                                     self._set_context_path([])
+                                    # Ensure original context is preserved for current() in predicates
+                                    self.original_context_path = old_original_context_path
+                                    self.original_data = old_original_data
                                     result = direct_node.evaluate(self)
                                 finally:
                                     self.data = old_data_temp
                                     self._set_context_path(old_context_temp)
+                                    self.original_context_path = old_original_context_path
+                                    self.original_data = old_original_data
                                 # If that didn't work, try from the node's location in the tree
                                 if result is None or (isinstance(result, list) and len(result) == 0):
                                     result = direct_node.evaluate(self)
@@ -247,13 +255,21 @@ class XPathEvaluator:
                                 # Try evaluating from the node itself as data first
                                 old_data_temp = self.data
                                 old_context_temp = self.context_path
+                                # Preserve original context for current() in predicates
+                                old_original_context_path = self.original_context_path
+                                old_original_data = self.original_data
                                 try:
                                     self.data = left
                                     self._set_context_path([])
+                                    # Ensure original context is preserved for current() in predicates
+                                    self.original_context_path = old_original_context_path
+                                    self.original_data = old_original_data
                                     result = self.path_evaluator.evaluate_path(direct_path)
                                 finally:
                                     self.data = old_data_temp
                                     self._set_context_path(old_context_temp)
+                                    self.original_context_path = old_original_context_path
+                                    self.original_data = old_original_data
                             # If that fails, try with .. (go up then down) as fallback
                             if result is None or (isinstance(result, list) and len(result) == 0):
                                 if hasattr(node.right, 'predicate') and node.right.predicate:
@@ -437,25 +453,34 @@ class XPathEvaluator:
         """
         # Always use original context for current()
         if self.original_context_path:
-            # Temporarily use original data and context
-            old_data = self.data
-            old_context = self.context_path
-            try:
-                self.data = self.original_data
-                self._set_context_path(self.original_context_path)
-                value = self.path_evaluator.get_path_value(self.original_context_path)
-                # If value is None, try to get it from the current data if it's a dict/list
-                # This handles cases where the path ends at a leaf in a list item
-                if value is None and isinstance(self.data, dict) and self.original_context_path:
-                    # Check if the last part of the path is a key in the current data
-                    last_part = self.original_context_path[-1]
-                    if isinstance(last_part, str) and last_part in self.data:
-                        value = self.data[last_part]
-                # Return empty string if None (XPath spec for current())
-                return value if value is not None else ""
-            finally:
-                self.data = old_data
-                self._set_context_path(old_context)
+            # Navigate directly from original_data using the original_context_path
+            # This avoids issues with get_path_value's context-aware navigation
+            current = self.original_data
+            path_to_use = list(self.original_context_path)
+            
+            # If the first part of the path doesn't exist in original_data, try without it
+            # This handles the case where root_data is data['data-model'] but context_path includes 'data-model'
+            if (path_to_use and isinstance(current, dict) and 
+                isinstance(path_to_use[0], str) and path_to_use[0] not in current):
+                # Try navigating from root_data instead (which might be the full data structure)
+                if hasattr(self, 'root_data') and self.root_data is not current:
+                    # Check if root_data has the first part
+                    if isinstance(self.root_data, dict) and path_to_use[0] in self.root_data:
+                        current = self.root_data
+                    else:
+                        # Remove the first part and try again
+                        path_to_use = path_to_use[1:]
+            
+            for part in path_to_use:
+                if isinstance(current, dict) and part in current:
+                    current = current[part]
+                elif isinstance(current, list) and isinstance(part, int) and 0 <= part < len(current):
+                    current = current[part]
+                else:
+                    # Path not found - return empty string (XPath spec for current())
+                    return ""
+            # Return the value, or empty string if None (XPath spec for current())
+            return current if current is not None else ""
         # If no original context path, try to get value from current data
         if isinstance(self.data, (str, int, float, bool)):
             return self.data
