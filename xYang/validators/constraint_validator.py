@@ -117,6 +117,70 @@ class ConstraintValidator:
             # Path doesn't exist - use root_data as fallback
             evaluator.data = root_data
     
+    def _resolve_schema_node_by_path(
+        self,
+        evaluator: XPathEvaluator,
+        data_path: List[str]
+    ) -> YangStatement:
+        """
+        Resolve a schema node by full data path.
+        
+        This ensures we match constraints to the correct schema node by full path,
+        not just by name. For example, fields[].foreignKey.field vs computed.fields[].field
+        are different schema nodes even though both have a leaf named "field".
+        
+        Args:
+            evaluator: XPath evaluator (has access to deref_evaluator)
+            data_path: Current path in data structure (may contain list indices)
+            
+        Returns:
+            The schema node (YangStatement) at this path, or None if not found
+        """
+        if not hasattr(evaluator, 'deref_evaluator'):
+            logger.warning("Evaluator does not have deref_evaluator, cannot resolve schema node by path")
+            return None
+        
+        # Convert data path to schema path (removes list indices)
+        schema_path = evaluator.deref_evaluator.data_path_to_schema_path(data_path)
+        
+        logger.debug(
+            "Resolving schema node: data_path=%s -> schema_path=%s",
+            data_path, schema_path
+        )
+        
+        # Find the schema node at this path
+        schema_node = evaluator.deref_evaluator.find_schema_node(schema_path)
+        
+        if schema_node:
+            logger.debug(
+                "Resolved schema node: path=%s -> node=%s (type=%s, has_must=%s)",
+                schema_path,
+                schema_node.name if hasattr(schema_node, 'name') else 'N/A',
+                type(schema_node).__name__,
+                len(schema_node.must_statements) if hasattr(schema_node, 'must_statements') else 0
+            )
+        else:
+            logger.warning(
+                "Could not resolve schema node: data_path=%s -> schema_path=%s",
+                data_path, schema_path
+            )
+        
+        return schema_node
+    
+    def _get_schema_path_for_node(self, node: YangStatement) -> str:
+        """
+        Get a human-readable schema path for a node (for logging).
+        
+        Args:
+            node: Schema node
+            
+        Returns:
+            String representation of the schema path
+        """
+        # This is a simplified version - in a full implementation, we'd walk up the tree
+        # For now, just return the node name
+        return node.name if hasattr(node, 'name') else type(node).__name__
+    
     def _validate_child_in_list_item(
         self,
         root_data: Dict[str, Any],
@@ -140,29 +204,56 @@ class ConstraintValidator:
         
         # Validate must statements on this child statement only
         if isinstance(child_stmt, YangLeafStmt):
+            # Resolve the schema node by full path to ensure we're validating the correct node
+            actual_schema_node = self._resolve_schema_node_by_path(evaluator, child_path)
+            
+            # If we couldn't resolve the schema node, fall back to the passed statement
+            if actual_schema_node is None:
+                logger.warning(
+                    "Could not resolve schema node for path %s in list item, using passed statement %s",
+                    child_path, child_stmt.name
+                )
+                actual_schema_node = child_stmt
+            elif actual_schema_node != child_stmt:
+                logger.debug(
+                    "Schema node mismatch in list item: path %s resolved to %s, but passed statement was %s. Using resolved node.",
+                    child_path,
+                    actual_schema_node.name if hasattr(actual_schema_node, 'name') else type(actual_schema_node).__name__,
+                    child_stmt.name
+                )
+            
             # Check if field exists in current data context
             field_exists = (
-                isinstance(evaluator.data, dict) and child_stmt.name in evaluator.data
+                isinstance(evaluator.data, dict) and actual_schema_node.name in evaluator.data
             )
             
-            logger.debug("Leaf %s in list item: field_exists=%s, mandatory=%s, has_must=%s, path=%s",
-                        child_stmt.name, field_exists, child_stmt.mandatory, 
-                        len(child_stmt.must_statements) > 0, child_path)
+            logger.debug("Leaf %s in list item: field_exists=%s, mandatory=%s, has_must=%s, path=%s, resolved_schema_path=%s",
+                        actual_schema_node.name, field_exists, actual_schema_node.mandatory, 
+                        len(actual_schema_node.must_statements) > 0, child_path,
+                        self._get_schema_path_for_node(actual_schema_node))
             
             # Skip validation if the field doesn't exist (optional fields)
             if not field_exists:
-                if not (child_stmt.mandatory or (hasattr(child_stmt, 'default') and child_stmt.default is not None)):
-                    logger.debug("Skipping validation for optional missing field in list item: %s", child_stmt.name)
+                if not (actual_schema_node.mandatory or (hasattr(actual_schema_node, 'default') and actual_schema_node.default is not None)):
+                    logger.debug("Skipping validation for optional missing field in list item: %s", actual_schema_node.name)
                     return  # Skip validation for missing optional fields
             
-            # Evaluate must constraints
-            logger.debug("Evaluating %d must constraints for leaf %s in list item", len(child_stmt.must_statements), child_stmt.name)
-            for must in child_stmt.must_statements:
+            # Evaluate must constraints from the resolved schema node
+            logger.debug("Evaluating %d must constraints for leaf %s in list item", len(actual_schema_node.must_statements), actual_schema_node.name)
+            for must in actual_schema_node.must_statements:
                 evaluator.original_data = root_data
                 evaluator.original_context_path = child_path.copy() if child_path else []
-                self._evaluate_must_constraint(evaluator, must, child_stmt.name, child_stmt.mandatory, child_stmt)
+                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, actual_schema_node)
         
         elif isinstance(child_stmt, (YangListStmt, YangContainerStmt)):
+            # Check if container/list exists in data before validating
+            container_data = self._navigate_path(root_data, child_path)
+            if container_data is None:
+                # Container/list doesn't exist in data - skip validation
+                logger.debug("Container/List %s does not exist in data at path %s, skipping validation", 
+                            child_stmt.name, child_path)
+                return
+            
             logger.debug("Container/List %s in list item: has_must=%s, path=%s",
                         child_stmt.name, hasattr(child_stmt, 'must_statements') and len(child_stmt.must_statements) > 0, child_path)
             if hasattr(child_stmt, 'must_statements'):
@@ -216,11 +307,9 @@ class ConstraintValidator:
                             logger.debug("Grandchild list %s: data type=%s, is_list=%s, path=%s, data=%s",
                                         grandchild.name, type(grandchild_data).__name__, isinstance(grandchild_data, list), grandchild_path,
                                         str(grandchild_data)[:100] if grandchild_data else "None")
-                            # Skip validation for computed.fields - these are field references, not field definitions
-                            # and should not have foreign key validation constraints applied
-                            if child_stmt.name == "computed" and grandchild.name == "fields":
-                                logger.debug("Skipping validation for computed.fields list - these are field references, not field definitions")
-                                continue
+                            # Note: We no longer skip computed.fields - path-based schema node resolution ensures
+                            # that computed.fields[].field only gets constraints from its own schema node,
+                            # not from fields[].foreignKey.field
                             if isinstance(grandchild_data, list):
                                 logger.debug("Grandchild list %s has %d items", grandchild.name, len(grandchild_data))
                                 for idx, item in enumerate(grandchild_data):
@@ -370,46 +459,55 @@ class ConstraintValidator:
         
         # Validate must statements on this statement
         if isinstance(stmt, YangLeafStmt):
-            # Skip foreign key validation for fields inside computed.fields - these are field references,
-            # not field definitions, and should not have foreign key validation constraints applied
-            # Check if "computed" and "fields" appear consecutively in the path before the current leaf
-            path_str = '/'.join(str(p) for p in current_path[:-1])  # Exclude current leaf name
-            if 'computed' in path_str and 'fields' in path_str:
-                # Find the position of "computed" and check if "fields" follows it
-                try:
-                    computed_idx = current_path.index("computed")
-                    if computed_idx + 1 < len(current_path) and current_path[computed_idx + 1] == "fields":
-                        logger.debug("Skipping validation for leaf %s inside computed.fields - field references don't have foreign key constraints", stmt.name)
-                        return
-                except ValueError:
-                    pass  # "computed" not in path, continue with normal validation
+            # Resolve the schema node by full path to ensure we're validating the correct node
+            # This prevents matching constraints from nodes with the same name but different paths
+            # (e.g., fields[].foreignKey.field vs computed.fields[].field)
+            actual_schema_node = self._resolve_schema_node_by_path(evaluator, current_path)
+            
+            # If we couldn't resolve the schema node, fall back to the passed statement
+            # but log a warning
+            if actual_schema_node is None:
+                logger.warning(
+                    "Could not resolve schema node for path %s, using passed statement %s",
+                    current_path, stmt.name
+                )
+                actual_schema_node = stmt
+            elif actual_schema_node != stmt:
+                logger.debug(
+                    "Schema node mismatch: path %s resolved to %s, but passed statement was %s. Using resolved node.",
+                    current_path,
+                    actual_schema_node.name if hasattr(actual_schema_node, 'name') else type(actual_schema_node).__name__,
+                    stmt.name
+                )
             
             # Check if field exists - need to check parent data, not current data
             # (current data might be the field value itself after navigation)
             parent_path = current_path[:-1] if len(current_path) > 0 else []
             parent_data = self._navigate_path(root_data, parent_path) if parent_path else root_data
             field_exists = (
-                isinstance(parent_data, dict) and stmt.name in parent_data
+                isinstance(parent_data, dict) and actual_schema_node.name in parent_data
             )
             
             logger.debug(
-                "Validating leaf %s: field_exists=%s, mandatory=%s, has_must=%s, path=%s",
-                stmt.name, field_exists, stmt.mandatory, len(stmt.must_statements) > 0, current_path
+                "Validating leaf %s: field_exists=%s, mandatory=%s, has_must=%s, path=%s, resolved_schema_path=%s",
+                actual_schema_node.name, field_exists, actual_schema_node.mandatory, 
+                len(actual_schema_node.must_statements) > 0, current_path,
+                self._get_schema_path_for_node(actual_schema_node)
             )
             
             # Skip validation if the field doesn't exist (optional fields)
             if not field_exists:
-                if not (stmt.mandatory or (hasattr(stmt, 'default') and stmt.default is not None)):
-                    logger.debug("Skipping validation for optional missing field: %s", stmt.name)
+                if not (actual_schema_node.mandatory or (hasattr(actual_schema_node, 'default') and actual_schema_node.default is not None)):
+                    logger.debug("Skipping validation for optional missing field: %s", actual_schema_node.name)
                     return  # Skip validation for missing optional fields
             
-            # Evaluate must constraints
-            logger.debug("Evaluating %d must constraints for leaf %s", len(stmt.must_statements), stmt.name)
-            for must in stmt.must_statements:
+            # Evaluate must constraints from the resolved schema node
+            logger.debug("Evaluating %d must constraints for leaf %s", len(actual_schema_node.must_statements), actual_schema_node.name)
+            for must in actual_schema_node.must_statements:
                 # Ensure original_data is set before each evaluation
                 evaluator.original_data = root_data
                 evaluator.original_context_path = current_path.copy() if current_path else []
-                self._evaluate_must_constraint(evaluator, must, stmt.name, stmt.mandatory, stmt)
+                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, actual_schema_node)
         
         elif isinstance(stmt, YangLeafListStmt):
             # Leaf-list: evaluate must constraints per-element with current() bound to each value
@@ -460,6 +558,14 @@ class ConstraintValidator:
                     self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False, stmt)
                 
         elif isinstance(stmt, (YangListStmt, YangContainerStmt)):
+            # Check if container/list exists in data before validating
+            container_data = self._navigate_path(root_data, current_path)
+            if container_data is None:
+                # Container/list doesn't exist in data - skip validation
+                logger.debug("Container/List %s does not exist in data at path %s, skipping validation", 
+                            stmt.name if hasattr(stmt, 'name') else type(stmt).__name__, current_path)
+                return
+            
             if hasattr(stmt, 'must_statements'):
                 for must in stmt.must_statements:
                     # Ensure original_data is set before each evaluation
