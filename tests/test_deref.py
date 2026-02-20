@@ -26,7 +26,7 @@ Expected behavior:
 """
 
 import pytest
-from xYang import XPathEvaluator, parse_yang_string
+from xYang import XPathEvaluator, parse_yang_string, YangValidator
 
 # YANG module for data-model structure with leafref definitions
 # This matches the meta-model.yang structure used in xFrame
@@ -1843,6 +1843,99 @@ def test_deref_relative_vs_absolute_leafref_paths():
     # 1. Relative path leafref (child_fk): Uses "../../fields/name" - resolved from schema position
     # 2. Absolute path leafref (foreignKey.entity): Uses "/data-model/entities/name" - resolved from root
     # Both work correctly, demonstrating that the evaluator handles both path types
+
+
+def test_foreign_key_with_optional_field():
+    """Test foreign key validation with optional field (should be lenient)."""
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+
+  container data-model {
+    container entities {
+      list entity {
+        key "name";
+        leaf name {
+          type string;
+        }
+        container fields {
+          list field {
+            key "name";
+            leaf name {
+              type string;
+            }
+          }
+        }
+        leaf-list primary_key {
+          type string;
+        }
+      }
+    }
+    container foreign-keys {
+      list foreign-key {
+        key "name";
+        leaf name {
+          type string;
+        }
+        leaf entity {
+          type leafref {
+            path "/data-model/entities/entity/name";
+            require-instance true;
+          }
+          mandatory false;  // Optional
+        }
+        leaf field {
+          type leafref {
+            path "/data-model/entities/entity/fields/field/name";
+            require-instance true;
+          }
+          mandatory false;  // Optional
+          must "deref(../entity)/../fields/field[name = current()]" {
+            error-message "Foreign key field must exist in the referenced entity's fields";
+          }
+        }
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    validator = YangValidator(module)
+
+    # Data with missing optional foreign key fields
+    data_missing_optional = {
+        "data-model": {
+            "entities": {
+                "entity": [
+                    {
+                        "name": "parent",
+                        "fields": {
+                            "field": [
+                                {"name": "id"}
+                            ]
+                        },
+                        "primary_key": ["id"]
+                    }
+                ]
+            },
+            "foreign-keys": {
+                "foreign-key": [
+                    {
+                        "name": "fk1"
+                        # entity and field are optional, so missing them should be OK
+                    }
+                ]
+            }
+        }
+    }
+    is_valid, errors, warnings = validator.validate(data_missing_optional)
+    # Optional fields should not trigger must validation when missing
+    print(f"Optional field test: is_valid={is_valid}, errors={errors}, warnings={warnings}")
+    # This should pass validation since the fields are optional
+    assert is_valid or not any("Foreign key field must exist" in str(e) for e in errors), \
+        f"Optional fields should not trigger must validation. Errors: {errors}"
 
 
 if __name__ == "__main__":

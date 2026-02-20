@@ -125,8 +125,8 @@ class PathEvaluator:
         """Navigate up the context path by the specified number of levels.
         
         Handles list indices properly: when going up from a list element,
-        removes only the index (not the list name). When going up from a
-        list container, removes the list name.
+        removes both the index and the list name (going to parent container).
+        When going up from a list container, removes the list name.
         
         Args:
             up_levels: Number of levels to go up
@@ -139,10 +139,11 @@ class PathEvaluator:
             if not new_path:
                 break
             removed = new_path.pop()
-            # If it was a list index, we've already removed it - that's one level up
-            # The list name stays (we're still in that list, just not at a specific element)
-            # If it was a list name (string), we've removed it - that's one level up
-            # No need to remove anything else
+            # If it was a list index (int), also remove the list name to go to parent container
+            # This is correct for leaf-list elements where .. should go to parent, not list container
+            if isinstance(removed, int) and new_path:
+                # Remove the list name as well (one more level up)
+                new_path.pop()
         return new_path
     
     def evaluate_path(self, path: str) -> Any:
