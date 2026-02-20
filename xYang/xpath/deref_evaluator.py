@@ -24,72 +24,142 @@ class DerefEvaluator:
         if len(node.args) == 1:
             arg_node = node.args[0]
             
-            # Create cache key based on node representation and context
-            cache_key = f"deref({repr(arg_node)}):{self.evaluator.context_path}"
+            # Cache context paths to avoid repeated attribute access
+            context_path = self.evaluator.context_path
+            original_context_path = self.evaluator.original_context_path
+            
+            # Create cache key - use string representation of context path for efficiency
+            context_str = str(context_path)
+            cache_key = f"deref({id(arg_node)}):{context_str}"
             if cache_key in self.evaluator.leafref_cache:
                 return self.evaluator.leafref_cache[cache_key]
             
             # Check if argument is a BinaryOpNode with '/' (path navigation from a node)
-            # This handles cases like deref(deref(current())/../foreignKey/entity)
+            # This handles cases like deref(deref(current())/../foreignKey/entity) and deref(./foreignKey/entity)
             if isinstance(arg_node, BinaryOpNode) and arg_node.operator == '/':
+                # First check if left side is a simple path (not a function call that returns a node)
+                # If so, try to check for leafref in original context first
+                left_is_simple_path = isinstance(arg_node.left, PathNode) or (
+                    isinstance(arg_node.left, FCN) and arg_node.left.name == 'current' and len(arg_node.left.args) == 0
+                )
+                
+                if left_is_simple_path:
+                    # Build the full path string to check for leafref in original context
+                    # This handles cases like ./foreignKey/entity where we need schema context from original path
+                    full_path = self.build_path_from_node(arg_node)
+                    if full_path:
+                        # Check if this full path points to a leafref in the original context
+                        leafref_path = self.get_leafref_path_from_schema(full_path)
+                        if leafref_path:
+                            # This is a leafref - evaluate the path to get the value, then resolve
+                            path_value = arg_node.evaluate(self.evaluator)
+                            if path_value is not None:
+                                result = self.find_node_by_leafref_path(leafref_path, path_value)
+                            else:
+                                result = None
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                
+                # Not a leafref in original context - try navigating from left side if it's a node
                 # Evaluate left side (might be nested deref() or other expression)
                 left_result = arg_node.left.evaluate(self.evaluator)
                 
                 # If left side is a node (dict), navigate from it
                 if isinstance(left_result, dict):
-                    # Save current context
+                    # Save current context (cache to avoid repeated attribute access)
                     old_data = self.evaluator.data
-                    old_context = self.evaluator.context_path
+                    old_context = context_path
+                    old_original_context = original_context_path
+                    
+                    # Pre-compute context parts (filtered) for later use
+                    if old_original_context:
+                        context_parts = [str(p) for p in old_original_context if not isinstance(p, int)]
+                        context_str = '/'.join(context_parts)
+                    else:
+                        context_parts = []
+                        context_str = ''
+                    
                     try:
                         # Set the node as current data context
                         self.evaluator.data = left_result
                         self.evaluator._set_context_path([])
+                        # Preserve original context for schema resolution
                         
                         # Evaluate right side (path navigation)
-                        if isinstance(arg_node.right, PathNode):
+                        right_node = arg_node.right
+                        if isinstance(right_node, PathNode):
                             # It's a PathNode - navigate from the node
-                            path_value = self.evaluator.path_evaluator.evaluate_path_node(arg_node.right)
-                        elif isinstance(arg_node.right, BinaryOpNode) and arg_node.right.operator == '/':
+                            path_value = self.evaluator.path_evaluator.evaluate_path_node(right_node)
+                            # Build right_path efficiently
+                            if right_node.is_absolute:
+                                right_path = '/' + '/'.join(right_node.steps)
+                            else:
+                                right_path = '/'.join(right_node.steps)
+                        elif isinstance(right_node, BinaryOpNode) and right_node.operator == '/':
                             # Nested path - extract and evaluate
-                            path_parts = self.evaluator.path_evaluator.extract_path_from_binary_op(arg_node.right)
+                            path_parts = self.evaluator.path_evaluator.extract_path_from_binary_op(right_node)
                             if path_parts:
                                 path_str = '/'.join(str(p) for p in path_parts if p)
                                 path_value = self.evaluator.path_evaluator.evaluate_path(path_str)
+                                right_path = path_str
                             else:
                                 path_value = None
+                                right_path = None
                         else:
                             # Try to evaluate as path
-                            path_value = arg_node.right.evaluate(self.evaluator)
+                            path_value = right_node.evaluate(self.evaluator)
+                            right_path = self.build_path_from_node(right_node)
                         
                         # Now deref() the resulting value
                         # CRITICAL: deref() requires schema context - check if the path points to a leafref
-                        if path_value is not None:
-                            # Build a path string from the right side to check for leafref
-                            # We're navigating from left_result (a node), so the path is relative to that node
-                            if isinstance(arg_node.right, PathNode):
-                                if arg_node.right.is_absolute:
-                                    right_path = '/' + '/'.join(arg_node.right.steps)
+                        if path_value is not None and right_path:
+                            # Build full path relative to original context
+                            # Handle .. by navigating up from original context
+                            if right_path.startswith('../'):
+                                # Count .. levels (optimized: count occurrences)
+                                up_levels = right_path.count('../')
+                                # Extract remaining path after .. (optimized: split once, filter)
+                                path_parts = right_path.split('/')
+                                remaining_path = '/'.join(p for p in path_parts if p and p != '..')
+                                if old_original_context and up_levels <= len(context_parts):
+                                    # Navigate up from original context
+                                    base_parts = context_parts[:-up_levels] if up_levels > 0 else context_parts
+                                    if remaining_path:
+                                        full_path_parts = base_parts + [remaining_path]
+                                    else:
+                                        full_path_parts = base_parts
+                                    # Convert to relative path format for schema checking
+                                    start_idx = len(context_parts) - up_levels
+                                    if len(full_path_parts) > start_idx:
+                                        full_relative_path = './' + '/'.join(full_path_parts[start_idx:])
+                                    else:
+                                        full_relative_path = '.'
                                 else:
-                                    # Relative path from the node - need to check schema relative to node's type
-                                    right_path = '/'.join(arg_node.right.steps)
+                                    full_relative_path = right_path
+                            elif right_path.startswith('./'):
+                                # Remove ./ prefix - path is relative to original context
+                                remaining_path = right_path[2:]
+                                full_relative_path = './' + remaining_path if remaining_path else '.'
                             else:
-                                # For other node types, try to build path representation
-                                right_path = self.build_path_from_node(arg_node.right)
+                                # Simple relative path - append to original context position
+                                full_relative_path = './' + right_path
                             
-                            # Check if this path (relative to left_result's schema context) points to a leafref
-                            # Since we've set the evaluator's data to left_result, we can check schema
-                            # relative to the current context (which is now the left_result node)
-                            if right_path:
-                                # Check if right_path is a leafref in the schema relative to left_result
-                                leafref_path = self.get_leafref_path_from_schema(right_path)
+                            # Check if this path is a leafref in the original context
+                            # Restore original context temporarily to check schema
+                            temp_context = self.evaluator.context_path
+                            temp_original = self.evaluator.original_context_path
+                            try:
+                                self.evaluator.context_path = old_original_context if old_original_context else old_context
+                                leafref_path = self.get_leafref_path_from_schema(full_relative_path)
                                 if leafref_path:
                                     # This is a leafref - use schema-aware resolution
                                     result = self.find_node_by_leafref_path(leafref_path, path_value)
                                 else:
                                     # Not a leafref - deref() requires schema context, return None
                                     result = None
-                            else:
-                                result = None
+                            finally:
+                                self.evaluator.context_path = temp_context
+                                self.evaluator.original_context_path = temp_original
                         else:
                             result = None
                         
@@ -99,6 +169,7 @@ class DerefEvaluator:
                     finally:
                         self.evaluator.data = old_data
                         self.evaluator._set_context_path(old_context)
+                        self.evaluator.original_context_path = old_original_context
                 else:
                     # Left side is not a node - treat as regular path expression
                     # Build path string from the binary op
@@ -109,11 +180,9 @@ class DerefEvaluator:
             
             # Handle simple path expressions
             if isinstance(arg_node, PathNode):
-                # Build path string first to check if it points to a leafref
-                if arg_node.is_absolute:
-                    path = '/' + '/'.join(arg_node.steps)
-                else:
-                    path = '/'.join(arg_node.steps)
+                # Build path string first to check if it points to a leafref (optimized: avoid conditional)
+                steps_str = '/'.join(arg_node.steps)
+                path = '/' + steps_str if arg_node.is_absolute else steps_str
                 
                 # CRITICAL: For leafref nodes, deref() MUST use the schema definition's path
                 # Check if this path points to a leafref field in the schema
@@ -212,7 +281,8 @@ class DerefEvaluator:
         # No args or invalid - cache None
         result = None
         if len(node.args) == 1:
-            cache_key = f"deref({repr(node.args[0])}):{self.evaluator.context_path}"
+            context_str = str(self.evaluator.context_path)
+            cache_key = f"deref({id(node.args[0])}):{context_str}"
             self.evaluator.leafref_cache[cache_key] = result
         return result
     
@@ -233,8 +303,9 @@ class DerefEvaluator:
         - Uses that path to find the node where name="company"
         """
         try:
-            # Check cache first
-            cache_key = f"{path}:{self.evaluator.context_path}"
+            # Check cache first (cache context path string to avoid repeated conversion)
+            context_str = str(self.evaluator.context_path)
+            cache_key = f"{path}:{context_str}"
             if cache_key in self.evaluator.leafref_cache:
                 return self.evaluator.leafref_cache[cache_key]
             
@@ -273,17 +344,18 @@ class DerefEvaluator:
             Path string representation
         """
         if isinstance(node, PathNode):
-            if node.is_absolute:
-                return '/' + '/'.join(node.steps)
-            return '/'.join(node.steps)
+            # Optimized: use join directly, avoid conditional string concatenation
+            steps_str = '/'.join(node.steps)
+            return '/' + steps_str if node.is_absolute else steps_str
         
         if isinstance(node, FCN):
+            # Optimized: early return for common case
             if node.name == 'current' and len(node.args) == 0:
                 return 'current()'
             return f"{node.name}()"
         
         if isinstance(node, BinaryOpNode) and node.operator == '/':
-            # Build path from binary op
+            # Build path from binary op (optimized: avoid multiple f-string operations)
             left_path = self.build_path_from_node(node.left)
             right_path = self.build_path_from_node(node.right)
             if left_path and right_path:
@@ -303,9 +375,7 @@ class DerefEvaluator:
             The leafref path string, or None if not found
         """
         # Resolve the path to find the schema node
-        # First, resolve the path to an absolute schema path
         schema_path = self.resolve_path_to_schema_location(path)
-        
         if not schema_path:
             return None
         
@@ -316,21 +386,21 @@ class DerefEvaluator:
             # If we can't find the schema node, try alternative approaches
             # For current(), the path might need adjustment
             if path == 'current()':
-                # Try to find the schema node by looking at the current context
-                # and finding the corresponding schema element
-                context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+                # Cache context paths to avoid repeated attribute access
+                original_context = self.evaluator.original_context_path
+                context_to_use = original_context if original_context else self.evaluator.context_path
                 if context_to_use:
                     # Try to find the schema node by matching the last element of the context
-                    # This handles cases where the schema structure doesn't exactly match the data path
-                    last_part = context_to_use[-1] if context_to_use else None
+                    last_part = context_to_use[-1]
                     if last_part and not isinstance(last_part, int):
                         # Try to find a schema node with this name in the parent context
                         parent_schema_path = self.data_path_to_schema_path(context_to_use[:-1])
                         if parent_schema_path:
                             parent_node = self.find_schema_node(parent_schema_path)
                             if parent_node:
-                                # Search for a child with the matching name
-                                for stmt in getattr(parent_node, 'statements', []):
+                                # Search for a child with the matching name (optimized: early return)
+                                statements = getattr(parent_node, 'statements', [])
+                                for stmt in statements:
                                     if getattr(stmt, 'name', None) == last_part:
                                         schema_node = stmt
                                         break
@@ -338,19 +408,17 @@ class DerefEvaluator:
             if not schema_node:
                 return None
         
-        # Check if it's a leaf with leafref type
+        # Check if it's a leaf with leafref type (optimized: early returns)
         from ..ast import YangLeafStmt
         if not isinstance(schema_node, YangLeafStmt):
             return None
         
-        if not schema_node.type or schema_node.type.name != 'leafref':
+        type_obj = schema_node.type
+        if not type_obj or type_obj.name != 'leafref':
             return None
         
-        # Get the leafref path
-        if hasattr(schema_node.type, 'path') and schema_node.type.path:
-            return schema_node.type.path
-        
-        return None
+        # Get the leafref path (optimized: single attribute check)
+        return getattr(type_obj, 'path', None)
     
     def resolve_path_to_schema_location(self, path: str) -> List[str]:
         """Resolve an XPath expression to a schema location path.
@@ -361,20 +429,19 @@ class DerefEvaluator:
         Returns:
             List of schema node names representing the full path from module root, or None
         """
-        # Use original_context_path if available (for current() support in predicates)
-        context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+        # Cache context paths to avoid repeated attribute access
+        original_context = self.evaluator.original_context_path
+        context_to_use = original_context if original_context else self.evaluator.context_path
         context_len = len(context_to_use) if context_to_use else 0
         
         # Handle current() or .
         if path == 'current()' or path == '.':
-            # Use original context path, but convert data path to schema path
-            # Schema path is similar but may need adjustment
             return self.data_path_to_schema_path(context_to_use)
         
         # Handle relative paths
         if path.startswith('../') or path.startswith('./'):
-            parts = path.split('/')
             # Optimized: single pass through parts
+            parts = path.split('/')
             up_levels = 0
             field_parts = []
             for p in parts:
@@ -385,10 +452,8 @@ class DerefEvaluator:
             
             # Navigate up from context
             if up_levels == 0:
-                # No navigation up - use current context + field parts
                 data_path = context_to_use + field_parts
             elif up_levels <= context_len:
-                # Navigate up 'up_levels' steps
                 data_path = context_to_use[:-up_levels] + field_parts
             else:
                 return None
@@ -396,7 +461,6 @@ class DerefEvaluator:
             schema_path = self.data_path_to_schema_path(data_path)
             # Ensure we have the full path from root (should start with data-model)
             if schema_path and schema_path[0] != "data-model":
-                # Prepend data-model if not present
                 schema_path = ["data-model"] + schema_path
             return schema_path
         
@@ -407,9 +471,8 @@ class DerefEvaluator:
         
         # Handle absolute paths
         if path.startswith('/'):
-            # Remove leading / and convert to schema path
-            parts = [p for p in path.split('/') if p]
-            return parts
+            # Remove leading / and convert to schema path (optimized: filter in list comprehension)
+            return [p for p in path.split('/') if p]
         
         return None
     
@@ -424,16 +487,11 @@ class DerefEvaluator:
         Returns:
             Schema path (list of node names, no indices)
         """
-        schema_path = []
-        for part in data_path:
-            # Skip list indices (integers)
-            if isinstance(part, int):
-                continue
-            # Skip special XPath parts
-            if part in ('.', '..', 'current()'):
-                continue
-            schema_path.append(str(part))
-        return schema_path
+        # Optimized: use list comprehension with filter
+        # Skip list indices (integers) and special XPath parts
+        skip_parts = {'.', '..', 'current()'}
+        return [str(part) for part in data_path 
+                if not isinstance(part, int) and part not in skip_parts]
     
     def find_schema_node(self, schema_path: List[str]) -> Any:
         """Find a schema node at the given path.
@@ -445,13 +503,14 @@ class DerefEvaluator:
             The schema node (YangStatement), or None if not found
         """
         # Optimized: early return
-        if not self.evaluator.module or not schema_path:
+        module = self.evaluator.module
+        if not module or not schema_path:
             return None
         
-        current_statements = self.evaluator.module.statements
+        current_statements = module.statements
         last_node = None
         
-        # Optimized: iterate through path parts
+        # Optimized: iterate through path parts with early return
         for part in schema_path:
             found = False
             # Optimized: iterate statements directly
@@ -481,12 +540,13 @@ class DerefEvaluator:
         """
         # Resolve relative paths to determine the target location
         if leafref_path.startswith('/'):
-            # Absolute path - walk from root
+            # Absolute path - walk from root (optimized: filter in list comprehension)
             target_path = [p for p in leafref_path.split('/') if p]
         else:
-            # Relative path - resolve relative to original context (for current() support in predicates)
-            # Use original_context_path if available, otherwise use context_path
-            context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+            # Relative path - resolve relative to original context
+            # Cache context paths to avoid repeated attribute access
+            original_context = self.evaluator.original_context_path
+            context_to_use = original_context if original_context else self.evaluator.context_path
             
             # Parse the relative path - optimized single pass
             parts = leafref_path.split('/')
@@ -503,8 +563,7 @@ class DerefEvaluator:
             if up_levels > context_len:
                 return None
             
-            # Remove list indices when going up (they're not part of schema structure)
-            # Optimized: single pass to filter and count
+            # Remove list indices when going up (optimized: list comprehension)
             context_without_indices = [p for p in context_to_use if not isinstance(p, int)]
             if up_levels > len(context_without_indices):
                 return None
@@ -561,8 +620,9 @@ class DerefEvaluator:
             return self.evaluator.root_data
         
         # Extract entity index from context if available and requested
-        # Use original_context_path if available (for current() support in predicates)
-        context_to_use = self.evaluator.original_context_path if self.evaluator.original_context_path else self.evaluator.context_path
+        # Cache context paths to avoid repeated attribute access
+        original_context = self.evaluator.original_context_path
+        context_to_use = original_context if original_context else self.evaluator.context_path
         entity_idx = None
         if use_context_index and context_to_use:
             context_len = len(context_to_use)
@@ -597,13 +657,14 @@ class DerefEvaluator:
                     return None
             elif isinstance(current, list):
                 # For lists, check if context has an index for this list part
+                # Use cached context_to_use instead of accessing attribute again
                 list_idx = None
-                if self.evaluator.context_path:
-                    context_len = len(self.evaluator.context_path)
+                if context_to_use:
+                    context_len = len(context_to_use)
                     # Optimized: iterate with explicit bounds check
                     for j in range(context_len - 1):
-                        if self.evaluator.context_path[j] == part:
-                            next_item = self.evaluator.context_path[j + 1]
+                        if context_to_use[j] == part:
+                            next_item = context_to_use[j + 1]
                             if isinstance(next_item, int):
                                 list_idx = next_item
                                 break
@@ -699,29 +760,33 @@ class DerefEvaluator:
         if container is None:
             return None
         
-        # Optimized: type check once
-        if isinstance(container, list):
+        # Optimized: type check once, use isinstance for performance
+        container_type = type(container)
+        if container_type is list:
             # Search in list items - optimized iteration
             for item in container:
                 if isinstance(item, dict):
-                    # Check direct match first (common case)
-                    if key_field in item and item[key_field] == ref_value:
+                    # Check direct match first (common case - optimized: single dict lookup)
+                    item_value = item.get(key_field)
+                    if item_value == ref_value:
                         return item
                     # Also search recursively in nested structures
                     result = self.search_for_node(item, key_field, ref_value)
                     if result is not None:
                         return result
-        elif isinstance(container, dict):
-            # Check if container itself matches (fast path)
-            if key_field in container and container[key_field] == ref_value:
+        elif container_type is dict:
+            # Check if container itself matches (fast path - optimized: single dict lookup)
+            container_value = container.get(key_field)
+            if container_value == ref_value:
                 return container
-            # Search in nested structures
+            # Search in nested structures (optimized: iterate values directly)
             for value in container.values():
                 if isinstance(value, list):
                     for item in value:
                         if isinstance(item, dict):
-                            # Check direct match first
-                            if key_field in item and item[key_field] == ref_value:
+                            # Check direct match first (optimized: single dict lookup)
+                            item_value = item.get(key_field)
+                            if item_value == ref_value:
                                 return item
                             # Recursively search nested structures
                             result = self.search_for_node(item, key_field, ref_value)
