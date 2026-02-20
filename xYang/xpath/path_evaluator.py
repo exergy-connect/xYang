@@ -65,10 +65,8 @@ class PathEvaluator:
         Returns:
             Value at the navigated path, or None
         """
-        if isinstance(result, list) and len(result) > 0:
-            with self._temporary_context(result[0]):
-                return self.evaluate_path(remaining_path)
-        return None
+        with self._temporary_context(result[0]):
+            return self.evaluate_path(remaining_path)
     
     def _evaluate_path_and_apply_predicate(self, path: str, predicate: Any, remaining_steps: List[str] = None) -> Any:
         """Evaluate a path, apply predicate if value is a list, then navigate remaining steps.
@@ -128,8 +126,6 @@ class PathEvaluator:
         """
         new_path = list(self.evaluator.context_path)
         for _ in range(up_levels):
-            if not new_path:
-                break
             removed = new_path.pop()
             # If it was a list index (int), check if the parent is a leaf-list or a list
             if isinstance(removed, int) and len(new_path) > 0:
@@ -182,12 +178,6 @@ class PathEvaluator:
         if path in ('.', 'current()'):
             return self.evaluator._get_current_value()
         
-        # Handle relative paths starting with ./
-        if path.startswith('./'):
-            remaining = path[2:]
-            parts = remaining.split('/')
-            return self.get_path_value(self.evaluator.context_path + parts)
-        
         # Handle relative paths with ..
         if path.startswith('../'):
             return self.evaluate_relative_path(path)
@@ -195,7 +185,6 @@ class PathEvaluator:
         # Handle absolute paths
         if path.startswith('/'):
             return self.evaluate_absolute_path(path)
-        
         
         # Simple field access - build path from context
         if '/' not in path:
@@ -224,10 +213,9 @@ class PathEvaluator:
     def evaluate_absolute_path(self, path: str) -> Any:
         """Evaluate an absolute path like /data-model/entities."""
         parts = path.lstrip('/').split('/')
-        
         old_data = self.evaluator.data
+        self.evaluator.data = self.evaluator.root_data
         try:
-            self.evaluator.data = self.evaluator.root_data
             return self.get_path_value(parts)
         finally:
             self.evaluator.data = old_data
@@ -267,14 +255,8 @@ class PathEvaluator:
         Returns:
             Adjusted path parts for root_data navigation
         """
-        # If root_data is at container level, skip first part if not in root_data
-        if (parts and isinstance(parts[0], str) and parts[0] not in self.evaluator.root_data):
-            return parts[1:]
-        
         if len(parts) > len(context_path):
-            # Path extends beyond context_path
             return parts[len(context_path):]
-        
         return parts
     
     def get_path_value(self, parts: List) -> Any:
@@ -293,9 +275,6 @@ class PathEvaluator:
             parts = self._adjust_parts_for_root_data(parts, context_path)
         
         for part in parts:
-            if part in ('.', 'current()'):
-                continue
-            
             # Handle integer list indices
             if isinstance(part, int):
                 if isinstance(current, list) and 0 <= part < len(current):
@@ -396,12 +375,9 @@ class PathEvaluator:
             For numeric predicates: single element or None
             For filter predicates: filtered list
         """
-        # Try numeric index first (fast path)
         numeric_result = self._apply_numeric_predicate(value, predicate)
         if numeric_result is not None:
             return numeric_result
-        
-        # Apply filter predicate
         return self._apply_predicate_to_list(value, predicate)
     
     def _apply_numeric_predicate(self, value: List[Any], predicate: Any) -> Optional[Any]:
@@ -414,10 +390,11 @@ class PathEvaluator:
         Returns:
             Element at index, or None if invalid
         """
-        if isinstance(predicate, LiteralNode):
-            idx = int(predicate.value) - 1  # XPath is 1-indexed
-            if 0 <= idx < len(value):
-                return value[idx]
+        if not isinstance(predicate, LiteralNode):
+            return None
+        idx = int(predicate.value) - 1  # XPath is 1-indexed
+        if 0 <= idx < len(value):
+            return value[idx]
         return None
     
     def evaluate_path_node(self, node: PathNode) -> Any:
@@ -438,10 +415,9 @@ class PathEvaluator:
                     value = self.get_path_value(new_path)
             else:
                 value = None
-        elif node.is_absolute:
-            value = self.evaluate_path('/' + '/'.join(node.steps))
         else:
-            value = self.evaluate_path('/'.join(node.steps))
+            path = '/' + '/'.join(node.steps) if node.is_absolute else '/'.join(node.steps)
+            value = self.evaluate_path(path)
         
         # Apply predicate if present and value is a list
         if node.predicate and isinstance(value, list):
