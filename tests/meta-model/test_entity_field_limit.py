@@ -114,6 +114,165 @@ def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
     assert is_valid, f"Entity with allow_unlimited_fields=true should pass. Errors: {errors}"
 
 
+def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
+    """Test that entity with allow_unlimited_fields='true' (string) can exceed limit."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "allow_unlimited_fields": "true",
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {"name": "field1", "type": "string"},
+                        {"name": "field2", "type": "string"},
+                        {"name": "field3", "type": "string"},
+                        {"name": "field4", "type": "string"},
+                        {"name": "field5", "type": "string"},
+                        {"name": "field6", "type": "string"},
+                        {"name": "field7", "type": "string"},
+                        {"name": "field8", "type": "string"},
+                        {"name": "field9", "type": "string"},
+                        {"name": "field10", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert is_valid, f"Entity with allow_unlimited_fields='true' (string) should pass. Errors: {errors}"
+
+
+def test_entity_field_limit_invalid_allow_unlimited_false(meta_model):
+    """Test that entity with allow_unlimited_fields=false still enforces limit."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "allow_unlimited_fields": False,
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {"name": "field1", "type": "string"},
+                        {"name": "field2", "type": "string"},
+                        {"name": "field3", "type": "string"},
+                        {"name": "field4", "type": "string"},
+                        {"name": "field5", "type": "string"},
+                        {"name": "field6", "type": "string"},
+                        {"name": "field7", "type": "string"},
+                        {"name": "field8", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert not is_valid, "Entity with allow_unlimited_fields=false should still enforce limit"
+    assert any("7 non-array fields" in str(err) or "field limit" in str(err).lower() for err in errors), \
+        f"Should have field limit error. Errors: {errors}"
+
+
+def test_entity_field_limit_invalid_allow_unlimited_missing(meta_model):
+    """Test that entity without allow_unlimited_fields (defaults to false) enforces limit."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            # allow_unlimited_fields not specified, should default to false
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {"name": "field1", "type": "string"},
+                        {"name": "field2", "type": "string"},
+                        {"name": "field3", "type": "string"},
+                        {"name": "field4", "type": "string"},
+                        {"name": "field5", "type": "string"},
+                        {"name": "field6", "type": "string"},
+                        {"name": "field7", "type": "string"},
+                        {"name": "field8", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert not is_valid, "Entity without allow_unlimited_fields should enforce limit (defaults to false)"
+    assert any("7 non-array fields" in str(err) or "field limit" in str(err).lower() for err in errors), \
+        f"Should have field limit error. Errors: {errors}"
+
+
+def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
+    """Test that allow_unlimited_fields applies to all entities in the model."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "allow_unlimited_fields": True,
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {"name": "field1", "type": "string"},
+                        {"name": "field2", "type": "string"},
+                        {"name": "field3", "type": "string"},
+                        {"name": "field4", "type": "string"},
+                        {"name": "field5", "type": "string"},
+                        {"name": "field6", "type": "string"},
+                        {"name": "field7", "type": "string"},
+                        {"name": "field8", "type": "string"}
+                    ]
+                },
+                {
+                    "name": "entity2",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {"name": "field1", "type": "string"},
+                        {"name": "field2", "type": "string"},
+                        {"name": "field3", "type": "string"},
+                        {"name": "field4", "type": "string"},
+                        {"name": "field5", "type": "string"},
+                        {"name": "field6", "type": "string"},
+                        {"name": "field7", "type": "string"},
+                        {"name": "field8", "type": "string"},
+                        {"name": "field9", "type": "string"},
+                        {"name": "field10", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert is_valid, f"All entities with allow_unlimited_fields=true should pass. Errors: {errors}"
+
+
 def test_entity_field_limit_invalid_exceeds_limit(meta_model):
     """Test that entity with more than 7 non-array fields fails validation."""
     validator = YangValidator(meta_model)
