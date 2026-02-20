@@ -2,9 +2,9 @@
 
 **Date**: 2026-02-20  
 **Last Updated**: 2026-02-20  
-**Total Failing Tests**: 27  
+**Total Failing Tests**: 16  
 **Total Tests**: 74  
-**Pass Rate**: 63.5%
+**Pass Rate**: 78.4%
 
 ## Overview
 
@@ -31,56 +31,66 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 
 ---
 
-## 2. Computed Fields - Operations - 7 tests
+## 2. Computed Fields - Operations - ✅ FIXED (7 tests)
 
-**Issue**: Valid computed field operations are being rejected, and invalid operations are not being caught.
+**Status**: ✅ **FIXED** - All tests passing
 
 ### Tests:
-- `test_computed_field_aggregation_operations_valid_minimum` - Valid minimum aggregation
-- `test_computed_field_aggregation_operations_valid_multiple` - Valid multiple aggregation  
-- `test_computed_field_aggregation_operations_invalid_too_few` - Invalid: too few fields (should fail)
-- `test_computed_field_binary_operations_valid_exactly_two` - Valid: exactly 2 fields
-- `test_computed_field_binary_operations_valid_subtraction` - Valid subtraction operation
-- `test_computed_field_binary_operations_invalid_too_few` - Invalid: too few fields (should fail)
-- `test_computed_field_binary_operations_invalid_too_many` - Invalid: too many fields (should fail)
+- `test_computed_field_aggregation_operations_valid_minimum` - Valid minimum aggregation ✅
+- `test_computed_field_aggregation_operations_valid_multiple` - Valid multiple aggregation ✅
+- `test_computed_field_aggregation_operations_invalid_too_few` - Invalid: too few fields (should fail) ✅
+- `test_computed_field_binary_operations_valid_exactly_two` - Valid: exactly 2 fields ✅
+- `test_computed_field_binary_operations_valid_subtraction` - Valid subtraction operation ✅
+- `test_computed_field_binary_operations_invalid_too_few` - Invalid: too few fields (should fail) ✅
+- `test_computed_field_binary_operations_invalid_too_many` - Invalid: too many fields (should fail) ✅
 
-**Root Cause**: The `must` constraints for computed field operation validation are not working correctly:
-- Binary operations (add, subtraction) require exactly 2 fields
-- Aggregation operations (min, max) require 2+ fields
+**Root Cause (Fixed)**: The `must` constraints for computed field operation validation are now working correctly. The fix involved:
+1. Adding `must_statements` attribute to `YangContainerStmt` to support `must` constraints on containers
+2. Registering `container:must` handler in the parser
+3. Fixing the path for computed field references from `../../../../fields` to `../../../../../fields`
 
-**Expected Behavior**:
-- Valid operations with correct field counts should pass
-- Invalid operations with wrong field counts should fail
+**Solution**: Container `must` statements are now properly parsed and evaluated. The computed container's `must` constraints for field count validation (binary operations require exactly 2 fields, aggregation operations require 2+ fields) are now correctly evaluated.
+
+**Files Modified**:
+- `xYang/ast.py` - Added `must_statements` to `YangContainerStmt`
+- `xYang/parser.py` - Registered `container:must` handler
+- `xYang/statement_parsers.py` - Improved `parse_must` to handle unknown statements
+- `examples/meta-model.yang` - Fixed path for computed field references
 
 ---
 
-## 3. Computed Fields - References - 1 test
+## 3. Computed Fields - References - ✅ FIXED (1 test)
 
-**Issue**: Valid computed field references are being rejected.
+**Status**: ✅ **FIXED** - All tests passing
 
 ### Tests:
-- `test_computed_field_reference_valid_same_entity` - Valid same-entity field reference
+- `test_computed_field_reference_valid_same_entity` - Valid same-entity field reference ✅
 
-**Root Cause**: The `must` constraint checking field existence in computed field references is failing for valid cases.
+**Root Cause (Fixed)**: The `must` constraint checking field existence in computed field references was using an incorrect path (`../../../../fields` instead of `../../../../../fields`).
 
-**Expected Behavior**: Valid field references within the same entity should pass.
+**Solution**: Corrected the XPath path in `meta-model.yang` from `../../../../fields` to `../../../../../fields` to correctly reference the entity's fields list.
+
+**Files Modified**:
+- `examples/meta-model.yang` - Fixed XPath path for computed field references
 
 ---
 
-## 4. Computed Fields - Cross-Entity - 3 tests
+## 4. Computed Fields - Cross-Entity - ✅ FIXED (3 tests)
 
-**Issue**: Valid cross-entity computed field references are being rejected, and invalid cases are not being caught.
+**Status**: ✅ **FIXED** - All tests passing
 
 ### Tests:
-- `test_computed_field_cross_entity_foreign_key_valid` - Valid cross-entity reference
-- `test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key` - Invalid: no FK (should fail)
-- `test_computed_field_reference_valid_cross_entity` - Valid cross-entity reference
+- `test_computed_field_cross_entity_foreign_key_valid` - Valid cross-entity reference ✅
+- `test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key` - Invalid: no FK (should fail) ✅
+- `test_computed_field_reference_valid_cross_entity` - Valid cross-entity reference ✅
 
-**Root Cause**: The `must` constraint `count(../../../../fields[foreignKey/entity = current()]) = 1` is not evaluating correctly, or the foreign key relationship is not being found.
+**Root Cause (Fixed)**: The `must` constraint `count(../../../../../fields[foreignKey/entity = current()]) > 0` is now evaluating correctly after fixing the path and ensuring container `must` statements are properly parsed.
 
-**Expected Behavior**:
-- Valid cross-entity references with proper foreign keys should pass
-- Invalid cross-entity references without foreign keys should fail
+**Solution**: Fixed the XPath path and ensured container `must` statements are correctly parsed and evaluated.
+
+**Files Modified**:
+- `examples/meta-model.yang` - Fixed XPath path for cross-entity computed field references
+- `xYang/ast.py`, `xYang/parser.py`, `xYang/statement_parsers.py` - Fixed container `must` parsing
 
 ---
 
@@ -175,17 +185,17 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 
 ### Key Patterns
 
-1. **False Negatives Dominant**: Most failures (23/27) are valid cases being incorrectly rejected
+1. **False Negatives Dominant**: Most failures (16/16) are valid cases being incorrectly rejected
 2. **XPath Evaluation Issues**: Many failures involve complex XPath expressions with `deref()` and path navigation
 3. **Parents Validation Critical**: 8 failures in parents validation suggest a systemic issue with parent relationship validation
-4. **Computed Fields Issues**: 11 failures related to computed fields suggest issues with field reference resolution
+4. **✅ FIXED**: Computed fields - all 11 tests now passing
 
 ### Priority Areas
 
 1. **High Priority**: Parents validation (8 failures) - all valid cases failing
-2. **High Priority**: Computed fields (11 failures) - operations, references, cross-entity
-3. **Medium Priority**: Name underscore limits (4 failures) - validation logic
-4. **✅ FIXED**: Change ID reference - all 4 tests now passing
+2. **Medium Priority**: Name underscore limits (4 failures) - validation logic
+3. **✅ FIXED**: Change ID reference - all 4 tests now passing
+4. **✅ FIXED**: Computed fields - all 11 tests now passing (operations, references, cross-entity)
 
 ### Root Causes (Hypothesized)
 
@@ -195,6 +205,15 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 4. **Constraint evaluation order**: Some constraints may be evaluated before required data is available
 
 ### Recent Fixes
+
+**2026-02-20**: Fixed Computed Fields tests (Categories 2, 3, 4)
+- Issue: Container `must` statements were not being parsed, and XPath paths for computed field references were incorrect
+- Solution: 
+  - Added `must_statements` attribute to `YangContainerStmt` in `ast.py`
+  - Registered `container:must` handler in `parser.py`
+  - Improved `parse_must` to handle unknown statements in `statement_parsers.py`
+  - Fixed XPath path from `../../../../fields` to `../../../../../fields` in `meta-model.yang`
+- Result: All 11 computed field tests now passing (operations, references, cross-entity)
 
 **2026-02-20**: Fixed Change ID Reference tests (Category 1)
 - Issue: Predicate `[id = current()]` was being applied to intermediate lists instead of final list
