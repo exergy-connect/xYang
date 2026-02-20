@@ -154,6 +154,12 @@ class XPathEvaluator:
                 self.data = old_data
                 self._set_context_path(old_context)
         
+        # Special case: if left is None and op is '/', return empty list (empty node-set)
+        # This handles cases like deref(...)/../fields where deref() returns None
+        # In XPath, navigating from an empty node-set results in an empty node-set
+        if op == '/' and left is None:
+            return []
+        
         # Special case: if left is a dict and op is '/', treat as path navigation
         # Extract the full path from nested BinaryOpNodes and evaluate as a single path
         if op == '/' and isinstance(left, dict):
@@ -170,6 +176,8 @@ class XPathEvaluator:
                     self._set_context_path(stored_path)
                 else:
                     # Set the node as the current data context
+                    # When navigating from a node (even without stored_path), ../field should mean ./field
+                    # This handles cases where deref() returns a node but stored_path wasn't set
                     self.data = left
                     self._set_context_path([])
                 
@@ -206,53 +214,64 @@ class XPathEvaluator:
                     # Handle .. at the start (for both with and without predicates)
                     steps = list(node.right.steps)
                     if steps and steps[0] == '..':
-                        if stored_path:
-                            # When navigating from a deref() node, YANG semantics:
-                            # ../field from entity node means ./field (field as child of entity)
-                            # This is because .. from a node's location would go to its parent (list),
-                            # which doesn't have the field. So we interpret it as the field within the node.
-                            if len(steps) > 1:
-                                # Remove .. and try field directly from the node's location
-                                direct_path = '/'.join(steps[1:])
-                                # If there's a predicate, we need to preserve it
-                                if hasattr(node.right, 'predicate') and node.right.predicate:
-                                    # Rebuild path with predicate but without ..
-                                    from ..xpath.ast import PathNode
-                                    direct_node = PathNode(steps[1:], node.right.is_absolute)
-                                    direct_node.predicate = node.right.predicate
+                        # When navigating from a deref() node (or any node), YANG semantics:
+                        # ../field from node means ./field (field as child of node)
+                        # This is because .. from a node's location would go to its parent (list),
+                        # which doesn't have the field. So we interpret it as the field within the node.
+                        # This applies whether or not stored_path is set, as long as left is a dict (node)
+                        if len(steps) > 1:
+                            # Remove .. and try field directly from the node's location
+                            direct_path = '/'.join(steps[1:])
+                            # If there's a predicate, we need to preserve it
+                            if hasattr(node.right, 'predicate') and node.right.predicate:
+                                # Rebuild path with predicate but without ..
+                                from ..xpath.ast import PathNode
+                                direct_node = PathNode(steps[1:], node.right.is_absolute)
+                                direct_node.predicate = node.right.predicate
+                                # When navigating from a deref() node, ../fields should mean ./fields
+                                # (fields as a child of the entity node)
+                                # Try evaluating from the node itself as data first
+                                old_data_temp = self.data
+                                old_context_temp = self.context_path
+                                try:
+                                    self.data = left
+                                    self._set_context_path([])
                                     result = direct_node.evaluate(self)
-                                else:
-                                    result = self.path_evaluator.evaluate_path(direct_path)
-                                # If that fails, try with .. (go up then down) as fallback
-                                if result is None:
-                                    if hasattr(node.right, 'predicate') and node.right.predicate:
-                                        result = node.right.evaluate(self)
-                                    else:
-                                        path_str = '/'.join(steps)
-                                        result = self.path_evaluator.evaluate_path(path_str)
+                                finally:
+                                    self.data = old_data_temp
+                                    self._set_context_path(old_context_temp)
+                                # If that didn't work, try from the node's location in the tree
+                                if result is None or (isinstance(result, list) and len(result) == 0):
+                                    result = direct_node.evaluate(self)
                             else:
-                                # Just .. means go up from stored_path
+                                # Try evaluating from the node itself as data first
+                                old_data_temp = self.data
+                                old_context_temp = self.context_path
+                                try:
+                                    self.data = left
+                                    self._set_context_path([])
+                                    result = self.path_evaluator.evaluate_path(direct_path)
+                                finally:
+                                    self.data = old_data_temp
+                                    self._set_context_path(old_context_temp)
+                            # If that fails, try with .. (go up then down) as fallback
+                            if result is None or (isinstance(result, list) and len(result) == 0):
                                 if hasattr(node.right, 'predicate') and node.right.predicate:
                                     result = node.right.evaluate(self)
                                 else:
                                     path_str = '/'.join(steps)
                                     result = self.path_evaluator.evaluate_path(path_str)
                         else:
-                            # Remove leading .. when navigating from a node (we're already at the node)
-                            steps = steps[1:]
-                            if steps:
-                                # Build path string without the leading ..
+                            # Just .. means go up from stored_path (if set) or return the node itself
+                            if stored_path:
                                 if hasattr(node.right, 'predicate') and node.right.predicate:
-                                    from ..xpath.ast import PathNode
-                                    direct_node = PathNode(steps, node.right.is_absolute)
-                                    direct_node.predicate = node.right.predicate
-                                    result = direct_node.evaluate(self)
+                                    result = node.right.evaluate(self)
                                 else:
                                     path_str = '/'.join(steps)
                                     result = self.path_evaluator.evaluate_path(path_str)
                             else:
-                                # Just .. means the current node
-                                result = self.data
+                                # No stored_path - just return the node itself
+                                result = left
                     else:
                         # No .. at start - evaluate normally (handles predicates automatically)
                         result = node.right.evaluate(self)
