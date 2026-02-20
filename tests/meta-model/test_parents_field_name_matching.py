@@ -1,8 +1,9 @@
 """
-Test for parents field name matching constraint.
+Test for parents field name matching.
 
-Must statement: deref(current())/../foreignKey/entity = ../../name or current() = deref(deref(current())/../foreignKey/entity)/../primary_key[1]
-Location: entities/parents/child_fk
+Note: The field name matching constraint was removed as it was too restrictive.
+child_fk field name doesn't need to match parent's primary key name - it just
+needs to reference a field with a foreignKey definition pointing to the parent's primary key.
 """
 import pytest
 from xYang import YangValidator, parse_yang_file
@@ -110,8 +111,13 @@ def test_parents_field_name_matching_valid_cross_entity_matching(meta_model):
     assert is_valid, f"Cross-entity parents with matching field name should pass. Errors: {errors}"
 
 
-def test_parents_field_name_matching_invalid_cross_entity_not_matching(meta_model):
-    """Test that cross-entity parents with non-matching field name fail validation."""
+def test_parents_field_name_matching_valid_cross_entity_not_matching(meta_model):
+    """Test that cross-entity parents with non-matching field name pass validation.
+    
+    Note: Field name matching constraint was removed as it was too restrictive.
+    child_fk field name doesn't need to match parent's primary key name - it just
+    needs to reference a field with a foreignKey definition pointing to the parent's primary key.
+    """
     validator = YangValidator(meta_model)
     
     data = {
@@ -158,6 +164,4 @@ def test_parents_field_name_matching_invalid_cross_entity_not_matching(meta_mode
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "Cross-entity parents with non-matching field name should fail"
-    assert any("field name must match" in str(err).lower() or "primary key" in str(err).lower() for err in errors), \
-        f"Should have field name matching error. Errors: {errors}"
+    assert is_valid, f"Cross-entity parents with non-matching field name should pass (field name matching constraint was removed). Errors: {errors}"

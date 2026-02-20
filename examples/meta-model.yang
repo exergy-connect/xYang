@@ -198,11 +198,10 @@ module meta-model {
             // Path from entities[name='X']/name to data-model/max_name_underscores: ../../../max_name_underscores
             // Note: If max_name_underscores is not accessible, this constraint may fail
             // For now, we'll require it to be explicitly set in the data
-            // TEMPORARILY COMMENTED OUT to test foreignKey constraint with libyang
-            // must "string-length(.) - string-length(translate(., '_', '')) <= number(../../../max_name_underscores)" {
-            //   error-message "Entity name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
-            //   description "Validates that entity name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
-            // }
+            must "string-length(.) - string-length(translate(., '_', '')) <= number(../../../max_name_underscores)" {
+              error-message "Entity name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
+              description "Validates that entity name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
+            }
           }
           leaf brief {
             type string;
@@ -248,11 +247,10 @@ module meta-model {
               // Path from entities[name='X']/fields[name='Y']/name to data-model/max_name_underscores: ../../../../../max_name_underscores
               // Note: If max_name_underscores is not accessible, this constraint may fail
               // For now, we'll require it to be explicitly set in the data
-              // TEMPORARILY COMMENTED OUT to test foreignKey constraint with libyang
-              // must "string-length(.) - string-length(translate(., '_', '')) <= number(../../../../../max_name_underscores)" {
-              //   error-message "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
-              //   description "Validates that field name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
-              // }
+              must "string-length(.) - string-length(translate(., '_', '')) <= number(../../../../../max_name_underscores)" {
+                error-message "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
+                description "Validates that field name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
+              }
             }
             leaf type {
               type primitive-type;
