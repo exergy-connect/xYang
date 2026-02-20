@@ -110,9 +110,23 @@ class FunctionEvaluator:
         return False
     
     def _handle_bool(self, args: list) -> bool:
-        """Handle bool() function."""
+        """Handle bool() function following XPath 1.0 semantics.
+        
+        XPath 1.0 bool() function:
+        - Python False -> XPath false() (returns False)
+        - Python True -> XPath true() (returns True)
+        - Then falls through to XPath 1.0 string/number coercion rules
+        """
         if len(args) == 1:
-            return yang_bool(args[0])
+            value = args[0]
+            # Explicitly handle Python booleans first (XPath-aware boolean semantics)
+            # This ensures Python False -> XPath false() and Python True -> XPath true()
+            # before falling through to XPath 1.0 string/number coercion rules
+            if isinstance(value, bool):
+                return value
+            # For other types, use yang_bool which handles YANG/JSON boolean strings
+            # and then falls through to XPath 1.0 coercion rules
+            return yang_bool(value)
         return False
     
     def _handle_number(self, args: list) -> float:

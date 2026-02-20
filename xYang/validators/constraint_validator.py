@@ -245,6 +245,54 @@ class ConstraintValidator:
                 evaluator.original_context_path = child_path.copy() if child_path else []
                 self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, actual_schema_node)
         
+        elif isinstance(child_stmt, YangLeafListStmt):
+            # Leaf-list: evaluate must constraints per-element with current() bound to each value
+            # Get the leaf-list values from root_data
+            leaf_list_data = self._navigate_path(root_data, child_path)
+            
+            # Check if field exists - navigate to parent and check
+            parent_path = child_path[:-1] if len(child_path) > 0 else []
+            parent_data = self._navigate_path(root_data, parent_path) if parent_path else root_data
+            field_exists = (
+                isinstance(parent_data, dict) and child_stmt.name in parent_data
+            )
+            
+            logger.debug(
+                "Leaf-list %s in list item: field_exists=%s, has_must=%s, path=%s, leaf_list_data=%s",
+                child_stmt.name, field_exists, len(child_stmt.must_statements) > 0, child_path, 
+                type(leaf_list_data).__name__ if leaf_list_data is not None else "None"
+            )
+            
+            # Skip validation if the field doesn't exist (optional fields)
+            if not field_exists:
+                logger.debug("Skipping validation for optional missing leaf-list in list item: %s", child_stmt.name)
+                return  # Skip validation for missing optional fields
+            
+            # Verify leaf-list data is actually a list
+            if not isinstance(leaf_list_data, list):
+                logger.debug("Leaf-list %s data is not a list (type: %s), skipping must validation", 
+                           child_stmt.name, type(leaf_list_data).__name__ if leaf_list_data is not None else "None")
+                return
+            
+            # Evaluate must constraints once per value with current() bound to each value
+            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
+                        len(child_stmt.must_statements), child_stmt.name, len(leaf_list_data))
+            for value_idx, value in enumerate(leaf_list_data):
+                # Set up evaluator context for this specific value
+                # current() should be bound to this value
+                value_path = child_path + [value_idx]
+                self._setup_evaluator_context(evaluator, value_path, root_data)
+                
+                # Set original context so current() returns this value
+                evaluator.original_data = root_data
+                evaluator.original_context_path = value_path.copy() if value_path else []
+                
+                # Evaluate each must constraint for this value
+                for must in child_stmt.must_statements:
+                    logger.debug("Evaluating must constraint for leaf-list %s value[%d]=%s in list item", 
+                               child_stmt.name, value_idx, value)
+                    self._evaluate_must_constraint(evaluator, must, f"{child_stmt.name}[{value_idx}]", False, child_stmt)
+        
         elif isinstance(child_stmt, (YangListStmt, YangContainerStmt)):
             # Check if container/list exists in data before validating
             container_data = self._navigate_path(root_data, child_path)
@@ -421,7 +469,12 @@ class ConstraintValidator:
                 field_name, result, must_expr.expression
             )
             if not result:
-                error_msg = must_expr.error_message or f"Must constraint failed for {field_name}"
+                # Use error_message if available, otherwise fall back to description, then generic message
+                error_msg = (
+                    must_expr.error_message or 
+                    (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
+                    f"Must constraint failed for {field_name}"
+                )
                 logger.warning("Must constraint failed for %s: %s", field_name, error_msg)
                 self.errors.append(error_msg)
         except Exception as e:
@@ -432,7 +485,12 @@ class ConstraintValidator:
             )
             # Only add error if field is mandatory or if it's a syntax error
             if is_mandatory or "syntax" in str(e).lower() or "parse" in str(e).lower():
-                error_msg = must_expr.error_message or f"Must constraint evaluation failed for {field_name}: {e}"
+                # Use error_message if available, otherwise fall back to description, then generic message
+                error_msg = (
+                    must_expr.error_message or 
+                    (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
+                    f"Must constraint evaluation failed for {field_name}: {e}"
+                )
                 self.errors.append(error_msg)
     
     def _validate_must_in_statement(
@@ -566,12 +624,34 @@ class ConstraintValidator:
                             stmt.name if hasattr(stmt, 'name') else type(stmt).__name__, current_path)
                 return
             
-            if hasattr(stmt, 'must_statements'):
-                for must in stmt.must_statements:
-                    # Ensure original_data is set before each evaluation
-                    evaluator.original_data = root_data
-                    evaluator.original_context_path = current_path.copy() if current_path else []
-                    self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
+            # For list statements, must constraints should be evaluated for each list item
+            # For container statements, must constraints are evaluated at the container level
+            if isinstance(stmt, YangListStmt):
+                list_data = container_data if isinstance(container_data, list) else None
+                if list_data:
+                    # Evaluate must constraints for each list item
+                    for idx, item in enumerate(list_data):
+                        item_path = current_path + [idx]
+                        self._setup_evaluator_context(evaluator, item_path, root_data)
+                        if hasattr(stmt, 'must_statements'):
+                            for must in stmt.must_statements:
+                                evaluator.original_data = root_data
+                                evaluator.original_context_path = item_path.copy() if item_path else []
+                                self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{idx}]", False, stmt)
+                else:
+                    # List doesn't exist or is not a list - evaluate at list level
+                    if hasattr(stmt, 'must_statements'):
+                        for must in stmt.must_statements:
+                            evaluator.original_data = root_data
+                            evaluator.original_context_path = current_path.copy() if current_path else []
+                            self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
+            else:
+                # Container: evaluate must constraints at container level
+                if hasattr(stmt, 'must_statements'):
+                    for must in stmt.must_statements:
+                        evaluator.original_data = root_data
+                        evaluator.original_context_path = current_path.copy() if current_path else []
+                        self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
         
         # Recurse into child statements
         if hasattr(stmt, 'statements'):
