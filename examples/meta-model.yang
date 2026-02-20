@@ -243,7 +243,7 @@ module meta-model {
               // Limit underscores based on max_name_underscores (default: 2)
               // Count underscores: string-length(.) - string-length(translate(., '_', ''))
               // Since max_name_underscores has a default value of 2, it will always have a value
-              must "string-length(.) - string-length(translate(., '_', '')) <= ../../../max_name_underscores" {
+              must "string-length(.) - string-length(translate(., '_', '')) <= ../../../../max_name_underscores" {
                 error-message "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
                 description "Validates that field name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
               }
@@ -312,7 +312,7 @@ module meta-model {
                 error-message "minDate can only be used with fields of type 'date' or 'datetime'";
                 description "Validates that minDate is only specified for date or datetime fields";
               }
-              must "not(../maxDate) or number(.) <= number(../maxDate)" {
+              must "not(../maxDate) or . <= ../maxDate" {
                 error-message "minDate must be less than or equal to maxDate when both are specified";
                 description "Validates that minDate is not greater than maxDate when both date constraints are present";
               }
@@ -324,7 +324,7 @@ module meta-model {
                 error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
                 description "Validates that maxDate is only specified for date or datetime fields";
               }
-              must "not(../minDate) or number(.) >= number(../minDate)" {
+              must "not(../minDate) or . >= ../minDate" {
                 error-message "maxDate must be greater than or equal to minDate when both are specified";
                 description "Validates that maxDate is not less than minDate when both date constraints are present";
               }

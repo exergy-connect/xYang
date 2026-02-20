@@ -1,8 +1,11 @@
 """
 Test for field name underscore limit constraint.
 
-Must statement: string-length(.) - string-length(translate(., '_', '')) <= ../../../max_name_underscores
+Must statement: string-length(.) - string-length(translate(., '_', '')) <= ../../../../max_name_underscores
 Location: entities/fields/name
+
+Note: The path ../../../../max_name_underscores goes up 4 levels from entities[0]/fields[0]/name to data-model.
+This is because from a list item context, we need to go: name -> fields[0] -> fields -> entities[0] -> entities -> data-model.
 """
 import pytest
 from xYang import YangValidator, parse_yang_file

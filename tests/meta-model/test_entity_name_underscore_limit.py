@@ -3,6 +3,8 @@ Test for entity name underscore limit constraint.
 
 Must statement: string-length(.) - string-length(translate(., '_', '')) <= ../../max_name_underscores
 Location: entities/name
+
+Note: The path ../../max_name_underscores goes up 2 levels from entities/name to data-model.
 """
 import pytest
 from xYang import YangValidator, parse_yang_file

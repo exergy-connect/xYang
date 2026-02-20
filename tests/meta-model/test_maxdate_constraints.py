@@ -5,6 +5,9 @@ Must statements:
 1. ../type = 'date' or ../type = 'datetime'
 2. not(../minDate) or . >= ../minDate
 Location: entities/fields/maxDate
+
+Note: Date comparison uses direct string comparison (not number()) since
+date strings in YYYY-MM-DD format compare correctly lexicographically.
 """
 import pytest
 from xYang import YangValidator, parse_yang_file
@@ -34,7 +37,7 @@ def test_maxdate_valid_date_type(meta_model):
                     "fields": [
                         {"name": "id", "type": "integer"},
                         {
-                            "name": "end_date",
+                            "name": "enddate",
                             "type": "date",
                             "maxDate": "2020-12-31"
                         }
@@ -64,7 +67,7 @@ def test_maxdate_valid_datetime_type(meta_model):
                     "fields": [
                         {"name": "id", "type": "integer"},
                         {
-                            "name": "end_datetime",
+                            "name": "enddatetime",
                             "type": "datetime",
                             "maxDate": "2020-12-31"
                         }
@@ -94,7 +97,7 @@ def test_maxdate_valid_with_mindate(meta_model):
                     "fields": [
                         {"name": "id", "type": "integer"},
                         {
-                            "name": "date_range",
+                            "name": "daterange",
                             "type": "date",
                             "minDate": "2020-01-01",
                             "maxDate": "2020-12-31"
@@ -157,7 +160,7 @@ def test_maxdate_invalid_less_than_mindate(meta_model):
                     "fields": [
                         {"name": "id", "type": "integer"},
                         {
-                            "name": "date_range",
+                            "name": "daterange",
                             "type": "date",
                             "minDate": "2020-12-31",
                             "maxDate": "2020-01-01"

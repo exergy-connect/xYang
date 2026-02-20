@@ -101,6 +101,28 @@ def compare_less_equal(left: Any, right: Any) -> bool:
         # If both are None, comparison is undefined - return False for <=
         # If only one is None, comparison is False
         return False
+    
+    # Handle NaN values (from number() on date strings)
+    # If both are NaN, try comparing as strings (for date strings in YYYY-MM-DD format)
+    import math
+    left_float = None
+    right_float = None
+    try:
+        left_float = float(left)
+        right_float = float(right)
+    except (ValueError, TypeError):
+        pass
+    
+    if left_float is not None and right_float is not None:
+        if math.isnan(left_float) and math.isnan(right_float):
+            # Both are NaN - likely from date strings, compare as strings
+            return str(left) <= str(right)
+        if math.isnan(left_float) or math.isnan(right_float):
+            # One is NaN, comparison fails
+            return False
+        return left_float <= right_float
+    
+    # Fall back to string comparison
     try:
         return float(left) <= float(right)
     except (ValueError, TypeError):
@@ -115,6 +137,28 @@ def compare_greater_equal(left: Any, right: Any) -> bool:
         # If both are None, comparison is undefined - return False for >=
         # If only one is None, comparison is False
         return False
+    
+    # Handle NaN values (from number() on date strings)
+    # If both are NaN, try comparing as strings (for date strings in YYYY-MM-DD format)
+    import math
+    left_float = None
+    right_float = None
+    try:
+        left_float = float(left)
+        right_float = float(right)
+    except (ValueError, TypeError):
+        pass
+    
+    if left_float is not None and right_float is not None:
+        if math.isnan(left_float) and math.isnan(right_float):
+            # Both are NaN - likely from date strings, compare as strings
+            return str(left) >= str(right)
+        if math.isnan(left_float) or math.isnan(right_float):
+            # One is NaN, comparison fails
+            return False
+        return left_float >= right_float
+    
+    # Fall back to string comparison
     try:
         return float(left) >= float(right)
     except (ValueError, TypeError):
