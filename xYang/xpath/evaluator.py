@@ -195,13 +195,14 @@ class XPathEvaluator:
                                 # It's a PathNode
                                 path_str_parts.extend(part.steps)
                             else:
-                                # Try to evaluate
-                                try:
-                                    val = part.evaluate(self) if hasattr(part, 'evaluate') else str(part)
-                                    if val:
-                                        path_str_parts.append(str(val))
-                                except:
-                                    pass
+                                # Try to evaluate (for function calls, etc.)
+                                if hasattr(part, 'evaluate'):
+                                    try:
+                                        val = part.evaluate(self)
+                                        if val:
+                                            path_str_parts.append(str(val))
+                                    except:
+                                        pass
                         if path_str_parts:
                             path_str = '/'.join(path_str_parts)
                             result = self.path_evaluator.evaluate_path(path_str)
@@ -303,56 +304,6 @@ class XPathEvaluator:
                 self.data = old_data
                 self._set_context_path(old_context)
         
-        # Also handle nested BinaryOpNodes: if left is a BinaryOpNode that evaluates to a dict
-        if op == '/' and isinstance(node.left, BinaryOpNode):
-            # Evaluate left first to see if it's a dict
-            left_result = node.left.evaluate(self)
-            if isinstance(left_result, dict):
-                # Left evaluated to a dict (node), treat / as path navigation
-                old_data = self.data
-                old_context = self.context_path
-                try:
-                    self.data = left_result
-                    self._set_context_path([])
-                    # Extract path from right side - handle nested BinaryOpNodes
-                    if isinstance(node.right, BinaryOpNode) and node.right.operator == '/':
-                        # Build full path by extracting from nested structure
-                        path_parts = self.path_evaluator.extract_path_from_binary_op(node.right)
-                        # Convert path parts to string steps
-                        path_steps = []
-                        for part in path_parts:
-                            if isinstance(part, str):
-                                path_steps.append(part)
-                            elif hasattr(part, 'steps'):
-                                path_steps.extend(part.steps)
-                            elif hasattr(part, 'evaluate'):
-                                # Evaluate in current context
-                                try:
-                                    val = part.evaluate(self)
-                                    if val is not None:
-                                        path_steps.append(str(val))
-                                except:
-                                    pass
-                        if path_steps:
-                            path_str = '/'.join(path_steps)
-                            result = self.path_evaluator.evaluate_path(path_str)
-                        else:
-                            result = None
-                    elif hasattr(node.right, 'steps'):
-                        # It's a PathNode - evaluate it directly
-                        result = node.right.evaluate(self)
-                    else:
-                        # Try to evaluate and treat as path
-                        right_val = node.right.evaluate(self)
-                        if isinstance(right_val, str):
-                            result = self.path_evaluator.evaluate_path(right_val)
-                        else:
-                            result = right_val
-                    return result
-                finally:
-                    self.data = old_data
-                    self._set_context_path(old_context)
-        
         # For other operations, evaluate right normally
         right = node.right.evaluate(self)
 
@@ -424,26 +375,6 @@ class XPathEvaluator:
     def _evaluate_path_node(self, node: PathNode) -> Any:
         """Evaluate a path node."""
         return self.path_evaluator.evaluate_path_node(node)
-
-    def _evaluate_path(self, path: str) -> Any:
-        """Evaluate a path expression."""
-        return self.path_evaluator.evaluate_path(path)
-
-    def _evaluate_relative_path(self, path: str) -> Any:
-        """Evaluate a relative path like ../field or ../../field."""
-        return self.path_evaluator.evaluate_relative_path(path)
-
-    def _evaluate_absolute_path(self, path: str) -> Any:
-        """Evaluate an absolute path like /data-model/entities."""
-        return self.path_evaluator.evaluate_absolute_path(path)
-
-    def _get_path_value(self, parts: List) -> Any:
-        """Get value at path in data structure."""
-        return self.path_evaluator.get_path_value(parts)
-
-    def _apply_predicate(self, items: List[Any], predicate: str) -> Any:
-        """Apply a predicate filter to a list of items."""
-        return self.predicate_evaluator.apply_predicate(items, predicate)
 
     def _get_current_value(self) -> Any:
         """Get the current value from the context path.

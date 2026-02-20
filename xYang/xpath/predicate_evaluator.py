@@ -56,13 +56,9 @@ class PredicateEvaluator:
         if len(parts) != 2:
             return items
         
-        # Optimized: strip only if needed (most expressions don't need it)
-        left_expr = parts[0]
-        right_expr = parts[1]
-        if left_expr and (left_expr[0].isspace() or left_expr[-1].isspace()):
-            left_expr = left_expr.strip()
-        if right_expr and (right_expr[0].isspace() or right_expr[-1].isspace()):
-            right_expr = right_expr.strip()
+        # Strip whitespace from expressions
+        left_expr = parts[0].strip()
+        right_expr = parts[1].strip()
         
         # Optimized: initialize empty list (Python lists grow efficiently)
         filtered = []

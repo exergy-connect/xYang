@@ -82,11 +82,8 @@ class FunctionEvaluator:
             to_chars = str(args[2] or '').strip("'\"")
             # In XPath translate(), if to_chars is shorter, extra from_chars are deleted
             if not to_chars:
-                # Delete all from_chars - use set for faster lookup
-                if from_chars:
-                    result = ''.join(c for c in source if c not in from_chars)
-                else:
-                    result = source
+                # Delete all from_chars
+                result = ''.join(c for c in source if c not in from_chars) if from_chars else source
             else:
                 # Map from_chars to to_chars, delete extras
                 trans_dict = {}

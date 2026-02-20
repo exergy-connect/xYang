@@ -25,26 +25,17 @@ def yang_bool(value: Any) -> bool:
     if isinstance(value, (list, dict)):
         return len(value) > 0
     if isinstance(value, str):
-        # YANG/JSON boolean strings - optimized comparison
-        # Check exact matches first (most common)
+        # YANG/JSON boolean strings - check exact matches first (most common)
         if value == 'true':
             return True
         if value == 'false':
             return False
-        # Check capitalized variants
-        if value == 'True':
+        # Check case-insensitive variants (covers 'True', 'False', etc.)
+        lower_val = value.lower().strip()
+        if lower_val == 'true':
             return True
-        if value == 'False':
+        if lower_val == 'false':
             return False
-        # Use lower() only if needed (less common)
-        if len(value) == 4:  # "true" or "True"
-            lower_val = value.lower()
-            if lower_val == 'true':
-                return True
-        elif len(value) == 5:  # "false" or "False"
-            lower_val = value.lower()
-            if lower_val == 'false':
-                return False
         # Other strings are truthy
         return bool(value)
     # For other types, use Python's bool()
@@ -59,13 +50,7 @@ def xpath_number(value: Any) -> float:
         return float(value)
     if isinstance(value, bool):
         return 1.0 if value else 0.0
-    if isinstance(value, str):
-        # Try to parse as number
-        try:
-            return float(value)
-        except ValueError:
-            return float('nan')
-    # For other types, try to convert
+    # Try to convert to float (handles strings and other types)
     try:
         return float(value)
     except (ValueError, TypeError):
