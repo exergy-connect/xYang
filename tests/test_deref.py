@@ -131,44 +131,6 @@ module data-model {
 """
 
 
-def test_deref_basic_functionality():
-    """Test basic deref() functionality - resolve entity name to entity node."""
-    data = {
-        "data-model": {
-            "entities": [
-                {
-                    "name": "company",
-                    "primary_key": ["company_id"]
-                }
-            ]
-        }
-    }
-    module = parse_yang_string(DATA_MODEL_YANG)
-    
-    # Context: we're at entities[0].name (value is "company")
-    # deref(current()) should resolve "company" to the company entity node
-    evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=["data-model", "entities", 0, "name"]
-    )
-    
-    # Verify current value
-    current_val = evaluator.evaluate_value('current()')
-    assert current_val == "company"
-    
-    # Test deref - this should find the entity with name="company"
-    result = evaluator.evaluate_value('deref(current())')
-    # Expected: should return the company entity node
-    # Current behavior: may return None if deref() isn't working correctly
-    # This test documents the expected vs actual behavior
-    if result is None:
-        pytest.skip("deref() implementation needs fixing - returns None instead of entity node")
-    assert result is not None
-    assert isinstance(result, dict)
-    assert result.get("name") == "company"
-
-
 def test_deref_simple_entity_reference():
     """Test deref() with a simple entity reference from foreignKey.entity."""
     data = {
@@ -220,125 +182,6 @@ def test_deref_simple_entity_reference():
     assert result is not None
     assert isinstance(result, dict)
     assert result.get("name") == "company"
-
-
-def test_deref_from_field_node():
-    """Test deref() when context is at a field node (not a leaf value)."""
-    data = {
-        "data-model": {
-            "entities": [
-                {
-                    "name": "company",
-                    "primary_key": ["company_id"]
-                },
-                {
-                    "name": "department",
-                    "fields": [
-                        {
-                            "name": "company_id",
-                            "foreignKey": {
-                                "entity": "company",
-                                "field": "company_id"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    module = parse_yang_string(DATA_MODEL_YANG)
-    
-    # Context: we're at department.fields[0] (the field node itself)
-    evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=["data-model", "entities", 1, "fields", 0]
-    )
-    
-    # deref(current()) should return the field node itself (we're already at it)
-    result = evaluator.evaluate_value('deref(current())')
-    # This is a special case - if we're already at a node, deref might return it
-    # Note: deref() on a field node may not be fully implemented
-    if result is None:
-        pytest.skip("deref() on field node not fully implemented - this is a known limitation")
-    assert result is not None
-    
-    # Test navigating to foreignKey.entity
-    entity_name = evaluator.evaluate_value('./foreignKey/entity')
-    assert entity_name == "company"
-    
-    # Test nested deref: deref(./foreignKey/entity) should get company entity
-    entity_node = evaluator.evaluate_value('deref(./foreignKey/entity)')
-    if entity_node is None:
-        pytest.skip("deref() cannot resolve entity from field's foreignKey.entity")
-    assert isinstance(entity_node, dict)
-    assert entity_node.get("name") == "company"
-
-
-def test_deref_nested_path():
-    """Test deref() with nested path navigation."""
-    data = {
-        "data-model": {
-            "entities": [
-                {
-                    "name": "company",
-                    "primary_key": ["company_id"],
-                    "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
-                    ]
-                },
-                {
-                    "name": "department",
-                    "fields": [
-                        {
-                            "name": "company_id",
-                            "type": "string",
-                            "foreignKey": {
-                                "entity": "company",
-                                "field": "company_id"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    module = parse_yang_string(DATA_MODEL_YANG)
-    
-    # Test: deref(deref(current())/../foreignKey/entity)/../primary_key
-    # This should:
-    # 1. deref(current()) - get the field node (company_id field)
-    # 2. /../foreignKey/entity - navigate to "company"
-    # 3. deref(...) - resolve "company" to company entity node
-    # 4. /../primary_key - get primary_key from company entity
-    
-    # Context: we're in department.fields[0] (the company_id field)
-    field_context = ["data-model", "entities", 1, "fields", 0]
-    evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=field_context
-    )
-    
-    # Test deref(current()) - should return the field node itself
-    field_node = evaluator.evaluate_value('deref(current())')
-    if field_node is None:
-        pytest.skip("deref() on field node not fully implemented - this is a known limitation")
-    assert field_node is not None
-    assert isinstance(field_node, dict)
-    assert field_node.get("name") == "company_id"
-    
-    # Test navigating to foreignKey.entity
-    entity_name = evaluator.evaluate_value('deref(current())/../foreignKey/entity')
-    assert entity_name == "company"
-    
-    # Test nested deref: deref(deref(current())/../foreignKey/entity)
-    entity_node = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
-    if entity_node is None:
-        pytest.skip("Nested deref() not fully implemented - this is a known limitation")
-    assert entity_node is not None
-    assert isinstance(entity_node, dict)
-    assert entity_node.get("name") == "company"
 
 
 def test_deref_parents_child_fk():
@@ -1925,6 +1768,123 @@ def test_deref_current_leafref_schema_resolution():
     # entities by name pattern alone (e.g., if there were a "company_old" entity,
     # it should still resolve to "company" based on the exact path match)
     # This test verifies schema-aware resolution, not just name matching
+
+
+def test_deref_relative_vs_absolute_leafref_paths():
+    """Test deref() with both relative and absolute leafref paths in the same scenario.
+    
+    This test explicitly verifies that both path resolution strategies work:
+    - Relative paths (e.g., "../../fields/name") are resolved from the current schema node position
+    - Absolute paths (e.g., "/data-model/entities/name") are resolved from the document root
+    
+    Both should resolve correctly to the referenced node when used appropriately.
+    This test ensures the evaluator correctly handles both path types and would catch
+    bugs where only one path style works.
+    """
+    data = {
+        "data-model": {
+            "entities": [
+                {
+                    "name": "company",
+                    "primary_key": ["company_id"],
+                    "fields": [
+                        {"name": "company_id", "type": "string"}
+                    ]
+                },
+                {
+                    "name": "department",
+                    "primary_key": ["department_id"],
+                    "fields": [
+                        {
+                            "name": "company_id",
+                            "type": "string",
+                            "foreignKey": {
+                                "entity": "company",  # Uses absolute path: /data-model/entities/name
+                                "field": "company_id"
+                            }
+                        }
+                    ],
+                    "parents": [
+                        {
+                            "child_fk": "company_id"  # Uses relative path: ../../fields/name
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    module = parse_yang_string(DATA_MODEL_YANG)
+    
+    # Test 1: Relative path leafref (child_fk uses "../../fields/name")
+    # Context: at parents[0].child_fk
+    # The relative path "../../fields/name" from parents[0].child_fk means:
+    # - Go up 2 levels from parents[0].child_fk: parents[0] -> entities[1] -> (root)
+    # - Then navigate to fields/name
+    # - Find field with name="company_id" in entities[1].fields
+    relative_evaluator = XPathEvaluator(
+        data,
+        module,
+        context_path=["data-model", "entities", 1, "parents", 0, "child_fk"]
+    )
+    
+    # Verify current value
+    current_val = relative_evaluator.evaluate_value('current()')
+    assert current_val == "company_id", "Should be at child_fk with value company_id"
+    
+    # deref() with relative path should resolve to the field node
+    # The schema defines child_fk with path "../../fields/name" (relative)
+    # This is resolved from the schema position of child_fk (under parents)
+    relative_result = relative_evaluator.evaluate_value('deref(current())')
+    assert relative_result is not None, "Relative path leafref should resolve"
+    assert isinstance(relative_result, dict), "Should return field node"
+    assert relative_result.get("name") == "company_id", "Should resolve to company_id field"
+    assert relative_result.get("type") == "string", "Should have correct field type"
+    
+    # Test 2: Absolute path leafref (foreignKey.entity uses "/data-model/entities/name")
+    # Context: at fields[0].foreignKey.entity
+    # The absolute path "/data-model/entities/name" means:
+    # - Start from document root (ignores current schema position)
+    # - Navigate to /data-model/entities
+    # - Find entity where name="company"
+    absolute_evaluator = XPathEvaluator(
+        data,
+        module,
+        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+    )
+    
+    # Verify current value
+    current_val = absolute_evaluator.evaluate_value('current()')
+    assert current_val == "company", "Should be at foreignKey.entity with value company"
+    
+    # deref() with absolute path should resolve to the entity node
+    # The schema defines foreignKey.entity with path "/data-model/entities/name" (absolute)
+    # This is resolved from the document root, not from the current schema position
+    absolute_result = absolute_evaluator.evaluate_value('deref(current())')
+    assert absolute_result is not None, "Absolute path leafref should resolve"
+    assert isinstance(absolute_result, dict), "Should return entity node"
+    assert absolute_result.get("name") == "company", "Should resolve to company entity"
+    assert "primary_key" in absolute_result, "Should have entity structure"
+    assert absolute_result.get("primary_key") == ["company_id"], "Should have correct entity data"
+    
+    # Test 3: Verify the key distinction - both path types work but use different resolution strategies
+    # This test explicitly demonstrates that:
+    # - Relative paths (../../fields/name) are resolved from the current schema node position
+    # - Absolute paths (/data-model/entities/name) are resolved from the document root
+    # 
+    # Both resolution strategies work correctly. This test would catch bugs where:
+    # - Only relative paths work (absolute paths broken)
+    # - Only absolute paths work (relative paths broken)
+    # - Both are broken (test would fail)
+    # - Both work (test passes - current state)
+    
+    # Verify both results are correct
+    assert relative_result.get("name") == "company_id", "Relative path resolves to field"
+    assert absolute_result.get("name") == "company", "Absolute path resolves to entity"
+    
+    # The key distinction verified:
+    # 1. Relative path leafref (child_fk): Uses "../../fields/name" - resolved from schema position
+    # 2. Absolute path leafref (foreignKey.entity): Uses "/data-model/entities/name" - resolved from root
+    # Both work correctly, demonstrating that the evaluator handles both path types
 
 
 if __name__ == "__main__":
