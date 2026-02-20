@@ -84,7 +84,7 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 - `test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key` - Invalid: no FK (should fail) ✅
 - `test_computed_field_reference_valid_cross_entity` - Valid cross-entity reference ✅
 
-**Root Cause (Fixed)**: The `must` constraint `count(../../../../../fields[foreignKey/entity = current()]) > 0` is now evaluating correctly after fixing the path and ensuring container `must` statements are properly parsed.
+**Root Cause (Fixed)**: The `must` constraint `count(../../../../../fields[foreignKey/entity = current()]) = 1` is now evaluating correctly after fixing the path and ensuring container `must` statements are properly parsed.
 
 **Solution**: Fixed the XPath path and ensured container `must` statements are correctly parsed and evaluated.
 

@@ -1,7 +1,7 @@
 """
 Test for computed field reference existence constraint.
 
-Must statement: (not(../entity) and count(../../../../..[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1)
+Must statement: (not(../entity) and count(../../../../../fields[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1)
 Location: entities/fields/computed/fields/field
 """
 import pytest

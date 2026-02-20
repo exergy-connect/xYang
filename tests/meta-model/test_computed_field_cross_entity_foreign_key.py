@@ -1,7 +1,7 @@
 """
 Test for cross-entity computed field foreign key requirement constraint.
 
-Must statement: count(../../../../fields[foreignKey/entity = current()]) = 1
+Must statement: count(../../../../../fields[foreignKey/entity = current()]) = 1
 Location: entities/fields/computed/fields/entity
 """
 import pytest
