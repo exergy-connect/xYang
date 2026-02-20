@@ -46,7 +46,7 @@ XPath evaluation is fast and consistent.
 - **Impact**: ~27% faster string parsing
 
 ### 3. Optimized translate() Function
-- **Location**: `xYang/xpath.py`
+- **Location**: `xYang/xpath/evaluator.py`
 - **Change**: Use `str.translate()` with `str.maketrans()` instead of multiple `replace()` calls
 - **Impact**: Faster XPath translate() operations
 

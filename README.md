@@ -125,7 +125,7 @@ xYang/
 │   ├── ast.py           # Abstract syntax tree nodes
 │   ├── types.py         # Type system
 │   ├── validator.py     # Validation engine
-│   ├── xpath.py         # XPath evaluator
+│   ├── xpath/           # XPath evaluator module
 │   ├── errors.py        # Error classes
 │   └── xpath/           # XPath implementation
 │       ├── __init__.py
