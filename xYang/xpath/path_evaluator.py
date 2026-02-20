@@ -59,20 +59,14 @@ class PathEvaluator:
         """Navigate a path from a predicate result.
         
         Args:
-            result: Result from predicate (list or dict)
+            result: Result from predicate (list)
             remaining_path: Path to navigate from result
             
         Returns:
             Value at the navigated path, or None
         """
-        if not remaining_path:
-            return result
-        
         if isinstance(result, list) and len(result) > 0:
             with self._temporary_context(result[0]):
-                return self.evaluate_path(remaining_path)
-        elif isinstance(result, dict):
-            with self._temporary_context(result):
                 return self.evaluate_path(remaining_path)
         return None
     
@@ -111,56 +105,11 @@ class PathEvaluator:
         filtered = []
         for item in items:
             with self._temporary_context(item):
-                try:
-                    pred_result = predicate_node.evaluate(self.evaluator)
-                    if yang_bool(pred_result):
-                        filtered.append(item)
-                except Exception:
-                    # If predicate evaluation fails, skip this item
-                    pass
+                pred_result = predicate_node.evaluate(self.evaluator)
+                if yang_bool(pred_result):
+                    filtered.append(item)
         return filtered
     
-    def _find_matching_bracket(self, path: str, start_idx: int) -> Optional[int]:
-        """Find the matching closing bracket for a predicate.
-        
-        Args:
-            path: Path string
-            start_idx: Index of opening bracket
-            
-        Returns:
-            Index of matching closing bracket, or None if not found
-        """
-        depth = 1
-        idx = start_idx + 1
-        while idx < len(path) and depth > 0:
-            if path[idx] == '[':
-                depth += 1
-            elif path[idx] == ']':
-                depth -= 1
-            idx += 1
-        return idx - 1 if depth == 0 else None
-    
-    def _parse_predicate_path(self, path: str) -> Optional[Tuple[str, str, str]]:
-        """Parse a path with predicate into base, predicate, and remaining parts.
-        
-        Args:
-            path: Path string potentially containing predicate
-            
-        Returns:
-            Tuple of (base_path, predicate, remaining_path) or None if no predicate
-        """
-        bracket_idx = path.find('[')
-        if bracket_idx < 0:
-            return None
-        
-        bracket_end = self._find_matching_bracket(path, bracket_idx)
-        if bracket_end is None:
-            return None
-        
-        base_path = path[:bracket_idx]
-        predicate = path[bracket_idx:bracket_end + 1]
-        remaining_path = path[bracket_end + 1:].lstrip('/')
-        return (base_path, predicate, remaining_path)
     
     def _go_up_context_path(self, up_levels: int) -> List:
         """Navigate up the context path by the specified number of levels.
@@ -210,43 +159,32 @@ class PathEvaluator:
         if not hasattr(self.evaluator, 'module') or not self.evaluator.module:
             return False
         
-        try:
-            from ..ast import YangLeafListStmt
-            
-            # Convert data path to schema path (remove indices)
-            schema_path = [p for p in path_to_list if not isinstance(p, int)]
-            
-            # Navigate schema to find the node
-            statements = self.evaluator.module.statements
-            for step in schema_path:
-                found = False
-                for stmt in statements:
-                    if hasattr(stmt, 'name') and stmt.name == step:
-                        if isinstance(stmt, YangLeafListStmt):
-                            return True
-                        elif hasattr(stmt, 'statements'):
-                            statements = stmt.statements
-                            found = True
-                            break
-                if not found:
-                    return False
-            return False
-        except Exception:
-            return False
+        from ..ast import YangLeafListStmt
+        
+        # Convert data path to schema path (remove indices)
+        schema_path = [p for p in path_to_list if not isinstance(p, int)]
+        
+        # Navigate schema to find the node
+        statements = self.evaluator.module.statements
+        for step in schema_path:
+            for stmt in statements:
+                if hasattr(stmt, 'name') and stmt.name == step:
+                    if isinstance(stmt, YangLeafListStmt):
+                        return True
+                    if hasattr(stmt, 'statements'):
+                        statements = stmt.statements
+                        break
+        return False
     
     def evaluate_path(self, path: str) -> Any:
         """Evaluate a path expression."""
         # Handle current node
         if path in ('.', 'current()'):
-            val = self.evaluator._get_current_value()
-            if val is not None:
-                return val
+            return self.evaluator._get_current_value()
         
         # Handle relative paths starting with ./
         if path.startswith('./'):
             remaining = path[2:]
-            if not remaining:
-                return self.evaluator._get_current_value()
             parts = remaining.split('/')
             return self.get_path_value(self.evaluator.context_path + parts)
         
@@ -258,17 +196,6 @@ class PathEvaluator:
         if path.startswith('/'):
             return self.evaluate_absolute_path(path)
         
-        # Handle paths with predicates
-        parsed = self._parse_predicate_path(path)
-        if parsed:
-            base_path, predicate, remaining_path = parsed
-            value = self.evaluate_path(base_path)
-            if isinstance(value, list):
-                result = self.evaluator.predicate_evaluator.apply_predicate(value, predicate)
-                if remaining_path:
-                    return self._navigate_from_result(result, remaining_path)
-                return result
-            return value
         
         # Simple field access - build path from context
         if '/' not in path:
@@ -281,40 +208,22 @@ class PathEvaluator:
     
     def evaluate_relative_path(self, path: str) -> Any:
         """Evaluate a relative path like ../field or ../../field."""
-        if path == '..':
-            up_levels, field_parts = 1, []
-        else:
-            parts = path.split('/')
-            up_levels = sum(1 for p in parts if p == '..')
-            field_parts = [p for p in parts if p and p != '..']
+        parts = path.split('/')
+        up_levels = sum(1 for p in parts if p == '..')
+        field_parts = [p for p in parts if p and p != '..']
         
         context_len = self.evaluator._context_path_len
-        
-        # Special case: at node level (empty context_path)
-        if up_levels > 0 and context_len == 0 and isinstance(self.evaluator.data, dict):
-            if len(field_parts) == 1:
-                return self.evaluator.data.get(field_parts[0])
-            return self.get_path_value(field_parts)
         
         # Navigate up the context path
         if up_levels <= context_len:
             new_path = self._go_up_context_path(up_levels) + field_parts
-            value = self.get_path_value(new_path)
-            if value is not None:
-                return value
-        
-        # Try from root if we need to go beyond context
-        if up_levels > context_len:
-            remaining_up = up_levels - context_len
-            if remaining_up == 1 and field_parts:
-                return self.evaluator._get_path_value(field_parts)
+            return self.get_path_value(new_path)
         
         return None
     
     def evaluate_absolute_path(self, path: str) -> Any:
         """Evaluate an absolute path like /data-model/entities."""
-        path = path.lstrip('/')
-        parts = path.split('/')
+        parts = path.lstrip('/').split('/')
         
         old_data = self.evaluator.data
         try:
@@ -339,9 +248,6 @@ class PathEvaluator:
         
         # Check if path starts with context path prefix
         min_len = min(len(parts), len(context_path))
-        if min_len == 0:
-            return False
-        
         path_matches_context = all(parts[i] == context_path[i] for i in range(min_len))
         if not path_matches_context:
             return False
@@ -365,18 +271,9 @@ class PathEvaluator:
         if (parts and isinstance(parts[0], str) and parts[0] not in self.evaluator.root_data):
             return parts[1:]
         
-        if len(parts) < len(context_path):
-            # Path is a prefix of context_path
-            if (context_path and isinstance(context_path[0], str) and
-                context_path[0] not in self.evaluator.root_data):
-                return context_path[1:len(parts)+1] if len(context_path) > 1 and len(parts) > 0 else []
-        elif len(parts) > len(context_path):
+        if len(parts) > len(context_path):
             # Path extends beyond context_path
-            remaining_parts = parts[len(context_path):]
-            if (context_path and isinstance(context_path[0], str) and
-                context_path[0] not in self.evaluator.root_data):
-                return context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
-            return remaining_parts
+            return parts[len(context_path):]
         
         return parts
     
@@ -426,13 +323,10 @@ class PathEvaluator:
                     current = current[part]
                 else:
                     return None
-            elif isinstance(current, list):
-                if part.isdigit():
-                    idx = int(part)
-                    if 0 <= idx < len(current):
-                        current = current[idx]
-                    else:
-                        return None
+            elif isinstance(current, list) and part.isdigit():
+                idx = int(part)
+                if 0 <= idx < len(current):
+                    current = current[idx]
                 else:
                     return None
             else:
@@ -455,13 +349,7 @@ class PathEvaluator:
         # Handle paths starting with .. when navigating from a node
         steps = list(node.steps)
         if steps and steps[0] == '..' and self.evaluator.context_path == []:
-            # We're navigating from a node (empty context_path), so .. means stay here
             steps = steps[1:]
-            if not steps:
-                # Just .. with predicate - apply predicate to current data if it's a list
-                if isinstance(self.evaluator.data, list):
-                    return self._apply_predicate_to_value(self.evaluator.data, node.predicate)
-                return None
         
         # Special case: if all steps are .., use _go_up_context_path
         if steps and all(step == '..' for step in steps):
@@ -493,7 +381,6 @@ class PathEvaluator:
                 if result is not None:
                     return result
         
-        # No step returned a list, evaluate as normal path
         return self.evaluate_path('/'.join(node.steps))
     
     def _apply_predicate_to_value(self, value: List[Any], predicate: Any) -> Any:
@@ -528,21 +415,9 @@ class PathEvaluator:
             Element at index, or None if invalid
         """
         if isinstance(predicate, LiteralNode):
-            try:
-                idx = int(predicate.value) - 1  # XPath is 1-indexed
-                if 0 <= idx < len(value):
-                    return value[idx]
-            except (ValueError, TypeError):
-                pass
-        else:
-            # Check string representation
-            pred_str = str(predicate)
-            if pred_str.startswith('[') and pred_str.endswith(']'):
-                pred_expr = pred_str[1:-1]
-                if pred_expr.isdigit():
-                    idx = int(pred_expr) - 1
-                    if 0 <= idx < len(value):
-                        return value[idx]
+            idx = int(predicate.value) - 1  # XPath is 1-indexed
+            if 0 <= idx < len(value):
+                return value[idx]
         return None
     
     def evaluate_path_node(self, node: PathNode) -> Any:
@@ -557,9 +432,7 @@ class PathEvaluator:
             field_parts = [step for step in node.steps if step != '..']
             
             context_len = len(self.evaluator.context_path) if self.evaluator.context_path else 0
-            if up_levels > 0 and context_len == 0 and isinstance(self.evaluator.data, dict):
-                value = self.evaluator.data if not field_parts else self.get_path_value(field_parts)
-            elif up_levels <= context_len:
+            if up_levels <= context_len:
                 new_path = self._go_up_context_path(up_levels) + field_parts
                 with self._temporary_root_data(new_path):
                     value = self.get_path_value(new_path)
