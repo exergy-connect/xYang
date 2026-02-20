@@ -68,7 +68,6 @@ def test_entity_field_limit_valid_array_fields_excluded(meta_model):
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "field7", "type": "string"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 }
@@ -77,7 +76,7 @@ def test_entity_field_limit_valid_array_fields_excluded(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Entity with 8 non-array fields should pass (array excluded). Errors: {errors}"
+    assert is_valid, f"Entity with 7 non-array fields plus array field should pass (array excluded). Errors: {errors}"
 
 
 def test_entity_field_limit_valid_allow_unlimited_true(meta_model):

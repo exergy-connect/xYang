@@ -74,15 +74,17 @@ def xpath_number(value: Any) -> float:
 
 def compare_equal(left: Any, right: Any) -> bool:
     """Compare two values for equality."""
-    # Fast path: same object reference
+    # Handle None/missing values first - in XPath, empty sequences don't equal anything
+    # This is consistent with comparison operators (<=, >=, etc.) which return False for None
+    # Note: We check this before the fast path to ensure None == None returns False
+    if left is None or right is None:
+        return False
+    # Fast path: same object reference (only reached if both are not None)
     if left is right:
         return True
     # Fast path for same types
     if type(left) is type(right):
         return left == right
-    # Handle None explicitly (common case)
-    if left is None or right is None:
-        return left is right
     # Handle string comparison with type coercion
     if isinstance(left, str) and isinstance(right, (int, float, bool)):
         return left == str(right)
@@ -93,6 +95,12 @@ def compare_equal(left: Any, right: Any) -> bool:
 
 def compare_less_equal(left: Any, right: Any) -> bool:
     """Compare left <= right."""
+    # Handle None values - in XPath, comparisons with None/missing values evaluate to False
+    # Exception: None == None is True, but for <=, None <= None should be False
+    if left is None or right is None:
+        # If both are None, comparison is undefined - return False for <=
+        # If only one is None, comparison is False
+        return False
     try:
         return float(left) <= float(right)
     except (ValueError, TypeError):
@@ -101,6 +109,12 @@ def compare_less_equal(left: Any, right: Any) -> bool:
 
 def compare_greater_equal(left: Any, right: Any) -> bool:
     """Compare left >= right."""
+    # Handle None values - in XPath, comparisons with None/missing values evaluate to False
+    # Exception: None == None is True, but for >=, None >= None should be False
+    if left is None or right is None:
+        # If both are None, comparison is undefined - return False for >=
+        # If only one is None, comparison is False
+        return False
     try:
         return float(left) >= float(right)
     except (ValueError, TypeError):
@@ -109,6 +123,9 @@ def compare_greater_equal(left: Any, right: Any) -> bool:
 
 def compare_less(left: Any, right: Any) -> bool:
     """Compare left < right."""
+    # Handle None values - in XPath, comparisons with None/missing values evaluate to False
+    if left is None or right is None:
+        return False
     try:
         return float(left) < float(right)
     except (ValueError, TypeError):
@@ -117,6 +134,9 @@ def compare_less(left: Any, right: Any) -> bool:
 
 def compare_greater(left: Any, right: Any) -> bool:
     """Compare left > right."""
+    # Handle None values - in XPath, comparisons with None/missing values evaluate to False
+    if left is None or right is None:
+        return False
     try:
         return float(left) > float(right)
     except (ValueError, TypeError):

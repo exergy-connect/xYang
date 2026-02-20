@@ -400,6 +400,11 @@ class PathEvaluator:
                 if part in current:
                     current = current[part]
                 else:
+                    # Path not found - try to get default value from schema
+                    # This handles YANG default values when a leaf is not present in data
+                    default_value = self._get_default_value_from_schema_path(parts[:parts.index(part)+1] if isinstance(parts, list) and part in parts else parts + [part])
+                    if default_value is not None:
+                        return default_value
                     return None
             elif isinstance(current, list) and part.isdigit():
                 idx = int(part)
@@ -582,3 +587,64 @@ class PathEvaluator:
         
         traverse(node)
         return steps
+    
+    def _get_default_value_from_schema_path(self, path_parts: List) -> Any:
+        """Get default value from YANG schema for a given path.
+        
+        Args:
+            path_parts: List of path parts (e.g., ['data-model', 'max_name_underscores'])
+            
+        Returns:
+            Default value from schema, or None if not found or no default
+        """
+        if not hasattr(self.evaluator, 'module') or not self.evaluator.module:
+            return None
+        
+        try:
+            # Navigate through schema to find the leaf
+            current = self.evaluator.module
+            for part in path_parts:
+                if isinstance(part, int):
+                    continue  # Skip list indices in schema navigation
+                if hasattr(current, 'statements'):
+                    found = False
+                    for stmt in current.statements:
+                        if hasattr(stmt, 'name') and stmt.name == part:
+                            current = stmt
+                            found = True
+                            break
+                    if not found:
+                        return None
+                else:
+                    return None
+            
+            # Check if current statement has a default value
+            if hasattr(current, 'default'):
+                value = current.default
+                # Convert string numbers to int/float
+                if isinstance(value, str):
+                    try:
+                        if '.' in value:
+                            return float(value)
+                        return int(value)
+                    except ValueError:
+                        return value
+                return value
+            # Also check statements for default keyword
+            if hasattr(current, 'statements'):
+                for stmt in current.statements:
+                    if hasattr(stmt, 'keyword') and stmt.keyword == 'default':
+                        if hasattr(stmt, 'value'):
+                            value = stmt.value
+                            # Convert string numbers to int/float
+                            if isinstance(value, str):
+                                try:
+                                    if '.' in value:
+                                        return float(value)
+                                    return int(value)
+                                except ValueError:
+                                    return value
+                            return value
+            return None
+        except (AttributeError, IndexError, ValueError):
+            return None
