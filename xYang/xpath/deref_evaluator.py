@@ -62,40 +62,34 @@ class DerefEvaluator:
                             path_value = arg_node.right.evaluate(self.evaluator)
                         
                         # Now deref() the resulting value
+                        # CRITICAL: deref() requires schema context - check if the path points to a leafref
                         if path_value is not None:
-                            # We have a value - try to deref it
-                            # First try to find it as an entity name (common case)
-                            result = self.deref_value(path_value)
-                            
-                            # If that didn't work, try to get schema context from the path
-                            # and use standard leafref resolution
-                            if result is None:
-                                # Try to determine what type of value this is based on context
-                                # If we navigated from a field node, the value might be an entity name
-                                # Try looking it up as an entity name
-                                if isinstance(path_value, str):
-                                    result = self.find_entity_by_name(path_value)
-                                
-                                # If still not found, try as field name in current entity
-                                if result is None:
-                                    result = self.find_field_by_name(path_value)
-                            
-                            # Check for cycles: if result is a node we're currently visiting
-                            if isinstance(result, dict):
-                                node_id = id(result)
-                                if node_id in self._visited_nodes:
-                                    # Cycle detected - return None to avoid infinite loop
-                                    result = None
+                            # Build a path string from the right side to check for leafref
+                            # We're navigating from left_result (a node), so the path is relative to that node
+                            if isinstance(arg_node.right, PathNode):
+                                if arg_node.right.is_absolute:
+                                    right_path = '/' + '/'.join(arg_node.right.steps)
                                 else:
-                                    # Add to visited set for nested deref calls
-                                    self._visited_nodes.add(node_id)
-                                    try:
-                                        # If result is a node, we might need to deref further
-                                        # But for now, just return it
-                                        pass
-                                    finally:
-                                        # Remove from visited set after we're done with this node
-                                        self._visited_nodes.discard(node_id)
+                                    # Relative path from the node - need to check schema relative to node's type
+                                    right_path = '/'.join(arg_node.right.steps)
+                            else:
+                                # For other node types, try to build path representation
+                                right_path = self.build_path_from_node(arg_node.right)
+                            
+                            # Check if this path (relative to left_result's schema context) points to a leafref
+                            # Since we've set the evaluator's data to left_result, we can check schema
+                            # relative to the current context (which is now the left_result node)
+                            if right_path:
+                                # Check if right_path is a leafref in the schema relative to left_result
+                                leafref_path = self.get_leafref_path_from_schema(right_path)
+                                if leafref_path:
+                                    # This is a leafref - use schema-aware resolution
+                                    result = self.find_node_by_leafref_path(leafref_path, path_value)
+                                else:
+                                    # Not a leafref - deref() requires schema context, return None
+                                    result = None
+                            else:
+                                result = None
                         else:
                             result = None
                         
@@ -115,35 +109,36 @@ class DerefEvaluator:
             
             # Handle simple path expressions
             if isinstance(arg_node, PathNode):
-                # Evaluate the path first to get the value
+                # Build path string first to check if it points to a leafref
+                if arg_node.is_absolute:
+                    path = '/' + '/'.join(arg_node.steps)
+                else:
+                    path = '/'.join(arg_node.steps)
+                
+                # CRITICAL: For leafref nodes, deref() MUST use the schema definition's path
+                # Check if this path points to a leafref field in the schema
+                leafref_path = self.get_leafref_path_from_schema(path)
+                if leafref_path:
+                    # This is a leafref - use schema-aware resolution
+                    # Step 1: Evaluate the path to get the leafref value
+                    path_value = arg_node.evaluate(self.evaluator)
+                    if path_value is None:
+                        result = None
+                    else:
+                        # Step 2: Use the leafref path from schema to find the referenced node
+                        result = self.find_node_by_leafref_path(leafref_path, path_value)
+                    self.evaluator.leafref_cache[cache_key] = result
+                    return result
+                
+                # Not a leafref - evaluate the path to get the value
                 path_value = arg_node.evaluate(self.evaluator)
                 # If it's a dict (node), return it as-is (identity)
                 if isinstance(path_value, dict):
                     result = path_value
                     self.evaluator.leafref_cache[cache_key] = result
                     return result
-                # If it's a string value, try to find field/node by name
-                if isinstance(path_value, str) and path_value:
-                    # Try to find as field name
-                    result = self.find_field_by_name(path_value)
-                    if result is not None:
-                        self.evaluator.leafref_cache[cache_key] = result
-                        return result
-                    # Try to find as entity name
-                    result = self.find_entity_by_name(path_value)
-                    if result is not None:
-                        self.evaluator.leafref_cache[cache_key] = result
-                        return result
-                    # If not found, try deref_value
-                    result = self.deref_value(path_value)
-                    if result is not None:
-                        self.evaluator.leafref_cache[cache_key] = result
-                        return result
-                # If not a string or not found, try as path expression
-                if arg_node.is_absolute:
-                    path = '/' + '/'.join(arg_node.steps)
-                else:
-                    path = '/'.join(arg_node.steps)
+                # For non-leafref paths, deref() requires schema context
+                # Fallback to evaluate_deref (which will check for leafref and return None if not found)
                 result = self.evaluate_deref(path)
                 self.evaluator.leafref_cache[cache_key] = result
                 return result
@@ -161,6 +156,15 @@ class DerefEvaluator:
                 
                 # For current(), evaluate to get the value, then find the field/node by that value
                 if arg_node.name == 'current' and len(arg_node.args) == 0:
+                    # CRITICAL: If current() points to a leafref field, deref() MUST use the schema definition's path
+                    # Check if current() context is a leafref field
+                    leafref_path = self.get_leafref_path_from_schema('current()')
+                    if leafref_path and value is not None:
+                        # This is a leafref - use schema-aware resolution
+                        result = self.find_node_by_leafref_path(leafref_path, value)
+                        self.evaluator.leafref_cache[cache_key] = result
+                        return result
+                    
                     # If we have a value, check what type it is
                     if value is not None:
                         # If current() returns a dict (node), deref() should return it as-is (identity)
@@ -169,53 +173,26 @@ class DerefEvaluator:
                             result = value
                             self.evaluator.leafref_cache[cache_key] = result
                             return result
-                        # If it's a string, try to find as field name in current entity
-                        if isinstance(value, str) and value:
-                            result = self.find_field_by_name(value)
-                            if result is not None:
-                                self.evaluator.leafref_cache[cache_key] = result
-                                return result
-                            # Try to find as entity name
-                            result = self.find_entity_by_name(value)
-                            if result is not None:
-                                self.evaluator.leafref_cache[cache_key] = result
-                                return result
-                            # If not found, try deref_value which handles both cases
-                            result = self.deref_value(value)
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
-                        # For other types, try deref_value
-                        result = self.deref_value(value)
+                        # For non-leafref cases, deref() requires schema context
+                        # Fallback to evaluate_deref (which will check for leafref and return None if not found)
+                        result = self.evaluate_deref('current()')
                         self.evaluator.leafref_cache[cache_key] = result
                         return result
-                    # If current() returns None, try as path
+                    # If current() returns None, try as path (evaluate_deref will check for leafref)
                     path = 'current()'
                     result = self.evaluate_deref(path)
                     self.evaluator.leafref_cache[cache_key] = result
                     return result
                 else:
-                    # For other functions that returned a value, try to deref it
-                    if value is not None:
-                        if isinstance(value, str) and value:
-                            result = self.find_field_by_name(value)
-                            if result is not None:
-                                self.evaluator.leafref_cache[cache_key] = result
-                                return result
-                            result = self.find_entity_by_name(value)
-                            if result is not None:
-                                self.evaluator.leafref_cache[cache_key] = result
-                                return result
-                        result = self.deref_value(value)
-                        self.evaluator.leafref_cache[cache_key] = result
-                        return result
-                    # If function returned None, try as path
+                    # For other functions, deref() requires schema context
+                    # Try as path (which will check for leafref and return None if not found)
                     path = f"{arg_node.name}()"
                     result = self.evaluate_deref(path)
                     self.evaluator.leafref_cache[cache_key] = result
                     return result
             else:
-                # For other node types, try to get a string representation
-                # This handles cases where the path is a simple value
+                # For other node types, deref() requires schema context
+                # Build path string and use evaluate_deref (which will check for leafref)
                 if hasattr(arg_node, 'evaluate'):
                     # Evaluate to get the value first
                     value = arg_node.evaluate(self.evaluator)
@@ -224,16 +201,6 @@ class DerefEvaluator:
                         result = value
                         self.evaluator.leafref_cache[cache_key] = result
                         return result
-                    # If it's a string value, try to find field/node by name
-                    if isinstance(value, str) and value:
-                        result = self.find_field_by_name(value)
-                        if result is not None:
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
-                        result = self.find_entity_by_name(value)
-                        if result is not None:
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
                     # Otherwise, try as path expression
                     path = str(arg_node) if hasattr(arg_node, '__str__') else ''
                 else:
@@ -295,124 +262,6 @@ class DerefEvaluator:
         except Exception:
             # If path evaluation fails, deref() returns None (referenced node doesn't exist)
             return None
-    
-    def deref_value(self, value: Any) -> Any:
-        """Deref a value directly (when we already have the value, not the path).
-        
-        This is used for nested deref() calls where we've already evaluated
-        the inner expression to get a value. We need to find the node containing
-        that value in the data structure.
-        
-        Args:
-            value: The value to deref (typically an entity name or field name)
-            
-        Returns:
-            The node containing that value, or None if not found
-        """
-        if value is None:
-            return None
-        
-        # Try to find as entity name first (most common case)
-        result = self.find_entity_by_name(value)
-        if result is not None:
-            return result
-        
-        # Try to find as field name in current entity
-        result = self.find_field_by_name(value)
-        return result
-    
-    def find_entity_by_name(self, name: str) -> Any:
-        """Find an entity node by name.
-        
-        Args:
-            name: Entity name to search for
-            
-        Returns:
-            Entity node (dict), or None if not found
-        """
-        # Optimized: early return for invalid inputs
-        if not isinstance(name, str) or not self.evaluator.root_data:
-            return None
-        
-        # Optimized: check key existence before get()
-        data_model = self.evaluator.root_data.get("data-model")
-        if not data_model:
-            return None
-        
-        entities = data_model.get("entities")
-        if not entities:
-            return None
-        
-        # Optimized: iterate directly, avoid isinstance check if possible
-        for entity in entities:
-            if isinstance(entity, dict):
-                entity_name = entity.get("name")
-                if entity_name == name:
-                    return entity
-        
-        return None
-    
-    def find_field_by_name(self, name: str) -> Any:
-        """Find a field node by name in the current entity or any entity.
-        
-        Args:
-            name: Field name to search for
-            
-        Returns:
-            Field node (dict), or None if not found
-        """
-        # Optimized: early return for invalid inputs
-        if not isinstance(name, str) or not self.evaluator.root_data:
-            return None
-        
-        # Find the entity index from context - optimized single pass
-        entity_idx = None
-        if self.evaluator.context_path:
-            context_len = len(self.evaluator.context_path)
-            for i, part in enumerate(self.evaluator.context_path):
-                if part == "entities" and i + 1 < context_len:
-                    next_part = self.evaluator.context_path[i + 1]
-                    if isinstance(next_part, int):
-                        entity_idx = next_part
-                        break
-        
-        data_model = self.evaluator.root_data.get("data-model")
-        if not data_model:
-            return None
-        
-        entities = data_model.get("entities")
-        if not entities:
-            return None
-        
-        # If we have an entity index, search in that entity first
-        if entity_idx is not None and entity_idx < len(entities):
-            entity = entities[entity_idx]
-            if isinstance(entity, dict):
-                fields = entity.get("fields")
-                if fields:
-                    # Handle both dict and list formats
-                    field_list = fields.get("field") if isinstance(fields, dict) else fields
-                    if isinstance(field_list, list):
-                        for field in field_list:
-                            if isinstance(field, dict):
-                                field_name = field.get("name")
-                                if field_name == name:
-                                    return field
-        
-        # If not found in current entity, search all entities
-        for entity in entities:
-            if isinstance(entity, dict):
-                fields = entity.get("fields")
-                if fields:
-                    field_list = fields.get("field") if isinstance(fields, dict) else fields
-                    if isinstance(field_list, list):
-                        for field in field_list:
-                            if isinstance(field, dict):
-                                field_name = field.get("name")
-                                if field_name == name:
-                                    return field
-        
-        return None
     
     def build_path_from_node(self, node: Any) -> str:
         """Build a path string from an AST node.

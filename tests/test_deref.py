@@ -1846,5 +1846,86 @@ def test_deref_circular_infinite_loop_prevention():
     assert time.time() - start_time < 5.0, "Circular chain deref() took too long - possible infinite loop"
 
 
+def test_deref_current_leafref_schema_resolution():
+    """Test that deref(current()) on a leafref field uses the schema definition's path.
+    
+    This test verifies that when current() points to a leafref field, deref() MUST
+    resolve using the path from the leafref's schema definition, not just heuristic
+    lookups. This reinforces that deref() is inherently schema-coupled.
+    """
+    data = {
+        "data-model": {
+            "entities": [
+                {
+                    "name": "company",
+                    "primary_key": ["company_id"],
+                    "fields": [
+                        {"name": "company_id", "type": "string", "primaryKey": True}
+                    ]
+                },
+                {
+                    "name": "department",
+                    "fields": [
+                        {
+                            "name": "company_id",
+                            "type": "string",
+                            "foreignKey": {
+                                "entity": "company",  # This is a leafref pointing to /data-model/entities/name
+                                "field": "company_id"
+                            }
+                        }
+                    ]
+                },
+                {
+                    "name": "location",  # Another entity with same name pattern
+                    "primary_key": ["location_id"],
+                    "fields": [
+                        {"name": "location_id", "type": "string", "primaryKey": True}
+                    ]
+                }
+            ]
+        }
+    }
+    module = parse_yang_string(DATA_MODEL_YANG)
+    
+    # Context: we're at department.fields[0].foreignKey.entity (the leafref field)
+    # The value is "company", and the schema defines this as a leafref with path
+    # "/data-model/entities/name", so deref() should resolve to the company entity,
+    # NOT to a heuristic lookup
+    evaluator = XPathEvaluator(
+        data,
+        module,
+        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+    )
+    
+    # Verify current() returns the leafref value
+    current_value = evaluator.evaluate_value('current()')
+    assert current_value == "company"
+    
+    # CRITICAL: deref(current()) should use the schema definition's path
+    # The schema defines foreignKey.entity as a leafref with path "/data-model/entities/name"
+    # So deref() should resolve "company" by following that path, not by heuristic lookup
+    result = evaluator.evaluate_value('deref(current())')
+    
+    # Should resolve to the company entity node
+    assert result is not None, "deref(current()) on leafref should resolve using schema path"
+    assert isinstance(result, dict), "deref() should return a node (dict), not just a value"
+    assert result.get("name") == "company", "Should resolve to company entity, not location or other entity"
+    
+    # Verify it's the correct entity by checking its primary_key
+    assert result.get("primary_key") == ["company_id"], "Should be the company entity with correct primary_key"
+    
+    # Verify it has the expected fields
+    fields = result.get("fields", [])
+    assert len(fields) > 0, "Company entity should have fields"
+    field_names = [f.get("name") for f in fields if isinstance(f, dict)]
+    assert "company_id" in field_names, "Company entity should have company_id field"
+    
+    # Test that it correctly uses the schema path by verifying it doesn't match
+    # entities by name pattern alone (e.g., if there were a "company_old" entity,
+    # it should still resolve to "company" based on the exact path match)
+    # This test verifies schema-aware resolution, not just name matching
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

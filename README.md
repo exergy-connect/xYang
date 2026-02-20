@@ -152,7 +152,7 @@ xYang implements exactly the XPath features required to correctly validate `meta
 - **Filtering**: `[name = current()]`, `[type != 'array']`, `[id = current()]`, `[1]`
 - **String concatenation**: `+` operator
 
-The evaluator implements the specific XPath patterns used in `meta-model.yang` with schema-aware evaluation, particularly for `deref()` chaining and `current()` scoping.
+The evaluator implements the specific XPath patterns used in `meta-model.yang` with schema-aware evaluation, particularly for `deref()` chaining and `current()` scoping. `deref()` is inherently schema-coupled: when called on a leafref node, it uses the leafref's schema definition path to resolve the referenced node, not heuristic lookups.
 
 ## When Conditions
 
@@ -190,7 +190,14 @@ If a `must` constraint fails, validation returns an error with the specified err
 - **Input contract**: The validator receives a consolidated JSON document. All data must be provided in a single, complete structure — there is no support for validating against source documents or handling partial/incremental data.
 - **Type-aware coercion**: The XPath evaluator's comparison operators receive schema-type context and perform coercion inline. This ensures `bool()` in XPath sees actual booleans, not strings (e.g., string `"true"` is coerced to `True` during boolean comparisons). For union types, coercion is attempted in declared order, using the first success. The validator accepts raw consolidated JSON - type awareness is pushed to exactly where it's needed (the evaluator).
 - **XPath scope**: Only the XPath features used in `meta-model.yang` are supported. Unsupported expressions will raise `UnsupportedXPathError` at parse time.
-- **deref() implementation**: `deref()` is fully implemented for the patterns used in `meta-model.yang`, including two-level chaining. It requires schema-aware XPath evaluation and is not a general-purpose implementation.
+- **deref() implementation**: `deref()` is fully implemented for the patterns used in `meta-model.yang`, including:
+  - **Schema-coupled resolution**: When `deref()` is called on a leafref node, it MUST resolve using the path from the leafref's schema definition, not just return the value. This reinforces that `deref()` is inherently schema-coupled and cannot be implemented without schema context.
+  - Nested chaining: `deref(deref(...))` and deeper nesting
+  - Field node identity: `deref(current())` returns the field node when `current()` is already a node (dict)
+  - Entity and field resolution: resolves entity names and field references by name (for non-leafref cases)
+  - Caching: results are cached for performance
+  - Cycle detection: prevents infinite loops in circular references
+  It requires schema-aware XPath evaluation and is not a general-purpose implementation.
 
 ## Design Rationale
 
