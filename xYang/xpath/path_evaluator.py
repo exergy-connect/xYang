@@ -288,7 +288,47 @@ class PathEvaluator:
         Args:
             parts: List of path parts (strings for dict keys, ints for list indices)
         """
+        # Special case: when in a list item context and path includes context path prefix,
+        # navigate from root_data instead of evaluator.data
+        # This handles: context_path=['data-model', 'entities', 0], path=['data-model', 'entities', 0, 'fields']
+        context_path = self.evaluator.context_path
         current = self.evaluator.data
+        
+        # Only apply special logic if:
+        # 1. We're in a list item context (context_path has integers)
+        # 2. Path is at least as long as context_path
+        # 3. Path starts with context_path
+        # 4. First part of path is not navigable from current data (indicating path was built from context_path)
+        if (context_path and 
+            any(isinstance(p, int) for p in context_path) and
+            len(parts) >= len(context_path)):
+            # Check if path starts with context path
+            path_matches_context = all(
+                i < len(parts) and parts[i] == context_path[i]
+                for i in range(len(context_path))
+            )
+            
+            if path_matches_context:
+                # Try to navigate first part from current data to see if path was built from context_path
+                first_part = parts[0] if parts else None
+                can_navigate_from_current = (
+                    first_part and isinstance(first_part, str) and
+                    isinstance(current, dict) and first_part in current
+                )
+                
+                # If we can't navigate from current, path was likely built from context_path
+                if not can_navigate_from_current:
+                    current = self.evaluator.root_data
+                    remaining_parts = parts[len(context_path):]
+                    # Skip first part of full path if root_data is at container level (e.g., data['data-model'])
+                    # But keep the context path parts for navigation
+                    if (parts and isinstance(parts[0], str) and
+                        isinstance(current, dict) and parts[0] not in current):
+                        # root_data is at container level, skip first part and navigate with context_path + remaining
+                        parts = context_path[1:] + remaining_parts if len(context_path) > 1 else remaining_parts
+                    else:
+                        # Navigate with full path from root_data
+                        parts = parts
         
         for part in parts:
             if part in ('.', 'current()'):
