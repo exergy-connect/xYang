@@ -1,9 +1,10 @@
 # Meta-Model Test Failures Analysis
 
 **Date**: 2026-02-20  
-**Total Failing Tests**: 30  
+**Last Updated**: 2026-02-20  
+**Total Failing Tests**: 27  
 **Total Tests**: 74  
-**Pass Rate**: 59.5%
+**Pass Rate**: 63.5%
 
 ## Overview
 
@@ -11,19 +12,22 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 
 ---
 
-## 1. Change ID Reference (Invalid Cases) - 2 tests
+## 1. Change ID Reference - ✅ FIXED (4 tests)
 
-**Issue**: Invalid change ID references should fail validation but are currently passing.
+**Status**: ✅ **FIXED** - All tests passing
 
 ### Tests:
-- `test_change_id_c_reference_invalid` - Invalid change ID in `c` field should fail
-- `test_change_id_m_reference_invalid` - Invalid change ID in `m` list should fail
+- `test_change_id_c_reference_valid` - Valid change ID in `c` field ✅
+- `test_change_id_m_reference_valid` - Valid change IDs in `m` list ✅
+- `test_change_id_c_reference_invalid` - Invalid change ID in `c` field should fail ✅
+- `test_change_id_m_reference_invalid` - Invalid change ID in `m` list should fail ✅
 
-**Root Cause**: The `must` constraints checking `../../changes[id = current()]` are not properly evaluating or the validation is not being triggered.
+**Root Cause (Fixed)**: The `must` constraints checking `../../changes[id = current()]` were applying the predicate to intermediate lists (like `entities`) instead of the final list (`changes`). The predicate `[id = current()]` was being evaluated on the wrong list, causing valid cases to fail and invalid cases to pass.
 
-**Expected Behavior**: 
-- `c` field referencing non-existent change ID should fail
-- `m` list containing non-existent change IDs should fail
+**Solution**: Modified `_evaluate_path_with_predicate` in `path_evaluator.py` to try the complete path first before trying individual steps. This ensures the predicate is applied to the final list (`changes`) rather than intermediate lists. Also fixed `_navigate_from_result` to handle empty predicate results correctly (return empty list instead of raising IndexError).
+
+**Files Modified**:
+- `xYang/xpath/path_evaluator.py` - Fixed predicate application order and empty result handling
 
 ---
 
@@ -171,7 +175,7 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 
 ### Key Patterns
 
-1. **False Negatives Dominant**: Most failures (26/30) are valid cases being incorrectly rejected
+1. **False Negatives Dominant**: Most failures (23/27) are valid cases being incorrectly rejected
 2. **XPath Evaluation Issues**: Many failures involve complex XPath expressions with `deref()` and path navigation
 3. **Parents Validation Critical**: 8 failures in parents validation suggest a systemic issue with parent relationship validation
 4. **Computed Fields Issues**: 11 failures related to computed fields suggest issues with field reference resolution
@@ -181,7 +185,7 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 1. **High Priority**: Parents validation (8 failures) - all valid cases failing
 2. **High Priority**: Computed fields (11 failures) - operations, references, cross-entity
 3. **Medium Priority**: Name underscore limits (4 failures) - validation logic
-4. **Medium Priority**: Change ID reference (2 failures) - invalid cases not caught
+4. **✅ FIXED**: Change ID reference - all 4 tests now passing
 
 ### Root Causes (Hypothesized)
 
@@ -190,13 +194,20 @@ This document clusters and analyzes the failing test cases in the meta-model tes
 3. **Context management**: The evaluation context may not be set correctly for nested structures
 4. **Constraint evaluation order**: Some constraints may be evaluated before required data is available
 
+### Recent Fixes
+
+**2026-02-20**: Fixed Change ID Reference tests (Category 1)
+- Issue: Predicate `[id = current()]` was being applied to intermediate lists instead of final list
+- Solution: Modified `_evaluate_path_with_predicate` to try complete path first
+- Result: All 4 change ID reference tests now passing
+
 ### Next Steps
 
 1. Investigate XPath `deref()` evaluation in `deref_evaluator.py`
 2. Review path navigation after `deref()` in `evaluator.py`
 3. Check context management in `constraint_validator.py`
 4. Add debug logging to trace constraint evaluation for failing cases
-5. Focus on parents validation first (largest cluster)
+5. Focus on parents validation first (largest cluster - 8 failures)
 
 ---
 

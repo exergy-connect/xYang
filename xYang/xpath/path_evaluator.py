@@ -65,6 +65,10 @@ class PathEvaluator:
         Returns:
             Value at the navigated path, or None
         """
+        # If predicate returned empty list, no match found - return empty list
+        # This allows the constraint to evaluate to False (no match)
+        if not result or len(result) == 0:
+            return []
         with self._temporary_context(result[0]):
             return self.evaluate_path(remaining_path)
     
@@ -411,8 +415,8 @@ class PathEvaluator:
     def _evaluate_path_with_predicate(self, node: PathNode) -> Any:
         """Evaluate a path node that has a predicate with multiple steps.
         
-        The predicate might be on the last step (due to parser merging),
-        but should apply to the first step that returns a list.
+        The predicate should apply to the final list in the path, not intermediate lists.
+        We try the complete path first, then fall back to trying individual steps.
         
         Args:
             node: PathNode with predicate and multiple steps
@@ -437,8 +441,18 @@ class PathEvaluator:
                         return self._apply_predicate_to_value(value, node.predicate)
                     return value
         
-        # Try each step to find first that returns a list
+        # Try the complete path first (predicate should apply to the final list)
         if steps:
+            complete_path = '/'.join(steps)
+            value = self.evaluate_path(complete_path)
+            if isinstance(value, list) and node.predicate:
+                # Predicate applies to the complete path result
+                return self._apply_predicate_to_value(value, node.predicate)
+            elif value is not None:
+                # Complete path worked but result is not a list - return it
+                return value
+            
+            # Fall back to trying individual steps if complete path didn't work
             # Try first step first (most common case)
             result = self._evaluate_path_and_apply_predicate(
                 steps[0], node.predicate, steps[1:] if len(steps) > 1 else None
