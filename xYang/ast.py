@@ -41,6 +41,7 @@ class YangContainerStmt(YangStatement):
     """Container statement."""
     presence: Optional[str] = None
     when: Optional['YangWhenStmt'] = None
+    must_statements: List['YangMustStmt'] = field(default_factory=list)
 
 
 @dataclass

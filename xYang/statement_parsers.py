@@ -446,16 +446,17 @@ class StatementParsers:
         tokens.consume('must')
         expr_parts = []
         
-        if tokens.peek() in ('"', "'"):
-            quote = tokens.consume()
-            while tokens.has_more() and tokens.peek() != quote:
-                expr_parts.append(tokens.consume())
-            tokens.consume(quote)
-        else:
-            while tokens.has_more() and tokens.peek() not in (';', '{'):
-                expr_parts.append(tokens.consume())
+        # The tokenizer removes quotes from tokens, so we won't see quotes here.
+        # The expression should be tokenized as one or more tokens.
+        # Consume tokens until we hit ';' or '{' (which indicates the start of the must body)
+        # Note: The expression itself should not contain ';' or '{', so this is safe
+        while tokens.has_more() and tokens.peek() not in (';', '{'):
+            token = tokens.consume()
+            expr_parts.append(token)
+            # Safety check: if we've consumed a lot of tokens without finding ';' or '{',
+            # something might be wrong, but continue anyway
         
-        expression = ' '.join(expr_parts)
+        expression = ' '.join(expr_parts) if expr_parts else ''
         
         # Validate XPath expression at parse time and get parsed AST
         ast = self.xpath_validator.validate(expression)
@@ -485,6 +486,7 @@ class StatementParsers:
                     context.current_parent.must_statements = []
                 context.current_parent.must_statements.append(must_stmt)
         
+        # Consume semicolon if present (optional for must statements in containers/lists)
         tokens.consume_if(';')
         return must_stmt
     

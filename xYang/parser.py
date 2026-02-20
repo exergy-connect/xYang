@@ -45,6 +45,7 @@ class YangParser:
         self.registry.register('container:description', self.parsers.parse_description)
         self.registry.register('container:presence', self.parsers.parse_presence)
         self.registry.register('container:when', self.parsers.parse_when)
+        self.registry.register('container:must', self.parsers.parse_must)
         self.registry.register('container:leaf', self.parsers.parse_leaf)
         self.registry.register('container:container', self.parsers.parse_container)
         self.registry.register('container:list', self.parsers.parse_list)
