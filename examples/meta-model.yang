@@ -452,7 +452,7 @@ module meta-model {
           type field-name;
           mandatory true;
           description "Field name to reference.";
-          must "(not(../entity) and count(../../../../..[name = current()]) > 0) or (../entity and count(deref(../entity)/../fields[name = current()]) > 0)" {
+          must "(not(../entity) and count(../../../../..[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1)" {
             error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified";
           }
@@ -463,9 +463,9 @@ module meta-model {
             require-instance true;
           }
           description "Entity name for cross-entity field reference (optional).";
-          must "count(../../../../fields[foreignKey/entity = current()]) > 0" {
+          must "count(../../../../fields[foreignKey/entity = current()]) = 1" {
             error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
-            description "When entity is specified, there must be at least one field in the current entity with a foreignKey referencing this entity";
+            description "When entity is specified, there must be exactly one field in the current entity with a foreignKey referencing this entity";
           }
         }
       }

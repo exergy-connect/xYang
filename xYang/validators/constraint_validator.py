@@ -222,9 +222,12 @@ class ConstraintValidator:
                     child_stmt.name
                 )
             
-            # Check if field exists in current data context
+            # Check if field exists in parent data context
+            # Navigate to parent to check if field exists there
+            parent_path = child_path[:-1] if len(child_path) > 0 else []
+            parent_data = self._navigate_path(root_data, parent_path) if parent_path else root_data
             field_exists = (
-                isinstance(evaluator.data, dict) and actual_schema_node.name in evaluator.data
+                isinstance(parent_data, dict) and actual_schema_node.name in parent_data
             )
             
             logger.debug("Leaf %s in list item: field_exists=%s, mandatory=%s, has_must=%s, path=%s, resolved_schema_path=%s",

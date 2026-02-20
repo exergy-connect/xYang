@@ -54,10 +54,15 @@ class DerefEvaluator:
                             # This is a leafref - evaluate the path to get the value, then resolve
                             path_value = arg_node.evaluate(self.evaluator)
                             if path_value is not None:
-                                result = self.find_node_by_leafref_path(leafref_path, path_value)
-                            else:
-                                result = None
-                            self.evaluator.leafref_cache[cache_key] = result
+                                result_tuple = self.find_node_by_leafref_path(leafref_path, path_value)
+                                if result_tuple:
+                                    result, node_path = result_tuple
+                                    if node_path:
+                                        self.evaluator._deref_node_paths[id(result)] = node_path
+                                    self.evaluator.leafref_cache[cache_key] = result
+                                else:
+                                    result = None
+                                    self.evaluator.leafref_cache[cache_key] = result
                             return result
                 
                 # Not a leafref in original context - try navigating from left side if it's a node
@@ -176,10 +181,14 @@ class DerefEvaluator:
                                 leafref_path = self.get_leafref_path_from_schema(schema_path)
                                 if leafref_path:
                                     # This is a leafref - use schema-aware resolution
-                                    result = self.find_node_by_leafref_path(leafref_path, path_value)
-                                else:
-                                    # Not a leafref - deref() requires schema context, return None
-                                    result = None
+                                    result_tuple = self.find_node_by_leafref_path(leafref_path, path_value)
+                                    if result_tuple:
+                                        result, node_path = result_tuple
+                                        if node_path:
+                                            self.evaluator._deref_node_paths[id(result)] = node_path
+                                    else:
+                                        # Not a leafref - deref() requires schema context, return None
+                                        result = None
                             finally:
                                 self.evaluator.context_path = temp_context
                                 self.evaluator.original_context_path = temp_original
@@ -218,9 +227,16 @@ class DerefEvaluator:
                         result = None
                     else:
                         # Step 2: Use the leafref path from schema to find the referenced node
-                        result = self.find_node_by_leafref_path(leafref_path, path_value)
-                    self.evaluator.leafref_cache[cache_key] = result
-                    return result
+                        result_tuple = self.find_node_by_leafref_path(leafref_path, path_value)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                        else:
+                            self.evaluator.leafref_cache[cache_key] = None
+                            return None
                 
                 # Not a leafref - evaluate the path to get the value
                 path_value = arg_node.evaluate(self.evaluator)
@@ -253,9 +269,16 @@ class DerefEvaluator:
                     leafref_path = self.get_leafref_path_from_schema('current()')
                     if leafref_path and value is not None:
                         # This is a leafref - use schema-aware resolution
-                        result = self.find_node_by_leafref_path(leafref_path, value)
-                        self.evaluator.leafref_cache[cache_key] = result
-                        return result
+                        result_tuple = self.find_node_by_leafref_path(leafref_path, value)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                        else:
+                            self.evaluator.leafref_cache[cache_key] = None
+                            return None
                     
                     # If we have a value, check what type it is
                     if value is not None:
@@ -347,12 +370,17 @@ class DerefEvaluator:
                 return None
             
             # Step 3: Use the leafref path to find the referenced node
-            result = self.find_node_by_leafref_path(leafref_path, ref_value)
+            result_tuple = self.find_node_by_leafref_path(leafref_path, ref_value)
             
-            if result is not None:
+            if result_tuple:
+                result, node_path = result_tuple
+                if node_path:
+                    self.evaluator._deref_node_paths[id(result)] = node_path
                 self.evaluator.leafref_cache[cache_key] = result
-            
-            return result
+                return result
+            else:
+                self.evaluator.leafref_cache[cache_key] = None
+                return None
         except Exception:
             # If path evaluation fails, deref() returns None (referenced node doesn't exist)
             return None
@@ -551,7 +579,7 @@ class DerefEvaluator:
         
         return last_node
     
-    def find_node_by_leafref_path(self, leafref_path: str, ref_value: Any) -> Any:
+    def find_node_by_leafref_path(self, leafref_path: str, ref_value: Any) -> tuple[Any, List] | None:
         """Find a node in the data using a leafref path by recursively walking the tree.
         
         Args:
@@ -559,7 +587,8 @@ class DerefEvaluator:
             ref_value: The value to search for
             
         Returns:
-            The node containing the value, or None if not found
+            Tuple of (node, path) where node is the found node and path is its location in data tree,
+            or None if not found
         """
         # Resolve relative paths to determine the target location
         if leafref_path.startswith('/'):
@@ -620,9 +649,54 @@ class DerefEvaluator:
                 return None
             
             # Search for the node with key_field == ref_value
-            return self.search_for_node(container, key_field, ref_value)
+            node = self.search_for_node(container, key_field, ref_value)
+            if node is None:
+                return None
+            
+            # Find the full path to the node by searching the data tree
+            node_path = self._find_node_path(self.evaluator.root_data, node, container_path_parts, key_field, ref_value)
+            return (node, node_path) if node_path else (node, None)
         finally:
             self.evaluator.data = old_data
+    
+    def _find_node_path(self, root_data: Any, target_node: Any, container_path: List[str], key_field: str, ref_value: Any) -> List | None:
+        """Find the full data path to a node by recursively searching the tree.
+        
+        Args:
+            root_data: Root data to search in
+            target_node: The node to find
+            container_path: Path to the container (schema path, no indices)
+            key_field: The key field name
+            ref_value: The key field value
+            
+        Returns:
+            Full data path (with indices) to the node, or None if not found
+        """
+        def search_recursive(data: Any, path: List) -> List | None:
+            """Recursively search for the target node."""
+            if data is target_node:
+                return path
+            
+            if isinstance(data, dict):
+                for key, value in data.items():
+                    if value is target_node:
+                        return path + [key]
+                    if isinstance(value, (dict, list)):
+                        result = search_recursive(value, path + [key])
+                        if result:
+                            return result
+            elif isinstance(data, list):
+                for idx, item in enumerate(data):
+                    if item is target_node:
+                        return path + [idx]
+                    if isinstance(item, (dict, list)):
+                        result = search_recursive(item, path + [idx])
+                        if result:
+                            return result
+            return None
+        
+        # Search from root
+        return search_recursive(root_data, [])
     
     def walk_path_to_container(self, path_parts: List[str], use_context_index: bool = True) -> Any:
         """Recursively walk down the tree following the path to find the container.

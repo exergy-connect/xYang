@@ -180,8 +180,25 @@ class PathEvaluator:
     
     def evaluate_path(self, path: str) -> Any:
         """Evaluate a path expression."""
-        # Handle current node
-        if path in ('.', 'current()'):
+        # Handle current node - but distinguish between . and current()
+        if path == 'current()':
+            return self.evaluator._get_current_value()
+        if path == '.':
+            # . means the current context node/value
+            # If data is a primitive value, return it directly
+            if isinstance(self.evaluator.data, (str, int, float, bool)):
+                return self.evaluator.data
+            # If data is a dict and context_path is empty, check if it's a wrapped value
+            if isinstance(self.evaluator.data, dict) and not self.evaluator.context_path:
+                # If it's a wrapped value (from predicate evaluator), return the value
+                if 'value' in self.evaluator.data and len(self.evaluator.data) == 1:
+                    return self.evaluator.data['value']
+                # Otherwise return the dict itself
+                return self.evaluator.data
+            # Otherwise, get value from current context path
+            if self.evaluator.context_path:
+                return self.get_path_value(self.evaluator.context_path)
+            # Fallback to current() if no context
             return self.evaluator._get_current_value()
         
         # Handle relative paths with ..

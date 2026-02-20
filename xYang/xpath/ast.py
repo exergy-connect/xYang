@@ -78,13 +78,40 @@ class PathNode(XPathNode):
 
 class CurrentNode(XPathNode):
     """Current node (.) or current() function."""
+    
+    def __init__(self, is_current_function: bool = False):
+        """Initialize current node.
+        
+        Args:
+            is_current_function: True if this is current() function, False if it's . (current node)
+        """
+        self.is_current_function = is_current_function
 
     def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
         # pylint: disable=protected-access
-        return evaluator._get_current_value()
+        if self.is_current_function:
+            # current() always refers to original context
+            return evaluator._get_current_value()
+        else:
+            # . refers to current context node/value
+            # If data is a primitive value, return it directly
+            if isinstance(evaluator.data, (str, int, float, bool)):
+                return evaluator.data
+            # If data is a dict and context_path is empty, check if it's a wrapped value
+            if isinstance(evaluator.data, dict) and not evaluator.context_path:
+                # If it's a wrapped value (from predicate evaluator), return the value
+                if 'value' in evaluator.data and len(evaluator.data) == 1:
+                    return evaluator.data['value']
+                # Otherwise return the dict itself
+                return evaluator.data
+            # Otherwise, get value from current context path
+            if evaluator.context_path:
+                return evaluator.path_evaluator.get_path_value(evaluator.context_path)
+            # Fallback to current() if no context
+            return evaluator._get_current_value()
 
     def __repr__(self):
-        return "Current()"
+        return "current()" if self.is_current_function else "."
 
 
 class FunctionCallNode(XPathNode):

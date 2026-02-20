@@ -1,0 +1,93 @@
+"""
+Test for field name underscore limit constraint.
+
+Must statement: string-length(.) - string-length(translate(., '_', '')) <= ../../../max_name_underscores
+Location: entities/fields/name
+"""
+import pytest
+from xYang import YangValidator, parse_yang_file
+from pathlib import Path
+
+
+@pytest.fixture
+def meta_model():
+    """Load the meta-model YANG module."""
+    yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model.yang"
+    return parse_yang_file(str(yang_path))
+
+
+def test_field_name_underscore_limit_valid(meta_model):
+    """Test that field names within underscore limit pass validation."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "field_name", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert is_valid, f"Valid field name should pass. Errors: {errors}"
+
+
+def test_field_name_underscore_limit_valid_at_limit(meta_model):
+    """Test that field names at the underscore limit pass validation."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "field_name_test", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert is_valid, f"Field name at limit should pass. Errors: {errors}"
+
+
+def test_field_name_underscore_limit_invalid_exceeds_default(meta_model):
+    """Test that field names exceeding default underscore limit fail validation."""
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "entities": [
+                {
+                    "name": "entity1",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "field_name_test_value", "type": "string"}
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    assert not is_valid, "Field name exceeding default limit should fail"
+    assert any("underscore limit" in str(err).lower() for err in errors), \
+        f"Should have underscore limit error. Errors: {errors}"

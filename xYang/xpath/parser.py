@@ -454,7 +454,7 @@ class XPathParser:
             if self._current_token().type == TokenType.PAREN_OPEN:
                 self._consume(TokenType.PAREN_OPEN)
                 self._consume(TokenType.PAREN_CLOSE)
-            return CurrentNode()
+            return CurrentNode(is_current_function=False)
 
         # Function calls - check if identifier is followed by (
         if token.type == TokenType.IDENTIFIER:
