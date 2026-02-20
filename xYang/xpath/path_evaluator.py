@@ -124,9 +124,11 @@ class PathEvaluator:
     def _go_up_context_path(self, up_levels: int) -> List:
         """Navigate up the context path by the specified number of levels.
         
-        Handles list indices properly: when going up from a list element,
-        removes both the index and the list name (going to parent container).
-        When going up from a list container, removes the list name.
+        Handles list indices properly:
+        - For leaf-list elements: removes both the index and the leaf-list name together
+          (because the indexed value is a scalar, not a container)
+        - For list elements: removes only the index (leaving the list name, which is
+          the list entry container)
         
         Args:
             up_levels: Number of levels to go up
@@ -139,12 +141,57 @@ class PathEvaluator:
             if not new_path:
                 break
             removed = new_path.pop()
-            # If it was a list index (int), also remove the list name to go to parent container
-            # This is correct for leaf-list elements where .. should go to parent, not list container
-            if isinstance(removed, int) and new_path:
-                # Remove the list name as well (one more level up)
-                new_path.pop()
+            # If it was a list index (int), check if the parent is a leaf-list or a list
+            if isinstance(removed, int) and len(new_path) > 0:
+                # Get the name of the list/leaf-list (the element before the index)
+                list_name = new_path[-1] if new_path else None
+                if list_name and isinstance(list_name, str):
+                    # Check if this is a leaf-list in the schema
+                    is_leaf_list = self._is_leaf_list_in_schema(new_path)
+                    if is_leaf_list:
+                        # For leaf-list: remove both the index (already removed) and the name
+                        # because the indexed value is a scalar, not a container
+                        new_path.pop()
+                    # For regular lists: keep the list name (it represents the list entry container)
+                    # The index has already been removed, so we're done
+            # If it was a string (list/container name), we've removed it and are at parent
         return new_path
+    
+    def _is_leaf_list_in_schema(self, path_to_list: List) -> bool:
+        """Check if the schema node at the given path is a leaf-list.
+        
+        Args:
+            path_to_list: Path to the list/leaf-list node (without the index)
+            
+        Returns:
+            True if the node is a leaf-list, False if it's a regular list or not found
+        """
+        if not hasattr(self.evaluator, 'module') or not self.evaluator.module:
+            return False
+        
+        try:
+            from ..ast import YangLeafListStmt
+            
+            # Convert data path to schema path (remove indices)
+            schema_path = [p for p in path_to_list if not isinstance(p, int)]
+            
+            # Navigate schema to find the node
+            statements = self.evaluator.module.statements
+            for step in schema_path:
+                found = False
+                for stmt in statements:
+                    if hasattr(stmt, 'name') and stmt.name == step:
+                        if isinstance(stmt, YangLeafListStmt):
+                            return True
+                        elif hasattr(stmt, 'statements'):
+                            statements = stmt.statements
+                            found = True
+                            break
+                if not found:
+                    return False
+            return False
+        except Exception:
+            return False
     
     def evaluate_path(self, path: str) -> Any:
         """Evaluate a path expression."""

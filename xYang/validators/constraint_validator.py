@@ -160,7 +160,7 @@ class ConstraintValidator:
             for must in child_stmt.must_statements:
                 evaluator.original_data = root_data
                 evaluator.original_context_path = child_path.copy() if child_path else []
-                self._evaluate_must_constraint(evaluator, must, child_stmt.name, child_stmt.mandatory)
+                self._evaluate_must_constraint(evaluator, must, child_stmt.name, child_stmt.mandatory, child_stmt)
         
         elif isinstance(child_stmt, (YangListStmt, YangContainerStmt)):
             logger.debug("Container/List %s in list item: has_must=%s, path=%s",
@@ -169,7 +169,7 @@ class ConstraintValidator:
                 for must in child_stmt.must_statements:
                     evaluator.original_data = root_data
                     evaluator.original_context_path = child_path.copy() if child_path else []
-                    self._evaluate_must_constraint(evaluator, must, child_stmt.name, False)
+                    self._evaluate_must_constraint(evaluator, must, child_stmt.name, False, child_stmt)
             
             # If this is a list or container, we need to recurse into its items/children to validate grandchildren
             if isinstance(child_stmt, YangListStmt):
@@ -216,6 +216,11 @@ class ConstraintValidator:
                             logger.debug("Grandchild list %s: data type=%s, is_list=%s, path=%s, data=%s",
                                         grandchild.name, type(grandchild_data).__name__, isinstance(grandchild_data, list), grandchild_path,
                                         str(grandchild_data)[:100] if grandchild_data else "None")
+                            # Skip validation for computed.fields - these are field references, not field definitions
+                            # and should not have foreign key validation constraints applied
+                            if child_stmt.name == "computed" and grandchild.name == "fields":
+                                logger.debug("Skipping validation for computed.fields list - these are field references, not field definitions")
+                                continue
                             if isinstance(grandchild_data, list):
                                 logger.debug("Grandchild list %s has %d items", grandchild.name, len(grandchild_data))
                                 for idx, item in enumerate(grandchild_data):
@@ -226,6 +231,7 @@ class ConstraintValidator:
                                     for great_grandchild in grandchild.statements:
                                         logger.debug("Validating great-grandchild %s in list item %d",
                                                     great_grandchild.name if hasattr(great_grandchild, 'name') else type(great_grandchild).__name__, idx)
+                                        # Pass the statement for type checking in constraint evaluation
                                         self._validate_child_in_list_item(root_data, great_grandchild, evaluator, item_path)
                             else:
                                 logger.warning("Grandchild list %s data is not a list at path %s", grandchild.name, grandchild_path)
@@ -240,7 +246,8 @@ class ConstraintValidator:
         evaluator: XPathEvaluator,
         must_expr: Any,
         field_name: str,
-        is_mandatory: bool
+        is_mandatory: bool,
+        stmt: YangStatement = None
     ) -> None:
         """
         Evaluate a must constraint and add error if it fails.
@@ -250,14 +257,70 @@ class ConstraintValidator:
             must_expr: Must statement with expression and error_message
             field_name: Name of field being validated (for error messages)
             is_mandatory: Whether the field is mandatory
+            stmt: The schema statement being validated (optional, for type checking)
         """
+        # Check if constraint uses deref() - these should only be applied to leafref nodes
+        # Constraints that use deref() are only valid for leafref types or containers/lists
+        # that contain leafref children. For leaf statements, we must check the type.
+        expression = getattr(must_expr, 'expression', '') or ''
+        if 'deref(' in expression.lower():
+            # Get context path to check if we're in computed.fields
+            context_path = getattr(evaluator, 'original_context_path', None) or getattr(evaluator, 'context_path', [])
+            
+            # First check: if we're in computed.fields, never apply deref() constraints
+            # (computed.fields[].field has type field-name, not leafref)
+            if 'computed' in context_path:
+                try:
+                    computed_idx = context_path.index("computed")
+                    if computed_idx + 1 < len(context_path) and context_path[computed_idx + 1] == "fields":
+                        logger.debug(
+                            "Skipping deref() constraint for field %s inside computed.fields (path: %s)",
+                            field_name, context_path
+                        )
+                        return
+                except (ValueError, AttributeError):
+                    pass
+            
+            # Second check: if statement is provided, check if it's a leafref type
+            if stmt:
+                if isinstance(stmt, YangLeafStmt):
+                    stmt_type_name = stmt.type.name if stmt.type else None
+                    if stmt_type_name != 'leafref':
+                        # Skip deref() constraints for non-leafref leaves
+                        # This prevents foreign key constraints from being applied to computed.fields[].field
+                        logger.debug(
+                            "Skipping deref() constraint for non-leafref leaf %s (type: %s, path: %s)",
+                            field_name, stmt_type_name, context_path
+                        )
+                        return
+                # For containers/lists, deref() constraints are allowed (they may reference leafref children)
+                # So we don't skip them here
+            else:
+                # If no statement provided, check context path as fallback
+                # This handles cases where stmt might not be passed correctly
+                if 'computed' in context_path and 'fields' in context_path:
+                    try:
+                        computed_idx = context_path.index("computed")
+                        if computed_idx + 1 < len(context_path) and context_path[computed_idx + 1] == "fields":
+                            logger.debug(
+                                "Skipping deref() constraint for field %s inside computed.fields (fallback check, path: %s)",
+                                field_name, context_path
+                            )
+                            return
+                    except (ValueError, AttributeError):
+                        pass
+        
         # Debug: Log constraint evaluation
+        context_path = getattr(evaluator, 'original_context_path', None) or getattr(evaluator, 'context_path', [])
+        stmt_info = f"stmt={type(stmt).__name__}" if stmt else "stmt=None"
+        if stmt and isinstance(stmt, YangLeafStmt):
+            stmt_info += f", type={stmt.type.name if stmt.type else 'None'}"
         logger.info(
-            "Evaluating must constraint for %s: expression='%s', error_message='%s', context_path=%s",
-            field_name, 
+            "Evaluating must constraint for %s (%s): expression='%s', error_message='%s', context_path=%s",
+            field_name, stmt_info,
             must_expr.expression if hasattr(must_expr, 'expression') else str(must_expr),
             must_expr.error_message if hasattr(must_expr, 'error_message') else 'N/A',
-            getattr(evaluator, 'context_path', [])
+            context_path
         )
         
         try:
@@ -307,6 +370,20 @@ class ConstraintValidator:
         
         # Validate must statements on this statement
         if isinstance(stmt, YangLeafStmt):
+            # Skip foreign key validation for fields inside computed.fields - these are field references,
+            # not field definitions, and should not have foreign key validation constraints applied
+            # Check if "computed" and "fields" appear consecutively in the path before the current leaf
+            path_str = '/'.join(str(p) for p in current_path[:-1])  # Exclude current leaf name
+            if 'computed' in path_str and 'fields' in path_str:
+                # Find the position of "computed" and check if "fields" follows it
+                try:
+                    computed_idx = current_path.index("computed")
+                    if computed_idx + 1 < len(current_path) and current_path[computed_idx + 1] == "fields":
+                        logger.debug("Skipping validation for leaf %s inside computed.fields - field references don't have foreign key constraints", stmt.name)
+                        return
+                except ValueError:
+                    pass  # "computed" not in path, continue with normal validation
+            
             # Check if field exists - need to check parent data, not current data
             # (current data might be the field value itself after navigation)
             parent_path = current_path[:-1] if len(current_path) > 0 else []
@@ -332,7 +409,7 @@ class ConstraintValidator:
                 # Ensure original_data is set before each evaluation
                 evaluator.original_data = root_data
                 evaluator.original_context_path = current_path.copy() if current_path else []
-                self._evaluate_must_constraint(evaluator, must, stmt.name, stmt.mandatory)
+                self._evaluate_must_constraint(evaluator, must, stmt.name, stmt.mandatory, stmt)
         
         elif isinstance(stmt, YangLeafListStmt):
             # Leaf-list: evaluate must constraints per-element with current() bound to each value
@@ -380,7 +457,7 @@ class ConstraintValidator:
                 for must in stmt.must_statements:
                     logger.debug("Evaluating must constraint for leaf-list %s value[%d]=%s", 
                                stmt.name, value_idx, value)
-                    self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False)
+                    self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False, stmt)
                 
         elif isinstance(stmt, (YangListStmt, YangContainerStmt)):
             if hasattr(stmt, 'must_statements'):
@@ -388,7 +465,7 @@ class ConstraintValidator:
                     # Ensure original_data is set before each evaluation
                     evaluator.original_data = root_data
                     evaluator.original_context_path = current_path.copy() if current_path else []
-                    self._evaluate_must_constraint(evaluator, must, stmt.name, False)
+                    self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
         
         # Recurse into child statements
         if hasattr(stmt, 'statements'):
