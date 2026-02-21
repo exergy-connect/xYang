@@ -5,6 +5,7 @@ Predicate evaluation logic for XPath expressions.
 from typing import Any, List
 
 from .parser import XPathTokenizer, XPathParser
+from .ast import BinaryOpNode
 from .utils import yang_bool, compare_equal
 from .context import Context
 
@@ -43,40 +44,49 @@ class PredicateEvaluator:
                 return items[idx]  # Return element directly, not wrapped in list
             return None
 
-        # Handle comparisons like [name = current()] or [type != 'array']
-        # Optimized: check for != first (longer string) to avoid false matches
-        if '!=' in pred_expr:
-            op = '!='
-            parts = pred_expr.split('!=', 1)
-        elif '=' in pred_expr:
-            op = '='
-            parts = pred_expr.split('=', 1)
+        # Parse predicate expression using AST parser
+        # Use evaluator's expression cache if available
+        if len(pred_expr) < 100 and hasattr(self.evaluator, '_expression_cache'):
+            if pred_expr in self.evaluator._expression_cache:
+                pred_ast = self.evaluator._expression_cache[pred_expr]
+            else:
+                tokenizer = XPathTokenizer(pred_expr)
+                tokens = tokenizer.tokenize()
+                parser = XPathParser(tokens, pred_expr)
+                pred_ast = parser.parse()
+                self.evaluator._expression_cache[pred_expr] = pred_ast
         else:
-            return items
-        
-        if len(parts) != 2:
-            return items
-        
-        # Strip whitespace from expressions
-        left_expr = parts[0].strip()
-        right_expr = parts[1].strip()
-        
-        # Optimized: initialize empty list (Python lists grow efficiently)
-        filtered = []
-        
-        # Optimized: combine comparison logic to avoid duplicate code
-        is_equal_op = (op == '=')
-        for item in items:
-            # Evaluate in the context of this item
-            # Pass base_context to preserve original_context_path and original_data for current()
-            left_val = self.evaluate_value_in_context(left_expr, item, context)
-            right_val = self.evaluate_value_in_context(right_expr, item, context)
-            
-            # Single comparison check
-            if compare_equal(left_val, right_val) == is_equal_op:
-                filtered.append(item)
+            tokenizer = XPathTokenizer(pred_expr)
+            tokens = tokenizer.tokenize()
+            parser = XPathParser(tokens, pred_expr)
+            pred_ast = parser.parse()
 
-        return filtered
+        # Handle comparison expressions like [name = current()] or [type != 'array']
+        if isinstance(pred_ast, BinaryOpNode) and pred_ast.operator in ('=', '!='):
+            op = pred_ast.operator
+            is_equal_op = (op == '=')
+            
+            # Optimized: initialize empty list (Python lists grow efficiently)
+            filtered = []
+            
+            for item in items:
+                # Create new context for evaluation, preserving original values for current()
+                item_data = item if isinstance(item, dict) else {'value': item}
+                new_context = context.with_data(item_data, [])
+                
+                # Evaluate left and right operands
+                left_val = pred_ast.left.evaluate(self.evaluator, new_context)
+                right_val = pred_ast.right.evaluate(self.evaluator, new_context)
+                
+                # Single comparison check
+                if compare_equal(left_val, right_val) == is_equal_op:
+                    filtered.append(item)
+            
+            return filtered
+        
+        # For other predicate expressions (not simple comparisons), return items unchanged
+        # This matches the original behavior where non-comparison predicates were ignored
+        return items
     
     def evaluate_value_in_context(self, expr: str, item_context: Any, base_context: Context) -> Any:
         """Evaluate a value expression in a specific context.

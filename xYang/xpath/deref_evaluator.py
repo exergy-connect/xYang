@@ -5,6 +5,7 @@ Deref evaluation logic for XPath expressions.
 from typing import Any, List, Optional
 
 from .ast import FunctionCallNode, PathNode, BinaryOpNode, FunctionCallNode as FCN
+from .parser import XPathTokenizer, XPathParser
 from .context import Context
 
 
@@ -19,6 +20,39 @@ class DerefEvaluator:
         """
         self.evaluator = evaluator
         self._visited_nodes: set = set()  # Track visited nodes for cycle detection
+    
+    def _parse_path_steps(self, path: str) -> tuple[List[str], bool, int]:
+        """Parse a path string using AST parser and extract steps.
+        
+        Args:
+            path: Path string to parse
+            
+        Returns:
+            Tuple of (steps, is_absolute, up_levels)
+            - steps: List of path steps (excluding '..')
+            - is_absolute: True if path starts with '/'
+            - up_levels: Number of '..' steps
+            
+        Raises:
+            XPathSyntaxError: If the path cannot be parsed
+        """
+        tokenizer = XPathTokenizer(path)
+        tokens = tokenizer.tokenize()
+        parser = XPathParser(tokens, path)
+        path_node = parser.parse()
+        
+        if not isinstance(path_node, PathNode):
+            from ..errors import XPathSyntaxError
+            raise XPathSyntaxError(f"Expected path expression, got {type(path_node).__name__}")
+        
+        steps = []
+        up_levels = 0
+        for step in path_node.steps:
+            if step == '..':
+                up_levels += 1
+            elif step and step != '.':
+                steps.append(step)
+        return steps, path_node.is_absolute, up_levels
     
     def evaluate_deref_function(self, node: FunctionCallNode, context: Context) -> Any:
         """Evaluate a deref() function call.
@@ -167,9 +201,9 @@ class DerefEvaluator:
                         # - For schema resolution, we need it relative to left_node_context
                         # - From a field node, ../foreignKey/entity should be ./foreignKey/entity
                         if right_path.startswith('../'):
-                            # Extract remaining path after ..
-                            path_parts = right_path.split('/')
-                            remaining_path = '/'.join(p for p in path_parts if p and p != '..')
+                            # Extract remaining path after .. using AST parser
+                            steps, _, _ = self._parse_path_steps(right_path)
+                            remaining_path = '/'.join(steps)
                             # Convert to relative path from the node's location
                             schema_path = './' + remaining_path if remaining_path else '.'
                         elif not right_path.startswith('./') and not right_path.startswith('/'):
@@ -263,10 +297,8 @@ class DerefEvaluator:
                                     # Build the full path: context + right_path
                                     # But right_path might start with ../, so we need to resolve it
                                     if right_path.startswith('../'):
-                                        # Resolve relative path
-                                        parts = right_path.split('/')
-                                        up_levels = sum(1 for p in parts if p == '..')
-                                        remaining = [p for p in parts if p and p != '..']
+                                        # Resolve relative path using AST parser
+                                        remaining, _, up_levels = self._parse_path_steps(right_path)
                                         # Go up from context, then add remaining parts
                                         if up_levels <= len(context_to_use):
                                             schema_path_parts = context_to_use[:-up_levels] + remaining
@@ -588,17 +620,9 @@ class DerefEvaluator:
                 schema_path = ["data-model"] + schema_path
             return schema_path
         
-        # Handle relative paths
+        # Handle relative paths using AST parser
         if path.startswith('../') or path.startswith('./'):
-            # Optimized: single pass through parts
-            parts = path.split('/')
-            up_levels = 0
-            field_parts = []
-            for p in parts:
-                if p == '..':
-                    up_levels += 1
-                elif p and p != '.':
-                    field_parts.append(p)
+            field_parts, _, up_levels = self._parse_path_steps(path)
             
             # Navigate up from context
             if up_levels == 0:
@@ -619,10 +643,10 @@ class DerefEvaluator:
             data_path = context_to_use + [path]
             return self.data_path_to_schema_path(data_path)
         
-        # Handle absolute paths
+        # Handle absolute paths using AST parser
         if path.startswith('/'):
-            # Remove leading / and convert to schema path (optimized: filter in list comprehension)
-            return [p for p in path.split('/') if p]
+            steps, _, _ = self._parse_path_steps(path)
+            return steps
         
         return None
     
@@ -690,25 +714,19 @@ class DerefEvaluator:
             Tuple of (node, path) where node is the found node and path is its location in data tree,
             or None if not found
         """
-        # Resolve relative paths to determine the target location
+        # Resolve relative paths to determine the target location using AST parser
         if leafref_path.startswith('/'):
-            # Absolute path - walk from root (optimized: filter in list comprehension)
-            target_path = [p for p in leafref_path.split('/') if p]
+            # Absolute path - walk from root using AST parser
+            steps, _, _ = self._parse_path_steps(leafref_path)
+            target_path = steps
         else:
             # Relative path - resolve relative to original context
             # Cache context paths to avoid repeated attribute access
             original_context = context.original_context_path
             context_to_use = original_context if original_context else context.context_path
             
-            # Parse the relative path - optimized single pass
-            parts = leafref_path.split('/')
-            up_levels = 0
-            field_parts = []
-            for p in parts:
-                if p == '..':
-                    up_levels += 1
-                elif p:
-                    field_parts.append(p)
+            # Parse the relative path using AST parser
+            field_parts, _, up_levels = self._parse_path_steps(leafref_path)
             
             # Build target path by going up from context, then adding field parts
             context_len = len(context_to_use)

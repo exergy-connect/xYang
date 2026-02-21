@@ -6,6 +6,7 @@ from contextlib import contextmanager
 from typing import Any, List, Optional, Tuple
 
 from .ast import BinaryOpNode, LiteralNode, PathNode
+from .parser import XPathTokenizer, XPathParser
 from .context import Context
 
 
@@ -413,13 +414,26 @@ class PathEvaluator:
                     return None
                 continue
             
-            # Handle predicates in path parts
-            if isinstance(part, str):
-                bracket_idx = part.find('[')
-                if bracket_idx >= 0:
-                    base_part = part[:bracket_idx]
-                    predicate = part[bracket_idx:]
-                    if isinstance(current, dict) and base_part in current:
+            # Handle predicates in path parts using AST parser
+            if isinstance(part, str) and '[' in part:
+                # Parse the path part as a path expression to check if it has a predicate
+                tokenizer = XPathTokenizer(part)
+                tokens = tokenizer.tokenize()
+                parser = XPathParser(tokens, part)
+                # Try to parse as a path expression (which handles predicates)
+                parsed_node = parser.parse()
+                
+                # Check if this is a PathNode with a predicate
+                if isinstance(parsed_node, PathNode) and parsed_node.predicate is not None:
+                    # Extract base part (first step) and predicate
+                    base_part = parsed_node.steps[0] if parsed_node.steps else part
+                    # Reconstruct predicate string for apply_predicate
+                    # We need to extract the predicate expression as a string
+                    # For now, extract it from the original part string
+                    bracket_start = part.find('[')
+                    predicate = part[bracket_start:] if bracket_start >= 0 else None
+                    
+                    if predicate and isinstance(current, dict) and base_part in current:
                         value = current[base_part]
                         if isinstance(value, list):
                             # Apply predicate to get filtered result
