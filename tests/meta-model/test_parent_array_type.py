@@ -1,7 +1,7 @@
 """
 Test for parent array type constraint.
 
-Must statement: deref(current())/../type = 'array'
+Must statement: /data-model/consolidated = false() or deref(deref(../child_fk)/../foreignKey/entity)/../fields[name = current()]/type = 'array'
 Location: entities/parents/parent_array
 """
 import pytest
@@ -12,7 +12,7 @@ from pathlib import Path
 @pytest.fixture
 def meta_model():
     """Load the meta-model YANG module."""
-    yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model.yang"
+    yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model-phased.yang"
     return parse_yang_file(str(yang_path))
 
 
@@ -25,6 +25,7 @@ def test_parent_array_type_valid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
@@ -76,6 +77,7 @@ def test_parent_array_type_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
