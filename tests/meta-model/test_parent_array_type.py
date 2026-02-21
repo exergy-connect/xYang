@@ -119,3 +119,53 @@ def test_parent_array_type_invalid(meta_model):
     assert not is_valid, "parent_array referencing non-array type should fail"
     assert any("array" in str(err).lower() and "type" in str(err).lower() for err in errors), \
         f"Should have array type error. Errors: {errors}"
+
+
+def test_parent_array_type_consolidated_false_no_parent(meta_model):
+    """Test that parent_array type validation is skipped when consolidated=false, even if parent entity is missing.
+    
+    The must constraint uses OR: /data-model/consolidated = false() or <deref check>
+    When consolidated=false, the first part is true, so the OR should short-circuit
+    and NOT evaluate the second part (deref), avoiding leafref errors.
+    """
+    validator = YangValidator(meta_model)
+    
+    data = {
+        "data-model": {
+            "name": "Test Model",
+            "version": "25.01.27.1",
+            "author": "Test",
+            "consolidated": False,
+            "entities": [
+                {
+                    "name": "child",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {
+                            "name": "parent_id",
+                            "type": "integer",
+                            "foreignKey": {
+                                "entity": "parent",
+                                "field": "id"
+                            }
+                        }
+                    ],
+                    "parents": [
+                        {
+                            "child_fk": "parent_id",
+                            "parent_array": "children"
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    
+    is_valid, errors, warnings = validator.validate(data)
+    # When consolidated=false, the OR should short-circuit and not evaluate deref()
+    # This means NO errors should occur, including no leafref errors from deref()
+    assert is_valid, \
+        f"Validation should pass in Phase 1 (consolidated=false) without evaluating deref(). The OR should short-circuit. Errors: {errors}"
+    assert len(errors) == 0, \
+        f"No errors should occur when consolidated=false because the OR should short-circuit. Errors: {errors}"

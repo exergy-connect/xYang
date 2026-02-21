@@ -304,13 +304,24 @@ class XPathEvaluator:
                 self.data = old_data
                 self._set_context_path(old_context)
         
+        # Short-circuit evaluation for logical operators
+        if op == 'or':
+            # If left is truthy, short-circuit and return True without evaluating right
+            if yang_bool(left):
+                return True
+            # Only evaluate right if left is falsy
+            right = node.right.evaluate(self)
+            return bool(right)
+        if op == 'and':
+            # If left is falsy, short-circuit and return False without evaluating right
+            if not yang_bool(left):
+                return False
+            # Only evaluate right if left is truthy
+            right = node.right.evaluate(self)
+            return bool(right)
+        
         # For other operations, evaluate right normally
         right = node.right.evaluate(self)
-
-        if op == 'or':
-            return bool(left) or bool(right)
-        if op == 'and':
-            return bool(left) and bool(right)
         # Get type context for coercion
         type_context = self._get_type_context()
         

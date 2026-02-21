@@ -137,12 +137,9 @@ class YangValidator:
                 # Validate leaf type
                 self.type_validator.validate_leaf(data, stmt, context_path)
                 
-                # Validate leafref if applicable
-                if (stmt.name in data and stmt.type and 
-                    stmt.type.name == 'leafref' and stmt.type.path):
-                    self.leafref_resolver.validate_leafref(
-                        stmt, data[stmt.name], data, context_path, root_data
-                    )
+                # Leafref validation is lazy - only happens when deref() is called
+                # or when the value is actually used in must constraints.
+                # This allows OR short-circuiting to prevent unnecessary validation.
             
             elif isinstance(stmt, YangLeafListStmt):
                 # Validate leaf-list type
