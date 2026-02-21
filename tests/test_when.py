@@ -4,6 +4,7 @@ Tests for when expression support.
 
 import pytest
 from xYang import parse_yang_string, YangValidator
+from tests.test_utils import create_context
 
 
 def test_when_condition_true():
@@ -110,14 +111,14 @@ def test_when_with_xpath_evaluator():
     evaluator = XPathEvaluator(data, module, context_path=["item_type"])
 
     # Test the when condition expression
-    context = evaluator.create_context(data, ["item_type"])
+    context = create_context(data, ["item_type"])
     result = evaluator.evaluate("../type = 'array'", context)
     assert result is True
 
     # Test with false condition
     data2 = {"type": "string"}
     evaluator2 = XPathEvaluator(data2, module, context_path=["item_type"])
-    context2 = evaluator2.create_context(data2, ["item_type"])
+    context2 = create_context(data2, ["item_type"])
     result2 = evaluator2.evaluate("../type = 'array'", context2)
     assert result2 is False
 

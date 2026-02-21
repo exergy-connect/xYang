@@ -27,6 +27,7 @@ Expected behavior:
 
 import pytest
 from xYang import XPathEvaluator, parse_yang_string, YangValidator
+from tests.test_utils import create_context
 
 # YANG module for data-model structure with leafref definitions
 # This matches the meta-model.yang structure used in xFrame
@@ -165,7 +166,7 @@ def test_deref_simple_entity_reference():
     # Context: we're at department.fields[0].foreignKey.entity (value is "company")
     evaluator = XPathEvaluator(data, module)
     context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
-    context = evaluator.create_context(data, context_path)
+    context = create_context(data, context_path)
     
     # Verify we can get the entity value
     entity_value = evaluator.evaluate_value('current()', context)
@@ -233,7 +234,7 @@ def test_deref_parents_child_fk():
         module,
         context_path=parent_context
     )
-    context = evaluator.create_context(data, parent_context)
+    context = create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "company_id" to the field node
     field_node = evaluator.evaluate_value('deref(current())', context)
@@ -300,7 +301,7 @@ def test_deref_parents_parent_array():
         module,
         context_path=parent_context
     )
-    context = evaluator.create_context(data, parent_context)
+    context = create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "departments" to the field node in company
     field_node = evaluator.evaluate_value('deref(current())', context)
@@ -365,7 +366,7 @@ def test_deref_self_referential():
         module,
         context_path=parent_context
     )
-    context = evaluator.create_context(data, parent_context)
+    context = create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "manager_id" to the field node
     field_node = evaluator.evaluate_value('deref(current())', context)
@@ -433,7 +434,7 @@ def test_deref_cross_entity_validation():
         module,
         context_path=parent_context
     )
-    context = evaluator.create_context(data, parent_context)
+    context = create_context(data, parent_context)
     
     # Get the child_fk value
     child_fk_value = evaluator.evaluate_value('current()', context)
@@ -494,7 +495,7 @@ def test_deref_field_type_matching():
         module,
         context_path=entity_context_path
     )
-    entity_context = entity_evaluator.create_context(data, entity_context_path)
+    entity_context = create_context(data, entity_context_path)
     
     # Verify we're at the entity leafref
     entity_name = entity_evaluator.evaluate_value('current()', entity_context)
@@ -559,7 +560,7 @@ def test_deref_nonexistent_reference():
         module,
         context_path=field_context
     )
-    context = evaluator.create_context(data, field_context)
+    context = create_context(data, field_context)
     
     # deref() should return None for nonexistent entity
     result = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', context)
@@ -604,7 +605,7 @@ def test_deref_cache():
         module,
         context_path=entity_context_path
     )
-    entity_context = entity_evaluator.create_context(data, entity_context_path)
+    entity_context = create_context(data, entity_context_path)
     
     # Verify we're at the entity leafref
     entity_name = entity_evaluator.evaluate_value('current()', entity_context)
@@ -707,7 +708,7 @@ def test_deref_physics_array_foreignkey():
         module,
         context_path=evaluator_context_path
     )
-    evaluator_context = evaluator.create_context(data, evaluator_context_path)
+    evaluator_context = create_context(data, evaluator_context_path)
     
     # Verify current value
     current_val = evaluator.evaluate_value('current()', evaluator_context)
@@ -800,7 +801,7 @@ def test_deref_physics_parent_child_relationship():
         module,
         context_path=child_fk_context_path
     )
-    child_fk_context = evaluator.create_context(data, child_fk_context_path)
+    child_fk_context = create_context(data, child_fk_context_path)
     
     # child_fk should reference "anomaly_id" field
     child_fk_value = evaluator.evaluate_value('current()', child_fk_context)
@@ -814,7 +815,7 @@ def test_deref_physics_parent_child_relationship():
         module,
         context_path=field_context_path
     )
-    field_context = field_evaluator.create_context(data, field_context_path)
+    field_context = create_context(data, field_context_path)
     
     # Verify foreignKey.entity value
     entity_value = field_evaluator.evaluate_value('current()', field_context)
@@ -834,7 +835,7 @@ def test_deref_physics_parent_child_relationship():
         module,
         context_path=parent_array_context_path
     )
-    parent_array_context = parent_array_evaluator.create_context(data, parent_array_context_path)
+    parent_array_context = create_context(data, parent_array_context_path)
     
     # parent_array should reference "violated_assumptions"
     parent_array_value = parent_array_evaluator.evaluate_value('current()', parent_array_context)
@@ -923,7 +924,7 @@ def test_deref_physics_cross_entity_reference():
         module,
         context_path=evaluator_context_path
     )
-    evaluator_context = evaluator.create_context(data, evaluator_context_path)
+    evaluator_context = create_context(data, evaluator_context_path)
     
     # Verify current value
     current_val = evaluator.evaluate_value('current()', evaluator_context)
@@ -943,7 +944,7 @@ def test_deref_physics_cross_entity_reference():
         module,
         context_path=assumption_context_path
     )
-    assumption_context = assumption_evaluator.create_context(data, assumption_context_path)
+    assumption_context = create_context(data, assumption_context_path)
     
     # Verify current value
     assumption_val = assumption_evaluator.evaluate_value('current()', assumption_context)
@@ -1024,7 +1025,7 @@ def test_deref_physics_nested_deref_validation():
         module,
         context_path=evaluator_context_path
     )
-    evaluator_context = evaluator.create_context(data, evaluator_context_path)
+    evaluator_context = create_context(data, evaluator_context_path)
     
     # child_fk should reference "anomaly_id" field name
     child_fk_value = evaluator.evaluate_value('current()', evaluator_context)
@@ -1045,7 +1046,7 @@ def test_deref_physics_nested_deref_validation():
         module,
         context_path=entity_context_path
     )
-    entity_context = entity_evaluator.create_context(data, entity_context_path)
+    entity_context = create_context(data, entity_context_path)
     
     # Verify we can get the entity name
     entity_name = entity_evaluator.evaluate_value('current()', entity_context)
@@ -1127,7 +1128,7 @@ def test_deref_physics_parents_validation_constraints():
         module,
         context_path=child_fk_context_path
     )
-    child_fk_context = child_fk_evaluator.create_context(data, child_fk_context_path)
+    child_fk_context = create_context(data, child_fk_context_path)
     
     # child_fk is a leafref pointing to fields/name, so current() returns "anomaly_id"
     child_fk_value = child_fk_evaluator.evaluate_value('current()', child_fk_context)
@@ -1194,7 +1195,7 @@ def test_deref_physics_parents_validation_constraints():
         module,
         context_path=parent_array_context_path
     )
-    parent_array_context = parent_array_evaluator.create_context(data, parent_array_context_path)
+    parent_array_context = create_context(data, parent_array_context_path)
     
     # parent_array is a leafref pointing to /data-model/entities/fields/name
     # So it can reference any field name in any entity
@@ -1291,7 +1292,7 @@ def test_deref_circular_reference():
         module,
         context_path=evaluator_context_path
     )
-    evaluator_context = evaluator.create_context(data, evaluator_context_path)
+    evaluator_context = create_context(data, evaluator_context_path)
     
     # Verify current value
     current_val = evaluator.evaluate_value('current()', evaluator_context)
@@ -1365,7 +1366,7 @@ def test_deref_circular_reference():
         module,
         context_path=a_context_path
     )
-    a_context = a_evaluator.create_context(data_circular, a_context_path)
+    a_context = create_context(data_circular, a_context_path)
     
     # Get entity_b
     b_entity = a_evaluator.evaluate_value('deref(current())', a_context)
@@ -1379,7 +1380,7 @@ def test_deref_circular_reference():
         module,
         context_path=b_context_path
     )
-    b_context = b_evaluator.create_context(data_circular, b_context_path)
+    b_context = create_context(data_circular, b_context_path)
     
     # Get entity_c
     c_entity = b_evaluator.evaluate_value('deref(current())', b_context)
@@ -1393,7 +1394,7 @@ def test_deref_circular_reference():
         module,
         context_path=c_context_path
     )
-    c_context = c_evaluator.create_context(data_circular, c_context_path)
+    c_context = create_context(data_circular, c_context_path)
     
     # Get entity_a (completing the circle)
     a_entity_again = c_evaluator.evaluate_value('deref(current())', c_context)
@@ -1408,7 +1409,7 @@ def test_deref_circular_reference():
         module,
         context_path=evaluator_context_path
     )
-    deep_context = deep_evaluator.create_context(data, evaluator_context_path)
+    deep_context = create_context(data, evaluator_context_path)
     
     # Test: deref(deref(deref(current()))) - should still work (returns same entity)
     # Note: Multiple nested deref() calls may not be fully supported
@@ -1464,7 +1465,7 @@ def test_deref_circular_reference():
         module,
         context_path=category_context_path
     )
-    category_context = category_evaluator.create_context(data_self_parent, category_context_path)
+    category_context = create_context(data_self_parent, category_context_path)
     
     # child_fk should reference "parent_category_id"
     child_fk_val = category_evaluator.evaluate_value('current()', category_context)
@@ -1543,7 +1544,7 @@ def test_deref_circular_infinite_loop_prevention():
         module,
         context_path=node_context_path
     )
-    node_context = evaluator.create_context(data, node_context_path)
+    node_context = create_context(data, node_context_path)
     
     # Verify current value
     current_val = evaluator.evaluate_value('current()', node_context)
@@ -1648,7 +1649,7 @@ def test_deref_circular_infinite_loop_prevention():
         module,
         context_path=a_eval_context_path
     )
-    a_eval_context = a_eval.create_context(data_long_chain, a_eval_context_path)
+    a_eval_context = create_context(data_long_chain, a_eval_context_path)
     b_entity = a_eval.evaluate_value('deref(current())', a_eval_context)
     assert b_entity is not None
     assert b_entity.get("name") == "entity_b"
@@ -1660,7 +1661,7 @@ def test_deref_circular_infinite_loop_prevention():
         module,
         context_path=b_eval_context_path
     )
-    b_eval_context = b_eval.create_context(data_long_chain, b_eval_context_path)
+    b_eval_context = create_context(data_long_chain, b_eval_context_path)
     c_entity = b_eval.evaluate_value('deref(current())', b_eval_context)
     assert c_entity is not None
     assert c_entity.get("name") == "entity_c"
@@ -1672,7 +1673,7 @@ def test_deref_circular_infinite_loop_prevention():
         module,
         context_path=c_eval_context_path
     )
-    c_eval_context = c_eval.create_context(data_long_chain, c_eval_context_path)
+    c_eval_context = create_context(data_long_chain, c_eval_context_path)
     d_entity = c_eval.evaluate_value('deref(current())', c_eval_context)
     assert d_entity is not None
     assert d_entity.get("name") == "entity_d"
@@ -1684,7 +1685,7 @@ def test_deref_circular_infinite_loop_prevention():
         module,
         context_path=d_eval_context_path
     )
-    d_eval_context = d_eval.create_context(data_long_chain, d_eval_context_path)
+    d_eval_context = create_context(data_long_chain, d_eval_context_path)
     a_entity_again = d_eval.evaluate_value('deref(current())', d_eval_context)
     assert a_entity_again is not None
     assert a_entity_again.get("name") == "entity_a"
@@ -1745,7 +1746,7 @@ def test_deref_current_leafref_schema_resolution():
         module,
         context_path=evaluator_context_path
     )
-    evaluator_context = evaluator.create_context(data, evaluator_context_path)
+    evaluator_context = create_context(data, evaluator_context_path)
     
     # Verify current() returns the leafref value
     current_value = evaluator.evaluate_value('current()', evaluator_context)
@@ -1835,7 +1836,7 @@ def test_deref_relative_vs_absolute_leafref_paths():
         module,
         context_path=relative_context_path
     )
-    relative_context = relative_evaluator.create_context(data, relative_context_path)
+    relative_context = create_context(data, relative_context_path)
     
     # Verify current value
     current_val = relative_evaluator.evaluate_value('current()', relative_context)
@@ -1862,7 +1863,7 @@ def test_deref_relative_vs_absolute_leafref_paths():
         module,
         context_path=absolute_context_path
     )
-    absolute_context = absolute_evaluator.create_context(data, absolute_context_path)
+    absolute_context = create_context(data, absolute_context_path)
     
     # Verify current value
     current_val = absolute_evaluator.evaluate_value('current()', absolute_context)

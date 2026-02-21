@@ -234,7 +234,10 @@ class PathEvaluator:
         up_levels = sum(1 for p in parts if p == '..')
         field_parts = [p for p in parts if p and p != '..']
         
-        context_len = len(context.context_path) if context.context_path else 0
+        # Use original_context_path if context_path is empty (e.g., in predicates)
+        # This ensures relative paths in predicates work from the original constraint location
+        path_to_use = context.context_path if context.context_path else context.original_context_path
+        context_len = len(path_to_use) if path_to_use else 0
         
         # Navigate up the context path
         if up_levels <= context_len:
@@ -243,10 +246,10 @@ class PathEvaluator:
             # Use root_data for navigation when we have a context path
             nav_context = context
             if context_len > 0 and isinstance(context.root_data, dict):
-                nav_context = context.with_data(context.root_data, context.context_path)
+                nav_context = context.with_data(context.root_data, path_to_use)
             
             # Try going up the specified number of levels
-            new_path = self._go_up_context_path(context.context_path, up_levels) + field_parts
+            new_path = self._go_up_context_path(path_to_use, up_levels) + field_parts
             result = self.get_path_value(new_path, nav_context)
             
             # If that didn't work, try two fallback strategies:
@@ -270,7 +273,7 @@ class PathEvaluator:
                 # Only try going up one less level, not all the way down to 0
                 # This prevents finding wrong paths that happen to exist
                 alt_levels = up_levels - 1
-                new_path_alt = self._go_up_context_path(context.context_path, alt_levels) + field_parts
+                new_path_alt = self._go_up_context_path(path_to_use, alt_levels) + field_parts
                 result_alt = self.get_path_value(new_path_alt, nav_context)
                 # Only use this result if it's a list (for field access) or matches expected type
                 if result_alt is not None:
@@ -685,8 +688,16 @@ class PathEvaluator:
                     filtered = self.evaluator.predicate_evaluator.apply_predicate(value, step_pred, predicate_context)
                     if filtered is None or (isinstance(filtered, list) and len(filtered) == 0):
                         return None
+                    # If this is the last segment, return the full filtered list
+                    # Otherwise, take the first item to continue navigation
+                    is_last_segment = (segment == segments[-1])
                     if isinstance(filtered, list):
-                        current = filtered[0] if len(filtered) > 0 else None
+                        if is_last_segment:
+                            # Last segment with predicate - return the full filtered list
+                            return filtered
+                        else:
+                            # Not the last segment - take first item to continue navigation
+                            current = filtered[0] if len(filtered) > 0 else None
                     else:
                         current = filtered
                     if current is None:

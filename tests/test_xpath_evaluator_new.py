@@ -7,6 +7,7 @@ Context as a parameter instead of accessing evaluator attributes directly.
 
 import pytest
 from xYang import XPathEvaluator, parse_yang_string
+from tests.test_utils import create_context
 from xYang.xpath.context import Context
 
 
@@ -53,7 +54,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0])
+        context = create_context(data, ["data-model", "entities", 0])
         result = evaluator.path_evaluator.evaluate_path("name", context)
         assert result == "company"
 
@@ -69,7 +70,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, [])
+        context = create_context(data, [])
         result = evaluator.path_evaluator.evaluate_path("/data-model/entities", context)
         assert isinstance(result, list)
         assert len(result) == 1
@@ -91,7 +92,7 @@ class TestContextParameterUsage:
             context_path=["data-model", "entities", 0, "fields", 0]
         )
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0, "fields", 0])
+        context = create_context(data, ["data-model", "entities", 0, "fields", 0])
         result = evaluator.path_evaluator.evaluate_path("../name", context)
         assert result == "company"
 
@@ -107,7 +108,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, [])
+        context = create_context(data, [])
         result = evaluator.path_evaluator.get_path_value(
             ["data-model", "entities", 0, "name"],
             context
@@ -128,8 +129,8 @@ class TestContextParameterUsage:
         evaluator = XPathEvaluator(data, module)
         
         # Create two different contexts
-        context1 = evaluator.create_context(data, ["data-model", "entities", 0])
-        context2 = evaluator.create_context(data, ["data-model", "entities", 1])
+        context1 = create_context(data, ["data-model", "entities", 0])
+        context2 = create_context(data, ["data-model", "entities", 1])
         
         result1 = evaluator.path_evaluator.evaluate_path("name", context1)
         result2 = evaluator.path_evaluator.evaluate_path("name", context2)
@@ -149,7 +150,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        original_context = evaluator.create_context(data, ["data-model", "entities", 0])
+        original_context = create_context(data, ["data-model", "entities", 0])
         new_data = {"name": "department"}
         new_context = original_context.with_data(new_data, [])
         
@@ -177,13 +178,13 @@ class TestContextParameterUsage:
             context_path=["data-model", "entities", 0, "name"]
         )
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0, "name"])
+        context = create_context(data, ["data-model", "entities", 0, "name"])
         current_value = context.current()
         assert current_value == "company"
 
     def test_evaluate_path_node_with_context(self):
         """Test that evaluate_path_node requires Context parameter."""
-        from xYang.xpath.ast import PathNode
+        from xYang.xpath.ast import PathNode, PathSegment
         
         data = {
             "data-model": {
@@ -195,8 +196,14 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        path_node = PathNode(steps=["data-model", "entities", "0", "name"], is_absolute=False)
-        context = evaluator.create_context(data, [])
+        segments = [
+            PathSegment("data-model"),
+            PathSegment("entities"),
+            PathSegment("0"),
+            PathSegment("name")
+        ]
+        path_node = PathNode(segments=segments, is_absolute=False)
+        context = create_context(data, [])
         result = evaluator.path_evaluator.evaluate_path_node(path_node, context)
         assert result == "company"
 
@@ -216,7 +223,7 @@ class TestContextParameterUsage:
             context_path=["data-model", "entities", 0, "name"]
         )
         
-        original_context = evaluator.create_context(data, ["data-model", "entities", 0, "name"])
+        original_context = create_context(data, ["data-model", "entities", 0, "name"])
         
         # Create new context with different data but preserve original
         new_data = {"name": "department"}
@@ -241,7 +248,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0])
+        context = create_context(data, ["data-model", "entities", 0])
         
         # Should be able to access root_data through context
         assert context.root_data == data
@@ -261,8 +268,8 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context1 = evaluator.create_context(data, ["data-model", "entities", 0])
-        context2 = evaluator.create_context(data, ["data-model", "entities", 1])
+        context1 = create_context(data, ["data-model", "entities", 0])
+        context2 = create_context(data, ["data-model", "entities", 1])
         
         result1 = evaluator.path_evaluator.evaluate_path("name", context1)
         result2 = evaluator.path_evaluator.evaluate_path("name", context2)
@@ -276,7 +283,7 @@ class TestContextParameterUsage:
         module = parse_yang_string("module test { }")
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, [])
+        context = create_context(data, [])
         result = evaluator.path_evaluator.evaluate_path(".", context)
         # When context_path is empty and data is a dict, "." returns the dict
         # But if data has a single key with a primitive value, it might return that value
@@ -304,7 +311,7 @@ class TestContextParameterUsage:
             context_path=["data-model", "entities", 0, "fields", 0]
         )
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0, "fields", 0])
+        context = create_context(data, ["data-model", "entities", 0, "fields", 0])
         
         # Navigate up one level
         result = evaluator.path_evaluator.evaluate_path("../../name", context)
@@ -326,7 +333,7 @@ class TestContextParameterUsage:
         module = parse_yang_string("module test { }")
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, [])
+        context = create_context(data, [])
         
         # Should not be able to modify context directly
         with pytest.raises(Exception):  # dataclass.FrozenInstanceError
@@ -350,7 +357,7 @@ class TestContextParameterUsage:
         module = parse_yang_string(SAMPLE_YANG)
         evaluator = XPathEvaluator(data, module)
         
-        context = evaluator.create_context(data, ["data-model", "entities", 0])
+        context = create_context(data, ["data-model", "entities", 0])
         result = evaluator.path_evaluator.evaluate_path("fields[name = 'id']", context)
         assert isinstance(result, list)
         assert len(result) == 1

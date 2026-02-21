@@ -55,7 +55,6 @@ class XPathEvaluator:
         self.deref_evaluator = DerefEvaluator(self)
         self.predicate_evaluator = PredicateEvaluator(self)
         self.comparison_evaluator = ComparisonEvaluator(self)
-    
 
     def evaluate(self, expression: str, context: Context, ast: Optional[XPathNode] = None) -> bool:
         """
