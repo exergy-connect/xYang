@@ -10,7 +10,7 @@ Implements only the XPath features used in meta-model.yang:
 - String concatenation: +
 """
 
-from typing import Any, Dict, List, Optional, Union
+from typing import Any, Dict, List, Optional
 
 from .parser import XPathTokenizer, XPathParser
 from .ast import PathNode, FunctionCallNode, BinaryOpNode, UnaryOpNode, XPathNode
@@ -21,7 +21,7 @@ from .function_evaluator import FunctionEvaluator
 from .deref_evaluator import DerefEvaluator
 from .predicate_evaluator import PredicateEvaluator
 from .comparison_evaluator import ComparisonEvaluator
-from .utils import yang_bool, compare_equal
+from .utils import yang_bool
 from .context import Context, JsonValue
 
 

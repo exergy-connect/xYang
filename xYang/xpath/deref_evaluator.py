@@ -2,7 +2,7 @@
 Deref evaluation logic for XPath expressions.
 """
 
-from typing import Any, List, Optional
+from typing import Any, List
 
 from .ast import FunctionCallNode, PathNode, BinaryOpNode, FunctionCallNode as FCN
 from .parser import XPathTokenizer, XPathParser

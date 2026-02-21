@@ -2,8 +2,7 @@
 Path evaluation logic for XPath expressions.
 """
 
-from contextlib import contextmanager
-from typing import Any, List, Optional, Tuple
+from typing import Any, List, Optional
 
 from .ast import BinaryOpNode, LiteralNode, PathNode
 from .parser import XPathTokenizer, XPathParser
