@@ -6,6 +6,7 @@ from typing import Any, List
 
 from .parser import XPathTokenizer, XPathParser
 from .utils import yang_bool, compare_equal
+from .context import Context
 
 
 class PredicateEvaluator:
@@ -19,7 +20,7 @@ class PredicateEvaluator:
         """
         self.evaluator = evaluator
     
-    def apply_predicate(self, items: List[Any], predicate: str) -> Any:
+    def apply_predicate(self, items: List[Any], predicate: str, context: Context) -> Any:
         """Apply a predicate filter to a list of items.
         
         Returns:
@@ -67,8 +68,9 @@ class PredicateEvaluator:
         is_equal_op = (op == '=')
         for item in items:
             # Evaluate in the context of this item
-            left_val = self.evaluate_value_in_context(left_expr, item)
-            right_val = self.evaluate_value_in_context(right_expr, item)
+            # Pass base_context to preserve original_context_path and original_data for current()
+            left_val = self.evaluate_value_in_context(left_expr, item, context)
+            right_val = self.evaluate_value_in_context(right_expr, item, context)
             
             # Single comparison check
             if compare_equal(left_val, right_val) == is_equal_op:
@@ -76,55 +78,41 @@ class PredicateEvaluator:
 
         return filtered
     
-    def evaluate_value_in_context(self, expr: str, context: Any) -> Any:
+    def evaluate_value_in_context(self, expr: str, item_context: Any, base_context: Context) -> Any:
         """Evaluate a value expression in a specific context.
         
         Note: current() should always refer to the original context, not the predicate context.
         So we preserve original_context_path and original_data while setting data and context_path
         to the item being tested (so paths like 'name' evaluate from the item).
-        """
-        # Save current context
-        old_data = self.evaluator.data
-        old_context_path = self.evaluator.context_path
-        old_original_context_path = self.evaluator.original_context_path
-        old_original_data = self.evaluator.original_data
         
-        # Set context - optimized: isinstance check is fast, dict is common case
-        if isinstance(context, dict):
-            self.evaluator.data = context
-        else:
-            self.evaluator.data = {'value': context}
-        # Set context_path to empty so paths like 'name' evaluate from the item root
-        # But preserve original_context_path and original_data so current() still works
-        self.evaluator._set_context_path([])
+        Args:
+            expr: Expression to evaluate
+            item_context: Item context (dict or value)
+            base_context: Base context (preserves original_context_path and original_data)
+        """
+        # Create new context for evaluation, preserving original values for current()
+        item_data = item_context if isinstance(item_context, dict) else {'value': item_context}
+        new_context = base_context.with_data(item_data, [])
 
-        try:
-            # Optimized: use evaluator's expression cache if available
-            # Check cache first (only for short expressions to avoid memory bloat)
-            if len(expr) < 100 and hasattr(self.evaluator, '_expression_cache'):
-                if expr in self.evaluator._expression_cache:
-                    ast = self.evaluator._expression_cache[expr]
-                else:
-                    # Parse expression into AST
-                    tokenizer = XPathTokenizer(expr)
-                    tokens = tokenizer.tokenize()
-                    parser = XPathParser(tokens)
-                    ast = parser.parse()
-                    # Cache only short expressions
-                    self.evaluator._expression_cache[expr] = ast
+        # Optimized: use evaluator's expression cache if available
+        # Check cache first (only for short expressions to avoid memory bloat)
+        if len(expr) < 100 and hasattr(self.evaluator, '_expression_cache'):
+            if expr in self.evaluator._expression_cache:
+                ast = self.evaluator._expression_cache[expr]
             else:
-                # Parse and evaluate using AST (no caching for long expressions)
+                # Parse expression into AST
                 tokenizer = XPathTokenizer(expr)
                 tokens = tokenizer.tokenize()
                 parser = XPathParser(tokens)
                 ast = parser.parse()
-            
-            result = ast.evaluate(self.evaluator)
-        finally:
-            # Restore context
-            self.evaluator.data = old_data
-            self.evaluator._set_context_path(old_context_path)
-            self.evaluator.original_context_path = old_original_context_path
-            self.evaluator.original_data = old_original_data
-
+                # Cache only short expressions
+                self.evaluator._expression_cache[expr] = ast
+        else:
+            # Parse and evaluate using AST (no caching for long expressions)
+            tokenizer = XPathTokenizer(expr)
+            tokens = tokenizer.tokenize()
+            parser = XPathParser(tokens)
+            ast = parser.parse()
+        
+        result = ast.evaluate(self.evaluator, new_context)
         return result

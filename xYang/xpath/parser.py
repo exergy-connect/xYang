@@ -193,7 +193,7 @@ class XPathTokenizer:
 
         # Check for .. (parent path)
         if self._peek_char(1) == '.':
-            self.tokens.append(Token(TokenType.IDENTIFIER, '..', start_pos))
+            self.tokens.append(Token(TokenType.DOTDOT, '..', start_pos))
             self.position += 2
         else:
             # Single dot
@@ -352,7 +352,7 @@ class XPathParser:
             if isinstance(left, PathNode):
                 # Path continuation - merge paths
                 self._consume()
-                right_path = self._parse_path()
+                right_path = self._parse_path(is_absolute=False)
                 left.steps.extend(right_path.steps)
                 # Only overwrite predicate if right has one
                 if right_path.predicate is not None:
@@ -360,7 +360,7 @@ class XPathParser:
             elif isinstance(left, FunctionCallNode) and left.name == 'deref':
                 # deref() followed by / is path navigation
                 self._consume()
-                right_path = self._parse_path()
+                right_path = self._parse_path(is_absolute=False)
                 left = BinaryOpNode('/', left, right_path)
             else:
                 # Regular division
@@ -456,18 +456,23 @@ class XPathParser:
                 self._consume(TokenType.PAREN_CLOSE)
             return CurrentNode(is_current_function=False)
 
+        # Parent path (..) - treat as path expression
+        if token.type == TokenType.DOTDOT:
+            return self._parse_path(is_absolute=False)
+
         # Function calls - check if identifier is followed by (
         if token.type == TokenType.IDENTIFIER:
             # Peek ahead to see if it's a function call
             if (self.position + 1 < len(self.tokens) and
                 self.tokens[self.position + 1].type == TokenType.PAREN_OPEN):
                 return self._parse_function_call()
-            # Otherwise, it's a path (could be .. or field name)
-            return self._parse_path()
+            # Otherwise, it's a path (field name)
+            return self._parse_path(is_absolute=False)
 
         # Path expressions starting with slash
         if token.type == TokenType.SLASH:
-            return self._parse_path()
+            self._consume()
+            return self._parse_path(is_absolute=True)
 
         # Parenthesized expressions
         if token.type == TokenType.PAREN_OPEN:
@@ -488,22 +493,20 @@ class XPathParser:
 
         return args
 
-    def _parse_path(self) -> XPathNode:
-        """Parse a path expression."""
+    def _parse_path(self, is_absolute: bool = False) -> XPathNode:
+        """Parse a path expression.
+        
+        Args:
+            is_absolute: Whether this is an absolute path (starts with /)
+        """
         steps = []
-        is_absolute = False
-
-        # Check for absolute path
-        if self._current_token().type == TokenType.SLASH:
-            self._consume()
-            is_absolute = True
 
         # Parse path steps
         while True:
             token = self._current_token()
 
             # Parent step (..)
-            if token.type == TokenType.IDENTIFIER and token.value == '..':
+            if token.type == TokenType.DOTDOT:
                 steps.append(self._consume().value)
                 # Check for slash after ..
                 if self._current_token().type == TokenType.SLASH:

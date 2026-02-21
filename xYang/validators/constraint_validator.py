@@ -7,6 +7,7 @@ from typing import Any, Dict, List
 from ..module import YangModule
 from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt, YangLeafListStmt
 from ..xpath import XPathEvaluator
+from ..xpath.context import Context
 
 logger = logging.getLogger(__name__)
 
@@ -86,36 +87,43 @@ class ConstraintValidator:
         """Get root_data from evaluator or use fallback."""
         return evaluator.root_data if hasattr(evaluator, 'root_data') else fallback
     
-    def _setup_evaluator_context(
-        self, 
-        evaluator: XPathEvaluator, 
-        context_path: List[str], 
+    def _create_evaluator_context(
+        self,
+        context_path: List[str],
         root_data: Dict[str, Any]
-    ) -> None:
+    ) -> Context:
         """
-        Set up evaluator context for must constraint evaluation.
-        
+        Create evaluator context for must constraint evaluation.
+    
         Args:
-            evaluator: XPath evaluator to configure
             context_path: Current path in data structure
             root_data: Root data structure
+            
+        Returns:
+            Context object for evaluation
         """
-        evaluator._set_context_path(context_path)  # Use _set_context_path to update cached length
-        evaluator.original_context_path = context_path.copy() if context_path else []
-        evaluator.original_data = root_data
+        from ..xpath.context import Context
         
         # Navigate to current data context
         current_data = self._navigate_path(root_data, context_path)
         
-        # Set evaluator.data appropriately
+        # Create context with appropriate data
         if current_data is not None and not isinstance(current_data, (dict, list)):
             # Primitive value - use root_data so current() can navigate via context_path
-            evaluator.data = root_data
+            data = root_data
         elif current_data is not None:
-            evaluator.data = current_data
+            data = current_data
         else:
             # Path doesn't exist - use root_data as fallback
-            evaluator.data = root_data
+            data = root_data
+        
+        return Context(
+            data=data,
+            context_path=context_path.copy() if context_path else [],
+            original_context_path=context_path.copy() if context_path else [],
+            original_data=root_data,
+            root_data=root_data
+        )
     
     def _resolve_schema_node_by_path(
         self,
@@ -199,8 +207,8 @@ class ConstraintValidator:
                     child_stmt.name if hasattr(child_stmt, 'name') else type(child_stmt).__name__, 
                     child_path)
         
-        # Set up evaluator context
-        self._setup_evaluator_context(evaluator, child_path, root_data)
+        # Create evaluator context
+        context = self._create_evaluator_context(child_path, root_data)
         
         # Validate must statements on this child statement only
         if isinstance(child_stmt, YangLeafStmt):
@@ -244,9 +252,9 @@ class ConstraintValidator:
             # Evaluate must constraints from the resolved schema node
             logger.debug("Evaluating %d must constraints for leaf %s in list item", len(actual_schema_node.must_statements), actual_schema_node.name)
             for must in actual_schema_node.must_statements:
-                evaluator.original_data = root_data
-                evaluator.original_context_path = child_path.copy() if child_path else []
-                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, actual_schema_node)
+                # Create context for this specific child path
+                child_context = self._create_evaluator_context(child_path, root_data)
+                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, child_context, actual_schema_node)
         
         elif isinstance(child_stmt, YangLeafListStmt):
             # Leaf-list: evaluate must constraints per-element with current() bound to each value
@@ -281,20 +289,16 @@ class ConstraintValidator:
             logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
                         len(child_stmt.must_statements), child_stmt.name, len(leaf_list_data))
             for value_idx, value in enumerate(leaf_list_data):
-                # Set up evaluator context for this specific value
+                # Create evaluator context for this specific value
                 # current() should be bound to this value
                 value_path = child_path + [value_idx]
-                self._setup_evaluator_context(evaluator, value_path, root_data)
-                
-                # Set original context so current() returns this value
-                evaluator.original_data = root_data
-                evaluator.original_context_path = value_path.copy() if value_path else []
+                value_context = self._create_evaluator_context(value_path, root_data)
                 
                 # Evaluate each must constraint for this value
                 for must in child_stmt.must_statements:
                     logger.debug("Evaluating must constraint for leaf-list %s value[%d]=%s in list item", 
                                child_stmt.name, value_idx, value)
-                    self._evaluate_must_constraint(evaluator, must, f"{child_stmt.name}[{value_idx}]", False, child_stmt)
+                    self._evaluate_must_constraint(evaluator, must, f"{child_stmt.name}[{value_idx}]", False, value_context, child_stmt)
         
         elif isinstance(child_stmt, (YangListStmt, YangContainerStmt)):
             # Check if container/list exists in data before validating
@@ -309,9 +313,8 @@ class ConstraintValidator:
                         child_stmt.name, hasattr(child_stmt, 'must_statements') and len(child_stmt.must_statements) > 0, child_path)
             if hasattr(child_stmt, 'must_statements'):
                 for must in child_stmt.must_statements:
-                    evaluator.original_data = root_data
-                    evaluator.original_context_path = child_path.copy() if child_path else []
-                    self._evaluate_must_constraint(evaluator, must, child_stmt.name, False, child_stmt)
+                    child_context = self._create_evaluator_context(child_path, root_data)
+                    self._evaluate_must_constraint(evaluator, must, child_stmt.name, False, child_context, child_stmt)
             
             # If this is a list or container, we need to recurse into its items/children to validate grandchildren
             if isinstance(child_stmt, YangListStmt):
@@ -324,8 +327,7 @@ class ConstraintValidator:
                     for idx, item in enumerate(list_data):
                         item_path = child_path + [idx]
                         logger.debug("Validating nested list item %d at path %s", idx, item_path)
-                        # Set up evaluator context for this nested list item
-                        self._setup_evaluator_context(evaluator, item_path, root_data)
+                        # Context is created per-statement in _validate_must_in_statement
                         # Validate child statements for this nested list item
                         for grandchild in child_stmt.statements:
                             logger.debug("Validating grandchild %s in nested list item %d", 
@@ -367,7 +369,7 @@ class ConstraintValidator:
                                     item_path = grandchild_path + [idx]
                                     logger.debug("Validating grandchild list item %d at path %s, item keys=%s", 
                                                idx, item_path, list(item.keys())[:5] if isinstance(item, dict) else "N/A")
-                                    self._setup_evaluator_context(evaluator, item_path, root_data)
+                                    # Context is created per-statement in _validate_must_in_statement
                                     for great_grandchild in grandchild.statements:
                                         logger.debug("Validating great-grandchild %s in list item %d",
                                                     great_grandchild.name if hasattr(great_grandchild, 'name') else type(great_grandchild).__name__, idx)
@@ -387,6 +389,7 @@ class ConstraintValidator:
         must_expr: Any,
         field_name: str,
         is_mandatory: bool,
+        context: Context,
         stmt: YangStatement = None
     ) -> None:
         """
@@ -397,74 +400,17 @@ class ConstraintValidator:
             must_expr: Must statement with expression and error_message
             field_name: Name of field being validated (for error messages)
             is_mandatory: Whether the field is mandatory
+            context: Context for evaluation (required, never None)
             stmt: The schema statement being validated (optional, for type checking)
+        
+        Note:
+            The deref() function validation is handled by the deref evaluator itself.
+            If deref() is called on a non-leafref node, it will return None, causing
+            the constraint to fail naturally. No special-case logic is needed here.
         """
-        # Check if constraint uses deref() - these should only be applied to leafref nodes
-        # Constraints that use deref() are only valid for leafref types or containers/lists
-        # that contain leafref children. For leaf statements, we must check the type.
-        expression = getattr(must_expr, 'expression', '') or ''
-        if 'deref(' in expression.lower():
-            # Get context path to check if we're in computed.fields
-            context_path = getattr(evaluator, 'original_context_path', None) or getattr(evaluator, 'context_path', [])
-            
-            # First check: if we're in computed.fields, check if deref() is used on the field itself
-            # (computed.fields[].field has type field-name, not leafref, so deref() on field is invalid)
-            # But deref() on entity is valid (entity is a leafref)
-            if 'computed' in context_path:
-                try:
-                    computed_idx = context_path.index("computed")
-                    if computed_idx + 1 < len(context_path) and context_path[computed_idx + 1] == "fields":
-                        # Check if deref() is used on the field itself (deref(current()) or deref(.))
-                        # If deref() is only used on entity (deref(../entity)), it's valid - don't skip
-                        # Only skip if deref() is used directly on current() or . (the field value)
-                        expr_lower = expression.lower()
-                        if 'deref(current())' in expr_lower or 'deref(.)' in expr_lower:
-                            # But allow deref(../entity) - check if it's specifically deref on entity
-                            # Allow any deref that references ../entity
-                            if '../entity' not in expression:
-                                logger.debug(
-                                    "Skipping deref() constraint on field %s inside computed.fields (path: %s)",
-                                    field_name, context_path
-                                )
-                                return
-                        # If deref() is used on ../entity, it's valid - don't skip
-                except (ValueError, AttributeError):
-                    pass
-            
-            # Second check: if statement is provided, check if it's a leafref type
-            if stmt:
-                if isinstance(stmt, YangLeafStmt):
-                    stmt_type_name = stmt.type.name if stmt.type else None
-                    if stmt_type_name != 'leafref':
-                        # Skip deref() constraints for non-leafref leaves, UNLESS deref() is used on ../entity
-                        # (entity is a leafref, so deref(../entity) is valid even for non-leafref fields)
-                        # This prevents foreign key constraints from being applied to computed.fields[].field
-                        # but allows constraints that reference the entity leafref
-                        if '../entity' not in expression:
-                            logger.debug(
-                                "Skipping deref() constraint for non-leafref leaf %s (type: %s, path: %s)",
-                                field_name, stmt_type_name, context_path
-                            )
-                            return
-                # For containers/lists, deref() constraints are allowed (they may reference leafref children)
-                # So we don't skip them here
-            else:
-                # If no statement provided, check context path as fallback
-                # This handles cases where stmt might not be passed correctly
-                if 'computed' in context_path and 'fields' in context_path:
-                    try:
-                        computed_idx = context_path.index("computed")
-                        if computed_idx + 1 < len(context_path) and context_path[computed_idx + 1] == "fields":
-                            logger.debug(
-                                "Skipping deref() constraint for field %s inside computed.fields (fallback check, path: %s)",
-                                field_name, context_path
-                            )
-                            return
-                    except (ValueError, AttributeError):
-                        pass
         
         # Debug: Log constraint evaluation
-        context_path = getattr(evaluator, 'original_context_path', None) or getattr(evaluator, 'context_path', [])
+        context_path = context.original_context_path if context.original_context_path else context.context_path
         stmt_info = f"stmt={type(stmt).__name__}" if stmt else "stmt=None"
         if stmt and isinstance(stmt, YangLeafStmt):
             stmt_info += f", type={stmt.type.name if stmt.type else 'None'}"
@@ -479,7 +425,7 @@ class ConstraintValidator:
         try:
             # Use pre-parsed AST if available to avoid double parsing
             ast = getattr(must_expr, 'ast', None)
-            result = evaluator.evaluate(must_expr.expression, ast=ast)
+            result = evaluator.evaluate(must_expr.expression, ast=ast, context=context)
             logger.info(
                 "Must constraint result for %s: %s (expression: %s)",
                 field_name, result, must_expr.expression
@@ -528,8 +474,8 @@ class ConstraintValidator:
         current_path = path + [stmt.name] if hasattr(stmt, 'name') else path
         root_data = self._get_root_data(evaluator, data)
         
-        # Set up evaluator context
-        self._setup_evaluator_context(evaluator, current_path, root_data)
+        # Create evaluator context
+        context = self._create_evaluator_context(current_path, root_data)
         
         # Validate must statements on this statement
         if isinstance(stmt, YangLeafStmt):
@@ -578,10 +524,9 @@ class ConstraintValidator:
             # Evaluate must constraints from the resolved schema node
             logger.debug("Evaluating %d must constraints for leaf %s", len(actual_schema_node.must_statements), actual_schema_node.name)
             for must in actual_schema_node.must_statements:
-                # Ensure original_data is set before each evaluation
-                evaluator.original_data = root_data
-                evaluator.original_context_path = current_path.copy() if current_path else []
-                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, actual_schema_node)
+                # Create context for this evaluation
+                leaf_context = self._create_evaluator_context(current_path, root_data)
+                self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, leaf_context, actual_schema_node)
         
         elif isinstance(stmt, YangLeafListStmt):
             # Leaf-list: evaluate must constraints per-element with current() bound to each value
@@ -616,20 +561,16 @@ class ConstraintValidator:
             logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
                         len(stmt.must_statements), stmt.name, len(leaf_list_data))
             for value_idx, value in enumerate(leaf_list_data):
-                # Set up evaluator context for this specific value
+                # Create evaluator context for this specific value
                 # current() should be bound to this value
                 value_path = current_path + [value_idx]
-                self._setup_evaluator_context(evaluator, value_path, root_data)
-                
-                # Set original context so current() returns this value
-                evaluator.original_data = root_data
-                evaluator.original_context_path = value_path.copy() if value_path else []
+                value_context = self._create_evaluator_context(value_path, root_data)
                 
                 # Evaluate each must constraint for this value
                 for must in stmt.must_statements:
                     logger.debug("Evaluating must constraint for leaf-list %s value[%d]=%s", 
                                stmt.name, value_idx, value)
-                    self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False, stmt)
+                    self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{value_idx}]", False, value_context, stmt)
                 
         elif isinstance(stmt, (YangListStmt, YangContainerStmt)):
             # Check if container/list exists in data before validating
@@ -648,26 +589,22 @@ class ConstraintValidator:
                     # Evaluate must constraints for each list item
                     for idx, item in enumerate(list_data):
                         item_path = current_path + [idx]
-                        self._setup_evaluator_context(evaluator, item_path, root_data)
+                        item_context = self._create_evaluator_context(item_path, root_data)
                         if hasattr(stmt, 'must_statements'):
                             for must in stmt.must_statements:
-                                evaluator.original_data = root_data
-                                evaluator.original_context_path = item_path.copy() if item_path else []
-                                self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{idx}]", False, stmt)
+                                self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{idx}]", False, item_context, stmt)
                 else:
                     # List doesn't exist or is not a list - evaluate at list level
                     if hasattr(stmt, 'must_statements'):
+                        list_context = self._create_evaluator_context(current_path, root_data)
                         for must in stmt.must_statements:
-                            evaluator.original_data = root_data
-                            evaluator.original_context_path = current_path.copy() if current_path else []
-                            self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
+                            self._evaluate_must_constraint(evaluator, must, stmt.name, False, list_context, stmt)
             else:
                 # Container: evaluate must constraints at container level
                 if hasattr(stmt, 'must_statements'):
+                    container_context = self._create_evaluator_context(current_path, root_data)
                     for must in stmt.must_statements:
-                        evaluator.original_data = root_data
-                        evaluator.original_context_path = current_path.copy() if current_path else []
-                        self._evaluate_must_constraint(evaluator, must, stmt.name, False, stmt)
+                        self._evaluate_must_constraint(evaluator, must, stmt.name, False, container_context, stmt)
         
         # Recurse into child statements
         if hasattr(stmt, 'statements'):
@@ -682,8 +619,7 @@ class ConstraintValidator:
                     for idx, item in enumerate(list_data):
                         item_path = current_path + [idx]
                         logger.debug("Validating list item %d at path %s", idx, item_path)
-                        # Set up evaluator context for this list item
-                        self._setup_evaluator_context(evaluator, item_path, root_data)
+                        # Context is created per-statement in _validate_must_in_statement
                         # Validate child statements for this list item
                         # Use a helper to validate children without double recursion
                         for child in stmt.statements:

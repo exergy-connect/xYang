@@ -163,18 +163,16 @@ def test_deref_simple_entity_reference():
     
     # Test deref from a field's foreignKey.entity to get the entity node
     # Context: we're at department.fields[0].foreignKey.entity (value is "company")
-    evaluator = XPathEvaluator(
-        data,
-        module,
-        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
-    )
+    evaluator = XPathEvaluator(data, module)
+    context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+    context = evaluator.create_context(data, context_path)
     
     # Verify we can get the entity value
-    entity_value = evaluator.evaluate_value('current()')
+    entity_value = evaluator.evaluate_value('current()', context)
     assert entity_value == "company"
     
     # Now deref should resolve it to the entity node
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', context)
     # Expected: should return the company entity node
     # Current behavior: may return None
     if result is None:
@@ -235,16 +233,17 @@ def test_deref_parents_child_fk():
         module,
         context_path=parent_context
     )
+    context = evaluator.create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "company_id" to the field node
-    field_node = evaluator.evaluate_value('deref(current())')
+    field_node = evaluator.evaluate_value('deref(current())', context)
     assert field_node is not None
     assert isinstance(field_node, dict)
     assert field_node.get("name") == "company_id"
     assert "foreignKey" in field_node
     
     # Test navigating to foreignKey
-    fk_def = evaluator.evaluate_value('deref(current())/../foreignKey')
+    fk_def = evaluator.evaluate_value('deref(current())/../foreignKey', context)
     assert fk_def is not None
     assert isinstance(fk_def, dict)
     assert fk_def.get("entity") == "company"
@@ -301,9 +300,10 @@ def test_deref_parents_parent_array():
         module,
         context_path=parent_context
     )
+    context = evaluator.create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "departments" to the field node in company
-    field_node = evaluator.evaluate_value('deref(current())')
+    field_node = evaluator.evaluate_value('deref(current())', context)
     assert field_node is not None
     assert isinstance(field_node, dict)
     assert field_node.get("name") == "departments"
@@ -312,7 +312,7 @@ def test_deref_parents_parent_array():
     # Test the complex constraint: verify field exists in parent entity
     # deref(deref(../child_fk)/../foreignKey/entity) should get company entity
     # Then /../fields[name = current()] should find the "departments" field
-    parent_entity = evaluator.evaluate_value('deref(deref(../child_fk)/../foreignKey/entity)')
+    parent_entity = evaluator.evaluate_value('deref(deref(../child_fk)/../foreignKey/entity)', context)
     if parent_entity is None:
         pytest.skip("Nested deref() not fully implemented - this is a known limitation")
     assert parent_entity is not None
@@ -365,19 +365,20 @@ def test_deref_self_referential():
         module,
         context_path=parent_context
     )
+    context = evaluator.create_context(data, parent_context)
     
     # Test deref(current()) - should resolve "manager_id" to the field node
-    field_node = evaluator.evaluate_value('deref(current())')
+    field_node = evaluator.evaluate_value('deref(current())', context)
     assert field_node is not None
     assert isinstance(field_node, dict)
     assert field_node.get("name") == "manager_id"
     
     # Test that foreignKey.entity resolves to "employee" (self-reference)
-    entity_name = evaluator.evaluate_value('deref(current())/../foreignKey/entity')
+    entity_name = evaluator.evaluate_value('deref(current())/../foreignKey/entity', context)
     assert entity_name == "employee"
     
     # Test nested deref to get the employee entity node
-    entity_node = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    entity_node = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', context)
     if entity_node is None:
         pytest.skip("Nested deref() not fully implemented - this is a known limitation")
     assert entity_node is not None
@@ -432,13 +433,14 @@ def test_deref_cross_entity_validation():
         module,
         context_path=parent_context
     )
+    context = evaluator.create_context(data, parent_context)
     
     # Get the child_fk value
-    child_fk_value = evaluator.evaluate_value('current()')
+    child_fk_value = evaluator.evaluate_value('current()', context)
     assert child_fk_value == "company_id"
     
     # Get the parent entity's first primary key
-    parent_entity = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    parent_entity = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', context)
     if parent_entity is None:
         pytest.skip("Nested deref() not fully implemented - this is a known limitation")
     assert parent_entity is not None
@@ -449,7 +451,7 @@ def test_deref_cross_entity_validation():
     # Test the full constraint
     # current() should equal parent's primary_key[1]
     # Note: XPath uses 1-based indexing, so [1] is the first element
-    result = evaluator.evaluate('current() = deref(deref(current())/../foreignKey/entity)/../primary_key[1]')
+    result = evaluator.evaluate('current() = deref(deref(current())/../foreignKey/entity)/../primary_key[1]', context)
     assert result is True
 
 
@@ -486,25 +488,27 @@ def test_deref_field_type_matching():
     # Test constraint: child FK field type must match parent PK field type
     # deref(current())/../type = deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]/type
     # Context: department.fields[0].foreignKey.entity (the leafref leaf)
+    entity_context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     entity_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+        context_path=entity_context_path
     )
+    entity_context = entity_evaluator.create_context(data, entity_context_path)
     
     # Verify we're at the entity leafref
-    entity_name = entity_evaluator.evaluate_value('current()')
+    entity_name = entity_evaluator.evaluate_value('current()', entity_context)
     assert entity_name == "company"
     
     # Get parent entity via deref
-    parent_entity = entity_evaluator.evaluate_value('deref(current())')
+    parent_entity = entity_evaluator.evaluate_value('deref(current())', entity_context)
     assert parent_entity is not None
     assert isinstance(parent_entity, dict)
     assert parent_entity.get("name") == "company"
     
     # Get the child field (company_id field in department)
     # Navigate back to the field node to get its type
-    child_field = entity_evaluator.evaluate_value('../..')
+    child_field = entity_evaluator.evaluate_value('../..', entity_context)
     assert child_field is not None
     assert isinstance(child_field, dict)
     child_type = child_field.get("type")
@@ -512,7 +516,7 @@ def test_deref_field_type_matching():
     
     # Get parent field type
     # Find field in parent entity where name matches foreignKey.field
-    fk_field = entity_evaluator.evaluate_value('../field')
+    fk_field = entity_evaluator.evaluate_value('../field', entity_context)
     assert fk_field == "company_id"
     
     # Find the field in parent entity
@@ -555,9 +559,10 @@ def test_deref_nonexistent_reference():
         module,
         context_path=field_context
     )
+    context = evaluator.create_context(data, field_context)
     
     # deref() should return None for nonexistent entity
-    result = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    result = evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', context)
     # Should return None since "nonexistent" entity doesn't exist
     assert result is None
 
@@ -593,24 +598,26 @@ def test_deref_cache():
     module = parse_yang_string(DATA_MODEL_YANG)
     
     # Context: department.fields[0].foreignKey.entity (the leafref leaf)
+    entity_context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     entity_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+        context_path=entity_context_path
     )
+    entity_context = entity_evaluator.create_context(data, entity_context_path)
     
     # Verify we're at the entity leafref
-    entity_name = entity_evaluator.evaluate_value('current()')
+    entity_name = entity_evaluator.evaluate_value('current()', entity_context)
     assert entity_name == "company"
     
     # First call should populate cache
-    result1 = entity_evaluator.evaluate_value('deref(current())')
+    result1 = entity_evaluator.evaluate_value('deref(current())', entity_context)
     assert result1 is not None
     assert isinstance(result1, dict)
     assert result1.get("name") == "company"
     
     # Second call should use cache
-    result2 = entity_evaluator.evaluate_value('deref(current())')
+    result2 = entity_evaluator.evaluate_value('deref(current())', entity_context)
     assert result2 is not None
     assert result1 == result2
     
@@ -694,18 +701,20 @@ def test_deref_physics_array_foreignkey():
     
     # Test deref() from item_type.foreignKey.entity in violated_claims field
     # Context: anomaly.fields[1].item_type.foreignKey.entity (value is "claim")
+    evaluator_context_path = ["data-model", "entities", 3, "fields", 1, "item_type", "foreignKey", "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 3, "fields", 1, "item_type", "foreignKey", "entity"]
+        context_path=evaluator_context_path
     )
+    evaluator_context = evaluator.create_context(data, evaluator_context_path)
     
     # Verify current value
-    current_val = evaluator.evaluate_value('current()')
+    current_val = evaluator.evaluate_value('current()', evaluator_context)
     assert current_val == "claim"
     
     # deref() should resolve "claim" to the claim entity node
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', evaluator_context)
     assert result is not None
     assert isinstance(result, dict)
     assert result.get("name") == "claim"
@@ -785,44 +794,50 @@ def test_deref_physics_parent_child_relationship():
     # This validates that child_fk field exists and has foreignKey definition
     
     # First, test from the child_fk leafref itself
+    child_fk_context_path = ["data-model", "entities", 1, "parents", 0, "child_fk"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "child_fk"]
+        context_path=child_fk_context_path
     )
+    child_fk_context = evaluator.create_context(data, child_fk_context_path)
     
     # child_fk should reference "anomaly_id" field
-    child_fk_value = evaluator.evaluate_value('current()')
+    child_fk_value = evaluator.evaluate_value('current()', child_fk_context)
     assert child_fk_value == "anomaly_id"
     
     # Navigate to the field and get its foreignKey.entity
     # Context: violated_assumption.fields[1] (anomaly_id field)
+    field_context_path = ["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
     field_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
+        context_path=field_context_path
     )
+    field_context = field_evaluator.create_context(data, field_context_path)
     
     # Verify foreignKey.entity value
-    entity_value = field_evaluator.evaluate_value('current()')
+    entity_value = field_evaluator.evaluate_value('current()', field_context)
     assert entity_value == "anomaly"
     
     # deref() should resolve "anomaly" to the anomaly entity node
-    result = field_evaluator.evaluate_value('deref(current())')
+    result = field_evaluator.evaluate_value('deref(current())', field_context)
     assert result is not None
     assert isinstance(result, dict)
     assert result.get("name") == "anomaly"
     
     # Test parent_array validation: deref(deref(../child_fk)/../foreignKey/entity)/../fields[name = ../parent_array]
     # This validates that parent_array exists in the parent entity's fields
+    parent_array_context_path = ["data-model", "entities", 1, "parents", 0, "parent_array"]
     parent_array_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "parent_array"]
+        context_path=parent_array_context_path
     )
+    parent_array_context = parent_array_evaluator.create_context(data, parent_array_context_path)
     
     # parent_array should reference "violated_assumptions"
-    parent_array_value = parent_array_evaluator.evaluate_value('current()')
+    parent_array_value = parent_array_evaluator.evaluate_value('current()', parent_array_context)
     assert parent_array_value == "violated_assumptions"
     
     # Verify that violated_assumptions field exists in anomaly entity
@@ -902,36 +917,40 @@ def test_deref_physics_cross_entity_reference():
     module = parse_yang_string(DATA_MODEL_YANG)
     
     # Test deref() from anomaly.theory_id foreignKey.entity
+    evaluator_context_path = ["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
+        context_path=evaluator_context_path
     )
+    evaluator_context = evaluator.create_context(data, evaluator_context_path)
     
     # Verify current value
-    current_val = evaluator.evaluate_value('current()')
+    current_val = evaluator.evaluate_value('current()', evaluator_context)
     assert current_val == "theory"
     
     # deref() should resolve "theory" to the theory entity node
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', evaluator_context)
     assert result is not None
     assert isinstance(result, dict)
     assert result.get("name") == "theory"
     assert "theory_id" in [f.get("name") for f in result.get("fields", [])]
     
     # Test deref() from violated_assumption.assumption_id foreignKey.entity
+    assumption_context_path = ["data-model", "entities", 3, "fields", 1, "foreignKey", "entity"]
     assumption_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 3, "fields", 1, "foreignKey", "entity"]
+        context_path=assumption_context_path
     )
+    assumption_context = assumption_evaluator.create_context(data, assumption_context_path)
     
     # Verify current value
-    assumption_val = assumption_evaluator.evaluate_value('current()')
+    assumption_val = assumption_evaluator.evaluate_value('current()', assumption_context)
     assert assumption_val == "assumption"
     
     # deref() should resolve "assumption" to the assumption entity node
-    assumption_result = assumption_evaluator.evaluate_value('deref(current())')
+    assumption_result = assumption_evaluator.evaluate_value('deref(current())', assumption_context)
     assert assumption_result is not None
     assert isinstance(assumption_result, dict)
     assert assumption_result.get("name") == "assumption"
@@ -999,37 +1018,41 @@ def test_deref_physics_nested_deref_validation():
     # Step 4: deref(...) resolves "anomaly" to the anomaly entity node
     
     # Start from parents[0].child_fk (which is a leafref to fields/name)
+    evaluator_context_path = ["data-model", "entities", 1, "parents", 0, "child_fk"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "child_fk"]
+        context_path=evaluator_context_path
     )
+    evaluator_context = evaluator.create_context(data, evaluator_context_path)
     
     # child_fk should reference "anomaly_id" field name
-    child_fk_value = evaluator.evaluate_value('current()')
+    child_fk_value = evaluator.evaluate_value('current()', evaluator_context)
     assert child_fk_value == "anomaly_id"
     
     # deref(current()) should resolve "anomaly_id" to the field node
     # The leafref path is "../../fields/name", so deref() should find the field in the same entity
-    field_node = evaluator.evaluate_value('deref(current())')
+    field_node = evaluator.evaluate_value('deref(current())', evaluator_context)
     assert field_node is not None, "deref() should resolve child_fk to field node"
     assert isinstance(field_node, dict), "Should return field node"
     assert field_node.get("name") == "anomaly_id", "Should resolve to anomaly_id field"
     
     # Test from the field's foreignKey.entity directly
     # Context: violated_assumption.fields[1].foreignKey.entity
+    entity_context_path = ["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
     entity_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
+        context_path=entity_context_path
     )
+    entity_context = entity_evaluator.create_context(data, entity_context_path)
     
     # Verify we can get the entity name
-    entity_name = entity_evaluator.evaluate_value('current()')
+    entity_name = entity_evaluator.evaluate_value('current()', entity_context)
     assert entity_name == "anomaly"
     
     # deref() should resolve "anomaly" to the anomaly entity node
-    entity_node = entity_evaluator.evaluate_value('deref(current())')
+    entity_node = entity_evaluator.evaluate_value('deref(current())', entity_context)
     assert entity_node is not None
     assert isinstance(entity_node, dict)
     assert entity_node.get("name") == "anomaly"
@@ -1098,19 +1121,21 @@ def test_deref_physics_parents_validation_constraints():
     # Test constraint 1: deref(current())/../foreignKey
     # Context: violated_assumption.parents[0].child_fk (value is "anomaly_id")
     # This should resolve "anomaly_id" to the field node, then navigate to foreignKey
+    child_fk_context_path = ["data-model", "entities", 1, "parents", 0, "child_fk"]
     child_fk_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "child_fk"]
+        context_path=child_fk_context_path
     )
+    child_fk_context = child_fk_evaluator.create_context(data, child_fk_context_path)
     
     # child_fk is a leafref pointing to fields/name, so current() returns "anomaly_id"
-    child_fk_value = child_fk_evaluator.evaluate_value('current()')
+    child_fk_value = child_fk_evaluator.evaluate_value('current()', child_fk_context)
     assert child_fk_value == "anomaly_id"
     
     # deref(current()) should resolve "anomaly_id" to the field node in violated_assumption
     # The leafref path is "../../fields/name", so we need to find the field in the same entity
-    field_node = child_fk_evaluator.evaluate_value('deref(current())')
+    field_node = child_fk_evaluator.evaluate_value('deref(current())', child_fk_context)
     # Note: deref() on a field name should find the field in the current entity's fields list
     if field_node is None:
         pytest.skip("deref() cannot resolve field name to field node - this is the failing case")
@@ -1120,7 +1145,7 @@ def test_deref_physics_parents_validation_constraints():
     assert field_node.get("name") == "anomaly_id"
     
     # Navigate to foreignKey
-    fk_def = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey')
+    fk_def = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey', child_fk_context)
     assert fk_def is not None
     assert isinstance(fk_def, dict)
     assert fk_def.get("entity") == "anomaly"
@@ -1128,10 +1153,10 @@ def test_deref_physics_parents_validation_constraints():
     
     # Test constraint 2: deref(deref(current())/../foreignKey/entity)
     # This should resolve "anomaly" to the anomaly entity node
-    entity_name = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey/entity')
+    entity_name = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey/entity', child_fk_context)
     assert entity_name == "anomaly"
     
-    entity_node = child_fk_evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    entity_node = child_fk_evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', child_fk_context)
     if entity_node is None:
         pytest.skip("Nested deref() not fully implemented - this is the failing case in physics model validation")
     assert entity_node is not None
@@ -1140,7 +1165,7 @@ def test_deref_physics_parents_validation_constraints():
     
     # Test constraint 3: deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]
     # This validates that the foreignKey.field exists in the parent entity
-    fk_field_name = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey/field')
+    fk_field_name = child_fk_evaluator.evaluate_value('deref(current())/../foreignKey/field', child_fk_context)
     assert fk_field_name == "anomaly_id"
     
     # Find the field in the parent entity
@@ -1156,27 +1181,29 @@ def test_deref_physics_parents_validation_constraints():
     
     # Test constraint 5: current() = deref(deref(current())/../foreignKey/entity)/../primary_key[1]
     # This validates that child_fk name matches parent's first primary key
-    child_fk_name = child_fk_evaluator.evaluate_value('current()')
+    child_fk_name = child_fk_evaluator.evaluate_value('current()', child_fk_context)
     parent_first_pk = parent_pk[0] if parent_pk else None
     assert child_fk_name == parent_first_pk == "anomaly_id"
     
     # Test constraint 6: deref(current())/../type = 'array'
     # Context: violated_assumption.parents[0].parent_array (value is "violated_assumptions")
     # This should resolve "violated_assumptions" to the field node in anomaly entity
+    parent_array_context_path = ["data-model", "entities", 1, "parents", 0, "parent_array"]
     parent_array_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "parent_array"]
+        context_path=parent_array_context_path
     )
+    parent_array_context = parent_array_evaluator.create_context(data, parent_array_context_path)
     
     # parent_array is a leafref pointing to /data-model/entities/fields/name
     # So it can reference any field name in any entity
-    parent_array_value = parent_array_evaluator.evaluate_value('current()')
+    parent_array_value = parent_array_evaluator.evaluate_value('current()', parent_array_context)
     assert parent_array_value == "violated_assumptions"
     
     # deref(current()) should resolve "violated_assumptions" to the field node
     # Since parent_array is an absolute leafref, it should find the field in any entity
-    array_field_node = parent_array_evaluator.evaluate_value('deref(current())')
+    array_field_node = parent_array_evaluator.evaluate_value('deref(current())', parent_array_context)
     if array_field_node is None:
         pytest.skip("deref() cannot resolve absolute leafref to field node - this is the failing case")
     
@@ -1195,7 +1222,7 @@ def test_deref_physics_parents_validation_constraints():
     # 4. /../fields[name = current()] - find field with name="violated_assumptions"
     
     # Get the parent entity via child_fk's foreignKey
-    parent_entity_via_fk = parent_array_evaluator.evaluate_value('deref(deref(../child_fk)/../foreignKey/entity)')
+    parent_entity_via_fk = parent_array_evaluator.evaluate_value('deref(deref(../child_fk)/../foreignKey/entity)', parent_array_context)
     assert parent_entity_via_fk is not None
     assert isinstance(parent_entity_via_fk, dict)
     assert parent_entity_via_fk.get("name") == "anomaly"
@@ -1258,19 +1285,21 @@ def test_deref_circular_reference():
     
     # Test 1: Self-referential foreign key (employee -> employee)
     # Context: employee.fields[1].foreignKey.entity (value is "employee")
+    evaluator_context_path = ["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
+        context_path=evaluator_context_path
     )
+    evaluator_context = evaluator.create_context(data, evaluator_context_path)
     
     # Verify current value
-    current_val = evaluator.evaluate_value('current()')
+    current_val = evaluator.evaluate_value('current()', evaluator_context)
     assert current_val == "employee"
     
     # deref() should resolve "employee" to the employee entity node
     # This is a self-reference, so it should work fine
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', evaluator_context)
     assert result is not None
     assert isinstance(result, dict)
     assert result.get("name") == "employee"
@@ -1330,38 +1359,44 @@ def test_deref_circular_reference():
     
     # Test deref chain: entity_a -> entity_b -> entity_c -> entity_a
     # Start from entity_a.fields[1].foreignKey.entity
+    a_context_path = ["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
     a_evaluator = XPathEvaluator(
         data_circular,
         module,
-        context_path=["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
+        context_path=a_context_path
     )
+    a_context = a_evaluator.create_context(data_circular, a_context_path)
     
     # Get entity_b
-    b_entity = a_evaluator.evaluate_value('deref(current())')
+    b_entity = a_evaluator.evaluate_value('deref(current())', a_context)
     assert b_entity is not None
     assert b_entity.get("name") == "entity_b"
     
     # Navigate to entity_b.fields[1].foreignKey.entity
+    b_context_path = ["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
     b_evaluator = XPathEvaluator(
         data_circular,
         module,
-        context_path=["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
+        context_path=b_context_path
     )
+    b_context = b_evaluator.create_context(data_circular, b_context_path)
     
     # Get entity_c
-    c_entity = b_evaluator.evaluate_value('deref(current())')
+    c_entity = b_evaluator.evaluate_value('deref(current())', b_context)
     assert c_entity is not None
     assert c_entity.get("name") == "entity_c"
     
     # Navigate to entity_c.fields[1].foreignKey.entity
+    c_context_path = ["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
     c_evaluator = XPathEvaluator(
         data_circular,
         module,
-        context_path=["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
+        context_path=c_context_path
     )
+    c_context = c_evaluator.create_context(data_circular, c_context_path)
     
     # Get entity_a (completing the circle)
-    a_entity_again = c_evaluator.evaluate_value('deref(current())')
+    a_entity_again = c_evaluator.evaluate_value('deref(current())', c_context)
     assert a_entity_again is not None
     assert a_entity_again.get("name") == "entity_a"
     
@@ -1371,12 +1406,13 @@ def test_deref_circular_reference():
     deep_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
+        context_path=evaluator_context_path
     )
+    deep_context = deep_evaluator.create_context(data, evaluator_context_path)
     
     # Test: deref(deref(deref(current()))) - should still work (returns same entity)
     # Note: Multiple nested deref() calls may not be fully supported
-    deep_result = deep_evaluator.evaluate_value('deref(deref(deref(current())))')
+    deep_result = deep_evaluator.evaluate_value('deref(deref(deref(current())))', deep_context)
     if deep_result is None:
         pytest.skip("Deeply nested deref() not fully implemented - this is a known limitation")
     # Should return the employee entity (self-reference)
@@ -1422,18 +1458,20 @@ def test_deref_circular_reference():
     }
     
     # Test deref from parents[0].child_fk
+    category_context_path = ["data-model", "entities", 0, "parents", 0, "child_fk"]
     category_evaluator = XPathEvaluator(
         data_self_parent,
         module,
-        context_path=["data-model", "entities", 0, "parents", 0, "child_fk"]
+        context_path=category_context_path
     )
+    category_context = category_evaluator.create_context(data_self_parent, category_context_path)
     
     # child_fk should reference "parent_category_id"
-    child_fk_val = category_evaluator.evaluate_value('current()')
+    child_fk_val = category_evaluator.evaluate_value('current()', category_context)
     assert child_fk_val == "parent_category_id"
     
     # deref(current()) should resolve to the field node
-    field_node = category_evaluator.evaluate_value('deref(current())')
+    field_node = category_evaluator.evaluate_value('deref(current())', category_context)
     if field_node is None:
         pytest.skip("deref() cannot resolve field name to field node")
     
@@ -1441,12 +1479,12 @@ def test_deref_circular_reference():
     assert field_node.get("name") == "parent_category_id"
     
     # Navigate to foreignKey.entity and deref it
-    entity_name = category_evaluator.evaluate_value('deref(current())/../foreignKey/entity')
+    entity_name = category_evaluator.evaluate_value('deref(current())/../foreignKey/entity', category_context)
     assert entity_name == "category"
     
     # This is a self-reference - deref should still work
     # Note: Nested deref() may not be fully implemented
-    category_entity = category_evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)')
+    category_entity = category_evaluator.evaluate_value('deref(deref(current())/../foreignKey/entity)', category_context)
     if category_entity is None:
         pytest.skip("Nested deref() not fully implemented - this is a known limitation")
     assert category_entity is not None
@@ -1499,21 +1537,23 @@ def test_deref_circular_infinite_loop_prevention():
     
     # Test that single-level deref() on self-reference works without infinite loop
     # Context: node.fields[1].foreignKey.entity (value is "node")
+    node_context_path = ["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
+        context_path=node_context_path
     )
+    node_context = evaluator.create_context(data, node_context_path)
     
     # Verify current value
-    current_val = evaluator.evaluate_value('current()')
+    current_val = evaluator.evaluate_value('current()', node_context)
     assert current_val == "node"
     
     # Single deref() should resolve "node" to the node entity
     # This should complete quickly without infinite recursion
     import time
     start_time = time.time()
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', node_context)
     elapsed_time = time.time() - start_time
     
     # Should complete in reasonable time (less than 1 second)
@@ -1526,8 +1566,8 @@ def test_deref_circular_infinite_loop_prevention():
     
     # Test that calling deref() multiple times on the same value doesn't cause issues
     # This tests caching behavior
-    result2 = evaluator.evaluate_value('deref(current())')
-    result3 = evaluator.evaluate_value('deref(current())')
+    result2 = evaluator.evaluate_value('deref(current())', node_context)
+    result3 = evaluator.evaluate_value('deref(current())', node_context)
     
     # All results should be the same (cached)
     assert result == result2 == result3
@@ -1602,42 +1642,50 @@ def test_deref_circular_infinite_loop_prevention():
     
     # Test that each step in the chain works
     # A -> B
+    a_eval_context_path = ["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
     a_eval = XPathEvaluator(
         data_long_chain,
         module,
-        context_path=["data-model", "entities", 0, "fields", 1, "foreignKey", "entity"]
+        context_path=a_eval_context_path
     )
-    b_entity = a_eval.evaluate_value('deref(current())')
+    a_eval_context = a_eval.create_context(data_long_chain, a_eval_context_path)
+    b_entity = a_eval.evaluate_value('deref(current())', a_eval_context)
     assert b_entity is not None
     assert b_entity.get("name") == "entity_b"
     
     # B -> C
+    b_eval_context_path = ["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
     b_eval = XPathEvaluator(
         data_long_chain,
         module,
-        context_path=["data-model", "entities", 1, "fields", 1, "foreignKey", "entity"]
+        context_path=b_eval_context_path
     )
-    c_entity = b_eval.evaluate_value('deref(current())')
+    b_eval_context = b_eval.create_context(data_long_chain, b_eval_context_path)
+    c_entity = b_eval.evaluate_value('deref(current())', b_eval_context)
     assert c_entity is not None
     assert c_entity.get("name") == "entity_c"
     
     # C -> D
+    c_eval_context_path = ["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
     c_eval = XPathEvaluator(
         data_long_chain,
         module,
-        context_path=["data-model", "entities", 2, "fields", 1, "foreignKey", "entity"]
+        context_path=c_eval_context_path
     )
-    d_entity = c_eval.evaluate_value('deref(current())')
+    c_eval_context = c_eval.create_context(data_long_chain, c_eval_context_path)
+    d_entity = c_eval.evaluate_value('deref(current())', c_eval_context)
     assert d_entity is not None
     assert d_entity.get("name") == "entity_d"
     
     # D -> A (completing the circle)
+    d_eval_context_path = ["data-model", "entities", 3, "fields", 1, "foreignKey", "entity"]
     d_eval = XPathEvaluator(
         data_long_chain,
         module,
-        context_path=["data-model", "entities", 3, "fields", 1, "foreignKey", "entity"]
+        context_path=d_eval_context_path
     )
-    a_entity_again = d_eval.evaluate_value('deref(current())')
+    d_eval_context = d_eval.create_context(data_long_chain, d_eval_context_path)
+    a_entity_again = d_eval.evaluate_value('deref(current())', d_eval_context)
     assert a_entity_again is not None
     assert a_entity_again.get("name") == "entity_a"
     
@@ -1691,20 +1739,22 @@ def test_deref_current_leafref_schema_resolution():
     # The value is "company", and the schema defines this as a leafref with path
     # "/data-model/entities/name", so deref() should resolve to the company entity,
     # NOT to a heuristic lookup
+    evaluator_context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+        context_path=evaluator_context_path
     )
+    evaluator_context = evaluator.create_context(data, evaluator_context_path)
     
     # Verify current() returns the leafref value
-    current_value = evaluator.evaluate_value('current()')
+    current_value = evaluator.evaluate_value('current()', evaluator_context)
     assert current_value == "company"
     
     # CRITICAL: deref(current()) should use the schema definition's path
     # The schema defines foreignKey.entity as a leafref with path "/data-model/entities/name"
     # So deref() should resolve "company" by following that path, not by heuristic lookup
-    result = evaluator.evaluate_value('deref(current())')
+    result = evaluator.evaluate_value('deref(current())', evaluator_context)
     
     # Should resolve to the company entity node
     assert result is not None, "deref(current()) on leafref should resolve using schema path"
@@ -1779,20 +1829,22 @@ def test_deref_relative_vs_absolute_leafref_paths():
     # - Go up 2 levels from parents[0].child_fk: parents[0] -> entities[1] -> (root)
     # - Then navigate to fields/name
     # - Find field with name="company_id" in entities[1].fields
+    relative_context_path = ["data-model", "entities", 1, "parents", 0, "child_fk"]
     relative_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "parents", 0, "child_fk"]
+        context_path=relative_context_path
     )
+    relative_context = relative_evaluator.create_context(data, relative_context_path)
     
     # Verify current value
-    current_val = relative_evaluator.evaluate_value('current()')
+    current_val = relative_evaluator.evaluate_value('current()', relative_context)
     assert current_val == "company_id", "Should be at child_fk with value company_id"
     
     # deref() with relative path should resolve to the field node
     # The schema defines child_fk with path "../../fields/name" (relative)
     # This is resolved from the schema position of child_fk (under parents)
-    relative_result = relative_evaluator.evaluate_value('deref(current())')
+    relative_result = relative_evaluator.evaluate_value('deref(current())', relative_context)
     assert relative_result is not None, "Relative path leafref should resolve"
     assert isinstance(relative_result, dict), "Should return field node"
     assert relative_result.get("name") == "company_id", "Should resolve to company_id field"
@@ -1804,20 +1856,22 @@ def test_deref_relative_vs_absolute_leafref_paths():
     # - Start from document root (ignores current schema position)
     # - Navigate to /data-model/entities
     # - Find entity where name="company"
+    absolute_context_path = ["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
     absolute_evaluator = XPathEvaluator(
         data,
         module,
-        context_path=["data-model", "entities", 1, "fields", 0, "foreignKey", "entity"]
+        context_path=absolute_context_path
     )
+    absolute_context = absolute_evaluator.create_context(data, absolute_context_path)
     
     # Verify current value
-    current_val = absolute_evaluator.evaluate_value('current()')
+    current_val = absolute_evaluator.evaluate_value('current()', absolute_context)
     assert current_val == "company", "Should be at foreignKey.entity with value company"
     
     # deref() with absolute path should resolve to the entity node
     # The schema defines foreignKey.entity with path "/data-model/entities/name" (absolute)
     # This is resolved from the document root, not from the current schema position
-    absolute_result = absolute_evaluator.evaluate_value('deref(current())')
+    absolute_result = absolute_evaluator.evaluate_value('deref(current())', absolute_context)
     assert absolute_result is not None, "Absolute path leafref should resolve"
     assert isinstance(absolute_result, dict), "Should return entity node"
     assert absolute_result.get("name") == "company", "Should resolve to company entity"

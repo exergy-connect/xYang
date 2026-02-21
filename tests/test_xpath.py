@@ -12,7 +12,8 @@ def test_string_length():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["name"])
 
-    result = evaluator.evaluate_value('string-length(.)')
+    context = evaluator.create_context(data, ["name"])
+    result = evaluator.evaluate_value('string-length(.)', context)
     assert result == 10  # "test_value" has 10 characters
 
 
@@ -22,7 +23,8 @@ def test_translate():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["name"])
 
-    result = evaluator.evaluate_value('string-length(.) - string-length(translate(., "_", ""))')
+    context = evaluator.create_context(data, ["name"])
+    result = evaluator.evaluate_value('string-length(.) - string-length(translate(., "_", ""))', context)
     # Should count underscores: "test_value_with_underscores" has 3 underscores
     assert result == 3
 
@@ -33,12 +35,13 @@ def test_current():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["name"])
 
+    context = evaluator.create_context(data, ["name"])
     # Test current() returns the value
-    current_val = evaluator.evaluate_value('current()')
+    current_val = evaluator.evaluate_value('current()', context)
     assert current_val == "test"
 
     # Test comparison
-    result = evaluator.evaluate('current() = "test"')
+    result = evaluator.evaluate('current() = "test"', context)
     assert result is True
 
 
@@ -53,8 +56,9 @@ def test_relative_path():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["entity", "name"])
 
+    context = evaluator.create_context(data, ["entity", "name"])
     # From ['entity', 'name'], ../ goes to ['entity'], then max_underscores
-    result = evaluator.evaluate_value('../max_underscores')
+    result = evaluator.evaluate_value('../max_underscores', context)
     assert result == 2
 
 
@@ -64,10 +68,11 @@ def test_comparison():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["count"])
 
-    assert evaluator.evaluate('. <= 7') is True
-    assert evaluator.evaluate('. >= 3') is True
-    assert evaluator.evaluate('. = 5') is True
-    assert evaluator.evaluate('. != 10') is True
+    context = evaluator.create_context(data, ["count"])
+    assert evaluator.evaluate('. <= 7', context) is True
+    assert evaluator.evaluate('. >= 3', context) is True
+    assert evaluator.evaluate('. = 5', context) is True
+    assert evaluator.evaluate('. != 10', context) is True
 
 
 def test_logical_operators():
@@ -76,15 +81,16 @@ def test_logical_operators():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["type"])
 
-    result = evaluator.evaluate('../type = "date" or ../type = "datetime"')
+    context = evaluator.create_context(data, ["type"])
+    result = evaluator.evaluate('../type = "date" or ../type = "datetime"', context)
     assert result is True
 
     # Test that not() works correctly
-    result = evaluator.evaluate('not(../nonexistent_field)')
+    result = evaluator.evaluate('not(../nonexistent_field)', context)
     assert result is True  # Nonexistent field should make not() return True
 
     # Test simple or
-    result = evaluator.evaluate('true() or false()')
+    result = evaluator.evaluate('true() or false()', context)
     assert result is True
 
 
@@ -100,7 +106,8 @@ def test_count():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=[])
 
-    result = evaluator.evaluate_value('count(fields[type != "array"])')
+    context = evaluator.create_context(data, [])
+    result = evaluator.evaluate_value('count(fields[type != "array"])', context)
     assert result == 2  # Two non-array fields
 
 
@@ -115,11 +122,12 @@ def test_predicate_filtering():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=[])
 
+    context = evaluator.create_context(data, [])
     # Test filtering
-    result = evaluator.evaluate('count(../fields[name = current()])')
+    result = evaluator.evaluate('count(../fields[name = current()])', context)
     # This is more complex - would need proper context
     # For now, just test that it doesn't crash
-    assert isinstance(evaluator.evaluate('count(fields)'), (int, bool))
+    assert isinstance(evaluator.evaluate('count(fields)', context), (int, bool))
 
 
 def test_boolean_functions():
@@ -128,7 +136,8 @@ def test_boolean_functions():
     module = parse_yang_string("module test { }")
     evaluator = XPathEvaluator(data, module, context_path=["required"])
 
-    result = evaluator.evaluate('not(../default) or . = false()')
+    context = evaluator.create_context(data, ["required"])
+    result = evaluator.evaluate('not(../default) or . = false()', context)
     # If default doesn't exist, not(../default) should be True
     assert isinstance(result, bool)
 

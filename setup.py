@@ -10,11 +10,11 @@ with open("README.md", "r", encoding="utf-8") as fh:
 setup(
     name="xYang",
     version="0.1.0",
-    author="Xtract",
-    description="A Python library implementing a subset of YANG features",
+    author="Exergy LLC",
+    description="A Python library implementing a subset of YANG features focused on constraint validation",
     long_description=long_description,
     long_description_content_type="text/markdown",
-    url="https://github.com/xtract/xYang",
+    url="https://github.com/exergy-connect/xYang",
     packages=find_packages(),
     classifiers=[
         "Development Status :: 3 - Alpha",

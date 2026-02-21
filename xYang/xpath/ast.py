@@ -3,10 +3,15 @@ AST nodes for XPath expressions.
 """
 
 from enum import Enum
-from typing import Any, List, Optional, TYPE_CHECKING
+from typing import Any, List, Optional, TYPE_CHECKING, Union
 
 if TYPE_CHECKING:
     from .evaluator import XPathEvaluator
+    from .context import Context
+
+# Type alias for JSON-like values that XPath can evaluate to
+# Note: This is a recursive type, so we use Any for nested structures
+JsonValue = Union[dict[str, Any], list[Any], str, int, float, bool, None]
 
 
 class TokenType(Enum):
@@ -20,6 +25,7 @@ class TokenType(Enum):
     BRACKET_OPEN = "BRACKET_OPEN"
     BRACKET_CLOSE = "BRACKET_CLOSE"
     DOT = "DOT"
+    DOTDOT = "DOTDOT"
     SLASH = "SLASH"
     COMMA = "COMMA"
     EOF = "EOF"
@@ -40,18 +46,26 @@ class Token:
 class XPathNode:
     """Base class for XPath AST nodes."""
 
-    def evaluate(self, evaluator: Any) -> Any:
-        """Evaluate this node."""
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
+        """Evaluate this node.
+        
+        Args:
+            evaluator: XPath evaluator instance
+            context: Context for evaluation
+            
+        Returns:
+            The evaluated value (JSON-like structure or primitive)
+        """
         raise NotImplementedError
 
 
 class LiteralNode(XPathNode):
     """Literal value node (string, number, boolean)."""
 
-    def __init__(self, value: Any):
+    def __init__(self, value: Union[str, int, float, bool]):
         self.value = value
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         return self.value
 
     def __repr__(self):
@@ -66,9 +80,9 @@ class PathNode(XPathNode):
         self.is_absolute = is_absolute  # True if starts with /
         self.predicate: Optional[XPathNode] = None  # Optional predicate filter
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         # pylint: disable=protected-access
-        return evaluator._evaluate_path_node(self)
+        return evaluator._evaluate_path_node(self, context)
 
     def __repr__(self):
         pred_str = f"[{self.predicate}]" if self.predicate else ""
@@ -87,28 +101,28 @@ class CurrentNode(XPathNode):
         """
         self.is_current_function = is_current_function
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         # pylint: disable=protected-access
         if self.is_current_function:
             # current() always refers to original context
-            return evaluator._get_current_value()
+            return context.current()
         else:
             # . refers to current context node/value
             # If data is a primitive value, return it directly
-            if isinstance(evaluator.data, (str, int, float, bool)):
-                return evaluator.data
+            if isinstance(context.data, (str, int, float, bool)):
+                return context.data
             # If data is a dict and context_path is empty, check if it's a wrapped value
-            if isinstance(evaluator.data, dict) and not evaluator.context_path:
+            if isinstance(context.data, dict) and not context.context_path:
                 # If it's a wrapped value (from predicate evaluator), return the value
-                if 'value' in evaluator.data and len(evaluator.data) == 1:
-                    return evaluator.data['value']
+                if 'value' in context.data and len(context.data) == 1:
+                    return context.data['value']
                 # Otherwise return the dict itself
-                return evaluator.data
+                return context.data
             # Otherwise, get value from current context path
-            if evaluator.context_path:
-                return evaluator.path_evaluator.get_path_value(evaluator.context_path)
+            if context.context_path:
+                return evaluator.path_evaluator.get_path_value(context.context_path, context)
             # Fallback to current() if no context
-            return evaluator._get_current_value()
+            return context.current()
 
     def __repr__(self):
         return "current()" if self.is_current_function else "."
@@ -121,9 +135,9 @@ class FunctionCallNode(XPathNode):
         self.name = name
         self.args = args
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         # pylint: disable=protected-access
-        return evaluator._evaluate_function_node(self)
+        return evaluator._evaluate_function_node(self, context)
 
     def __repr__(self):
         args_str = ", ".join(repr(arg) for arg in self.args)
@@ -138,9 +152,9 @@ class BinaryOpNode(XPathNode):
         self.left = left
         self.right = right
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         # pylint: disable=protected-access
-        return evaluator._evaluate_binary_op(self)
+        return evaluator._evaluate_binary_op(self, context)
 
     def __repr__(self):
         return f"BinaryOp({self.operator}, {self.left}, {self.right})"
@@ -153,9 +167,9 @@ class UnaryOpNode(XPathNode):
         self.operator = operator
         self.operand = operand
 
-    def evaluate(self, evaluator: 'XPathEvaluator') -> Any:
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> JsonValue:
         # pylint: disable=protected-access
-        return evaluator._evaluate_unary_op(self)
+        return evaluator._evaluate_unary_op(self, context)
 
     def __repr__(self):
         return f"UnaryOp({self.operator}, {self.operand})"
