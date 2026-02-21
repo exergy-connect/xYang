@@ -138,7 +138,17 @@ class YangValidator:
                     root_data=data
                 )
                 # Use pre-parsed AST if available to avoid double parsing
+                # YANG when statements should always have AST populated during parsing
                 ast = getattr(stmt.when, 'ast', None)
+                if ast is None:
+                    # AST should have been populated during YANG parsing - this indicates a bug
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "When statement AST not found for condition '%s' - will parse again. "
+                        "This should not happen if YANG was parsed correctly.",
+                        stmt.when.condition
+                    )
                 if not evaluator.evaluate(stmt.when.condition, ast=ast, context=context):
                     continue
             

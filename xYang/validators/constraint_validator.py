@@ -424,7 +424,15 @@ class ConstraintValidator:
         
         try:
             # Use pre-parsed AST if available to avoid double parsing
+            # YANG must statements should always have AST populated during parsing
             ast = getattr(must_expr, 'ast', None)
+            if ast is None:
+                # AST should have been populated during YANG parsing - this indicates a bug
+                logger.warning(
+                    "Must statement AST not found for expression '%s' - will parse again. "
+                    "This should not happen if YANG was parsed correctly.",
+                    must_expr.expression if hasattr(must_expr, 'expression') else str(must_expr)
+                )
             result = evaluator.evaluate(must_expr.expression, ast=ast, context=context)
             logger.info(
                 "Must constraint result for %s: %s (expression: %s)",

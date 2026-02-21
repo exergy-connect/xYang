@@ -81,9 +81,10 @@ class XPathEvaluator:
         Evaluate an XPath expression and return boolean result.
         
         Args:
-            expression: The XPath expression string (used for caching if ast not provided)
+            expression: The XPath expression string (used for error messages and caching if ast not provided)
             context: Context for evaluation
-            ast: Optional pre-parsed AST node to reuse (avoids double parsing)
+            ast: Optional pre-parsed AST node to reuse (avoids double parsing).
+                 If provided, expression string is only used for error messages.
         """
         try:
             result = self.evaluate_value(expression, context, ast)
@@ -103,15 +104,21 @@ class XPathEvaluator:
         Evaluate an XPath expression and return the raw value.
         
         Args:
-            expression: The XPath expression string (used for caching if ast not provided)
+            expression: The XPath expression string (used for error messages and caching if ast not provided)
             context: Context for evaluation
-            ast: Optional pre-parsed AST node to reuse (avoids double parsing)
+            ast: Optional pre-parsed AST node to reuse (avoids double parsing).
+                 If provided, expression string is only used for error messages, not parsed again.
+        
+        Note:
+            YANG must/when statements have pre-parsed ASTs stored in their .ast attribute.
+            Always pass the AST when available to ensure expressions are only parsed once.
         """
         try:
-            # Use provided AST if available
+            # Use provided AST if available - this ensures YANG expressions are only parsed once
             if ast is not None:
                 return ast.evaluate(self, context)
             
+            # AST not provided - parse expression (fallback for dynamically constructed expressions)
             # Check cache first (only for simple expressions to avoid memory bloat)
             if len(expression) < 100 and expression in self._expression_cache:
                 ast = self._expression_cache[expression]
