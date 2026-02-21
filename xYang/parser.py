@@ -83,6 +83,7 @@ class YangParser:
         self.registry.register('typedef:description', self.parsers.parse_description)
         
         # Type constraint statements
+        self.registry.register('type:type', self.parsers.parse_type)  # For union types
         self.registry.register('type:pattern', self.parsers.parse_type_pattern)
         self.registry.register('type:length', self.parsers.parse_type_length)
         self.registry.register('type:range', self.parsers.parse_type_range)

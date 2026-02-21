@@ -284,7 +284,11 @@ class StatementParsers:
                     handler = self.registry.get_handler(f"type:{tokens.peek()}")
                     if handler:
                         # Type constraint handlers take type_stmt as third parameter
-                        handler(tokens, type_context, type_stmt)
+                        # But parse_type (for union nested types) only takes (tokens, context)
+                        if tokens.peek() == 'type':
+                            handler(tokens, type_context)
+                        else:
+                            handler(tokens, type_context, type_stmt)
                     else:
                         tokens.consume()
                 else:
@@ -292,14 +296,21 @@ class StatementParsers:
         
         # Assign to parent
         if context.current_parent:
-            if hasattr(context.current_parent, 'type') and not context.current_parent.type:
+            # Check if parent is a union type statement - add nested types to union.types
+            if isinstance(context.current_parent, YangTypeStmt) and context.current_parent.name == 'union':
+                if not hasattr(context.current_parent, 'types'):
+                    context.current_parent.types = []
+                context.current_parent.types.append(type_stmt)
+                # Debug: print what we're adding
+                # print(f"DEBUG: Adding {type_stmt.name} to union.types (now has {len(context.current_parent.types)} types)")
+            elif hasattr(context.current_parent, 'type') and not context.current_parent.type:
                 context.current_parent.type = type_stmt
             elif hasattr(context.current_parent, 'types'):
                 if not context.current_parent.types:
                     context.current_parent.types = []
                 context.current_parent.types.append(type_stmt)
             elif hasattr(context.current_parent, 'type') and context.current_parent.type:
-                # For union types, add to types list
+                # For union types nested in other structures, add to types list
                 if not hasattr(type_stmt, 'types'):
                     type_stmt.types = []
                 if not hasattr(context.current_parent.type, 'types'):

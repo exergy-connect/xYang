@@ -90,11 +90,54 @@ class TypeValidator:
         
         if leaf_list.type:
             for item in items:
-                result = self._validate_type(item, leaf_list.type.name, leaf_list.type)
+                # Check if this is a union type
+                if leaf_list.type.name == 'union' and hasattr(leaf_list.type, 'types') and leaf_list.type.types:
+                    result = self._validate_union_type(item, leaf_list.type)
+                else:
+                    result = self._validate_type(item, leaf_list.type.name, leaf_list.type)
                 if not result.is_valid:
                     self.errors.append(
                         f"Invalid value in leaf-list {leaf_list.name}: {result.error_message}"
                     )
+    
+    def _validate_union_type(
+        self,
+        value: Any,
+        union_type_stmt: Any  # YangTypeStmt with name='union' and types list
+    ) -> ValidationResult:
+        """
+        Validate a value against a union type by trying each member type.
+        
+        Args:
+            value: Value to validate
+            union_type_stmt: Union type statement with types list
+            
+        Returns:
+            ValidationResult
+        """
+        if not hasattr(union_type_stmt, 'types') or not union_type_stmt.types:
+            return ValidationResult.invalid("Union type has no member types")
+        
+        errors = []
+        for union_member in union_type_stmt.types:
+            from ..types import TypeConstraint
+            constraints = TypeConstraint(
+                pattern=union_member.pattern,
+                length=union_member.length,
+                range=union_member.range,
+                fraction_digits=union_member.fraction_digits,
+                enums=union_member.enums
+            )
+            is_valid, error_msg = self.type_system.validate(value, union_member.name, constraints)
+            if is_valid:
+                return ValidationResult.valid()
+            if error_msg:
+                errors.append(f"{union_member.name}: {error_msg}")
+        
+        # None of the union members matched
+        return ValidationResult.invalid(
+            f"Value does not match any union member type. Errors: {'; '.join(errors)}"
+        )
     
     def _validate_type(
         self, 
@@ -113,6 +156,33 @@ class TypeValidator:
         Returns:
             ValidationResult
         """
+        # Handle union types: try each type in the union until one succeeds
+        if type_name == 'union' or (type_stmt and hasattr(type_stmt, 'types') and type_stmt.types):
+            # This is a union type - try each member type
+            if not type_stmt or not hasattr(type_stmt, 'types') or not type_stmt.types:
+                return ValidationResult.invalid("Union type has no member types")
+            
+            errors = []
+            for union_member in type_stmt.types:
+                from ..types import TypeConstraint
+                constraints = TypeConstraint(
+                    pattern=union_member.pattern,
+                    length=union_member.length,
+                    range=union_member.range,
+                    fraction_digits=union_member.fraction_digits,
+                    enums=union_member.enums
+                )
+                is_valid, error_msg = self.type_system.validate(value, union_member.name, constraints)
+                if is_valid:
+                    return ValidationResult.valid()
+                if error_msg:
+                    errors.append(f"{union_member.name}: {error_msg}")
+            
+            # None of the union members matched
+            return ValidationResult.invalid(
+                f"Value does not match any union member type. Errors: {'; '.join(errors)}"
+            )
+        
         # Convert type_stmt to TypeConstraint
         from ..types import TypeConstraint
         
