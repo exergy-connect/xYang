@@ -442,24 +442,28 @@ class PathEvaluator:
                             if isinstance(value, list):
                                 # Apply predicate AST node directly (no string conversion)
                                 filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.segments[0].predicate, context)
-                            # If there are more parts to navigate, continue from the filtered result
-                            if filtered is not None and parts.index(part) < len(parts) - 1:
-                                # Get remaining parts after this one
-                                remaining_parts = parts[parts.index(part) + 1:]
-                                # If filtered is a list, navigate from first item
-                                if isinstance(filtered, list) and len(filtered) > 0:
-                                    # Update current to the first filtered item and continue loop
-                                    current = filtered[0]
-                                    # Continue to next iteration to process remaining parts
-                                    continue
-                                # If filtered is a single item, navigate from it
-                                elif filtered is not None:
-                                    current = filtered
-                                    # Continue to next iteration to process remaining parts
-                                    continue
-                            # No more parts, return the filtered result
-                            return filtered
-                        return value
+                                # If there are more parts to navigate, continue from the filtered result
+                                if filtered is not None and parts.index(part) < len(parts) - 1:
+                                    # Get remaining parts after this one
+                                    remaining_parts = parts[parts.index(part) + 1:]
+                                    # If filtered is a list, navigate from first item
+                                    if isinstance(filtered, list) and len(filtered) > 0:
+                                        # Update current to the first filtered item and continue loop
+                                        current = filtered[0]
+                                        # Continue to next iteration to process remaining parts
+                                        continue
+                                    # If filtered is a single item, navigate from it
+                                    elif filtered is not None:
+                                        current = filtered
+                                        # Continue to next iteration to process remaining parts
+                                        continue
+                                # No more parts, return the filtered result
+                                return filtered
+                            # Value is not a list, return it as-is
+                            return value
+                        # Base part not found in current dict
+                        return None
+                    # No predicate in first segment
                     return None
             
             # Navigate through dict or list
@@ -569,7 +573,9 @@ class PathEvaluator:
         # Handle relative paths with .. steps
         if node.segments and node.segments[0].step == '..':
             up_levels = sum(1 for seg in node.segments if seg.step == '..')
-            field_parts = [seg.step for seg in node.segments if seg.step != '..']
+            # Get non-.. segments, preserving predicates
+            field_segments = [seg for seg in node.segments if seg.step != '..']
+            field_parts = [seg.step for seg in field_segments]
             
             context_len = len(context.context_path) if context.context_path else 0
             if up_levels <= context_len:
@@ -580,6 +586,12 @@ class PathEvaluator:
                 if context_len > 0 and isinstance(context.root_data, dict):
                     nav_context = context.with_data(context.root_data, context.context_path)
                 value = self.get_path_value(new_path, nav_context)
+                
+                # Apply predicate from the last segment if it exists
+                if value is not None and field_segments:
+                    last_segment = field_segments[-1]
+                    if last_segment.predicate is not None and isinstance(value, list):
+                        value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
                 
                 # If that didn't work, try two fallback strategies:
                 # 1. Try going up one more semantic level by removing the list name
@@ -594,6 +606,11 @@ class PathEvaluator:
                         value_alt = self.get_path_value(new_path_alt, nav_context)
                         if value_alt is not None:
                             value = value_alt
+                            # Apply predicate if present
+                            if field_segments:
+                                last_segment = field_segments[-1]
+                                if last_segment.predicate is not None and isinstance(value, list):
+                                    value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
                 
                 # 2. Try going up fewer levels (in case we went up too far)
                 # But only if the first fallback didn't work
@@ -607,6 +624,11 @@ class PathEvaluator:
                     # Only use this result if it's not None
                     if value_alt is not None:
                         value = value_alt
+                        # Apply predicate if present
+                        if field_segments:
+                            last_segment = field_segments[-1]
+                            if last_segment.predicate is not None and isinstance(value, list):
+                                value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
             else:
                 value = None
         else:

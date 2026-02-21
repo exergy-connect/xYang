@@ -71,11 +71,18 @@ class FunctionEvaluator:
                 path_value = self.evaluator.path_evaluator.evaluate_path_node(arg_node, context)
                 if isinstance(path_value, list):
                     return len(path_value)
+                # If result is a single dict (from predicate filtering), count as 1
+                # This handles cases where a predicate filters to a single item
+                if isinstance(path_value, dict):
+                    return 1
                 return 0
             # Otherwise evaluate normally
             arg_value = arg_node.evaluate(self.evaluator, context)
             if isinstance(arg_value, list):
                 return len(arg_value)
+            # If result is a single dict (from predicate filtering), count as 1
+            if isinstance(arg_value, dict):
+                return 1
             return 0
         return 0
     

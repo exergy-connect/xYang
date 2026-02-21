@@ -56,25 +56,6 @@ class XPathEvaluator:
         self.predicate_evaluator = PredicateEvaluator(self)
         self.comparison_evaluator = ComparisonEvaluator(self)
     
-    def create_context(self, data: Dict[str, Any], context_path: Optional[List[str]] = None) -> Context:
-        """Create an initial context for evaluation.
-        
-        Args:
-            data: The data instance being validated
-            context_path: Current path in the data structure (for current() and relative paths)
-            
-        Returns:
-            Initial Context object
-        """
-        context_path = context_path or []
-        return Context(
-            data=data,
-            context_path=context_path,
-            original_context_path=context_path.copy(),
-            original_data=data,
-            root_data=data
-        )
-    
 
     def evaluate(self, expression: str, context: Context, ast: Optional[XPathNode] = None) -> bool:
         """
@@ -378,20 +359,6 @@ class XPathEvaluator:
         """
         return self.path_evaluator.evaluate_path_node(node, context)
 
-    def _get_current_value(self, context: Context) -> JsonValue:
-        """Get the current value from the context path.
-        
-        In XPath, current() always refers to the original context node where
-        the expression is being evaluated, not the current iteration context.
-        
-        Args:
-            context: Context for evaluation
-        
-        Note:
-            This method delegates to context.current() for consistency.
-        """
-        return context.current()
-    
     def _get_type_context(self, context: Context) -> Optional[Any]:
         """
         Get the schema type for the current context.
