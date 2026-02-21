@@ -425,19 +425,14 @@ class PathEvaluator:
                 
                 # Check if this is a PathNode with a predicate
                 if isinstance(parsed_node, PathNode) and parsed_node.predicate is not None:
-                    # Extract base part (first step) and predicate
+                    # Extract base part (first step) and use predicate AST node directly
                     base_part = parsed_node.steps[0] if parsed_node.steps else part
-                    # Reconstruct predicate string for apply_predicate
-                    # We need to extract the predicate expression as a string
-                    # For now, extract it from the original part string
-                    bracket_start = part.find('[')
-                    predicate = part[bracket_start:] if bracket_start >= 0 else None
                     
-                    if predicate and isinstance(current, dict) and base_part in current:
+                    if isinstance(current, dict) and base_part in current:
                         value = current[base_part]
                         if isinstance(value, list):
-                            # Apply predicate to get filtered result
-                            filtered = self.evaluator.predicate_evaluator.apply_predicate(value, predicate, context)
+                            # Apply predicate AST node directly (no string conversion)
+                            filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.predicate, context)
                             # If there are more parts to navigate, continue from the filtered result
                             if filtered is not None and parts.index(part) < len(parts) - 1:
                                 # Get remaining parts after this one
