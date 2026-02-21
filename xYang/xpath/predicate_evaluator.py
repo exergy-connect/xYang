@@ -66,11 +66,11 @@ class PredicateEvaluator:
                 # Create new context for evaluation, preserving original values for current()
                 item_data = item if isinstance(item, dict) else {'value': item}
                 new_context = context.with_data(item_data, [])
-                
+
                 # Evaluate left and right operands
                 left_val = pred_ast.left.evaluate(self.evaluator, new_context)
                 right_val = pred_ast.right.evaluate(self.evaluator, new_context)
-                
+
                 # Single comparison check
                 if compare_equal(left_val, right_val) == is_equal_op:
                     filtered.append(item)

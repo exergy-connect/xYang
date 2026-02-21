@@ -353,10 +353,7 @@ class XPathParser:
                 # Path continuation - merge paths
                 self._consume()
                 right_path = self._parse_path(is_absolute=False)
-                left.steps.extend(right_path.steps)
-                # Only overwrite predicate if right has one
-                if right_path.predicate is not None:
-                    left.predicate = right_path.predicate
+                left.segments.extend(right_path.segments)
             elif isinstance(left, FunctionCallNode) and left.name == 'deref':
                 # deref() followed by / is path navigation
                 self._consume()
@@ -500,6 +497,7 @@ class XPathParser:
             is_absolute: Whether this is an absolute path (starts with /)
         """
         steps = []
+        step_predicates = []  # Store predicates for each step
 
         # Parse path steps
         while True:
@@ -508,6 +506,12 @@ class XPathParser:
             # Parent step (..)
             if token.type == TokenType.DOTDOT:
                 steps.append(self._consume().value)
+                step_predicates.append(None)  # No predicate for this step yet
+                # Check for predicate before slash
+                if self._current_token().type == TokenType.BRACKET_OPEN:
+                    self._consume(TokenType.BRACKET_OPEN)
+                    step_predicates[-1] = self._parse_expression()
+                    self._consume(TokenType.BRACKET_CLOSE)
                 # Check for slash after ..
                 if self._current_token().type == TokenType.SLASH:
                     self._consume()
@@ -519,6 +523,12 @@ class XPathParser:
             elif token.type == TokenType.DOT:
                 self._consume()
                 steps.append('.')
+                step_predicates.append(None)
+                # Check for predicate before slash
+                if self._current_token().type == TokenType.BRACKET_OPEN:
+                    self._consume(TokenType.BRACKET_OPEN)
+                    step_predicates[-1] = self._parse_expression()
+                    self._consume(TokenType.BRACKET_CLOSE)
                 # Check for slash after .
                 if self._current_token().type == TokenType.SLASH:
                     self._consume()
@@ -527,6 +537,12 @@ class XPathParser:
             # Identifier step
             elif token.type == TokenType.IDENTIFIER:
                 steps.append(self._consume().value)
+                step_predicates.append(None)
+                # Check for predicate before slash
+                if self._current_token().type == TokenType.BRACKET_OPEN:
+                    self._consume(TokenType.BRACKET_OPEN)
+                    step_predicates[-1] = self._parse_expression()
+                    self._consume(TokenType.BRACKET_CLOSE)
                 # Check for slash after identifier
                 if self._current_token().type == TokenType.SLASH:
                     self._consume()
@@ -535,13 +551,13 @@ class XPathParser:
             else:
                 break
 
-        # Create path node
-        path_node = PathNode(steps, is_absolute)
-
-        # Check for predicate
-        if self._current_token().type == TokenType.BRACKET_OPEN:
-            self._consume(TokenType.BRACKET_OPEN)
-            path_node.predicate = self._parse_expression()
-            self._consume(TokenType.BRACKET_CLOSE)
+        # Create path segments with predicates
+        from .ast import PathSegment
+        segments = []
+        for step, step_pred in zip(steps, step_predicates):
+            segments.append(PathSegment(step, step_pred))
+        
+        # Create path node with segments
+        path_node = PathNode(segments, is_absolute)
 
         return path_node

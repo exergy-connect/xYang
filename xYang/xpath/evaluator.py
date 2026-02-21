@@ -169,7 +169,7 @@ class XPathEvaluator:
             item_data = left[0] if isinstance(left[0], dict) else {'value': left[0]}
             new_context = context.with_data(item_data, [])
             # Evaluate right side as path
-            if hasattr(node.right, 'steps'):
+            if isinstance(node.right, PathNode):
                 # It's a PathNode
                 result = node.right.evaluate(self, new_context)
             else:
@@ -213,9 +213,9 @@ class XPathEvaluator:
                     for part in path_parts:
                         if isinstance(part, str):
                             path_str_parts.append(part)
-                        elif hasattr(part, 'steps'):
-                            # It's a PathNode
-                            path_str_parts.extend(part.steps)
+                        elif isinstance(part, PathNode):
+                            # It's a PathNode - extract step names from segments
+                            path_str_parts.extend(seg.step for seg in part.segments)
                         else:
                             # Try to evaluate (for function calls, etc.)
                             if hasattr(part, 'evaluate'):
@@ -232,52 +232,44 @@ class XPathEvaluator:
                         result = None
                 else:
                     result = None
-            elif hasattr(node.right, 'steps'):
+            elif isinstance(node.right, PathNode):
                 # It's a PathNode - evaluate it directly
                 # Handle .. at the start (for both with and without predicates)
-                steps = list(node.right.steps)
-                if steps and steps[0] == '..':
+                segments = list(node.right.segments)
+                if segments and segments[0].step == '..':
                     # When navigating from a deref() node (or any node), YANG semantics:
                     # ../field from node means ./field (field as child of node)
                     # This is because .. from a node's location would go to its parent (list),
                     # which doesn't have the field. So we interpret it as the field within the node.
                     # This applies whether or not stored_path is set, as long as left is a dict (node)
-                    if len(steps) > 1:
+                    if len(segments) > 1:
                         # Remove .. and try field directly from the node's location
-                        direct_path = '/'.join(steps[1:])
-                        # If there's a predicate, we need to preserve it
-                        if hasattr(node.right, 'predicate') and node.right.predicate:
-                            # Rebuild path with predicate but without ..
-                            from ..xpath.ast import PathNode
-                            direct_node = PathNode(steps[1:], node.right.is_absolute)
-                            direct_node.predicate = node.right.predicate
-                            # When navigating from a deref() node, ../fields should mean ./fields
-                            # (fields as a child of the entity node)
-                            # Try evaluating from the node itself as data first
-                            item_context = nav_context.with_data(left, [])
-                            result = direct_node.evaluate(self, item_context)
-                            # If that didn't work, try from the node's location in the tree
-                            if result is None or (isinstance(result, list) and len(result) == 0):
-                                result = direct_node.evaluate(self, nav_context)
-                        else:
+                        direct_segments = segments[1:]
+                        direct_path = '/'.join(seg.step for seg in direct_segments)
+                        # Rebuild path without ..
+                        from .ast import PathSegment
+                        direct_node = PathNode(direct_segments, node.right.is_absolute)
+                        # When navigating from a deref() node, ../fields should mean ./fields
+                        # (fields as a child of the entity node)
+                        # Try evaluating from the node itself as data first
+                        item_context = nav_context.with_data(left, [])
+                        result = direct_node.evaluate(self, item_context)
+                        # If that didn't work, try from the node's location in the tree
+                        if result is None or (isinstance(result, list) and len(result) == 0):
+                            result = direct_node.evaluate(self, nav_context)
+                        if not result:
                             # Try evaluating from the node itself as data first
                             item_context = nav_context.with_data(left, [])
                             result = self.path_evaluator.evaluate_path(direct_path, item_context)
                         # If that fails, try with .. (go up then down) as fallback
                         if result is None or (isinstance(result, list) and len(result) == 0):
-                            if hasattr(node.right, 'predicate') and node.right.predicate:
-                                result = node.right.evaluate(self, nav_context)
-                            else:
-                                path_str = '/'.join(steps)
-                                result = self.path_evaluator.evaluate_path(path_str, nav_context)
+                            path_str = '/'.join(seg.step for seg in segments)
+                            result = self.path_evaluator.evaluate_path(path_str, nav_context)
                     else:
                         # Just .. means go up from stored_path (if set) or return the node itself
                         if stored_path:
-                            if hasattr(node.right, 'predicate') and node.right.predicate:
-                                result = node.right.evaluate(self, nav_context)
-                            else:
-                                path_str = '/'.join(steps)
-                                result = self.path_evaluator.evaluate_path(path_str, nav_context)
+                            path_str = '/'.join(seg.step for seg in segments)
+                            result = self.path_evaluator.evaluate_path(path_str, nav_context)
                         else:
                             # No stored_path - just return the node itself
                             result = left

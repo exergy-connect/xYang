@@ -99,8 +99,10 @@ class XPathValidator:
         elif isinstance(node, PathNode):
             # Path nodes are supported
             # Validate predicate if present
-            if node.predicate is not None:
-                self._validate_node(node.predicate, expression)
+            # Validate predicates in segments
+            for segment in node.segments:
+                if segment.predicate is not None:
+                    self._validate_node(segment.predicate, expression)
         elif isinstance(node, CurrentNode):
             # Current node is supported
             pass

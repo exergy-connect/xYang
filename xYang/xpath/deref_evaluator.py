@@ -41,17 +41,18 @@ class DerefEvaluator:
         parser = XPathParser(tokens, path)
         path_node = parser.parse()
         
+        from ..errors import XPathSyntaxError
+        
         if not isinstance(path_node, PathNode):
-            from ..errors import XPathSyntaxError
             raise XPathSyntaxError(f"Expected path expression, got {type(path_node).__name__}")
         
         steps = []
         up_levels = 0
-        for step in path_node.steps:
-            if step == '..':
+        for segment in path_node.segments:
+            if segment.step == '..':
                 up_levels += 1
-            elif step and step != '.':
-                steps.append(step)
+            elif segment.step and segment.step != '.':
+                steps.append(segment.step)
         return steps, path_node.is_absolute, up_levels
     
     def evaluate_deref_function(self, node: FunctionCallNode, context: Context) -> Any:
@@ -172,9 +173,9 @@ class DerefEvaluator:
                         path_value = self.evaluator.path_evaluator.evaluate_path_node(right_node, nav_context)
                         # Build right_path efficiently
                         if right_node.is_absolute:
-                            right_path = '/' + '/'.join(right_node.steps)
+                            right_path = '/' + '/'.join(seg.step for seg in right_node.segments)
                         else:
-                            right_path = '/'.join(right_node.steps)
+                            right_path = '/'.join(seg.step for seg in right_node.segments)
                     elif isinstance(right_node, BinaryOpNode) and right_node.operator == '/':
                         # Nested path - extract and evaluate
                         path_parts = self.evaluator.path_evaluator.extract_path_from_binary_op(right_node)
@@ -235,7 +236,7 @@ class DerefEvaluator:
                     # Cache the result
                     self.evaluator.leafref_cache[cache_key] = result
                     return result
-                        # Context object automatically preserves original_context_path
+                    # Context object automatically preserves original_context_path
                 elif isinstance(left_result, str):
                     # Left side evaluated to a string - this happens when navigating from a node
                     # and the path returns a string value (e.g., entity name from foreignKey.entity)
@@ -336,7 +337,7 @@ class DerefEvaluator:
             # Handle simple path expressions
             if isinstance(arg_node, PathNode):
                 # Build path string first to check if it points to a leafref (optimized: avoid conditional)
-                steps_str = '/'.join(arg_node.steps)
+                steps_str = '/'.join(seg.step for seg in arg_node.segments)
                 path = '/' + steps_str if arg_node.is_absolute else steps_str
                 
                 # CRITICAL: For leafref nodes, deref() MUST use the schema definition's path
@@ -388,20 +389,32 @@ class DerefEvaluator:
                 # For current(), evaluate to get the value, then find the field/node by that value
                 if arg_node.name == 'current' and len(arg_node.args) == 0:
                     # CRITICAL: If current() points to a leafref field, deref() MUST use the schema definition's path
-                    # Check if current() context is a leafref field
-                    leafref_path = self.get_leafref_path_from_schema('current()', context)
-                    if leafref_path and value is not None:
-                        # This is a leafref - use schema-aware resolution
-                        result_tuple = self.find_node_by_leafref_path(leafref_path, value, context)
-                        if result_tuple:
-                            result, node_path = result_tuple
-                            if node_path:
-                                self.evaluator._deref_node_paths[id(result)] = node_path
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
-                        else:
-                            self.evaluator.leafref_cache[cache_key] = None
-                            return None
+                    # Use original_context_path to find the schema node for current()
+                    if context.original_context_path and value is not None:
+                        # Resolve the schema path from original_context_path
+                        schema_path = self.resolve_path_to_schema_location('current()', context)
+                        if schema_path:
+                            # Find the schema node at this path
+                            schema_node = self.find_schema_node(schema_path)
+                            if schema_node:
+                                # Check if it's a leafref
+                                from ..ast import YangLeafStmt
+                                if isinstance(schema_node, YangLeafStmt):
+                                    type_obj = schema_node.type
+                                    if type_obj and type_obj.name == 'leafref':
+                                        leafref_path = getattr(type_obj, 'path', None)
+                                        if leafref_path:
+                                            # This is a leafref - use schema-aware resolution
+                                            result_tuple = self.find_node_by_leafref_path(leafref_path, value, context)
+                                            if result_tuple:
+                                                result, node_path = result_tuple
+                                                if node_path:
+                                                    self.evaluator._deref_node_paths[id(result)] = node_path
+                                                self.evaluator.leafref_cache[cache_key] = result
+                                                return result
+                                            else:
+                                                self.evaluator.leafref_cache[cache_key] = None
+                                                return None
                     
                     # If we have a value, check what type it is
                     if value is not None:
@@ -521,7 +534,7 @@ class DerefEvaluator:
         """
         if isinstance(node, PathNode):
             # Optimized: use join directly, avoid conditional string concatenation
-            steps_str = '/'.join(node.steps)
+            steps_str = '/'.join(seg.step for seg in node.segments)
             return '/' + steps_str if node.is_absolute else steps_str
         
         if isinstance(node, FCN):

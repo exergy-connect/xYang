@@ -286,10 +286,18 @@ class PathEvaluator:
         Args:
             path: Absolute path to evaluate
             context: Context for evaluation
+            
+        Note:
+            When evaluating absolute paths, we navigate from root_data but preserve
+            the original_context_path and original_data for current() function evaluation
+            in predicates. The nav_context preserves these original values.
         """
         # Parse path parts, handling predicates that may contain '/' characters
         parts = self._parse_path_parts(path.lstrip('/'))
+        # Create navigation context from root_data, preserving original context for current()
+        # This ensures that current() in predicates can still access the original context
         nav_context = context.with_data(context.root_data, [])
+        # original_context_path and original_data are preserved by with_data()
         return self.get_path_value(parts, nav_context)
     
     def _parse_path_parts(self, path: str) -> List[str]:
@@ -422,16 +430,18 @@ class PathEvaluator:
                 # Try to parse as a path expression (which handles predicates)
                 parsed_node = parser.parse()
                 
-                # Check if this is a PathNode with a predicate
-                if isinstance(parsed_node, PathNode) and parsed_node.predicate is not None:
-                    # Extract base part (first step) and use predicate AST node directly
-                    base_part = parsed_node.steps[0] if parsed_node.steps else part
-                    
-                    if isinstance(current, dict) and base_part in current:
-                        value = current[base_part]
-                        if isinstance(value, list):
-                            # Apply predicate AST node directly (no string conversion)
-                            filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.predicate, context)
+                # Check if this is a PathNode with segment predicates
+                if isinstance(parsed_node, PathNode):
+                    # Check if first segment has a predicate
+                    if parsed_node.segments and parsed_node.segments[0].predicate is not None:
+                        # Extract base part (first step) and use predicate AST node directly
+                        base_part = parsed_node.segments[0].step
+                        
+                        if isinstance(current, dict) and base_part in current:
+                            value = current[base_part]
+                            if isinstance(value, list):
+                                # Apply predicate AST node directly (no string conversion)
+                                filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.segments[0].predicate, context)
                             # If there are more parts to navigate, continue from the filtered result
                             if filtered is not None and parts.index(part) < len(parts) - 1:
                                 # Get remaining parts after this one
@@ -488,51 +498,30 @@ class PathEvaluator:
             Evaluated result
         """
         # Handle paths starting with .. when navigating from a node
-        steps = list(node.steps)
-        if steps and steps[0] == '..' and context.context_path == []:
-            steps = steps[1:]
+        segments = list(node.segments)
+        if segments and segments[0].step == '..' and context.context_path == []:
+            segments = segments[1:]
         
         # Special case: if all steps are .., use _go_up_context_path
-        if steps and all(step == '..' for step in steps):
-            up_levels = len(steps)
+        if segments and all(seg.step == '..' for seg in segments):
+            up_levels = len(segments)
             context_len = len(context.context_path) if context.context_path else 0
             if up_levels <= context_len:
                 new_path = self._go_up_context_path(context.context_path, up_levels)
                 nav_context = context.with_data(context.root_data, context.context_path)
                 value = self.get_path_value(new_path, nav_context)
-                if isinstance(value, list) and node.predicate:
-                    return self._apply_predicate_to_value(value, node.predicate, context)
                 return value
         
         # Try the complete path first (predicate should apply to the final list)
-        if steps:
-            complete_path = '/'.join(steps)
+        if segments:
+            complete_path = '/'.join(seg.step for seg in segments)
             value = self.evaluate_path(complete_path, context)
-            if isinstance(value, list) and node.predicate:
-                # Predicate applies to the complete path result
-                return self._apply_predicate_to_value(value, node.predicate, context)
-            elif value is not None:
+            if value is not None:
                 # Complete path worked but result is not a list - return it
                 return value
             
-            # Fall back to trying individual steps if complete path didn't work
-            # Try first step first (most common case)
-            result = self._evaluate_path_and_apply_predicate(
-                steps[0], node.predicate, context, steps[1:] if len(steps) > 1 else None
-            )
-            if result is not None:
-                return result
-            
-            # Try other steps if first didn't return a list
-            for i in range(1, len(steps)):
-                partial_path = '/'.join(steps[:i+1])
-                result = self._evaluate_path_and_apply_predicate(
-                    partial_path, node.predicate, context, steps[i+1:] if i+1 < len(steps) else None
-                )
-                if result is not None:
-                    return result
         
-        return self.evaluate_path('/'.join(node.steps), context)
+        return self.evaluate_path('/'.join(seg.step for seg in node.segments), context)
     
     def _apply_predicate_to_value(self, value: List[Any], predicate: Any, context: Context) -> Any:
         """Apply a predicate to a list value, handling both numeric and filter predicates.
@@ -577,14 +566,10 @@ class PathEvaluator:
             node: Path node to evaluate
             context: Context for evaluation
         """
-        # Check for predicate with multiple steps first (before handling ..)
-        if node.predicate and len(node.steps) > 1:
-            return self._evaluate_path_with_predicate(node, context)
-        
         # Handle relative paths with .. steps
-        if node.steps and node.steps[0] == '..':
-            up_levels = sum(1 for step in node.steps if step == '..')
-            field_parts = [step for step in node.steps if step != '..']
+        if node.segments and node.segments[0].step == '..':
+            up_levels = sum(1 for seg in node.segments if seg.step == '..')
+            field_parts = [seg.step for seg in node.segments if seg.step != '..']
             
             context_len = len(context.context_path) if context.context_path else 0
             if up_levels <= context_len:
@@ -625,14 +610,156 @@ class PathEvaluator:
             else:
                 value = None
         else:
-            path = '/' + '/'.join(node.steps) if node.is_absolute else '/'.join(node.steps)
-            value = self.evaluate_path(path, context)
-        
-        # Apply predicate if present and value is a list
-        if node.predicate and isinstance(value, list):
-            return self._apply_predicate_to_value(value, node.predicate, context)
+            # Check if any segments have predicates
+            has_segment_predicates = any(seg.predicate is not None for seg in node.segments)
+            
+            if has_segment_predicates:
+                # We have predicates on intermediate steps - evaluate step by step
+                if node.is_absolute:
+                    nav_context = context.with_data(context.root_data, [])
+                    value = self._evaluate_path_with_segments(node.segments, None, nav_context, context)
+                else:
+                    value = self._evaluate_path_with_segments(node.segments, None, context, context)
+            else:
+                # No segment predicates - use standard evaluation
+                if node.is_absolute:
+                    path = '/' + '/'.join(seg.step for seg in node.segments)
+                    nav_context = context.with_data(context.root_data, [])
+                    value = self.evaluate_path(path, nav_context)
+                else:
+                    path = '/'.join(seg.step for seg in node.segments)
+                    value = self.evaluate_path(path, context)
         
         return value
+    
+    def _evaluate_path_with_segments(self, segments: List[Any], final_predicate: Any, nav_context: Context, predicate_context: Context) -> Any:
+        """Evaluate path segments with predicates on intermediate steps.
+        
+        Args:
+            segments: List of PathSegment objects, each with an optional predicate
+            final_predicate: Final predicate to apply (if any)
+            nav_context: Context for navigation
+            predicate_context: Context for predicate evaluation (preserves original context)
+        """
+        from .ast import PathSegment
+        
+        current = nav_context.data
+        current_context = nav_context
+        
+        for segment in segments:
+            if not isinstance(segment, PathSegment):
+                # Fallback for backward compatibility
+                step = segment if isinstance(segment, str) else segment.step
+                step_pred = None
+            else:
+                step = segment.step
+                step_pred = segment.predicate
+            
+            # Navigate to the step
+            if isinstance(current, dict) and step in current:
+                value = current[step]
+                # If this step has a predicate and value is a list, apply it
+                if step_pred is not None and isinstance(value, list):
+                    filtered = self.evaluator.predicate_evaluator.apply_predicate(value, step_pred, predicate_context)
+                    if filtered is None or (isinstance(filtered, list) and len(filtered) == 0):
+                        return None
+                    if isinstance(filtered, list):
+                        current = filtered[0] if len(filtered) > 0 else None
+                    else:
+                        current = filtered
+                    if current is None:
+                        return None
+                else:
+                    current = value
+                current_context = current_context.with_data(current, [])
+            elif isinstance(current, list) and step.isdigit():
+                idx = int(step)
+                if 0 <= idx < len(current):
+                    current = current[idx]
+                    current_context = current_context.with_data(current, [])
+                else:
+                    return None
+            else:
+                return None
+        
+        # Apply final predicate if present
+        if final_predicate and isinstance(current, list):
+            return self._apply_predicate_to_value(current, final_predicate, predicate_context)
+        
+        return current
+    
+    def _evaluate_path_steps_with_predicates(self, steps: List[str], final_predicate: Any, nav_context: Context, predicate_context: Context) -> Any:
+        """Evaluate path steps one by one, applying predicates at list steps.
+        
+        Args:
+            steps: List of path steps
+            final_predicate: Predicate to apply at the end (if any)
+            nav_context: Context for navigation
+            predicate_context: Context for predicate evaluation (preserves original context)
+            
+        Returns:
+            Evaluated result
+        """
+        current = nav_context.data
+        current_context = nav_context
+        
+        for i, step in enumerate(steps):
+            # Check if this step has a predicate (e.g., "entities[name = ...]")
+            if '[' in step and ']' in step:
+                # Parse the step to extract base name and predicate
+                bracket_start = step.find('[')
+                base_step = step[:bracket_start]
+                predicate_str = step[bracket_start:]
+                
+                # Navigate to the list
+                if isinstance(current, dict) and base_step in current:
+                    value = current[base_step]
+                    if isinstance(value, list):
+                        # Parse and evaluate the predicate
+                        from .parser import XPathTokenizer, XPathParser
+                        tokenizer = XPathTokenizer(predicate_str)
+                        tokens = tokenizer.tokenize()
+                        parser = XPathParser(tokens, predicate_str)
+                        predicate_ast = parser.parse()
+                        
+                        # Apply predicate to filter the list
+                        filtered = self.evaluator.predicate_evaluator.apply_predicate(value, predicate_ast, predicate_context)
+                        
+                        # Continue navigation from filtered result
+                        if filtered is None or (isinstance(filtered, list) and len(filtered) == 0):
+                            return None
+                        if isinstance(filtered, list):
+                            current = filtered[0] if len(filtered) > 0 else None
+                        else:
+                            current = filtered
+                        if current is None:
+                            return None
+                        # Update context for next step
+                        current_context = predicate_context.with_data(current, [])
+                        continue
+                    current = value
+                else:
+                    return None
+            else:
+                # Regular step navigation
+                if isinstance(current, dict) and step in current:
+                    current = current[step]
+                    current_context = current_context.with_data(current, [])
+                elif isinstance(current, list) and step.isdigit():
+                    idx = int(step)
+                    if 0 <= idx < len(current):
+                        current = current[idx]
+                        current_context = current_context.with_data(current, [])
+                    else:
+                        return None
+                else:
+                    return None
+        
+        # Apply final predicate if present and value is a list
+        if final_predicate and isinstance(current, list):
+            return self._apply_predicate_to_value(current, final_predicate, predicate_context)
+        
+        return current
     
     def extract_path_from_binary_op(self, node: Any) -> List:
         """Extract path steps from a nested BinaryOpNode tree with / operators.
@@ -643,7 +770,8 @@ class PathEvaluator:
         
         def traverse(n):
             if isinstance(n, PathNode):
-                steps.extend(n.steps)
+                # Extract step names from segments
+                steps.extend(seg.step for seg in n.segments)
             elif isinstance(n, BinaryOpNode) and n.operator == '/':
                 traverse(n.left)
                 traverse(n.right)
