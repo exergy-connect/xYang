@@ -504,28 +504,27 @@ module meta-model {
               must "deref(current())/../foreignKey" {
                 error-message "Child foreign key field must have a foreignKey definition";
               }
-              // Validate that the foreignKey entity exists using deref()
-              // deref(current()) = name leaf, /.. = field container, /foreignKey/entity = entity leafref, deref() resolves it to entity node
-              must "deref(deref(current())/../foreignKey/entity)" {
+              // Validate that the foreignKey entity exists using path expression
+              // Use path expression to find entity by name instead of nested deref
+              must "/data-model/entities[name = deref(current())/../foreignKey/entity]" {
                 error-message "Foreign key entity must exist in the data model";
                 description "Validates that the entity referenced in the child_fk field's foreignKey exists in the data model";
               }
               // Validate that the foreignKey field exists in the referenced entity
-              // deref(deref(current())/../foreignKey/entity) returns the entity name leaf, so go up to entity container
-              // Then check that the field specified in foreignKey/field exists in that entity's fields
-              must "deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]" {
+              // Use path expression to find entity, then check fields
+              must "/data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = deref(current())/../foreignKey/field]" {
                 error-message "Foreign key field must exist in the referenced entity's fields";
                 description "Validates that the field referenced in foreignKey.field exists in the entity specified by foreignKey.entity";
               }
               // Validate parent entity has primary key
-              // deref(deref(current())/../foreignKey/entity) resolves to the parent entity name leaf, go up to entity container
-              must "deref(deref(current())/../foreignKey/entity)/../primary_key" {
+              // Use path expression to find entity, then check primary_key
+              must "/data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key" {
                 error-message "Parent entity must have a primary key defined";
                 description "Validates that the parent entity has a primary_key field defined";
               }
               // Validate foreign key field points to parent's primary key
               // Check that the foreignKey.field value is in the parent entity's primary_key list
-              must "deref(deref(current())/../foreignKey/entity)/../primary_key[. = deref(current())/../foreignKey/field]" {
+              must "/data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key[. = deref(current())/../foreignKey/field]" {
                 error-message "Foreign key field must reference one of the parent entity's primary key fields";
                 description "Validates that the foreignKey.field references one of the parent entity's primary_key fields";
               }

@@ -1,7 +1,7 @@
 """
 Test for parents foreign key field existence constraint.
 
-Must statement: deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]
+Must statement: /data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = deref(current())/../foreignKey/field]
 Location: entities/parents/child_fk
 """
 import pytest

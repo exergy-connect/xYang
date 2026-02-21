@@ -1,7 +1,7 @@
 """
 Test for parents foreign key entity existence constraint.
 
-Must statement: deref(deref(current())/../foreignKey/entity)
+Must statement: /data-model/entities[name = deref(current())/../foreignKey/entity]
 Location: entities/parents/child_fk
 """
 import pytest

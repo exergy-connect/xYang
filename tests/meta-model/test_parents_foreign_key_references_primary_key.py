@@ -1,7 +1,7 @@
 """
 Test for parents foreign key referencing primary key constraint.
 
-Must statement: deref(deref(current())/../foreignKey/entity)/../primary_key[. = deref(current())/../foreignKey/field]
+Must statement: /data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key[. = deref(current())/../foreignKey/field]
 Location: entities/parents/child_fk
 """
 import pytest

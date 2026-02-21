@@ -481,23 +481,23 @@ module meta-model {
         }
         mandatory true;
         description "Child foreign key field name. Must reference a field in the current entity's fields list that has a foreignKey definition.";
-        must "/data-model/consolidated = true() or deref(current())/../foreignKey" {
+        must "deref(current())/../foreignKey" {
           error-message "Child foreign key field must have a foreignKey definition";
-          description "Validates that child_fk field has a foreignKey definition. Enforced in Phase 1 (consolidated=false) as it only requires checking the field definition in the current entity. Skipped in Phase 2 (consolidated=true, already validated).";
+          description "Validates that child_fk field has a foreignKey definition.";
         }
-        must "/data-model/consolidated = false() or deref(deref(current())/../foreignKey/entity)" {
+        must "/data-model/consolidated = false() or /data-model/entities[name = deref(current())/../foreignKey/entity]" {
           error-message "Foreign key entity must exist in the data model";
           description "Validates that the entity referenced in the child_fk field's foreignKey exists in the data model. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
-        must "/data-model/consolidated = false() or deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]" {
+        must "/data-model/consolidated = false() or /data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = deref(current())/../foreignKey/field]" {
           error-message "Foreign key field must exist in the referenced entity's fields";
           description "Validates that the field referenced in foreignKey.field exists in the entity specified by foreignKey.entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
-        must "/data-model/consolidated = false() or deref(deref(current())/../foreignKey/entity)/../primary_key" {
+        must "/data-model/consolidated = false() or /data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key" {
           error-message "Parent entity must have a primary key defined";
           description "Validates that the parent entity has a primary_key field defined. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
-        must "/data-model/consolidated = false() or deref(deref(current())/../foreignKey/entity)/../primary_key[. = deref(current())/../foreignKey/field]" {
+        must "/data-model/consolidated = false() or /data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key[. = deref(current())/../foreignKey/field]" {
           error-message "Foreign key field must reference one of the parent entity's primary key fields";
           description "Validates that the foreignKey.field references one of the parent entity's primary_key fields. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
@@ -514,7 +514,7 @@ module meta-model {
         }
         mandatory true;
         description "Parent's array field name where children are nested. References a field name that must exist in some entity's fields list and be of type 'array'.";
-        must "/data-model/consolidated = false() or deref(deref(../child_fk)/../foreignKey/entity)/../fields[name = current()]" {
+        must "/data-model/consolidated = false() or /data-model/entities[name = deref(../child_fk)/../foreignKey/entity]/fields[name = current()]" {
           error-message "Parent array field must exist in the parent entity's fields (specified by child_fk's foreignKey)";
           description "Validates that parent_array references a field in the specific parent entity (looked up via child_fk's foreignKey). Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
