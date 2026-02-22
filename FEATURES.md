@@ -34,6 +34,9 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `list` - List statements (with key)
 - ✅ `leaf` - Leaf statements
 - ✅ `leaf-list` - Leaf-list statements
+- ✅ `grouping` - Grouping statements (defines reusable schema components)
+- ✅ `uses` - Uses statements (incorporates groupings)
+- ✅ `refine` - Refine statements (modifies nodes from groupings)
 
 ### Constraints
 - ✅ `must` - Must constraints (57 occurrences) - **Parsed and evaluated**
@@ -62,7 +65,6 @@ This document lists the YANG features implemented in xYang, based on actual usag
 
 The following YANG features are not used in `meta-model.yang` and are not implemented:
 
-- ❌ `grouping` / `uses` - Grouping and uses statements
 - ❌ `augment` - Augmentation
 - ❌ `deviation` - Deviation
 - ❌ `import` - Module imports (modules are self-contained)
@@ -86,6 +88,61 @@ container item_type {
 ```
 
 If `../type = 'array'` evaluates to false, the `item_type` container is not validated and is treated as optional.
+
+## Grouping and Uses Implementation
+
+xYang supports `grouping` and `uses` statements for defining and reusing schema components. This allows for modular schema design and eliminates duplication.
+
+### Grouping Definition
+Groupings can be defined at the module level and contain any schema statements (containers, lists, leaves, leaf-lists, and even other uses statements).
+
+Example:
+```yang
+grouping common-fields {
+  leaf name {
+    type string;
+    mandatory true;
+  }
+  leaf description {
+    type string;
+  }
+}
+```
+
+### Uses Statement
+The `uses` statement incorporates a grouping into the current schema node. When a `uses` statement is encountered, the statements from the grouping are copied and expanded into the current location.
+
+Example:
+```yang
+container data {
+  uses common-fields;
+  leaf value {
+    type int32;
+  }
+}
+```
+
+### Refine Statement
+The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties.
+
+Example:
+```yang
+container data {
+  uses base-field {
+    refine type {
+      must ". != 'invalid'" {
+        error-message "Type cannot be invalid";
+      }
+    }
+  }
+}
+```
+
+### Nested Groupings
+Groupings can use other groupings, allowing for composition and extension of schema components.
+
+### Context Preservation
+When groupings are expanded via `uses`, must constraints and XPath expressions are evaluated in the context where the grouping is used, not where it was defined. This ensures that relative paths like `../type` correctly reference the expanded location.
 
 ## XPath Implementation
 
@@ -233,6 +290,23 @@ The modular architecture separates concerns:
 - `range`: 1 occurrence
 
 ## Recent Improvements
+
+### Composite Fields and Grouping Support (2026-01-16)
+- ✅ **Composite field type**: Added `composite` to primitive-type enumeration
+- ✅ **Composite field structure**: Implemented composite fields with subcomponents using grouping architecture
+- ✅ **Field definition refactoring**: Refactored field definitions to use grouping-based architecture
+  - Created `composite-field` grouping for subcomponent definitions
+  - Created `field-definition` grouping that extends `composite-field`
+  - Created `foreign-key-definition` grouping for reuse
+- ✅ **Primary key changes**: Changed `primary_key` from leaf-list to single leaf supporting composite fields
+- ✅ **Foreign key refactoring**: Changed `foreignKey` to use `references` list for multiple entity/field combinations
+- ✅ **Grouping/uses parser support**: Full parser implementation completed
+  - Supports grouping definitions and uses statements
+  - Supports refine statements to modify nodes from groupings
+  - Supports nested groupings (grouping that uses another grouping)
+  - Properly expands uses statements by copying statements from groupings
+  - Must constraints from groupings are evaluated in the correct context
+  - Comprehensive test suite in `tests/test_grouping_uses.py` (8 tests, all passing)
 
 ### XPath Evaluator Enhancements (2026)
 - ✅ **Nested deref() support**: Full implementation of nested `deref()` calls for complex cross-entity validation

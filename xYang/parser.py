@@ -36,6 +36,7 @@ class YangParser:
         self.registry.register('module:description', self.parsers.parse_description)
         self.registry.register('module:revision', self.parsers.parse_revision)
         self.registry.register('module:typedef', self.parsers.parse_typedef)
+        self.registry.register('module:grouping', self.parsers.parse_grouping)
         self.registry.register('module:container', self.parsers.parse_container)
         self.registry.register('module:list', self.parsers.parse_list)
         self.registry.register('module:leaf', self.parsers.parse_leaf)
@@ -50,6 +51,7 @@ class YangParser:
         self.registry.register('container:container', self.parsers.parse_container)
         self.registry.register('container:list', self.parsers.parse_list)
         self.registry.register('container:leaf-list', self.parsers.parse_leaf_list)
+        self.registry.register('container:uses', self.parsers.parse_uses)
         
         # List body statements
         self.registry.register('list:key', self.parsers.parse_list_key)
@@ -62,6 +64,7 @@ class YangParser:
         self.registry.register('list:list', self.parsers.parse_list)
         self.registry.register('list:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('list:must', self.parsers.parse_must)
+        self.registry.register('list:uses', self.parsers.parse_uses)
         
         # Leaf body statements
         self.registry.register('leaf:type', self.parsers.parse_type)
@@ -81,6 +84,17 @@ class YangParser:
         # Typedef body statements
         self.registry.register('typedef:type', self.parsers.parse_type)
         self.registry.register('typedef:description', self.parsers.parse_description)
+        
+        # Grouping body statements
+        self.registry.register('grouping:description', self.parsers.parse_description)
+        
+        # Uses body statements
+        self.registry.register('uses:refine', self.parsers.parse_refine)
+        self.registry.register('uses:description', self.parsers.parse_description)
+        
+        # Refine body statements
+        self.registry.register('refine:must', self.parsers.parse_must)
+        self.registry.register('refine:description', self.parsers.parse_description)
         
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types

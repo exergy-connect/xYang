@@ -6,7 +6,8 @@ from typing import Optional, TYPE_CHECKING
 from .parser_context import TokenStream, ParserContext
 from .ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
-    YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt
+    YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
+    YangGroupingStmt, YangUsesStmt, YangRefineStmt
 )
 from .xpath.validator import XPathValidator
 
@@ -496,6 +497,9 @@ class StatementParsers:
                 if not hasattr(context.current_parent, 'must_statements'):
                     context.current_parent.must_statements = []
                 context.current_parent.must_statements.append(must_stmt)
+            elif isinstance(context.current_parent, YangRefineStmt):
+                # Must statements in refine are stored in statements list
+                context.current_parent.statements.append(must_stmt)
         
         # Consume semicolon if present (optional for must statements in containers/lists)
         tokens.consume_if(';')
@@ -535,3 +539,198 @@ class StatementParsers:
                 context.current_parent.when = when_stmt
         
         tokens.consume_if(';')
+    
+    def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse grouping statement."""
+        tokens.consume('grouping')
+        grouping_name = tokens.consume()
+        grouping_stmt = YangGroupingStmt(name=grouping_name)
+        
+        if tokens.consume_if('{'):
+            new_context = context.push_parent(grouping_stmt)
+            while tokens.has_more() and tokens.peek() != '}':
+                # Parse any statement that can appear in a grouping
+                handler = self.registry.get_handler(f"grouping:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                else:
+                    # Try generic handlers for common statements
+                    if tokens.peek() == 'container':
+                        self.parse_container(tokens, new_context)
+                    elif tokens.peek() == 'list':
+                        self.parse_list(tokens, new_context)
+                    elif tokens.peek() == 'leaf':
+                        self.parse_leaf(tokens, new_context)
+                    elif tokens.peek() == 'leaf-list':
+                        self.parse_leaf_list(tokens, new_context)
+                    elif tokens.peek() == 'uses':
+                        self.parse_uses(tokens, new_context)
+                    elif tokens.peek() == 'description':
+                        self.parse_description(tokens, new_context)
+                    else:
+                        tokens.consume()  # Skip unknown
+            tokens.consume('}')
+        
+        # Store grouping in module
+        context.module.groupings[grouping_name] = grouping_stmt
+        tokens.consume_if(';')
+    
+    def parse_uses(self, tokens: TokenStream, context: ParserContext) -> Optional[YangUsesStmt]:
+        """Parse uses statement."""
+        tokens.consume('uses')
+        grouping_name = tokens.consume()
+        uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
+        
+        if tokens.consume_if('{'):
+            new_context = context.push_parent(uses_stmt)
+            while tokens.has_more() and tokens.peek() != '}':
+                if tokens.peek() == 'refine':
+                    self.parse_refine(tokens, new_context)
+                elif tokens.peek() == 'description':
+                    self.parse_description(tokens, new_context)
+                else:
+                    tokens.consume()  # Skip unknown
+            tokens.consume('}')
+        
+        # Expand the uses statement by copying statements from the grouping
+        grouping = context.module.get_grouping(grouping_name)
+        if grouping:
+            # Copy statements from grouping, applying refines
+            expanded_statements = self._expand_uses(grouping, uses_stmt.refines)
+            # Add expanded statements to current parent
+            if context.current_parent:
+                context.current_parent.statements.extend(expanded_statements)
+        else:
+            # Grouping not found - this will be an error, but we'll continue parsing
+            pass
+        
+        tokens.consume_if(';')
+        return None  # Uses statements are expanded, not returned
+    
+    def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse refine statement."""
+        tokens.consume('refine')
+        target_path = tokens.consume()
+        refine_stmt = YangRefineStmt(name="refine", target_path=target_path)
+        
+        if tokens.consume_if('{'):
+            new_context = context.push_parent(refine_stmt)
+            while tokens.has_more() and tokens.peek() != '}':
+                # Refine can contain must, description, default, etc.
+                handler = self.registry.get_handler(f"refine:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                elif tokens.peek() == 'must':
+                    self.parse_must(tokens, new_context)
+                elif tokens.peek() == 'description':
+                    self.parse_description(tokens, new_context)
+                elif tokens.peek() == 'default':
+                    if hasattr(context.current_parent, 'parent') and context.current_parent.parent:
+                        # Try to find the target node and add default
+                        pass
+                    tokens.consume()  # Skip for now
+                else:
+                    tokens.consume()  # Skip unknown
+            tokens.consume('}')
+        
+        # Add refine to uses statement
+        if context.current_parent and isinstance(context.current_parent, YangUsesStmt):
+            context.current_parent.refines.append(refine_stmt)
+        
+        tokens.consume_if(';')
+    
+    def _expand_uses(self, grouping: 'YangStatement', refines: list) -> list:
+        """Expand a uses statement by copying statements from grouping and applying refines."""
+        expanded = []
+        for stmt in grouping.statements:
+            # Create a shallow copy of the statement
+            stmt_copy = self._copy_statement(stmt)
+            
+            # Apply refines if any match this statement
+            for refine in refines:
+                if refine.target_path == stmt.name:
+                    # Apply refine modifications
+                    self._apply_refine(stmt_copy, refine)
+            
+            expanded.append(stmt_copy)
+        
+        return expanded
+    
+    def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
+        """Create a copy of a statement, handling AST nodes properly."""
+        from .ast import (
+            YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt,
+            YangTypeStmt, YangMustStmt, YangWhenStmt
+        )
+        
+        # Copy child statements recursively
+        copied_statements = [self._copy_statement(s) for s in stmt.statements]
+        
+        if isinstance(stmt, YangContainerStmt):
+            return YangContainerStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                presence=stmt.presence,
+                when=stmt.when,  # When statements contain AST, but we'll keep the reference
+                must_statements=stmt.must_statements[:] if stmt.must_statements else []
+            )
+        elif isinstance(stmt, YangListStmt):
+            return YangListStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                key=stmt.key,
+                min_elements=stmt.min_elements,
+                max_elements=stmt.max_elements,
+                when=stmt.when
+            )
+        elif isinstance(stmt, YangLeafStmt):
+            # Copy must_statements list
+            must_statements = list(stmt.must_statements) if stmt.must_statements else []
+            return YangLeafStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                type=stmt.type,  # TypeStmt doesn't need deep copy
+                mandatory=stmt.mandatory,
+                default=stmt.default,
+                must_statements=must_statements,
+                when=stmt.when
+            )
+        elif isinstance(stmt, YangLeafListStmt):
+            return YangLeafListStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                type=stmt.type,
+                min_elements=stmt.min_elements,
+                max_elements=stmt.max_elements,
+                must_statements=stmt.must_statements[:] if stmt.must_statements else []
+            )
+        else:
+            # Generic statement copy
+            new_stmt = type(stmt)(name=stmt.name, description=stmt.description, statements=copied_statements)
+            # Copy other attributes if they exist
+            for attr in ['type', 'mandatory', 'default', 'key', 'presence', 'when',
+                        'min_elements', 'max_elements', 'must_statements']:
+                if hasattr(stmt, attr):
+                    setattr(new_stmt, attr, getattr(stmt, attr))
+            return new_stmt
+    
+    def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
+        """Apply refine modifications to a statement."""
+        from .ast import YangMustStmt, YangLeafStmt, YangContainerStmt, YangListStmt
+        
+        # Apply must statements from refine
+        for refine_stmt in refine.statements:
+            if isinstance(refine_stmt, YangMustStmt):
+                # Initialize must_statements if it doesn't exist
+                if not hasattr(stmt, 'must_statements'):
+                    stmt.must_statements = []
+                if stmt.must_statements is None:
+                    stmt.must_statements = []
+                # Add the must statement from refine
+                stmt.must_statements.append(refine_stmt)
+            # Apply other refine modifications (default, description, etc.)
+            # This is a simplified implementation
