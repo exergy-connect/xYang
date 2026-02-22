@@ -133,29 +133,16 @@ class DerefEvaluator:
                 # If left side is a node (dict), navigate from it
                 if isinstance(left_result, dict):
                     # CRITICAL: When left_result is a node from deref(), we need to find where it came from
-                    # Try to determine the context where left_result came from
-                    left_node = arg_node.left
+                    # deref() stores the path when it resolves a node, so check that first
                     left_node_context = None
-                    
-                    # If left side is a deref() call, try to find where the node came from
-                    if isinstance(left_node, FCN) and left_node.name == 'deref' and len(left_node.args) == 1:
-                        # The node came from a deref() call - find its location in the data
-                        # We can search for the node in the data structure
+                    node_id = id(left_result)
+                    stored_path = self.evaluator._deref_node_paths.get(node_id)
+                    if stored_path:
+                        # Use the path that deref() stored when it resolved this node
+                        left_node_context = stored_path
+                    else:
+                        # Node wasn't from a known deref() call - try to find its location
                         left_node_context = self._find_node_location_in_data(left_result, original_context_path or context_path)
-                    
-                    # If we couldn't determine left_node_context, try to infer from the node structure
-                    if left_node_context is None and isinstance(left_result, dict):
-                        # If the node has a 'name' field, it might be a field node
-                        # Try to find it in the entity's fields
-                        if 'name' in left_result:
-                            # Search for the field in the current entity context
-                            entity_context = self._find_entity_context(original_context_path or context_path)
-                            if entity_context:
-                                # Try to find the field in this entity's fields
-                                field_name = left_result.get('name')
-                                field_context = entity_context + ['fields']
-                                # Check if we can find this field
-                                left_node_context = self._find_field_context(field_context, field_name, context)
                     
                     # If we still couldn't determine left_node_context, use original context
                     if left_node_context is None:
@@ -1062,45 +1049,3 @@ class DerefEvaluator:
         result_path = search_recursive(root_data, [], node)
         return result_path if result_path else None
     
-    def _find_entity_context(self, context: List) -> List:
-        """Find the entity context from a given context path.
-        
-        Args:
-            context: Current context path
-            
-        Returns:
-            Context path up to and including the entity, or None
-        """
-        # Find where "entities" is in the context
-        try:
-            entities_idx = context.index("entities")
-            if entities_idx + 1 < len(context):
-                # Return context up to and including the entity index
-                return context[:entities_idx + 2]
-        except ValueError:
-            pass
-        return None
-    
-    def _find_field_context(self, field_base_context: List, field_name: str, context: Context) -> List:
-        """Find the context for a specific field.
-        
-        Args:
-            field_base_context: Base context (e.g., ['data-model', 'entities', 1, 'fields'])
-            field_name: Name of the field to find
-            context: Context for evaluation
-            
-        Returns:
-            Context path to the field, or None
-        """
-        # Try to navigate to the field using the base context
-        try:
-            # Get the data at field_base_context
-            field_list = self.evaluator.path_evaluator.get_path_value(field_base_context, context)
-            if isinstance(field_list, list):
-                # Search for the field with matching name
-                for i, field in enumerate(field_list):
-                    if isinstance(field, dict) and field.get('name') == field_name:
-                        return field_base_context + [i]
-        except Exception:
-            pass
-        return None
