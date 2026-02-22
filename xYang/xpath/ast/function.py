@@ -33,6 +33,7 @@ class FunctionCallNode(XPathNode):
             'false': FalseFunctionNode,
             'bool': BoolFunctionNode,
             'number': NumberFunctionNode,
+            'string': StringFunctionNode,
             'not': NotFunctionNode,
         }
         
@@ -193,6 +194,30 @@ class NumberFunctionNode(FunctionCallNode):
         # number() with no args converts current context node to number
         # Pass evaluator for per-evaluator caching (thread safety)
         return xpath_number(context.current(evaluator))
+
+
+class StringFunctionNode(FunctionCallNode):
+    """string() function node."""
+    
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> 'JsonValue':
+        """Handle string() function following XPath 1.0 semantics.
+        
+        XPath 1.0 string() function:
+        - If no argument, converts current context node to string
+        - If one argument, converts that argument to string
+        - Numbers: convert to string representation (no scientific notation for integers)
+        - Booleans: "true" or "false"
+        - Node sets: string value of first node (if list, first element)
+        - None/empty: empty string ""
+        """
+        from ..utils import xpath_string
+        
+        if len(self.args) == 1:
+            arg_value = self.args[0].evaluate(evaluator, context)
+            return xpath_string(arg_value)
+        # string() with no args converts current context node to string
+        # Pass evaluator for per-evaluator caching (thread safety)
+        return xpath_string(context.current(evaluator))
 
 
 class NotFunctionNode(FunctionCallNode):
