@@ -179,7 +179,7 @@ xYang/
 │   ├── parser.py                # Tokenizer and recursive descent parser
 │   ├── ast.py                   # AST node definitions
 │   ├── path_evaluator.py        # Path navigation logic
-│   ├── deref_evaluator.py       # deref() function implementation
+│   ├── schema_leafref_resolver.py  # Schema and leafref resolution utilities
 │   ├── predicate_evaluator.py   # Predicate filtering logic
 │   ├── function_evaluator.py    # XPath function implementations
 │   ├── comparison_evaluator.py  # Comparison operations

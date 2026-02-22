@@ -19,7 +19,6 @@ class SchemaLeafrefResolver:
             evaluator: The main XPathEvaluator instance
         """
         self.evaluator = evaluator
-        self._visited_nodes: set = set()  # Track visited nodes for cycle detection
     
     def _parse_path_steps(self, path: str) -> tuple[List[str], bool, int]:
         """Parse a path string using AST parser and extract steps.

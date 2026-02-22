@@ -176,7 +176,7 @@ The remaining failures are related to **parents/parent array validation**, indic
   - Fixed `None` handling - when `deref()` returns `None`, path navigation with `/` now returns `[]` (empty node-set) instead of `None`
   - Enhanced path evaluation to try evaluating from the node itself as data first, then fall back to stored_path navigation
 - Files Modified:
-  - `xYang/xpath/deref_evaluator.py` - Added handling for string values from path navigation in nested `deref()` calls
+  - `xYang/xpath/schema_leafref_resolver.py` - Added handling for string values from path navigation in nested `deref()` calls
   - `xYang/xpath/evaluator.py` - Fixed path navigation from `deref()` nodes to treat `../field` as `./field`, added `None` handling for path navigation
 - Result: 
   - `deref(current())/../foreignKey` - ✅ FIXED

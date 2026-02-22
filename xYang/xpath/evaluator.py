@@ -17,8 +17,7 @@ from .ast import PathNode, FunctionCallNode, BinaryOpNode, UnaryOpNode, XPathNod
 from ..errors import XPathSyntaxError
 
 from .path_evaluator import PathEvaluator
-from .function_evaluator import FunctionEvaluator
-from .deref_evaluator import DerefEvaluator
+from .schema_leafref_resolver import SchemaLeafrefResolver
 from .predicate_evaluator import PredicateEvaluator
 from .utils import yang_bool
 from .context import Context, JsonValue
@@ -50,8 +49,7 @@ class XPathEvaluator:
         
         # Initialize sub-evaluators
         self.path_evaluator = PathEvaluator(self)
-        self.function_evaluator = FunctionEvaluator(self)
-        self.deref_evaluator = DerefEvaluator(self)
+        self.deref_evaluator = SchemaLeafrefResolver(self)
         self.predicate_evaluator = PredicateEvaluator(self)
 
     def evaluate(self, expression: str, context: Context, ast: Optional[XPathNode] = None) -> bool:
@@ -127,7 +125,8 @@ class XPathEvaluator:
             node: Function call node
             context: Context for evaluation
         """
-        return self.function_evaluator.evaluate_function(node, context)
+        # FunctionCallNode subclasses now handle their own evaluation
+        return node.evaluate(self, context)
 
 
     def _evaluate_unary_op(self, node: UnaryOpNode, context: Context) -> JsonValue:
