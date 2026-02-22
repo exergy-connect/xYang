@@ -28,6 +28,7 @@ SUPPORTED_FUNCTIONS: Set[str] = {
     'false',
     'bool',
     'number',
+    'string',
 }
 
 # Whitelist of supported binary operators
