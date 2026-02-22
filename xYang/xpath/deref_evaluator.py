@@ -85,17 +85,20 @@ class DerefEvaluator:
                 if isinstance(path_value, str):
                     # The path evaluated to a string - check if it's from a known leafref path
                     right_path = self.build_path_from_node(arg_node.right)
-                    # Check if the path ends with foreignKey/entity - if so, use the known leafref path
-                    if right_path and ('foreignKey/entity' in right_path or right_path.endswith('foreignKey/entity')):
-                        # This is a foreignKey.entity reference - use the known leafref path
-                        leafref_path = '/data-model/entities/name'
-                        result_tuple = self.find_node_by_leafref_path(leafref_path, path_value, context)
-                        if result_tuple:
-                            result, node_path = result_tuple
-                            if node_path:
-                                self.evaluator._deref_node_paths[id(result)] = node_path
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
+                    # Build the full path to check for leafref in schema
+                    full_path = self.build_path_from_node(arg_node)
+                    if full_path:
+                        # Get the leafref path from the schema instead of hardcoding
+                        leafref_path = self.get_leafref_path_from_schema(full_path, context)
+                        if leafref_path:
+                            # This is a leafref - resolve it
+                            result_tuple = self.find_node_by_leafref_path(leafref_path, path_value, context)
+                            if result_tuple:
+                                result, node_path = result_tuple
+                                if node_path:
+                                    self.evaluator._deref_node_paths[id(result)] = node_path
+                                self.evaluator.leafref_cache[cache_key] = result
+                                return result
                 
                 # First check if left side is a simple path (not a function call that returns a node)
                 # If so, try to check for leafref in original context first
@@ -141,12 +144,11 @@ class DerefEvaluator:
                         # Use the path that deref() stored when it resolved this node
                         left_node_context = stored_path
                     else:
-                        # Node wasn't from a known deref() call - try to find its location
+                        # Node wasn't from a known deref() call - find its location
                         left_node_context = self._find_node_location_in_data(left_result, original_context_path or context_path)
-                    
-                    # If we still couldn't determine left_node_context, use original context
-                    if left_node_context is None:
-                        left_node_context = original_context_path or context_path
+                        if left_node_context is None:
+                            # Cannot determine node location - cannot proceed
+                            return None
                     
                     # Create new context with left_result as data and empty context_path
                     # so that .. navigates within the node structure, not up the global context path
@@ -231,21 +233,39 @@ class DerefEvaluator:
                     # - deref(current()) returns field node
                     # - /../foreignKey/entity returns "parent" (string)
                     # - deref() needs to resolve "parent" using the leafref path for foreignKey.entity
-                    # The leafref path for foreignKey.entity is /data-model/entities/name
                     # Build the path string from the right side of the binary op (the navigation part)
                     right_path = self.build_path_from_node(arg_node.right)
                     
-                    # Check if the path ends with foreignKey/entity - if so, use the known leafref path
-                    if right_path and ('foreignKey/entity' in right_path or right_path.endswith('foreignKey/entity')):
-                        # This is a foreignKey.entity reference - use the known leafref path
-                        leafref_path = '/data-model/entities/name'
-                        result_tuple = self.find_node_by_leafref_path(leafref_path, left_result, context)
-                        if result_tuple:
-                            result, node_path = result_tuple
-                            if node_path:
-                                self.evaluator._deref_node_paths[id(result)] = node_path
-                            self.evaluator.leafref_cache[cache_key] = result
-                            return result
+                    if right_path:
+                        # Build schema path from the node's context, similar to the dict case above
+                        if right_path.startswith('../'):
+                            # Extract remaining path after .. using AST parser
+                            steps, _, _ = self._parse_path_steps(right_path)
+                            remaining_path = '/'.join(steps)
+                            # Convert to relative path from the node's location
+                            schema_path = './' + remaining_path if remaining_path else '.'
+                        elif not right_path.startswith('./') and not right_path.startswith('/'):
+                            # Make it explicitly relative
+                            schema_path = './' + right_path
+                        else:
+                            schema_path = right_path
+                        
+                        # Check if this path is a leafref in the left_node_context
+                        # Create a new Context for schema resolution instead of modifying the original
+                        schema_context = context.with_context_path(
+                            left_node_context if left_node_context else context_path
+                        )
+                        # Use the new context for schema resolution - original_context_path is preserved
+                        leafref_path = self.get_leafref_path_from_schema(schema_path, schema_context)
+                        if leafref_path:
+                            # This is a leafref - resolve it
+                            result_tuple = self.find_node_by_leafref_path(leafref_path, left_result, context)
+                            if result_tuple:
+                                result, node_path = result_tuple
+                                if node_path:
+                                    self.evaluator._deref_node_paths[id(result)] = node_path
+                                self.evaluator.leafref_cache[cache_key] = result
+                                return result
                     
                     if right_path:
                         # The path is relative to the left side node's location
@@ -615,9 +635,13 @@ class DerefEvaluator:
         # Handle current() or .
         if path == 'current()' or path == '.':
             schema_path = self.data_path_to_schema_path(context_to_use)
-            # Ensure we have the full path from root (should start with data-model)
-            if schema_path and schema_path[0] != "data-model":
-                schema_path = ["data-model"] + schema_path
+            # Ensure we have the full path from root
+            if schema_path:
+                root_container = self._get_root_container_name()
+                if not root_container:
+                    return None
+                if schema_path[0] != root_container:
+                    schema_path = [root_container] + schema_path
             return schema_path
         
         # Handle relative paths using AST parser
@@ -633,9 +657,13 @@ class DerefEvaluator:
                 return None
             
             schema_path = self.data_path_to_schema_path(data_path)
-            # Ensure we have the full path from root (should start with data-model)
-            if schema_path and schema_path[0] != "data-model":
-                schema_path = ["data-model"] + schema_path
+            # Ensure we have the full path from root
+            if schema_path:
+                root_container = self._get_root_container_name()
+                if not root_container:
+                    return None
+                if schema_path[0] != root_container:
+                    schema_path = [root_container] + schema_path
             return schema_path
         
         # Simple field name
@@ -666,6 +694,24 @@ class DerefEvaluator:
         skip_parts = {'.', '..', 'current()'}
         return [str(part) for part in data_path 
                 if not isinstance(part, int) and part not in skip_parts]
+    
+    def _get_root_container_name(self) -> str | None:
+        """Get the root container name from the module.
+        
+        Returns:
+            The name of the root container, or None if not found
+        """
+        module = self.evaluator.module
+        if not module:
+            return None
+        
+        # Look for the first top-level container in the module
+        from ..ast import YangContainerStmt
+        for stmt in module.statements:
+            if isinstance(stmt, YangContainerStmt):
+                return getattr(stmt, 'name', None)
+        
+        return None
     
     def find_schema_node(self, schema_path: List[str]) -> Any:
         """Find a schema node at the given path.
@@ -832,20 +878,22 @@ class DerefEvaluator:
         if not path_parts:
             return context.root_data
         
-        # Extract entity index from context if available and requested
+        # Extract list index from context if available and requested
         # Cache context paths to avoid repeated attribute access
         original_context = context.original_context_path
         context_to_use = original_context if original_context else context.context_path
-        entity_idx = None
+        list_idx = None
+        list_name = None
         if use_context_index and context_to_use:
             context_len = len(context_to_use)
-            # Optimized: iterate with explicit bounds check
+            # Find any list in the context path (generic, not hardcoded to "entities")
+            # Look for pattern: [..., list_name, index, ...]
             for j in range(context_len - 1):
-                if context_to_use[j] == "entities":
-                    next_item = context_to_use[j + 1]
-                    if isinstance(next_item, int):
-                        entity_idx = next_item
-                        break
+                if isinstance(context_to_use[j + 1], int):
+                    # Found a list index - store the list name and index
+                    list_name = context_to_use[j]
+                    list_idx = context_to_use[j + 1]
+                    break
         
         current = context.root_data
         
@@ -856,12 +904,13 @@ class DerefEvaluator:
             if isinstance(current, dict):
                 if part in current:
                     next_value = current[part]
-                    # Special handling: if we're navigating to "entities" and it's a list,
-                    # and we have an entity index from context AND use_context_index is True, use it
-                    if (part == "entities" and isinstance(next_value, list) and 
-                        entity_idx is not None and use_context_index):
-                        if 0 <= entity_idx < len(next_value):
-                            current = next_value[entity_idx]
+                    # Special handling: if we're navigating to a list that matches the context,
+                    # and we have a list index from context AND use_context_index is True, use it
+                    # This is generic - works with any list, not just "entities"
+                    if (part == list_name and isinstance(next_value, list) and 
+                        list_idx is not None and use_context_index):
+                        if 0 <= list_idx < len(next_value):
+                            current = next_value[list_idx]
                         else:
                             return None
                     else:
