@@ -37,8 +37,7 @@ class PathEvaluator:
         if not result or len(result) == 0:
             return []
         # Create new context with result[0] as data
-        item_data = result[0] if isinstance(result[0], dict) else {'value': result[0]}
-        new_context = context.with_data(item_data, [])
+        new_context = context.for_item(result[0])
         return self.evaluate_path(remaining_path, new_context)
     
     def _evaluate_path_and_apply_predicate(self, path: str, predicate: Any, context: Context, remaining_steps: List[str] = None) -> Any:
@@ -79,8 +78,7 @@ class PathEvaluator:
         for item in items:
             # Create new context for the item being tested (so paths like 'name' evaluate from the item)
             # Preserve original_context_path and original_data for current()
-            item_data = item if isinstance(item, dict) else {'value': item}
-            item_context = context.with_data(item_data, [])
+            item_context = context.for_item(item)
             
             pred_result = predicate_node.evaluate(self.evaluator, item_context)
             if yang_bool(pred_result):

@@ -323,8 +323,7 @@ class PathNavigationNode(BinaryOpNode):
         # Path navigation: if left is a dict or list and op is '/', treat as path navigation
         if isinstance(left, list) and len(left) > 0:
             # Left is a list - navigate from first element
-            item_data = left[0] if isinstance(left[0], dict) else {'value': left[0]}
-            new_context = context.with_data(item_data, [])
+            new_context = context.for_item(left[0])
             if isinstance(self.right, PathNode):
                 result = self.right.evaluate(evaluator, new_context)
             else:

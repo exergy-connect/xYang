@@ -95,6 +95,22 @@ class Context:
             root_data=self.root_data
         )
     
+    def for_item(self, item: JsonValue) -> 'Context':
+        """Create a new context for evaluating an item in a list/collection.
+        
+        Wraps non-dict items in {'value': item} so they can be accessed via path navigation.
+        Creates a new context with the item as data and empty context_path.
+        Preserves original_context_path and original_data for current().
+        
+        Args:
+            item: The item to create context for (dict or any other value)
+            
+        Returns:
+            New Context object with item as data and empty context_path
+        """
+        item_data = item if isinstance(item, dict) else {'value': item}
+        return self.with_data(item_data, [])
+    
     def current(self) -> JsonValue:
         """Get the current value from the original context path.
         
