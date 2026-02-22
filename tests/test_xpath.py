@@ -143,5 +143,70 @@ def test_boolean_functions():
     assert isinstance(result, bool)
 
 
+def test_string_conversion():
+    """Test string() function conversion."""
+    data = {
+        "name": "test",
+        "count": 42,
+        "price": 3.14,
+        "active": True,
+        "inactive": False,
+        "items": ["first", "second"]
+    }
+    module = parse_yang_string("module test { }")
+    evaluator = XPathEvaluator(data, module, context_path=[])
+
+    context = create_context(data, [])
+    
+    # Test string() with no args - converts current context node
+    context_name = create_context(data, ["name"])
+    result = evaluator.evaluate_value('string()', context_name)
+    assert result == "test"
+    
+    # Test string() with string argument
+    result = evaluator.evaluate_value('string("hello")', context)
+    assert result == "hello"
+    
+    # Test string() with integer
+    context_count = create_context(data, ["count"])
+    result = evaluator.evaluate_value('string(.)', context_count)
+    assert result == "42"
+    
+    # Test string() with float
+    context_price = create_context(data, ["price"])
+    result = evaluator.evaluate_value('string(.)', context_price)
+    assert result == "3.14"
+    
+    # Test string() with boolean True
+    context_active = create_context(data, ["active"])
+    result = evaluator.evaluate_value('string(.)', context_active)
+    assert result == "true"
+    
+    # Test string() with boolean False
+    context_inactive = create_context(data, ["inactive"])
+    result = evaluator.evaluate_value('string(.)', context_inactive)
+    assert result == "false"
+    
+    # Test string() with list (should return string of first element)
+    context_items = create_context(data, ["items"])
+    result = evaluator.evaluate_value('string(.)', context_items)
+    assert result == "first"
+    
+    # Test string() with None/missing value
+    context_missing = create_context(data, ["nonexistent"])
+    result = evaluator.evaluate_value('string(.)', context_missing)
+    assert result == ""
+    
+    # Test string() in comparison
+    result = evaluator.evaluate('string(42) = "42"', context)
+    assert result is True
+    
+    result = evaluator.evaluate('string(true()) = "true"', context)
+    assert result is True
+    
+    result = evaluator.evaluate('string(false()) = "false"', context)
+    assert result is True
+
+
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

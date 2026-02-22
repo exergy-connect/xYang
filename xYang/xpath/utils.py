@@ -57,6 +57,48 @@ def xpath_number(value: Any) -> float:
         return float('nan')
 
 
+def xpath_string(value: Any) -> str:
+    """Convert a value to a string following XPath string() function rules.
+    
+    XPath 1.0 string() function:
+    - None/empty -> ""
+    - Boolean True -> "true"
+    - Boolean False -> "false"
+    - Numbers -> string representation (integers without scientific notation)
+    - Lists -> string value of first element (if list is non-empty)
+    - Other types -> string representation
+    """
+    if value is None:
+        return ""
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    if isinstance(value, (int, float)):
+        # Convert number to string
+        # For integers, use integer representation (no decimal point)
+        if isinstance(value, int):
+            return str(value)
+        # For floats, use standard representation
+        # Avoid scientific notation for reasonable numbers
+        s = str(value)
+        # If it's a float that represents an integer (e.g., 5.0), show as integer
+        if '.' in s and s.replace('.', '').replace('-', '').isdigit():
+            if float(s) == int(float(s)):
+                return str(int(float(s)))
+        return s
+    if isinstance(value, list):
+        # For node sets (lists), return string value of first node
+        if len(value) > 0:
+            return xpath_string(value[0])
+        return ""
+    if isinstance(value, dict):
+        # For objects/dicts, convert to string representation
+        # In XPath, this would be the string value of the node
+        # For JSON objects, we'll return a string representation
+        return str(value)
+    # For strings and other types, convert to string
+    return str(value)
+
+
 def compare_equal(left: Any, right: Any) -> bool:
     """Compare two values for equality."""
     # Handle None/missing values first - in XPath, empty sequences don't equal anything
