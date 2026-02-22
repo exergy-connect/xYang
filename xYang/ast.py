@@ -94,3 +94,22 @@ class YangLeafrefStmt:
     """Leafref type statement."""
     path: str = ""
     require_instance: bool = True
+
+
+@dataclass
+class YangGroupingStmt(YangStatement):
+    """Grouping statement - defines reusable schema components."""
+    pass
+
+
+@dataclass
+class YangUsesStmt(YangStatement):
+    """Uses statement - incorporates a grouping."""
+    grouping_name: str = ""
+    refines: List['YangRefineStmt'] = field(default_factory=list)
+
+
+@dataclass
+class YangRefineStmt(YangStatement):
+    """Refine statement - modifies nodes from a grouping when using it."""
+    target_path: str = ""  # Path to the node being refined (e.g., "type", "required")

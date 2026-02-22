@@ -24,11 +24,16 @@ class YangModule:
     description: str = ""
     revisions: List[Dict[str, str]] = field(default_factory=list)
     typedefs: Dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
+    groupings: Dict[str, 'YangStatement'] = field(default_factory=dict)
     statements: List['YangStatement'] = field(default_factory=list)
 
     def get_typedef(self, name: str) -> Optional['YangTypedefStmt']:
         """Get a typedef by name."""
         return self.typedefs.get(name)
+    
+    def get_grouping(self, name: str) -> Optional['YangStatement']:
+        """Get a grouping by name."""
+        return self.groupings.get(name)
 
     def find_statement(self, name: str) -> Optional['YangStatement']:
         """Find a statement by name."""
