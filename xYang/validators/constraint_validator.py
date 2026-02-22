@@ -41,6 +41,7 @@ class ConstraintValidator:
         logger.info("Starting must statement validation, root keys: %s", list(root.keys()) if isinstance(root, dict) else "N/A")
         
         # Create evaluator with root context
+        # Note: Caches are cleared at YangValidator level, so each validation starts fresh
         evaluator = self.evaluator_factory(root, self.module, context_path=[])
         
         # Store root data in evaluator for absolute path resolution
@@ -433,10 +434,12 @@ class ConstraintValidator:
                     "This should not happen if YANG was parsed correctly.",
                     must_expr.expression if hasattr(must_expr, 'expression') else str(must_expr)
                 )
+            # Get raw value first to debug
+            raw_result = evaluator.evaluate_value(must_expr.expression, ast=ast, context=context)
             result = evaluator.evaluate(must_expr.expression, ast=ast, context=context)
             logger.info(
-                "Must constraint result for %s: %s (expression: %s)",
-                field_name, result, must_expr.expression
+                "Must constraint result for %s: %s (raw: %s, type: %s, expression: %s)",
+                field_name, result, raw_result, type(raw_result).__name__, must_expr.expression
             )
             if not result:
                 # Use error_message if available, otherwise fall back to description, then generic message

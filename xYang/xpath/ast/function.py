@@ -136,7 +136,8 @@ class CurrentFunctionNode(FunctionCallNode):
     
     def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> 'JsonValue':
         """Handle current() function."""
-        return context.current()
+        # Pass evaluator for per-evaluator caching (thread safety)
+        return context.current(evaluator)
 
 
 class TrueFunctionNode(FunctionCallNode):
@@ -190,7 +191,8 @@ class NumberFunctionNode(FunctionCallNode):
             arg_value = self.args[0].evaluate(evaluator, context)
             return xpath_number(arg_value)
         # number() with no args converts current context node to number
-        return xpath_number(context.current())
+        # Pass evaluator for per-evaluator caching (thread safety)
+        return xpath_number(context.current(evaluator))
 
 
 class NotFunctionNode(FunctionCallNode):

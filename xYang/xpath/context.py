@@ -42,19 +42,6 @@ class Context:
     original_data: JsonValue
     root_data: JsonValue
     
-    @classmethod
-    def clear_current_cache(cls) -> None:
-        """Clear the current() result cache."""
-        cls._current_cache.clear()
-    
-    @classmethod
-    def get_cache_size(cls) -> int:
-        """Get the number of cached current() results.
-        
-        Returns:
-            Number of cached entries
-        """
-        return len(cls._current_cache)
     
     def with_data(self, data: JsonValue, context_path: Optional[List[str]] = None) -> 'Context':
         """Create a new context with different data and context_path.
@@ -111,19 +98,25 @@ class Context:
         item_data = item if isinstance(item, dict) else {'value': item}
         return self.with_data(item_data, [])
     
-    def current(self) -> JsonValue:
+    def current(self, evaluator: Any) -> JsonValue:
         """Get the current value from the original context path.
         
         In XPath, current() always refers to the original context node where
         the expression is being evaluated, not the current iteration context.
         
+        Args:
+            evaluator: XPathEvaluator instance to use for per-evaluator caching (required for thread safety).
+        
         Returns:
             The value at the original context path, or empty string if not found (XPath spec)
         """
+        # Use evaluator's cache for thread safety
+        cache = evaluator._current_cache
+        
         # Check cache first (using path and data identity as key)
         cache_key = (tuple(self.original_context_path) if self.original_context_path else (), id(self.original_data))
-        if cache_key in self._current_cache:
-            return self._current_cache[cache_key]
+        if cache_key in cache:
+            return cache[cache_key]
         
         # Always use original context for current()
         if self.original_context_path:
@@ -153,28 +146,26 @@ class Context:
                 else:
                     # Path not found - return empty string (XPath spec for current())
                     result = ""
-                    self._current_cache[cache_key] = result
+                    cache[cache_key] = result
                     return result
             # Return the value, or empty string if None (XPath spec for current())
             result = current if current is not None else ""
-            self._current_cache[cache_key] = result
+            cache[cache_key] = result
             return result
         # If no original context path, try to get value from current data
         if isinstance(self.data, (str, int, float, bool)):
             result = self.data
-            self._current_cache[cache_key] = result
+            cache[cache_key] = result
             return result
         # If data is a dict and we're at a leaf, try to get the value
         if isinstance(self.data, dict) and self.context_path:
             last_part = self.context_path[-1]
             if isinstance(last_part, str) and last_part in self.data:
                 result = self.data[last_part]
-                self._current_cache[cache_key] = result
+                cache[cache_key] = result
                 return result
         result = ""
-        self._current_cache[cache_key] = result
+        cache[cache_key] = result
         return result
 
 
-# Initialize class-level cache (after class definition since it's a frozen dataclass)
-Context._current_cache: dict = {}

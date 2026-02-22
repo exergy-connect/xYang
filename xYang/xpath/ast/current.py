@@ -28,7 +28,8 @@ class CurrentNode(XPathNode):
         # pylint: disable=protected-access
         if self.is_current_function:
             # current() always refers to original context
-            return context.current()
+            # Pass evaluator for per-evaluator caching (thread safety)
+            return context.current(evaluator)
         else:
             # . refers to current context node/value
             # If data is a primitive value, return it directly
@@ -45,7 +46,8 @@ class CurrentNode(XPathNode):
             if context.context_path:
                 return evaluator.path_evaluator.get_path_value(context.context_path, context)
             # Fallback to current() if no context
-            return context.current()
+            # Pass evaluator for per-evaluator caching (thread safety)
+            return context.current(evaluator)
 
     def __repr__(self):
         return "current()" if self.is_current_function else "."

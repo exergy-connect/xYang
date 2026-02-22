@@ -40,6 +40,7 @@ class XPathEvaluator:
         self.leafref_cache: Dict[str, Any] = {}  # Cache for deref() results
         self._expression_cache: Dict[str, Any] = {}  # Cache for parsed expressions
         self._deref_node_paths: Dict[int, List] = {}  # Map node id to its path in data tree for navigation after deref()
+        self._current_cache: Dict[tuple, Any] = {}  # Cache for current() results (per-evaluator for thread safety)
         
         # Context state (set from Context object when evaluating)
         self.data = data

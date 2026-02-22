@@ -179,7 +179,7 @@ class TestContextParameterUsage:
         )
         
         context = create_context(data, ["data-model", "entities", 0, "name"])
-        current_value = context.current()
+        current_value = context.current(evaluator)
         assert current_value == "company"
 
     def test_evaluate_path_node_with_context(self):
@@ -230,7 +230,7 @@ class TestContextParameterUsage:
         new_context = original_context.with_data(new_data, [])
         
         # current() should still return original value
-        assert new_context.current() == "company"
+        assert new_context.current(evaluator) == "company"
         
         # But direct access should return new value
         result = evaluator.path_evaluator.evaluate_path("name", new_context)

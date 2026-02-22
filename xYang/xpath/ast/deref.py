@@ -31,8 +31,10 @@ class DerefFunctionNode(FunctionCallNode):
         context_path = context.context_path
         original_context_path = context.original_context_path
         
-        # Check cache
-        cache_key = self._make_cache_key(arg_node, context_path)
+        # For cache key, use original_context_path if context_path is empty
+        # This ensures consistent caching when evaluating from item contexts in predicates
+        cache_path = context_path if context_path else (original_context_path or [])
+        cache_key = self._make_cache_key(arg_node, cache_path)
         if cache_key in evaluator.leafref_cache:
             return evaluator.leafref_cache[cache_key]
         
@@ -56,7 +58,10 @@ class DerefFunctionNode(FunctionCallNode):
     
     def _make_cache_key(self, arg_node: Any, context_path: list) -> str:
         """Create cache key for deref() result."""
-        return f"deref({id(arg_node)}):{str(context_path)}"
+        # Use context_path if available, otherwise use empty list for cache key
+        # This ensures consistent caching even when context_path is empty
+        path_str = str(context_path) if context_path else "[]"
+        return f"deref({id(arg_node)}):{path_str}"
     
     def _cache_and_return(
         self, evaluator: 'XPathEvaluator', result: Any, arg_node: Any = None

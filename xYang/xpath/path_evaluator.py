@@ -166,7 +166,8 @@ class PathEvaluator:
         """
         # Handle current node - but distinguish between . and current()
         if path == 'current()':
-            return context.current()
+            # Pass evaluator for per-evaluator caching (thread safety)
+            return context.current(self.evaluator)
         if path == '.':
             # . means the current context node/value
             # If data is a primitive value, return it directly
@@ -179,7 +180,8 @@ class PathEvaluator:
                     return context.data['value']
                 return context.data
             # Get value from current context path or fallback to current()
-            return self.get_path_value(context.context_path, context) if context.context_path else context.current()
+            # Pass evaluator for per-evaluator caching (thread safety)
+            return self.get_path_value(context.context_path, context) if context.context_path else context.current(self.evaluator)
         
         # Handle relative paths with ..
         if path.startswith('../'):
@@ -187,6 +189,8 @@ class PathEvaluator:
         
         # Handle absolute paths
         if path.startswith('/'):
+            # For absolute paths, always use evaluate_absolute_path which handles predicate_context
+            # This ensures relative paths in predicates (like ../child_fk) resolve correctly
             return self.evaluate_absolute_path(path, context)
         
         # Simple field access - try direct access first, then build path from context
@@ -291,15 +295,18 @@ class PathEvaluator:
         Note:
             When evaluating absolute paths, we navigate from root_data but preserve
             the original_context_path and original_data for current() function evaluation
-            in predicates. The nav_context preserves these original values.
+            and relative paths in predicates. The nav_context preserves these original values.
         """
         # Parse path parts, handling predicates that may contain '/' characters
         parts = self._parse_path_parts(path.lstrip('/'))
         # Create navigation context from root_data, preserving original context for current()
-        # This ensures that current() in predicates can still access the original context
+        # and relative paths in predicates. We need to preserve original_context_path so that
+        # relative paths like ../child_fk in predicates can resolve correctly.
         nav_context = context.with_data(context.root_data, [])
         # original_context_path and original_data are preserved by with_data()
-        return self.get_path_value(parts, nav_context)
+        # But we also need to ensure the context_path is set correctly for relative paths in predicates
+        # The predicate_context should use the original context_path for relative path resolution
+        return self.get_path_value(parts, nav_context, predicate_context=context)
     
     def _parse_path_parts(self, path: str) -> List[str]:
         """Parse a path string into parts, handling predicates that may contain '/' characters.
@@ -386,13 +393,17 @@ class PathEvaluator:
             return parts[len(context_path):]
         return parts
     
-    def get_path_value(self, parts: List, context: Context) -> Any:
+    def get_path_value(self, parts: List, context: Context, predicate_context: Context = None) -> Any:
         """Get value at path in data structure.
         
         Args:
             parts: List of path parts (strings for dict keys, ints for list indices)
             context: Context for evaluation
+            predicate_context: Optional context for predicate evaluation (preserves original context for relative paths)
         """
+        # Use predicate_context if provided, otherwise use context for predicates
+        # This ensures relative paths in predicates (like ../child_fk) resolve correctly
+        pred_ctx = predicate_context if predicate_context is not None else context
         context_path = context.context_path
         current = context.data
         
@@ -442,7 +453,8 @@ class PathEvaluator:
                             value = current[base_part]
                             if isinstance(value, list):
                                 # Apply predicate AST node directly (no string conversion)
-                                filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.segments[0].predicate, context)
+                                # Use predicate_context for relative paths in predicates
+                                filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.segments[0].predicate, pred_ctx)
                                 # If there are more parts to navigate, continue from the filtered result
                                 if filtered is not None and parts.index(part) < len(parts) - 1:
                                     # Get remaining parts after this one
@@ -578,14 +590,17 @@ class PathEvaluator:
             field_segments = [seg for seg in node.segments if seg.step != '..']
             field_parts = [seg.step for seg in field_segments]
             
-            context_len = len(context.context_path) if context.context_path else 0
+            # Use original_context_path if context_path is empty (e.g., in predicates)
+            # This ensures relative paths in predicates work from the original constraint location
+            path_to_use = context.context_path if context.context_path else context.original_context_path
+            context_len = len(path_to_use) if path_to_use else 0
             if up_levels <= context_len:
                 # Try going up the specified number of levels
-                new_path = self._go_up_context_path(context.context_path, up_levels) + field_parts
+                new_path = self._go_up_context_path(path_to_use, up_levels) + field_parts
                 # Use root_data for navigation when we have a context path
                 nav_context = context
                 if context_len > 0 and isinstance(context.root_data, dict):
-                    nav_context = context.with_data(context.root_data, context.context_path)
+                    nav_context = context.with_data(context.root_data, path_to_use)
                 value = self.get_path_value(new_path, nav_context)
                 
                 # Apply predicate from the last segment if it exists
@@ -620,7 +635,7 @@ class PathEvaluator:
                     # Only try going up one less level, not all the way down to 0
                     # This prevents finding wrong paths that happen to exist
                     alt_levels = up_levels - 1
-                    new_path_alt = self._go_up_context_path(context.context_path, alt_levels) + field_parts
+                    new_path_alt = self._go_up_context_path(path_to_use, alt_levels) + field_parts
                     value_alt = self.get_path_value(new_path_alt, nav_context)
                     # Only use this result if it's not None
                     if value_alt is not None:
@@ -648,7 +663,13 @@ class PathEvaluator:
                 if node.is_absolute:
                     path = '/' + '/'.join(seg.step for seg in node.segments)
                     nav_context = context.with_data(context.root_data, [])
-                    value = self.evaluate_path(path, nav_context)
+                    # For absolute paths, check if path contains predicates with relative paths
+                    # If so, we need to use evaluate_absolute_path which handles predicate_context
+                    if '[' in path and ('../' in path or 'deref(' in path):
+                        # Path has predicates that might contain relative paths - use evaluate_absolute_path
+                        value = self.evaluate_absolute_path(path, context)
+                    else:
+                        value = self.evaluate_path(path, nav_context)
                 else:
                     path = '/'.join(seg.step for seg in node.segments)
                     value = self.evaluate_path(path, context)

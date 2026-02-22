@@ -391,15 +391,10 @@ class PathNavigationNode(BinaryOpNode):
                         # If that didn't work, try from the node's location in the tree
                         if result is None or (isinstance(result, list) and len(result) == 0):
                             result = direct_node.evaluate(evaluator, nav_context)
-                        if not result:
-                            # Try evaluating from the node itself as data first
-                            item_context = nav_context.with_data(left, [])
-                            direct_path = '/'.join(seg.step for seg in direct_segments)
-                            result = evaluator.path_evaluator.evaluate_path(direct_path, item_context)
                         # If that fails, try with .. (go up then down) as fallback
+                        # Use the full PathNode to preserve predicates
                         if result is None or (isinstance(result, list) and len(result) == 0):
-                            path_str = '/'.join(seg.step for seg in segments)
-                            result = evaluator.path_evaluator.evaluate_path(path_str, nav_context)
+                            result = self.right.evaluate(evaluator, nav_context)
                     else:
                         # Just .. means go up from stored_path (if set) or return the node itself
                         if stored_path:

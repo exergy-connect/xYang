@@ -186,7 +186,12 @@ class YangValidator:
                     )
     
     def _reset(self) -> None:
-        """Reset all validators to initial state."""
+        """Reset all validators to initial state.
+        
+        Note: Caches are now per-evaluator (instance-level), so they don't need
+        to be cleared here. Each validation creates a new XPathEvaluator with
+        fresh caches, making parallel validations safe.
+        """
         self.structure_validator.errors = []
         self.structure_validator.warnings = []
         self.type_validator.errors = []
