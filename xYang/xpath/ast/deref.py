@@ -354,7 +354,7 @@ class DerefFunctionNode(FunctionCallNode):
                 if schema_path:
                     schema_node = deref_eval.find_schema_node(schema_path)
                     if schema_node:
-                        from ..ast import YangLeafStmt
+                        from ...ast import YangLeafStmt
                         if isinstance(schema_node, YangLeafStmt):
                             type_obj = schema_node.type
                             if type_obj and type_obj.name == 'leafref':
@@ -389,7 +389,7 @@ class DerefFunctionNode(FunctionCallNode):
                 if schema_path:
                     schema_node = deref_eval.find_schema_node(schema_path)
                     if schema_node:
-                        from ..ast import YangLeafStmt
+                        from ...ast import YangLeafStmt
                         if isinstance(schema_node, YangLeafStmt):
                             type_obj = schema_node.type
                             if type_obj and type_obj.name == 'leafref':
