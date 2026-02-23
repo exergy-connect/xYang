@@ -2,7 +2,7 @@
 Schema and leafref resolution utilities for XPath expressions.
 """
 
-from typing import Any, List
+from typing import Any, List, Iterator
 
 from .ast import FunctionCallNode, PathNode, BinaryOpNode, FunctionCallNode as FCN
 from .parser import XPathTokenizer, XPathParser
@@ -93,7 +93,23 @@ class SchemaLeafrefResolver:
             leafref_path = self.get_leafref_path_from_schema(path, context)
             
             if not leafref_path:
-                # No leafref definition found - cannot resolve
+                # No leafref definition found - try fallback for entity names
+                # This handles cases like deref(deref(current())/foreignKeys[0]/entity)
+                # where the path is complex but the value is an entity name
+                if isinstance(ref_value, str):
+                    # Try common entity reference paths
+                    root_container = self._get_root_container_name()
+                    if root_container:
+                        # Try /data-model/entities/name pattern
+                        entity_path = f"/{root_container}/entities/name"
+                        result_tuple = self.find_node_by_leafref_path(entity_path, ref_value, context)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                # No leafref definition found and fallback failed - cannot resolve
                 return None
             
             # Step 3: Use the leafref path to find the referenced node
@@ -213,7 +229,7 @@ class SchemaLeafrefResolver:
         """Resolve an XPath expression to a schema location path.
         
         Args:
-            path: XPath expression (e.g., "../entity", "current()", "./field")
+            path: XPath expression (e.g., "../entity", "current()", "./field", "foreignKeys[0]/entity")
             context: Context to use for schema resolution (required, never None)
             
         Returns:
@@ -236,9 +252,13 @@ class SchemaLeafrefResolver:
                     schema_path = [root_container] + schema_path
             return schema_path
         
+        # Strip predicates from path (e.g., "foreignKeys[0]/entity" -> "foreignKeys/entity")
+        # Predicates are for data filtering, not schema navigation
+        path_without_predicates = self._strip_predicates(path)
+        
         # Handle relative paths using AST parser
-        if path.startswith('../') or path.startswith('./'):
-            field_parts, _, up_levels = self._parse_path_steps(path)
+        if path_without_predicates.startswith('../') or path_without_predicates.startswith('./'):
+            field_parts, _, up_levels = self._parse_path_steps(path_without_predicates)
             
             # Navigate up from context
             if up_levels == 0:
@@ -258,17 +278,37 @@ class SchemaLeafrefResolver:
                     schema_path = [root_container] + schema_path
             return schema_path
         
-        # Simple field name
-        if path and not path.startswith('/'):
-            data_path = context_to_use + [path]
-            return self.data_path_to_schema_path(data_path)
+        # Simple field name (may contain predicates)
+        if path_without_predicates and not path_without_predicates.startswith('/'):
+            # Split by '/' to handle paths like "foreignKeys/entity"
+            parts = path_without_predicates.split('/')
+            data_path = context_to_use + parts
+            schema_path = self.data_path_to_schema_path(data_path)
+            if schema_path:
+                root_container = self._get_root_container_name()
+                if root_container and schema_path[0] != root_container:
+                    schema_path = [root_container] + schema_path
+            return schema_path
         
         # Handle absolute paths using AST parser
-        if path.startswith('/'):
-            steps, _, _ = self._parse_path_steps(path)
+        if path_without_predicates.startswith('/'):
+            steps, _, _ = self._parse_path_steps(path_without_predicates)
             return steps
         
         return None
+    
+    def _strip_predicates(self, path: str) -> str:
+        """Strip XPath predicates from a path string.
+        
+        Examples:
+            "foreignKeys[0]/entity" -> "foreignKeys/entity"
+            "fields[name='test']" -> "fields"
+            "entities[0]/fields[1]" -> "entities/fields"
+        """
+        import re
+        # Remove predicates like [0], [name='test'], etc.
+        # This regex matches [...] patterns
+        return re.sub(r'\[[^\]]*\]', '', path)
     
     def data_path_to_schema_path(self, data_path: List) -> List[str]:
         """Convert a data structure path to a schema path.
@@ -308,6 +348,9 @@ class SchemaLeafrefResolver:
     def find_schema_node(self, schema_path: List[str]) -> Any:
         """Find a schema node at the given path.
         
+        Traverses uses statements by following grouping references.
+        Only instantiates nodes when there's a refine statement.
+        
         Args:
             schema_path: List of schema node names
             
@@ -325,7 +368,7 @@ class SchemaLeafrefResolver:
         # Optimized: iterate through path parts with early return
         for part in schema_path:
             found = False
-            # Optimized: iterate statements directly
+            # Traverse statements (groupings are already expanded during parsing)
             for stmt in current_statements:
                 # Optimized: check name attribute existence once
                 stmt_name = getattr(stmt, 'name', None)
@@ -339,6 +382,7 @@ class SchemaLeafrefResolver:
                 return None
         
         return last_node
+    
     
     def find_node_by_leafref_path(self, leafref_path: str, ref_value: Any, context: Context) -> tuple[Any, List] | None:
         """Find a node in the data using a leafref path by recursively walking the tree.

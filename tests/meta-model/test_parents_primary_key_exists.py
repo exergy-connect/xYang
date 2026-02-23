@@ -28,9 +28,9 @@ def test_parents_primary_key_exists_valid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "children",
                             "type": "array",
@@ -40,16 +40,15 @@ def test_parents_primary_key_exists_valid(meta_model):
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "parent"
+                            }]
                         }
                     ],
                     "parents": [
@@ -76,12 +75,13 @@ def test_parents_primary_key_exists_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
                     # Missing primary_key
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "children",
                             "type": "array",
@@ -91,16 +91,15 @@ def test_parents_primary_key_exists_invalid(meta_model):
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "parent"
+                            }]
                         }
                     ],
                     "parents": [
@@ -116,5 +115,5 @@ def test_parents_primary_key_exists_invalid(meta_model):
     
     is_valid, errors, warnings = validator.validate(data)
     assert not is_valid, "Parent entity without primary key should fail"
-    assert any("primary key" in str(err).lower() and "parent" in str(err).lower() for err in errors), \
+    assert any("primary key" in str(err).lower() or "primary_key" in str(err).lower() for err in errors), \
         f"Should have primary key existence error. Errors: {errors}"

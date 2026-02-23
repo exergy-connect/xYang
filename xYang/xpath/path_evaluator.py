@@ -123,8 +123,13 @@ class PathEvaluator:
                         # For leaf-list: remove both the index (already removed) and the name
                         # because the indexed value is a scalar, not a container
                         new_path.pop()
-                    # For regular lists: keep the list name (it represents the list entry container)
-                    # The index has already been removed, so we're done
+                    else:
+                        # For regular lists: YANG semantics say .. from list item goes to parent of list
+                        # So we should remove both the index (already removed) and the list name
+                        # This applies even when the parent is a list item (nested lists)
+                        # From entities[1]/fields[1], going up from fields[1] removes both
+                        # the index (1) and the list name (fields) to get to entities[1]
+                        new_path.pop()
             # If it was a string (list/container name), we've removed it and are at parent
         return new_path
     
@@ -195,32 +200,165 @@ class PathEvaluator:
         
         # Simple field access - try direct access first, then build path from context
         if '/' not in path:
+            # Check if path has a predicate (e.g., "foreignKeys[0]")
+            if '[' in path and ']' in path:
+                bracket_start = path.find('[')
+                bracket_end = path.find(']')
+                base_field = path[:bracket_start]
+                predicate_str = path[bracket_start+1:bracket_end]
+                # First, try to access the field directly from context.data
+                if isinstance(context.data, dict) and base_field in context.data:
+                    value = context.data[base_field]
+                    if isinstance(value, list):
+                        # Handle numeric predicate (e.g., [0], [1]) as direct index
+                        if predicate_str.isdigit():
+                            idx = int(predicate_str)
+                            # XPath uses 1-based indexing, but we'll support 0-based for convenience
+                            if idx == 0:
+                                return value[0] if len(value) > 0 else None
+                            elif 1 <= idx <= len(value):
+                                return value[idx - 1]
+                            return None
+                        # For non-numeric predicates, parse and evaluate
+                        from .parser import XPathTokenizer, XPathParser
+                        full_predicate = '[' + predicate_str + ']'
+                        tokenizer = XPathTokenizer(full_predicate)
+                        tokens = tokenizer.tokenize()
+                        parser = XPathParser(tokens, full_predicate)
+                        predicate_ast = parser.parse()
+                        # Apply predicate to filter the list
+                        filtered = self.evaluator.predicate_evaluator.apply_predicate(value, predicate_ast, context)
+                        if isinstance(filtered, list) and len(filtered) > 0:
+                            return filtered[0]
+                        return filtered if filtered is not None else None
             # First, try to access the field directly from context.data
             # This handles the case where context.data is set to a list item (e.g., entity dict)
             if isinstance(context.data, dict) and path in context.data:
                 return context.data[path]
             # Fall back to building path from context
-            full_path = list(context.context_path) + [path]
+            # Parse path into parts to handle multi-segment paths
+            parts = self._parse_path_parts(path)
+            if parts:
+                # Try direct access for first part
+                first_part = parts[0]
+                if isinstance(context.data, dict) and first_part in context.data:
+                    # Start from current data and navigate remaining parts
+                    current = context.data[first_part]
+                    for part in parts[1:]:
+                        if isinstance(current, dict) and part in current:
+                            current = current[part]
+                        elif isinstance(current, list):
+                            # Handle list navigation
+                            if part.isdigit():
+                                idx = int(part)
+                                if 0 <= idx < len(current):
+                                    current = current[idx]
+                                else:
+                                    return None
+                            else:
+                                # Collect from all items
+                                collected = []
+                                for item in current:
+                                    if isinstance(item, dict) and part in item:
+                                        value = item[part]
+                                        if isinstance(value, list):
+                                            collected.extend(value)
+                                        else:
+                                            collected.append(value)
+                                current = collected if len(collected) > 1 else (collected[0] if collected else None)
+                                if current is None:
+                                    return None
+                        else:
+                            return None
+                    return current
+            full_path = list(context.context_path) + parts if parts else [path]
             return self.get_path_value(full_path, context)
         
         # Path with slashes - try direct access first for first part
         # Parse path parts, handling predicates that may contain '/' characters
         parts = self._parse_path_parts(path)
-        if parts and isinstance(context.data, dict) and parts[0] in context.data:
-            # Start from current data and navigate remaining parts
-            current = context.data[parts[0]]
-            for part in parts[1:]:
-                if isinstance(current, dict) and part in current:
-                    current = current[part]
-                elif isinstance(current, list) and part.isdigit():
-                    idx = int(part)
-                    if 0 <= idx < len(current):
-                        current = current[idx]
+        if parts:
+            # Extract base field name (without predicate) for first part
+            first_part = parts[0]
+            base_first_part = first_part.split('[')[0] if '[' in first_part else first_part
+            if isinstance(context.data, dict) and base_first_part in context.data:
+                # Start from current data and navigate remaining parts
+                current = context.data[base_first_part]
+                # Handle predicate on first part if present
+                if '[' in first_part and ']' in first_part:
+                    bracket_start = first_part.find('[')
+                    bracket_end = first_part.find(']')
+                    predicate_content = first_part[bracket_start+1:bracket_end]
+                    if isinstance(current, list):
+                        # Handle numeric predicate as direct index
+                        if predicate_content.isdigit():
+                            idx = int(predicate_content)
+                            # XPath uses 1-based indexing, but we'll support 0-based for convenience
+                            if idx == 0:
+                                current = current[0] if len(current) > 0 else None
+                            elif 1 <= idx <= len(current):
+                                current = current[idx - 1]
+                            else:
+                                return None
+                        else:
+                            # For non-numeric predicates, parse and evaluate
+                            from .parser import XPathTokenizer, XPathParser
+                            predicate_str = '[' + predicate_content + ']'
+                            tokenizer = XPathTokenizer(predicate_str)
+                            tokens = tokenizer.tokenize()
+                            parser = XPathParser(tokens, predicate_str)
+                            predicate_ast = parser.parse()
+                            filtered = self.evaluator.predicate_evaluator.apply_predicate(current, predicate_ast, context)
+                            if isinstance(filtered, list) and len(filtered) > 0:
+                                current = filtered[0]
+                            elif filtered is not None:
+                                current = filtered
+                            else:
+                                return None
+                # Navigate remaining parts
+                for part in parts[1:]:
+                    base_part = part.split('[')[0] if '[' in part else part
+                    if isinstance(current, dict) and base_part in current:
+                        current = current[base_part]
+                        # Handle predicate if present
+                        if '[' in part and ']' in part:
+                            bracket_start = part.find('[')
+                            bracket_end = part.find(']')
+                            predicate_content = part[bracket_start+1:bracket_end]
+                            if isinstance(current, list):
+                                # Handle numeric predicate as direct index
+                                if predicate_content.isdigit():
+                                    idx = int(predicate_content)
+                                    if idx == 0:
+                                        current = current[0] if len(current) > 0 else None
+                                    elif 1 <= idx <= len(current):
+                                        current = current[idx - 1]
+                                    else:
+                                        return None
+                                else:
+                                    # For non-numeric predicates, parse and evaluate
+                                    from .parser import XPathTokenizer, XPathParser
+                                    predicate_str = '[' + predicate_content + ']'
+                                    tokenizer = XPathTokenizer(predicate_str)
+                                    tokens = tokenizer.tokenize()
+                                    parser = XPathParser(tokens, predicate_str)
+                                    predicate_ast = parser.parse()
+                                    filtered = self.evaluator.predicate_evaluator.apply_predicate(current, predicate_ast, context)
+                                    if isinstance(filtered, list) and len(filtered) > 0:
+                                        current = filtered[0]
+                                    elif filtered is not None:
+                                        current = filtered
+                                    else:
+                                        return None
+                    elif isinstance(current, list) and part.isdigit():
+                        idx = int(part)
+                        if 0 <= idx < len(current):
+                            current = current[idx]
+                        else:
+                            return None
                     else:
                         return None
-                else:
-                    return None
-            return current
+                return current
         # Fall back to building path from context
         return self.get_path_value(list(context.context_path) + parts, context)
     
@@ -251,8 +389,25 @@ class PathEvaluator:
                 nav_context = context.with_data(context.root_data, path_to_use)
             
             # Try going up the specified number of levels
-            new_path = self._go_up_context_path(path_to_use, up_levels) + field_parts
-            result = self.get_path_value(new_path, nav_context)
+            new_path = self._go_up_context_path(path_to_use, up_levels)
+            
+            # If we went past the root (empty path), we need to handle it specially
+            # In YANG, when you go up from the root, you stay at the root
+            # So if new_path is empty but we have field_parts, try accessing from root
+            if not new_path:
+                if field_parts:
+                    # We're at root level, try accessing field directly from root_data
+                    result = self.get_path_value(field_parts, nav_context)
+                    # If that didn't work and root_data has a single top-level key (like 'data-model'),
+                    # try accessing from that key
+                    if result is None and isinstance(context.root_data, dict) and len(context.root_data) == 1:
+                        top_level_key = list(context.root_data.keys())[0]
+                        result = self.get_path_value([top_level_key] + field_parts, nav_context)
+                else:
+                    # No field parts and empty path - we're at root
+                    result = context.root_data
+            else:
+                result = self.get_path_value(new_path + field_parts, nav_context)
             
             # If that didn't work, try two fallback strategies:
             # 1. Try going up one more semantic level by removing the list name
@@ -418,11 +573,15 @@ class PathEvaluator:
               len(parts) > 0 and 
               isinstance(parts[0], str)):
             # If we're in a list item context and the path doesn't start with context_path,
-            # we need to navigate from root_data using the full path
-            # Check if the first part of parts matches the context_path
-            if not (len(parts) > 0 and len(context_path) > 0 and parts[0] == context_path[0]):
-                # Path doesn't start with context_path, so navigate from root_data
+            # check if we can access it directly from context.data first
+            # Only navigate from root_data if the field is not in context.data
+            if (len(parts) > 0 and len(context_path) > 0 and parts[0] == context_path[0]):
+                # Path starts with context_path, navigate from root_data
                 current = context.root_data
+            elif parts[0] not in context.data:
+                # Field not in context.data, try navigating from root_data
+                current = context.root_data
+            # Otherwise, use context.data (field exists in current context)
         
         for part in parts:
             # Handle integer list indices
@@ -490,12 +649,42 @@ class PathEvaluator:
                     if default_value is not None:
                         return default_value
                     return None
-            elif isinstance(current, list) and part.isdigit():
-                idx = int(part)
-                if 0 <= idx < len(current):
-                    current = current[idx]
+            elif isinstance(current, list):
+                # When navigating into a list with a field name (not an index),
+                # collect values from all items in the list (XPath semantics)
+                if part.isdigit():
+                    # Numeric index - access specific item
+                    idx = int(part)
+                    if 0 <= idx < len(current):
+                        current = current[idx]
+                    else:
+                        return None
                 else:
-                    return None
+                    # Field name - collect from all items
+                    collected = []
+                    for item in current:
+                        if isinstance(item, dict) and part in item:
+                            value = item[part]
+                            if isinstance(value, list):
+                                collected.extend(value)
+                            else:
+                                collected.append(value)
+                    # If we have remaining parts, continue navigation from collected items
+                    if collected and parts.index(part) < len(parts) - 1:
+                        # For now, if we have multiple values and more parts, use first value
+                        # This is a simplification - full XPath would handle this differently
+                        if len(collected) == 1:
+                            current = collected[0]
+                        elif collected:
+                            # Multiple values - in XPath, this would create a node-set
+                            # For now, use first value for navigation
+                            current = collected[0]
+                        else:
+                            return None
+                    else:
+                        # No more parts - return collected values
+                        return collected if len(collected) > 1 else (collected[0] if collected else None)
+                    continue
             else:
                 return None
         
@@ -571,7 +760,12 @@ class PathEvaluator:
         """
         if not isinstance(predicate, LiteralNode):
             return None
-        idx = int(predicate.value) - 1  # XPath is 1-indexed
+        pred_value = int(predicate.value)
+        # Handle [0] as 0-based indexing for convenience, [1] and above as 1-based (XPath standard)
+        if pred_value == 0:
+            idx = 0
+        else:
+            idx = pred_value - 1  # XPath is 1-indexed
         if 0 <= idx < len(value):
             return value[idx]
         return None
@@ -596,12 +790,27 @@ class PathEvaluator:
             context_len = len(path_to_use) if path_to_use else 0
             if up_levels <= context_len:
                 # Try going up the specified number of levels
-                new_path = self._go_up_context_path(path_to_use, up_levels) + field_parts
+                new_path = self._go_up_context_path(path_to_use, up_levels)
                 # Use root_data for navigation when we have a context path
                 nav_context = context
                 if context_len > 0 and isinstance(context.root_data, dict):
                     nav_context = context.with_data(context.root_data, path_to_use)
-                value = self.get_path_value(new_path, nav_context)
+                
+                # If we went past the root (empty path), handle it specially
+                if not new_path:
+                    if field_parts:
+                        # We're at root level, try accessing field directly from root_data
+                        value = self.get_path_value(field_parts, nav_context)
+                        # If that didn't work and root_data has a single top-level key (like 'data-model'),
+                        # try accessing from that key
+                        if value is None and isinstance(context.root_data, dict) and len(context.root_data) == 1:
+                            top_level_key = list(context.root_data.keys())[0]
+                            value = self.get_path_value([top_level_key] + field_parts, nav_context)
+                    else:
+                        # No field parts and empty path - we're at root
+                        value = context.root_data
+                else:
+                    value = self.get_path_value(new_path + field_parts, nav_context)
                 
                 # Apply predicate from the last segment if it exists
                 if value is not None and field_segments:
@@ -671,8 +880,10 @@ class PathEvaluator:
                     else:
                         value = self.evaluate_path(path, nav_context)
                 else:
-                    path = '/'.join(seg.step for seg in node.segments)
-                    value = self.evaluate_path(path, context)
+                    # For relative paths, use get_path_value directly with segment steps
+                    # This ensures proper handling of list navigation (e.g., foreignKeys/entity)
+                    segment_steps = [seg.step for seg in node.segments]
+                    value = self.get_path_value(segment_steps, context)
         
         return value
     

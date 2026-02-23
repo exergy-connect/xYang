@@ -3,7 +3,7 @@ Constraint validator for YANG must/when statements.
 """
 
 import logging
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Iterator, Optional
 from ..module import YangModule
 from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt, YangLeafListStmt
 from ..xpath import XPathEvaluator
@@ -109,9 +109,13 @@ class ConstraintValidator:
         current_data = self._navigate_path(root_data, context_path)
         
         # Create context with appropriate data
+        # For primitive values (like leaf values), set data to the primitive so that
+        # . (current node) returns the value directly, while current() can still navigate
+        # via original_context_path to get the same value
         if current_data is not None and not isinstance(current_data, (dict, list)):
-            # Primitive value - use root_data so current() can navigate via context_path
-            data = root_data
+            # Primitive value - set data to the primitive for . to work correctly
+            # but keep root_data for current() navigation
+            data = current_data
         elif current_data is not None:
             data = current_data
         else:
@@ -633,6 +637,7 @@ class ConstraintValidator:
                         # Context is created per-statement in _validate_must_in_statement
                         # Validate child statements for this list item
                         # Use a helper to validate children without double recursion
+                        # Traverse uses statements by following grouping references
                         for child in stmt.statements:
                             logger.debug("Validating child %s in list item %d", child.name if hasattr(child, 'name') else type(child).__name__, idx)
                             self._validate_child_in_list_item(root_data, child, evaluator, item_path)
@@ -646,11 +651,14 @@ class ConstraintValidator:
                         self._validate_must_in_statement(child_data, child, evaluator, current_path)
             else:
                 # For non-list statements, validate child statements normally
-                logger.debug("Non-list statement %s, validating %d children", stmt.name if hasattr(stmt, 'name') else type(stmt).__name__, len(stmt.statements))
-                for child in stmt.statements:
+                # Traverse uses statements by following grouping references
+                child_statements = stmt.statements
+                logger.debug("Non-list statement %s, validating %d children", stmt.name if hasattr(stmt, 'name') else type(stmt).__name__, len(child_statements))
+                for child in child_statements:
                     # Navigate to child data from root_data
                     child_data = self._navigate_path(root_data, current_path)
                     if child_data is None:
                         child_data = root_data
                     logger.debug("Validating child %s of %s", child.name if hasattr(child, 'name') else type(child).__name__, stmt.name if hasattr(stmt, 'name') else type(stmt).__name__)
                     self._validate_must_in_statement(child_data, child, evaluator, current_path)
+    

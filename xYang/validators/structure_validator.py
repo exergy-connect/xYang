@@ -82,8 +82,9 @@ class StructureValidator:
                 # Container or other composite statement
                 if stmt.name in data:
                     new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
+                    child_statements = stmt.statements
                     self.validate(
-                        data[stmt.name], stmt.statements, context_path=new_path
+                        data[stmt.name], child_statements, context_path=new_path
                     )
                 elif (isinstance(stmt, YangContainerStmt) and
                       hasattr(stmt, 'presence') and stmt.presence):
@@ -91,8 +92,9 @@ class StructureValidator:
                     if stmt.name in data:
                         new_path = (context_path + [stmt.name]
                                      if hasattr(stmt, 'name') else context_path)
+                        child_statements = stmt.statements
                         self.validate(
-                            data[stmt.name], stmt.statements, context_path=new_path
+                            data[stmt.name], child_statements, context_path=new_path
                         )
     
     def _validate_leaf(
@@ -134,7 +136,8 @@ class StructureValidator:
                     # Pass context path for nested validation
                     item_path = (context_path + [list_stmt.name]
                                   if context_path else [list_stmt.name])
-                    self.validate(item, list_stmt.statements, context_path=item_path)
+                    item_statements = list_stmt.statements
+                    self.validate(item, item_statements, context_path=item_path)
     
     def _validate_leaf_list(self, data: Dict[str, Any], leaf_list: YangLeafListStmt) -> None:
         """Validate a leaf-list."""
@@ -157,3 +160,4 @@ class StructureValidator:
                     f"Leaf-list {leaf_list.name} has more than "
                     f"{leaf_list.max_elements} elements"
                 )
+    

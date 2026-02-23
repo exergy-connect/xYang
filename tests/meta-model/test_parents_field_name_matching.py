@@ -29,16 +29,13 @@ def test_parents_field_name_matching_valid_self_referential(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "entity1", "field": "id"}]
                         },
                         {
                             "name": "children",
@@ -73,27 +70,21 @@ def test_parents_field_name_matching_valid_cross_entity_matching(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "children",
-                            "type": "array",
-                            "item_type": {"entity": "child"}
-                        }
+                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {
                             "name": "id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}],
+                            "primaryKey": True
                         }
                     ],
                     "parents": [
@@ -128,28 +119,21 @@ def test_parents_field_name_matching_valid_cross_entity_not_matching(meta_model)
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "children",
-                            "type": "array",
-                            "item_type": {"entity": "child"}
-                        }
+                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [

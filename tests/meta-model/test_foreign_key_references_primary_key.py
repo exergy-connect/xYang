@@ -28,23 +28,20 @@ def test_foreign_key_references_primary_key_valid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ]
                 }
@@ -57,7 +54,7 @@ def test_foreign_key_references_primary_key_valid(meta_model):
 
 
 def test_foreign_key_references_primary_key_valid_composite(meta_model):
-    """Test that foreign key referencing one field in composite primary key passes."""
+    """Test that foreign key referencing composite primary key passes."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -68,24 +65,30 @@ def test_foreign_key_references_primary_key_valid_composite(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id", "code"],
+                    "primary_key": "composite_key",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "code", "type": "string"}
+                        {
+                            "name": "composite_key",
+                            "type": "composite",
+                            "primaryKey": True,
+                            "composite": [
+                                {"name": "id", "type": "integer"}
+                            ]
+                        }
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
-                            "name": "parent_id",
-                            "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "name": "parent_key",
+                            "type": "composite",
+                            "foreignKeys": [{"entity": "parent", "field": "composite_key"}],
+                            "composite": [
+                                {"name": "id", "type": "integer"}
+                            ]
                         }
                     ]
                 }
@@ -106,27 +109,25 @@ def test_foreign_key_references_primary_key_invalid_not_primary_key(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "name", "type": "string"}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_name",
                             "type": "string",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "name"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "name"}]
                         }
                     ]
                 }

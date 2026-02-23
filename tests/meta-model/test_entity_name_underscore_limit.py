@@ -31,9 +31,9 @@ def test_entity_name_underscore_limit_valid(meta_model):
             "entities": [
                 {
                     "name": "entity_name",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -57,9 +57,9 @@ def test_entity_name_underscore_limit_valid_at_limit(meta_model):
             "entities": [
                 {
                     "name": "entity_field_name",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -84,9 +84,9 @@ def test_entity_name_underscore_limit_valid_custom_limit(meta_model):
             "entities": [
                 {
                     "name": "entity_field_name_test",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -110,9 +110,9 @@ def test_entity_name_underscore_limit_invalid_exceeds_default(meta_model):
             "entities": [
                 {
                     "name": "entity_field_name_test",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -139,9 +139,9 @@ def test_entity_name_underscore_limit_invalid_exceeds_custom(meta_model):
             "entities": [
                 {
                     "name": "entity_field_name_test",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]

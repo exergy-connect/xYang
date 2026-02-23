@@ -28,9 +28,9 @@ def test_parents_type_matching_valid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "children",
                             "type": "array",
@@ -40,16 +40,15 @@ def test_parents_type_matching_valid(meta_model):
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "parent"
+                            }]
                         }
                     ],
                     "parents": [
@@ -76,12 +75,13 @@ def test_parents_type_matching_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "string"},
+                        {"name": "id", "type": "string", "primaryKey": True},
                         {
                             "name": "children",
                             "type": "array",
@@ -91,16 +91,15 @@ def test_parents_type_matching_invalid(meta_model):
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "parent"
+                            }]
                         }
                     ],
                     "parents": [

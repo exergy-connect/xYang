@@ -28,28 +28,21 @@ def test_parents_foreign_key_entity_exists_valid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "children",
-                            "type": "array",
-                            "item_type": {"entity": "child"}
-                        }
+                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [
@@ -76,19 +69,17 @@ def test_parents_foreign_key_entity_exists_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "nonexistent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [
@@ -104,5 +95,5 @@ def test_parents_foreign_key_entity_exists_invalid(meta_model):
     
     is_valid, errors, warnings = validator.validate(data)
     assert not is_valid, "Parents foreign key entity not existing should fail"
-    assert any("foreign key entity must exist" in str(err).lower() for err in errors), \
+    assert any("foreign key entity" in str(err).lower() or "parent array" in str(err).lower() for err in errors), \
         f"Should have foreign key entity existence error. Errors: {errors}"

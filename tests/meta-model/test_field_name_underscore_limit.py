@@ -31,9 +31,9 @@ def test_field_name_underscore_limit_valid(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["field_name"],
+                    "primary_key": "field_name",
                     "fields": [
-                        {"name": "field_name", "type": "string"}
+                        {"name": "field_name", "type": "string", "primaryKey": True}
                     ]
                 }
             ]
@@ -56,9 +56,9 @@ def test_field_name_underscore_limit_valid_at_limit(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["field_name_test"],
+                    "primary_key": "field_name_test",
                     "fields": [
-                        {"name": "field_name_test", "type": "string"}
+                        {"name": "field_name_test", "type": "string", "primaryKey": True}
                     ]
                 }
             ]
@@ -78,12 +78,13 @@ def test_field_name_underscore_limit_invalid_exceeds_default(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["field_name_test_value"],
+                    "primary_key": "field_name_test_value_exceed",
                     "fields": [
-                        {"name": "field_name_test_value", "type": "string"}
+                        {"name": "field_name_test_value_exceed", "type": "string", "primaryKey": True}
                     ]
                 }
             ]

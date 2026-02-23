@@ -71,7 +71,6 @@ def _generate_yang_model(must_condition: str) -> str:
               path "/data-model/entities/fields/name";
               require-instance true;
             }}
-            mandatory true;
           }}
         }}
       }}
@@ -105,6 +104,7 @@ def test_data():
             "entities": [
                 {
                     "name": "parent",
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "string"}
                     ]
@@ -116,8 +116,7 @@ def test_data():
                             "name": "parent_id",
                             "type": "string",
                             "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
+                                "entity": "parent"
                             }
                         }
                     ],
@@ -136,9 +135,12 @@ def test_data():
 def working_model():
     """Generate and parse YANG model with WORKING expression (nested deref)."""
     # WORKING: Type matching check using nested deref
+    # If field is not present, default to primary_key
     must_condition = (
-        "/data-model/consolidated = false() or deref(current())/../type = " +
-        "deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]/type"
+        "/data-model/consolidated = false() or " +
+        "(deref(current())/../type = deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]/type or " +
+        "(count(deref(current())/../foreignKey/field) = 0 and " +
+        "deref(current())/../type = deref(deref(current())/../foreignKey/entity)/../fields[name = deref(deref(current())/../foreignKey/entity)/../primary_key]/type))"
     )
     yang_content = _generate_yang_model(must_condition)
     return parse_yang_string(yang_content)
@@ -148,9 +150,12 @@ def working_model():
 def failing_model():
     """Generate and parse YANG model with FAILING expression (absolute path with predicate)."""
     # FAILING: Type matching check using absolute path with predicate
+    # If field is not present, default to primary_key
     must_condition = (
-        "/data-model/consolidated = false() or deref(current())/../type = " +
-        "/data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = deref(current())/../foreignKey/field]/type"
+        "/data-model/consolidated = false() or " +
+        "(deref(current())/../type = /data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = deref(current())/../foreignKey/field]/type or " +
+        "(count(deref(current())/../foreignKey/field) = 0 and " +
+        "deref(current())/../type = /data-model/entities[name = deref(current())/../foreignKey/entity]/fields[name = /data-model/entities[name = deref(current())/../foreignKey/entity]/primary_key]/type))"
     )
     yang_content = _generate_yang_model(must_condition)
     return parse_yang_string(yang_content)

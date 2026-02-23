@@ -28,9 +28,9 @@ def test_computed_field_binary_operations_valid_exactly_two(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -66,9 +66,9 @@ def test_computed_field_binary_operations_valid_subtraction(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -101,12 +101,13 @@ def test_computed_field_binary_operations_invalid_too_few(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
                         {
                             "name": "sum",
@@ -139,12 +140,13 @@ def test_computed_field_binary_operations_invalid_too_many(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {"name": "field3", "type": "integer"},

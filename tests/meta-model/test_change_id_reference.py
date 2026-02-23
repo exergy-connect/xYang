@@ -27,13 +27,14 @@ def test_change_id_c_reference_valid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "c": 1,
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ],
@@ -56,14 +57,15 @@ def test_change_id_m_reference_valid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "c": 1,
                     "m": [2, 3],
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ],
@@ -88,13 +90,14 @@ def test_change_id_c_reference_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "c": 999,
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ],
@@ -119,14 +122,15 @@ def test_change_id_m_reference_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "c": 1,
                     "m": [2, 999],
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ],

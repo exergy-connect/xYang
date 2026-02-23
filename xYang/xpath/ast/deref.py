@@ -94,9 +94,10 @@ class DerefFunctionNode(FunctionCallNode):
     
     def _create_schema_context(
         self, context: 'Context', context_path: list
-    ) -> 'ContextType':
+    ) -> 'Context':
         """Create a new context for schema resolution."""
-        return ContextType(
+        from ..context import Context
+        return Context(
             data=context.data,
             context_path=context_path,
             original_context_path=context_path,
@@ -196,13 +197,37 @@ class DerefFunctionNode(FunctionCallNode):
         if not right_path:
             return self._cache_and_return(evaluator, None, arg_node)
         
-        schema_context = self._create_schema_context(context, context_to_use)
-        leafref_path = deref_eval.get_leafref_path_from_schema(right_path, schema_context)
+        # For nested deref, we need to resolve the right_path relative to context_to_use
+        # to find where it ends in the data structure, then get the leafref schema from there
+        field_schema_context = self._create_schema_context(context, context_to_use)
+        
+        # Resolve the right_path to get the full schema path where it ends
+        # Strip predicates first (e.g., "foreignKeys[0]/entity" -> "foreignKeys/entity")
+        right_path_stripped = deref_eval._strip_predicates(right_path) if hasattr(deref_eval, '_strip_predicates') else right_path
+        full_schema_path = deref_eval.resolve_path_to_schema_location(right_path_stripped, field_schema_context)
+        
+        if full_schema_path:
+            # Create a context at the end location to get the leafref schema
+            end_schema_context = self._create_schema_context(context, full_schema_path)
+            leafref_path = deref_eval.get_leafref_path_from_schema("current()", end_schema_context)
+        else:
+            # Fallback: try with the field node context and the stripped path
+            leafref_path = deref_eval.get_leafref_path_from_schema(right_path_stripped, field_schema_context)
         
         if leafref_path:
             return self._resolve_leafref(
                 deref_eval, leafref_path, path_value, context, evaluator, cache_key
             )
+        
+        # If we still don't have a leafref path, try the fallback for entity names
+        if isinstance(path_value, str):
+            root_container = deref_eval._get_root_container_name()
+            if root_container:
+                entity_path = f"/{root_container}/entities/name"
+                result_tuple = deref_eval.find_node_by_leafref_path(entity_path, path_value, context)
+                if result_tuple:
+                    result, node_path = result_tuple
+                    return self._store_result_with_path(evaluator, result, node_path, cache_key)
         
         return self._cache_and_return(evaluator, None, arg_node)
     

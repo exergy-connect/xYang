@@ -2,7 +2,7 @@
 Schema and leafref resolution utilities for XPath expressions.
 """
 
-from typing import Any, List
+from typing import Any, List, Iterator
 
 from .ast import FunctionCallNode, PathNode, BinaryOpNode, FunctionCallNode as FCN
 from .parser import XPathTokenizer, XPathParser
@@ -307,6 +307,9 @@ class SchemaLeafrefResolver:
     def find_schema_node(self, schema_path: List[str]) -> Any:
         """Find a schema node at the given path.
         
+        Traverses uses statements by following grouping references.
+        Only instantiates nodes when there's a refine statement.
+        
         Args:
             schema_path: List of schema node names
             
@@ -324,7 +327,7 @@ class SchemaLeafrefResolver:
         # Optimized: iterate through path parts with early return
         for part in schema_path:
             found = False
-            # Optimized: iterate statements directly
+            # Traverse statements (groupings are already expanded during parsing)
             for stmt in current_statements:
                 # Optimized: check name attribute existence once
                 stmt_name = getattr(stmt, 'name', None)

@@ -12,7 +12,7 @@ from pathlib import Path
 @pytest.fixture
 def meta_model():
     """Load the meta-model YANG module."""
-    yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model-phased.yang"
+    yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model.yang"
     return parse_yang_file(str(yang_path))
 
 
@@ -29,28 +29,21 @@ def test_parent_array_type_valid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "children",
-                            "type": "array",
-                            "item_type": {"entity": "child"}
-                        }
+                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [
@@ -81,27 +74,21 @@ def test_parent_array_type_invalid(meta_model):
             "entities": [
                 {
                     "name": "parent",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "name",
-                            "type": "string"
-                        }
+                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "name", "type": "string"}
                     ]
                 },
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [
@@ -139,16 +126,13 @@ def test_parent_array_type_consolidated_false_no_parent(meta_model):
             "entities": [
                 {
                     "name": "child",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "parent",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [

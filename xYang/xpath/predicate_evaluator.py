@@ -32,9 +32,14 @@ class PredicateEvaluator:
             For simple index predicates like [1], returns the element directly.
             For other predicates, returns a filtered list.
         """
-        # Handle index access [1] - check if predicate is a numeric literal
+        # Handle index access [1] or [0] - check if predicate is a numeric literal
         if isinstance(predicate, LiteralNode) and isinstance(predicate.value, (int, float)):
-            idx = int(predicate.value) - 1  # XPath is 1-indexed
+            pred_value = int(predicate.value)
+            # Handle [0] as 0-based indexing for convenience, [1] and above as 1-based (XPath standard)
+            if pred_value == 0:
+                idx = 0
+            else:
+                idx = pred_value - 1  # XPath is 1-indexed
             items_len = len(items)
             if 0 <= idx < items_len:
                 return items[idx]  # Return element directly, not wrapped in list

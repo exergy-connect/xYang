@@ -28,9 +28,9 @@ def test_computed_field_reference_valid_same_entity(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -66,24 +66,21 @@ def test_computed_field_reference_valid_cross_entity(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "value", "type": "integer"}
                     ]
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "entity1"}]
                         },
                         {
                             "name": "computed_value",
@@ -92,10 +89,7 @@ def test_computed_field_reference_valid_cross_entity(meta_model):
                                 "operation": "add",
                                 "fields": [
                                     {"field": "id"},
-                                    {
-                                        "field": "value",
-                                        "entity": "entity1"
-                                    }
+                                    {"field": "value", "entity": "entity1"}
                                 ]
                             }
                         }
@@ -118,12 +112,13 @@ def test_computed_field_reference_invalid_same_entity_missing(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "sum",
                             "type": "integer",
@@ -156,26 +151,24 @@ def test_computed_field_reference_invalid_cross_entity_missing(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "entity1"}]
                         },
                         {
                             "name": "computed_value",
@@ -184,10 +177,7 @@ def test_computed_field_reference_invalid_cross_entity_missing(meta_model):
                                 "operation": "add",
                                 "fields": [
                                     {"field": "id"},
-                                    {
-                                        "field": "nonexistent",
-                                        "entity": "entity1"
-                                    }
+                                    {"field": "nonexistent", "entity": "entity1"}
                                 ]
                             }
                         }

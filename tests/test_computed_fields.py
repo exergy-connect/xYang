@@ -35,7 +35,7 @@ def test_computed_field_missing_field_same_entity():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
@@ -76,7 +76,7 @@ def test_computed_field_valid_same_entity():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
@@ -117,7 +117,7 @@ def test_computed_field_missing_field_cross_entity():
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"}
@@ -125,16 +125,15 @@ def test_computed_field_missing_field_cross_entity():
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "entity1"
+                            }]
                         },
                         {
                             "name": "invalid_computed",
@@ -173,7 +172,7 @@ def test_computed_field_cross_entity_no_foreign_key():
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"}
@@ -181,7 +180,7 @@ def test_computed_field_cross_entity_no_foreign_key():
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         # No foreign key field to entity1!
@@ -239,7 +238,7 @@ def test_computed_field_cross_entity_with_foreign_key():
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"}
@@ -247,16 +246,15 @@ def test_computed_field_cross_entity_with_foreign_key():
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{
+                                "entity": "entity1"
+                            }]
                         },
                         {
                             "name": "valid_computed",
@@ -294,7 +292,7 @@ def test_computed_field_wrong_field_count_binary():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
@@ -334,7 +332,7 @@ def test_computed_field_valid_aggregation():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},

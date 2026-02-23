@@ -36,7 +36,7 @@ def test_absolute_path_entities_list():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
@@ -115,7 +115,7 @@ def test_absolute_path_with_relative_navigation():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},
@@ -133,7 +133,7 @@ def test_absolute_path_with_relative_navigation():
                 },
                 {
                     "name": "other_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True}
                     ]
@@ -165,7 +165,7 @@ def test_absolute_path_simple():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True}
                     ]
@@ -198,7 +198,7 @@ def test_absolute_path_in_computed_field_validation():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "integer"},

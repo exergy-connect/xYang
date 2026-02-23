@@ -85,9 +85,9 @@ def main():
         "entities": [
             {
                 "name": "parent",
-                "primary_key": ["id"],
+                "primary_key": "id",
                 "fields": [
-                    {"name": "id", "type": "integer"},
+                    {"name": "id", "type": "integer", "primaryKey": True},
                     {
                         "name": "children",
                         "type": "array",
@@ -97,17 +97,15 @@ def main():
             },
             {
                 "name": "child",
-                "primary_key": ["id"],
+                "primary_key": "id",
                 "fields": [
-                    {"name": "id", "type": "integer"},
+                    {"name": "id", "type": "integer", "primaryKey": True},
                     {
                         "name": "parent_id",
                         "type": "integer",
-                        "foreignKey": {
-                            "entity": "parent",
-                            "field": "id"
-                        }
-                    }
+                        "foreignKeys": [{
+                            "entity": "parent"
+                        }]
                 ],
                 "parents": [
                     {
@@ -130,9 +128,9 @@ def main():
         "entities": [
             {
                 "name": "parent",
-                "primary_key": ["id"],
+                "primary_key": "id",
                 "fields": [
-                    {"name": "id", "type": "integer"},
+                    {"name": "id", "type": "integer", "primaryKey": True},
                     {
                         "name": "children",
                         "type": "array",
@@ -142,9 +140,9 @@ def main():
             },
             {
                 "name": "child",
-                "primary_key": ["id"],
+                "primary_key": "id",
                 "fields": [
-                    {"name": "id", "type": "integer"},
+                    {"name": "id", "type": "integer", "primaryKey": True},
                     {
                         "name": "parent_id",
                         "type": "integer"

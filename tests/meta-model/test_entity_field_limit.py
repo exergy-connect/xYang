@@ -28,15 +28,14 @@ def test_entity_field_limit_valid_within_limit(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
-                        {"name": "field5", "type": "string"},
-                        {"name": "field6", "type": "string"}
+                        {"name": "field5", "type": "string"}
                     ]
                 }
             ]
@@ -59,16 +58,16 @@ def test_entity_field_limit_valid_array_fields_excluded(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
+                        {"name": "children", "type": "array", "item_type": {"entity": "parent"}}
                     ]
                 }
             ]
@@ -92,9 +91,9 @@ def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
@@ -102,8 +101,7 @@ def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
                         {"name": "field7", "type": "string"},
-                        {"name": "field8", "type": "string"},
-                        {"name": "field9", "type": "string"}
+                        {"name": "field8", "type": "string"}
                     ]
                 }
             ]
@@ -127,9 +125,9 @@ def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
@@ -138,8 +136,7 @@ def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
                         {"name": "field6", "type": "string"},
                         {"name": "field7", "type": "string"},
                         {"name": "field8", "type": "string"},
-                        {"name": "field9", "type": "string"},
-                        {"name": "field10", "type": "string"}
+                        {"name": "field9", "type": "string"}
                     ]
                 }
             ]
@@ -163,17 +160,16 @@ def test_entity_field_limit_invalid_allow_unlimited_false(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "field7", "type": "string"},
-                        {"name": "field8", "type": "string"}
+                        {"name": "field7", "type": "string"}
                     ]
                 }
             ]
@@ -199,17 +195,16 @@ def test_entity_field_limit_invalid_allow_unlimited_missing(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "field7", "type": "string"},
-                        {"name": "field8", "type": "string"}
+                        {"name": "field7", "type": "string"}
                     ]
                 }
             ]
@@ -235,24 +230,23 @@ def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "field7", "type": "string"},
-                        {"name": "field8", "type": "string"}
+                        {"name": "field7", "type": "string"}
                     ]
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
@@ -261,8 +255,7 @@ def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
                         {"name": "field6", "type": "string"},
                         {"name": "field7", "type": "string"},
                         {"name": "field8", "type": "string"},
-                        {"name": "field9", "type": "string"},
-                        {"name": "field10", "type": "string"}
+                        {"name": "field9", "type": "string"}
                     ]
                 }
             ]
@@ -285,17 +278,16 @@ def test_entity_field_limit_invalid_exceeds_limit(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
                         {"name": "field4", "type": "string"},
                         {"name": "field5", "type": "string"},
                         {"name": "field6", "type": "string"},
-                        {"name": "field7", "type": "string"},
-                        {"name": "field8", "type": "string"}
+                        {"name": "field7", "type": "string"}
                     ]
                 }
             ]
@@ -320,9 +312,9 @@ def test_entity_field_limit_invalid_exceeds_limit_with_arrays(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "field1", "type": "string"},
                         {"name": "field2", "type": "string"},
                         {"name": "field3", "type": "string"},
@@ -331,7 +323,7 @@ def test_entity_field_limit_invalid_exceeds_limit_with_arrays(meta_model):
                         {"name": "field6", "type": "string"},
                         {"name": "field7", "type": "string"},
                         {"name": "field8", "type": "string"},
-                        {"name": "children", "type": "array", "item_type": {"entity": "child"}}
+                        {"name": "children", "type": "array", "item_type": {"entity": "parent"}}
                     ]
                 }
             ]

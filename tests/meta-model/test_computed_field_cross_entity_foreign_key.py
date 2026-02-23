@@ -28,24 +28,21 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "value", "type": "integer"}
                     ]
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKey": {
-                                "entity": "entity1",
-                                "field": "id"
-                            }
+                            "foreignKeys": [{"entity": "entity1", "field": "id"}]
                         },
                         {
                             "name": "computed_value",
@@ -54,10 +51,7 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
                                 "operation": "add",
                                 "fields": [
                                     {"field": "id"},
-                                    {
-                                        "field": "value",
-                                        "entity": "entity1"
-                                    }
+                                    {"field": "value", "entity": "entity1"}
                                 ]
                             }
                         }
@@ -80,20 +74,21 @@ def test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key(meta_mod
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {"name": "value", "type": "integer"}
                     ]
                 },
                 {
                     "name": "entity2",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "type": "integer", "primaryKey": True},
                         {
                             "name": "computed_value",
                             "type": "integer",
@@ -101,10 +96,7 @@ def test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key(meta_mod
                                 "operation": "add",
                                 "fields": [
                                     {"field": "id"},
-                                    {
-                                        "field": "value",
-                                        "entity": "entity1"
-                                    }
+                                    {"field": "value", "entity": "entity1"}
                                 ]
                             }
                         }

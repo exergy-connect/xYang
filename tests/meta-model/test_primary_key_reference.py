@@ -28,9 +28,9 @@ def test_primary_key_reference_valid(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id"],
+                    "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -42,7 +42,7 @@ def test_primary_key_reference_valid(meta_model):
 
 
 def test_primary_key_reference_valid_multiple(meta_model):
-    """Test that multiple primary key fields all referencing existing fields passes."""
+    """Test that composite primary key field referencing existing subcomponents passes."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -53,10 +53,16 @@ def test_primary_key_reference_valid_multiple(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id", "code"],
+                    "primary_key": "composite_key",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "code", "type": "string"}
+                        {
+                            "name": "composite_key",
+                            "type": "composite",
+                            "primaryKey": True,
+                            "composite": [
+                                {"name": "id", "type": "integer"}
+                            ]
+                        }
                     ]
                 }
             ]
@@ -64,7 +70,7 @@ def test_primary_key_reference_valid_multiple(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Multiple primary keys referencing existing fields should pass. Errors: {errors}"
+    assert is_valid, f"Composite primary key referencing existing subcomponents should pass. Errors: {errors}"
 
 
 def test_primary_key_reference_invalid_missing_field(meta_model):
@@ -79,9 +85,9 @@ def test_primary_key_reference_invalid_missing_field(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["nonexistent"],
+                    "primary_key": "nonexistent",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -95,7 +101,7 @@ def test_primary_key_reference_invalid_missing_field(meta_model):
 
 
 def test_primary_key_reference_invalid_partial(meta_model):
-    """Test that primary key with one valid and one invalid reference fails."""
+    """Test that primary key referencing non-existent composite field fails."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -106,9 +112,9 @@ def test_primary_key_reference_invalid_partial(meta_model):
             "entities": [
                 {
                     "name": "entity1",
-                    "primary_key": ["id", "nonexistent"],
+                    "primary_key": "nonexistent_composite",
                     "fields": [
-                        {"name": "id", "type": "integer"}
+                        {"name": "id", "type": "integer", "primaryKey": True}
                     ]
                 }
             ]
@@ -116,6 +122,6 @@ def test_primary_key_reference_invalid_partial(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "Primary key with invalid reference should fail"
+    assert not is_valid, "Primary key referencing non-existent composite field should fail"
     assert any("primary_key" in str(err).lower() or "field" in str(err).lower() for err in errors), \
         f"Should have primary key reference error. Errors: {errors}"

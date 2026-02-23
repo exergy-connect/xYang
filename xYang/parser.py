@@ -13,6 +13,7 @@ from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
 from .errors import YangSyntaxError
+from .ast import YangUsesStmt
 
 
 class YangParser:
@@ -142,6 +143,55 @@ class YangParser:
         
         # Parse module
         self.parsers.parse_module(tokens, context)
+        
+        # Expand all uses statements now that all groupings have been parsed
+        self._expand_all_uses(module)
+        
+        return module
+    
+    def _expand_all_uses(self, module: YangModule) -> None:
+        """Expand all uses statements in the module after parsing is complete.
+        
+        This recursively finds all YangUsesStmt nodes and replaces them with
+        the expanded statements from their groupings.
+        """
+        # Expand uses statements in module-level statements
+        module.statements = self._expand_uses_in_statements(module.statements, module)
+        
+        # Expand uses statements in groupings (for nested uses)
+        for grouping_name, grouping in module.groupings.items():
+            grouping.statements = self._expand_uses_in_statements(grouping.statements, module)
+    
+    def _expand_uses_in_statements(self, statements, module: YangModule):
+        """Recursively expand uses statements in a list of statements."""
+        from .ast import YangStatement
+        
+        expanded = []
+        for stmt in statements:
+            if isinstance(stmt, YangUsesStmt):
+                # Expand this uses statement
+                grouping = module.get_grouping(stmt.grouping_name)
+                if grouping:
+                    # Expand the grouping, which may itself contain uses statements
+                    # First expand uses in the grouping
+                    expanded_grouping_statements = self._expand_uses_in_statements(grouping.statements, module)
+                    # Then apply refines and copy statements
+                    expanded_statements = self.parsers._expand_uses_with_statements(
+                        expanded_grouping_statements, stmt.refines, module
+                    )
+                    expanded.extend(expanded_statements)
+                else:
+                    # Grouping not found - log warning but continue
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(f"Grouping '{stmt.grouping_name}' not found when expanding uses statement")
+            elif hasattr(stmt, 'statements'):
+                # Recursively expand uses in child statements
+                stmt.statements = self._expand_uses_in_statements(stmt.statements, module)
+                expanded.append(stmt)
+            else:
+                expanded.append(stmt)
+        return expanded
         
         # Ensure we consumed all tokens
         # After parsing, there should be no more tokens (except possibly trailing empty lines)

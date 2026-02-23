@@ -340,14 +340,14 @@ class PathNavigationNode(BinaryOpNode):
         
         # Special case: if left is a dict and op is '/', treat as path navigation
         if isinstance(left, dict):
-            # Check if this node was returned by deref() - if so, use its stored path
+            # Check if this node was returned by deref() - if so, use its stored path for schema resolution
+            # But for data navigation, always use the node itself as data
             node_id = id(left)
             stored_path = evaluator._deref_node_paths.get(node_id)
             
-            if stored_path:
-                nav_context = context.with_data(context.root_data, stored_path)
-            else:
-                nav_context = context.with_data(left, [])
+            # Always use the node itself as data for navigation
+            # stored_path is only used for schema resolution or relative navigation with ..
+            nav_context = context.with_data(left, [])
             
             # Extract path from nested binary ops or evaluate as path node
             if isinstance(self.right, BinaryOpNode) and self.right.operator == '/':

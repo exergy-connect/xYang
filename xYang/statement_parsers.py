@@ -576,7 +576,11 @@ class StatementParsers:
         tokens.consume_if(';')
     
     def parse_uses(self, tokens: TokenStream, context: ParserContext) -> Optional[YangUsesStmt]:
-        """Parse uses statement."""
+        """Parse uses statement.
+        
+        Uses statements are stored temporarily and expanded after all groupings
+        have been parsed. A YangUsesStmt node is created as a placeholder.
+        """
         tokens.consume('uses')
         grouping_name = tokens.consume()
         uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
@@ -592,20 +596,12 @@ class StatementParsers:
                     tokens.consume()  # Skip unknown
             tokens.consume('}')
         
-        # Expand the uses statement by copying statements from the grouping
-        grouping = context.module.get_grouping(grouping_name)
-        if grouping:
-            # Copy statements from grouping, applying refines
-            expanded_statements = self._expand_uses(grouping, uses_stmt.refines)
-            # Add expanded statements to current parent
-            if context.current_parent:
-                context.current_parent.statements.extend(expanded_statements)
-        else:
-            # Grouping not found - this will be an error, but we'll continue parsing
-            pass
+        # Store the uses statement temporarily - it will be expanded later
+        if context.current_parent:
+            context.current_parent.statements.append(uses_stmt)
         
         tokens.consume_if(';')
-        return None  # Uses statements are expanded, not returned
+        return uses_stmt
     
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse refine statement."""
@@ -639,10 +635,47 @@ class StatementParsers:
         
         tokens.consume_if(';')
     
-    def _expand_uses(self, grouping: 'YangStatement', refines: list) -> list:
-        """Expand a uses statement by copying statements from grouping and applying refines."""
+    def _expand_uses(self, grouping: 'YangStatement', refines: list, module: 'YangModule' = None) -> list:
+        """Expand a uses statement by copying statements from grouping and applying refines.
+        
+        Recursively expands nested uses statements within the grouping.
+        """
+        from .ast import YangUsesStmt
+        
         expanded = []
         for stmt in grouping.statements:
+            # If this statement is itself a uses statement, recursively expand it
+            if isinstance(stmt, YangUsesStmt):
+                nested_grouping = module.get_grouping(stmt.grouping_name) if module else None
+                if nested_grouping:
+                    # Recursively expand the nested uses statement
+                    nested_expanded = self._expand_uses(nested_grouping, stmt.refines, module)
+                    expanded.extend(nested_expanded)
+                else:
+                    # Grouping not found - skip or log warning
+                    pass
+            else:
+                # Create a shallow copy of the statement
+                stmt_copy = self._copy_statement(stmt)
+                
+                # Apply refines if any match this statement
+                for refine in refines:
+                    if refine.target_path == stmt.name:
+                        # Apply refine modifications
+                        self._apply_refine(stmt_copy, refine)
+                
+                expanded.append(stmt_copy)
+        
+        return expanded
+    
+    def _expand_uses_with_statements(self, statements, refines: list, module: 'YangModule' = None) -> list:
+        """Expand uses statements from a list of already-expanded statements.
+        
+        This is used when expanding uses statements that reference groupings
+        whose uses statements have already been expanded.
+        """
+        expanded = []
+        for stmt in statements:
             # Create a shallow copy of the statement
             stmt_copy = self._copy_statement(stmt)
             

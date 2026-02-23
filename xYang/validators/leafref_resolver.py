@@ -49,8 +49,9 @@ class LeafrefResolver:
         target_node = self._resolve_leafref_path(path, context_path)
         
         if target_node is None:
+            leaf_name = leaf.name if hasattr(leaf, 'name') else 'unknown'
             self.errors.append(
-                f"Invalid leafref value \"{value}\" - no target instance \"{path}\" found in schema"
+                f"Invalid leafref value \"{value}\" in field \"{leaf_name}\" - no target instance \"{path}\" found in schema"
             )
             return
         
@@ -70,8 +71,9 @@ class LeafrefResolver:
             
             target_values = self._get_leafref_target_values(data_path, validation_data)
             if value not in target_values:
+                leaf_name = leaf.name if hasattr(leaf, 'name') else 'unknown'
                 self.errors.append(
-                    f"Invalid leafref value \"{value}\" - no target instance "
+                    f"Invalid leafref value \"{value}\" in field \"{leaf_name}\" - no target instance "
                     f"\"{path}\" with value \"{value}\""
                 )
     
