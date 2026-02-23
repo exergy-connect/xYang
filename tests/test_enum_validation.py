@@ -32,7 +32,7 @@ def test_invalid_enum_value():
                 "name": "test",
                 "primary_key": "id",  # New format: string instead of list
                 "fields": [
-                    {"name": "id", "type": "integer", "primaryKey": True},
+                    {"name": "id", "type": "integer"},
                     {"name": "field1", "type": "integer"},
                     {"name": "field2", "type": "integer"},
                     {
@@ -89,7 +89,7 @@ def test_valid_enum_value():
                 "name": "test",
                 "primary_key": "id",  # New format: string instead of list
                 "fields": [
-                    {"name": "id", "type": "integer", "primaryKey": True},
+                    {"name": "id", "type": "integer"},
                     {"name": "field1", "type": "integer"},
                     {"name": "field2", "type": "integer"},
                     {

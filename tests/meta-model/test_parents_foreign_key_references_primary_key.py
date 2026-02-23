@@ -30,7 +30,7 @@ def test_parents_foreign_key_references_primary_key_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
@@ -38,7 +38,7 @@ def test_parents_foreign_key_references_primary_key_valid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -75,7 +75,7 @@ def test_parents_foreign_key_references_primary_key_invalid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
@@ -84,7 +84,7 @@ def test_parents_foreign_key_references_primary_key_invalid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_name",
                             "type": "string",

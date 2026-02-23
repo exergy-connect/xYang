@@ -206,7 +206,7 @@ def test_yang_expressions_parsed_once_with_meta_model():
                         "name": "test_entity",
                         "primary_key": "id",
                         "fields": [
-                            {"name": "id", "type": "string", "primaryKey": True}
+                            {"name": "id", "type": "string"}
                         ]
                     }
                 ]

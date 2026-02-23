@@ -31,7 +31,7 @@ def test_parents_field_name_matching_valid_self_referential(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -72,7 +72,7 @@ def test_parents_field_name_matching_valid_cross_entity_matching(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
@@ -83,8 +83,7 @@ def test_parents_field_name_matching_valid_cross_entity_matching(meta_model):
                         {
                             "name": "id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}],
-                            "primaryKey": True
+                            "foreignKeys": [{"entity": "parent", "field": "id"}]
                         }
                     ],
                     "parents": [
@@ -121,7 +120,7 @@ def test_parents_field_name_matching_valid_cross_entity_not_matching(meta_model)
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
@@ -129,7 +128,7 @@ def test_parents_field_name_matching_valid_cross_entity_not_matching(meta_model)
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",

@@ -30,7 +30,7 @@ def test_required_field_no_default_valid_not_required(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "name",
                             "type": "string",
@@ -61,7 +61,7 @@ def test_required_field_no_default_valid_required_no_default(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "name",
                             "type": "string",
@@ -91,7 +91,7 @@ def test_required_field_no_default_invalid_required_with_default(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "name",
                             "type": "string",

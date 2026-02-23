@@ -33,7 +33,7 @@ def test_field_name_underscore_limit_valid(meta_model):
                     "name": "entity1",
                     "primary_key": "field_name",
                     "fields": [
-                        {"name": "field_name", "type": "string", "primaryKey": True}
+                        {"name": "field_name", "type": "string"}
                     ]
                 }
             ]
@@ -58,7 +58,7 @@ def test_field_name_underscore_limit_valid_at_limit(meta_model):
                     "name": "entity1",
                     "primary_key": "field_name_test",
                     "fields": [
-                        {"name": "field_name_test", "type": "string", "primaryKey": True}
+                        {"name": "field_name_test", "type": "string"}
                     ]
                 }
             ]
@@ -84,7 +84,7 @@ def test_field_name_underscore_limit_invalid_exceeds_default(meta_model):
                     "name": "entity1",
                     "primary_key": "field_name_test_value_exceed",
                     "fields": [
-                        {"name": "field_name_test_value_exceed", "type": "string", "primaryKey": True}
+                        {"name": "field_name_test_value_exceed", "type": "string"}
                     ]
                 }
             ]

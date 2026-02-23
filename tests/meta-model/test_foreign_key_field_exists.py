@@ -30,14 +30,14 @@ def test_foreign_key_field_exists_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 },
                 {
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -70,14 +70,14 @@ def test_foreign_key_field_exists_invalid_missing(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 },
                 {
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",

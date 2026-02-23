@@ -30,7 +30,7 @@ def test_computed_field_reference_valid_same_entity(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -68,7 +68,7 @@ def test_computed_field_reference_valid_cross_entity(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "value", "type": "integer"}
                     ]
                 },
@@ -76,7 +76,7 @@ def test_computed_field_reference_valid_cross_entity(meta_model):
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "entity1_id",
                             "type": "integer",
@@ -118,7 +118,7 @@ def test_computed_field_reference_invalid_same_entity_missing(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "sum",
                             "type": "integer",
@@ -157,14 +157,14 @@ def test_computed_field_reference_invalid_cross_entity_missing(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 },
                 {
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "entity1_id",
                             "type": "integer",

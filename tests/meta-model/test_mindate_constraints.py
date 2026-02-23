@@ -35,7 +35,7 @@ def test_mindate_valid_date_type(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "startdate", "type": "date", "minDate": "2020-01-01"}
                     ]
                 }
@@ -61,7 +61,7 @@ def test_mindate_valid_datetime_type(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "startdatetime", "type": "datetime", "minDate": "2020-01-01"}
                     ]
                 }
@@ -87,7 +87,7 @@ def test_mindate_valid_with_maxdate(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "daterange", "type": "date", "minDate": "2020-01-01", "maxDate": "2020-12-31"}
                     ]
                 }
@@ -114,7 +114,7 @@ def test_mindate_invalid_wrong_type(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string", "minDate": "2020-01-01"}
                     ]
                 }
@@ -143,7 +143,7 @@ def test_mindate_invalid_greater_than_maxdate(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "daterange", "type": "date", "minDate": "2020-12-31", "maxDate": "2020-01-01"}
                     ]
                 }

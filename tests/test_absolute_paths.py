@@ -38,7 +38,7 @@ def test_absolute_path_entities_list():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {"name": "field3", "type": "integer"},
@@ -117,7 +117,7 @@ def test_absolute_path_with_relative_navigation():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {
                             "name": "computed_field",
@@ -135,7 +135,7 @@ def test_absolute_path_with_relative_navigation():
                     "name": "other_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]
@@ -167,7 +167,7 @@ def test_absolute_path_simple():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]
@@ -200,7 +200,7 @@ def test_absolute_path_in_computed_field_validation():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -259,7 +259,7 @@ def test_absolute_path_vs_relative_path():
                     "name": "test_entity",
                     "primary_key": ["id", "nonexistent"],  # Should fail - field doesn't exist
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]

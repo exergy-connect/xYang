@@ -51,7 +51,7 @@ def test_leafref_relative_path_resolution():
                     "name": "parent_entity",
                     "primary_key": "parent_id",
                     "fields": [
-                        {"name": "parent_id", "type": "string", "primaryKey": True},
+                        {"name": "parent_id", "type": "string"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child_entity"}}
                     ]
                 },
@@ -59,14 +59,13 @@ def test_leafref_relative_path_resolution():
                     "name": "child_entity",
                     "primary_key": "child_id",
                     "fields": [
-                        {"name": "child_id", "type": "string", "primaryKey": True},
+                        {"name": "child_id", "type": "string"},
                         {
                             "name": "parent_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "parent_entity"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ],
                     "parents": [
@@ -124,7 +123,7 @@ def test_leafref_relative_path_invalid_reference():
                     "name": "child_entity",
                     "primary_key": "child_id",
                     "fields": [
-                        {"name": "child_id", "type": "string", "primaryKey": True},
+                        {"name": "child_id", "type": "string"},
                         {"name": "valid_field", "type": "string"}
                     ],
                     "parents": [
@@ -176,7 +175,7 @@ def test_leafref_relative_path_multiple_entities():
                     "name": "entity1",
                     "primary_key": "id1",
                     "fields": [
-                        {"name": "id1", "type": "string", "primaryKey": True},
+                        {"name": "id1", "type": "string"},
                         {"name": "field1", "type": "string"}
                     ]
                 },
@@ -184,7 +183,7 @@ def test_leafref_relative_path_multiple_entities():
                     "name": "entity2",
                     "primary_key": "id2",
                     "fields": [
-                        {"name": "id2", "type": "string", "primaryKey": True},
+                        {"name": "id2", "type": "string"},
                         {
                             "name": "fk_field",
                             "type": "string",
@@ -205,7 +204,7 @@ def test_leafref_relative_path_multiple_entities():
                     "name": "entity3",
                     "primary_key": "id3",
                     "fields": [
-                        {"name": "id3", "type": "string", "primaryKey": True}
+                        {"name": "id3", "type": "string"}
                     ]
                 }
             ]

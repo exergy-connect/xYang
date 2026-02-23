@@ -37,7 +37,7 @@ def test_computed_field_missing_field_same_entity():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {
                             "name": "invalid_computed",
@@ -78,7 +78,7 @@ def test_computed_field_valid_same_entity():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -119,7 +119,7 @@ def test_computed_field_missing_field_cross_entity():
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"}
                     ]
                 },
@@ -127,7 +127,7 @@ def test_computed_field_missing_field_cross_entity():
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "entity1_id",
                             "type": "integer",
@@ -174,7 +174,7 @@ def test_computed_field_cross_entity_no_foreign_key():
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"}
                     ]
                 },
@@ -182,7 +182,7 @@ def test_computed_field_cross_entity_no_foreign_key():
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         # No foreign key field to entity1!
                         {
                             "name": "invalid_computed",
@@ -240,7 +240,7 @@ def test_computed_field_cross_entity_with_foreign_key():
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"}
                     ]
                 },
@@ -248,7 +248,7 @@ def test_computed_field_cross_entity_with_foreign_key():
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "entity1_id",
                             "type": "integer",
@@ -294,7 +294,7 @@ def test_computed_field_wrong_field_count_binary():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {
                             "name": "invalid_computed",
@@ -334,7 +334,7 @@ def test_computed_field_valid_aggregation():
                     "name": "test_entity",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {"name": "field3", "type": "integer"},

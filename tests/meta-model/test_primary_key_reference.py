@@ -30,7 +30,7 @@ def test_primary_key_reference_valid(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]
@@ -58,7 +58,6 @@ def test_primary_key_reference_valid_multiple(meta_model):
                         {
                             "name": "composite_key",
                             "type": "composite",
-                            "primaryKey": True,
                             "composite": [
                                 {"name": "id", "type": "integer"}
                             ]
@@ -87,7 +86,7 @@ def test_primary_key_reference_invalid_missing_field(meta_model):
                     "name": "entity1",
                     "primary_key": "nonexistent",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]
@@ -114,7 +113,7 @@ def test_primary_key_reference_invalid_partial(meta_model):
                     "name": "entity1",
                     "primary_key": "nonexistent_composite",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ]

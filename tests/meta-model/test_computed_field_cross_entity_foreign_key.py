@@ -30,7 +30,7 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "value", "type": "integer"}
                     ]
                 },
@@ -38,7 +38,7 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "entity1_id",
                             "type": "integer",
@@ -80,7 +80,7 @@ def test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key(meta_mod
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "value", "type": "integer"}
                     ]
                 },
@@ -88,7 +88,7 @@ def test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key(meta_mod
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "computed_value",
                             "type": "integer",

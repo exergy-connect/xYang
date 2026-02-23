@@ -69,9 +69,6 @@ module data-model {
         leaf type {
           type string;
         }
-        leaf primaryKey {
-          type boolean;
-        }
         list foreignKeys {
           key entity;
           leaf entity {
@@ -144,7 +141,7 @@ def test_deref_simple_entity_reference():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
+                        {"name": "company_id", "type": "string"}
                     ]
                 },
                 {
@@ -156,8 +153,7 @@ def test_deref_simple_entity_reference():
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -196,7 +192,7 @@ def test_deref_parents_child_fk():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True},
+                        {"name": "company_id", "type": "string"},
                         {"name": "departments", "type": "array", "item_type": {"entity": "department"}}
                     ]
                 },
@@ -210,15 +206,14 @@ def test_deref_parents_child_fk():
                         }
                     ],
                     "fields": [
-                        {"name": "department_id", "type": "string", "primaryKey": True},
+                        {"name": "department_id", "type": "string"},
                         {
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -265,7 +260,7 @@ def test_deref_parents_parent_array():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True},
+                        {"name": "company_id", "type": "string"},
                         {"name": "departments", "type": "array", "item_type": {"entity": "department"}}
                     ]
                 },
@@ -284,8 +279,7 @@ def test_deref_parents_parent_array():
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -346,7 +340,7 @@ def test_deref_self_referential():
                         }
                     ],
                     "fields": [
-                        {"name": "employee_id", "type": "string", "primaryKey": True},
+                        {"name": "employee_id", "type": "string"},
                         {
                             "name": "manager_id",
                             "type": "string",
@@ -397,7 +391,7 @@ def test_deref_cross_entity_validation():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
+                        {"name": "company_id", "type": "string"}
                     ]
                 },
                 {
@@ -410,15 +404,14 @@ def test_deref_cross_entity_validation():
                         }
                     ],
                     "fields": [
-                        {"name": "department_id", "type": "string", "primaryKey": True},
+                        {"name": "department_id", "type": "string"},
                         {
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -465,7 +458,7 @@ def test_deref_field_type_matching():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
+                        {"name": "company_id", "type": "string"}
                     ]
                 },
                 {
@@ -477,8 +470,7 @@ def test_deref_field_type_matching():
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -543,7 +535,7 @@ def test_deref_nonexistent_reference():
                     "name": "company",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "string", "primaryKey": True},
+                        {"name": "id", "type": "string"},
                         {
                             "name": "invalid_ref",
                             "type": "string",
@@ -581,7 +573,7 @@ def test_deref_cache():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
+                        {"name": "company_id", "type": "string"}
                     ]
                 },
                 {
@@ -593,8 +585,7 @@ def test_deref_cache():
                             "foreignKeys": [{
                                 "entity": "company",
                                 "field": "company_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -646,28 +637,28 @@ def test_deref_physics_array_foreignkey():
                     "name": "claim",
                     "primary_key": "claim_id",
                     "fields": [
-                        {"name": "claim_id", "type": "string", "primaryKey": True}
+                        {"name": "claim_id", "type": "string"}
                     ]
                 },
                 {
                     "name": "paper",
                     "primary_key": "paper_id",
                     "fields": [
-                        {"name": "paper_id", "type": "string", "primaryKey": True}
+                        {"name": "paper_id", "type": "string"}
                     ]
                 },
                 {
                     "name": "person",
                     "primary_key": "person_id",
                     "fields": [
-                        {"name": "person_id", "type": "string", "primaryKey": True}
+                        {"name": "person_id", "type": "string"}
                     ]
                 },
                 {
                     "name": "anomaly",
                     "primary_key": "anomaly_id",
                     "fields": [
-                        {"name": "anomaly_id", "type": "string", "primaryKey": True},
+                        {"name": "anomaly_id", "type": "string"},
                         {
                             "name": "violated_claims",
                             "type": "array",
@@ -730,7 +721,7 @@ def test_deref_physics_parent_child_relationship():
                     "name": "anomaly",
                     "primary_key": "anomaly_id",
                     "fields": [
-                        {"name": "anomaly_id", "type": "string", "primaryKey": True},
+                        {"name": "anomaly_id", "type": "string"},
                         {
                             "name": "violated_assumptions",
                             "type": "array",
@@ -750,23 +741,21 @@ def test_deref_physics_parent_child_relationship():
                         }
                     ],
                     "fields": [
-                        {"name": "violated_assumption_id", "type": "string", "primaryKey": True},
+                        {"name": "violated_assumption_id", "type": "string"},
                         {
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "anomaly",
                                 "field": "anomaly_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         },
                         {
                             "name": "assumption_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "assumption"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 },
@@ -774,7 +763,7 @@ def test_deref_physics_parent_child_relationship():
                     "name": "assumption",
                     "primary_key": "assumption_id",
                     "fields": [
-                        {"name": "assumption_id", "type": "string", "primaryKey": True}
+                        {"name": "assumption_id", "type": "string"}
                     ]
                 }
             ]
@@ -855,7 +844,7 @@ def test_deref_physics_cross_entity_reference():
                     "name": "theory",
                     "primary_key": "theory_id",
                     "fields": [
-                        {"name": "theory_id", "type": "string", "primaryKey": True},
+                        {"name": "theory_id", "type": "string"},
                         {"name": "name", "type": "string"}
                     ]
                 },
@@ -863,7 +852,7 @@ def test_deref_physics_cross_entity_reference():
                     "name": "assumption",
                     "primary_key": "assumption_id",
                     "fields": [
-                        {"name": "assumption_id", "type": "string", "primaryKey": True},
+                        {"name": "assumption_id", "type": "string"},
                         {"name": "statement", "type": "string"}
                     ]
                 },
@@ -871,14 +860,13 @@ def test_deref_physics_cross_entity_reference():
                     "name": "anomaly",
                     "primary_key": "anomaly_id",
                     "fields": [
-                        {"name": "anomaly_id", "type": "string", "primaryKey": True},
+                        {"name": "anomaly_id", "type": "string"},
                         {
                             "name": "theory_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "theory"
-                            }],
-                            "primaryKey": True
+                            }]
                         },
                         {
                             "name": "explanation_theory_id",
@@ -893,14 +881,13 @@ def test_deref_physics_cross_entity_reference():
                     "name": "violated_assumption",
                     "primary_key": "violated_assumption_id",
                     "fields": [
-                        {"name": "violated_assumption_id", "type": "string", "primaryKey": True},
+                        {"name": "violated_assumption_id", "type": "string"},
                         {
                             "name": "assumption_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "assumption"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -967,7 +954,7 @@ def test_deref_physics_nested_deref_validation():
                     "name": "anomaly",
                     "primary_key": "anomaly_id",
                     "fields": [
-                        {"name": "anomaly_id", "type": "string", "primaryKey": True},
+                        {"name": "anomaly_id", "type": "string"},
                         {
                             "name": "violated_assumptions",
                             "type": "array",
@@ -987,15 +974,14 @@ def test_deref_physics_nested_deref_validation():
                         }
                     ],
                     "fields": [
-                        {"name": "violated_assumption_id", "type": "string", "primaryKey": True},
+                        {"name": "violated_assumption_id", "type": "string"},
                         {
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "anomaly",
                                 "field": "anomaly_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -1076,7 +1062,7 @@ def test_deref_physics_parents_validation_constraints():
                     "name": "anomaly",
                     "primary_key": "anomaly_id",
                     "fields": [
-                        {"name": "anomaly_id", "type": "string", "primaryKey": True},
+                        {"name": "anomaly_id", "type": "string"},
                         {
                             "name": "violated_assumptions",
                             "type": "array",
@@ -1096,15 +1082,14 @@ def test_deref_physics_parents_validation_constraints():
                         }
                     ],
                     "fields": [
-                        {"name": "violated_assumption_id", "type": "string", "primaryKey": True},
+                        {"name": "violated_assumption_id", "type": "string"},
                         {
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "anomaly",
                                 "field": "anomaly_id"
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 }
@@ -1253,7 +1238,7 @@ def test_deref_circular_reference():
                     "name": "employee",
                     "primary_key": "employee_id",
                     "fields": [
-                        {"name": "employee_id", "type": "string", "primaryKey": True},
+                        {"name": "employee_id", "type": "string"},
                         {
                             "name": "manager_id",
                             "type": "string",
@@ -1304,7 +1289,7 @@ def test_deref_circular_reference():
                     "name": "entity_a",
                     "primary_key": "a_id",
                     "fields": [
-                        {"name": "a_id", "type": "string", "primaryKey": True},
+                        {"name": "a_id", "type": "string"},
                         {
                             "name": "b_ref",
                             "type": "string",
@@ -1318,7 +1303,7 @@ def test_deref_circular_reference():
                     "name": "entity_b",
                     "primary_key": "b_id",
                     "fields": [
-                        {"name": "b_id", "type": "string", "primaryKey": True},
+                        {"name": "b_id", "type": "string"},
                         {
                             "name": "c_ref",
                             "type": "string",
@@ -1332,7 +1317,7 @@ def test_deref_circular_reference():
                     "name": "entity_c",
                     "primary_key": "c_id",
                     "fields": [
-                        {"name": "c_id", "type": "string", "primaryKey": True},
+                        {"name": "c_id", "type": "string"},
                         {
                             "name": "a_ref",
                             "type": "string",
@@ -1421,7 +1406,7 @@ def test_deref_circular_reference():
                         }
                     ],
                     "fields": [
-                        {"name": "category_id", "type": "string", "primaryKey": True},
+                        {"name": "category_id", "type": "string"},
                         {
                             "name": "parent_category_id",
                             "type": "string",
@@ -1494,7 +1479,7 @@ def test_deref_circular_infinite_loop_prevention():
                     "name": "node",
                     "primary_key": "node_id",
                     "fields": [
-                        {"name": "node_id", "type": "string", "primaryKey": True},
+                        {"name": "node_id", "type": "string"},
                         {
                             "name": "parent_id",
                             "type": "string",
@@ -1561,7 +1546,7 @@ def test_deref_circular_infinite_loop_prevention():
                     "name": "entity_a",
                     "primary_key": "a_id",
                     "fields": [
-                        {"name": "a_id", "type": "string", "primaryKey": True},
+                        {"name": "a_id", "type": "string"},
                         {
                             "name": "b_ref",
                             "type": "string",
@@ -1575,7 +1560,7 @@ def test_deref_circular_infinite_loop_prevention():
                     "name": "entity_b",
                     "primary_key": "b_id",
                     "fields": [
-                        {"name": "b_id", "type": "string", "primaryKey": True},
+                        {"name": "b_id", "type": "string"},
                         {
                             "name": "c_ref",
                             "type": "string",
@@ -1589,7 +1574,7 @@ def test_deref_circular_infinite_loop_prevention():
                     "name": "entity_c",
                     "primary_key": "c_id",
                     "fields": [
-                        {"name": "c_id", "type": "string", "primaryKey": True},
+                        {"name": "c_id", "type": "string"},
                         {
                             "name": "d_ref",
                             "type": "string",
@@ -1603,7 +1588,7 @@ def test_deref_circular_infinite_loop_prevention():
                     "name": "entity_d",
                     "primary_key": "d_id",
                     "fields": [
-                        {"name": "d_id", "type": "string", "primaryKey": True},
+                        {"name": "d_id", "type": "string"},
                         {
                             "name": "a_ref",
                             "type": "string",
@@ -1684,7 +1669,7 @@ def test_deref_current_leafref_schema_resolution():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True}
+                        {"name": "company_id", "type": "string"}
                     ]
                 },
                 {
@@ -1695,8 +1680,7 @@ def test_deref_current_leafref_schema_resolution():
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "company"  # This is a leafref pointing to /data-model/entities/name
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ]
                 },
@@ -1704,7 +1688,7 @@ def test_deref_current_leafref_schema_resolution():
                     "name": "location",  # Another entity with same name pattern
                     "primary_key": "location_id",
                     "fields": [
-                        {"name": "location_id", "type": "string", "primaryKey": True}
+                        {"name": "location_id", "type": "string"}
                     ]
                 }
             ]
@@ -1771,7 +1755,7 @@ def test_deref_relative_vs_absolute_leafref_paths():
                     "name": "company",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string", "primaryKey": True},
+                        {"name": "company_id", "type": "string"},
                         {"name": "departments", "type": "array", "item_type": {"entity": "department"}}
                     ]
                 },
@@ -1784,8 +1768,7 @@ def test_deref_relative_vs_absolute_leafref_paths():
                             "type": "string",
                             "foreignKeys": [{
                                 "entity": "company"  # Uses absolute path: /data-model/entities/name
-                            }],
-                            "primaryKey": True
+                            }]
                         }
                     ],
                     "parents": [

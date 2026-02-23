@@ -31,7 +31,7 @@ def test_parent_array_type_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "children", "type": "array", "item_type": {"entity": "child"}}
                     ]
                 },
@@ -39,7 +39,7 @@ def test_parent_array_type_valid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -76,7 +76,7 @@ def test_parent_array_type_invalid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string"}
                     ]
                 },
@@ -84,7 +84,7 @@ def test_parent_array_type_invalid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -128,7 +128,7 @@ def test_parent_array_type_consolidated_false_no_parent(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",

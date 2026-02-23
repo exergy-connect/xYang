@@ -30,7 +30,7 @@ def test_parents_primary_key_exists_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "children",
                             "type": "array",
@@ -42,7 +42,7 @@ def test_parents_primary_key_exists_valid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -81,7 +81,7 @@ def test_parents_primary_key_exists_invalid(meta_model):
                     "name": "parent",
                     # Missing primary_key
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "children",
                             "type": "array",
@@ -93,7 +93,7 @@ def test_parents_primary_key_exists_invalid(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",

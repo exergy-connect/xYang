@@ -178,7 +178,7 @@ def test_must_on_foreignkeys_list_valid():
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string"}
                     ]
                 },
@@ -186,7 +186,7 @@ def test_must_on_foreignkeys_list_valid():
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -227,7 +227,7 @@ def test_must_on_foreignkeys_list_invalid():
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string"}
                     ]
                 },
@@ -235,7 +235,7 @@ def test_must_on_foreignkeys_list_invalid():
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_name",
                             "type": "string",

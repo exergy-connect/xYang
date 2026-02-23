@@ -31,14 +31,14 @@ def test_array_item_type_foreign_key_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 },
                 {
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parents",
                             "type": "array",

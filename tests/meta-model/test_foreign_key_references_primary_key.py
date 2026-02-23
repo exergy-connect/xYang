@@ -30,14 +30,14 @@ def test_foreign_key_references_primary_key_valid(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 },
                 {
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
                             "type": "integer",
@@ -70,7 +70,6 @@ def test_foreign_key_references_primary_key_valid_composite(meta_model):
                         {
                             "name": "composite_key",
                             "type": "composite",
-                            "primaryKey": True,
                             "composite": [
                                 {"name": "id", "type": "integer"}
                             ]
@@ -81,7 +80,7 @@ def test_foreign_key_references_primary_key_valid_composite(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_key",
                             "type": "composite",
@@ -115,7 +114,7 @@ def test_foreign_key_references_primary_key_invalid_not_primary_key(meta_model):
                     "name": "parent",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "name", "type": "string"}
                     ]
                 },
@@ -123,7 +122,7 @@ def test_foreign_key_references_primary_key_invalid_not_primary_key(meta_model):
                     "name": "child",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {
                             "name": "parent_name",
                             "type": "string",

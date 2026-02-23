@@ -30,7 +30,7 @@ def test_computed_field_aggregation_operations_valid_minimum(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {
@@ -68,7 +68,7 @@ def test_computed_field_aggregation_operations_valid_multiple(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {"name": "field2", "type": "integer"},
                         {"name": "field3", "type": "integer"},
@@ -109,7 +109,7 @@ def test_computed_field_aggregation_operations_invalid_too_few(meta_model):
                     "name": "entity1",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True},
+                        {"name": "id", "type": "integer"},
                         {"name": "field1", "type": "integer"},
                         {
                             "name": "minimum",

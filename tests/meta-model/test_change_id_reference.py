@@ -34,7 +34,7 @@ def test_change_id_c_reference_valid(meta_model):
                     "primary_key": "id",
                     "c": 1,
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ],
@@ -65,7 +65,7 @@ def test_change_id_m_reference_valid(meta_model):
                     "c": 1,
                     "m": [2, 3],
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ],
@@ -97,7 +97,7 @@ def test_change_id_c_reference_invalid(meta_model):
                     "primary_key": "id",
                     "c": 999,
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ],
@@ -130,7 +130,7 @@ def test_change_id_m_reference_invalid(meta_model):
                     "c": 1,
                     "m": [2, 999],
                     "fields": [
-                        {"name": "id", "type": "integer", "primaryKey": True}
+                        {"name": "id", "type": "integer"}
                     ]
                 }
             ],

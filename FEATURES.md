@@ -39,7 +39,10 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
 
 ### Constraints
-- ✅ `must` - Must constraints (57 occurrences) - **Parsed and evaluated**
+- ✅ `must` - Must constraints (57+ occurrences) - **Parsed and evaluated**
+  - Supports must constraints on containers, lists, leaves, and leaf-lists
+  - Supports must constraints on lists containing leafref types
+  - `current()` correctly refers to list item context in list must constraints
 - ✅ `when` - When conditions (1 occurrence) - **Parsed and evaluated**
 - ✅ `mandatory` - Mandatory fields (15 occurrences)
 - ✅ `default` - Default values (29 occurrences)
@@ -274,7 +277,7 @@ The modular architecture separates concerns:
 
 ## Usage Statistics from meta-model.yang
 
-- `must`: 57 occurrences
+- `must`: 60+ occurrences (including constraints on lists with leafref)
 - `default`: 29 occurrences
 - `mandatory`: 15 occurrences
 - `leafref`: 11 occurrences
@@ -289,7 +292,51 @@ The modular architecture separates concerns:
 - `when`: 1 occurrence
 - `range`: 1 occurrence
 
+## Test Coverage
+
+xYang has comprehensive test coverage with **178 passing tests** covering:
+- Basic YANG parsing and validation
+- Type validation (including enumeration)
+- Constraint validation (must, when, mandatory, default)
+- Leafref resolution and validation
+- Deref() function with nested calls
+- Grouping and uses statements
+- XPath expression evaluation
+- Foreign key validation
+- Parent-child relationship validation
+- Must constraints on leafref lists
+- Current context preservation in predicates
+- Relative and absolute path resolution
+
 ## Recent Improvements
+
+### Foreign Key Validation and Must Constraints (2026-02-23)
+- ✅ **Foreign key primary key validation**: Added must constraints to enforce that foreign keys reference primary keys
+  - Constraint on `foreignKeys` list: if `field` is specified, it must equal the referenced entity's primary key
+  - Constraint on `field` leaf: validates that field references the primary key when specified
+- ✅ **Parents list validation**: Added comprehensive must constraints for parent-child relationships
+  - Validates that child foreign key references parent's primary key
+  - Validates that child foreign key field type matches parent primary key type
+- ✅ **Must constraints on leafref lists**: Full support for must constraints on list statements containing leafref types
+  - `current()` correctly refers to the list item context
+  - Constraints can access sibling leafref values within the same list item
+  - Comprehensive test suite in `tests/test_must_on_leafref_list.py` (5 tests)
+- ✅ **Leafref error messages**: Enhanced error messages to include field names for better debugging
+- ✅ **Deref() improvements**: Enhanced `deref()` function to handle:
+  - Entity name resolution with fallback mechanisms
+  - Complex paths with predicates (e.g., `foreignKeys[0]/entity`)
+  - Path stripping for predicate handling
+  - Nested deref() calls with proper context preservation
+- ✅ **Grouping expansion refactoring**: Moved grouping expansion to parsing phase
+  - Groupings are now expanded once during parsing, not in each validator
+  - Eliminates redundancy and ensures consistency across validators
+  - Removed unused grouping expansion code from validators
+- ✅ **Test coverage**: All 178 tests now passing, including fixes for:
+  - Foreign key validation tests
+  - Parents validation tests
+  - Deref() function tests
+  - Current context in predicate tests
+  - Leafref relative path tests
 
 ### Composite Fields and Grouping Support (2026-01-16)
 - ✅ **Composite field type**: Added `composite` to primitive-type enumeration

@@ -20,7 +20,7 @@ module meta-model {
        - Refactored field-definition to extend composite-field grouping
        - Changed foreignKey to foreignKeys as a direct list (replacing single entity/field and references wrapper)
        - Changed primary_key from leaf-list to single leaf supporting composite fields
-       - Composite subcomponents inherit required and primaryKey from parent
+       - Composite subcomponents inherit required from parent
        - Only one level of composition allowed (no nested composites)";
   }
 
@@ -163,11 +163,6 @@ module meta-model {
   grouping field-definition {
     description "Reusable field definition structure for top-level fields";
     uses composite-field;
-    leaf primaryKey {
-      type boolean;
-      default false;
-      description "Marks this field as part of the primary key";
-    }
     leaf required {
       type boolean;
       default false;
@@ -181,7 +176,7 @@ module meta-model {
       when "../type = 'composite'";
       key name;
       min-elements 1;
-      description "List of subcomponent fields that make up this composite field. Only present when type is 'composite'. The required and primaryKey properties are inherited from the parent composite field and cannot be explicitly set on subcomponents.";
+      description "List of subcomponent fields that make up this composite field. Only present when type is 'composite'. The required property is inherited from the parent composite field and cannot be explicitly set on subcomponents.";
       uses composite-field {
         refine type {
           must ". != 'composite'" {
@@ -193,9 +188,9 @@ module meta-model {
     }
   }
 
-  // Grouping for composite subcomponent definition (excludes required and primaryKey)
+  // Grouping for composite subcomponent definition (excludes required)
   grouping composite-field {
-    description "Field definition for composite subcomponents, excluding required and primaryKey which are inherited from the parent";
+    description "Field definition for composite subcomponents, excluding required which is inherited from the parent";
     leaf name {
       type field-name;
       mandatory true;
