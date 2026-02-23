@@ -42,7 +42,7 @@ def test_parents_foreign_key_field_exists_valid(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [
@@ -61,7 +61,11 @@ def test_parents_foreign_key_field_exists_valid(meta_model):
 
 
 def test_parents_foreign_key_field_exists_invalid(meta_model):
-    """Test that parents foreign key field not existing in parent entity fails validation."""
+    """Test that parents foreign key field with mismatched type fails validation.
+    
+    Since foreign keys always reference the primary key, validation should fail
+    if the field type doesn't match the parent's primary key type.
+    """
     validator = YangValidator(meta_model)
     
     data = {
@@ -86,8 +90,8 @@ def test_parents_foreign_key_field_exists_invalid(meta_model):
                         {"name": "id", "type": "integer"},
                         {
                             "name": "parent_id",
-                            "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "nonexistent"}]
+                            "type": "string",  # Type mismatch: parent primary key is integer
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [
@@ -102,6 +106,6 @@ def test_parents_foreign_key_field_exists_invalid(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "Parents foreign key field not existing should fail"
-    assert any("foreign key field must exist" in str(err).lower() for err in errors), \
-        f"Should have foreign key field existence error. Errors: {errors}"
+    assert not is_valid, "Parents foreign key field with mismatched type should fail"
+    assert any("type" in str(err).lower() or "primary key" in str(err).lower() for err in errors), \
+        f"Error should mention type or primary key. Errors: {errors}"

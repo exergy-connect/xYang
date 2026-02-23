@@ -1,14 +1,19 @@
 module meta-model {
   yang-version 1.1;
-  namespace "urn:xtract:meta-model";
+  namespace "urn:xframe:meta-model";
   prefix "mm";
 
-  organization "Xtract";
-  contact "Xtract";
-  description "YANG schema for the Xtract meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships.";
+  organization "Exergy LLC";
+  contact "Exergy.connect@gmail.com";
+  description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
-  revision "2026-01-15" {
-    description "Initial version";
+  revision "2026-02-23" {
+    description
+      "Removed field leaf from foreignKeys list and primaryKey field from field-definition:
+       - Foreign keys now always reference the primary key of the referenced entity
+       - Removed optional field specification from foreignKeys (field leaf removed)
+       - Removed primaryKey boolean field from field-definition grouping
+       - Updated all related constraints and test data";
   }
 
   revision "2026-02-22" {
@@ -22,6 +27,10 @@ module meta-model {
        - Changed primary_key from leaf-list to single leaf supporting composite fields
        - Composite subcomponents inherit required from parent
        - Only one level of composition allowed (no nested composites)";
+  }
+
+  revision "2026-01-15" {
+    description "Initial version";
   }
 
   // Type definitions
@@ -227,10 +236,6 @@ module meta-model {
         error-message "Foreign key field type must match the referenced entity's primary key field type";
         description "Validates that the foreign key field type matches the referenced entity's primary key field type. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
       }
-      must "/data-model/consolidated = false() or count(field) = 0 or field = /data-model/entities[name = current()/entity]/primary_key" {
-        error-message "Foreign key field must reference the referenced entity's primary key";
-        description "Validates that if a field is specified, it must equal the referenced entity's primary key. If omitted, the foreign key field name must match the primary key. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
-      }
       leaf entity {
         type leafref {
           path "/data-model/entities/name";
@@ -238,18 +243,6 @@ module meta-model {
         }
         mandatory true;
         description "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.";
-      }
-      leaf field {
-        type field-name;
-        description "Optional field name in the referenced entity. If specified, must exist in the referenced entity's fields. If omitted, the foreign key field must match the referenced entity's primary key.";
-        must "/data-model/consolidated = false() or deref(../entity)/../fields[name = current()]" {
-          error-message "Foreign key field must exist in the referenced entity's fields";
-          description "Validates that the field exists in the referenced entity's fields list. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
-        }
-        must "/data-model/consolidated = false() or current() = /data-model/entities[name = ../entity]/primary_key" {
-          error-message "Foreign key field must reference the referenced entity's primary key";
-          description "Validates that if a field is specified, it must equal the referenced entity's primary key. If omitted, the foreign key field name must match the primary key. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
-        }
       }
       must "/data-model/consolidated = false() or " +
            "../../type != 'composite' or " +
@@ -533,13 +526,6 @@ module meta-model {
         must "deref(current())/../foreignKeys" {
           error-message "Child foreign key field must have a foreignKeys definition";
           description "Validates that child_fk field has a foreignKeys definition.";
-        }
-        must "/data-model/consolidated = false() or " +
-             "not(deref(current())/../foreignKeys[1]/field) or " +
-             "deref(current())/../foreignKeys[1]/field = " +
-             "/data-model/entities[name = string(deref(current())/../foreignKeys[1]/entity)]/primary_key" {
-          error-message "Child foreign key field must reference the parent entity's primary key";
-          description "Validates that the child_fk foreign key references the parent entity's primary key. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
         }
         must "/data-model/consolidated = false() or " +
              "deref(current())/../type = " +

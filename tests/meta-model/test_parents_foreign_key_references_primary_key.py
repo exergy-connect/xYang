@@ -42,7 +42,7 @@ def test_parents_foreign_key_references_primary_key_valid(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [
@@ -88,7 +88,7 @@ def test_parents_foreign_key_references_primary_key_invalid(meta_model):
                         {
                             "name": "parent_name",
                             "type": "string",
-                            "foreignKeys": [{"entity": "parent", "field": "name"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [

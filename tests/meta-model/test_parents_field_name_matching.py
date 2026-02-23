@@ -35,7 +35,7 @@ def test_parents_field_name_matching_valid_self_referential(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "entity1", "field": "id"}]
+                            "foreignKeys": [{"entity": "entity1"}]
                         },
                         {
                             "name": "children",
@@ -83,7 +83,7 @@ def test_parents_field_name_matching_valid_cross_entity_matching(meta_model):
                         {
                             "name": "id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [
@@ -132,7 +132,7 @@ def test_parents_field_name_matching_valid_cross_entity_not_matching(meta_model)
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [

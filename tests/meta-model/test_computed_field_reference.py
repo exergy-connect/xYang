@@ -38,10 +38,7 @@ def test_computed_field_reference_valid_same_entity(meta_model):
                             "type": "integer",
                             "computed": {
                                 "operation": "add",
-                                "fields": [
-                                    {"field": "field1"},
-                                    {"field": "field2"}
-                                ]
+                                "fields": [{"field": "field1"}, {"field": "field2"}]
                             }
                         }
                     ]
@@ -88,8 +85,8 @@ def test_computed_field_reference_valid_cross_entity(meta_model):
                             "computed": {
                                 "operation": "add",
                                 "fields": [
-                                    {"field": "id"},
-                                    {"field": "value", "entity": "entity1"}
+                                    {"field": "entity1_id"},
+                                    {"entity": "entity1", "field": "value"}
                                 ]
                             }
                         }
@@ -124,10 +121,7 @@ def test_computed_field_reference_invalid_same_entity_missing(meta_model):
                             "type": "integer",
                             "computed": {
                                 "operation": "add",
-                                "fields": [
-                                    {"field": "nonexistent"},
-                                    {"field": "also_nonexistent"}
-                                ]
+                                "fields": [{"field": "field1"}, {"field": "field2"}]
                             }
                         }
                     ]
@@ -176,8 +170,8 @@ def test_computed_field_reference_invalid_cross_entity_missing(meta_model):
                             "computed": {
                                 "operation": "add",
                                 "fields": [
-                                    {"field": "id"},
-                                    {"field": "nonexistent", "entity": "entity1"}
+                                    {"field": "entity1_id"},
+                                    {"entity": "entity1", "field": "value"}
                                 ]
                             }
                         }

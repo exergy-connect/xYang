@@ -42,7 +42,7 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
                         {
                             "name": "entity1_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "entity1", "field": "id"}]
+                            "foreignKeys": [{"entity": "entity1"}]
                         },
                         {
                             "name": "computed_value",
@@ -50,8 +50,8 @@ def test_computed_field_cross_entity_foreign_key_valid(meta_model):
                             "computed": {
                                 "operation": "add",
                                 "fields": [
-                                    {"field": "id"},
-                                    {"field": "value", "entity": "entity1"}
+                                    {"field": "entity1_id"},
+                                    {"entity": "entity1", "field": "value"}
                                 ]
                             }
                         }
@@ -95,8 +95,8 @@ def test_computed_field_cross_entity_foreign_key_invalid_no_foreign_key(meta_mod
                             "computed": {
                                 "operation": "add",
                                 "fields": [
-                                    {"field": "id"},
-                                    {"field": "value", "entity": "entity1"}
+                                    {"field": "entity1_id"},
+                                    {"entity": "entity1", "field": "value"}
                                 ]
                             }
                         }

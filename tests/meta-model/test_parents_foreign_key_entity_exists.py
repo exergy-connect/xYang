@@ -42,7 +42,7 @@ def test_parents_foreign_key_entity_exists_valid(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [
@@ -79,7 +79,7 @@ def test_parents_foreign_key_entity_exists_invalid(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [

@@ -46,7 +46,7 @@ def test_computed_field_missing_field_same_entity():
                                 "operation": "subtraction",
                                 "fields": [
                                     {"field": "field1"},
-                                    {"field": "nonexistent_field"}  # This field doesn't exist
+                                    {"field": "nonexistent"}  # This field doesn't exist
                                 ]
                             }
                         }
@@ -141,8 +141,8 @@ def test_computed_field_missing_field_cross_entity():
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"field": "nonexistent_field", "entity": "entity1"},  # Field doesn't exist in entity1
-                                    {"field": "id"}
+                                    {"entity": "entity1", "field": "nonexistent"},  # Field doesn't exist in entity1
+                                    {"field": "field1"}
                                 ]
                             }
                         }
@@ -190,8 +190,8 @@ def test_computed_field_cross_entity_no_foreign_key():
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"field": "field1", "entity": "entity1"},  # Cross-entity but no FK
-                                    {"field": "id"}
+                                    {"entity": "entity1", "field": "field1"},  # Cross-entity but no FK
+                                    {"field": "field1"}
                                 ]
                             }
                         }
@@ -262,8 +262,8 @@ def test_computed_field_cross_entity_with_foreign_key():
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"field": "field1", "entity": "entity1"},  # Cross-entity with FK
-                                    {"field": "id"}
+                                    {"entity": "entity1", "field": "field1"},  # Cross-entity with FK
+                                    {"field": "entity1_id"}
                                 ]
                             }
                         }

@@ -42,7 +42,7 @@ def test_parents_child_fk_foreign_key_valid(meta_model):
                         {
                             "name": "parent_id",
                             "type": "integer",
-                            "foreignKeys": [{"entity": "parent", "field": "id"}]
+                            "foreignKeys": [{"entity": "parent"}]
                         }
                     ],
                     "parents": [

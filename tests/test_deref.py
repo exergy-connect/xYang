@@ -151,8 +151,7 @@ def test_deref_simple_entity_reference():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -211,8 +210,7 @@ def test_deref_parents_child_fk():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -248,7 +246,7 @@ def test_deref_parents_child_fk():
     assert fk_def is not None
     assert isinstance(fk_def, dict)
     assert fk_def.get("entity") == "company"
-    assert fk_def.get("field") == "company_id"
+    # Note: 'field' is no longer part of foreignKeys - foreign keys always reference the primary key
 
 
 def test_deref_parents_parent_array():
@@ -277,8 +275,7 @@ def test_deref_parents_parent_array():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -409,8 +406,7 @@ def test_deref_cross_entity_validation():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -468,8 +464,7 @@ def test_deref_field_type_matching():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -511,13 +506,13 @@ def test_deref_field_type_matching():
     assert child_type == "string"
     
     # Get parent field type
-    # Find field in parent entity where name matches foreignKey.field
-    fk_field = entity_evaluator.evaluate_value('../field', entity_context)
-    assert fk_field == "company_id"
+    # Since foreign keys always reference the primary key, get the primary key name
+    parent_primary_key = parent_entity.get("primary_key")
+    assert parent_primary_key == "company_id"
     
     # Find the field in parent entity
     parent_fields = parent_entity.get("fields", [])
-    parent_field = next((f for f in parent_fields if f.get("name") == fk_field), None)
+    parent_field = next((f for f in parent_fields if f.get("name") == parent_primary_key), None)
     assert parent_field is not None
     parent_type = parent_field.get("type")
     assert parent_type == "string"
@@ -583,8 +578,7 @@ def test_deref_cache():
                             "name": "company_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "company",
-                                "field": "company_id"
+                                "entity": "company"
                             }]
                         }
                     ]
@@ -746,8 +740,7 @@ def test_deref_physics_parent_child_relationship():
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "anomaly",
-                                "field": "anomaly_id"
+                                "entity": "anomaly"
                             }]
                         },
                         {
@@ -979,8 +972,7 @@ def test_deref_physics_nested_deref_validation():
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "anomaly",
-                                "field": "anomaly_id"
+                                "entity": "anomaly"
                             }]
                         }
                     ]
@@ -1087,8 +1079,7 @@ def test_deref_physics_parents_validation_constraints():
                             "name": "anomaly_id",
                             "type": "string",
                             "foreignKeys": [{
-                                "entity": "anomaly",
-                                "field": "anomaly_id"
+                                "entity": "anomaly"
                             }]
                         }
                     ]
@@ -1129,7 +1120,7 @@ def test_deref_physics_parents_validation_constraints():
     assert fk_def is not None
     assert isinstance(fk_def, dict)
     assert fk_def.get("entity") == "anomaly"
-    assert fk_def.get("field") == "anomaly_id"
+    # Note: 'field' is no longer part of foreignKeys - foreign keys always reference the primary key
     
     # Test constraint 2: deref(deref(current())/../foreignKey/entity)
     # This should resolve "anomaly" to the anomaly entity node
@@ -1141,18 +1132,22 @@ def test_deref_physics_parents_validation_constraints():
     assert isinstance(entity_node, dict)
     assert entity_node.get("name") == "anomaly"
     
-    # Test constraint 3: deref(deref(current())/../foreignKey/entity)/../fields[name = deref(current())/../foreignKey/field]
-    # This validates that the foreignKey.field exists in the parent entity
-    fk_field_name = child_fk_evaluator.evaluate_value('deref(current())/foreignKeys[0]/field', child_fk_context)
-    assert fk_field_name == "anomaly_id"
+    # Test constraint 3: Since foreign keys always reference the primary key, we check the primary key directly
+    # Foreign keys no longer have a 'field' property - they always reference the primary key
+    # The primary key name can be obtained from the referenced entity
+    parent_entity = child_fk_evaluator.evaluate_value('deref(deref(current())/foreignKeys[0]/entity)', child_fk_context)
+    assert parent_entity is not None
+    # The foreign key field name should match the primary key name of the referenced entity
     
-    # Find the field in the parent entity
+    # Find the primary key field in the parent entity
+    parent_primary_key = entity_node.get("primary_key")
+    assert parent_primary_key is not None
     parent_fields = entity_node.get("fields", [])
-    parent_field = next((f for f in parent_fields if f.get("name") == fk_field_name), None)
+    parent_field = next((f for f in parent_fields if f.get("name") == parent_primary_key), None)
     assert parent_field is not None
-    assert parent_field.get("name") == "anomaly_id"
+    assert parent_field.get("name") == parent_primary_key
     
-    # Test constraint 4: deref(deref(current())/../foreignKey/entity)/../primary_key = deref(current())/../foreignKey/field
+    # Test constraint 4: Since foreign keys always reference the primary key, we verify the primary key matches
     # This validates that the foreignKey field matches the parent's primary_key
     parent_pk = entity_node.get("primary_key")
     assert parent_pk is not None
