@@ -41,7 +41,7 @@ class YangValidator:
         
         # Create focused validators
         self.structure_validator = StructureValidator(module, evaluator_factory)
-        self.type_validator = TypeValidator(self.type_system)
+        self.type_validator = TypeValidator(self.type_system, module)
         self.constraint_validator = ConstraintValidator(module, evaluator_factory)
         self.leafref_resolver = LeafrefResolver(module)
     
@@ -94,7 +94,8 @@ class YangValidator:
                 
                 # Extract constraints from typedef
                 constraints = None
-                if typedef_stmt.type.pattern or typedef_stmt.type.length or typedef_stmt.type.range:
+                if (typedef_stmt.type.pattern or typedef_stmt.type.length or 
+                    typedef_stmt.type.range or typedef_stmt.type.enums):
                     constraints = TypeConstraint(
                         pattern=typedef_stmt.type.pattern,
                         length=typedef_stmt.type.length,

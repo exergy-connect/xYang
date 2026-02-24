@@ -100,9 +100,23 @@ module meta-model {
       enum qualified_string;
       enum qualified_integer;
       enum qualified_number;
-      enum composite;
     }
     description "Primitive field data type";
+  }
+
+  typedef composite-type {
+    type enumeration {
+      enum composite;
+    }
+    description "Composite field type";
+  }
+
+  typedef field-type {
+    type union {
+      type primitive-type;
+      type composite-type;
+    }
+    description "Field type - either a primitive type or composite";
   }
 
   typedef rate-of-change {
@@ -210,7 +224,7 @@ module meta-model {
       }
     }
     leaf type {
-      type primitive-type;
+      type field-type;
       mandatory true;
       description "Field data type";
     }
