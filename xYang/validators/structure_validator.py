@@ -5,7 +5,7 @@ Structure validator for YANG data.
 from typing import Any, Dict, List
 from ..module import YangModule
 from ..ast import (
-    YangStatement, YangLeafStmt, YangListStmt, YangLeafListStmt, YangContainerStmt
+    YangStatement, YangLeafStmt, YangListStmt, YangLeafListStmt, YangContainerStmt, YangChoiceStmt, YangCaseStmt
 )
 from ..xpath import XPathEvaluator
 
@@ -43,6 +43,14 @@ class StructureValidator:
         if context_path is None:
             context_path = []
         
+        # Collect all valid field names from statements (including choice cases)
+        # IMPORTANT: Only collect field names from the statements passed to THIS validate() call.
+        # This ensures the check is scoped to the current context, not global.
+        valid_field_names = set()
+        
+        # First pass: collect valid field names, handling choice cases
+        # Only consider fields defined in the current context's statements
+        choice_data = data if isinstance(data, dict) else {}
         for stmt in statements:
             # Check when condition - skip if condition is false
             if hasattr(stmt, 'when') and stmt.when:
@@ -61,6 +69,66 @@ class StructureValidator:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is None:
                     # AST should have been populated during YANG parsing - this indicates a bug
+                    import logging
+                    logger = logging.getLogger(__name__)
+                    logger.warning(
+                        "When statement AST not found for condition '%s' - will parse again. "
+                        "This should not happen if YANG was parsed correctly.",
+                        stmt.when.condition
+                    )
+                if not evaluator.evaluate(stmt.when.condition, ast=ast, context=context):
+                    # When condition is false, skip this statement
+                    continue
+            
+            if isinstance(stmt, YangLeafStmt):
+                if hasattr(stmt, 'name'):
+                    valid_field_names.add(stmt.name)
+            elif isinstance(stmt, YangListStmt):
+                if hasattr(stmt, 'name'):
+                    valid_field_names.add(stmt.name)
+            elif isinstance(stmt, YangLeafListStmt):
+                if hasattr(stmt, 'name'):
+                    valid_field_names.add(stmt.name)
+            elif isinstance(stmt, YangChoiceStmt):
+                # Choice doesn't create a field, but its cases do
+                # Check which case is present and collect its field names
+                for case_stmt in stmt.cases:
+                    # Check if any field from this case is present
+                    case_active = False
+                    for case_child in case_stmt.statements:
+                        if isinstance(case_child, (YangLeafStmt, YangListStmt, YangLeafListStmt, YangContainerStmt)):
+                            if hasattr(case_child, 'name') and case_child.name in choice_data:
+                                case_active = True
+                                break
+                    
+                    if case_active:
+                        # This case is active - collect all its field names
+                        for case_child in case_stmt.statements:
+                            if isinstance(case_child, (YangLeafStmt, YangListStmt, YangLeafListStmt, YangContainerStmt)):
+                                if hasattr(case_child, 'name'):
+                                    valid_field_names.add(case_child.name)
+            elif hasattr(stmt, 'statements'):
+                # Container or other composite statement
+                if hasattr(stmt, 'name'):
+                    valid_field_names.add(stmt.name)
+        
+        # Second pass: validate the data
+        for stmt in statements:
+            # Check when condition - skip if condition is false
+            if hasattr(stmt, 'when') and stmt.when:
+                evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
+                # Create context for evaluation
+                from ..xpath.context import Context
+                context = Context(
+                    data=data,
+                    context_path=context_path.copy() if context_path else [],
+                    original_context_path=context_path.copy() if context_path else [],
+                    original_data=data,
+                    root_data=data
+                )
+                # Use pre-parsed AST if available to avoid double parsing
+                ast = getattr(stmt.when, 'ast', None)
+                if ast is None:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(
@@ -96,6 +164,18 @@ class StructureValidator:
                         self.validate(
                             data[stmt.name], child_statements, context_path=new_path
                         )
+        
+        # Third pass: check for unknown fields (only if data is a dict)
+        # IMPORTANT: Only check fields in the current data dict (local to this context).
+        # Nested structures are validated recursively in separate validate() calls.
+        if isinstance(data, dict):
+            for field_name in data.keys():
+                if field_name not in valid_field_names:
+                    path_str = '/'.join(context_path) if context_path else 'root'
+                    self.errors.append(
+                        f"Unknown field '{field_name}' at path '{path_str}'. "
+                        f"Field is not defined in the schema."
+                    )
     
     def _validate_leaf(
         self, data: Dict[str, Any], leaf: YangLeafStmt, context_path: List[str]

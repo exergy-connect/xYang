@@ -100,9 +100,23 @@ module meta-model {
       enum qualified_string;
       enum qualified_integer;
       enum qualified_number;
-      enum composite;
     }
     description "Primitive field data type";
+  }
+
+  typedef composite-type {
+    type enumeration {
+      enum composite;
+    }
+    description "Composite field type";
+  }
+
+  typedef field-type {
+    type union {
+      type primitive-type;
+      type composite-type;
+    }
+    description "Field type - either a primitive type or composite";
   }
 
   typedef rate-of-change {
@@ -125,7 +139,7 @@ module meta-model {
       enum warn;
       enum skip;
     }
-    default strict;
+    // Suggested default: strict
     description "Data validation mode for entity";
   }
 
@@ -135,7 +149,7 @@ module meta-model {
       enum enforce;
       enum filter;
     }
-    default enforce;
+    // Suggested default: enforce
     description "Field validation mode. 'enforce' (default) - field constraints are enforced during validation, 'filter' - field value is filtered out (not included in data output)";
   }
 
@@ -210,7 +224,7 @@ module meta-model {
       }
     }
     leaf type {
-      type primitive-type;
+      type field-type;
       mandatory true;
       description "Field data type";
     }
@@ -315,37 +329,20 @@ module meta-model {
     container item_type {
       when "../type = 'array'";
       description "Required for array fields - specifies the type of each item";
-      leaf primitive {
-        type primitive-type;
-        description "Primitive type (string, integer, etc.)";
-      }
-      leaf entity {
-        type entity-name;
-        description "Entity reference type";
-      }
-      list foreignKeys {
-        key entity;
-        min-elements 1;
-        description "Foreign key reference type. Each entry references an entity, and the foreign key field must match that entity's primary key.";
-        leaf entity {
-          type leafref {
-            path "/data-model/entities/name";
-            require-instance true;
-          }
-          mandatory true;
-          description "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.";
-          must "/data-model/consolidated = false() or /data-model/entities[name = current()]/primary_key" {
-            error-message "Referenced entity must have a primary key defined";
-            description "Validates that the referenced entity has a primary_key field defined. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
+      choice item-type-choice {
+        mandatory true;
+        description "Type of array items - must be one of: primitive or entity";
+        case primitive-case {
+          leaf primitive {
+            type primitive-type;
+            description "Primitive type (string, integer, etc.)";
           }
         }
-      }
-      container primitive-object {
-        presence "Primitive object type";
-        leaf primitive {
-          type primitive-type;
-          mandatory true;
-          description "Primitive type in object form";
+        case entity-case {
+          leaf entity {
+            type entity-name;
+            description "Entity by value";
+          }
         }
       }
     }

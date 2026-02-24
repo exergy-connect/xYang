@@ -7,7 +7,7 @@ from .parser_context import TokenStream, ParserContext
 from .ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
-    YangGroupingStmt, YangUsesStmt, YangRefineStmt
+    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt
 )
 from .xpath.validator import XPathValidator
 
@@ -109,7 +109,7 @@ class StatementParsers:
                     revision['description'] = tokens.consume().strip('"\'')
                     tokens.consume_if(';')
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in revision: {tokens.peek()}")
             tokens.consume('}')
         
         context.module.revisions.append(revision)
@@ -128,7 +128,7 @@ class StatementParsers:
                 if handler:
                     handler(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in typedef '{typedef_name}': {tokens.peek()}")
             tokens.consume('}')
         
         context.module.typedefs[typedef_name] = typedef_stmt
@@ -156,7 +156,7 @@ class StatementParsers:
                 if handler:
                     handler(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in container '{container_name}': {tokens.peek()}")
             
             # Consume the container's closing brace
             if tokens.has_more() and tokens.peek() == '}':
@@ -188,7 +188,7 @@ class StatementParsers:
                 if handler:
                     handler(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in list '{list_name}': {tokens.peek()}")
             tokens.consume('}')
         
         # Add to parent if provided, otherwise to module
@@ -217,7 +217,7 @@ class StatementParsers:
                 if handler:
                     handler(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in leaf '{leaf_name}': {tokens.peek()}")
             tokens.consume('}')
         
         # Add to parent if provided, otherwise to module
@@ -246,7 +246,7 @@ class StatementParsers:
                 if handler:
                     handler(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in leaf-list '{leaf_list_name}': {tokens.peek()}")
             tokens.consume('}')
         
         # Add to parent if provided, otherwise to module
@@ -291,9 +291,9 @@ class StatementParsers:
                         else:
                             handler(tokens, type_context, type_stmt)
                     else:
-                        tokens.consume()
+                        raise tokens._make_error(f"Unknown statement in type '{type_name}': {tokens.peek()}")
                 else:
-                    tokens.consume()
+                    tokens.consume()  # Skip nested braces content
         
         # Assign to parent
         if context.current_parent:
@@ -568,7 +568,7 @@ class StatementParsers:
                     elif tokens.peek() == 'description':
                         self.parse_description(tokens, new_context)
                     else:
-                        tokens.consume()  # Skip unknown
+                        raise tokens._make_error(f"Unknown statement in grouping '{grouping_name}': {tokens.peek()}")
             tokens.consume('}')
         
         # Store grouping in module
@@ -593,7 +593,7 @@ class StatementParsers:
                 elif tokens.peek() == 'description':
                     self.parse_description(tokens, new_context)
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in uses '{grouping_name}': {tokens.peek()}")
             tokens.consume('}')
         
         # Store the uses statement temporarily - it will be expanded later
@@ -626,13 +626,94 @@ class StatementParsers:
                         pass
                     tokens.consume()  # Skip for now
                 else:
-                    tokens.consume()  # Skip unknown
+                    raise tokens._make_error(f"Unknown statement in refine '{target_path}': {tokens.peek()}")
             tokens.consume('}')
         
         # Add refine to uses statement
         if context.current_parent and isinstance(context.current_parent, YangUsesStmt):
             context.current_parent.refines.append(refine_stmt)
         
+        tokens.consume_if(';')
+    
+    def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
+        """Parse choice statement."""
+        tokens.consume('choice')
+        choice_name = tokens.consume()
+        choice_stmt = YangChoiceStmt(name=choice_name)
+        
+        if tokens.consume_if('{'):
+            new_context = context.push_parent(choice_stmt)
+            while tokens.has_more() and tokens.peek() != '}':
+                handler = self.registry.get_handler(f"choice:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                else:
+                    raise tokens._make_error(f"Unknown statement in choice '{choice_name}': {tokens.peek()}")
+            tokens.consume('}')
+        
+        # Add to parent if provided, otherwise to module
+        if context.current_parent:
+            if not hasattr(context.current_parent, 'statements'):
+                context.current_parent.statements = []
+            context.current_parent.statements.append(choice_stmt)
+        else:
+            if not hasattr(context.module, 'statements'):
+                context.module.statements = []
+            context.module.statements.append(choice_stmt)
+        
+        tokens.consume_if(';')
+        return choice_stmt
+    
+    def parse_case(self, tokens: TokenStream, context: ParserContext) -> YangCaseStmt:
+        """Parse case statement."""
+        tokens.consume('case')
+        case_name = tokens.consume()
+        case_stmt = YangCaseStmt(name=case_name)
+        
+        if tokens.consume_if('{'):
+            new_context = context.push_parent(case_stmt)
+            while tokens.has_more() and tokens.peek() != '}':
+                # Case can contain leaf, container, list, leaf-list, choice, etc.
+                handler = self.registry.get_handler(f"case:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                elif tokens.peek() == 'leaf':
+                    self.parse_leaf(tokens, new_context)
+                elif tokens.peek() == 'container':
+                    self.parse_container(tokens, new_context)
+                elif tokens.peek() == 'list':
+                    self.parse_list(tokens, new_context)
+                elif tokens.peek() == 'leaf-list':
+                    self.parse_leaf_list(tokens, new_context)
+                elif tokens.peek() == 'choice':
+                    self.parse_choice(tokens, new_context)
+                elif tokens.peek() == 'description':
+                    self.parse_description(tokens, new_context)
+                else:
+                    raise tokens._make_error(f"Unknown statement in case '{case_name}': {tokens.peek()}")
+            tokens.consume('}')
+        
+        # Add case to parent choice
+        if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
+            context.current_parent.cases.append(case_stmt)
+        elif context.current_parent:
+            if not hasattr(context.current_parent, 'statements'):
+                context.current_parent.statements = []
+            context.current_parent.statements.append(case_stmt)
+        else:
+            if not hasattr(context.module, 'statements'):
+                context.module.statements = []
+            context.module.statements.append(case_stmt)
+        
+        tokens.consume_if(';')
+        return case_stmt
+    
+    def parse_choice_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse mandatory statement in choice."""
+        tokens.consume('mandatory')
+        mandatory_val = tokens.consume()
+        if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
+            context.current_parent.mandatory = (mandatory_val.lower() == 'true')
         tokens.consume_if(';')
     
     def _expand_uses(self, grouping: 'YangStatement', refines: list, module: 'YangModule' = None) -> list:
@@ -693,7 +774,7 @@ class StatementParsers:
         """Create a copy of a statement, handling AST nodes properly."""
         from .ast import (
             YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt,
-            YangTypeStmt, YangMustStmt, YangWhenStmt
+            YangTypeStmt, YangMustStmt, YangWhenStmt, YangChoiceStmt, YangCaseStmt
         )
         
         # Copy child statements recursively
@@ -740,6 +821,22 @@ class StatementParsers:
                 min_elements=stmt.min_elements,
                 max_elements=stmt.max_elements,
                 must_statements=stmt.must_statements[:] if stmt.must_statements else []
+            )
+        elif isinstance(stmt, YangChoiceStmt):
+            # Copy cases recursively
+            copied_cases = [self._copy_statement(c) for c in stmt.cases]
+            return YangChoiceStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                mandatory=stmt.mandatory,
+                cases=copied_cases
+            )
+        elif isinstance(stmt, YangCaseStmt):
+            return YangCaseStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements
             )
         else:
             # Generic statement copy

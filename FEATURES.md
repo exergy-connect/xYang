@@ -27,13 +27,15 @@ This document lists the YANG features implemented in xYang, based on actual usag
 
 ### Derived Types
 - ✅ `enumeration` - Enumeration type (6 occurrences)
-- ✅ `union` - Union type (3 occurrences)
+- ✅ `union` - Union type (3 occurrences) - **Full support in typedefs with validation**
 
 ### Data Structures
 - ✅ `container` - Container statements
 - ✅ `list` - List statements (with key)
 - ✅ `leaf` - Leaf statements
 - ✅ `leaf-list` - Leaf-list statements
+- ✅ `choice` - Choice statements (mutually exclusive alternatives)
+- ✅ `case` - Case statements (choice alternatives)
 - ✅ `grouping` - Grouping statements (defines reusable schema components)
 - ✅ `uses` - Uses statements (incorporates groupings)
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
@@ -45,6 +47,7 @@ This document lists the YANG features implemented in xYang, based on actual usag
   - `current()` correctly refers to list item context in list must constraints
 - ✅ `when` - When conditions (1 occurrence) - **Parsed and evaluated**
 - ✅ `mandatory` - Mandatory fields (15 occurrences)
+  - Supports mandatory on choice statements (exactly one case must be present)
 - ✅ `default` - Default values (29 occurrences)
 - ✅ `min-elements` - Minimum elements (5 occurrences)
 - ✅ `max-elements` - Maximum elements (2 occurrences)
@@ -285,7 +288,9 @@ The modular architecture separates concerns:
 - `enumeration`: 6 occurrences
 - `min-elements`: 5 occurrences
 - `presence`: 4 occurrences
-- `union`: 3 occurrences
+- `union`: 3 occurrences (fully supported in typedefs)
+- `choice`: 1 occurrence
+- `case`: 2 occurrences
 - `max-elements`: 2 occurrences
 - `decimal64`: 2 occurrences
 - `fraction-digits`: 2 occurrences
@@ -294,13 +299,16 @@ The modular architecture separates concerns:
 
 ## Test Coverage
 
-xYang has comprehensive test coverage with **178 passing tests** covering:
+xYang has comprehensive test coverage with **195+ passing tests** covering:
 - Basic YANG parsing and validation
 - Type validation (including enumeration)
 - Constraint validation (must, when, mandatory, default)
 - Leafref resolution and validation
 - Deref() function with nested calls
 - Grouping and uses statements
+- Choice/case statements
+- Union types in typedefs
+- Unknown field detection
 - XPath expression evaluation
 - Foreign key validation
 - Parent-child relationship validation
@@ -309,6 +317,21 @@ xYang has comprehensive test coverage with **178 passing tests** covering:
 - Relative and absolute path resolution
 
 ## Recent Improvements
+
+### Choice/Case and Stricter Validation (2026-02-24)
+- ✅ **Choice/case statements**: Full implementation of YANG choice and case statements
+  - Supports mandatory choices (exactly one case must be present)
+  - Validates that only one case is present per choice
+  - Properly handles choice cases in uses expansion
+  - Comprehensive test suite in `tests/test_choice_case.py` (8 tests)
+- ✅ **Union types in typedefs**: Full support for union types in typedef definitions
+  - Validates values against all union member types
+  - Properly resolves typedefs with union base types
+  - Comprehensive test suite in `tests/test_typedef_union.py` (6 tests)
+- ✅ **Stricter structure validation**: Validator now rejects unknown fields not defined in schema
+  - Field checking is scoped locally to each validation context
+  - Properly handles choice/case when collecting valid field names
+  - Clear error messages with path information
 
 ### Foreign Key Validation and Must Constraints (2026-02-23)
 - ✅ **Foreign key primary key validation**: Added must constraints to enforce that foreign keys reference primary keys
