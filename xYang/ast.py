@@ -113,3 +113,16 @@ class YangUsesStmt(YangStatement):
 class YangRefineStmt(YangStatement):
     """Refine statement - modifies nodes from a grouping when using it."""
     target_path: str = ""  # Path to the node being refined (e.g., "type", "required")
+
+
+@dataclass
+class YangChoiceStmt(YangStatement):
+    """Choice statement - defines mutually exclusive alternatives."""
+    mandatory: bool = False
+    cases: List['YangCaseStmt'] = field(default_factory=list)
+
+
+@dataclass
+class YangCaseStmt(YangStatement):
+    """Case statement - defines one alternative in a choice."""
+    pass

@@ -4,7 +4,7 @@ YANG validation engine (refactored).
 
 from typing import Any, Dict, List, Tuple, Callable, Optional
 from .module import YangModule
-from .ast import YangStatement, YangLeafStmt, YangLeafListStmt, YangContainerStmt, YangListStmt
+from .ast import YangStatement, YangLeafStmt, YangLeafListStmt, YangContainerStmt, YangListStmt, YangChoiceStmt, YangCaseStmt
 from .types import TypeSystem
 from .xpath import XPathEvaluator
 from .validators import (
@@ -177,8 +177,64 @@ class YangValidator:
                                     item, stmt.statements, root_data, context_path=new_path
                                 )
             
+            elif isinstance(stmt, YangChoiceStmt):
+                # Validate choice - exactly one case must be present if mandatory
+                # At most one case can be present
+                # Choice doesn't create a named node in the data - its cases do
+                # So we check the current data context for case children
+                choice_data = data if isinstance(data, dict) else {}
+                
+                # Count how many cases are present
+                present_cases = []
+                for case_stmt in stmt.cases:
+                    # Check if any leaf from this case is present
+                    case_present = False
+                    for case_child in case_stmt.statements:
+                        if isinstance(case_child, YangLeafStmt):
+                            if case_child.name in choice_data:
+                                case_present = True
+                                break
+                        elif hasattr(case_child, 'name') and case_child.name in choice_data:
+                            case_present = True
+                            break
+                    
+                    if case_present:
+                        present_cases.append(case_stmt)
+                
+                # Validate choice constraints
+                if stmt.mandatory:
+                    if len(present_cases) == 0:
+                        self.structure_validator.errors.append(
+                            f"Mandatory choice '{stmt.name}' must have exactly one case present, but none found"
+                        )
+                    elif len(present_cases) > 1:
+                        case_names = [c.name for c in present_cases]
+                        self.structure_validator.errors.append(
+                            f"Choice '{stmt.name}' must have exactly one case present, but found multiple: {', '.join(case_names)}"
+                        )
+                else:
+                    if len(present_cases) > 1:
+                        case_names = [c.name for c in present_cases]
+                        self.structure_validator.errors.append(
+                            f"Choice '{stmt.name}' can have at most one case present, but found multiple: {', '.join(case_names)}"
+                        )
+                
+                # Validate the present case(s)
+                for case_stmt in present_cases:
+                    self._validate_types(
+                        choice_data, case_stmt.statements, root_data, context_path=context_path
+                    )
+            
+            elif isinstance(stmt, YangContainerStmt):
+                # Validate container
+                if stmt.name in data:
+                    new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
+                    self._validate_types(
+                        data[stmt.name], stmt.statements, root_data, context_path=new_path
+                    )
+            
             elif hasattr(stmt, 'statements'):
-                # Recurse into composite statements (containers, etc.)
+                # Recurse into composite statements (groupings, etc.)
                 if stmt.name in data:
                     new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
                     self._validate_types(

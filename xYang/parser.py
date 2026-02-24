@@ -53,6 +53,7 @@ class YangParser:
         self.registry.register('container:list', self.parsers.parse_list)
         self.registry.register('container:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('container:uses', self.parsers.parse_uses)
+        self.registry.register('container:choice', self.parsers.parse_choice)
         
         # List body statements
         self.registry.register('list:key', self.parsers.parse_list_key)
@@ -66,6 +67,7 @@ class YangParser:
         self.registry.register('list:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('list:must', self.parsers.parse_must)
         self.registry.register('list:uses', self.parsers.parse_uses)
+        self.registry.register('list:choice', self.parsers.parse_choice)
         
         # Leaf body statements
         self.registry.register('leaf:type', self.parsers.parse_type)
@@ -88,6 +90,7 @@ class YangParser:
         
         # Grouping body statements
         self.registry.register('grouping:description', self.parsers.parse_description)
+        self.registry.register('grouping:choice', self.parsers.parse_choice)
         
         # Uses body statements
         self.registry.register('uses:refine', self.parsers.parse_refine)
@@ -110,6 +113,14 @@ class YangParser:
         # Must body statements
         self.registry.register('must:error-message', self.parsers.parse_must_error_message)
         self.registry.register('must:description', self.parsers.parse_description)
+        
+        # Choice body statements
+        self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
+        self.registry.register('choice:description', self.parsers.parse_description)
+        self.registry.register('choice:case', self.parsers.parse_case)
+        
+        # Case body statements
+        self.registry.register('case:description', self.parsers.parse_description)
     
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file."""
