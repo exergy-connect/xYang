@@ -100,12 +100,28 @@ def xpath_string(value: Any) -> str:
 
 
 def compare_equal(left: Any, right: Any) -> bool:
-    """Compare two values for equality."""
+    """Compare two values for equality.
+    
+    In XPath, when comparing a node-set (list) to a value, returns True if any node equals the value.
+    """
     # Handle None/missing values first - in XPath, empty sequences don't equal anything
     # This is consistent with comparison operators (<=, >=, etc.) which return False for None
     # Note: We check this before the fast path to ensure None == None returns False
     if left is None or right is None:
         return False
+    
+    # Handle list (node-set) comparisons: in XPath, a node-set equals a value if any node equals it
+    if isinstance(left, list):
+        if len(left) == 0:
+            return False
+        # Check if any element in the list equals right
+        return any(compare_equal(item, right) for item in left)
+    if isinstance(right, list):
+        if len(right) == 0:
+            return False
+        # Check if any element in the list equals left
+        return any(compare_equal(left, item) for item in right)
+    
     # Fast path: same object reference (only reached if both are not None)
     if left is right:
         return True
