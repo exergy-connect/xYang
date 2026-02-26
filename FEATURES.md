@@ -27,7 +27,7 @@ This document lists the YANG features implemented in xYang, based on actual usag
 
 ### Derived Types
 - ✅ `enumeration` - Enumeration type (6 occurrences)
-- ✅ `union` - Union type (3 occurrences) - **Full support in typedefs with validation**
+- ✅ `union` - Union type (3 occurrences) - **Full support in typedefs with validation, including union types with leafref members**
 
 ### Data Structures
 - ✅ `container` - Container statements
@@ -163,6 +163,9 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 ### Functions
 - ✅ `string-length(.)` - Get length of current node value
 - ✅ `translate(., '_', '')` - Translate/remove characters
+- ✅ `contains(string1, string2)` - Check if string1 contains string2
+- ✅ `substring-before(string1, string2)` - Get substring before first occurrence of string2
+- ✅ `substring-after(string1, string2)` - Get substring after first occurrence of string2
 - ✅ `count(...)` - Count elements in a list
 - ✅ `deref(...)` - **Resolve leafref with full support for nested paths**
   - Supports: `deref(../entity)`, `deref(current())`, `deref(deref(...)/../foreignKey/entity)`
@@ -189,6 +192,7 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 
 ### String Operations
 - ✅ **String concatenation**: `+` operator for string concatenation
+- ✅ **String functions**: `contains()`, `substring-before()`, `substring-after()` for string manipulation and pattern matching
 
 ### Arithmetic Operations
 - ✅ `+`, `-`, `*`, `/` - Arithmetic operators (with `/` treated as path navigation when appropriate)
@@ -317,6 +321,17 @@ xYang has comprehensive test coverage with **195+ passing tests** covering:
 - Relative and absolute path resolution
 
 ## Recent Improvements
+
+### Union Types with Leafref and XPath String Functions (2026-02-26)
+- ✅ **Union types with leafref**: Added support for union types containing leafref members
+  - Union validation now handles leafref members correctly
+  - Leafref validation is deferred to LeafrefResolver for proper context resolution
+  - Enables typedefs with union of multiple leafref paths (e.g., top-level fields and composite subcomponents)
+- ✅ **XPath string functions**: Added support for additional XPath 1.0 string functions
+  - `contains(string1, string2)` - Check if string1 contains string2
+  - `substring-before(string1, string2)` - Get substring before first occurrence of string2
+  - `substring-after(string1, string2)` - Get substring after first occurrence of string2
+  - All functions follow XPath 1.0 semantics with proper string conversion
 
 ### Choice/Case and Stricter Validation (2026-02-24)
 - ✅ **Choice/case statements**: Full implementation of YANG choice and case statements
