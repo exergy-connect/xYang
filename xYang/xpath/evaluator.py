@@ -3,7 +3,7 @@ Minimal XPath evaluator for YANG must/when expressions.
 
 Implements only the XPath features used in meta-model.yang:
 - Path navigation (../, ../../, etc.)
-- Functions: string-length(), translate(), count(), deref(), current(), not(), true(), false(), bool()
+- Functions: string-length(), translate(), count(), deref(), current(), not(), true(), false(), bool(), contains(), substring-before(), substring-after()
 - Comparisons: =, !=, <=, >=, <, >
 - Logical operators: or, and
 - Filtering: [predicate]

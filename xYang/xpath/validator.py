@@ -29,6 +29,9 @@ SUPPORTED_FUNCTIONS: Set[str] = {
     'bool',
     'number',
     'string',
+    'contains',
+    'substring-before',
+    'substring-after',
 }
 
 # Whitelist of supported binary operators

@@ -122,6 +122,13 @@ class TypeValidator:
         
         errors = []
         for union_member in union_type_stmt.types:
+            # Handle leafref types specially - they're validated separately by LeafrefResolver
+            if union_member.name == 'leafref':
+                # For leafref, we accept it as potentially valid
+                # Actual validation happens later by LeafrefResolver
+                # We can't validate the path here without context, so we accept it
+                return ValidationResult.valid()
+            
             from ..types import TypeConstraint
             constraints = TypeConstraint(
                 pattern=union_member.pattern,
@@ -169,6 +176,12 @@ class TypeValidator:
                         # This is a union typedef - validate against each member type
                         errors = []
                         for union_member in typedef_stmt.type.types:
+                            # Handle leafref types specially - they're validated separately by LeafrefResolver
+                            if union_member.name == 'leafref':
+                                # For leafref, we accept it as potentially valid
+                                # Actual validation happens later by LeafrefResolver
+                                return ValidationResult.valid()
+                            
                             from ..types import TypeConstraint
                             constraints = TypeConstraint(
                                 pattern=union_member.pattern,
@@ -196,6 +209,12 @@ class TypeValidator:
             
             errors = []
             for union_member in type_stmt.types:
+                # Handle leafref types specially - they're validated separately by LeafrefResolver
+                if union_member.name == 'leafref':
+                    # For leafref, we accept it as potentially valid
+                    # Actual validation happens later by LeafrefResolver
+                    return ValidationResult.valid()
+                
                 from ..types import TypeConstraint
                 constraints = TypeConstraint(
                     pattern=union_member.pattern,

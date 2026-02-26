@@ -35,6 +35,9 @@ class FunctionCallNode(XPathNode):
             'number': NumberFunctionNode,
             'string': StringFunctionNode,
             'not': NotFunctionNode,
+            'contains': ContainsFunctionNode,
+            'substring-before': SubstringBeforeFunctionNode,
+            'substring-after': SubstringAfterFunctionNode,
         }
         
         node_class = function_map.get(name.lower())
@@ -235,3 +238,88 @@ class NotFunctionNode(FunctionCallNode):
                 return len(operand) == 0
             return False
         return True
+
+
+class ContainsFunctionNode(FunctionCallNode):
+    """contains() function node."""
+    
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> 'JsonValue':
+        """Handle contains() function.
+        
+        XPath 1.0 contains() function:
+        - contains(string1, string2) returns true if string1 contains string2, false otherwise
+        - Both arguments are converted to strings
+        - Empty string is contained in any string
+        """
+        if len(self.args) == 2:
+            string1_val = self.args[0].evaluate(evaluator, context)
+            string2_val = self.args[1].evaluate(evaluator, context)
+            
+            # Convert to strings following XPath 1.0 semantics
+            from ..utils import xpath_string
+            string1 = xpath_string(string1_val)
+            string2 = xpath_string(string2_val)
+            
+            # Check if string1 contains string2
+            return string2 in string1
+        return False
+
+
+class SubstringBeforeFunctionNode(FunctionCallNode):
+    """substring-before() function node."""
+    
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> 'JsonValue':
+        """Handle substring-before() function.
+        
+        XPath 1.0 substring-before() function:
+        - substring-before(string1, string2) returns the substring of string1 that precedes
+          the first occurrence of string2, or empty string if string2 is not found
+        - Both arguments are converted to strings
+        """
+        if len(self.args) == 2:
+            string1_val = self.args[0].evaluate(evaluator, context)
+            string2_val = self.args[1].evaluate(evaluator, context)
+            
+            # Convert to strings following XPath 1.0 semantics
+            from ..utils import xpath_string
+            string1 = xpath_string(string1_val)
+            string2 = xpath_string(string2_val)
+            
+            # Find the position of string2 in string1
+            pos = string1.find(string2)
+            if pos == -1:
+                # string2 not found, return empty string
+                return ''
+            # Return substring before the first occurrence
+            return string1[:pos]
+        return ''
+
+
+class SubstringAfterFunctionNode(FunctionCallNode):
+    """substring-after() function node."""
+    
+    def evaluate(self, evaluator: 'XPathEvaluator', context: 'Context') -> 'JsonValue':
+        """Handle substring-after() function.
+        
+        XPath 1.0 substring-after() function:
+        - substring-after(string1, string2) returns the substring of string1 that follows
+          the first occurrence of string2, or empty string if string2 is not found
+        - Both arguments are converted to strings
+        """
+        if len(self.args) == 2:
+            string1_val = self.args[0].evaluate(evaluator, context)
+            string2_val = self.args[1].evaluate(evaluator, context)
+            
+            # Convert to strings following XPath 1.0 semantics
+            from ..utils import xpath_string
+            string1 = xpath_string(string1_val)
+            string2 = xpath_string(string2_val)
+            
+            # Find the position of string2 in string1
+            pos = string1.find(string2)
+            if pos == -1:
+                # string2 not found, return empty string
+                return ''
+            # Return substring after the first occurrence
+            return string1[pos + len(string2):]
+        return ''
