@@ -522,7 +522,9 @@ def test_deref_field_type_matching():
 
 
 def test_deref_nonexistent_reference():
-    """Test deref() with nonexistent reference (should return None)."""
+    """Test deref() with nonexistent reference (should raise error when require-instance is true)."""
+    from xYang.errors import XPathEvaluationError
+    
     data = {
         "data-model": {
             "entities": [
@@ -545,18 +547,26 @@ def test_deref_nonexistent_reference():
     }
     module = parse_yang_string(DATA_MODEL_YANG)
     
-    field_context = ["data-model", "entities", 0, "fields", 0]
+    # Context should be at the entity leafref field itself
+    # This is where the leafref value "nonexistent" is located
+    entity_context = ["data-model", "entities", 0, "fields", 1, "foreignKeys", 0, "entity"]
     evaluator = XPathEvaluator(
         data,
         module,
-        context_path=field_context
+        context_path=entity_context
     )
-    context = create_context(data, field_context)
+    context = create_context(data, entity_context)
     
-    # deref() should return None for nonexistent entity
-    result = evaluator.evaluate_value('deref(deref(current())/foreignKeys[0]/entity)', context)
-    # Should return None since "nonexistent" entity doesn't exist
-    assert result is None
+    # deref() should raise XPathEvaluationError for nonexistent entity when require-instance is true
+    # The YANG schema has require-instance true for foreignKeys.entity (line 77)
+    # When we call deref(current()), current() is the value "nonexistent", which doesn't exist
+    with pytest.raises(XPathEvaluationError) as exc_info:
+        evaluator.evaluate_value('deref(current())', context)
+    
+    # Verify the error message mentions the missing entity
+    error_msg = str(exc_info.value)
+    assert "nonexistent" in error_msg or "require-instance" in error_msg.lower(), \
+        f"Error message should mention missing entity or require-instance, got: {error_msg}"
 
 
 def test_deref_cache():

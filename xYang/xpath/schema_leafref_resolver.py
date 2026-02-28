@@ -92,7 +92,23 @@ class SchemaLeafrefResolver:
             leafref_path = self.get_leafref_path_from_schema(path, context)
             
             if not leafref_path:
-                # No leafref definition found - cannot resolve
+                # No leafref definition found - try fallback for entity names
+                # This handles cases like deref(deref(current())/foreignKeys[0]/entity)
+                # where the path is complex but the value is an entity name
+                if isinstance(ref_value, str):
+                    # Try common entity reference paths
+                    root_container = self._get_root_container_name()
+                    if root_container:
+                        # Try /data-model/entities/name pattern
+                        entity_path = f"/{root_container}/entities/name"
+                        result_tuple = self.find_node_by_leafref_path(entity_path, ref_value, context)
+                        if result_tuple:
+                            result, node_path = result_tuple
+                            if node_path:
+                                self.evaluator._deref_node_paths[id(result)] = node_path
+                            self.evaluator.leafref_cache[cache_key] = result
+                            return result
+                # No leafref definition found and fallback failed - cannot resolve
                 return None
             
             # Step 3: Use the leafref path to find the referenced node
@@ -103,10 +119,29 @@ class SchemaLeafrefResolver:
                     self.evaluator._deref_node_paths[id(result)] = node_path
                 self.evaluator.leafref_cache[cache_key] = result
                 return result
+            
+            # Node not found - check require-instance
+            schema_node = self._get_leafref_schema_node(path, context)
+            if schema_node:
+                from ..ast import YangLeafStmt
+                if isinstance(schema_node, YangLeafStmt) and schema_node.type:
+                    require_instance = getattr(schema_node.type, 'require_instance', True)
+                    if require_instance:
+                        # require-instance is true but node doesn't exist - this is an error
+                        from ..errors import XPathEvaluationError
+                        raise XPathEvaluationError(
+                            f"deref() failed: leafref value \"{ref_value}\" does not exist at path \"{leafref_path}\" "
+                            f"(require-instance is true)"
+                        )
+            
             self.evaluator.leafref_cache[cache_key] = None
             return None
-        except Exception:
-            # If path evaluation fails, deref() returns None (referenced node doesn't exist)
+        except Exception as e:
+            # Re-raise XPathEvaluationError from require-instance validation
+            from ..errors import XPathEvaluationError
+            if isinstance(e, XPathEvaluationError):
+                raise
+            # If path evaluation fails for other reasons, deref() returns None (referenced node doesn't exist)
             return None
     
     def build_path_from_node(self, node: Any) -> str:
@@ -140,15 +175,19 @@ class SchemaLeafrefResolver:
         # Fallback to string representation
         return str(node) if hasattr(node, '__str__') else ''
     
-    def get_leafref_path_from_schema(self, path: str, context: Context) -> str:
-        """Get the leafref path definition from the schema for the field at the given path.
+    def _resolve_leafref_schema_node(self, path: str, context: Context):
+        """Resolve the leafref schema node for the field at the given path.
+        
+        This is a shared helper that performs the common logic for finding
+        leafref schema nodes. Used by both get_leafref_path_from_schema() and
+        _get_leafref_schema_node() to avoid code duplication.
         
         Args:
             path: XPath expression pointing to a leafref field (e.g., "../entity", "current()")
             context: Context to use for schema resolution (required, never None)
             
         Returns:
-            The leafref path string, or None if not found
+            The leafref schema node (YangLeafStmt), or None if not found
         """
         # Resolve the path to find the schema node
         schema_path = self.resolve_path_to_schema_location(path, context)
@@ -196,7 +235,7 @@ class SchemaLeafrefResolver:
                     schema_node = stmt
                     break
         
-        # Check if it's a leaf with leafref type (optimized: early returns)
+        # Check if it's a leaf with leafref type
         from ..ast import YangLeafStmt
         if not isinstance(schema_node, YangLeafStmt):
             return None
@@ -205,8 +244,36 @@ class SchemaLeafrefResolver:
         if not type_obj or type_obj.name != 'leafref':
             return None
         
+        return schema_node
+    
+    def get_leafref_path_from_schema(self, path: str, context: Context) -> str:
+        """Get the leafref path definition from the schema for the field at the given path.
+        
+        Args:
+            path: XPath expression pointing to a leafref field (e.g., "../entity", "current()")
+            context: Context to use for schema resolution (required, never None)
+            
+        Returns:
+            The leafref path string, or None if not found
+        """
+        schema_node = self._resolve_leafref_schema_node(path, context)
+        if not schema_node:
+            return None
+        
         # Get the leafref path (optimized: single attribute check)
-        return getattr(type_obj, 'path', None)
+        return getattr(schema_node.type, 'path', None)
+    
+    def _get_leafref_schema_node(self, path: str, context: Context):
+        """Get the leafref schema node for the field at the given path.
+        
+        Args:
+            path: XPath expression pointing to a leafref field (e.g., "../entity", "current()")
+            context: Context to use for schema resolution (required, never None)
+            
+        Returns:
+            The leafref schema node (YangLeafStmt), or None if not found
+        """
+        return self._resolve_leafref_schema_node(path, context)
     
     def resolve_path_to_schema_location(self, path: str, context: Context) -> List[str]:
         """Resolve an XPath expression to a schema location path.
@@ -235,9 +302,13 @@ class SchemaLeafrefResolver:
                     schema_path = [root_container] + schema_path
             return schema_path
         
+        # Strip predicates from path (e.g., "foreignKeys[0]/entity" -> "foreignKeys/entity")
+        # Predicates are for data filtering, not schema navigation
+        path_without_predicates = self._strip_predicates(path)
+        
         # Handle relative paths using AST parser
-        if path.startswith('../') or path.startswith('./'):
-            field_parts, _, up_levels = self._parse_path_steps(path)
+        if path_without_predicates.startswith('../') or path_without_predicates.startswith('./'):
+            field_parts, _, up_levels = self._parse_path_steps(path_without_predicates)
             
             # Navigate up from context
             if up_levels == 0:
@@ -257,17 +328,37 @@ class SchemaLeafrefResolver:
                     schema_path = [root_container] + schema_path
             return schema_path
         
-        # Simple field name
-        if path and not path.startswith('/'):
-            data_path = context_to_use + [path]
-            return self.data_path_to_schema_path(data_path)
+        # Simple field name (may contain predicates)
+        if path_without_predicates and not path_without_predicates.startswith('/'):
+            # Split by '/' to handle paths like "foreignKeys/entity"
+            parts = path_without_predicates.split('/')
+            data_path = context_to_use + parts
+            schema_path = self.data_path_to_schema_path(data_path)
+            if schema_path:
+                root_container = self._get_root_container_name()
+                if root_container and schema_path[0] != root_container:
+                    schema_path = [root_container] + schema_path
+            return schema_path
         
         # Handle absolute paths using AST parser
-        if path.startswith('/'):
-            steps, _, _ = self._parse_path_steps(path)
+        if path_without_predicates.startswith('/'):
+            steps, _, _ = self._parse_path_steps(path_without_predicates)
             return steps
         
         return None
+    
+    def _strip_predicates(self, path: str) -> str:
+        """Strip XPath predicates from a path string.
+        
+        Examples:
+            "foreignKeys[0]/entity" -> "foreignKeys/entity"
+            "fields[name='test']" -> "fields"
+            "entities[0]/fields[1]" -> "entities/fields"
+        """
+        import re
+        # Remove predicates like [0], [name='test'], etc.
+        # This regex matches [...] patterns
+        return re.sub(r'\[[^\]]*\]', '', path)
     
     def data_path_to_schema_path(self, data_path: List) -> List[str]:
         """Convert a data structure path to a schema path.

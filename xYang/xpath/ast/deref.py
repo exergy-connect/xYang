@@ -415,19 +415,22 @@ class DerefFunctionNode(FunctionCallNode):
                 return self._cache_and_return(evaluator, value, arg_node)
             
             if isinstance(value, str) and (original_context_path or context_path):
-                schema_path = deref_eval.resolve_path_to_schema_location('current()', context)
-                if schema_path:
-                    schema_node = deref_eval.find_schema_node(schema_path)
-                    if schema_node:
-                        from ...ast import YangLeafStmt
-                        if isinstance(schema_node, YangLeafStmt):
-                            type_obj = schema_node.type
-                            if type_obj and type_obj.name == 'leafref':
-                                leafref_path = getattr(type_obj, 'path', None)
-                                if leafref_path:
-                                    return self._resolve_leafref(
-                                        deref_eval, leafref_path, value, context, evaluator, cache_key
-                                    )
+                # Use evaluate_deref() to ensure require-instance validation is performed
+                try:
+                    result = deref_eval.evaluate_deref('current()', context)
+                    if result is not None:
+                        node_path = evaluator._deref_node_paths.get(id(result))
+                        return self._store_result_with_path(evaluator, result, node_path, cache_key)
+                    # If result is None and require-instance is true, evaluate_deref() would have raised an error
+                    # So if we get here, require-instance is false or not set, return None
+                    return self._cache_and_return(evaluator, None, arg_node)
+                except Exception as e:
+                    # Re-raise XPathEvaluationError from require-instance validation
+                    from ...errors import XPathEvaluationError
+                    if isinstance(e, XPathEvaluationError):
+                        raise
+                    # For other exceptions, return None
+                    return self._cache_and_return(evaluator, None, arg_node)
             
             result = deref_eval.evaluate_deref('current()', context)
             return self._cache_and_return(evaluator, result, arg_node)

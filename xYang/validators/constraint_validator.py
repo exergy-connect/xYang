@@ -447,11 +447,12 @@ class ConstraintValidator:
             )
             if not result:
                 # Use error_message if available, otherwise fall back to description, then generic message
-                error_msg = (
+                base_error_msg = (
                     must_expr.error_message or 
                     (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
                     f"Must constraint failed for {field_name}"
                 )
+                error_msg = f"{base_error_msg} (path: {context_path})"
                 logger.warning("Must constraint failed for %s: %s", field_name, error_msg)
                 self.errors.append(error_msg)
         except Exception as e:
@@ -460,8 +461,9 @@ class ConstraintValidator:
                 "Must constraint evaluation failed for %s: %s (expression: %s, context_path=%s)",
                 field_name, e, must_expr.expression, getattr(evaluator, 'context_path', [])
             )
-            # Only add error if field is mandatory or if it's a syntax error
-            if is_mandatory or "syntax" in str(e).lower() or "parse" in str(e).lower():
+            # Add error if field is mandatory, syntax/parse error, or deref() failure (require-instance violation)
+            is_deref_error = "deref() failed" in str(e) or "require-instance" in str(e).lower()
+            if is_mandatory or "syntax" in str(e).lower() or "parse" in str(e).lower() or is_deref_error:
                 # Use error_message if available, otherwise fall back to description, then generic message
                 error_msg = (
                     must_expr.error_message or 
