@@ -50,6 +50,7 @@ class YangListStmt(YangStatement):
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+    must_statements: List['YangMustStmt'] = field(default_factory=list)
     when: Optional['YangWhenStmt'] = None
 
 

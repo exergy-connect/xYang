@@ -462,13 +462,42 @@ class StatementParsers:
         # The expression should be tokenized as one or more tokens.
         # Consume tokens until we hit ';' or '{' (which indicates the start of the must body)
         # Note: The expression itself should not contain ';' or '{', so this is safe
+        # Handle string concatenation with + operator - preserve + as separate token
         while tokens.has_more() and tokens.peek() not in (';', '{'):
             token = tokens.consume()
             expr_parts.append(token)
             # Safety check: if we've consumed a lot of tokens without finding ';' or '{',
             # something might be wrong, but continue anyway
         
-        expression = ' '.join(expr_parts) if expr_parts else ''
+        # Join tokens, handling + operator for string concatenation
+        # In YANG, string concatenation with + happens at parse time
+        # We need to concatenate the strings directly, not pass + to XPath
+        expression_parts = []
+        i = 0
+        while i < len(expr_parts):
+            part = expr_parts[i]
+            if part == '+':
+                # String concatenation: skip the + and concatenate previous and next strings
+                if i + 1 < len(expr_parts):
+                    # Concatenate the last part with the next part
+                    if expression_parts:
+                        # Get last part (may be a string with trailing space)
+                        last_part = expression_parts[-1]
+                        next_part = expr_parts[i + 1]
+                        # Concatenate directly (preserving any spaces in the strings)
+                        expression_parts[-1] = last_part + next_part
+                    else:
+                        # + at the start - just skip it and take next part
+                        expression_parts.append(expr_parts[i + 1])
+                    i += 2  # Skip both + and next token
+                    continue
+            else:
+                # Normal token - add space before if not first and previous wasn't +
+                if expression_parts and expression_parts[-1] != '+':
+                    expression_parts.append(' ')
+                expression_parts.append(part)
+            i += 1
+        expression = ''.join(expression_parts).strip()
         
         # Validate XPath expression at parse time and get parsed AST
         ast = self.xpath_validator.validate(expression)
@@ -486,10 +515,12 @@ class StatementParsers:
             tokens.consume('}')
         
         # Add to appropriate parent
+        # Note: For list statements, parse_list_must handles adding to must_statements
+        # So we only add here if not called from parse_list_must
         if context.current_parent:
             if isinstance(context.current_parent, YangLeafStmt):
                 context.current_parent.must_statements.append(must_stmt)
-            elif isinstance(context.current_parent, (YangListStmt, YangContainerStmt)):
+            elif isinstance(context.current_parent, YangContainerStmt):
                 if not hasattr(context.current_parent, 'must_statements'):
                     context.current_parent.must_statements = []
                 context.current_parent.must_statements.append(must_stmt)
@@ -500,6 +531,8 @@ class StatementParsers:
             elif isinstance(context.current_parent, YangRefineStmt):
                 # Must statements in refine are stored in statements list
                 context.current_parent.statements.append(must_stmt)
+            # For YangListStmt, parse_list_must handles adding to must_statements
+            # Don't add here to avoid duplication
         
         # Consume semicolon if present (optional for must statements in containers/lists)
         tokens.consume_if(';')
@@ -797,6 +830,7 @@ class StatementParsers:
                 key=stmt.key,
                 min_elements=stmt.min_elements,
                 max_elements=stmt.max_elements,
+                must_statements=stmt.must_statements[:] if stmt.must_statements else [],
                 when=stmt.when
             )
         elif isinstance(stmt, YangLeafStmt):

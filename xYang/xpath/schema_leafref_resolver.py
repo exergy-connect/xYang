@@ -111,31 +111,8 @@ class SchemaLeafrefResolver:
                 # No leafref definition found and fallback failed - cannot resolve
                 return None
             
-            # Step 3: Use the leafref path to find the referenced node
-            result_tuple = self.find_node_by_leafref_path(leafref_path, ref_value, context)
-            if result_tuple:
-                result, node_path = result_tuple
-                if node_path:
-                    self.evaluator._deref_node_paths[id(result)] = node_path
-                self.evaluator.leafref_cache[cache_key] = result
-                return result
-            
-            # Node not found - check require-instance
-            schema_node = self._get_leafref_schema_node(path, context)
-            if schema_node:
-                from ..ast import YangLeafStmt
-                if isinstance(schema_node, YangLeafStmt) and schema_node.type:
-                    require_instance = getattr(schema_node.type, 'require_instance', True)
-                    if require_instance:
-                        # require-instance is true but node doesn't exist - this is an error
-                        from ..errors import XPathEvaluationError
-                        raise XPathEvaluationError(
-                            f"deref() failed: leafref value \"{ref_value}\" does not exist at path \"{leafref_path}\" "
-                            f"(require-instance is true)"
-                        )
-            
-            self.evaluator.leafref_cache[cache_key] = None
-            return None
+            # Step 3: Use the consolidated resolution method
+            return self._resolve_leafref_value(path, ref_value, leafref_path, context, cache_key)
         except Exception as e:
             # Re-raise XPathEvaluationError from require-instance validation
             from ..errors import XPathEvaluationError
@@ -262,6 +239,76 @@ class SchemaLeafrefResolver:
         
         # Get the leafref path (optimized: single attribute check)
         return getattr(schema_node.type, 'path', None)
+    
+    def _resolve_leafref_value(
+        self, path: str, value: Any, leafref_path: str, context: Context, cache_key: str
+    ) -> Any:
+        """Resolve a leafref value using the leafref path.
+        
+        This is the consolidated method for resolving leafref values. It handles:
+        1. Finding the referenced node using the leafref path
+        2. Caching the result
+        3. Checking require-instance if node not found
+        
+        Args:
+            path: The original path expression (e.g., "current()/entity") for require-instance check
+            value: The leafref value to resolve
+            leafref_path: The leafref path from the schema
+            context: Context for evaluation
+            cache_key: Cache key for storing the result
+            
+        Returns:
+            The referenced node (dict) if found, None otherwise
+            
+        Raises:
+            XPathEvaluationError: If require-instance is true and node doesn't exist
+        """
+        # Try to find the node using the leafref path
+        result_tuple = self.find_node_by_leafref_path(leafref_path, value, context)
+        if result_tuple:
+            result, node_path = result_tuple
+            if node_path:
+                self.evaluator._deref_node_paths[id(result)] = node_path
+            self.evaluator.leafref_cache[cache_key] = result
+            return result
+        
+        # Node not found - check require-instance
+        self._check_require_instance(path, value, leafref_path, context)
+        
+        # Cache None result
+        self.evaluator.leafref_cache[cache_key] = None
+        return None
+    
+    def _check_require_instance(
+        self, path: str, value: Any, leafref_path: str, context: Context
+    ) -> None:
+        """Check require-instance and raise error if violated.
+        
+        This is the single place where require-instance validation is performed.
+        All deref resolution paths should call this method when a referenced node
+        is not found.
+        
+        Args:
+            path: The original path expression (e.g., "current()/entity")
+            value: The leafref value that was not found
+            leafref_path: The leafref path from the schema
+            context: Context for evaluation
+            
+        Raises:
+            XPathEvaluationError: If require-instance is true and node doesn't exist
+        """
+        schema_node = self._get_leafref_schema_node(path, context)
+        if schema_node:
+            from ..ast import YangLeafStmt
+            if isinstance(schema_node, YangLeafStmt) and schema_node.type:
+                require_instance = getattr(schema_node.type, 'require_instance', True)
+                if require_instance:
+                    # require-instance is true but node doesn't exist - this is an error
+                    from ..errors import XPathEvaluationError
+                    raise XPathEvaluationError(
+                        f"deref() failed: leafref value \"{value}\" does not exist at path \"{leafref_path}\" "
+                        f"(require-instance is true)"
+                    )
     
     def _get_leafref_schema_node(self, path: str, context: Context):
         """Get the leafref schema node for the field at the given path.

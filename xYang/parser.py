@@ -65,7 +65,7 @@ class YangParser:
         self.registry.register('list:container', self.parsers.parse_container)
         self.registry.register('list:list', self.parsers.parse_list)
         self.registry.register('list:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('list:must', self.parsers.parse_must)
+        self.registry.register('list:must', self.parsers.parse_list_must)
         self.registry.register('list:uses', self.parsers.parse_uses)
         self.registry.register('list:choice', self.parsers.parse_choice)
         

@@ -349,3 +349,270 @@ def test_must_on_list_with_leafref_current_context():
     assert not is_valid, "Invalid data should fail"
     assert any("source_value must match" in err for err in errors), \
         f"Error should mention the constraint. Errors: {errors}"
+
+
+def test_must_with_string_concatenation_plus_operator():
+    """Test that must constraints with + operator for string concatenation are parsed and evaluated correctly.
+    
+    This test validates that must statements using the + operator to concatenate strings
+    across multiple lines are correctly parsed and evaluated.
+    """
+    yang_model = """module test-must-plus {
+  namespace "urn:test:must-plus";
+  prefix "tmp";
+  yang-version 1.1;
+
+  container data {
+    list items {
+      key id;
+      leaf id {
+        type string;
+      }
+      leaf type {
+        type string;
+      }
+      leaf value {
+        type string;
+      }
+      
+      must "/data-model/consolidated = false() or " +
+           "type = 'test' or " +
+           "value != ''" {
+        error-message "Type must be 'test' or value must not be empty";
+        description "Tests string concatenation with + operator across multiple lines";
+      }
+    }
+  }
+}"""
+    
+    module = parse_yang_string(yang_model)
+    validator = YangValidator(module)
+    
+    # First verify the must statement was parsed
+    for stmt in module.statements:
+        if hasattr(stmt, 'name') and stmt.name == 'data':
+            for child in stmt.statements:
+                if hasattr(child, 'name') and child.name == 'items':
+                    assert hasattr(child, 'must_statements'), "Must statements should be parsed"
+                    assert len(child.must_statements) > 0, "At least one must statement should be found"
+                    # Verify the expression was concatenated correctly
+                    must_expr = child.must_statements[0].expression
+                    assert 'or' in must_expr, "Expression should contain 'or' operator"
+                    assert "type = 'test'" in must_expr or "type = \"test\"" in must_expr, \
+                        f"Expression should contain type check. Got: {must_expr}"
+                    assert "value != ''" in must_expr or "value != \"\"" in must_expr, \
+                        f"Expression should contain value check. Got: {must_expr}"
+    
+    # Test with consolidated=false (constraint short-circuits, always passes)
+    # Valid data: type is 'test'
+    valid_data1 = {
+        "data": {
+            "items": [
+                {"id": "item1", "type": "test", "value": ""}
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(valid_data1)
+    assert is_valid, f"Valid data (type='test') should pass. Errors: {errors}"
+    
+    # Valid data: value is not empty
+    valid_data2 = {
+        "data": {
+            "items": [
+                {"id": "item2", "type": "other", "value": "non-empty"}
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(valid_data2)
+    assert is_valid, f"Valid data (value not empty) should pass. Errors: {errors}"
+    
+    # Invalid data: type is not 'test' and value is empty
+    # Since /data-model/consolidated doesn't exist, it evaluates to false(),
+    # so the rest of the expression is evaluated
+    invalid_data = {
+        "data": {
+            "items": [
+                {"id": "item3", "type": "other", "value": ""}
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(invalid_data)
+    # The constraint should fail because type != 'test' and value == ''
+    assert not is_valid, "Invalid data should fail validation"
+    assert len(errors) > 0, "Should have errors for invalid constraint"
+    assert any("Type must be 'test' or value must not be empty" in err for err in errors), \
+        f"Error should mention the constraint. Errors: {errors}"
+
+
+def test_must_with_plus_operator_foreignkeys():
+    """Test must constraint on foreignKeys list with + operator (from meta-model.yang pattern).
+    
+    This test specifically tests the pattern used in meta-model.yang where foreignKeys
+    has a must constraint with string concatenation using + operator.
+    """
+    yang_model = """module test-foreignkeys-plus {
+  namespace "urn:test:foreignkeys-plus";
+  prefix "tfp";
+  yang-version 1.1;
+
+  container data-model {
+    leaf consolidated {
+      type boolean;
+      default false;
+    }
+    list entities {
+      key name;
+      leaf name {
+        type string;
+      }
+      leaf-list primary_key {
+        type string;
+      }
+      list fields {
+        key name;
+        leaf name {
+          type string;
+        }
+        leaf type {
+          type string;
+        }
+        list foreignKeys {
+          key entity;
+          must "/data-model/consolidated = false() or " +
+               "../../type = deref(current()/entity)/../fields[name = ../primary_key]/type" {
+            error-message "Foreign key field type must match the referenced entity's primary key field type";
+          }
+          leaf entity {
+            type leafref {
+              path "/data-model/entities/name";
+              require-instance true;
+            }
+            mandatory true;
+          }
+        }
+      }
+    }
+  }
+}"""
+    
+    module = parse_yang_string(yang_model)
+    validator = YangValidator(module)
+    
+    # Verify the must statement was parsed
+    for stmt in module.statements:
+        if hasattr(stmt, 'name') and stmt.name == 'data-model':
+            for child in stmt.statements:
+                if hasattr(child, 'name') and child.name == 'entities':
+                    for entity_child in child.statements:
+                        if hasattr(entity_child, 'name') and entity_child.name == 'fields':
+                            for field_child in entity_child.statements:
+                                if hasattr(field_child, 'name') and field_child.name == 'foreignKeys':
+                                    assert hasattr(field_child, 'must_statements'), \
+                                        "Must statements should be parsed for foreignKeys list"
+                                    assert len(field_child.must_statements) > 0, \
+                                        "At least one must statement should be found"
+                                    must_expr = field_child.must_statements[0].expression
+                                    assert 'deref' in must_expr, \
+                                        f"Expression should contain deref(). Got: {must_expr}"
+                                    assert 'current()/entity' in must_expr, \
+                                        f"Expression should contain current()/entity. Got: {must_expr}"
+    
+    # Test with valid data: consolidated=false (constraint short-circuits)
+    valid_data1 = {
+        "data-model": {
+            "consolidated": False,
+            "entities": [
+                {
+                    "name": "parent",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"}
+                    ]
+                },
+                {
+                    "name": "child",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {
+                            "name": "parent_id",
+                            "type": "integer",
+                            "foreignKeys": [
+                                {"entity": "parent"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(valid_data1)
+    assert is_valid, f"Valid data (consolidated=false) should pass. Errors: {errors}"
+    
+    # Test with valid data: consolidated=true, types match
+    valid_data2 = {
+        "data-model": {
+            "consolidated": True,
+            "entities": [
+                {
+                    "name": "parent",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"}
+                    ]
+                },
+                {
+                    "name": "child",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {
+                            "name": "parent_id",
+                            "type": "integer",
+                            "foreignKeys": [
+                                {"entity": "parent"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(valid_data2)
+    assert is_valid, f"Valid data (consolidated=true, types match) should pass. Errors: {errors}"
+    
+    # Test with invalid data: consolidated=true, types don't match
+    invalid_data = {
+        "data-model": {
+            "consolidated": True,
+            "entities": [
+                {
+                    "name": "parent",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"}
+                    ]
+                },
+                {
+                    "name": "child",
+                    "primary_key": ["id"],
+                    "fields": [
+                        {"name": "id", "type": "integer"},
+                        {
+                            "name": "parent_id",
+                            "type": "string",  # Wrong type
+                            "foreignKeys": [
+                                {"entity": "parent"}
+                            ]
+                        }
+                    ]
+                }
+            ]
+        }
+    }
+    is_valid, errors, warnings = validator.validate(invalid_data)
+    # The constraint should fail because type 'string' != 'integer'
+    assert not is_valid, "Invalid data (type mismatch) should fail validation"
+    assert len(errors) > 0, "Should have errors for invalid constraint"
+    assert any("Foreign key field type" in err or "type" in err.lower() for err in errors), \
+        f"Error should mention the constraint. Errors: {errors}"

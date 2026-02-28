@@ -464,12 +464,23 @@ class ConstraintValidator:
             # Add error if field is mandatory, syntax/parse error, or deref() failure (require-instance violation)
             is_deref_error = "deref() failed" in str(e) or "require-instance" in str(e).lower()
             if is_mandatory or "syntax" in str(e).lower() or "parse" in str(e).lower() or is_deref_error:
-                # Use error_message if available, otherwise fall back to description, then generic message
-                error_msg = (
-                    must_expr.error_message or 
-                    (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
-                    f"Must constraint evaluation failed for {field_name}: {e}"
-                )
+                # For deref errors, include the exception details in the error message
+                # This ensures the specific deref() failure is visible to the user
+                if is_deref_error:
+                    # Include both the error_message (if available) and the deref() error details
+                    base_msg = (
+                        must_expr.error_message or 
+                        (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
+                        f"Must constraint evaluation failed for {field_name}"
+                    )
+                    error_msg = f"{base_msg}: {e}"
+                else:
+                    # Use error_message if available, otherwise fall back to description, then generic message
+                    error_msg = (
+                        must_expr.error_message or 
+                        (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
+                        f"Must constraint evaluation failed for {field_name}: {e}"
+                    )
                 self.errors.append(error_msg)
     
     def _validate_must_in_statement(
@@ -601,21 +612,26 @@ class ConstraintValidator:
             # For list statements, must constraints should be evaluated for each list item
             # For container statements, must constraints are evaluated at the container level
             if isinstance(stmt, YangListStmt):
+                # YangListStmt stores must statements in must_statements attribute (created dynamically by parser)
+                # Fallback to checking statements list if must_statements doesn't exist
+                from ..ast import YangMustStmt
+                if hasattr(stmt, 'must_statements'):
+                    must_statements = stmt.must_statements
+                else:
+                    must_statements = [s for s in stmt.statements if isinstance(s, YangMustStmt)] if hasattr(stmt, 'statements') else []
                 list_data = container_data if isinstance(container_data, list) else None
                 if list_data:
                     # Evaluate must constraints for each list item
                     for idx, item in enumerate(list_data):
                         item_path = current_path + [idx]
                         item_context = self._create_evaluator_context(item_path, root_data)
-                        if hasattr(stmt, 'must_statements'):
-                            for must in stmt.must_statements:
-                                self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{idx}]", False, item_context, stmt)
+                        for must in must_statements:
+                            self._evaluate_must_constraint(evaluator, must, f"{stmt.name}[{idx}]", False, item_context, stmt)
                 else:
                     # List doesn't exist or is not a list - evaluate at list level
-                    if hasattr(stmt, 'must_statements'):
-                        list_context = self._create_evaluator_context(current_path, root_data)
-                        for must in stmt.must_statements:
-                            self._evaluate_must_constraint(evaluator, must, stmt.name, False, list_context, stmt)
+                    list_context = self._create_evaluator_context(current_path, root_data)
+                    for must in must_statements:
+                        self._evaluate_must_constraint(evaluator, must, stmt.name, False, list_context, stmt)
             else:
                 # Container: evaluate must constraints at container level
                 if hasattr(stmt, 'must_statements'):

@@ -83,12 +83,29 @@ class DerefFunctionNode(FunctionCallNode):
     
     def _resolve_leafref(
         self, deref_eval: Any, leafref_path: str, value: Any, context: 'Context',
-        evaluator: 'XPathEvaluator', cache_key: str
+        evaluator: 'XPathEvaluator', cache_key: str, original_path: str = None
     ) -> Any:
-        """Resolve a leafref path and cache the result."""
-        result_tuple = deref_eval.find_node_by_leafref_path(leafref_path, value, context)
-        if result_tuple:
-            result, node_path = result_tuple
+        """Resolve a leafref path and cache the result.
+        
+        This method uses the consolidated _resolve_leafref_value() method from
+        SchemaLeafrefResolver to ensure consistent behavior and require-instance validation.
+        
+        Args:
+            original_path: The original path expression (e.g., "current()/entity") used to check require-instance
+        """
+        if not original_path:
+            # If we don't have original_path, we can't check require-instance properly
+            # Fall back to basic resolution without require-instance check
+            result_tuple = deref_eval.find_node_by_leafref_path(leafref_path, value, context)
+            if result_tuple:
+                result, node_path = result_tuple
+                return self._store_result_with_path(evaluator, result, node_path, cache_key)
+            return self._cache_and_return(evaluator, None, None)
+        
+        # Use the consolidated resolution method
+        result = deref_eval._resolve_leafref_value(original_path, value, leafref_path, context, cache_key)
+        if result is not None:
+            node_path = evaluator._deref_node_paths.get(id(result))
             return self._store_result_with_path(evaluator, result, node_path, cache_key)
         return self._cache_and_return(evaluator, None, None)
     
@@ -141,7 +158,7 @@ class DerefFunctionNode(FunctionCallNode):
                         path_value = arg_node.evaluate(evaluator, context)
                     if path_value is not None:
                         return self._resolve_leafref(
-                            deref_eval, leafref_path, path_value, context, evaluator, cache_key
+                            deref_eval, leafref_path, path_value, context, evaluator, cache_key, full_path
                         )
         
         # Evaluate left side
@@ -216,7 +233,7 @@ class DerefFunctionNode(FunctionCallNode):
         
         if leafref_path:
             return self._resolve_leafref(
-                deref_eval, leafref_path, path_value, context, evaluator, cache_key
+                deref_eval, leafref_path, path_value, context, evaluator, cache_key, right_path_stripped
             )
         
         # If we still don't have a leafref path, try the fallback for entity names
@@ -325,7 +342,7 @@ class DerefFunctionNode(FunctionCallNode):
         
         if leafref_path:
             return self._resolve_leafref(
-                deref_eval, leafref_path, left_result, context, evaluator, cache_key
+                deref_eval, leafref_path, left_result, context, evaluator, cache_key, right_path
             )
         
         return self._cache_and_return(evaluator, None, arg_node)
@@ -365,7 +382,7 @@ class DerefFunctionNode(FunctionCallNode):
             path_value = arg_node.evaluate(evaluator, context)
             if path_value is not None:
                 return self._resolve_leafref(
-                    deref_eval, leafref_path, path_value, context, evaluator, cache_key
+                    deref_eval, leafref_path, path_value, context, evaluator, cache_key, path
                 )
             return self._cache_and_return(evaluator, None, arg_node)
         
@@ -391,7 +408,7 @@ class DerefFunctionNode(FunctionCallNode):
                                 leafref_path = getattr(type_obj, 'path', None)
                                 if leafref_path:
                                     return self._resolve_leafref(
-                                        deref_eval, leafref_path, path_value, context, evaluator, cache_key
+                                        deref_eval, leafref_path, path_value, context, evaluator, cache_key, 'current()'
                                     )
         
         # Fallback

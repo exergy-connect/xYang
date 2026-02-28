@@ -71,15 +71,15 @@ module data-model {
         }
         list foreignKeys {
           key entity;
+          must "/data-model/consolidated = false() or " +
+               "../../type = deref(current()/entity)/../fields[name = ../primary_key]/type" {
+            error-message "Foreign key field type must match the referenced entity's primary key field type";
+          }
           leaf entity {
             type leafref {
               path "/data-model/entities/name";
               require-instance true;
             }
-            mandatory true;
-          }
-          leaf field {
-            type field-name;
             mandatory true;
           }
         }
