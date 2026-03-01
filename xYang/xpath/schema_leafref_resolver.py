@@ -73,6 +73,9 @@ class SchemaLeafrefResolver:
         - Finds the schema leaf for "entity" field
         - Gets its leafref path (e.g., "/data-model/entities/name")
         - Uses that path to find the node where name="company"
+        
+        Raises:
+            XPathEvaluationError: If path points to a non-leafref node
         """
         try:
             # Check cache first (cache context path string to avoid repeated conversion)
@@ -88,7 +91,24 @@ class SchemaLeafrefResolver:
                 # Referenced node doesn't exist - acceptable for optional references
                 return None
             
-            # Step 2: Find the schema node for the field at this path
+            # Step 2: Check if path points to a schema node and verify it's a leafref
+            schema_node = self._resolve_leafref_schema_node(path, context)
+            if schema_node:
+                # We found a schema node - check if it's actually a leafref
+                from ..ast import YangLeafStmt
+                if isinstance(schema_node, YangLeafStmt):
+                    type_obj = schema_node.type
+                    if type_obj and type_obj.name != 'leafref':
+                        # Found a schema node but it's not a leafref - raise clear error
+                        from ..errors import XPathEvaluationError
+                        field_name = getattr(schema_node, 'name', 'unknown')
+                        field_type = type_obj.name if type_obj else 'unknown'
+                        raise XPathEvaluationError(
+                            f"deref() can only be used on leafref nodes. "
+                            f"Path '{path}' points to field '{field_name}' which is of type '{field_type}', not 'leafref'."
+                        )
+            
+            # Step 3: Find the schema node for the field at this path
             leafref_path = self.get_leafref_path_from_schema(path, context)
             
             if not leafref_path:
@@ -108,6 +128,18 @@ class SchemaLeafrefResolver:
                                 self.evaluator._deref_node_paths[id(result)] = node_path
                             self.evaluator.leafref_cache[cache_key] = result
                             return result
+                # No leafref definition found and fallback failed - check if we found a non-leafref node
+                if schema_node:
+                    from ..ast import YangLeafStmt
+                    if isinstance(schema_node, YangLeafStmt):
+                        from ..errors import XPathEvaluationError
+                        field_name = getattr(schema_node, 'name', 'unknown')
+                        type_obj = schema_node.type
+                        field_type = type_obj.name if type_obj else 'unknown'
+                        raise XPathEvaluationError(
+                            f"deref() can only be used on leafref nodes. "
+                            f"Path '{path}' points to field '{field_name}' which is of type '{field_type}', not 'leafref'."
+                        )
                 # No leafref definition found and fallback failed - cannot resolve
                 return None
             

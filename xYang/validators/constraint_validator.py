@@ -3,11 +3,13 @@ Constraint validator for YANG must/when statements.
 """
 
 import logging
+import re
 from typing import Any, Dict, List, Iterator, Optional
 from ..module import YangModule
 from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt, YangLeafListStmt
 from ..xpath import XPathEvaluator
 from ..xpath.context import Context
+from ..xpath.utils import xpath_string
 
 logger = logging.getLogger(__name__)
 
@@ -193,6 +195,53 @@ class ConstraintValidator:
         # This is a simplified version - in a full implementation, we'd walk up the tree
         # For now, just return the node name
         return node.name if hasattr(node, 'name') else type(node).__name__
+    
+    def _process_dynamic_error_message(
+        self,
+        error_message: str,
+        evaluator: XPathEvaluator,
+        context: Context
+    ) -> str:
+        """
+        Process error message with dynamic XPath expressions in curly braces.
+        
+        Replaces expressions like {current()} or {../../name} with their evaluated values.
+        Uses Python f-string style syntax: {expression}
+        
+        Args:
+            error_message: Error message template with optional {expression} placeholders
+            evaluator: XPath evaluator for evaluating expressions
+            context: Context for evaluation
+            
+        Returns:
+            Error message with XPath expressions replaced by their values
+        """
+        if not error_message or '{' not in error_message:
+            return error_message
+        
+        # Pattern to match {expression} where expression is an XPath expression
+        # This handles nested braces by matching from innermost to outermost
+        pattern = r'\{([^}]+)\}'
+        
+        def replace_match(match: re.Match) -> str:
+            """Replace a single {expression} match with its evaluated value."""
+            xpath_expr = match.group(1)
+            try:
+                # Evaluate the XPath expression
+                value = evaluator.evaluate_value(xpath_expr, context=context)
+                # Convert to string using XPath string conversion rules
+                return xpath_string(value)
+            except Exception as e:
+                # If evaluation fails, include the expression and error in the message
+                logger.debug(
+                    "Failed to evaluate XPath expression '%s' in error message: %s",
+                    xpath_expr, e
+                )
+                return f"<{xpath_expr} evaluation failed: {e}>"
+        
+        # Replace all {expression} patterns
+        processed_message = re.sub(pattern, replace_match, error_message)
+        return processed_message
     
     def _validate_child_in_list_item(
         self,
@@ -452,7 +501,11 @@ class ConstraintValidator:
                     (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
                     f"Must constraint failed for {field_name}"
                 )
-                error_msg = f"{base_error_msg} (path: {context_path})"
+                # Process dynamic error message with XPath expressions
+                processed_error_msg = self._process_dynamic_error_message(
+                    base_error_msg, evaluator, context
+                )
+                error_msg = f"{processed_error_msg} (path: {context_path})"
                 logger.warning("Must constraint failed for %s: %s", field_name, error_msg)
                 self.errors.append(error_msg)
         except Exception as e:
@@ -473,14 +526,23 @@ class ConstraintValidator:
                         (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
                         f"Must constraint evaluation failed for {field_name}"
                     )
-                    error_msg = f"{base_msg}: {e}"
+                    # Process dynamic error message with XPath expressions
+                    processed_msg = self._process_dynamic_error_message(
+                        base_msg, evaluator, context
+                    )
+                    error_msg = f"{processed_msg}: {e}"
                 else:
                     # Use error_message if available, otherwise fall back to description, then generic message
-                    error_msg = (
+                    base_msg = (
                         must_expr.error_message or 
                         (must_expr.description if hasattr(must_expr, 'description') and must_expr.description else None) or
-                        f"Must constraint evaluation failed for {field_name}: {e}"
+                        f"Must constraint evaluation failed for {field_name}"
                     )
+                    # Process dynamic error message with XPath expressions
+                    processed_msg = self._process_dynamic_error_message(
+                        base_msg, evaluator, context
+                    )
+                    error_msg = f"{processed_msg}: {e}"
                 self.errors.append(error_msg)
     
     def _validate_must_in_statement(

@@ -52,9 +52,10 @@ class DerefFunctionNode(FunctionCallNode):
                 evaluator, deref_eval, arg_node, context, cache_key, context_path, original_context_path
             )
         else:
-            return self._handle_other_node(
-                evaluator, deref_eval, arg_node, context, cache_key
-            )
+            # Fallback for other node types - just use evaluate_deref
+            path = deref_eval.build_path_from_node(arg_node) if hasattr(deref_eval, 'build_path_from_node') else str(arg_node)
+            result = deref_eval.evaluate_deref(path, context)
+            return self._cache_and_return(evaluator, result, arg_node)
     
     def _make_cache_key(self, arg_node: Any, context_path: list) -> str:
         """Create cache key for deref() result."""
@@ -81,60 +82,6 @@ class DerefFunctionNode(FunctionCallNode):
         evaluator.leafref_cache[cache_key] = result
         return result
     
-    def _resolve_leafref(
-        self, deref_eval: Any, leafref_path: str, value: Any, context: 'Context',
-        evaluator: 'XPathEvaluator', cache_key: str, original_path: str = None
-    ) -> Any:
-        """Resolve a leafref path and cache the result.
-        
-        This method uses the consolidated _resolve_leafref_value() method from
-        SchemaLeafrefResolver to ensure consistent behavior and require-instance validation.
-        
-        Args:
-            original_path: The original path expression (e.g., "current()/entity") used to check require-instance
-        """
-        if not original_path:
-            # If we don't have original_path, we can't check require-instance properly
-            # Fall back to basic resolution without require-instance check
-            result_tuple = deref_eval.find_node_by_leafref_path(leafref_path, value, context)
-            if result_tuple:
-                result, node_path = result_tuple
-                return self._store_result_with_path(evaluator, result, node_path, cache_key)
-            return self._cache_and_return(evaluator, None, None)
-        
-        # Use the consolidated resolution method
-        result = deref_eval._resolve_leafref_value(original_path, value, leafref_path, context, cache_key)
-        if result is not None:
-            node_path = evaluator._deref_node_paths.get(id(result))
-            return self._store_result_with_path(evaluator, result, node_path, cache_key)
-        return self._cache_and_return(evaluator, None, None)
-    
-    def _create_schema_context(
-        self, context: 'Context', context_path: list
-    ) -> 'Context':
-        """Create a new context for schema resolution."""
-        from ..context import Context
-        return Context(
-            data=context.data,
-            context_path=context_path,
-            original_context_path=context_path,
-            original_data=context.original_data,
-            root_data=context.root_data
-        )
-    
-    def _find_node_context(
-        self, deref_eval: Any, node: dict, evaluator: 'XPathEvaluator',
-        fallback_path: list
-    ) -> list | None:
-        """Find the context path for a node."""
-        node_id = id(node)
-        stored_path = evaluator._deref_node_paths.get(node_id)
-        if stored_path:
-            return stored_path
-        
-        found_path = deref_eval._find_node_location_in_data(node, fallback_path)
-        return found_path if found_path is not None else fallback_path
-    
     def _handle_binary_op_path(
         self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: BinaryOpNode,
         context: 'Context', cache_key: str, context_path: list, original_context_path: list
@@ -148,42 +95,38 @@ class DerefFunctionNode(FunctionCallNode):
             result = path_value if isinstance(path_value, dict) else None
             return self._cache_and_return(evaluator, result, arg_node)
         
-        # Check if left side is a simple path - try leafref in original context
+        # Check if left side is a simple path - try evaluate_deref in original context
         if self._is_simple_path(arg_node.left):
             full_path = deref_eval.build_path_from_node(arg_node)
             if full_path:
-                leafref_path = deref_eval.get_leafref_path_from_schema(full_path, context)
-                if leafref_path:
-                    if path_value is None:
-                        path_value = arg_node.evaluate(evaluator, context)
-                    if path_value is not None:
-                        return self._resolve_leafref(
-                            deref_eval, leafref_path, path_value, context, evaluator, cache_key, full_path
-                        )
+                # Use evaluate_deref() which validates leafref and handles resolution
+                result = deref_eval.evaluate_deref(full_path, context)
+                if result is not None:
+                    return self._cache_and_return(evaluator, result, arg_node)
         
-        # Evaluate left side
-        left_result = arg_node.left.evaluate(evaluator, context)
-        
-        # Handle string path value with node left side
-        if isinstance(path_value, str) and isinstance(left_result, dict):
-            return self._handle_string_path_from_node(
-                evaluator, deref_eval, arg_node, path_value, left_result,
-                context, cache_key, context_path, original_context_path
+        # If path_value is a string, try to resolve it as an entity name first
+        # This handles cases like deref(deref(current())/foreignKeys[0]/entity)
+        # where the expression evaluates to an entity name string
+        if isinstance(path_value, str):
+            from ..context import Context
+            # Create a context at the root level where the string value can be resolved
+            # as an entity name. We need to be at the root to resolve entity names.
+            root_container = deref_eval._get_root_container_name() if hasattr(deref_eval, '_get_root_container_name') else 'data-model'
+            root_path = [root_container] if root_container else []
+            # Create a context at root level with the string value as current data
+            # The context_path should point to where the entity name would be (entities/name)
+            string_context = Context(
+                data=path_value,
+                context_path=root_path + ['entities', 0, 'name'],  # Point to entity name location
+                original_context_path=root_path + ['entities', 0, 'name'],
+                original_data=context.root_data,
+                root_data=context.root_data
             )
-        
-        # Handle node left side
-        if isinstance(left_result, dict):
-            return self._handle_node_navigation(
-                evaluator, deref_eval, arg_node, left_result, context, cache_key,
-                context_path, original_context_path
-            )
-        
-        # Handle string left side
-        if isinstance(left_result, str):
-            return self._handle_string_left_side(
-                evaluator, deref_eval, arg_node, left_result, context, cache_key,
-                context_path, original_context_path
-            )
+            # Try to resolve the string as an entity name using the entity name leafref path
+            # evaluate_deref will use the fallback logic to resolve entity names
+            result = deref_eval.evaluate_deref('current()', string_context)
+            if result is not None:
+                return self._cache_and_return(evaluator, result, arg_node)
         
         # Fallback: treat as regular path
         path = deref_eval.build_path_from_node(arg_node)
@@ -196,178 +139,6 @@ class DerefFunctionNode(FunctionCallNode):
             isinstance(node, FCN) and node.name == 'current' and len(node.args) == 0
         )
     
-    def _handle_string_path_from_node(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: BinaryOpNode,
-        path_value: str, left_result: dict, context: 'Context', cache_key: str,
-        context_path: list, original_context_path: list
-    ) -> 'JsonValue':
-        """Handle case where path evaluates to string and left side is a node."""
-        context_to_use = self._find_node_context(
-            deref_eval, left_result, evaluator,
-            original_context_path if original_context_path else context_path
-        )
-        
-        if not context_to_use:
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        right_path = deref_eval.build_path_from_node(arg_node.right)
-        if not right_path:
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        # For nested deref, we need to resolve the right_path relative to context_to_use
-        # to find where it ends in the data structure, then get the leafref schema from there
-        field_schema_context = self._create_schema_context(context, context_to_use)
-        
-        # Resolve the right_path to get the full schema path where it ends
-        # Strip predicates first (e.g., "foreignKeys[0]/entity" -> "foreignKeys/entity")
-        right_path_stripped = deref_eval._strip_predicates(right_path) if hasattr(deref_eval, '_strip_predicates') else right_path
-        full_schema_path = deref_eval.resolve_path_to_schema_location(right_path_stripped, field_schema_context)
-        
-        if full_schema_path:
-            # Create a context at the end location to get the leafref schema
-            end_schema_context = self._create_schema_context(context, full_schema_path)
-            leafref_path = deref_eval.get_leafref_path_from_schema("current()", end_schema_context)
-        else:
-            # Fallback: try with the field node context and the stripped path
-            leafref_path = deref_eval.get_leafref_path_from_schema(right_path_stripped, field_schema_context)
-        
-        if leafref_path:
-            return self._resolve_leafref(
-                deref_eval, leafref_path, path_value, context, evaluator, cache_key, right_path_stripped
-            )
-        
-        # If we still don't have a leafref path, try the fallback for entity names
-        if isinstance(path_value, str):
-            root_container = deref_eval._get_root_container_name()
-            if root_container:
-                entity_path = f"/{root_container}/entities/name"
-                result_tuple = deref_eval.find_node_by_leafref_path(entity_path, path_value, context)
-                if result_tuple:
-                    result, node_path = result_tuple
-                    return self._store_result_with_path(evaluator, result, node_path, cache_key)
-        
-        return self._cache_and_return(evaluator, None, arg_node)
-    
-    def _handle_node_navigation(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: BinaryOpNode,
-        left_result: dict, context: 'Context', cache_key: str,
-        context_path: list, original_context_path: list
-    ) -> 'JsonValue':
-        """Handle navigation from a node (left side is a dict)."""
-        left_node_context = self._find_node_context(
-            deref_eval, left_result, evaluator, original_context_path or context_path
-        )
-        
-        if left_node_context is None:
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        # Navigate from the node
-        nav_context = context.with_data(left_result, [])
-        right_node = arg_node.right
-        path_value, right_path = self._evaluate_right_side(
-            evaluator, deref_eval, right_node, nav_context
-        )
-        
-        if path_value is None or not right_path:
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        # Convert path for schema resolution
-        schema_path = self._normalize_path_for_schema(deref_eval, right_path)
-        schema_context = context.with_context_path(
-            left_node_context if left_node_context else context_path
-        )
-        
-        leafref_path = deref_eval.get_leafref_path_from_schema(schema_path, schema_context)
-        if leafref_path:
-            result_tuple = deref_eval.find_node_by_leafref_path(leafref_path, path_value, context)
-            if result_tuple:
-                result, node_path = result_tuple
-                return self._store_result_with_path(evaluator, result, node_path, cache_key)
-        
-        return self._cache_and_return(evaluator, None, arg_node)
-    
-    def _evaluate_right_side(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any,
-        right_node: Any, nav_context: 'Context'
-    ) -> tuple[Any, str | None]:
-        """Evaluate right side of binary op and return (value, path_string)."""
-        if isinstance(right_node, PathNode):
-            path_value = evaluator.path_evaluator.evaluate_path_node(right_node, nav_context)
-            if right_node.is_absolute:
-                right_path = '/' + '/'.join(seg.step for seg in right_node.segments)
-            else:
-                right_path = '/'.join(seg.step for seg in right_node.segments)
-            return path_value, right_path
-        
-        if isinstance(right_node, BinaryOpNode) and right_node.operator == '/':
-            path_parts = evaluator.path_evaluator.extract_path_from_binary_op(right_node)
-            if path_parts:
-                path_str = '/'.join(str(p) for p in path_parts if p)
-                path_value = evaluator.path_evaluator.evaluate_path(path_str, nav_context)
-                return path_value, path_str
-            return None, None
-        
-        # Try to evaluate as path
-        path_value = right_node.evaluate(evaluator, nav_context)
-        right_path = deref_eval.build_path_from_node(right_node)
-        return path_value, right_path
-    
-    def _normalize_path_for_schema(self, deref_eval: Any, path: str) -> str:
-        """Normalize path for schema resolution (convert ../ to ./)."""
-        if path.startswith('../'):
-            # Extract remaining path after .. using parser
-            steps, _, _ = deref_eval._parse_path_steps(path)
-            remaining_path = '/'.join(steps)
-            return './' + remaining_path if remaining_path else '.'
-        elif not path.startswith('./') and not path.startswith('/'):
-            return './' + path
-        return path
-    
-    def _handle_string_left_side(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: BinaryOpNode,
-        left_result: str, context: 'Context', cache_key: str,
-        context_path: list, original_context_path: list
-    ) -> 'JsonValue':
-        """Handle case where left side evaluates to a string."""
-        right_path = deref_eval.build_path_from_node(arg_node.right)
-        context_to_use = self._find_context_for_left_node(
-            evaluator, deref_eval, arg_node.left, context, context_path, original_context_path
-        )
-        
-        if not right_path or not context_to_use:
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        schema_context = self._create_schema_context(context, context_to_use)
-        leafref_path = deref_eval.get_leafref_path_from_schema(right_path, schema_context)
-        
-        if leafref_path:
-            return self._resolve_leafref(
-                deref_eval, leafref_path, left_result, context, evaluator, cache_key, right_path
-            )
-        
-        return self._cache_and_return(evaluator, None, arg_node)
-    
-    def _find_context_for_left_node(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any, left_node: Any,
-        context: 'Context', context_path: list, original_context_path: list
-    ) -> list:
-        """Find context path for left node of binary op."""
-        fallback = original_context_path if original_context_path else context_path
-        
-        if isinstance(left_node, FCN) and left_node.name == 'deref' and len(left_node.args) == 1:
-            inner_result = left_node.evaluate(evaluator, context)
-            if isinstance(inner_result, dict):
-                return self._find_node_context(deref_eval, inner_result, evaluator, fallback)
-            return fallback
-        
-        if isinstance(left_node, PathNode):
-            path_value = left_node.evaluate(evaluator, context)
-            if isinstance(path_value, dict):
-                return self._find_node_context(deref_eval, path_value, evaluator, fallback)
-            return fallback
-        
-        return fallback
-    
     def _handle_path_node(
         self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: PathNode,
         context: 'Context', cache_key: str, context_path: list, original_context_path: list
@@ -376,42 +147,8 @@ class DerefFunctionNode(FunctionCallNode):
         steps_str = '/'.join(seg.step for seg in arg_node.segments)
         path = '/' + steps_str if arg_node.is_absolute else steps_str
         
-        # Check if this is a leafref
-        leafref_path = deref_eval.get_leafref_path_from_schema(path, context)
-        if leafref_path:
-            path_value = arg_node.evaluate(evaluator, context)
-            if path_value is not None:
-                return self._resolve_leafref(
-                    deref_eval, leafref_path, path_value, context, evaluator, cache_key, path
-                )
-            return self._cache_and_return(evaluator, None, arg_node)
-        
-        # Not a leafref - evaluate path
-        path_value = arg_node.evaluate(evaluator, context)
-        
-        # If it's a node, return as-is
-        if isinstance(path_value, dict):
-            return self._cache_and_return(evaluator, path_value, arg_node)
-        
-        # Try to resolve string value as leafref
-        if isinstance(path_value, str) and (original_context_path or context_path):
-            context_to_use = original_context_path if original_context_path else context_path
-            if context_to_use:
-                schema_path = deref_eval.resolve_path_to_schema_location(path, context)
-                if schema_path:
-                    schema_node = deref_eval.find_schema_node(schema_path)
-                    if schema_node:
-                        from ...ast import YangLeafStmt
-                        if isinstance(schema_node, YangLeafStmt):
-                            type_obj = schema_node.type
-                            if type_obj and type_obj.name == 'leafref':
-                                leafref_path = getattr(type_obj, 'path', None)
-                                if leafref_path:
-                                    return self._resolve_leafref(
-                                        deref_eval, leafref_path, path_value, context, evaluator, cache_key, 'current()'
-                                    )
-        
-        # Fallback
+        # Use evaluate_deref() which validates leafref and handles resolution
+        # This is the single entry point for all deref() validation
         result = deref_eval.evaluate_deref(path, context)
         return self._cache_and_return(evaluator, result, arg_node)
     
@@ -457,18 +194,3 @@ class DerefFunctionNode(FunctionCallNode):
         result = deref_eval.evaluate_deref(path, context)
         return self._cache_and_return(evaluator, result, arg_node)
     
-    def _handle_other_node(
-        self, evaluator: 'XPathEvaluator', deref_eval: Any, arg_node: Any,
-        context: 'Context', cache_key: str
-    ) -> 'JsonValue':
-        """Handle deref() with other node types."""
-        if hasattr(arg_node, 'evaluate'):
-            value = arg_node.evaluate(evaluator, context)
-            if isinstance(value, dict):
-                return self._cache_and_return(evaluator, value, arg_node)
-            path = str(arg_node) if hasattr(arg_node, '__str__') else ''
-        else:
-            path = str(arg_node)
-        
-        result = deref_eval.evaluate_deref(path, context)
-        return self._cache_and_return(evaluator, result, arg_node)
