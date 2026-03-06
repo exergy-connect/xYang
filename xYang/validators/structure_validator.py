@@ -210,6 +210,23 @@ class StructureValidator:
                     f"List {list_stmt.name} has more than {list_stmt.max_elements} elements"
                 )
             
+            # Enforce list key uniqueness (YANG RFC 7950)
+            if list_stmt.key and isinstance(items, list):
+                key_parts = [k.strip() for k in list_stmt.key.split() if k.strip()]
+                if key_parts:
+                    seen_keys: List[tuple] = []
+                    for idx, item in enumerate(items):
+                        if not isinstance(item, dict):
+                            continue
+                        key_values = tuple(item.get(k) for k in key_parts)
+                        if key_values in seen_keys:
+                            self.errors.append(
+                                f"List {list_stmt.name} has duplicate key value(s) "
+                                f"{key_values} (key: {list_stmt.key})"
+                            )
+                            break
+                        seen_keys.append(key_values)
+            
             # Validate each item
             for item in items:
                 if isinstance(item, dict):
