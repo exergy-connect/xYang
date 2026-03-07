@@ -180,6 +180,20 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 ### Comparisons
 - ✅ `=`, `!=`, `<=`, `>=`, `<`, `>` - All comparison operators with proper type coercion
 
+### XPath 2.0-style additions
+xYang supports a small XPath 2.0–style extension so that **literal sequences** can appear on the right-hand side of equality, meaning “left equals any item in the sequence”:
+
+- **Literal sequence syntax**: A parenthesized, comma-separated list of string or number literals is parsed as a single expression that evaluates to a **list** of those values:
+  - `('integer', 'number')` → evaluates to `['integer', 'number']`
+  - `(1, 2, 3)` → evaluates to `[1, 2, 3]`
+  - Only **literals** are allowed inside the parentheses (no expressions or function calls). A single literal in parentheses, e.g. `('x')`, is also treated as a one-element sequence (a list).
+
+- **Equality with a sequence**: When the right-hand side of `=` is a list (e.g. from a literal sequence), the result is **true** if the left-hand side equals **any** element of the list. This matches the intended reading of expressions like:
+  - `(../../../fields[name = current()/field]/type) = ('integer', 'number')`  
+  → true when the referenced `type` is `'integer'` or `'number'`.
+
+Parsing rule: after `(`, if the next token is a string or number literal, the parser treats the construct as a literal sequence `( literal , literal , ... )`; otherwise it parses a normal parenthesized expression.
+
 ### Logical Operators
 - ✅ `or` - Logical OR
 - ✅ `and` - Logical AND

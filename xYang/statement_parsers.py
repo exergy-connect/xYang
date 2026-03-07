@@ -653,6 +653,8 @@ class StatementParsers:
                     self.parse_must(tokens, new_context)
                 elif tokens.peek() == 'description':
                     self.parse_description(tokens, new_context)
+                elif tokens.peek() == 'type':
+                    self.parse_type(tokens, new_context)
                 elif tokens.peek() == 'default':
                     if hasattr(context.current_parent, 'parent') and context.current_parent.parent:
                         # Try to find the target node and add default
@@ -885,6 +887,10 @@ class StatementParsers:
     def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
         """Apply refine modifications to a statement."""
         from .ast import YangMustStmt, YangLeafStmt, YangContainerStmt, YangListStmt
+        
+        # Apply refined type when target is a leaf
+        if getattr(refine, 'type', None) is not None and isinstance(stmt, YangLeafStmt):
+            stmt.type = refine.type
         
         # Apply must statements from refine
         for refine_stmt in refine.statements:

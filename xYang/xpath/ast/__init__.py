@@ -10,7 +10,7 @@ JsonValue = Union[dict[str, Any], list[Any], str, int, float, bool, None]
 
 from .base import XPathNode
 from .tokens import TokenType, Token
-from .literal import LiteralNode
+from .literal import LiteralNode, SequenceNode
 from .path import PathSegment, PathNode
 from .current import CurrentNode
 from .function import FunctionCallNode
@@ -23,6 +23,7 @@ __all__ = [
     'TokenType',
     'Token',
     'LiteralNode',
+    'SequenceNode',
     'PathSegment',
     'PathNode',
     'CurrentNode',

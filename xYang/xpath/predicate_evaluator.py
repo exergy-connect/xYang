@@ -5,7 +5,7 @@ Predicate evaluation logic for XPath expressions.
 from typing import Any, List
 
 from .ast import BinaryOpNode, LiteralNode, XPathNode
-from .utils import compare_equal
+from .utils import compare_equal, yang_bool
 from .context import Context
 
 
@@ -66,7 +66,16 @@ class PredicateEvaluator:
                     filtered.append(item)
             
             return filtered
-        
-        # For other predicate expressions (not simple comparisons), return items unchanged
-        # This matches the original behavior where non-comparison predicates were ignored
-        return items
+
+        # For any other predicate (e.g. count(...) > 7), evaluate per item and filter by truthiness
+        # so that expressions like entities[count(fields[type != 'array']) > 7] work in Phase 1 must checks
+        filtered = []
+        for item in items:
+            new_context = context.for_item(item)
+            try:
+                pred_result = predicate.evaluate(self.evaluator, new_context)
+                if yang_bool(pred_result):
+                    filtered.append(item)
+            except Exception:
+                pass  # Excluded when predicate raises
+        return filtered

@@ -101,8 +101,11 @@ def xpath_string(value: Any) -> str:
 
 def compare_equal(left: Any, right: Any) -> bool:
     """Compare two values for equality.
-    
-    In XPath, when comparing a node-set (list) to a value, returns True if any node equals the value.
+
+    - If either side is a list (node-set or XPath 2.0-style sequence): returns True
+      if the other value equals any element of the list. So
+      left = ('integer', 'number') is true when left equals 'integer' or 'number'.
+    - Otherwise: standard equality with type coercion for string/number/boolean.
     """
     # Handle None/missing values first - in XPath, empty sequences don't equal anything
     # This is consistent with comparison operators (<=, >=, etc.) which return False for None

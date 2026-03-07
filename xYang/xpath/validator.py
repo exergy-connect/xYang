@@ -9,7 +9,7 @@ features are detected.
 from typing import Set
 
 from .ast import (
-    XPathNode, LiteralNode, PathNode, CurrentNode,
+    XPathNode, LiteralNode, SequenceNode, PathNode, CurrentNode,
     FunctionCallNode, BinaryOpNode, UnaryOpNode
 )
 from ..errors import UnsupportedXPathError
@@ -99,6 +99,9 @@ class XPathValidator:
         # Validate based on node type
         if isinstance(node, LiteralNode):
             # Literals are always supported
+            pass
+        elif isinstance(node, SequenceNode):
+            # XPath 2.0-style literal sequence ('a', 'b') is supported
             pass
         elif isinstance(node, PathNode):
             # Path nodes are supported

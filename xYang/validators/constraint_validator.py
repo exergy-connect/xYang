@@ -39,17 +39,18 @@ class ConstraintValidator:
         """
         # Use root_data if provided, otherwise use data as root
         root = root_data if root_data is not None else data
-        
+        self._validation_root = root  # Keep full root for navigation in recursive calls (Phase 1)
+
         logger.info("Starting must statement validation, root keys: %s", list(root.keys()) if isinstance(root, dict) else "N/A")
-        
+
         # Create evaluator with root context
         # Note: Caches are cleared at YangValidator level, so each validation starts fresh
         evaluator = self.evaluator_factory(root, self.module, context_path=[])
-        
+
         # Store root data in evaluator for absolute path resolution
         if hasattr(evaluator, 'root_data'):
             evaluator.root_data = root
-        
+
         # Validate must statements recursively
         logger.info("Module has %d top-level statements", len(self.module.statements))
         for stmt in self.module.statements:
@@ -87,7 +88,11 @@ class ConstraintValidator:
         return current
     
     def _get_root_data(self, evaluator: XPathEvaluator, fallback: Dict[str, Any]) -> Dict[str, Any]:
-        """Get root_data from evaluator or use fallback."""
+        """Get root_data for navigation. Prefer validation root so recursive must validation
+        always navigates from the full tree (e.g. parent_path ['data-model'] from leaf
+        allow_unlimited_fields resolves correctly in Phase 1)."""
+        if getattr(self, '_validation_root', None) is not None:
+            return self._validation_root
         return evaluator.root_data if hasattr(evaluator, 'root_data') else fallback
     
     def _create_evaluator_context(
@@ -589,7 +594,16 @@ class ConstraintValidator:
                     actual_schema_node.name if hasattr(actual_schema_node, 'name') else type(actual_schema_node).__name__,
                     stmt.name
                 )
-            
+            # Use passed statement's must_statements if resolved node has none (Phase 1: ensure
+            # top-level leaves like allow_unlimited_fields are validated when resolution loses musts)
+            musts_to_eval = getattr(actual_schema_node, 'must_statements', None) or []
+            if not musts_to_eval and hasattr(stmt, 'must_statements') and stmt.must_statements:
+                musts_to_eval = stmt.must_statements
+                logger.debug(
+                    "Using passed statement must_statements for leaf %s (resolved node had none)",
+                    actual_schema_node.name
+                )
+
             # Check if field exists - need to check parent data, not current data
             # (current data might be the field value itself after navigation)
             parent_path = current_path[:-1] if len(current_path) > 0 else []
@@ -600,20 +614,20 @@ class ConstraintValidator:
             
             logger.debug(
                 "Validating leaf %s: field_exists=%s, mandatory=%s, has_must=%s, path=%s, resolved_schema_path=%s",
-                actual_schema_node.name, field_exists, actual_schema_node.mandatory, 
-                len(actual_schema_node.must_statements) > 0, current_path,
+                actual_schema_node.name, field_exists, actual_schema_node.mandatory,
+                len(musts_to_eval) > 0, current_path,
                 self._get_schema_path_for_node(actual_schema_node)
             )
-            
+
             # Skip validation if the field doesn't exist (optional fields)
             if not field_exists:
                 if not (actual_schema_node.mandatory or (hasattr(actual_schema_node, 'default') and actual_schema_node.default is not None)):
                     logger.debug("Skipping validation for optional missing field: %s", actual_schema_node.name)
                     return  # Skip validation for missing optional fields
-            
-            # Evaluate must constraints from the resolved schema node
-            logger.debug("Evaluating %d must constraints for leaf %s", len(actual_schema_node.must_statements), actual_schema_node.name)
-            for must in actual_schema_node.must_statements:
+
+            # Evaluate must constraints (from resolved node or passed statement fallback)
+            logger.debug("Evaluating %d must constraints for leaf %s", len(musts_to_eval), actual_schema_node.name)
+            for must in musts_to_eval:
                 # Create context for this evaluation
                 leaf_context = self._create_evaluator_context(current_path, root_data)
                 self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, leaf_context, actual_schema_node)

@@ -148,6 +148,7 @@ xYang implements exactly the XPath features required to correctly validate `meta
 - **Path navigation**: `../field`, `../../field`, absolute paths `/data-model/entities`
 - **Functions**: `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `bool()`
 - **Comparisons**: `=`, `!=`, `<=`, `>=`, `<`, `>`
+- **XPath 2.0-style**: literal sequence on RHS of `=`, e.g. `path = ('integer', 'number')` (true when left equals any item in the sequence)
 - **Logical operators**: `or`, `and`
 - **Filtering**: `[name = current()]`, `[type != 'array']`, `[id = current()]`, `[1]`
 - **String concatenation**: `+` operator

@@ -76,6 +76,29 @@ def test_comparison():
     assert evaluator.evaluate('. != 10', context) is True
 
 
+def test_xpath2_sequence_equality():
+    """Test XPath 2.0-style sequence on RHS of =: left equals any item in sequence."""
+    module = parse_yang_string("module test { }")
+
+    # type = 'integer' -> . = ('integer', 'number') is True
+    data = {"type": "integer"}
+    evaluator = XPathEvaluator(data, module, context_path=["type"])
+    context = create_context(data, ["type"])
+    assert evaluator.evaluate('. = ("integer", "number")', context) is True
+
+    # type = 'number' -> . = ('integer', 'number') is True
+    data = {"type": "number"}
+    evaluator = XPathEvaluator(data, module, context_path=["type"])
+    context = create_context(data, ["type"])
+    assert evaluator.evaluate('. = ("integer", "number")', context) is True
+
+    # type = 'string' -> . = ('integer', 'number') is False
+    data = {"type": "string"}
+    evaluator = XPathEvaluator(data, module, context_path=["type"])
+    context = create_context(data, ["type"])
+    assert evaluator.evaluate('. = ("integer", "number")', context) is False
+
+
 def test_logical_operators():
     """Test logical operators."""
     data = {"type": "date", "minDate": "2020-01-01", "maxDate": "2025-01-01"}

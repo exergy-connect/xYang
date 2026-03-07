@@ -2,10 +2,10 @@
 XPath expression tokenizer and parser.
 """
 
-from typing import List, Optional, Set
+from typing import Any, List, Optional, Set
 
 from .ast import (
-    Token, TokenType, XPathNode, LiteralNode, PathNode, CurrentNode,
+    Token, TokenType, XPathNode, LiteralNode, SequenceNode, PathNode, CurrentNode,
     FunctionCallNode, BinaryOpNode, UnaryOpNode
 )
 from ..errors import XPathSyntaxError
@@ -471,14 +471,46 @@ class XPathParser:
             self._consume()
             return self._parse_path(is_absolute=True)
 
-        # Parenthesized expressions
+        # Parenthesized expression or XPath 2.0 sequence of literals: ('a', 'b')
         if token.type == TokenType.PAREN_OPEN:
             self._consume(TokenType.PAREN_OPEN)
+            next_tok = self._current_token()
+            if next_tok.type in (TokenType.STRING, TokenType.NUMBER):
+                seq = self._parse_sequence_literal()
+                self._consume(TokenType.PAREN_CLOSE)
+                return SequenceNode(seq)
             expr = self._parse_expression()
             self._consume(TokenType.PAREN_CLOSE)
             return expr
 
         raise ValueError(f"Unexpected token: {token} at position {token.position}")
+
+    def _parse_sequence_literal(self) -> List[Any]:
+        """Parse a sequence of string/number literals (XPath 2.0 style). Returns a list of values."""
+        def consume_literal() -> Any:
+            t = self._current_token()
+            if t.type == TokenType.STRING:
+                return self._consume().value
+            if t.type == TokenType.NUMBER:
+                raw = self._consume().value
+                return float(raw) if '.' in raw else int(raw)
+            return None
+        values = []
+        first = consume_literal()
+        if first is None:
+            return values
+        values.append(first)
+        while self._current_token().type == TokenType.COMMA:
+            self._consume(TokenType.COMMA)
+            next_val = consume_literal()
+            if next_val is None:
+                raise XPathSyntaxError(
+                    "Expected string or number in sequence",
+                    position=self._current_token().position,
+                    expression=self._get_expression()
+                )
+            values.append(next_val)
+        return values
 
     def _parse_argument_list(self) -> List[XPathNode]:
         """Parse function argument list."""

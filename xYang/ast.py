@@ -114,6 +114,7 @@ class YangUsesStmt(YangStatement):
 class YangRefineStmt(YangStatement):
     """Refine statement - modifies nodes from a grouping when using it."""
     target_path: str = ""  # Path to the node being refined (e.g., "type", "required")
+    type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
 
 
 @dataclass
