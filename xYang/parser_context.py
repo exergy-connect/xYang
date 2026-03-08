@@ -11,7 +11,7 @@ from .errors import YangSyntaxError
 
 if TYPE_CHECKING:
     from .module import YangModule
-    from .ast import YangStatement
+    from .ast import YangStatement, YangStatementList
 
 
 class YangTokenType(Enum):
@@ -214,8 +214,8 @@ class TokenStream:
 class ParserContext:
     """Context for parsing, holds module and current state."""
     module: 'YangModule'
-    current_parent: Optional['YangStatement'] = None
-    
-    def push_parent(self, parent: 'YangStatement') -> 'ParserContext':
+    current_parent: 'YangStatementList'
+
+    def push_parent(self, parent: 'YangStatementList') -> 'ParserContext':
         """Create new context with updated parent."""
         return ParserContext(module=self.module, current_parent=parent)

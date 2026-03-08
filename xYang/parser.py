@@ -149,8 +149,8 @@ class YangParser:
         if not tokens.has_more() or tokens.peek() != 'module':
             raise tokens._make_error("Expected 'module' statement at start of file")
         
-        # Create context
-        context = ParserContext(module=module)
+        # Create context (module is the root statement list)
+        context = ParserContext(module=module, current_parent=module)
         
         # Parse module
         self.parsers.parse_module(tokens, context)

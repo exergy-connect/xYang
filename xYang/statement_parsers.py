@@ -13,6 +13,7 @@ from .xpath.validator import XPathValidator
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
+    from .ast import YangStatement
 
 
 class StatementParsers:
@@ -21,7 +22,11 @@ class StatementParsers:
     def __init__(self, registry):
         self.registry = registry
         self.xpath_validator = XPathValidator()
-    
+
+    def _add_to_parent_or_module(self, context: ParserContext, stmt: 'YangStatement') -> None:
+        """Add statement to current_parent.statements (module or nested statement)."""
+        context.current_parent.statements.append(stmt)
+
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
         tokens.consume_type(YangTokenType.MODULE)
@@ -88,10 +93,8 @@ class StatementParsers:
         """Parse description statement."""
         tokens.consume_type(YangTokenType.DESCRIPTION)
         desc = tokens.consume().strip('"\'')
-        if context.current_parent:
+        if hasattr(context.current_parent, 'description'):
             context.current_parent.description = desc
-        else:
-            context.module.description = desc
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -152,16 +155,7 @@ class StatementParsers:
                     raise tokens._make_error(f"Unknown statement in container '{container_name}': {tokens.peek()}")
             if tokens.has_more() and tokens.peek_type() == YangTokenType.RBRACE:
                 tokens.consume_type(YangTokenType.RBRACE)
-        # Add to parent if provided, otherwise to module
-        if context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(container_stmt)
-        else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(container_stmt)
-        
+        self._add_to_parent_or_module(context, container_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return container_stmt
 
@@ -179,72 +173,45 @@ class StatementParsers:
                 else:
                     raise tokens._make_error(f"Unknown statement in list '{list_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
-        # Add to parent if provided, otherwise to module
-        if context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(list_stmt)
-        else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(list_stmt)
-        
-        tokens.consume_if(';')
+        self._add_to_parent_or_module(context, list_stmt)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
         return list_stmt
-    
+
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
         """Parse leaf statement."""
-        tokens.consume('leaf')
+        tokens.consume_type(YangTokenType.LEAF)
         leaf_name = tokens.consume()
         leaf_stmt = YangLeafStmt(name=leaf_name)
         
-        if tokens.consume_if('{'):
+        if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(leaf_stmt)
-            while tokens.has_more() and tokens.peek() != '}':
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 handler = self.registry.get_handler(f"leaf:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
                 else:
                     raise tokens._make_error(f"Unknown statement in leaf '{leaf_name}': {tokens.peek()}")
-            tokens.consume('}')
-        
-        # Add to parent if provided, otherwise to module
-        if context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(leaf_stmt)
-        else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(leaf_stmt)
-        
-        tokens.consume_if(';')
+            tokens.consume_type(YangTokenType.RBRACE)
+        self._add_to_parent_or_module(context, leaf_stmt)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
         return leaf_stmt
-    
+
     def parse_leaf_list(self, tokens: TokenStream, context: ParserContext) -> YangLeafListStmt:
         """Parse leaf-list statement."""
-        tokens.consume('leaf-list')
+        tokens.consume_type(YangTokenType.LEAF_LIST)
         leaf_list_name = tokens.consume()
         leaf_list_stmt = YangLeafListStmt(name=leaf_list_name)
         
-        if tokens.consume_if('{'):
+        if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(leaf_list_stmt)
-            while tokens.has_more() and tokens.peek() != '}':
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 handler = self.registry.get_handler(f"leaf-list:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
                 else:
                     raise tokens._make_error(f"Unknown statement in leaf-list '{leaf_list_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
-        # Add to parent if provided, otherwise to module
-        if context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(leaf_list_stmt)
-        else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(leaf_list_stmt)
+        self._add_to_parent_or_module(context, leaf_list_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return leaf_list_stmt
 
@@ -630,14 +597,7 @@ class StatementParsers:
                 else:
                     raise tokens._make_error(f"Unknown statement in choice '{choice_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
-        if context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(choice_stmt)
-        else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(choice_stmt)
+        self._add_to_parent_or_module(context, choice_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return choice_stmt
     
@@ -669,14 +629,8 @@ class StatementParsers:
             tokens.consume_type(YangTokenType.RBRACE)
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.cases.append(case_stmt)
-        elif context.current_parent:
-            if not hasattr(context.current_parent, 'statements'):
-                context.current_parent.statements = []
-            context.current_parent.statements.append(case_stmt)
         else:
-            if not hasattr(context.module, 'statements'):
-                context.module.statements = []
-            context.module.statements.append(case_stmt)
+            self._add_to_parent_or_module(context, case_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return case_stmt
 

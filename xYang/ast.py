@@ -7,11 +7,40 @@ from dataclasses import dataclass, field
 
 
 @dataclass
-class YangStatement:
-    """Base class for all YANG statements."""
-    name: str
-    description: str = ""
+class YangStatementList:
+    """Base for nodes that contain a list of YANG statements (module body or statement body)."""
     statements: List['YangStatement'] = field(default_factory=list)
+
+    def find_statement(self, name: str) -> Optional['YangStatement']:
+        """Find a statement by name."""
+        for stmt in self.statements:
+            if stmt.name == name:
+                return stmt
+        return None
+
+    def get_all_leaves(self) -> List['YangLeafStmt']:
+        """Get all leaf statements recursively."""
+        leaves = []
+        for stmt in self.statements:
+            leaves.extend(self._collect_leaves(stmt))
+        return leaves
+
+    def _collect_leaves(self, stmt: 'YangStatement') -> List['YangLeafStmt']:
+        """Recursively collect leaf statements."""
+        leaves = []
+        if isinstance(stmt, YangLeafStmt):
+            leaves.append(stmt)
+        elif isinstance(stmt, (YangContainerStmt, YangListStmt)):
+            for child in stmt.statements:
+                leaves.extend(self._collect_leaves(child))
+        return leaves
+
+
+@dataclass
+class YangStatement(YangStatementList):
+    """Base class for all YANG statements."""
+    name: str = ""
+    description: str = ""
 
 
 
