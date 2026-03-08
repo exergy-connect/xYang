@@ -27,21 +27,25 @@ class StructureValidator:
         self.warnings: List[str] = []
     
     def validate(
-        self, 
-        data: Dict[str, Any], 
+        self,
+        data: Dict[str, Any],
         statements: List[YangStatement],
-        context_path: List[str] = None
+        context_path: List[str] = None,
+        root_data: Dict[str, Any] = None,
     ) -> None:
         """
         Validate data structure against statements.
-        
+
         Args:
             data: Data to validate
             statements: YANG statements to validate against
             context_path: Current path in data structure
+            root_data: Root data for XPath resolution (when expressions); defaults to data
         """
         if context_path is None:
             context_path = []
+        if root_data is None:
+            root_data = data
         
         # Collect all valid field names from statements (including choice cases)
         # IMPORTANT: Only collect field names from the statements passed to THIS validate() call.
@@ -52,22 +56,34 @@ class StructureValidator:
         # Only consider fields defined in the current context's statements
         choice_data = data if isinstance(data, dict) else {}
         for stmt in statements:
-            # Check when condition (AST set during YANG parsing; evaluate only)
+            # Check when condition (xpath_new AST; resolve via Visitor)
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is not None:
-                    evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                    from ..xpath.context import Context
-                    context = Context(
-                        data=data,
-                        context_path=context_path.copy() if context_path else [],
-                        original_context_path=context_path.copy() if context_path else [],
-                        original_data=data,
-                        root_data=data
-                    )
-                    if not evaluator.evaluate_ast(ast, context):
-                        continue
-            
+                    if hasattr(ast, 'accept'):
+                        from ..xpath_new import ResolverVisitor
+                        from ..xpath.utils import yang_bool
+                        visitor = ResolverVisitor(
+                            data, list(context_path) if context_path else [],
+                            root_data=root_data, module=self.module,
+                        )
+                        if not yang_bool(visitor.resolve(ast)):
+                            continue
+                    else:
+                        evaluator = self.evaluator_factory(
+                            data, self.module, context_path=context_path
+                        )
+                        from ..xpath.context import Context
+                        context = Context(
+                            data=data,
+                            context_path=context_path.copy() if context_path else [],
+                            original_context_path=context_path.copy() if context_path else [],
+                            original_data=data,
+                            root_data=data,
+                        )
+                        if not evaluator.evaluate_ast(ast, context):
+                            continue
+
             if isinstance(stmt, YangLeafStmt):
                 if hasattr(stmt, 'name'):
                     valid_field_names.add(stmt.name)
@@ -102,26 +118,38 @@ class StructureValidator:
         
         # Second pass: validate the data
         for stmt in statements:
-            # Check when condition (AST set during YANG parsing; evaluate only)
+            # Check when condition (xpath_new AST; resolve via Visitor)
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is not None:
-                    evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                    from ..xpath.context import Context
-                    context = Context(
-                        data=data,
-                        context_path=context_path.copy() if context_path else [],
-                        original_context_path=context_path.copy() if context_path else [],
-                        original_data=data,
-                        root_data=data
-                    )
-                    if not evaluator.evaluate_ast(ast, context):
-                        continue
+                    if hasattr(ast, 'accept'):
+                        from ..xpath_new import ResolverVisitor
+                        from ..xpath.utils import yang_bool
+                        visitor = ResolverVisitor(
+                            data, list(context_path) if context_path else [],
+                            root_data=root_data, module=self.module,
+                        )
+                        if not yang_bool(visitor.resolve(ast)):
+                            continue
+                    else:
+                        evaluator = self.evaluator_factory(
+                            data, self.module, context_path=context_path
+                        )
+                        from ..xpath.context import Context
+                        context = Context(
+                            data=data,
+                            context_path=context_path.copy() if context_path else [],
+                            original_context_path=context_path.copy() if context_path else [],
+                            original_data=data,
+                            root_data=data,
+                        )
+                        if not evaluator.evaluate_ast(ast, context):
+                            continue
             
             if isinstance(stmt, YangLeafStmt):
                 self._validate_leaf(data, stmt, context_path)
             elif isinstance(stmt, YangListStmt):
-                self._validate_list(data, stmt, context_path)
+                self._validate_list(data, stmt, context_path, root_data)
             elif isinstance(stmt, YangLeafListStmt):
                 self._validate_leaf_list(data, stmt)
             elif hasattr(stmt, 'statements'):
@@ -130,17 +158,19 @@ class StructureValidator:
                     new_path = context_path + [stmt.name] if hasattr(stmt, 'name') else context_path
                     child_statements = stmt.statements
                     self.validate(
-                        data[stmt.name], child_statements, context_path=new_path
+                        data[stmt.name], child_statements,
+                        context_path=new_path, root_data=root_data,
                     )
                 elif (isinstance(stmt, YangContainerStmt) and
                       hasattr(stmt, 'presence') and stmt.presence):
                     # Presence container - if present in data, validate it
                     if stmt.name in data:
                         new_path = (context_path + [stmt.name]
-                                     if hasattr(stmt, 'name') else context_path)
+                                    if hasattr(stmt, 'name') else context_path)
                         child_statements = stmt.statements
                         self.validate(
-                            data[stmt.name], child_statements, context_path=new_path
+                            data[stmt.name], child_statements,
+                            context_path=new_path, root_data=root_data,
                         )
         
         # Third pass: check for unknown fields (only if data is a dict)
@@ -149,7 +179,7 @@ class StructureValidator:
         if isinstance(data, dict):
             for field_name in data.keys():
                 if field_name not in valid_field_names:
-                    path_str = '/'.join(context_path) if context_path else 'root'
+                    path_str = '/'.join(str(p) for p in context_path) if context_path else 'root'
                     self.errors.append(
                         f"Unknown field '{field_name}' at path '{path_str}'. "
                         f"Field is not defined in the schema."
@@ -167,7 +197,11 @@ class StructureValidator:
                 pass
     
     def _validate_list(
-        self, data: Dict[str, Any], list_stmt: YangListStmt, context_path: List[str]
+        self,
+        data: Dict[str, Any],
+        list_stmt: YangListStmt,
+        context_path: List[str],
+        root_data: Dict[str, Any],
     ) -> None:
         """Validate a list."""
         if list_stmt.name in data:
@@ -206,13 +240,16 @@ class StructureValidator:
                         seen_keys.append(key_values)
             
             # Validate each item
-            for item in items:
+            for idx, item in enumerate(items):
                 if isinstance(item, dict):
-                    # Pass context path for nested validation
-                    item_path = (context_path + [list_stmt.name]
-                                  if context_path else [list_stmt.name])
+                    # Pass context path including index for XPath (e.g. when "../type")
+                    item_path = (context_path + [list_stmt.name, idx]
+                                 if context_path else [list_stmt.name, idx])
                     item_statements = list_stmt.statements
-                    self.validate(item, item_statements, context_path=item_path)
+                    self.validate(
+                        item, item_statements,
+                        context_path=item_path, root_data=root_data,
+                    )
     
     def _validate_leaf_list(self, data: Dict[str, Any], leaf_list: YangLeafListStmt) -> None:
         """Validate a leaf-list."""

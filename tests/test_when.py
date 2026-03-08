@@ -99,6 +99,76 @@ module test {
     # Should be valid - when condition false means container is optional
     assert is_valid
 
+    # When condition is false, item_type must not appear; if present it is invalid
+    data_with_item_type = {
+        "data": {
+            "type": "string",
+            "item_type": {
+                "primitive": "string"
+            }
+        }
+    }
+    is_valid_extra, errors_extra, _ = validator.validate(data_with_item_type)
+    assert not is_valid_extra, "item_type with type != 'array' should be invalid"
+    assert any("item_type" in str(e).lower() for e in errors_extra)
+
+
+def test_when_condition_empty_type_leaf():
+    """Test when condition based on a leaf with type empty (presence/absence)."""
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+
+  container data {
+    leaf enabled {
+      type empty;
+      description "Flag leaf - no value, only presence";
+    }
+    container optional_section {
+      when "../enabled";
+      description "Only present when enabled (type empty) is present";
+      leaf note {
+        type string;
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    validator = YangValidator(module)
+
+    # When enabled (empty leaf) is present, condition is true - optional_section valid
+    # Empty type in data: key present with value None; when "../enabled" must evaluate true
+    data_enabled = {
+        "data": {
+            "enabled": None,
+            "optional_section": {
+                "note": "enabled is set"
+            }
+        }
+    }
+    is_valid, errors, _ = validator.validate(data_enabled)
+    assert is_valid, errors
+
+    # When enabled is absent, condition is false - optional_section not in schema
+    data_disabled = {
+        "data": {}
+    }
+    is_valid, errors, _ = validator.validate(data_disabled)
+    assert is_valid, errors
+
+    # When enabled is absent but optional_section is present: invalid (unknown field)
+    data_extra = {
+        "data": {
+            "optional_section": {"note": "ignored"}
+        }
+    }
+    is_valid, errors, _ = validator.validate(data_extra)
+    assert not is_valid
+    assert any("optional_section" in e for e in errors)
+
 
 def test_when_with_xpath_evaluator():
     """Test that when conditions use XPath evaluator."""

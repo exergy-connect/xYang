@@ -126,22 +126,34 @@ class YangValidator:
             context_path = []
         
         for stmt in statements:
-            # Check when condition (AST set during YANG parsing; evaluate only)
+            # Check when condition (AST from xpath_new parser; resolve via Visitor)
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is None:
                     continue
-                evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                from .xpath.context import Context
-                context = Context(
-                    data=data,
-                    context_path=context_path.copy() if context_path else [],
-                    original_context_path=context_path.copy() if context_path else [],
-                    original_data=data,
-                    root_data=data
-                )
-                if not evaluator.evaluate_ast(ast, context):
-                    continue
+                if hasattr(ast, 'accept'):
+                    from .xpath_new import ResolverVisitor
+                    from .xpath.utils import yang_bool
+                    visitor = ResolverVisitor(
+                        data, list(context_path) if context_path else [],
+                        root_data=root_data, module=self.module,
+                    )
+                    if not yang_bool(visitor.resolve(ast)):
+                        continue
+                else:
+                    evaluator = self.evaluator_factory(
+                        data, self.module, context_path=context_path
+                    )
+                    from .xpath.context import Context
+                    context = Context(
+                        data=data,
+                        context_path=context_path.copy() if context_path else [],
+                        original_context_path=context_path.copy() if context_path else [],
+                        original_data=data,
+                        root_data=data,
+                    )
+                    if not evaluator.evaluate_ast(ast, context):
+                        continue
             
             if isinstance(stmt, YangLeafStmt):
                 # Validate leaf type

@@ -11,6 +11,7 @@ from .ast import (
     YangStatementWithMust,
 )
 from .xpath.validator import XPathValidator
+from .xpath_new import XPathParserNew
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -422,14 +423,18 @@ class StatementParsers:
             context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
-        """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
-        tokens.consume_type(YangTokenType.MUST)
+    def _parse_string_concatenation(self, tokens: TokenStream) -> str:
+        """Consume one or more STRING tokens with optional PLUS between; return concatenated string."""
         parts = [tokens.consume_type(YangTokenType.STRING)]
         while tokens.peek_type() == YangTokenType.PLUS:
             tokens.consume_type(YangTokenType.PLUS)
             parts.append(tokens.consume_type(YangTokenType.STRING))
-        expression = ''.join(parts)
+        return ''.join(parts)
+
+    def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
+        """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
+        tokens.consume_type(YangTokenType.MUST)
+        expression = self._parse_string_concatenation(tokens)
 
         ast = self.xpath_validator.validate(expression)
         
@@ -465,18 +470,14 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse when statement."""
+        """Parse when statement. Argument is string (with optional + concatenation). Uses xpath_new."""
         tokens.consume_type(YangTokenType.WHEN)
-        expr_parts = []
-        # When expression is typically one STRING token or multiple tokens until ; or {
-        while tokens.has_more() and tokens.peek_type() not in (YangTokenType.SEMICOLON, YangTokenType.LBRACE):
-            expr_parts.append(tokens.consume())
-        condition = ' '.join(expr_parts)
-        ast = self.xpath_validator.validate(condition)
+        condition = self._parse_string_concatenation(tokens)
+        parser_new = XPathParserNew(condition)
+        ast = parser_new.parse()
         when_stmt = YangWhenStmt(condition=condition, ast=ast)
-        if context.current_parent:
-            if hasattr(context.current_parent, 'when'):
-                context.current_parent.when = when_stmt
+        if context.current_parent and hasattr(context.current_parent, 'when'):
+            context.current_parent.when = when_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
