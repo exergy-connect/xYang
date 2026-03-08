@@ -7,13 +7,15 @@ from .parser_context import TokenStream, ParserContext, YangTokenType
 from .ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
-    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt
+    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
+    YangStatementWithMust,
 )
 from .xpath.validator import XPathValidator
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
     from .ast import YangStatement
+    from .module import YangModule
 
 
 class StatementParsers:
@@ -457,25 +459,10 @@ class StatementParsers:
                 else:
                     tokens.consume()
             tokens.consume_type(YangTokenType.RBRACE)
-        # Add to appropriate parent
-        # Note: For list statements, parse_list_must handles adding to must_statements
-        # So we only add here if not called from parse_list_must
-        if context.current_parent:
-            if isinstance(context.current_parent, YangLeafStmt):
-                context.current_parent.must_statements.append(must_stmt)
-            elif isinstance(context.current_parent, YangContainerStmt):
-                if not hasattr(context.current_parent, 'must_statements'):
-                    context.current_parent.must_statements = []
-                context.current_parent.must_statements.append(must_stmt)
-            elif isinstance(context.current_parent, YangLeafListStmt):
-                if not hasattr(context.current_parent, 'must_statements'):
-                    context.current_parent.must_statements = []
-                context.current_parent.must_statements.append(must_stmt)
-            elif isinstance(context.current_parent, YangRefineStmt):
-                # Must statements in refine are stored in statements list
-                context.current_parent.statements.append(must_stmt)
-            # For YangListStmt, parse_list_must handles adding to must_statements
-            # Don't add here to avoid duplication
+        # Add to appropriate parent (leaf, leaf-list, container, list, refine)
+        if isinstance(context.current_parent, YangStatementWithMust):
+            context.current_parent.must_statements.append(must_stmt)
+        # For YangListStmt, parse_list_must also appends; both paths are valid
         
         # Consume semicolon if present (optional for must statements in containers/lists)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -777,21 +764,16 @@ class StatementParsers:
     
     def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
         """Apply refine modifications to a statement."""
-        from .ast import YangMustStmt, YangLeafStmt, YangContainerStmt, YangListStmt
+        from .ast import YangLeafStmt, YangContainerStmt, YangListStmt
         
         # Apply refined type when target is a leaf
         if getattr(refine, 'type', None) is not None and isinstance(stmt, YangLeafStmt):
             stmt.type = refine.type
         
         # Apply must statements from refine
-        for refine_stmt in refine.statements:
-            if isinstance(refine_stmt, YangMustStmt):
-                # Initialize must_statements if it doesn't exist
-                if not hasattr(stmt, 'must_statements'):
-                    stmt.must_statements = []
-                if stmt.must_statements is None:
-                    stmt.must_statements = []
-                # Add the must statement from refine
-                stmt.must_statements.append(refine_stmt)
-            # Apply other refine modifications (default, description, etc.)
-            # This is a simplified implementation
+        for refine_stmt in refine.must_statements:
+            if not hasattr(stmt, 'must_statements'):
+                stmt.must_statements = []
+            if stmt.must_statements is None:
+                stmt.must_statements = []
+            stmt.must_statements.append(refine_stmt)

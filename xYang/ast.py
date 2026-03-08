@@ -43,6 +43,10 @@ class YangStatement(YangStatementList):
     description: str = ""
 
 
+@dataclass
+class YangStatementWithMust(YangStatement):
+    """Statement that can have must constraints (leaf, leaf-list, container, list)."""
+    must_statements: List['YangMustStmt'] = field(default_factory=list)
 
 
 @dataclass
@@ -66,40 +70,36 @@ class YangTypeStmt:
 
 
 @dataclass
-class YangContainerStmt(YangStatement):
+class YangContainerStmt(YangStatementWithMust):
     """Container statement."""
     presence: Optional[str] = None
     when: Optional['YangWhenStmt'] = None
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
 
 
 @dataclass
-class YangListStmt(YangStatement):
+class YangListStmt(YangStatementWithMust):
     """List statement."""
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
     when: Optional['YangWhenStmt'] = None
 
 
 @dataclass
-class YangLeafStmt(YangStatement):
+class YangLeafStmt(YangStatementWithMust):
     """Leaf statement."""
     type: Optional[YangTypeStmt] = None
     mandatory: bool = False
     default: Optional[Any] = None
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
     when: Optional['YangWhenStmt'] = None
 
 
 @dataclass
-class YangLeafListStmt(YangStatement):
+class YangLeafListStmt(YangStatementWithMust):
     """Leaf-list statement."""
     type: Optional[YangTypeStmt] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
 
 
 @dataclass
@@ -140,7 +140,7 @@ class YangUsesStmt(YangStatement):
 
 
 @dataclass
-class YangRefineStmt(YangStatement):
+class YangRefineStmt(YangStatementWithMust):
     """Refine statement - modifies nodes from a grouping when using it."""
     target_path: str = ""  # Path to the node being refined (e.g., "type", "required")
     type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
