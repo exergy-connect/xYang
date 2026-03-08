@@ -481,24 +481,21 @@ class ConstraintValidator:
             context_path
         )
         
-        try:
-            # Use pre-parsed AST if available to avoid double parsing
-            # YANG must statements should always have AST populated during parsing
-            ast = getattr(must_expr, 'ast', None)
-            if ast is None:
-                # AST should have been populated during YANG parsing - this indicates a bug
-                logger.warning(
-                    "Must statement AST not found for expression '%s' - will parse again. "
-                    "This should not happen if YANG was parsed correctly.",
-                    must_expr.expression if hasattr(must_expr, 'expression') else str(must_expr)
-                )
-            # Get raw value first to debug
-            raw_result = evaluator.evaluate_value(must_expr.expression, ast=ast, context=context)
-            result = evaluator.evaluate(must_expr.expression, ast=ast, context=context)
-            logger.info(
-                "Must constraint result for %s: %s (raw: %s, type: %s, expression: %s)",
-                field_name, result, raw_result, type(raw_result).__name__, must_expr.expression
+        ast = getattr(must_expr, 'ast', None)
+        if ast is None:
+            expr_str = must_expr.expression if hasattr(must_expr, 'expression') else str(must_expr)
+            self.errors.append(
+                f"Must constraint has no AST (expression not parsed during YANG parsing): {expr_str!r}"
             )
+            return
+        try:
+            result = evaluator.evaluate_ast(ast, context)
+            if logger.isEnabledFor(logging.DEBUG):
+                raw_result = evaluator.evaluate_value_ast(ast, context)
+                logger.debug(
+                    "Must constraint result for %s: %s (raw: %s, expression: %s)",
+                    field_name, result, raw_result, getattr(must_expr, 'expression', '')
+                )
             if not result:
                 # Use error_message if available, otherwise fall back to description, then generic message
                 base_error_msg = (

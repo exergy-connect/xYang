@@ -53,69 +53,72 @@ class XPathEvaluator:
         self.deref_evaluator = SchemaLeafrefResolver(self)
         self.predicate_evaluator = PredicateEvaluator(self)
 
+    def evaluate_ast(self, ast: XPathNode, context: Context) -> bool:
+        """
+        Evaluate a pre-parsed XPath AST and return boolean result.
+
+        Use this for YANG must/when expressions; they are parsed during YANG parsing
+        and only evaluated here. No parsing is done.
+        """
+        try:
+            result = ast.evaluate(self, context)
+            return yang_bool(result)
+        except XPathSyntaxError:
+            raise
+        except Exception as e:
+            from ..errors import XPathEvaluationError
+            raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
+
+    def evaluate_value_ast(self, ast: XPathNode, context: Context) -> JsonValue:
+        """Evaluate a pre-parsed XPath AST and return the raw value. No parsing."""
+        try:
+            return ast.evaluate(self, context)
+        except XPathSyntaxError:
+            raise
+        except Exception as e:
+            from ..errors import XPathEvaluationError
+            raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
+
     def evaluate(self, expression: str, context: Context, ast: Optional[XPathNode] = None) -> bool:
         """
         Evaluate an XPath expression and return boolean result.
-        
-        Args:
-            expression: The XPath expression string (used for error messages and caching if ast not provided)
-            context: Context for evaluation
-            ast: Optional pre-parsed AST node to reuse (avoids double parsing).
-                 If provided, expression string is only used for error messages.
+
+        For YANG must/when, prefer evaluate_ast(ast, context) with the AST
+        set during YANG parsing. This method supports fallback parsing when
+        ast is not provided (e.g. dynamically built expressions).
         """
         try:
             result = self.evaluate_value(expression, context, ast)
-            # Convert to boolean using yang_bool for proper XPath truthiness
-            from .utils import yang_bool
             return yang_bool(result)
         except XPathSyntaxError:
-            # Re-raise syntax errors
             raise
         except Exception as e:
-            # For other errors, raise a more specific exception
             from ..errors import XPathEvaluationError
             raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
 
     def evaluate_value(self, expression: str, context: Context, ast: Optional[XPathNode] = None) -> JsonValue:
         """
         Evaluate an XPath expression and return the raw value.
-        
-        Args:
-            expression: The XPath expression string (used for error messages and caching if ast not provided)
-            context: Context for evaluation
-            ast: Optional pre-parsed AST node to reuse (avoids double parsing).
-                 If provided, expression string is only used for error messages, not parsed again.
-        
-        Note:
-            YANG must/when statements have pre-parsed ASTs stored in their .ast attribute.
-            Always pass the AST when available to ensure expressions are only parsed once.
+
+        If ast is provided, only evaluation is performed (no parsing).
+        If ast is None, the expression is parsed then evaluated (fallback for dynamic expressions).
         """
         try:
-            # Use provided AST if available - this ensures YANG expressions are only parsed once
             if ast is not None:
                 return ast.evaluate(self, context)
-            
-            # AST not provided - parse expression (fallback for dynamically constructed expressions)
-            # Check cache first (only for simple expressions to avoid memory bloat)
             if len(expression) < 100 and expression in self._expression_cache:
                 ast = self._expression_cache[expression]
             else:
-                # Parse expression into AST
                 tokenizer = XPathTokenizer(expression)
                 tokens = tokenizer.tokenize()
                 parser = XPathParser(tokens, expression=expression)
                 ast = parser.parse()
-                # Cache only short expressions
                 if len(expression) < 100:
                     self._expression_cache[expression] = ast
-
-            # Evaluate AST
             return ast.evaluate(self, context)
         except XPathSyntaxError:
-            # Re-raise syntax errors
             raise
         except Exception as e:
-            # For other errors, raise a more specific exception
             from ..errors import XPathEvaluationError
             raise XPathEvaluationError(f"XPath evaluation failed: {e}") from e
 

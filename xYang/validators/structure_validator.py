@@ -52,33 +52,21 @@ class StructureValidator:
         # Only consider fields defined in the current context's statements
         choice_data = data if isinstance(data, dict) else {}
         for stmt in statements:
-            # Check when condition - skip if condition is false
+            # Check when condition (AST set during YANG parsing; evaluate only)
             if hasattr(stmt, 'when') and stmt.when:
-                evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                # Create context for evaluation
-                from ..xpath.context import Context
-                context = Context(
-                    data=data,
-                    context_path=context_path.copy() if context_path else [],
-                    original_context_path=context_path.copy() if context_path else [],
-                    original_data=data,
-                    root_data=data
-                )
-                # Use pre-parsed AST if available to avoid double parsing
-                # YANG when statements should always have AST populated during parsing
                 ast = getattr(stmt.when, 'ast', None)
-                if ast is None:
-                    # AST should have been populated during YANG parsing - this indicates a bug
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(
-                        "When statement AST not found for condition '%s' - will parse again. "
-                        "This should not happen if YANG was parsed correctly.",
-                        stmt.when.condition
+                if ast is not None:
+                    evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
+                    from ..xpath.context import Context
+                    context = Context(
+                        data=data,
+                        context_path=context_path.copy() if context_path else [],
+                        original_context_path=context_path.copy() if context_path else [],
+                        original_data=data,
+                        root_data=data
                     )
-                if not evaluator.evaluate(stmt.when.condition, ast=ast, context=context):
-                    # When condition is false, skip this statement
-                    continue
+                    if not evaluator.evaluate_ast(ast, context):
+                        continue
             
             if isinstance(stmt, YangLeafStmt):
                 if hasattr(stmt, 'name'):
@@ -114,31 +102,21 @@ class StructureValidator:
         
         # Second pass: validate the data
         for stmt in statements:
-            # Check when condition - skip if condition is false
+            # Check when condition (AST set during YANG parsing; evaluate only)
             if hasattr(stmt, 'when') and stmt.when:
-                evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
-                # Create context for evaluation
-                from ..xpath.context import Context
-                context = Context(
-                    data=data,
-                    context_path=context_path.copy() if context_path else [],
-                    original_context_path=context_path.copy() if context_path else [],
-                    original_data=data,
-                    root_data=data
-                )
-                # Use pre-parsed AST if available to avoid double parsing
                 ast = getattr(stmt.when, 'ast', None)
-                if ast is None:
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(
-                        "When statement AST not found for condition '%s' - will parse again. "
-                        "This should not happen if YANG was parsed correctly.",
-                        stmt.when.condition
+                if ast is not None:
+                    evaluator = self.evaluator_factory(data, self.module, context_path=context_path)
+                    from ..xpath.context import Context
+                    context = Context(
+                        data=data,
+                        context_path=context_path.copy() if context_path else [],
+                        original_context_path=context_path.copy() if context_path else [],
+                        original_data=data,
+                        root_data=data
                     )
-                if not evaluator.evaluate(stmt.when.condition, ast=ast, context=context):
-                    # When condition is false, skip this statement
-                    continue
+                    if not evaluator.evaluate_ast(ast, context):
+                        continue
             
             if isinstance(stmt, YangLeafStmt):
                 self._validate_leaf(data, stmt, context_path)

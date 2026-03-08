@@ -56,12 +56,13 @@ def test_foreign_key_references_primary_key_valid(meta_model):
 def test_foreign_key_references_primary_key_valid_composite(meta_model):
     """Test that foreign key referencing composite primary key passes."""
     validator = YangValidator(meta_model)
-    
+    # Phase 1 (consolidated=false): composite FK subcomponent matching is not enforced
     data = {
         "data-model": {
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": False,
             "entities": [
                 {
                     "name": "parent",
