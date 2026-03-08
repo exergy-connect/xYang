@@ -2,15 +2,20 @@
 Path evaluation logic for XPath expressions.
 """
 
-from typing import Any, List, Optional
+from typing import Any, List, Optional, Union
 
-from .ast import BinaryOpNode, LiteralNode, PathNode
+from .ast import BinaryOpNode, LiteralNode, PathNode, PathSegment, CurrentNode
+from ..ast import YangLeafStmt, YangContainerStmt, YangListStmt, YangChoiceStmt
 from .parser import XPathTokenizer, XPathParser
 from .context import Context
 
 
 class PathEvaluator:
-    """Handles path evaluation in XPath expressions."""
+    """Handles path evaluation in XPath expressions.
+
+    Path strings are parsed once into an AST (PathNode), then evaluation walks
+    the AST only; no re-parsing of path parts or predicates.
+    """
     
     def __init__(self, evaluator: Any):
         """Initialize path evaluator with reference to main evaluator.
@@ -19,6 +24,7 @@ class PathEvaluator:
             evaluator: The main XPathEvaluator instance
         """
         self.evaluator = evaluator
+        self._path_ast_cache: dict = {}  # path_str -> PathNode/CurrentNode, for parse-once
     
     
     
@@ -161,307 +167,47 @@ class PathEvaluator:
                         statements = stmt.statements
                         break
         return False
-    
-    def evaluate_path(self, path: str, context: Context) -> Any:
-        """Evaluate a path expression.
-        
-        Args:
-            path: Path expression to evaluate
-            context: Context for evaluation
-        """
-        # Handle current node - but distinguish between . and current()
-        if path == 'current()':
-            # Pass evaluator for per-evaluator caching (thread safety)
-            return context.current(self.evaluator)
-        if path == '.':
-            # . means the current context node/value
-            # If data is a primitive value, return it directly
-            if isinstance(context.data, (str, int, float, bool)):
-                return context.data
-            # If data is a dict and context_path is empty, check if it's a wrapped value
-            if isinstance(context.data, dict) and not context.context_path:
-                # If it's a wrapped value (from predicate evaluator), return the value
-                if 'value' in context.data and len(context.data) == 1:
-                    return context.data['value']
-                return context.data
-            # Get value from current context path or fallback to current()
-            # Pass evaluator for per-evaluator caching (thread safety)
-            return self.get_path_value(context.context_path, context) if context.context_path else context.current(self.evaluator)
-        
-        # Handle relative paths with ..
-        if path.startswith('../'):
-            return self.evaluate_relative_path(path, context)
-        
-        # Handle absolute paths
-        if path.startswith('/'):
-            # For absolute paths, always use evaluate_absolute_path which handles predicate_context
-            # This ensures relative paths in predicates (like ../child_fk) resolve correctly
-            return self.evaluate_absolute_path(path, context)
-        
-        # Simple field access - try direct access first, then build path from context
-        if '/' not in path:
-            # Check if path has a predicate (e.g., "foreignKeys[0]")
-            if '[' in path and ']' in path:
-                bracket_start = path.find('[')
-                bracket_end = path.find(']')
-                base_field = path[:bracket_start]
-                predicate_str = path[bracket_start+1:bracket_end]
-                # First, try to access the field directly from context.data
-                if isinstance(context.data, dict) and base_field in context.data:
-                    value = context.data[base_field]
-                    if isinstance(value, list):
-                        # Handle numeric predicate (e.g., [0], [1]) as direct index
-                        if predicate_str.isdigit():
-                            idx = int(predicate_str)
-                            # XPath uses 1-based indexing, but we'll support 0-based for convenience
-                            if idx == 0:
-                                return value[0] if len(value) > 0 else None
-                            elif 1 <= idx <= len(value):
-                                return value[idx - 1]
-                            return None
-                        # For non-numeric predicates, parse and evaluate
-                        from .parser import XPathTokenizer, XPathParser
-                        full_predicate = '[' + predicate_str + ']'
-                        tokenizer = XPathTokenizer(full_predicate)
-                        tokens = tokenizer.tokenize()
-                        parser = XPathParser(tokens, full_predicate)
-                        predicate_ast = parser.parse()
-                        # Apply predicate to filter the list
-                        filtered = self.evaluator.predicate_evaluator.apply_predicate(value, predicate_ast, context)
-                        if isinstance(filtered, list) and len(filtered) > 0:
-                            return filtered[0]
-                        return filtered if filtered is not None else None
-            # First, try to access the field directly from context.data
-            # This handles the case where context.data is set to a list item (e.g., entity dict)
-            if isinstance(context.data, dict) and path in context.data:
-                return context.data[path]
-            # Fall back to building path from context
-            # Parse path into parts to handle multi-segment paths
-            parts = self._parse_path_parts(path)
-            if parts:
-                # Try direct access for first part
-                first_part = parts[0]
-                if isinstance(context.data, dict) and first_part in context.data:
-                    # Start from current data and navigate remaining parts
-                    current = context.data[first_part]
-                    for part in parts[1:]:
-                        if isinstance(current, dict) and part in current:
-                            current = current[part]
-                        elif isinstance(current, list):
-                            # Handle list navigation
-                            if part.isdigit():
-                                idx = int(part)
-                                if 0 <= idx < len(current):
-                                    current = current[idx]
-                                else:
-                                    return None
-                            else:
-                                # Collect from all items
-                                collected = []
-                                for item in current:
-                                    if isinstance(item, dict) and part in item:
-                                        value = item[part]
-                                        if isinstance(value, list):
-                                            collected.extend(value)
-                                        else:
-                                            collected.append(value)
-                                current = collected if len(collected) > 1 else (collected[0] if collected else None)
-                                if current is None:
-                                    return None
-                        else:
-                            return None
-                    return current
-            full_path = list(context.context_path) + parts if parts else [path]
-            return self.get_path_value(full_path, context)
-        
-        # Path with slashes - try direct access first for first part
-        # Parse path parts, handling predicates that may contain '/' characters
-        parts = self._parse_path_parts(path)
-        if parts:
-            # Extract base field name (without predicate) for first part
-            first_part = parts[0]
-            base_first_part = first_part.split('[')[0] if '[' in first_part else first_part
-            if isinstance(context.data, dict) and base_first_part in context.data:
-                # Start from current data and navigate remaining parts
-                current = context.data[base_first_part]
-                # Handle predicate on first part if present
-                if '[' in first_part and ']' in first_part:
-                    bracket_start = first_part.find('[')
-                    bracket_end = first_part.find(']')
-                    predicate_content = first_part[bracket_start+1:bracket_end]
-                    if isinstance(current, list):
-                        # Handle numeric predicate as direct index
-                        if predicate_content.isdigit():
-                            idx = int(predicate_content)
-                            # XPath uses 1-based indexing, but we'll support 0-based for convenience
-                            if idx == 0:
-                                current = current[0] if len(current) > 0 else None
-                            elif 1 <= idx <= len(current):
-                                current = current[idx - 1]
-                            else:
-                                return None
-                        else:
-                            # For non-numeric predicates, parse and evaluate
-                            from .parser import XPathTokenizer, XPathParser
-                            predicate_str = '[' + predicate_content + ']'
-                            tokenizer = XPathTokenizer(predicate_str)
-                            tokens = tokenizer.tokenize()
-                            parser = XPathParser(tokens, predicate_str)
-                            predicate_ast = parser.parse()
-                            filtered = self.evaluator.predicate_evaluator.apply_predicate(current, predicate_ast, context)
-                            if isinstance(filtered, list) and len(filtered) > 0:
-                                current = filtered[0]
-                            elif filtered is not None:
-                                current = filtered
-                            else:
-                                return None
-                # Navigate remaining parts
-                for part in parts[1:]:
-                    base_part = part.split('[')[0] if '[' in part else part
-                    if isinstance(current, dict) and base_part in current:
-                        current = current[base_part]
-                        # Handle predicate if present
-                        if '[' in part and ']' in part:
-                            bracket_start = part.find('[')
-                            bracket_end = part.find(']')
-                            predicate_content = part[bracket_start+1:bracket_end]
-                            if isinstance(current, list):
-                                # Handle numeric predicate as direct index
-                                if predicate_content.isdigit():
-                                    idx = int(predicate_content)
-                                    if idx == 0:
-                                        current = current[0] if len(current) > 0 else None
-                                    elif 1 <= idx <= len(current):
-                                        current = current[idx - 1]
-                                    else:
-                                        return None
-                                else:
-                                    # For non-numeric predicates, parse and evaluate
-                                    from .parser import XPathTokenizer, XPathParser
-                                    predicate_str = '[' + predicate_content + ']'
-                                    tokenizer = XPathTokenizer(predicate_str)
-                                    tokens = tokenizer.tokenize()
-                                    parser = XPathParser(tokens, predicate_str)
-                                    predicate_ast = parser.parse()
-                                    filtered = self.evaluator.predicate_evaluator.apply_predicate(current, predicate_ast, context)
-                                    if isinstance(filtered, list) and len(filtered) > 0:
-                                        current = filtered[0]
-                                    elif filtered is not None:
-                                        current = filtered
-                                    else:
-                                        return None
-                    elif isinstance(current, list) and part.isdigit():
-                        idx = int(part)
-                        if 0 <= idx < len(current):
-                            current = current[idx]
-                        else:
-                            return None
-                    else:
-                        return None
-                return current
-        # Fall back to building path from context
-        return self.get_path_value(list(context.context_path) + parts, context)
-    
-    def evaluate_relative_path(self, path: str, context: Context) -> Any:
-        """Evaluate a relative path like ../field or ../../field.
-        
-        Args:
-            path: Relative path to evaluate
-            context: Context for evaluation
-        """
-        # Parse path parts, handling predicates that may contain '/' characters
-        parts = self._parse_path_parts(path)
-        up_levels = sum(1 for p in parts if p == '..')
-        field_parts = [p for p in parts if p and p != '..']
-        
-        # Use original_context_path if context_path is empty (e.g., in predicates)
-        # This ensures relative paths in predicates work from the original constraint location
-        path_to_use = context.context_path if context.context_path else context.original_context_path
-        context_len = len(path_to_use) if path_to_use else 0
-        
-        # Navigate up the context path
-        if up_levels <= context_len:
-            # When navigating from a list item context, we need to use root_data
-            # because the path is relative to the context path, not the current data
-            # Use root_data for navigation when we have a context path
-            nav_context = context
-            if context_len > 0 and isinstance(context.root_data, dict):
-                nav_context = context.with_data(context.root_data, path_to_use)
-            
-            # Try going up the specified number of levels
-            new_path = self._go_up_context_path(path_to_use, up_levels)
-            
-            # If we went past the root (empty path), we need to handle it specially
-            # In YANG, when you go up from the root, you stay at the root
-            # So if new_path is empty but we have field_parts, try accessing from root
-            if not new_path:
-                if field_parts:
-                    # We're at root level, try accessing field directly from root_data
-                    result = self.get_path_value(field_parts, nav_context)
-                    # If that didn't work and root_data has a single top-level key (like 'data-model'),
-                    # try accessing from that key
-                    if result is None and isinstance(context.root_data, dict) and len(context.root_data) == 1:
-                        top_level_key = list(context.root_data.keys())[0]
-                        result = self.get_path_value([top_level_key] + field_parts, nav_context)
-                else:
-                    # No field parts and empty path - we're at root
-                    result = context.root_data
-            else:
-                result = self.get_path_value(new_path + field_parts, nav_context)
-            
-            # If that didn't work, try two fallback strategies:
-            # 1. Try going up one more semantic level by removing the list name
-            #    (YANG semantics: .. from list item goes to parent of list, not the list itself)
-            if result is None and field_parts and len(new_path) > len(field_parts):
-                # new_path includes field_parts at the end, so we need to remove field_parts first
-                # to get the base path, then remove the list name, then re-add field_parts
-                base_path = new_path[:-len(field_parts)] if len(field_parts) > 0 else new_path
-                if len(base_path) > 0 and isinstance(base_path[-1], str):
-                    # Remove the list name and re-add field_parts
-                    new_path_alt = base_path[:-1] + field_parts
-                    result_alt = self.get_path_value(new_path_alt, nav_context)
-                    if result_alt is not None:
-                        return result_alt
-            
-            # 2. Try going up fewer levels (in case we went up too far)
-            # But only if the first fallback didn't work and we're sure we need to go up less
-            # (Don't try this if we already tried removing the list name)
-            if result is None and field_parts and up_levels > 1:
-                # Only try going up one less level, not all the way down to 0
-                # This prevents finding wrong paths that happen to exist
-                alt_levels = up_levels - 1
-                new_path_alt = self._go_up_context_path(path_to_use, alt_levels) + field_parts
-                result_alt = self.get_path_value(new_path_alt, nav_context)
-                # Only use this result if it's a list (for field access) or matches expected type
-                if result_alt is not None:
-                    return result_alt
-            
-            return result
-        
+
+    def _parse_path_expression(self, path: str) -> Any:
+        """Parse a path string once into an AST (PathNode or CurrentNode)."""
+        if len(path) < 80 and path in self._path_ast_cache:
+            return self._path_ast_cache[path]
+        try:
+            tokenizer = XPathTokenizer(path)
+            tokens = tokenizer.tokenize()
+            parser = XPathParser(tokens, expression=path)
+            node = parser.parse()
+            if len(path) < 80:
+                self._path_ast_cache[path] = node
+            return node
+        except Exception:
+            return None
+
+    def _evaluate_path_ast(self, node: Any, context: Context) -> Any:
+        """Evaluate a path AST node (PathNode or CurrentNode) without re-parsing."""
+        if isinstance(node, PathNode):
+            return self.evaluate_path_node(node, context)
+        if isinstance(node, CurrentNode):
+            return node.evaluate(self.evaluator, context)
+        if node is not None and hasattr(node, 'evaluate'):
+            return node.evaluate(self.evaluator, context)
         return None
-    
+
+    def evaluate_path(self, path: str, context: Context) -> Any:
+        """Evaluate a path expression. Parses the path once, then walks the AST."""
+        node = self._parse_path_expression(path)
+        if node is None:
+            return None
+        return self._evaluate_path_ast(node, context)
+    def evaluate_relative_path(self, path: str, context: Context) -> Any:
+        """Evaluate a relative path. Parses once, then walks AST."""
+        node = self._parse_path_expression(path)
+        return self._evaluate_path_ast(node, context) if node is not None else None
+
     def evaluate_absolute_path(self, path: str, context: Context) -> Any:
-        """Evaluate an absolute path like /data-model/entities.
-        
-        Args:
-            path: Absolute path to evaluate
-            context: Context for evaluation
-            
-        Note:
-            When evaluating absolute paths, we navigate from root_data but preserve
-            the original_context_path and original_data for current() function evaluation
-            and relative paths in predicates. The nav_context preserves these original values.
-        """
-        # Parse path parts, handling predicates that may contain '/' characters
-        parts = self._parse_path_parts(path.lstrip('/'))
-        # Create navigation context from root_data, preserving original context for current()
-        # and relative paths in predicates. We need to preserve original_context_path so that
-        # relative paths like ../child_fk in predicates can resolve correctly.
-        nav_context = context.with_data(context.root_data, [])
-        # original_context_path and original_data are preserved by with_data()
-        # But we also need to ensure the context_path is set correctly for relative paths in predicates
-        # The predicate_context should use the original context_path for relative path resolution
-        return self.get_path_value(parts, nav_context, predicate_context=context)
+        """Evaluate an absolute path. Parses once (path must start with /), then walks AST."""
+        node = self._parse_path_expression(path) if path else None
+        return self._evaluate_path_ast(node, context) if node is not None else None
     
     def _parse_path_parts(self, path: str) -> List[str]:
         """Parse a path string into parts, handling predicates that may contain '/' characters.
@@ -523,16 +269,16 @@ class PathEvaluator:
                 len(parts) > 0 and isinstance(context.root_data, dict)):
             return False
         
-        # Check if path starts with context path prefix
+        # Check if path starts with context path prefix (compare step names)
         min_len = min(len(parts), len(context_path))
-        path_matches_context = all(parts[i] == context_path[i] for i in range(min_len))
+        path_matches_context = all(
+            self._step_from_part(parts[i]) == context_path[i] for i in range(min_len)
+        )
         if not path_matches_context:
             return False
-        
-        # Check if we can navigate from current data
-        first_part = parts[0] if parts else None
-        return not (first_part and isinstance(first_part, str) and
-                   isinstance(context.data, dict) and first_part in context.data)
+        first_step = self._step_from_part(parts[0]) if parts else None
+        return not (first_step and isinstance(first_step, str) and
+                    isinstance(context.data, dict) and first_step in context.data)
     
     def _adjust_parts_for_root_data(self, parts: List, context_path: List) -> List:
         """Adjust path parts when navigating from root_data.
@@ -548,148 +294,139 @@ class PathEvaluator:
             return parts[len(context_path):]
         return parts
     
+    def _step_from_part(self, part: Any) -> str:
+        """Return the step name for navigation (string)."""
+        return part.step if isinstance(part, PathSegment) else part
+
     def get_path_value(self, parts: List, context: Context, predicate_context: Context = None) -> Any:
         """Get value at path in data structure.
-        
+
         Args:
-            parts: List of path parts (strings for dict keys, ints for list indices)
+            parts: List of path parts: strings (step names), ints (list indices),
+                   or PathSegment (step + optional predicate AST). No re-parsing.
             context: Context for evaluation
-            predicate_context: Optional context for predicate evaluation (preserves original context for relative paths)
+            predicate_context: Optional context for predicate evaluation
         """
-        # Use predicate_context if provided, otherwise use context for predicates
-        # This ensures relative paths in predicates (like ../child_fk) resolve correctly
         pred_ctx = predicate_context if predicate_context is not None else context
         context_path = context.context_path
         current = context.data
-        
-        # Special case: when in a list item context and path was built from context_path,
-        # navigate from root_data instead of context.data
+
         if self._should_use_root_data(parts, context):
             current = context.root_data
             parts = self._adjust_parts_for_root_data(parts, context_path)
-        elif (context_path and 
-              isinstance(context.data, dict) and 
+        elif (context_path and
+              isinstance(context.data, dict) and
               context.data is not context.root_data and
-              len(parts) > 0 and 
-              isinstance(parts[0], str)):
-            # If we're in a list item context and the path doesn't start with context_path,
-            # check if we can access it directly from context.data first
-            # Only navigate from root_data if the field is not in context.data
-            if (len(parts) > 0 and len(context_path) > 0 and parts[0] == context_path[0]):
-                # Path starts with context_path, navigate from root_data
+              len(parts) > 0):
+            first_step = self._step_from_part(parts[0])
+            if isinstance(first_step, str) and first_step and (
+                    (len(context_path) > 0 and first_step == context_path[0]) or
+                    first_step not in context.data):
                 current = context.root_data
-            elif parts[0] not in context.data:
-                # Field not in context.data, try navigating from root_data
-                current = context.root_data
-            # Otherwise, use context.data (field exists in current context)
-        
-        for part in parts:
-            # Handle integer list indices
+
+        for i, part in enumerate(parts):
             if isinstance(part, int):
                 if isinstance(current, list) and 0 <= part < len(current):
                     current = current[part]
                 else:
                     return None
                 continue
-            
-            # Handle predicates in path parts using AST parser
-            if isinstance(part, str) and '[' in part:
-                # Parse the path part as a path expression to check if it has a predicate
-                tokenizer = XPathTokenizer(part)
-                tokens = tokenizer.tokenize()
-                parser = XPathParser(tokens, part)
-                # Try to parse as a path expression (which handles predicates)
-                parsed_node = parser.parse()
-                
-                # Check if this is a PathNode with segment predicates
-                if isinstance(parsed_node, PathNode):
-                    # Check if first segment has a predicate
-                    if parsed_node.segments and parsed_node.segments[0].predicate is not None:
-                        # Extract base part (first step) and use predicate AST node directly
-                        base_part = parsed_node.segments[0].step
-                        
-                        if isinstance(current, dict) and base_part in current:
-                            value = current[base_part]
-                            if isinstance(value, list):
-                                # Apply predicate AST node directly (no string conversion)
-                                # Use predicate_context for relative paths in predicates
-                                filtered = self.evaluator.predicate_evaluator.apply_predicate(value, parsed_node.segments[0].predicate, pred_ctx)
-                                # If there are more parts to navigate, continue from the filtered result
-                                if filtered is not None and parts.index(part) < len(parts) - 1:
-                                    # Get remaining parts after this one
-                                    remaining_parts = parts[parts.index(part) + 1:]
-                                    # If filtered is a list, navigate from first item
-                                    if isinstance(filtered, list) and len(filtered) > 0:
-                                        # Update current to the first filtered item and continue loop
-                                        current = filtered[0]
-                                        # Continue to next iteration to process remaining parts
-                                        continue
-                                    # If filtered is a single item, navigate from it
-                                    elif filtered is not None:
-                                        current = filtered
-                                        # Continue to next iteration to process remaining parts
-                                        continue
-                                # No more parts, return the filtered result
-                                return filtered
-                            # Value is not a list, return it as-is
-                            return value
-                        # Base part not found in current dict
-                        return None
-                    # No predicate in first segment
-                    return None
-            
-            # Navigate through dict or list
+
+            step = self._step_from_part(part)
+            step_pred = part.predicate if isinstance(part, PathSegment) else None
+
             if isinstance(current, dict):
-                if part in current:
-                    current = current[part]
+                if step in current:
+                    value = current[step]
+                    if step_pred is not None and isinstance(value, list):
+                        filtered = self.evaluator.predicate_evaluator.apply_predicate(
+                            value, step_pred, pred_ctx)
+                        if filtered is None or (isinstance(filtered, list) and len(filtered) == 0):
+                            return None
+                        current = filtered[0] if isinstance(filtered, list) else filtered
+                        if i < len(parts) - 1:
+                            continue
+                        if self._is_empty_type_leaf_at_path(parts[:i + 1]):
+                            return True
+                        return current
+                    current = value
+                    continue
                 else:
-                    # Path not found - try to get default value from schema
-                    # This handles YANG default values when a leaf is not present in data
-                    default_value = self._get_default_value_from_schema_path(parts[:parts.index(part)+1] if isinstance(parts, list) and part in parts else parts + [part])
+                    schema_path = [self._step_from_part(p) for p in parts[:i + 1]
+                                 if not isinstance(p, int)]
+                    default_value = self._get_default_value_from_schema_path(schema_path)
                     if default_value is not None:
                         return default_value
                     return None
             elif isinstance(current, list):
-                # When navigating into a list with a field name (not an index),
-                # collect values from all items in the list (XPath semantics)
-                if part.isdigit():
-                    # Numeric index - access specific item
-                    idx = int(part)
+                if isinstance(step, str) and step.isdigit():
+                    idx = int(step)
                     if 0 <= idx < len(current):
                         current = current[idx]
                     else:
                         return None
                 else:
-                    # Field name - collect from all items
                     collected = []
                     for item in current:
-                        if isinstance(item, dict) and part in item:
-                            value = item[part]
+                        if isinstance(item, dict) and step in item:
+                            value = item[step]
                             if isinstance(value, list):
                                 collected.extend(value)
                             else:
                                 collected.append(value)
-                    # If we have remaining parts, continue navigation from collected items
-                    if collected and parts.index(part) < len(parts) - 1:
-                        # For now, if we have multiple values and more parts, use first value
-                        # This is a simplification - full XPath would handle this differently
-                        if len(collected) == 1:
-                            current = collected[0]
-                        elif collected:
-                            # Multiple values - in XPath, this would create a node-set
-                            # For now, use first value for navigation
-                            current = collected[0]
-                        else:
-                            return None
+                    if collected and i < len(parts) - 1:
+                        current = collected[0] if len(collected) == 1 else collected[0]
                     else:
-                        # No more parts - return collected values
-                        return collected if len(collected) > 1 else (collected[0] if collected else None)
+                        result = collected if len(collected) > 1 else (collected[0] if collected else None)
+                        if result is not None and self._is_empty_type_leaf_at_path(parts[:i + 1]):
+                            return True
+                        return result
                     continue
             else:
                 return None
-        
+
+        if self._is_empty_type_leaf_at_path(parts):
+            return True
         return current
-    
+
+    def _is_empty_type_leaf_at_path(self, path_parts: List) -> bool:
+        """Return True if the schema leaf at path_parts has type empty."""
+        if not self.evaluator.module or not path_parts:
+            return False
+        schema_path = [self._step_from_part(p) for p in path_parts if not isinstance(p, int)]
+        if not schema_path:
+            return False
+        statements = self.evaluator.module.statements
+        for i, part in enumerate(schema_path):
+            if not isinstance(part, str):
+                continue
+            found = None
+            for stmt in statements:
+                if hasattr(stmt, 'name') and stmt.name == part:
+                    found = stmt
+                    break
+            if found is None:
+                return False
+            if isinstance(found, YangLeafStmt):
+                return (
+                    i == len(schema_path) - 1
+                    and hasattr(found, 'type')
+                    and found.type
+                    and getattr(found.type, 'name', None) == 'empty'
+                )
+            if isinstance(found, YangListStmt) and hasattr(found, 'statements'):
+                statements = found.statements
+            elif isinstance(found, YangContainerStmt) and hasattr(found, 'statements'):
+                statements = found.statements
+            elif isinstance(found, YangChoiceStmt) and hasattr(found, 'cases'):
+                statements = []
+                for case in found.cases:
+                    if hasattr(case, 'statements'):
+                        statements.extend(case.statements)
+            else:
+                return False
+        return False
+
     def _evaluate_path_with_predicate(self, node: PathNode, context: Context) -> Any:
         """Evaluate a path node that has a predicate with multiple steps.
         
@@ -798,62 +535,32 @@ class PathEvaluator:
                 
                 # If we went past the root (empty path), handle it specially
                 if not new_path:
-                    if field_parts:
-                        # We're at root level, try accessing field directly from root_data
-                        value = self.get_path_value(field_parts, nav_context)
-                        # If that didn't work and root_data has a single top-level key (like 'data-model'),
-                        # try accessing from that key
+                    if field_segments:
+                        value = self.get_path_value(field_segments, nav_context, predicate_context=context)
                         if value is None and isinstance(context.root_data, dict) and len(context.root_data) == 1:
                             top_level_key = list(context.root_data.keys())[0]
-                            value = self.get_path_value([top_level_key] + field_parts, nav_context)
+                            value = self.get_path_value([top_level_key] + field_segments, nav_context, predicate_context=context)
                     else:
-                        # No field parts and empty path - we're at root
                         value = context.root_data
                 else:
-                    value = self.get_path_value(new_path + field_parts, nav_context)
-                
-                # Apply predicate from the last segment if it exists
-                if value is not None and field_segments:
-                    last_segment = field_segments[-1]
-                    if last_segment.predicate is not None and isinstance(value, list):
-                        value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
+                    value = self.get_path_value(new_path + field_segments, nav_context, predicate_context=context)
                 
                 # If that didn't work, try two fallback strategies:
                 # 1. Try going up one more semantic level by removing the list name
-                #    (YANG semantics: .. from list item goes to parent of list, not the list itself)
-                if value is None and field_parts and len(new_path) > len(field_parts):
-                    # new_path includes field_parts at the end, so we need to remove field_parts first
-                    # to get the base path, then remove the list name, then re-add field_parts
-                    base_path = new_path[:-len(field_parts)] if len(field_parts) > 0 else new_path
+                if value is None and field_segments and len(new_path) > len(field_segments):
+                    base_path = new_path[:-len(field_segments)] if field_segments else new_path
                     if len(base_path) > 0 and isinstance(base_path[-1], str):
-                        # Remove the list name and re-add field_parts
-                        new_path_alt = base_path[:-1] + field_parts
-                        value_alt = self.get_path_value(new_path_alt, nav_context)
+                        new_path_alt = base_path[:-1] + field_segments
+                        value_alt = self.get_path_value(new_path_alt, nav_context, predicate_context=context)
                         if value_alt is not None:
                             value = value_alt
-                            # Apply predicate if present
-                            if field_segments:
-                                last_segment = field_segments[-1]
-                                if last_segment.predicate is not None and isinstance(value, list):
-                                    value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
-                
                 # 2. Try going up fewer levels (in case we went up too far)
-                # But only if the first fallback didn't work
-                # (Don't try this if we already tried removing the list name)
-                if value is None and field_parts and up_levels > 1:
-                    # Only try going up one less level, not all the way down to 0
-                    # This prevents finding wrong paths that happen to exist
+                if value is None and field_segments and up_levels > 1:
                     alt_levels = up_levels - 1
-                    new_path_alt = self._go_up_context_path(path_to_use, alt_levels) + field_parts
-                    value_alt = self.get_path_value(new_path_alt, nav_context)
-                    # Only use this result if it's not None
+                    new_path_alt = self._go_up_context_path(path_to_use, alt_levels) + field_segments
+                    value_alt = self.get_path_value(new_path_alt, nav_context, predicate_context=context)
                     if value_alt is not None:
                         value = value_alt
-                        # Apply predicate if present
-                        if field_segments:
-                            last_segment = field_segments[-1]
-                            if last_segment.predicate is not None and isinstance(value, list):
-                                value = self.evaluator.predicate_evaluator.apply_predicate(value, last_segment.predicate, context)
             else:
                 value = None
         else:
@@ -868,22 +575,12 @@ class PathEvaluator:
                 else:
                     value = self._evaluate_path_with_segments(node.segments, None, context, context)
             else:
-                # No segment predicates - use standard evaluation
+                # No segment predicates - walk AST segments only (no path string, no re-parse)
                 if node.is_absolute:
-                    path = '/' + '/'.join(seg.step for seg in node.segments)
                     nav_context = context.with_data(context.root_data, [])
-                    # For absolute paths, check if path contains predicates with relative paths
-                    # If so, we need to use evaluate_absolute_path which handles predicate_context
-                    if '[' in path and ('../' in path or 'deref(' in path):
-                        # Path has predicates that might contain relative paths - use evaluate_absolute_path
-                        value = self.evaluate_absolute_path(path, context)
-                    else:
-                        value = self.evaluate_path(path, nav_context)
+                    value = self.get_path_value(node.segments, nav_context, predicate_context=context)
                 else:
-                    # For relative paths, use get_path_value directly with segment steps
-                    # This ensures proper handling of list navigation (e.g., foreignKeys/entity)
-                    segment_steps = [seg.step for seg in node.segments]
-                    value = self.get_path_value(segment_steps, context)
+                    value = self.get_path_value(node.segments, context)
         
         return value
     

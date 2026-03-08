@@ -57,7 +57,7 @@ class YangValidator:
         """
         # Reset all validators
         self._reset()
-        
+
         # Store root data for leafref validation
         root_data = data
         
@@ -244,7 +244,7 @@ class YangValidator:
     
     def _reset(self) -> None:
         """Reset all validators to initial state.
-        
+
         Note: Caches are now per-evaluator (instance-level), so they don't need
         to be cleared here. Each validation creates a new XPathEvaluator with
         fresh caches, making parallel validations safe.

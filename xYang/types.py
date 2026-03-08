@@ -47,6 +47,7 @@ class TypeSystem:
         self.register_type('int32', self._validate_int32)
         self.register_type('uint8', self._validate_uint8)
         self.register_type('boolean', self._validate_boolean)
+        self.register_type('empty', self._validate_empty)
         self.register_type('decimal64', self._validate_decimal64)
         self.register_type('enumeration', self._validate_enumeration)
     
@@ -177,6 +178,22 @@ class TypeSystem:
             if value.lower() in ('true', 'false'):
                 return True, None
         return False, f"Expected boolean, got {type(value).__name__}"
+
+    def _validate_empty(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
+        """Validate empty type: leaf is either present (no value) or absent.
+
+        YANG empty type has no value; when the leaf is present, any placeholder
+        (None, True, empty list) is accepted for JSON/YAML compatibility.
+        """
+        if value is None:
+            return True, None
+        if isinstance(value, bool):
+            return True, None
+        if isinstance(value, list) and len(value) == 0:
+            return True, None
+        if value == "":
+            return True, None
+        return False, f"Expected empty type (no value), got {type(value).__name__}"
 
     def _validate_decimal64(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
         """Validate decimal64 value."""
