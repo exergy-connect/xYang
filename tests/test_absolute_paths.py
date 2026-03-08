@@ -248,7 +248,7 @@ def test_absolute_path_vs_relative_path():
     validator = YangValidator(module)
     
     # Test with a constraint that should work with relative paths
-    # (primary_key constraint uses ../fields[name = current()])
+    # (primary_key is a leaf; constraint uses ../fields[name = current()])
     data = {
         "data-model": {
             "name": "Test Model",
@@ -257,7 +257,7 @@ def test_absolute_path_vs_relative_path():
             "entities": [
                 {
                     "name": "test_entity",
-                    "primary_key": ["id", "nonexistent"],  # Should fail - field doesn't exist
+                    "primary_key": "nonexistent",  # Should fail - field doesn't exist
                     "fields": [
                         {"name": "id", "type": "integer"}
                     ]

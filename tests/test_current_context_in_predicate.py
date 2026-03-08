@@ -48,6 +48,9 @@ def _generate_yang_model(must_condition: str) -> str:
       leaf name {{
         type string;
       }}
+      leaf primary_key {{
+        type string;
+      }}
 
       list fields {{
         key name;

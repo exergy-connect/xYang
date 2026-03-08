@@ -323,6 +323,18 @@ class PathEvaluator:
                     (len(context_path) > 0 and first_step == context_path[0]) or
                     first_step not in context.data):
                 current = context.root_data
+        elif context_path and len(parts) > 0 and isinstance(context.root_data, dict):
+            # Relative path: first step not at root - start from node at context_path
+            first_step = self._step_from_part(parts[0])
+            if first_step not in current:
+                current = context.root_data
+                for p in context_path:
+                    if isinstance(current, dict) and p in current:
+                        current = current[p]
+                    elif isinstance(current, list) and isinstance(p, int) and 0 <= p < len(current):
+                        current = current[p]
+                    else:
+                        return None
 
         for i, part in enumerate(parts):
             if isinstance(part, int):
@@ -573,7 +585,21 @@ class PathEvaluator:
                     nav_context = context.with_data(context.root_data, [])
                     value = self._evaluate_path_with_segments(node.segments, None, nav_context, context)
                 else:
-                    value = self._evaluate_path_with_segments(node.segments, None, context, context)
+                    # Relative path: start from node at context_path
+                    if context.context_path and isinstance(context.root_data, dict):
+                        current = context.root_data
+                        for p in context.context_path:
+                            if isinstance(current, dict) and p in current:
+                                current = current[p]
+                            elif isinstance(current, list) and isinstance(p, int) and 0 <= p < len(current):
+                                current = current[p]
+                            else:
+                                current = None
+                                break
+                        nav_context = context.with_data(current if current is not None else context.data, [])
+                    else:
+                        nav_context = context
+                    value = self._evaluate_path_with_segments(node.segments, None, nav_context, context)
             else:
                 # No segment predicates - walk AST segments only (no path string, no re-parse)
                 if node.is_absolute:

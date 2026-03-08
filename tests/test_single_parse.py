@@ -73,11 +73,11 @@ module test {
       key "id";
       leaf id {
         type string;
-        must "string-length(.) > 0";  # Same expression as leaf name
+        must "string-length(.) > 0";  // Same expression as leaf name
       }
       leaf value {
         type uint8;
-        must ". >= 0";  # Same expression as leaf count
+        must ". >= 0";  // Same expression as leaf count
       }
     }
   }
