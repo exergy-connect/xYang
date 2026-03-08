@@ -174,6 +174,20 @@ class TokenStream:
             return True
         return False
 
+    def consume_oneof(self, allowed_types: List[YangTokenType]) -> Tuple[str, YangTokenType]:
+        """Consume current token if its type is in allowed_types; raise otherwise.
+        Returns (token_value, token_type)."""
+        if self.index >= len(self._token_list):
+            raise self._make_error("Unexpected end of input")
+        tok = self._token_list[self.index]
+        if tok.type not in allowed_types:
+            names = ", ".join(t.name for t in allowed_types)
+            raise self._make_error(
+                f"Expected one of ({names}), got {tok.type.name} ({tok.value!r})"
+            )
+        self.index += 1
+        return (tok.value, tok.type)
+
     def has_more(self) -> bool:
         """Check if there are more tokens."""
         return self.index < len(self.tokens)

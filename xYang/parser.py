@@ -110,10 +110,6 @@ class YangParser:
         self.registry.register('type:path', self.parsers.parse_type_path)
         self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
         
-        # Must body statements
-        self.registry.register('must:error-message', self.parsers.parse_must_error_message)
-        self.registry.register('must:description', self.parsers.parse_description)
-        
         # Choice body statements
         self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
         self.registry.register('choice:description', self.parsers.parse_description)

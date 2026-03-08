@@ -32,7 +32,7 @@ class StatementParsers:
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
         tokens.consume_type(YangTokenType.MODULE)
-        module_name = tokens.consume()
+        module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         tokens.consume_type(YangTokenType.LBRACE)
 
         context.module.name = module_name
@@ -59,42 +59,42 @@ class StatementParsers:
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse yang-version statement."""
         tokens.consume_type(YangTokenType.YANG_VERSION)
-        version = tokens.consume()
+        version = tokens.consume_type(YangTokenType.IDENTIFIER)
         context.module.yang_version = version
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_namespace(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse namespace statement."""
         tokens.consume_type(YangTokenType.NAMESPACE)
-        namespace = tokens.consume().strip('"\'')
+        namespace = tokens.consume_type(YangTokenType.STRING)
         context.module.namespace = namespace
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_prefix(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse prefix statement."""
         tokens.consume_type(YangTokenType.PREFIX)
-        prefix = tokens.consume().strip('"\'')
+        prefix = tokens.consume_type(YangTokenType.STRING)
         context.module.prefix = prefix
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_organization(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse organization statement."""
         tokens.consume_type(YangTokenType.ORGANIZATION)
-        org = tokens.consume().strip('"\'')
+        org = tokens.consume_type(YangTokenType.STRING)
         context.module.organization = org
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_contact(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse contact statement."""
         tokens.consume_type(YangTokenType.CONTACT)
-        contact = tokens.consume().strip('"\'')
+        contact = tokens.consume_type(YangTokenType.STRING)
         context.module.contact = contact
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement."""
         tokens.consume_type(YangTokenType.DESCRIPTION)
-        desc = tokens.consume().strip('"\'')
+        desc = tokens.consume_type(YangTokenType.STRING)
         if hasattr(context.current_parent, 'description'):
             context.current_parent.description = desc
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -108,7 +108,7 @@ class StatementParsers:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.peek_type() == YangTokenType.DESCRIPTION:
                     tokens.consume_type(YangTokenType.DESCRIPTION)
-                    revision['description'] = tokens.consume().strip('"\'')
+                    revision['description'] = tokens.consume_type(YangTokenType.STRING)
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 else:
                     raise tokens._make_error(f"Unknown statement in revision: {tokens.peek()}")
@@ -118,8 +118,8 @@ class StatementParsers:
     
     def parse_typedef(self, tokens: TokenStream, context: ParserContext) -> Optional[YangTypedefStmt]:
         """Parse typedef statement."""
-        tokens.consume('typedef')
-        typedef_name = tokens.consume()
+        tokens.consume_type(YangTokenType.TYPEDEF)
+        typedef_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         typedef_stmt = YangTypedefStmt(name=typedef_name)
         
         if tokens.consume_if('{'):
@@ -139,7 +139,7 @@ class StatementParsers:
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
         """Parse container statement."""
         tokens.consume_type(YangTokenType.CONTAINER)
-        container_name = tokens.consume()
+        container_name = tokens.consume()  # identifier or keyword (e.g. type)
         container_stmt = YangContainerStmt(name=container_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(container_stmt)
@@ -164,7 +164,7 @@ class StatementParsers:
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         """Parse list statement."""
         tokens.consume_type(YangTokenType.LIST)
-        list_name = tokens.consume()
+        list_name = tokens.consume()  # identifier or keyword
         list_stmt = YangListStmt(name=list_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(list_stmt)
@@ -182,7 +182,7 @@ class StatementParsers:
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
         """Parse leaf statement."""
         tokens.consume_type(YangTokenType.LEAF)
-        leaf_name = tokens.consume()
+        leaf_name = tokens.consume()  # identifier or keyword (e.g. type)
         leaf_stmt = YangLeafStmt(name=leaf_name)
         
         if tokens.consume_if_type(YangTokenType.LBRACE):
@@ -201,7 +201,7 @@ class StatementParsers:
     def parse_leaf_list(self, tokens: TokenStream, context: ParserContext) -> YangLeafListStmt:
         """Parse leaf-list statement."""
         tokens.consume_type(YangTokenType.LEAF_LIST)
-        leaf_list_name = tokens.consume()
+        leaf_list_name = tokens.consume()  # identifier or keyword
         leaf_list_stmt = YangLeafListStmt(name=leaf_list_name)
         
         if tokens.consume_if_type(YangTokenType.LBRACE):
@@ -220,7 +220,7 @@ class StatementParsers:
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
         tokens.consume_type(YangTokenType.TYPE)
-        type_name = tokens.consume()
+        type_name = tokens.consume()  # identifier (typedef) or type keyword (leafref, string, etc.)
         type_stmt = YangTypeStmt(name=type_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             brace_depth = 1
@@ -275,7 +275,7 @@ class StatementParsers:
     def parse_type_pattern(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse pattern constraint."""
         tokens.consume_type(YangTokenType.PATTERN)
-        pattern = tokens.consume().strip('"\'')
+        pattern = tokens.consume_type(YangTokenType.STRING)
         type_stmt.pattern = pattern
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -289,56 +289,57 @@ class StatementParsers:
     def parse_type_range(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse range constraint."""
         tokens.consume_type(YangTokenType.RANGE)
-        range_val = tokens.consume().strip('"\'')
+        range_val = tokens.consume_type(YangTokenType.STRING)
         type_stmt.range = range_val
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_fraction_digits(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse fraction-digits constraint."""
         tokens.consume_type(YangTokenType.FRACTION_DIGITS)
-        type_stmt.fraction_digits = int(tokens.consume())
+        type_stmt.fraction_digits = int(tokens.consume_type(YangTokenType.INTEGER))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_enum(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse enum constraint."""
         tokens.consume_type(YangTokenType.ENUM)
-        enum_name = tokens.consume()
+        enum_name = tokens.consume()  # identifier or keyword (e.g. string, boolean)
         type_stmt.enums.append(enum_name)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_path(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse path constraint (for leafref)."""
         tokens.consume_type(YangTokenType.PATH)
-        path = tokens.consume().strip('"\'')
+        path = tokens.consume_type(YangTokenType.STRING)
         type_stmt.path = path
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse require-instance constraint (for leafref)."""
         tokens.consume_type(YangTokenType.REQUIRE_INSTANCE)
-        require_instance = tokens.consume().strip('"\'')
-        type_stmt.require_instance = require_instance == 'true'
+        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+        type_stmt.require_instance = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_list_key(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse key in list statement."""
         tokens.consume_type(YangTokenType.KEY)
         if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            context.current_parent.key = tokens.consume().strip('"\'')
+            value, _ = tokens.consume_oneof([YangTokenType.STRING, YangTokenType.IDENTIFIER])
+            context.current_parent.key = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_list_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse min-elements in list statement."""
         tokens.consume_type(YangTokenType.MIN_ELEMENTS)
         if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            context.current_parent.min_elements = int(tokens.consume())
+            context.current_parent.min_elements = int(tokens.consume_type(YangTokenType.INTEGER))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_list_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse max-elements in list statement."""
         tokens.consume_type(YangTokenType.MAX_ELEMENTS)
         if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            context.current_parent.max_elements = int(tokens.consume())
+            context.current_parent.max_elements = int(tokens.consume_type(YangTokenType.INTEGER))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_list_must(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -351,18 +352,35 @@ class StatementParsers:
     
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in leaf statement."""
-        tokens.consume('mandatory')
+        tokens.consume_type(YangTokenType.MANDATORY)
         if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
-            mandatory_val = tokens.consume()
-            context.current_parent.mandatory = mandatory_val == 'true'
-        tokens.consume_if(';')
+            _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+            context.current_parent.mandatory = tt == YangTokenType.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_leaf_default(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse default in leaf statement."""
-        tokens.consume('default')
+        tokens.consume_type(YangTokenType.DEFAULT)
         if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
-            context.current_parent.default = tokens.consume().strip('"\'')
-        tokens.consume_if(';')
+            tt = tokens.peek_type()
+            if tt == YangTokenType.STRING:
+                context.current_parent.default = tokens.consume_type(YangTokenType.STRING)
+            elif tt == YangTokenType.INTEGER:
+                context.current_parent.default = tokens.consume_type(YangTokenType.INTEGER)
+            elif tt == YangTokenType.IDENTIFIER:
+                context.current_parent.default = tokens.consume_type(YangTokenType.IDENTIFIER)
+            elif tt == YangTokenType.TRUE:
+                tokens.consume_type(YangTokenType.TRUE)
+                context.current_parent.default = "true"
+            elif tt == YangTokenType.FALSE:
+                tokens.consume_type(YangTokenType.FALSE)
+                context.current_parent.default = "false"
+            else:
+                raise tokens._make_error(
+                    f"Expected default value (string, integer, identifier, or true/false), "
+                    f"got {tt.name if tt else 'end'}"
+                )
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_leaf_must(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse must in leaf statement."""
@@ -374,14 +392,14 @@ class StatementParsers:
         """Parse min-elements in leaf-list statement."""
         tokens.consume_type(YangTokenType.MIN_ELEMENTS)
         if context.current_parent and isinstance(context.current_parent, YangLeafListStmt):
-            context.current_parent.min_elements = int(tokens.consume())
+            context.current_parent.min_elements = int(tokens.consume_type(YangTokenType.INTEGER))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_leaf_list_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse max-elements in leaf-list statement."""
         tokens.consume_type(YangTokenType.MAX_ELEMENTS)
         if context.current_parent and isinstance(context.current_parent, YangLeafListStmt):
-            context.current_parent.max_elements = int(tokens.consume())
+            context.current_parent.max_elements = int(tokens.consume_type(YangTokenType.INTEGER))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_leaf_list_type(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -401,51 +419,18 @@ class StatementParsers:
         """Parse presence statement for container."""
         tokens.consume_type(YangTokenType.PRESENCE)
         if context.current_parent and isinstance(context.current_parent, YangContainerStmt):
-            context.current_parent.presence = tokens.consume().strip('"\'')
+            context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
-        """Parse must statement."""
+        """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
         tokens.consume_type(YangTokenType.MUST)
-        expr_parts = []
-        # Consume tokens until we hit SEMICOLON or LBRACE (start of must body)
-        while tokens.has_more() and tokens.peek_type() not in (YangTokenType.SEMICOLON, YangTokenType.LBRACE):
-            token = tokens.consume()
-            expr_parts.append(token)
-            # Safety check: if we've consumed a lot of tokens without finding ';' or '{',
-            # something might be wrong, but continue anyway
-        
-        # Join tokens, handling + operator for string concatenation
-        # In YANG, string concatenation with + happens at parse time
-        # We need to concatenate the strings directly, not pass + to XPath
-        expression_parts = []
-        i = 0
-        while i < len(expr_parts):
-            part = expr_parts[i]
-            if part == '+':
-                # String concatenation: skip the + and concatenate previous and next strings
-                if i + 1 < len(expr_parts):
-                    # Concatenate the last part with the next part
-                    if expression_parts:
-                        # Get last part (may be a string with trailing space)
-                        last_part = expression_parts[-1]
-                        next_part = expr_parts[i + 1]
-                        # Concatenate directly (preserving any spaces in the strings)
-                        expression_parts[-1] = last_part + next_part
-                    else:
-                        # + at the start - just skip it and take next part
-                        expression_parts.append(expr_parts[i + 1])
-                    i += 2  # Skip both + and next token
-                    continue
-            else:
-                # Normal token - add space before if not first and previous wasn't +
-                if expression_parts and expression_parts[-1] != '+':
-                    expression_parts.append(' ')
-                expression_parts.append(part)
-            i += 1
-        expression = ''.join(expression_parts).strip()
-        
-        # Validate XPath expression at parse time and get parsed AST
+        parts = [tokens.consume_type(YangTokenType.STRING)]
+        while tokens.peek_type() == YangTokenType.PLUS:
+            tokens.consume_type(YangTokenType.PLUS)
+            parts.append(tokens.consume_type(YangTokenType.STRING))
+        expression = ''.join(parts)
+
         ast = self.xpath_validator.validate(expression)
         
         must_stmt = YangMustStmt(expression=expression, ast=ast)
@@ -453,11 +438,15 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(must_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"must:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
+                if tokens.peek_type() == YangTokenType.ERROR_MESSAGE:
+                    self.parse_must_error_message(tokens, new_context)
+                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self.parse_description(tokens, new_context)
                 else:
-                    tokens.consume()
+                    raise tokens._make_error(
+                        f"Unknown statement in must: {tokens.peek()!r} "
+                        f"(only error-message and description allowed)"
+                    )
             tokens.consume_type(YangTokenType.RBRACE)
         # Add to appropriate parent (leaf, leaf-list, container, list, refine)
         if isinstance(context.current_parent, YangStatementWithMust):
@@ -472,7 +461,7 @@ class StatementParsers:
         """Parse error-message in must statement."""
         tokens.consume_type(YangTokenType.ERROR_MESSAGE)
         if context.current_parent and isinstance(context.current_parent, YangMustStmt):
-            context.current_parent.error_message = tokens.consume().strip('"\'')
+            context.current_parent.error_message = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -493,7 +482,7 @@ class StatementParsers:
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse grouping statement."""
         tokens.consume_type(YangTokenType.GROUPING)
-        grouping_name = tokens.consume()
+        grouping_name = tokens.consume()  # identifier or keyword
         grouping_stmt = YangGroupingStmt(name=grouping_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(grouping_stmt)
@@ -527,7 +516,7 @@ class StatementParsers:
         have been parsed. A YangUsesStmt node is created as a placeholder.
         """
         tokens.consume_type(YangTokenType.USES)
-        grouping_name = tokens.consume()
+        grouping_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)
@@ -547,7 +536,7 @@ class StatementParsers:
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse refine statement."""
         tokens.consume_type(YangTokenType.REFINE)
-        target_path = tokens.consume()
+        target_path = tokens.consume()  # identifier or keyword (e.g. type)
         refine_stmt = YangRefineStmt(name="refine", target_path=target_path)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(refine_stmt)
@@ -573,7 +562,7 @@ class StatementParsers:
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
         """Parse choice statement."""
         tokens.consume_type(YangTokenType.CHOICE)
-        choice_name = tokens.consume()
+        choice_name = tokens.consume()  # identifier or keyword
         choice_stmt = YangChoiceStmt(name=choice_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(choice_stmt)
@@ -591,7 +580,7 @@ class StatementParsers:
     def parse_case(self, tokens: TokenStream, context: ParserContext) -> YangCaseStmt:
         """Parse case statement."""
         tokens.consume_type(YangTokenType.CASE)
-        case_name = tokens.consume()
+        case_name = tokens.consume()  # identifier or keyword
         case_stmt = YangCaseStmt(name=case_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(case_stmt)
@@ -624,9 +613,9 @@ class StatementParsers:
     def parse_choice_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory statement in choice."""
         tokens.consume_type(YangTokenType.MANDATORY)
-        mandatory_val = tokens.consume()
+        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
-            context.current_parent.mandatory = (mandatory_val.lower() == 'true')
+            context.current_parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def _expand_uses(self, grouping: 'YangStatement', refines: list, module: 'YangModule' = None) -> list:
