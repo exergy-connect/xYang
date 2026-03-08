@@ -152,6 +152,28 @@ class TokenStream:
             return True
         return False
 
+    def peek_type(self) -> Optional[YangTokenType]:
+        """Peek at current token type without consuming."""
+        tok = self.peek_token()
+        return tok.type if tok else None
+
+    def consume_type(self, expected: YangTokenType) -> str:
+        """Consume current token if its type matches expected; raise otherwise. Returns value."""
+        if self.index >= len(self._token_list):
+            raise self._make_error("Unexpected end of input")
+        tok = self._token_list[self.index]
+        if tok.type != expected:
+            raise self._make_error(f"Expected {expected.name}, got {tok.type.name} ({tok.value!r})")
+        self.index += 1
+        return tok.value
+
+    def consume_if_type(self, expected: YangTokenType) -> bool:
+        """Consume token if its type matches expected, return True if consumed."""
+        if self.peek_type() == expected:
+            self.consume_type(expected)
+            return True
+        return False
+
     def has_more(self) -> bool:
         """Check if there are more tokens."""
         return self.index < len(self.tokens)
