@@ -117,13 +117,22 @@ class TypeChecker:
         path: str,
         root_data: Any,
         root_schema: Any,
+        context_node: Optional[Node] = None,
+        evaluator: Optional[Any] = None,
+        root_node: Optional[Node] = None,
     ) -> List[str]:
         name = type_stmt.name
 
         if name == "union":
             return self._check_union(value, type_stmt, path, root_data, root_schema)
         if name == "leafref":
-            return self._check_leafref(value, type_stmt, path, root_data)
+            return self._check_leafref(
+                value,
+                type_stmt,
+                context_node=context_node,
+                evaluator=evaluator,
+                root_node=root_node,
+            )
         if name in (
             "string",
             "entity-name",
@@ -175,42 +184,34 @@ class TypeChecker:
         self,
         value: Any,
         type_stmt: YangTypeStmt,
-        path: str,
-        root_data: Any,
+        context_node: Optional[Node] = None,
+        evaluator: Optional[Any] = None,
+        root_node: Optional[Node] = None,
     ) -> List[str]:
         if not type_stmt.require_instance or not type_stmt.path:
             return []
-        targets = self._resolve_path(type_stmt.path, root_data)
+        path_ast = type_stmt.path
+        if evaluator is None or root_node is None:
+            return [
+                "Leafref require-instance check requires evaluator and root node"
+            ]
+        if path_ast.is_absolute:
+            start_node = root_node
+        else:
+            if context_node is None:
+                return [
+                    f"Leafref relative path {path_ast.to_string()!r} requires context node"
+                ]
+            start_node = context_node
+        ctx = Context(current=start_node, root=root_node)
+        target_nodes = evaluator.eval_path(path_ast, ctx, start_node)
+        targets = [n.data for n in target_nodes]
         if value not in targets:
             return [
-                f"Leafref value {value!r} not found via path {type_stmt.path!r} "
+                f"Leafref value {value!r} not found via path {path_ast.to_string()!r} "
                 "(require-instance is true)"
             ]
         return []
-
-    def _resolve_path(self, path_str: str, root_data: Any) -> List[Any]:
-        """Walk a simple absolute path and collect leaf values."""
-        parts = [p for p in path_str.strip("/").split("/") if p]
-        nodes = [root_data]
-        for part in parts:
-            next_nodes: List[Any] = []
-            for n in nodes:
-                if isinstance(n, dict) and part in n:
-                    v = n[part]
-                    if isinstance(v, list):
-                        next_nodes.extend(v)
-                    elif v is not None:
-                        next_nodes.append(v)
-                elif isinstance(n, list):
-                    for item in n:
-                        if isinstance(item, dict) and part in item:
-                            v = item[part]
-                            if isinstance(v, list):
-                                next_nodes.extend(v)
-                            elif v is not None:
-                                next_nodes.append(v)
-            nodes = next_nodes
-        return nodes
 
     def _check_string(
         self, value: Any, type_stmt: YangTypeStmt
@@ -453,7 +454,14 @@ class DocumentValidator:
             and val is not None
         ):
             for msg in self._type_checker.check(
-                val, stmt.type, child_path, root_data, self._root_schema
+                val,
+                stmt.type,
+                child_path,
+                root_data,
+                self._root_schema,
+                context_node=parent_node,
+                evaluator=self._evaluator,
+                root_node=xpath_v._root,
             ):
                 errors.append(ValidationError(path=child_path, message=msg))
         elif isinstance(stmt, YangLeafListStmt) and stmt.type is not None:
@@ -463,7 +471,14 @@ class DocumentValidator:
             for i, item in enumerate(items):
                 item_path = f"{child_path}[{i}]"
                 for msg in self._type_checker.check(
-                    item, stmt.type, item_path, root_data, self._root_schema
+                    item,
+                    stmt.type,
+                    item_path,
+                    root_data,
+                    self._root_schema,
+                    context_node=parent_node,
+                    evaluator=self._evaluator,
+                    root_node=xpath_v._root,
                 ):
                     errors.append(ValidationError(path=item_path, message=msg))
 

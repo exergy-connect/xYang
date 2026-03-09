@@ -50,6 +50,11 @@ class PathNode(ASTNode):
     def accept(self, ev: "XPathEvaluator", ctx: "Context", node: "Node") -> Any:
         return ev.eval_path(self, ctx, node)
 
+    def to_string(self) -> str:
+        """Serialize path back to string (e.g. for error messages)."""
+        prefix = "/" if self.is_absolute else ""
+        return prefix + "/".join(seg.step for seg in self.segments)
+
 
 class BinaryOpNode(ASTNode):
     def __init__(self, left: ASTNode, operator: str, right: ASTNode):

@@ -91,8 +91,8 @@ class SchemaNav:
         return isinstance(schema, YangLeafListStmt)
 
     @staticmethod
-    def leafref_path(schema: Any) -> Optional[str]:
-        """Return the leafref path string if this leaf is a leafref, else None."""
+    def leafref_path(schema: Any) -> Optional[Any]:
+        """Return the leafref path (parsed PathNode) if this leaf is a leafref, else None."""
         if not isinstance(schema, YangLeafStmt):
             return None
         t = schema.type

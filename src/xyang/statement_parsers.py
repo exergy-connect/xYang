@@ -307,10 +307,10 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_path(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
-        """Parse path constraint (for leafref)."""
+        """Parse path constraint (for leafref). Path is parsed to XPath PathNode during parsing."""
         tokens.consume_type(YangTokenType.PATH)
-        path = tokens.consume_type(YangTokenType.STRING)
-        type_stmt.path = path
+        path_str = tokens.consume_type(YangTokenType.STRING)
+        type_stmt.path = XPathParser(path_str).parse()
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:

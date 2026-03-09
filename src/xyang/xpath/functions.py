@@ -127,11 +127,14 @@ def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
         if not leafref_path:
             continue
 
-        target_path = _parse_path(leafref_path)
-        if target_path is None:
-            continue
-
-        start = ctx.root if leafref_path.startswith("/") else node
+        if isinstance(leafref_path, PathNode):
+            target_path = leafref_path
+            start = ctx.root if leafref_path.is_absolute else node
+        else:
+            target_path = _parse_path(leafref_path)
+            if target_path is None:
+                continue
+            start = ctx.root if leafref_path.startswith("/") else node
         targets = ev.eval_path(target_path, ctx, start)
 
         for t in targets:

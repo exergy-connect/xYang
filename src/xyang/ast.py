@@ -2,8 +2,13 @@
 Abstract Syntax Tree (AST) nodes for YANG statements.
 """
 
-from typing import List, Optional, Any
+from __future__ import annotations
+
+from typing import TYPE_CHECKING, Any, List, Optional
 from dataclasses import dataclass, field
+
+if TYPE_CHECKING:
+    from .xpath.ast import PathNode
 
 
 @dataclass
@@ -71,7 +76,7 @@ class YangTypeStmt:
     fraction_digits: Optional[int] = None
     enums: List[str] = field(default_factory=list)
     types: List['YangTypeStmt'] = field(default_factory=list)  # For union types
-    path: Optional[str] = None  # For leafref
+    path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
     require_instance: bool = True  # For leafref
 
 
