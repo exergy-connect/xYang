@@ -142,6 +142,40 @@ def _bin_minus(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
         return float('nan')
 
 
+def _bin_slash(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    """XPath path composition: left/right = evaluate right with each node from left as context."""
+    left = node.left.accept(self)
+    if left is None:
+        return []
+    if isinstance(left, list) and left and isinstance(left[0], Node):
+        nodes = left
+    elif isinstance(left, Node):
+        nodes = [left]
+    else:
+        nodes = [Node(left, None)]
+    results: List[Any] = []
+    for n in nodes:
+        sub = ResolverVisitor(
+            data=n.data,
+            context_path=[],
+            root_data=self.root_data,
+            module=self.module,
+            original_context_path=self.original_context_path,
+            original_data=self.original_data,
+            initial_node=n,
+            current_from_outer=self.current_from_outer,
+            deref_evaluator=self.deref_evaluator,
+        )
+        r = node.right.accept(sub)
+        if isinstance(r, list):
+            results.extend(r)
+        elif isinstance(r, Node):
+            results.append(r)
+        elif r is not None:
+            results.append(Node(r, n))
+    return results
+
+
 _BINARY_OP_HANDLERS = {
     'or': _bin_or,
     'and': _bin_and,
@@ -157,6 +191,7 @@ _BINARY_OP_HANDLERS = {
     ),
     '+': _bin_plus,
     '-': _bin_minus,
+    '/': _bin_slash,
 }
 
 

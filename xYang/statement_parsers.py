@@ -10,9 +10,7 @@ from .ast import (
     YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementWithMust,
 )
-from .xpath.validator import XPathValidator
 from .xpath_new import XPathParserNew
-from .errors import XPathSyntaxError
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -25,7 +23,6 @@ class StatementParsers:
     
     def __init__(self, registry):
         self.registry = registry
-        self.xpath_validator = XPathValidator()
 
     def _add_to_parent_or_module(self, context: ParserContext, stmt: 'YangStatement') -> None:
         """Add statement to current_parent.statements (module or nested statement)."""
@@ -436,10 +433,7 @@ class StatementParsers:
         """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
         tokens.consume_type(YangTokenType.MUST)
         expression = self._parse_string_concatenation(tokens)
-        try:
-            ast = XPathParserNew(expression).parse()
-        except XPathSyntaxError:
-            ast = self.xpath_validator.validate(expression)
+        ast = XPathParserNew(expression).parse()
         must_stmt = YangMustStmt(expression=expression, ast=ast)
         
         if tokens.consume_if_type(YangTokenType.LBRACE):

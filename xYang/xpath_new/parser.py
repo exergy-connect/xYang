@@ -129,13 +129,16 @@ class XPathParser:
                 t.type == TokenType.SLASH
                 or (t.type == TokenType.OPERATOR and t.value == '/')
             )
-            if is_slash and isinstance(left, PathNode):
+            if is_slash:
                 self._consume()
                 right = self._parse_path(is_absolute=False)
-                left = PathNode(
-                    left.segments + right.segments,
-                    is_absolute=left.is_absolute,
-                )
+                if isinstance(left, PathNode):
+                    left = PathNode(
+                        left.segments + right.segments,
+                        is_absolute=left.is_absolute,
+                    )
+                else:
+                    left = BinaryOpNode('/', left, right)
             elif t.type == TokenType.OPERATOR and t.value == '*':
                 op = self._consume().value
                 right = self._parse_unary()
