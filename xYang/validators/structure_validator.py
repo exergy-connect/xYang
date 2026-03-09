@@ -62,30 +62,15 @@ class StructureValidator:
                 when_path = when_path + [stmt.name]
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
-                if ast is not None:
-                    if hasattr(ast, 'accept'):
-                        from ..xpath_new import ResolverVisitor
-                        from ..xpath.utils import yang_bool
-                        visitor = ResolverVisitor(
-                            data, when_path,
-                            root_data=root_data, module=self.module,
-                        )
-                        if not yang_bool(visitor.resolve(ast)):
-                            continue
-                    else:
-                        evaluator = self.evaluator_factory(
-                            data, self.module, context_path=when_path
-                        )
-                        from ..xpath.context import Context
-                        context = Context(
-                            data=data,
-                            context_path=when_path.copy(),
-                            original_context_path=when_path.copy(),
-                            original_data=data,
-                            root_data=data,
-                        )
-                        if not evaluator.evaluate_ast(ast, context):
-                            continue
+                if ast is not None and hasattr(ast, 'accept'):
+                    from ..xpath_new import ResolverVisitor
+                    from ..xpath.utils import yang_bool
+                    visitor = ResolverVisitor(
+                        data, when_path,
+                        root_data=root_data, module=self.module,
+                    )
+                    if not yang_bool(visitor.resolve(ast)):
+                        continue
 
             if isinstance(stmt, YangLeafStmt):
                 if hasattr(stmt, 'name'):
@@ -127,30 +112,15 @@ class StructureValidator:
                 when_path = when_path + [stmt.name]
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
-                if ast is not None:
-                    if hasattr(ast, 'accept'):
-                        from ..xpath_new import ResolverVisitor
-                        from ..xpath.utils import yang_bool
-                        visitor = ResolverVisitor(
-                            data, when_path,
-                            root_data=root_data, module=self.module,
-                        )
-                        if not yang_bool(visitor.resolve(ast)):
-                            continue
-                    else:
-                        evaluator = self.evaluator_factory(
-                            data, self.module, context_path=when_path
-                        )
-                        from ..xpath.context import Context
-                        context = Context(
-                            data=data,
-                            context_path=when_path.copy(),
-                            original_context_path=when_path.copy(),
-                            original_data=data,
-                            root_data=data,
-                        )
-                        if not evaluator.evaluate_ast(ast, context):
-                            continue
+                if ast is not None and hasattr(ast, 'accept'):
+                    from ..xpath_new import ResolverVisitor
+                    from ..xpath.utils import yang_bool
+                    visitor = ResolverVisitor(
+                        data, when_path,
+                        root_data=root_data, module=self.module,
+                    )
+                    if not yang_bool(visitor.resolve(ast)):
+                        continue
 
             if isinstance(stmt, YangLeafStmt):
                 self._validate_leaf(data, stmt, context_path)

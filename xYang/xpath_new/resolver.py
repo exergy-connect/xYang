@@ -7,7 +7,7 @@ parent pointer so ".." is current = current.parent (like most XPath engines).
 Returns JSON-like values; for when/must the result is coerced to bool via yang_bool.
 """
 
-from typing import Any, List, Optional
+from typing import Any, Dict, List, Optional
 
 from ..xpath.utils import yang_bool
 
@@ -246,9 +246,53 @@ def _fn_concat(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
     return "".join(parts)
 
 
+def _build_path_string_from_ast(node: Any) -> str:
+    """Build path string from xpath_new AST for deref() (current(), path, or path/path)."""
+    if isinstance(node, PathNode):
+        steps = [seg.step for seg in node.segments]
+        s = "/".join(steps)
+        return ("/" + s) if node.is_absolute else s
+    if isinstance(node, FunctionCallNode):
+        if node.name == 'current' and len(node.args) == 0:
+            return 'current()'
+        return f"{node.name}()"
+    if isinstance(node, BinaryOpNode) and node.operator == '/':
+        left = _build_path_string_from_ast(node.left)
+        right = _build_path_string_from_ast(node.right)
+        if left and right:
+            return f"{left}/{right}"
+        return left or right or ""
+    return str(getattr(node, 'value', node))
+
+
+def _fn_deref(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    """deref(path): resolve leafref; uses SchemaLeafrefResolver when deref_evaluator is set."""
+    if not node.args or self.deref_evaluator is None:
+        return None
+    arg = node.args[0]
+    path_str = _build_path_string_from_ast(arg)
+    from ..xpath.context import Context
+    ctx_path = self.original_context_path or self.context_path
+    data_at_path = self._get_at_path(self.root_data, ctx_path) if ctx_path else self.root_data
+    if data_at_path is None:
+        data_at_path = self.original_data if self.original_data is not None else self.root_data
+    context = Context(
+        data=data_at_path,
+        context_path=list(ctx_path) if ctx_path else [],
+        original_context_path=list(self.original_context_path) if self.original_context_path else [],
+        original_data=self.original_data,
+        root_data=self.root_data,
+    )
+    try:
+        return self.deref_evaluator.evaluate_deref(path_str, context)
+    except Exception:  # pylint: disable=broad-except
+        return None
+
+
 _FUNCTION_HANDLERS = {
     'current': _fn_current,
     'concat': _fn_concat,
+    'deref': _fn_deref,
     'true': lambda self, node: True,
     'false': lambda self, node: False,
     'not': _fn_not,
@@ -274,6 +318,7 @@ class ResolverVisitor(Visitor):
         original_data: Optional[Any] = None,
         initial_node: Optional[Node] = None,
         current_from_outer: bool = False,
+        deref_evaluator: Optional[Any] = None,
     ) -> None:
         self.data = data
         self.context_path = list(context_path)
@@ -286,7 +331,9 @@ class ResolverVisitor(Visitor):
         self.original_data = original_data if original_data is not None else data
         self.initial_node = initial_node
         self.current_from_outer = current_from_outer
+        self.deref_evaluator = deref_evaluator
         self._current_cache: dict = {}
+        self._schema_default_cache: Dict[tuple, Optional[Any]] = {}
 
     def resolve(self, node: Any) -> Any:
         """Resolve an AST node to a value. Entry point."""
@@ -370,23 +417,29 @@ class ResolverVisitor(Visitor):
         """Return schema default for the leaf at path_parts, or None. Drops list indices."""
         if not self.module or not path_parts:
             return None
-        schema_path = [p for p in path_parts if not isinstance(p, int)]
+        # Early exit: path with list index is not a leaf schema path
+        if any(isinstance(p, int) for p in path_parts):
+            return None
+        schema_path = [p for p in path_parts if isinstance(p, str)]
         if not schema_path:
             return None
+        cache_key = tuple(schema_path)
+        if cache_key in self._schema_default_cache:
+            return self._schema_default_cache[cache_key]
         statements = getattr(self.module, 'statements', [])
         for i, part in enumerate(schema_path):
-            if not isinstance(part, str):
-                continue
             found = None
             for stmt in statements:
                 if getattr(stmt, 'name', None) == part:
                     found = stmt
                     break
             if found is None:
+                self._schema_default_cache[cache_key] = None
                 return None
             if i == len(schema_path) - 1:
                 # Reached the target node; only leaves have default
                 default = getattr(found, 'default', None)
+                self._schema_default_cache[cache_key] = default
                 return default
             if hasattr(found, 'statements') and found.statements:
                 statements = found.statements
@@ -395,7 +448,9 @@ class ResolverVisitor(Visitor):
                 for case in getattr(found, 'cases', []):
                     statements.extend(getattr(case, 'statements', []))
             else:
+                self._schema_default_cache[cache_key] = None
                 return None
+        self._schema_default_cache[cache_key] = None
         return None
 
     def _get_at_path(self, root: Any, path: List[Any]) -> Any:
