@@ -1,0 +1,83 @@
+(*
+  EBNF grammar for XPath expressions supported by xpath_new.
+
+  Used in YANG when and must statements. Parser: xpath_new.parser.XPathParser.
+  Evaluation: xpath_new.resolver.ResolverVisitor.
+
+  Notation:
+    =   definition
+    |   alternative
+    [ ] optional (0 or 1)
+    { } repetition (0 or more)
+    ( ) grouping
+    ' ' terminal literal
+*)
+
+expression       = logical_or ;
+
+logical_or       = logical_and { 'or' logical_and } ;
+
+logical_and      = comparison { 'and' comparison } ;
+
+comparison       = additive [ ( '=' | '!=' | '<' | '>' | '<=' | '>=' ) additive ] ;
+
+additive         = multiplicative { ( '+' | '-' ) multiplicative } ;
+
+(* In the parser, path concatenation (Path '/' path_body) is only accepted when the left operand is a path *)
+multiplicative   = unary { ( '/' path_body | '*' unary ) } ;
+
+unary            = '-' unary
+                 | '+' unary
+                 | 'not' '(' expression ')'
+                 | primary
+                 ;
+
+(* identifier: if followed by '(' then function_call, else path (identifier path_rest) *)
+primary          = string_literal
+                 | number_literal
+                 | 'true' [ '(' ')' ]
+                 | 'false' [ '(' ')' ]
+                 | function_call
+                 | identifier path_rest
+                 | '.' [ path_rest ]
+                 | '..' [ path_rest ]
+                 | '/' path_body
+                 | '(' expression ')'
+                 ;
+
+(* Paths: path_body is one or more steps; path_rest is zero or more steps after an initial step *)
+path_body        = path_step { '/' path_step } ;
+
+path_rest        = { '/' path_step } ;
+
+path_step        = step_name [ '[' expression ']' ] ;
+
+step_name        = '..'
+                 | '.'
+                 | identifier
+                 ;
+
+(* Function call *)
+function_call    = identifier '(' [ argument_list ] ')' ;
+
+argument_list    = expression { ',' expression } ;
+
+(* Literals and identifiers *)
+string_literal   = ? double- or single-quoted string, with escape for the delimiter ?
+                 ;
+
+number_literal   = digit { digit } [ '.' { digit } ]
+                 | '.' digit { digit }
+                 ;
+
+identifier       = ( letter | '_' ) { letter | digit | '_' | '-' } ;
+
+letter           = ? Unicode letter ? ;
+digit            = '0' | '1' | '2' | '3' | '4' | '5' | '6' | '7' | '8' | '9' ;
+
+(*
+  Supported functions (resolver): current, true, false, not, count,
+  string, number, bool, string-length.
+
+  Keywords (case-insensitive in parser): or, and, not, true, false.
+*)

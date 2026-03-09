@@ -81,10 +81,15 @@ class ResolverVisitor(Visitor):
             current = self.root_data
             path: List[Any] = []
         else:
-            current = self._get_at_path(
-                self.root_data, self.context_path
-            )
-            path = list(self.context_path)
+            if not self.context_path:
+                # Relative path with empty context (e.g. in predicate): start at self.data
+                current = self.data
+                path = []
+            else:
+                current = self._get_at_path(
+                    self.root_data, self.context_path
+                )
+                path = list(self.context_path)
         for seg in node.segments:
             if seg.step == '..':
                 path, current = self._go_up(path, current)
@@ -97,7 +102,7 @@ class ResolverVisitor(Visitor):
                     # Key present with value None: node exists (e.g. empty-type leaf), evaluate as present
                     current = True
                 if current is None:
-                    return "" if node.segments else None
+                    return None
                 if isinstance(current, list) and len(current) == 1:
                     current = current[0]
                 path = path + [seg.step]
@@ -119,13 +124,17 @@ class ResolverVisitor(Visitor):
 
     def _go_up(self, path: List[Any], current: Any) -> tuple:
         """Go up one level; return (new_path, new_current).
-        - From a list item (path ends with int), ".." stays so ../sibling reads from same node.
+        - From a list or leaf-list item (path ends with int), ".." goes to parent of the list.
         - From a single-segment path (e.g. ['data']), ".." stays so ../type means current's type.
         - Otherwise pop one to get parent.
         """
         if not path:
             return [], current
         if isinstance(path[-1], int):
+            # List/leaf-list item: .. goes to parent of the list (e.g. ../min_value from values[i])
+            if len(path) >= 2:
+                new_path = path[:-2]
+                return new_path, self._get_at_path(self.root_data, new_path)
             return path, current
         if len(path) == 1:
             return path, current
@@ -264,6 +273,17 @@ class ResolverVisitor(Visitor):
                 return float(node.args[0].accept(self))
             except (TypeError, ValueError):
                 return float('nan')
+        if name == 'bool':
+            if len(node.args) != 1:
+                return False
+            return yang_bool(node.args[0].accept(self))
+        if name == 'string-length':
+            if len(node.args) != 1:
+                return 0
+            v = node.args[0].accept(self)
+            if v is None:
+                return 0
+            return len(str(v))
         return None
 
     def _current_value(self) -> Any:

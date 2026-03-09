@@ -12,6 +12,7 @@ from .ast import (
 )
 from .xpath.validator import XPathValidator
 from .xpath_new import XPathParserNew
+from .errors import XPathSyntaxError
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -435,9 +436,10 @@ class StatementParsers:
         """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
         tokens.consume_type(YangTokenType.MUST)
         expression = self._parse_string_concatenation(tokens)
-
-        ast = self.xpath_validator.validate(expression)
-        
+        try:
+            ast = XPathParserNew(expression).parse()
+        except XPathSyntaxError:
+            ast = self.xpath_validator.validate(expression)
         must_stmt = YangMustStmt(expression=expression, ast=ast)
         
         if tokens.consume_if_type(YangTokenType.LBRACE):

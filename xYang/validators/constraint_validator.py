@@ -9,7 +9,7 @@ from ..module import YangModule
 from ..ast import YangStatement, YangLeafStmt, YangListStmt, YangContainerStmt, YangLeafListStmt
 from ..xpath import XPathEvaluator
 from ..xpath.context import Context
-from ..xpath.utils import xpath_string
+from ..xpath.utils import xpath_string, yang_bool
 
 logger = logging.getLogger(__name__)
 
@@ -489,9 +489,28 @@ class ConstraintValidator:
             )
             return
         try:
-            result = evaluator.evaluate_ast(ast, context)
+            if hasattr(ast, 'accept'):
+                # xpath_new AST: resolve via ResolverVisitor
+                from ..xpath_new import ResolverVisitor
+                root_data = self._get_root_data(evaluator, getattr(context, 'root_data', None))
+                ctx_path = context.context_path.copy() if context.context_path else []
+                # current() must resolve from root_data via original_context_path
+                orig_path = getattr(context, 'original_context_path', None) or ctx_path
+                orig_data = getattr(context, 'original_data', None) or root_data
+                visitor = ResolverVisitor(
+                    context.data,
+                    ctx_path,
+                    root_data=root_data,
+                    module=self.module,
+                    original_context_path=orig_path,
+                    original_data=orig_data,
+                )
+                raw_result = visitor.resolve(ast)
+                result = yang_bool(raw_result)
+            else:
+                result = evaluator.evaluate_ast(ast, context)
+                raw_result = evaluator.evaluate_value_ast(ast, context) if logger.isEnabledFor(logging.DEBUG) else result
             if logger.isEnabledFor(logging.DEBUG):
-                raw_result = evaluator.evaluate_value_ast(ast, context)
                 logger.debug(
                     "Must constraint result for %s: %s (raw: %s, expression: %s)",
                     field_name, result, raw_result, getattr(must_expr, 'expression', '')
