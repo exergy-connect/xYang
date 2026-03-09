@@ -12,7 +12,7 @@ where .. from a list item goes to the parent of the list.
 import sys
 from pathlib import Path
 
-from xyang import parse_yang_file, YangValidator
+from xyang import parse_yang_file, parse_yang_string, YangValidator
 
 
 def test_leafref_relative_path_resolution():
@@ -98,52 +98,59 @@ def test_leafref_relative_path_resolution():
 
 def test_leafref_relative_path_invalid_reference():
     """Test that invalid references in relative path leafref are caught.
-    
-    This ensures the relative path resolution works correctly even when
-    the referenced value doesn't exist.
+
+    Minimal schema: one list with fields and a leafref leaf. Validation fails
+    when the leafref value is not present in the referenced list.
     """
-    yang_file = Path(__file__).parent.parent / "examples" / "meta-model.yang"
-    module = parse_yang_file(str(yang_file))
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+
+  container data {
+    list entities {
+      key name;
+      leaf name { type string; }
+      list fields {
+        key name;
+        leaf name { type string; }
+      }
+      leaf ref {
+        type leafref {
+          path "../fields/name";
+          require-instance true;
+        }
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
     validator = YangValidator(module)
-    
-    # Test data with an invalid parent-child relationship
-    # The child_fk references a field that doesn't exist
+
+    # ref points to a field name that does not exist in this entity's fields
     data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "consolidated": False,
+        "data": {
             "entities": [
                 {
-                    "name": "child_entity",
-                    "primary_key": "child_id",
+                    "name": "e1",
                     "fields": [
-                        {"name": "child_id", "type": "string"},
-                        {"name": "valid_field", "type": "string"}
+                        {"name": "id"},
+                        {"name": "other"}
                     ],
-                    "parents": [
-                        {
-                            "child_fk": "nonexistent_field"  # This field doesn't exist
-                        }
-                    ]
+                    "ref": "nonexistent_field"
                 }
             ]
         }
     }
-    
-    # Validation should fail - nonexistent_field doesn't exist in child_entity.fields
+
     is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "Validation should fail for invalid relative path leafref"
-    assert len(errors) > 0, "Should have errors for invalid reference"
-    # Check that the error mentions the leafref path or the field name
-    # Note: The error may come from leafref validation (with field name) or from must constraints
-    # Both are valid - the important thing is that validation fails
+    assert not is_valid, "Validation should fail for invalid leafref value"
+    assert len(errors) > 0, "Should have at least one error"
     error_msg = " ".join(errors)
-    # The error should mention either the field name, the invalid value, or indicate a validation failure
-    assert ("child_fk" in error_msg or "nonexistent_field" in error_msg or 
-            "invalid" in error_msg.lower() or "must" in error_msg.lower()), (
-        f"Error should mention the invalid reference or indicate validation failure. Errors: {errors}"
+    assert "leafref" in error_msg.lower() or "nonexistent_field" in error_msg, (
+        f"Error should be from leafref require-instance check. Errors: {errors}"
     )
 
 
