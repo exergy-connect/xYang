@@ -5,7 +5,7 @@ Must statement: deref(deref(../child_fk)/../foreignKey/entity)/../fields[name = 
 Location: entities/parents/parent_array
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 
@@ -69,6 +69,7 @@ def test_parent_array_exists_invalid(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": True,  # Force Phase 2 so parent_array existence must is evaluated
             "entities": [
                 {
                     "name": "parent",

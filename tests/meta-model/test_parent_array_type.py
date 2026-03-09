@@ -5,7 +5,7 @@ Must statement: /data-model/consolidated = false() or deref(deref(../child_fk)/.
 Location: entities/parents/parent_array
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

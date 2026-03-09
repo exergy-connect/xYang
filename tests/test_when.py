@@ -2,9 +2,58 @@
 Tests for when expression support.
 """
 
+from typing import Any, List
+
 import pytest
-from xYang import parse_yang_string, YangValidator
-from tests.test_utils import create_context
+from xyang import parse_yang_string, YangValidator
+from xyang.ast import YangStatementWithWhen
+from xyang.xpath import (
+    Context,
+    Node,
+    XPathEvaluator,
+    XPathParser,
+    SchemaNav,
+    yang_bool,
+)
+
+
+def _make_node_context(
+    data: Any,
+    module: Any,
+    context_path: List[Any],
+) -> tuple[Context, Node]:
+    """Build (Context, Node) for xyang evaluator from data, module, and path."""
+    root = Node(data, module, None)
+    current_node = root
+    for seg in context_path:
+        if isinstance(current_node.data, list):
+            current_data = current_node.data[seg]
+            current_schema = current_node.schema
+        else:
+            current_schema = SchemaNav.child(current_node.schema, seg)
+            if current_schema is None:
+                raise ValueError(
+                    f"no schema for {seg!r} under "
+                    f"{getattr(current_node.schema, 'name', current_node.schema)}"
+                )
+            data_val = (
+                current_node.data.get(seg)
+                if isinstance(current_node.data, dict)
+                else None
+            )
+            if data_val is None:
+                data_val = SchemaNav.default(current_schema)
+            current_data = data_val
+        current_node = Node(current_data, current_schema, current_node)
+    ctx = Context(current=current_node, root=root)
+    return ctx, current_node
+
+
+def _evaluate_bool(ev: XPathEvaluator, expr: str, ctx: Context, node: Node) -> bool:
+    """Parse expr, evaluate, return YANG boolean."""
+    ast = XPathParser(expr).parse()
+    result = ev.eval(ast, ctx, node)
+    return yang_bool(result)
 
 
 def test_when_condition_true():
@@ -42,6 +91,7 @@ module test {
             break
 
     assert item_type is not None
+    assert isinstance(item_type, YangStatementWithWhen)
     assert item_type.when is not None
     assert item_type.when.condition == "../type = 'array'"
 
@@ -172,24 +222,35 @@ module test {
 
 def test_when_with_xpath_evaluator():
     """Test that when conditions use XPath evaluator."""
-    from xYang import XPathEvaluator
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
 
-    data = {
-        "type": "array"
+  container data {
+    leaf type { type string; }
+    container item_type {
+      when "../type = 'array'";
+      leaf primitive { type string; }
     }
-    module = parse_yang_string("module test { }")
-    evaluator = XPathEvaluator(data, module, context_path=["item_type"])
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
 
-    # Test the when condition expression
-    context = create_context(data, ["item_type"])
-    result = evaluator.evaluate("../type = 'array'", context)
+    # When is evaluated in parent context: current = container "data"
+    # ../type from item_type = parent.type = "array"
+    data_true = {"data": {"type": "array", "item_type": {"primitive": "string"}}}
+    ctx, node = _make_node_context(data_true, module, ["data", "item_type"])
+    evaluator = XPathEvaluator()
+    result = _evaluate_bool(evaluator, "../type = 'array'", ctx, node)
     assert result is True
 
-    # Test with false condition
-    data2 = {"type": "string"}
-    evaluator2 = XPathEvaluator(data2, module, context_path=["item_type"])
-    context2 = create_context(data2, ["item_type"])
-    result2 = evaluator2.evaluate("../type = 'array'", context2)
+    # False condition
+    data_false = {"data": {"type": "string", "item_type": {}}}
+    ctx2, node2 = _make_node_context(data_false, module, ["data", "item_type"])
+    result2 = _evaluate_bool(evaluator, "../type = 'array'", ctx2, node2)
     assert result2 is False
 
 

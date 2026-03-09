@@ -20,7 +20,7 @@ Solution:
 - Use nested deref() which preserves context through relative path navigation
 """
 import pytest
-from xYang import YangValidator, parse_yang_string
+from xyang import YangValidator, parse_yang_string
 
 
 def _generate_yang_model(must_condition: str) -> str:

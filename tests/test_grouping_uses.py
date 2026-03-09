@@ -8,7 +8,7 @@ Grouping/uses support has been implemented in the parser.
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator
+from xyang import parse_yang_string, YangValidator
 
 
 def test_grouping_and_uses_basic():

@@ -5,7 +5,7 @@ Each test targets one failing pattern so resolver fixes can be validated in isol
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator
+from xyang import parse_yang_string, YangValidator
 
 
 def test_primary_key_fields_name_equals_current():

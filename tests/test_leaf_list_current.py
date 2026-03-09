@@ -7,7 +7,7 @@ or on a list (evaluated once per list entry with context node being the entry).
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator
+from xyang import parse_yang_string, YangValidator
 
 
 def test_leaf_list_current_single_constraint():

@@ -6,7 +6,7 @@ typedef definitions that use union types, including validation of valid and inva
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator
+from xyang import parse_yang_string, YangValidator
 
 
 def test_typedef_union_primitive_and_composite():

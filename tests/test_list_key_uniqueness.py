@@ -5,7 +5,7 @@ YANG lists with a key statement require unique key values within the list.
 Enforced by StructureValidator._validate_list.
 """
 import pytest
-from xYang import YangValidator, parse_yang_string
+from xyang import YangValidator, parse_yang_string
 
 
 @pytest.fixture

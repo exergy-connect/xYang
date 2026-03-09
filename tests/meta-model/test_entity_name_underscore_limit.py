@@ -7,8 +7,9 @@ Location: entities/name
 Note: The path ../../max_name_underscores goes up 2 levels from entities/name to data-model.
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
 from pathlib import Path
+
+from xyang import YangValidator, parse_yang_file
 
 
 @pytest.fixture

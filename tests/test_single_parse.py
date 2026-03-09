@@ -10,7 +10,7 @@ import pytest
 from unittest.mock import patch
 from collections import defaultdict
 
-from xYang import parse_yang_string, YangValidator
+from xyang import parse_yang_string, YangValidator
 
 
 def test_yang_expressions_parsed_once():
@@ -84,8 +84,8 @@ module test {
 }
 """
     
-    # Monkey patch XPathTokenizer.tokenize before parsing
-    from xYang.xpath.parser import XPathTokenizer
+    # Monkey patch XPathTokenizer.tokenize before parsing (xyang package)
+    from xyang.xpath.tokenizer import XPathTokenizer
     original_tokenize = XPathTokenizer.tokenize
     
     with patch.object(XPathTokenizer, 'tokenize', tracked_tokenize):
@@ -181,8 +181,8 @@ def test_yang_expressions_parsed_once_with_meta_model():
         
         return original_tokenize(self)
     
-    from xYang import parse_yang_file
-    from xYang.xpath.parser import XPathTokenizer
+    from xyang import parse_yang_file
+    from xyang.xpath.tokenizer import XPathTokenizer
     original_tokenize = XPathTokenizer.tokenize
     
     with patch.object(XPathTokenizer, 'tokenize', tracked_tokenize):

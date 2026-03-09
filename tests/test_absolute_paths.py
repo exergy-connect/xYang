@@ -6,8 +6,9 @@ starting with '/' in must constraints.
 """
 
 import pytest
-from xYang import parse_yang_file, YangValidator
 from pathlib import Path
+
+from xyang import parse_yang_file, YangValidator
 
 
 def get_meta_model_path():
@@ -195,6 +196,7 @@ def test_absolute_path_in_computed_field_validation():
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
+            "consolidated": False,
             "entities": [
                 {
                     "name": "test_entity",
@@ -219,7 +221,7 @@ def test_absolute_path_in_computed_field_validation():
             ]
         }
     }
-    
+
     # This tests the constraint: ../../../../fields[name = current()]
     # Note: The constraint now uses relative paths, not absolute paths
     # The test verifies that the computed field validation works correctly

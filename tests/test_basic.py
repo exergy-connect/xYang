@@ -1,10 +1,10 @@
 """
-Basic tests for xYang library.
+Basic tests for xYang library (using xyang package).
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator, TypeSystem
-from xYang.types import TypeConstraint
+
+from xyang import parse_yang_string, YangValidator, TypeSystem, TypeConstraint
 
 
 def test_parse_simple_module():

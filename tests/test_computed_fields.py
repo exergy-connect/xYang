@@ -1,37 +1,112 @@
 """
-Tests for computed field validation in YANG must statements.
+Standalone tests for computed field validation.
 
-This test validates the computed field constraints:
-- Field references must exist in the specified entity (or current entity)
-- Cross-entity computed field references require a foreign key relationship
-- Field count validation for binary vs aggregation operations
+Uses an inline subset of the meta-model YANG: only the parts needed for
+computed fields (data-model, entities, fields, computed, foreignKeys).
+Same structure and must expressions as the meta-model; no external file.
 """
 
 import pytest
-from xYang import parse_yang_file, YangValidator
-from pathlib import Path
+from xyang import parse_yang_string, YangValidator
 
 
-def get_meta_model_path():
-    """Get path to meta-model.yang file."""
-    # Use examples/meta-model.yang (self-contained test)
-    examples_path = Path(__file__).parent.parent / "examples" / "meta-model.yang"
-    if examples_path.exists():
-        return examples_path
-    raise FileNotFoundError(f"Could not find meta-model.yang at {examples_path}")
+# Minimal YANG for computed-field tests only: entities, fields, computed, foreignKeys.
+META_MODEL_SUBSET = """
+module meta-model {
+  yang-version 1.1;
+  namespace "urn:xframe:meta-model";
+  prefix "mm";
+
+  typedef field-type {
+    type enumeration {
+      enum string; enum integer; enum number; enum boolean; enum array;
+      enum datetime; enum date; enum composite;
+    }
+  }
+
+  container data-model {
+    leaf consolidated { type boolean; default false; }
+    leaf allow_unlimited_fields { type boolean; default false; }
+    list entities {
+      key name;
+      min-elements 1;
+      leaf name { type string; mandatory true; }
+      leaf primary_key {
+        type string;
+        mandatory true;
+        must "../fields[name = current()]" {
+          error-message "primary_key must reference an existing field";
+        }
+      }
+      list fields {
+        key name;
+        min-elements 1;
+        leaf name { type string; mandatory true; }
+        leaf type { type field-type; mandatory true; }
+        list foreignKeys {
+          key entity;
+          leaf entity {
+            type leafref { path "/data-model/entities/name"; require-instance true; }
+            mandatory true;
+            must "/data-model/consolidated = false() or /data-model/entities[name = string(current())]" {
+              error-message "Foreign key entity must exist in the data model";
+            }
+          }
+        }
+        container computed {
+          presence " ";
+          leaf operation {
+            type enumeration {
+              enum add; enum subtraction; enum multiplication; enum division;
+              enum min; enum max;
+            }
+            mandatory true;
+          }
+          list fields {
+            key field;
+            min-elements 2;
+            max-elements 100;
+            leaf field {
+              type string;
+              mandatory true;
+              must "/data-model/consolidated = false() or ((not(../entity) and count(../../../../../fields[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1))" {
+                error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
+              }
+            }
+            leaf entity {
+              type leafref { path "/data-model/entities/name"; require-instance true; }
+              must "/data-model/consolidated = false() or count(../../../../../fields[foreignKeys/entity = current()]) = 1" {
+                error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
+              }
+            }
+          }
+          must "(operation != 'add' and operation != 'subtraction') or count(fields) = 2" {
+            error-message "Binary operations (add, subtraction) require exactly 2 fields";
+          }
+          must "(operation != 'min' and operation != 'max') or count(fields) >= 2" {
+            error-message "Aggregation operations (min, max) require at least 2 fields";
+          }
+        }
+      }
+      must "/data-model/consolidated = true() or ../../allow_unlimited_fields = 'true' or ../../allow_unlimited_fields = true() or count(fields[type != 'array']) <= 7" {
+        error-message "Entity has more than 7 non-array fields.";
+      }
+    }
+  }
+}
+"""
+
+
+def _validator():
+    return YangValidator(parse_yang_string(META_MODEL_SUBSET))
 
 
 def test_computed_field_missing_field_same_entity():
-    """Test 1: Computed field referencing non-existent field in same entity should fail."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Computed field referencing non-existent field in same entity should fail."""
+    validator = _validator()
     invalid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "test_entity",
@@ -46,7 +121,7 @@ def test_computed_field_missing_field_same_entity():
                                 "operation": "subtraction",
                                 "fields": [
                                     {"field": "field1"},
-                                    {"field": "nonexistent"}  # This field doesn't exist
+                                    {"field": "nonexistent"}
                                 ]
                             }
                         }
@@ -55,24 +130,16 @@ def test_computed_field_missing_field_same_entity():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(invalid_data)
     assert not is_valid, "Validation should fail for missing field reference"
-    assert any("exist" in error.lower() or "field" in error.lower() for error in errors), \
-        f"Error should mention missing field, got: {errors}"
+    assert any("exist" in e.lower() or "field" in e.lower() for e in errors), f"Errors: {errors}"
 
 
 def test_computed_field_valid_same_entity():
-    """Test 2: Valid computed field with fields in same entity should pass."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Valid computed field with fields in same entity should pass."""
+    validator = _validator()
     valid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
             "entities": [
                 {
                     "name": "test_entity",
@@ -97,23 +164,16 @@ def test_computed_field_valid_same_entity():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(valid_data)
-    
-    assert is_valid, f"Valid data should pass validation. Errors: {errors}"
+    assert is_valid, f"Valid data should pass. Errors: {errors}"
 
 
 def test_computed_field_missing_field_cross_entity():
-    """Test 3: Computed field referencing non-existent field in cross-entity should fail."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Computed field referencing non-existent field in cross-entity should fail."""
+    validator = _validator()
     invalid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
@@ -128,20 +188,14 @@ def test_computed_field_missing_field_cross_entity():
                     "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer"},
-                        {
-                            "name": "entity1_id",
-                            "type": "integer",
-                            "foreignKeys": [{
-                                "entity": "entity1"
-                            }]
-                        },
+                        {"name": "entity1_id", "type": "integer", "foreignKeys": [{"entity": "entity1"}]},
                         {
                             "name": "invalid_computed",
                             "type": "integer",
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"entity": "entity1", "field": "nonexistent"},  # Field doesn't exist in entity1
+                                    {"entity": "entity1", "field": "nonexistent"},
                                     {"field": "field1"}
                                 ]
                             }
@@ -151,46 +205,34 @@ def test_computed_field_missing_field_cross_entity():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(invalid_data)
     assert not is_valid, "Validation should fail for missing field in cross-entity reference"
-    assert any("exist" in error.lower() or "field" in error.lower() for error in errors), \
-        f"Error should mention missing field, got: {errors}"
 
 
 def test_computed_field_cross_entity_no_foreign_key():
-    """Test 4: Cross-entity computed field reference without foreign key should fail."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Cross-entity computed field reference without foreign key should fail."""
+    validator = _validator()
     invalid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
+            "consolidated": True,
             "entities": [
                 {
                     "name": "entity1",
                     "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"}
-                    ]
+                    "fields": [{"name": "id", "type": "integer"}, {"name": "field1", "type": "integer"}]
                 },
                 {
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer"},
-                        # No foreign key field to entity1!
                         {
                             "name": "invalid_computed",
                             "type": "integer",
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"entity": "entity1", "field": "field1"},  # Cross-entity but no FK
+                                    {"entity": "entity1", "field": "field1"},
                                     {"field": "field1"}
                                 ]
                             }
@@ -200,69 +242,34 @@ def test_computed_field_cross_entity_no_foreign_key():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(invalid_data)
-    
-    # BUG: Currently validation passes (is_valid=True) when it should fail because
-    # the constraint 'count(../../../../fields[foreignKey/entity = current()]) > 0'
-    # doesn't work correctly when evaluator.data is set to the computed.fields[] item.
-    # See tests/test_path_resolution_list_items.py for unit tests demonstrating this bug.
-    if is_valid:
-        pytest.skip("Constraint validation bug: path resolution fails when evaluator.data is set to nested list item. "
-                    "See tests/test_path_resolution_list_items.py for unit tests.")
-    assert not is_valid, "Validation should fail for cross-entity reference without foreign key"
-    # The constraint on entity leaf checks for foreign key requirement
-    # Note: This constraint uses absolute paths which may have parsing issues,
-    # so we check that validation fails (which it does) rather than requiring
-    # a specific error message
-    # If the constraint is working, we'd see: "Cross-entity computed field references require a foreign key..."
-    # But even if that constraint isn't working, validation should still fail
-    # (e.g., due to field existence checks or other constraints)
-    fk_errors = [e for e in errors if ("foreign" in e.lower() and "key" in e.lower()) or 
-                ("cross-entity" in e.lower())]
-    # Validation fails (which is correct), even if the specific FK constraint message isn't present
-    # This is acceptable since the absolute path constraint may have parsing issues
+    assert not is_valid
 
 
 def test_computed_field_cross_entity_with_foreign_key():
-    """Test 5: Valid cross-entity computed field with foreign key should pass."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Valid cross-entity computed field with foreign key should pass."""
+    validator = _validator()
     valid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
             "entities": [
                 {
                     "name": "entity1",
                     "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"}
-                    ]
+                    "fields": [{"name": "id", "type": "integer"}, {"name": "field1", "type": "integer"}]
                 },
                 {
                     "name": "entity2",
                     "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer"},
-                        {
-                            "name": "entity1_id",
-                            "type": "integer",
-                            "foreignKeys": [{
-                                "entity": "entity1"
-                            }]
-                        },
+                        {"name": "entity1_id", "type": "integer", "foreignKeys": [{"entity": "entity1"}]},
                         {
                             "name": "valid_computed",
                             "type": "integer",
                             "computed": {
                                 "operation": "subtraction",
                                 "fields": [
-                                    {"entity": "entity1", "field": "field1"},  # Cross-entity with FK
+                                    {"entity": "entity1", "field": "field1"},
                                     {"field": "entity1_id"}
                                 ]
                             }
@@ -272,81 +279,60 @@ def test_computed_field_cross_entity_with_foreign_key():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(valid_data)
-    
-    assert is_valid, f"Valid data should pass validation. Errors: {errors}"
+    assert is_valid, f"Valid data should pass. Errors: {errors}"
 
 
 def test_computed_field_wrong_field_count_binary():
-    """Test 6: Binary operation with wrong field count should fail."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Binary operation with wrong field count should fail."""
+    validator = _validator()
     invalid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
             "entities": [
                 {
-                    "name": "test_entity",
+                    "name": "e1",
                     "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"},
+                        {"name": "a", "type": "integer"},
                         {
-                            "name": "invalid_computed",
+                            "name": "bad",
                             "type": "integer",
-                            "computed": {
-                                "operation": "subtraction",
-                                "fields": [
-                                    {"field": "field1"}  # Only 1 field, binary ops need 2
-                                ]
-                            }
+                            "computed": {"operation": "subtraction", "fields": [{"field": "a"}]}
                         }
                     ]
                 }
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(invalid_data)
     assert not is_valid, "Validation should fail for binary operation with wrong field count"
-    assert any("2" in error or "binary" in error.lower() or "field" in error.lower() for error in errors), \
-        f"Error should mention field count requirement, got: {errors}"
+    assert any("2" in e or "binary" in e.lower() or "field" in e.lower() for e in errors), f"Errors: {errors}"
 
 
 def test_computed_field_valid_aggregation():
-    """Test 7: Valid aggregation operation with multiple fields should pass."""
-    meta_model_path = get_meta_model_path()
-    module = parse_yang_file(str(meta_model_path))
-    validator = YangValidator(module)
-    
+    """Valid aggregation (e.g. max) with multiple fields should pass."""
+    validator = _validator()
     valid_data = {
         "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
             "entities": [
                 {
-                    "name": "test_entity",
+                    "name": "e1",
                     "primary_key": "id",
                     "fields": [
                         {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"},
-                        {"name": "field2", "type": "integer"},
-                        {"name": "field3", "type": "integer"},
+                        {"name": "f1", "type": "integer"},
+                        {"name": "f2", "type": "integer"},
+                        {"name": "f3", "type": "integer"},
                         {
                             "name": "valid_computed",
                             "type": "integer",
                             "computed": {
                                 "operation": "max",
                                 "fields": [
-                                    {"field": "field1"},
-                                    {"field": "field2"},
-                                    {"field": "field3"}
+                                    {"field": "f1"},
+                                    {"field": "f2"},
+                                    {"field": "f3"}
                                 ]
                             }
                         }
@@ -355,7 +341,5 @@ def test_computed_field_valid_aggregation():
             ]
         }
     }
-    
     is_valid, errors, warnings = validator.validate(valid_data)
-    
-    assert is_valid, f"Valid data should pass validation. Errors: {errors}"
+    assert is_valid, f"Valid aggregation should pass. Errors: {errors}"

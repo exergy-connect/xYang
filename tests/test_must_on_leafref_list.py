@@ -8,11 +8,8 @@ be evaluated for each list item, with current() referring to the list item.
 import sys
 from pathlib import Path
 
-# Add src directory to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
-from xYang import parse_yang_file, YangValidator, parse_yang_string
+from xyang import parse_yang_file, YangValidator, parse_yang_string
+from xyang.ast import YangStatementWithMust
 
 
 def test_must_on_list_with_leafref_valid():
@@ -52,7 +49,7 @@ def test_must_on_list_with_leafref_valid():
       }
       leaf ref_name {
         type leafref {
-          path "/data/items[name = current()/../ref_id]/name";
+          path "/data/items[id = current()/ref_id]/name";
           require-instance true;
         }
       }
@@ -393,7 +390,9 @@ def test_must_with_string_concatenation_plus_operator():
         if hasattr(stmt, 'name') and stmt.name == 'data':
             for child in stmt.statements:
                 if hasattr(child, 'name') and child.name == 'items':
-                    assert hasattr(child, 'must_statements'), "Must statements should be parsed"
+                    assert isinstance(
+                        child, YangStatementWithMust
+                    ), "items list should have must statements"
                     assert len(child.must_statements) >= 2, "At least two must statements"
                     exprs = [m.expression for m in child.must_statements]
                     assert any('concat' in e for e in exprs), "One must should use concat()"
@@ -470,7 +469,7 @@ def test_must_with_plus_operator_foreignkeys():
         list foreignKeys {
           key entity;
           must "/data-model/consolidated = false() or " +
-               "../../type = deref(current()/entity)/../fields[name = ../primary_key]/type" {
+               "../../type = deref(current()/entity)/../fields[name = deref(current()/entity)/../primary_key]/type" {
             error-message "Foreign key field type must match the referenced entity's primary key field type";
           }
           leaf entity {
@@ -498,8 +497,9 @@ def test_must_with_plus_operator_foreignkeys():
                         if hasattr(entity_child, 'name') and entity_child.name == 'fields':
                             for field_child in entity_child.statements:
                                 if hasattr(field_child, 'name') and field_child.name == 'foreignKeys':
-                                    assert hasattr(field_child, 'must_statements'), \
-                                        "Must statements should be parsed for foreignKeys list"
+                                    assert isinstance(
+                                        field_child, YangStatementWithMust
+                                    ), "foreignKeys list should have must statements"
                                     assert len(field_child.must_statements) > 0, \
                                         "At least one must statement should be found"
                                     must_expr = field_child.must_statements[0].expression

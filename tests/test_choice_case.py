@@ -7,8 +7,9 @@ for array item_type selection (primitive vs entity).
 """
 
 import pytest
-from xYang import parse_yang_string, YangValidator, parse_yang_file
 from pathlib import Path
+
+from xyang import parse_yang_file, parse_yang_string, YangValidator
 
 
 def test_choice_case_primitive_valid():
@@ -316,7 +317,7 @@ def test_choice_case_meta_model_primitive():
             ]
         }
     }
-    
+
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Expected valid meta-model data with primitive case. Errors: {errors}"
 
@@ -357,7 +358,7 @@ def test_choice_case_meta_model_entity():
             ]
         }
     }
-    
+
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Expected valid meta-model data with entity case. Errors: {errors}"
 

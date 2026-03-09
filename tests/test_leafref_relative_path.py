@@ -12,11 +12,7 @@ where .. from a list item goes to the parent of the list.
 import sys
 from pathlib import Path
 
-# Add src directory to path
-project_root = Path(__file__).parent.parent
-sys.path.insert(0, str(project_root / "src"))
-
-from xYang import parse_yang_file, YangValidator
+from xyang import parse_yang_file, YangValidator
 
 
 def test_leafref_relative_path_resolution():
