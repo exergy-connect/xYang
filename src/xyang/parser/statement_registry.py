@@ -6,7 +6,7 @@ from typing import Dict, Callable, Optional, TYPE_CHECKING
 from .parser_context import TokenStream, ParserContext
 
 if TYPE_CHECKING:
-    from .ast import YangStatement
+    from ..ast import YangStatement
 
 
 class StatementRegistry:

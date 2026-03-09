@@ -6,7 +6,7 @@ document validation (when, structure, must, type checks).
 """
 
 from .parser import parse_yang_file, parse_yang_string
-from .validator import YangValidator
+from .validator.yang_validator import YangValidator
 
 # Re-export for compatibility
 from .module import YangModule

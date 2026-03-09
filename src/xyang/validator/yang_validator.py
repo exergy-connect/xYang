@@ -1,10 +1,10 @@
 """
-xYang2 validator: uses xpath DocumentValidator for validation.
+xYang validator: uses xpath DocumentValidator for validation.
 """
 
 from typing import Any, Dict, List, Tuple
 
-from .module import YangModule
+from ..module import YangModule
 from .document_validator import DocumentValidator, ValidationError
 
 

@@ -7,13 +7,13 @@ Parses YANG module files and builds an in-memory representation.
 from pathlib import Path
 from typing import Optional
 
-from .module import YangModule
+from ..module import YangModule
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
-from .errors import YangSyntaxError
-from .ast import YangUsesStmt
+from ..errors import YangSyntaxError
+from ..ast import YangUsesStmt
 
 
 class YangParser:
@@ -171,7 +171,7 @@ class YangParser:
     
     def _expand_uses_in_statements(self, statements, module: YangModule):
         """Recursively expand uses statements in a list of statements."""
-        from .ast import YangStatement
+        from ..ast import YangStatement
         
         expanded = []
         for stmt in statements:

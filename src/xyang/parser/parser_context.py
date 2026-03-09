@@ -7,11 +7,11 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 from enum import Enum
 from typing import List, Tuple, Optional, TYPE_CHECKING
 from dataclasses import dataclass
-from .errors import YangSyntaxError
+from ..errors import YangSyntaxError
 
 if TYPE_CHECKING:
-    from .module import YangModule
-    from .ast import YangStatement, YangStatementList
+    from ..module import YangModule
+    from ..ast import YangStatement, YangStatementList
 
 
 class YangTokenType(Enum):

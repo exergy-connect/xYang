@@ -4,19 +4,19 @@ Statement parsers for YANG statements.
 
 from typing import Optional, TYPE_CHECKING
 from .parser_context import TokenStream, ParserContext, YangTokenType
-from .ast import (
+from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementWithMust,
     YangStatementWithWhen,
 )
-from .xpath import XPathParser
+from ..xpath import XPathParser
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
-    from .ast import YangStatement
-    from .module import YangModule
+    from ..ast import YangStatement
+    from ..module import YangModule
 
 
 class StatementParsers:
@@ -620,7 +620,7 @@ class StatementParsers:
         
         Recursively expands nested uses statements within the grouping.
         """
-        from .ast import YangUsesStmt
+        from ..ast import YangUsesStmt
         
         expanded = []
         for stmt in grouping.statements:
@@ -671,7 +671,7 @@ class StatementParsers:
     
     def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
         """Create a copy of a statement, handling AST nodes properly."""
-        from .ast import (
+        from ..ast import (
             YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt,
             YangTypeStmt, YangMustStmt, YangWhenStmt, YangChoiceStmt, YangCaseStmt
         )
@@ -751,7 +751,7 @@ class StatementParsers:
     
     def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
         """Apply refine modifications to a statement."""
-        from .ast import YangLeafStmt, YangContainerStmt, YangListStmt
+        from ..ast import YangLeafStmt, YangContainerStmt, YangListStmt
         
         # Apply refined type when target is a leaf
         if getattr(refine, 'type', None) is not None and isinstance(stmt, YangLeafStmt):
