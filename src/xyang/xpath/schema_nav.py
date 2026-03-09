@@ -15,6 +15,7 @@ from ..ast import (
     YangLeafStmt,
     YangListStmt,
 )
+from .utils import coerce_default_value
 
 
 class SchemaNav:
@@ -49,9 +50,34 @@ class SchemaNav:
 
     @staticmethod
     def default(schema: Any) -> Any:
-        """Return the default value for a leaf, or None."""
+        """
+        Return the schema default for a node, or None.
+
+        YangLeafStmt      -- schema.default (any scalar)
+        YangLeafListStmt  -- [schema.default] if schema.default is not None,
+                             else None. A leaf-list default is a single
+                             default element; wrap it in a list to match
+                             the expected data shape.
+        YangChoiceStmt    -- None. Choice defaults (default case) are
+                             structural and handled by the walker, not
+                             by value resolution.
+        YangContainerStmt -- None. Presence containers have no default;
+                             non-presence containers are always implicitly
+                             present when their children are present.
+        YangListStmt      -- None. Lists have no default value.
+        """
         if isinstance(schema, YangLeafStmt):
-            return schema.default
+            d = schema.default
+            if d is None:
+                return None
+            type_name = getattr(getattr(schema, "type", None), "name", None)
+            return coerce_default_value(d, type_name)
+        if isinstance(schema, YangLeafListStmt):
+            d = getattr(schema, "default", None)
+            if d is None:
+                return None
+            type_name = getattr(getattr(schema, "type", None), "name", None)
+            return [coerce_default_value(d, type_name)]
         return None
 
     @staticmethod

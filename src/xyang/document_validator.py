@@ -40,6 +40,7 @@ from .ast import (
 )
 from .xpath.evaluator import XPathEvaluator
 from .xpath.node import Context, Node
+from .xpath.schema_nav import SchemaNav
 from .xpath.utils import yang_bool
 from .xpath.validator import Validator as XPathValidator
 
@@ -350,6 +351,21 @@ class DocumentValidator:
         )
         return errors
 
+    def _effective_value(
+        self, data: Dict[str, Any], name: str, stmt: YangStatement
+    ) -> Any:
+        """
+        Return the effective value for a node:
+        - data[name] if present
+        - SchemaNav.default(stmt) if absent and a default exists
+        - None if truly absent
+
+        Does not modify data.
+        """
+        if name in data:
+            return data[name]
+        return SchemaNav.default(stmt)
+
     # ------------------------------------------------------------------
     # Tree walk
     # ------------------------------------------------------------------
@@ -421,7 +437,7 @@ class DocumentValidator:
         if not self._check_structural(stmt, name, data, child_path, errors):
             return
 
-        val = data.get(name)
+        val = self._effective_value(data, name, stmt)
         curr_ctx, curr_node = xpath_v.make_context(val, stmt, parent=parent_node)
 
         # -- 3. must (evaluated in current node context) --
@@ -459,11 +475,12 @@ class DocumentValidator:
             )
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
+            list_node = Node(val, stmt, parent_node)
             for entry in val:
                 key = self._entry_key(entry, stmt)
                 path.push(name, key)
                 entry_ctx, entry_node = xpath_v.make_context(
-                    entry, stmt, parent=parent_node
+                    entry, stmt, parent=list_node
                 )
                 self._check_must(
                     stmt, entry_ctx, entry_node, path.current(), errors
@@ -525,26 +542,26 @@ class DocumentValidator:
         errors: List[ValidationError],
     ) -> bool:
         present = name in data
-        val = data.get(name)
+        effective = self._effective_value(data, name, stmt)
 
         if isinstance(stmt, YangLeafStmt):
-            if not present and stmt.mandatory and stmt.default is None:
+            if effective is None and stmt.mandatory:
                 errors.append(
                     ValidationError(
                         path=path,
                         message=f"Mandatory leaf '{name}' is missing",
                     )
                 )
-            return present
+            return effective is not None
 
         if isinstance(stmt, YangContainerStmt):
             return present
 
         if isinstance(stmt, (YangListStmt, YangLeafListStmt)):
             count = (
-                len(val)
-                if isinstance(val, list)
-                else (1 if val is not None else 0)
+                len(effective)
+                if isinstance(effective, list)
+                else (1 if effective is not None else 0)
             )
             min_e = getattr(stmt, "min_elements", None)
             max_e = getattr(stmt, "max_elements", None)

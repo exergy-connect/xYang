@@ -2,9 +2,47 @@
 Utilities for xpath: YANG boolean coercion, node-set helpers, comparisons.
 """
 
-from typing import Any, List
+from typing import Any, List, Optional
 
 from .node import Node
+
+# Built-in YANG type names that need default value coercion for XPath comparison
+_YANG_BOOL_TYPE = "boolean"
+_YANG_INT_TYPES = frozenset(
+    {"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}
+)
+_YANG_FLOAT_TYPES = frozenset({"decimal64", "number"})
+
+
+def coerce_default_value(value: Any, type_name: Optional[str]) -> Any:
+    """
+    Coerce a schema default value to the Python type that matches the YANG type,
+    so path comparisons (e.g. /path/leaf = false()) evaluate correctly when the leaf is defaulted.
+
+    Returns the value unchanged if type_name is None or not a built-in type (e.g. typedef).
+    """
+    if value is None or type_name is None:
+        return value
+    if type_name == _YANG_BOOL_TYPE:
+        if value in (True, "true"):
+            return True
+        if value in (False, "false"):
+            return False
+    if type_name in _YANG_INT_TYPES:
+        if isinstance(value, int):
+            return value
+        try:
+            return int(value)
+        except (TypeError, ValueError):
+            pass
+    if type_name in _YANG_FLOAT_TYPES:
+        if isinstance(value, (int, float)):
+            return float(value)
+        try:
+            return float(value)
+        except (TypeError, ValueError):
+            pass
+    return value
 
 
 def yang_bool(val: Any) -> bool:
