@@ -47,6 +47,9 @@ packages = ["xYang"]
 [tool.setuptools.package-dir]
 "" = "."
 
+[tool.pyright]
+extraPaths = ["src"]
+
 [tool.pytest.ini_options]
 testpaths = ["tests"]
 python_files = ["test_*.py"]
