@@ -48,6 +48,125 @@ def _compare_greater(left: Any, right: Any) -> bool:
         return str(left) > str(right)
 
 
+def _bin_or(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    if yang_bool(node.left.accept(self)):
+        return True
+    return yang_bool(node.right.accept(self))
+
+
+def _bin_and(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    if not yang_bool(node.left.accept(self)):
+        return False
+    return yang_bool(node.right.accept(self))
+
+
+def _bin_compare(
+    self: 'ResolverVisitor', node: BinaryOpNode, compare: Any
+) -> Any:
+    left = node.left.accept(self)
+    right = node.right.accept(self)
+    return compare(left, right)
+
+
+def _bin_plus(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    left = node.left.accept(self)
+    right = node.right.accept(self)
+    if isinstance(left, str) and isinstance(right, str):
+        return left + right
+    try:
+        return float(left) + float(right)
+    except (TypeError, ValueError):
+        return str(left) + str(right)
+
+
+def _bin_minus(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    left = node.left.accept(self)
+    right = node.right.accept(self)
+    try:
+        return float(left) - float(right)
+    except (TypeError, ValueError):
+        return None
+
+
+_BINARY_OP_HANDLERS = {
+    'or': _bin_or,
+    'and': _bin_and,
+    '=': lambda self, n: _bin_compare(self, n, _compare_equal),
+    '!=': lambda self, n: _bin_compare(self, n, lambda l, r: not _compare_equal(l, r)),
+    '<': lambda self, n: _bin_compare(self, n, _compare_less),
+    '>': lambda self, n: _bin_compare(self, n, _compare_greater),
+    '<=': lambda self, n: _bin_compare(
+        self, n, lambda l, r: _compare_equal(l, r) or _compare_less(l, r)
+    ),
+    '>=': lambda self, n: _bin_compare(
+        self, n, lambda l, r: _compare_equal(l, r) or _compare_greater(l, r)
+    ),
+    '+': _bin_plus,
+    '-': _bin_minus,
+}
+
+
+def _fn_current(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    return self._current_value()
+
+
+def _fn_not(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return None
+    return not yang_bool(node.args[0].accept(self))
+
+
+def _fn_count(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return 0
+    val = node.args[0].accept(self)
+    if isinstance(val, list):
+        return len(val)
+    return 1 if val not in (None, "") else 0
+
+
+def _fn_string(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return ""
+    v = node.args[0].accept(self)
+    return "" if v is None else str(v)
+
+
+def _fn_number(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return float('nan')
+    try:
+        return float(node.args[0].accept(self))
+    except (TypeError, ValueError):
+        return float('nan')
+
+
+def _fn_bool(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return False
+    return yang_bool(node.args[0].accept(self))
+
+
+def _fn_string_length(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    if len(node.args) != 1:
+        return 0
+    v = node.args[0].accept(self)
+    return 0 if v is None else len(str(v))
+
+
+_FUNCTION_HANDLERS = {
+    'current': _fn_current,
+    'true': lambda self, node: True,
+    'false': lambda self, node: False,
+    'not': _fn_not,
+    'count': _fn_count,
+    'string': _fn_string,
+    'number': _fn_number,
+    'bool': _fn_bool,
+    'string-length': _fn_string_length,
+}
+
+
 class ResolverVisitor(Visitor):
     """Visitor that resolves XPath AST against data and schema."""
 
@@ -195,39 +314,10 @@ class ResolverVisitor(Visitor):
         return node.value
 
     def visit_binary_op(self, node: BinaryOpNode) -> Any:
-        left = node.left.accept(self)
-        if node.operator == 'or':
-            if yang_bool(left):
-                return True
-            return yang_bool(node.right.accept(self))
-        if node.operator == 'and':
-            if not yang_bool(left):
-                return False
-            return yang_bool(node.right.accept(self))
-        right = node.right.accept(self)
-        if node.operator == '=':
-            return _compare_equal(left, right)
-        if node.operator == '!=':
-            return not _compare_equal(left, right)
-        if node.operator == '<':
-            return _compare_less(left, right)
-        if node.operator == '>':
-            return _compare_greater(left, right)
-        if node.operator == '<=':
-            return _compare_equal(left, right) or _compare_less(left, right)
-        if node.operator == '>=':
-            return _compare_equal(left, right) or _compare_greater(left, right)
-        if node.operator == '+':
-            try:
-                return float(left) + float(right)
-            except (TypeError, ValueError):
-                return str(left) + str(right)
-        if node.operator == '-':
-            try:
-                return float(left) - float(right)
-            except (TypeError, ValueError):
-                return None
-        return None
+        handler = _BINARY_OP_HANDLERS.get(node.operator)
+        if handler is None:
+            return None
+        return handler(self, node)
 
     def visit_unary_op(self, node: UnaryOpNode) -> Any:
         if node.operator == 'not':
@@ -241,50 +331,10 @@ class ResolverVisitor(Visitor):
         return None
 
     def visit_function_call(self, node: FunctionCallNode) -> Any:
-        name = node.name.lower()
-        if name == 'current':
-            return self._current_value()
-        if name == 'true':
-            return True
-        if name == 'false':
-            return False
-        if name == 'not':
-            if len(node.args) != 1:
-                return None
-            return not yang_bool(node.args[0].accept(self))
-        if name == 'count':
-            if len(node.args) != 1:
-                return 0
-            val = node.args[0].accept(self)
-            if isinstance(val, list):
-                return len(val)
-            return 1 if val not in (None, "") else 0
-        if name == 'string':
-            if len(node.args) != 1:
-                return ""
-            v = node.args[0].accept(self)
-            if v is None:
-                return ""
-            return str(v)
-        if name == 'number':
-            if len(node.args) != 1:
-                return float('nan')
-            try:
-                return float(node.args[0].accept(self))
-            except (TypeError, ValueError):
-                return float('nan')
-        if name == 'bool':
-            if len(node.args) != 1:
-                return False
-            return yang_bool(node.args[0].accept(self))
-        if name == 'string-length':
-            if len(node.args) != 1:
-                return 0
-            v = node.args[0].accept(self)
-            if v is None:
-                return 0
-            return len(str(v))
-        return None
+        handler = _FUNCTION_HANDLERS.get(node.name.lower())
+        if handler is None:
+            return None
+        return handler(self, node)
 
     def _current_value(self) -> Any:
         """Value at original context path (current() semantics)."""
