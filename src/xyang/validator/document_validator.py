@@ -42,7 +42,7 @@ from ..xpath.validator import Validator as XPathValidator
 
 from .path_builder import PathBuilder
 from .type_checker import TypeChecker
-from .validation_error import ValidationError
+from .validation_error import ValidationError, Severity
 
 logger = logging.getLogger("xyang.validator")
 
@@ -66,7 +66,13 @@ class DocumentValidator:
         self._type_checker = TypeChecker()
         self._evaluator = XPathEvaluator()
 
-    def validate(self, data: Any) -> List[ValidationError]:
+    def validate(
+        self,
+        data: Any,
+        *,
+        leafref_severity: Severity = Severity.ERROR,
+    ) -> List[ValidationError]:
+        self._leafref_severity = leafref_severity
         errors: List[ValidationError] = []
         xpath_v = XPathValidator(data, self._root_schema)
         ctx, node = xpath_v.make_context(data, self._root_schema, parent=None)
@@ -246,11 +252,21 @@ class DocumentValidator:
                 evaluator=self._evaluator,
                 root_node=xpath_v._root,
             ):
-                errors.append(ValidationError(path=child_path, message=msg))
+                severity = (
+                    self._leafref_severity if type_name == "leafref" else Severity.ERROR
+                )
+                errors.append(
+                    ValidationError(
+                        path=child_path,
+                        message=msg,
+                        severity=severity,
+                    )
+                )
         elif isinstance(stmt, YangLeafListStmt) and stmt.type is not None:
             items = (
                 val if isinstance(val, list) else ([val] if val is not None else [])
             )
+            leaf_list_leafref = getattr(stmt.type, "name", None) == "leafref"
             for i, item in enumerate(items):
                 item_path = f"{child_path}[{i}]"
                 for msg in self._type_checker.check(
@@ -263,7 +279,18 @@ class DocumentValidator:
                     evaluator=self._evaluator,
                     root_node=xpath_v._root,
                 ):
-                    errors.append(ValidationError(path=item_path, message=msg))
+                    severity = (
+                        self._leafref_severity
+                        if leaf_list_leafref
+                        else Severity.ERROR
+                    )
+                    errors.append(
+                        ValidationError(
+                            path=item_path,
+                            message=msg,
+                            severity=severity,
+                        )
+                    )
 
         # -- 5. Descend --
         logger.debug("phase 5 descend path=%s", child_path)
