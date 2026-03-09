@@ -42,10 +42,10 @@ Repository = "https://github.com/exergy-connect/xYang.git"
 Issues = "https://github.com/exergy-connect/xYang/issues"
 
 [tool.setuptools]
-packages = ["xYang"]
+packages = ["xyang"]
 
 [tool.setuptools.package-dir]
-"" = "."
+"" = "src"
 
 [tool.pyright]
 extraPaths = ["src"]

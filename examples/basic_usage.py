@@ -5,7 +5,7 @@ Note: This is a minimal implementation. Must/when statements are parsed
 but not evaluated (would require a full XPath engine).
 """
 
-from xYang import parse_yang_file, parse_yang_string, YangValidator
+from xyang import parse_yang_file, parse_yang_string, YangValidator
 
 def example_parse_file():
     """Example: Parse a YANG file."""

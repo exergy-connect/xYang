@@ -7,7 +7,8 @@ import statistics
 from pathlib import Path
 from typing import List, Dict, Any
 
-from xYang import parse_yang_file, parse_yang_string, YangValidator, XPathEvaluator
+from xyang import parse_yang_file, parse_yang_string, YangValidator
+from xyang.xpath import XPathEvaluator
 
 
 class Benchmark:
@@ -166,8 +167,8 @@ def benchmark_xpath_count():
 
 def benchmark_type_validation():
     """Benchmark type validation."""
-    from xYang import TypeSystem
-    from xYang.types import TypeConstraint
+    from xyang import TypeSystem
+    from xyang.types import TypeConstraint
 
     type_system = TypeSystem()
     constraint = TypeConstraint(
