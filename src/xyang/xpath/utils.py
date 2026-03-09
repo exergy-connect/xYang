@@ -59,9 +59,11 @@ def yang_bool(val: Any) -> bool:
 
 
 def node_set_values(val: Any) -> List[Any]:
-    """Extract scalar data values from a node-set (list of Node) or scalar."""
+    """Extract scalar data values from a node-set (list of Node), single Node, or scalar."""
     if isinstance(val, list):
         return [n.data if isinstance(n, Node) else n for n in val]
+    if isinstance(val, Node):
+        return [val.data]
     return [] if val is None else [val]
 
 

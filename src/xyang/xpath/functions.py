@@ -7,26 +7,13 @@ ctx and node follow the same contract as evaluator methods.
 
 from typing import Any, List, Optional
 
-from .ast import PathNode, PathSegment
 from .node import Node
 from .utils import first_value, is_nodeset, yang_bool
 
 
-def _parse_path(path_str: str) -> Optional[PathNode]:
-    """Parse a simple slash-separated path string (no predicates)."""
-    path_str = path_str.strip()
-    if not path_str:
-        return None
-    is_absolute = path_str.startswith("/")
-    parts = [p for p in path_str.strip("/").split("/") if p]
-    if not parts:
-        return None
-    return PathNode([PathSegment(p) for p in parts], is_absolute)
-
-
 def f_current(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
-    """current() returns the validation anchor, never the predicate cursor."""
-    return ctx.current.data if ctx.current is not None else ""
+    """current() returns the validation anchor (as a Node) so current()/child works."""
+    return ctx.current if ctx.current is not None else None
 
 
 def f_not(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
@@ -105,12 +92,12 @@ def f_translate(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
 
 def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
     """
-    deref(path): resolve a leafref to its target container nodes.
+    deref(path): resolve a leafref to its target nodes.
     1. Evaluate path argument to get source nodes.
     2. Read leafref path from schema of each source node.
     3. Resolve that path from root.
     4. Filter targets whose data matches the source value.
-    5. Return parent of each match so deref(...)/../sibling works.
+    5. Return each match (the referenced node); use deref(...)/.. to get the container.
     """
     if len(ast.args) != 1:
         return []
@@ -127,19 +114,17 @@ def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
         if not leafref_path:
             continue
 
-        if isinstance(leafref_path, PathNode):
-            target_path = leafref_path
-            start = ctx.root if leafref_path.is_absolute else node
-        else:
-            target_path = _parse_path(leafref_path)
-            if target_path is None:
-                continue
-            start = ctx.root if leafref_path.startswith("/") else node
-        targets = ev.eval_path(target_path, ctx, start)
+        # YANG: path is relative to the node that contains the leafref (parent of the leaf)
+        start = (
+            ctx.root
+            if leafref_path.is_absolute
+            else (src.parent if src.parent is not None else node)
+        )
+        targets = ev.eval_path(leafref_path, ctx, start)
 
         for t in targets:
             if t.data == src.data:
-                results.append(t.parent if t.parent is not None else t)
+                results.append(t)
 
     return results
 

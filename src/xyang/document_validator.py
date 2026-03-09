@@ -164,6 +164,20 @@ class TypeChecker:
             return self._check_enum(value, type_stmt)
         if name == "empty":
             return self._check_empty(value)
+        # Resolve typedef and check against the underlying type
+        if getattr(root_schema, "get_typedef", None) is not None:
+            typedef = root_schema.get_typedef(name)
+            if typedef is not None and typedef.type is not None:
+                return self.check(
+                    value,
+                    typedef.type,
+                    path,
+                    root_data,
+                    root_schema,
+                    context_node=context_node,
+                    evaluator=evaluator,
+                    root_node=root_node,
+                )
         return []
 
     def _check_union(
@@ -203,7 +217,11 @@ class TypeChecker:
                     f"Leafref relative path {path_ast.to_string()!r} requires context node"
                 ]
             start_node = context_node
-        ctx = Context(current=start_node, root=root_node)
+        # current() in path predicates must refer to the node containing this leaf
+        ctx = Context(
+            current=context_node if context_node is not None else start_node,
+            root=root_node,
+        )
         target_nodes = evaluator.eval_path(path_ast, ctx, start_node)
         targets = [n.data for n in target_nodes]
         if value not in targets:
@@ -414,9 +432,16 @@ class DocumentValidator:
         child_path = path.child(name)
         parent_ctx_obj, parent_node = parent_ctx
 
-        # -- 1. when (evaluated in parent context) --
+        # -- 2. Structural checks (need before when so we have val for context) --
+        if not self._check_structural(stmt, name, data, child_path, errors):
+            return
+
+        val = self._effective_value(data, name, stmt)
+        curr_ctx, curr_node = xpath_v.make_context(val, stmt, parent=parent_node)
+
+        # -- 1. when (context node is the node the when is attached to, so child) --
         if isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
-            when_ok = self._eval_expr(stmt.when.ast, parent_ctx_obj, parent_node)
+            when_ok = self._eval_expr(stmt.when.ast, curr_ctx, curr_node)
             if when_ok is None:
                 when_ok = True
             if not when_ok and present:
@@ -434,18 +459,25 @@ class DocumentValidator:
             if not when_ok:
                 return
 
-        # -- 2. Structural checks --
-        if not self._check_structural(stmt, name, data, child_path, errors):
-            return
-
-        val = self._effective_value(data, name, stmt)
-        curr_ctx, curr_node = xpath_v.make_context(val, stmt, parent=parent_node)
-
         # -- 3. must (evaluated in current node context) --
         if isinstance(stmt, YangStatementWithMust) and not isinstance(
             stmt, YangListStmt
         ):
-            self._check_must(stmt, curr_ctx, curr_node, child_path, errors)
+            if isinstance(stmt, YangLeafListStmt):
+                # Leaf-list: evaluate must per element; skip when empty
+                items = (
+                    val
+                    if isinstance(val, list)
+                    else ([val] if val is not None else [])
+                )
+                for i, item in enumerate(items):
+                    item_ctx, item_node = xpath_v.make_context(
+                        item, stmt, parent=parent_node
+                    )
+                    item_path = f"{child_path}[{i}]"
+                    self._check_must(stmt, item_ctx, item_node, item_path, errors)
+            else:
+                self._check_must(stmt, curr_ctx, curr_node, child_path, errors)
 
         # -- 4. Type check --
         if (
@@ -490,10 +522,14 @@ class DocumentValidator:
             )
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
+            key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
+            if self._check_list_key_uniqueness(
+                val, key_names, name, child_path, errors
+            ):
+                return  # duplicate key; skip per-entry validation
             list_node = Node(val, stmt, parent_node)
             for entry in val:
-                key = self._entry_key(entry, stmt)
-                path.push(name, key)
+                path.push(name, self._entry_key_from_names(entry, key_names))
                 entry_ctx, entry_node = xpath_v.make_context(
                     entry, stmt, parent=list_node
                 )
@@ -652,9 +688,52 @@ class DocumentValidator:
     # Utilities
     # ------------------------------------------------------------------
 
+    def _check_list_key_uniqueness(
+        self,
+        val: list,
+        key_names: List[str],
+        list_name: str,
+        path_str: str,
+        errors: List[ValidationError],
+    ) -> bool:
+        """Report duplicate key in list. Returns True if duplicate found."""
+        if not key_names:
+            return False
+        seen_keys: Dict[tuple, int] = {}
+        for i, entry in enumerate(val):
+            if not isinstance(entry, dict):
+                continue
+            key_tuple = tuple(entry.get(k) for k in key_names)
+            if key_tuple in seen_keys:
+                first_idx = seen_keys[key_tuple]
+                key_display = ", ".join(
+                    f"{k}='{entry.get(k)}'" for k in key_names
+                )
+                errors.append(
+                    ValidationError(
+                        path=path_str,
+                        message=(
+                            f"Duplicate key in list '{list_name}': {key_display} "
+                            f"(entries at index {first_idx} and {i})"
+                        ),
+                        expression="",
+                    )
+                )
+                return True
+            seen_keys[key_tuple] = i
+        return False
+
+    def _entry_key_from_names(
+        self, entry: Any, key_names: List[str]
+    ) -> Optional[str]:
+        """Path key string for a list entry from key leaf names."""
+        if not isinstance(entry, dict) or not key_names:
+            return None
+        parts = [f"{k}='{entry.get(k)}'" for k in key_names]
+        return ", ".join(parts) if parts else None
+
     def _entry_key(self, entry: Any, list_stmt: YangListStmt) -> Optional[str]:
         if not isinstance(entry, dict) or not list_stmt.key:
             return None
-        key_name = list_stmt.key.strip()
-        val = entry.get(key_name)
-        return f"{key_name}='{val}'" if val is not None else None
+        key_names = [k.strip() for k in list_stmt.key.split()]
+        return self._entry_key_from_names(entry, key_names)

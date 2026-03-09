@@ -8,6 +8,7 @@ Groupings are pre-expanded during parsing; uses/grouping resolution is never nee
 
 from typing import Any, List, Optional
 
+from .ast import PathNode
 from ..ast import (
     YangCaseStmt,
     YangChoiceStmt,
@@ -91,8 +92,8 @@ class SchemaNav:
         return isinstance(schema, YangLeafListStmt)
 
     @staticmethod
-    def leafref_path(schema: Any) -> Optional[Any]:
-        """Return the leafref path (parsed PathNode) if this leaf is a leafref, else None."""
+    def leafref_path(schema: Any) -> Optional[PathNode]:
+        """Return the leafref path if this leaf is a leafref, else None."""
         if not isinstance(schema, YangLeafStmt):
             return None
         t = schema.type
