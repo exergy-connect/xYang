@@ -1,5 +1,12 @@
 """
 Constraint validator for YANG must/when statements.
+
+Leaf-list must evaluation follows XPath 1.0 semantics: the context node is the
+node containing the constraint; for a leaf-list the constraint is evaluated
+once per list element with that element as the context node. Relative paths
+(.., ../type, etc.) are resolved from the context node; .. is the parent.
+See docs/xpath-must-semantics.md for full semantics (node-sets, predicates,
+comparisons, empty node-set → false).
 """
 
 import logging
@@ -316,8 +323,9 @@ class ConstraintValidator:
                 self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, child_context, actual_schema_node)
         
         elif isinstance(child_stmt, YangLeafListStmt):
-            # Leaf-list: evaluate must constraints per-element with current() bound to each value
-            # Get the leaf-list values from root_data
+            # Leaf-list: per XPath 1.0 semantics the context node is the node containing the
+            # constraint; for a leaf-list we evaluate once per list element with that element
+            # as context (see docs/xpath-must-semantics.md). So .. = parent, ../type = parent's type.
             leaf_list_data = self._navigate_path(root_data, child_path)
             
             # Check if field exists - navigate to parent and check
@@ -344,12 +352,10 @@ class ConstraintValidator:
                            child_stmt.name, type(leaf_list_data).__name__ if leaf_list_data is not None else "None")
                 return
             
-            # Evaluate must constraints once per value with current() bound to each value
-            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
+            # Context node = this list element; current() and . resolve to the value at value_path
+            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values",
                         len(child_stmt.must_statements), child_stmt.name, len(leaf_list_data))
             for value_idx, value in enumerate(leaf_list_data):
-                # Create evaluator context for this specific value
-                # current() should be bound to this value
                 value_path = child_path + [value_idx]
                 value_context = self._create_evaluator_context(value_path, root_data)
                 
@@ -649,8 +655,7 @@ class ConstraintValidator:
                 self._evaluate_must_constraint(evaluator, must, actual_schema_node.name, actual_schema_node.mandatory, leaf_context, actual_schema_node)
         
         elif isinstance(stmt, YangLeafListStmt):
-            # Leaf-list: evaluate must constraints per-element with current() bound to each value
-            # Get the leaf-list values from root_data
+            # Leaf-list: per XPath semantics evaluate once per element, context node = that element
             leaf_list_data = self._navigate_path(root_data, current_path)
             
             # Check if field exists - navigate to parent and check
@@ -677,12 +682,10 @@ class ConstraintValidator:
                            stmt.name, type(leaf_list_data).__name__ if leaf_list_data is not None else "None")
                 return
             
-            # Evaluate must constraints once per value with current() bound to each value
-            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values", 
+            # Context node = this list element (see docs/xpath-must-semantics.md)
+            logger.debug("Evaluating %d must constraints for leaf-list %s with %d values",
                         len(stmt.must_statements), stmt.name, len(leaf_list_data))
             for value_idx, value in enumerate(leaf_list_data):
-                # Create evaluator context for this specific value
-                # current() should be bound to this value
                 value_path = current_path + [value_idx]
                 value_context = self._create_evaluator_context(value_path, root_data)
                 

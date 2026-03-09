@@ -54,9 +54,12 @@ class StructureValidator:
         
         # First pass: collect valid field names, handling choice cases
         # Only consider fields defined in the current context's statements
+        # When context = node that has the when (RFC 7950), so ../ in when means parent of that node.
         choice_data = data if isinstance(data, dict) else {}
         for stmt in statements:
-            # Check when condition (xpath_new AST; resolve via Visitor)
+            when_path = list(context_path) if context_path else []
+            if hasattr(stmt, 'name') and stmt.name:
+                when_path = when_path + [stmt.name]
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is not None:
@@ -64,20 +67,20 @@ class StructureValidator:
                         from ..xpath_new import ResolverVisitor
                         from ..xpath.utils import yang_bool
                         visitor = ResolverVisitor(
-                            data, list(context_path) if context_path else [],
+                            data, when_path,
                             root_data=root_data, module=self.module,
                         )
                         if not yang_bool(visitor.resolve(ast)):
                             continue
                     else:
                         evaluator = self.evaluator_factory(
-                            data, self.module, context_path=context_path
+                            data, self.module, context_path=when_path
                         )
                         from ..xpath.context import Context
                         context = Context(
                             data=data,
-                            context_path=context_path.copy() if context_path else [],
-                            original_context_path=context_path.copy() if context_path else [],
+                            context_path=when_path.copy(),
+                            original_context_path=when_path.copy(),
                             original_data=data,
                             root_data=data,
                         )
@@ -118,7 +121,10 @@ class StructureValidator:
         
         # Second pass: validate the data
         for stmt in statements:
-            # Check when condition (xpath_new AST; resolve via Visitor)
+            # Check when condition (same context as first pass: node that has the when)
+            when_path = list(context_path) if context_path else []
+            if hasattr(stmt, 'name') and stmt.name:
+                when_path = when_path + [stmt.name]
             if hasattr(stmt, 'when') and stmt.when:
                 ast = getattr(stmt.when, 'ast', None)
                 if ast is not None:
@@ -126,26 +132,26 @@ class StructureValidator:
                         from ..xpath_new import ResolverVisitor
                         from ..xpath.utils import yang_bool
                         visitor = ResolverVisitor(
-                            data, list(context_path) if context_path else [],
+                            data, when_path,
                             root_data=root_data, module=self.module,
                         )
                         if not yang_bool(visitor.resolve(ast)):
                             continue
                     else:
                         evaluator = self.evaluator_factory(
-                            data, self.module, context_path=context_path
+                            data, self.module, context_path=when_path
                         )
                         from ..xpath.context import Context
                         context = Context(
                             data=data,
-                            context_path=context_path.copy() if context_path else [],
-                            original_context_path=context_path.copy() if context_path else [],
+                            context_path=when_path.copy(),
+                            original_context_path=when_path.copy(),
                             original_data=data,
                             root_data=data,
                         )
                         if not evaluator.evaluate_ast(ast, context):
                             continue
-            
+
             if isinstance(stmt, YangLeafStmt):
                 self._validate_leaf(data, stmt, context_path)
             elif isinstance(stmt, YangListStmt):

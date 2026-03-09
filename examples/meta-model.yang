@@ -218,7 +218,7 @@ module meta-model {
       type field-name;
       mandatory true;
       description "Field name";
-      must "string-length(.) - string-length(translate(., '_', '')) <= number(../../../../../max_name_underscores)" {
+      must "string-length(.) - string-length(translate(., '_', '')) <= number(/data-model/max_name_underscores)" {
         error-message "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
         description "Validates that field name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
       }
@@ -499,7 +499,7 @@ module meta-model {
         type field-name;
         description "List of required field names (auto-generated)";
       }
-      must "/data-model/consolidated = true() or ../allow_unlimited_fields = 'true' or ../allow_unlimited_fields = true() or count(fields[type != 'array']) <= 7" {
+      must "/data-model/consolidated = true() or ../../allow_unlimited_fields = 'true' or ../../allow_unlimited_fields = true() or count(fields[type != 'array']) <= 7" {
         error-message "Entity has more than 7 non-array fields. Array fields are excluded from this count as they represent relationships to child entities. Consider splitting into multiple entities with foreign key relationships, or set allow_unlimited_fields: true to bypass this limit.";
         description "Validates that entity has at most 7 non-array fields, unless allow_unlimited_fields is true. Field limits are enforced in Phase 1 (individual file validation, consolidated=false) using the file's allow_unlimited_fields setting. In Phase 2 (combined validation, consolidated=true), this constraint is skipped as field limits are already validated per-file.";
       }

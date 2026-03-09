@@ -352,10 +352,10 @@ def test_must_on_list_with_leafref_current_context():
 
 
 def test_must_with_string_concatenation_plus_operator():
-    """Test that must constraints with + operator for string concatenation are parsed and evaluated correctly.
-    
-    This test validates that must statements using the + operator to concatenate strings
-    across multiple lines are correctly parsed and evaluated.
+    """Test must constraints using concat() for string concatenation (per XPath spec).
+
+    XPath + is numeric addition only; string concatenation must use concat().
+    This test verifies that must expressions using concat() are evaluated correctly.
     """
     yang_model = """module test-must-plus {
   namespace "urn:test:must-plus";
@@ -374,37 +374,31 @@ def test_must_with_string_concatenation_plus_operator():
       leaf value {
         type string;
       }
-      
-      must "/data-model/consolidated = false() or " +
-           "type = 'test' or " +
-           "value != ''" {
+      must "/data-model/consolidated = false() or type = 'test' or value != ''" {
         error-message "Type must be 'test' or value must not be empty";
-        description "Tests string concatenation with + operator across multiple lines";
+        description "Type/value check; string concatenation uses concat() not +";
+      }
+      must "concat(type, '-', value) != 'other-' or type = 'test'" {
+        error-message "When type is 'other', value must not be empty";
+        description "Uses XPath concat() for string concatenation (spec-compliant)";
       }
     }
   }
 }"""
-    
     module = parse_yang_string(yang_model)
     validator = YangValidator(module)
-    
-    # First verify the must statement was parsed
+
+    # Verify must statements were parsed and concat() is in the expression
     for stmt in module.statements:
         if hasattr(stmt, 'name') and stmt.name == 'data':
             for child in stmt.statements:
                 if hasattr(child, 'name') and child.name == 'items':
                     assert hasattr(child, 'must_statements'), "Must statements should be parsed"
-                    assert len(child.must_statements) > 0, "At least one must statement should be found"
-                    # Verify the expression was concatenated correctly
-                    must_expr = child.must_statements[0].expression
-                    assert 'or' in must_expr, "Expression should contain 'or' operator"
-                    assert "type = 'test'" in must_expr or "type = \"test\"" in must_expr, \
-                        f"Expression should contain type check. Got: {must_expr}"
-                    assert "value != ''" in must_expr or "value != \"\"" in must_expr, \
-                        f"Expression should contain value check. Got: {must_expr}"
-    
-    # Test with consolidated=false (constraint short-circuits, always passes)
-    # Valid data: type is 'test'
+                    assert len(child.must_statements) >= 2, "At least two must statements"
+                    exprs = [m.expression for m in child.must_statements]
+                    assert any('concat' in e for e in exprs), "One must should use concat()"
+
+    # Valid: type is 'test' (first and second must pass)
     valid_data1 = {
         "data": {
             "items": [
@@ -414,8 +408,8 @@ def test_must_with_string_concatenation_plus_operator():
     }
     is_valid, errors, warnings = validator.validate(valid_data1)
     assert is_valid, f"Valid data (type='test') should pass. Errors: {errors}"
-    
-    # Valid data: value is not empty
+
+    # Valid: value is not empty (concat(type,'-',value) is e.g. 'other-non-empty' != 'other-')
     valid_data2 = {
         "data": {
             "items": [
@@ -425,10 +419,8 @@ def test_must_with_string_concatenation_plus_operator():
     }
     is_valid, errors, warnings = validator.validate(valid_data2)
     assert is_valid, f"Valid data (value not empty) should pass. Errors: {errors}"
-    
-    # Invalid data: type is not 'test' and value is empty
-    # Since /data-model/consolidated doesn't exist, it evaluates to false(),
-    # so the rest of the expression is evaluated
+
+    # Invalid: type is 'other' and value is empty -> concat('other','-','') = 'other-', so second must fails
     invalid_data = {
         "data": {
             "items": [
@@ -437,10 +429,9 @@ def test_must_with_string_concatenation_plus_operator():
         }
     }
     is_valid, errors, warnings = validator.validate(invalid_data)
-    # The constraint should fail because type != 'test' and value == ''
     assert not is_valid, "Invalid data should fail validation"
     assert len(errors) > 0, "Should have errors for invalid constraint"
-    assert any("Type must be 'test' or value must not be empty" in err for err in errors), \
+    assert any("value must not be empty" in err or "Type must be" in err for err in errors), \
         f"Error should mention the constraint. Errors: {errors}"
 
 

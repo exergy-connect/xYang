@@ -2,8 +2,9 @@
 Resolver visitor: evaluates XPath AST against data and schema.
 
 Uses (data, context_path, root_data, module) to resolve paths and
-current(). Returns JSON-like values; for when/must the result is
-coerced to bool via yang_bool.
+current(). Each node in the data tree is represented with an explicit
+parent pointer so ".." is current = current.parent (like most XPath engines).
+Returns JSON-like values; for when/must the result is coerced to bool via yang_bool.
 """
 
 from typing import Any, List, Optional
@@ -21,31 +22,76 @@ from .ast import (
 from .visitor import Visitor
 
 
+class Node:
+    """A node in the data tree with explicit parent. .. becomes current = current.parent."""
+
+    __slots__ = ('data', 'parent')
+
+    def __init__(self, data: Any, parent: Optional['Node'] = None):
+        self.data = data
+        self.parent = parent
+
+
+def _node_set_values(val: Any) -> List[Any]:
+    """Extract comparable values from a path result (node-set or scalar)."""
+    if isinstance(val, list):
+        if not val or isinstance(val[0], Node):
+            return [n.data for n in val]
+        return val
+    return [val] if val is not None else []
+
+
 def _compare_equal(left: Any, right: Any) -> bool:
-    """YANG/XPath equality: type coercion for bool/int/string."""
-    if left is None and right is None:
-        return True
-    if left is None or right is None:
-        return False
-    if isinstance(left, bool) or isinstance(right, bool):
-        return yang_bool(left) == yang_bool(right)
-    if isinstance(left, (int, float)) and isinstance(right, (int, float)):
-        return float(left) == float(right)
-    return str(left).strip() == str(right).strip()
+    """XPath equality: node-set vs scalar → true if any node matches; type coercion."""
+    left_vals = _node_set_values(left)
+    right_vals = _node_set_values(right)
+    if not left_vals or not right_vals:
+        return not left_vals and not right_vals
+    for lv in left_vals:
+        for rv in right_vals:
+            if lv is None and rv is None:
+                return True
+            if lv is None or rv is None:
+                continue
+            if isinstance(lv, bool) or isinstance(rv, bool):
+                if yang_bool(lv) == yang_bool(rv):
+                    return True
+            elif isinstance(lv, (int, float)) and isinstance(rv, (int, float)):
+                if float(lv) == float(rv):
+                    return True
+            elif str(lv).strip() == str(rv).strip():
+                return True
+    return False
 
 
 def _compare_less(left: Any, right: Any) -> bool:
-    try:
-        return float(left) < float(right)
-    except (TypeError, ValueError):
-        return str(left) < str(right)
+    """XPath: node-set op scalar/node-set → true if any pair satisfies <."""
+    left_vals = _node_set_values(left)
+    right_vals = _node_set_values(right)
+    for lv in left_vals:
+        for rv in right_vals:
+            try:
+                if float(lv) < float(rv):
+                    return True
+            except (TypeError, ValueError):
+                if str(lv) < str(rv):
+                    return True
+    return False
 
 
 def _compare_greater(left: Any, right: Any) -> bool:
-    try:
-        return float(left) > float(right)
-    except (TypeError, ValueError):
-        return str(left) > str(right)
+    """XPath: node-set op scalar/node-set → true if any pair satisfies >."""
+    left_vals = _node_set_values(left)
+    right_vals = _node_set_values(right)
+    for lv in left_vals:
+        for rv in right_vals:
+            try:
+                if float(lv) > float(rv):
+                    return True
+            except (TypeError, ValueError):
+                if str(lv) > str(rv):
+                    return True
+    return False
 
 
 def _bin_or(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
@@ -69,23 +115,31 @@ def _bin_compare(
 
 
 def _bin_plus(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    """XPath + is numeric addition only; string concatenation uses concat()."""
     left = node.left.accept(self)
     right = node.right.accept(self)
-    if isinstance(left, str) and isinstance(right, str):
-        return left + right
+    lv = _node_set_values(left)
+    rv = _node_set_values(right)
+    l = lv[0] if lv else None
+    r = rv[0] if rv else None
     try:
-        return float(left) + float(right)
+        return float(l) + float(r)
     except (TypeError, ValueError):
-        return str(left) + str(right)
+        return float('nan')
 
 
 def _bin_minus(self: 'ResolverVisitor', node: BinaryOpNode) -> Any:
+    """XPath - is numeric subtraction; node-sets use first value."""
     left = node.left.accept(self)
     right = node.right.accept(self)
+    lv = _node_set_values(left)
+    rv = _node_set_values(right)
+    l = lv[0] if lv else None
+    r = rv[0] if rv else None
     try:
-        return float(left) - float(right)
+        return float(l) - float(r)
     except (TypeError, ValueError):
-        return None
+        return float('nan')
 
 
 _BINARY_OP_HANDLERS = {
@@ -117,26 +171,32 @@ def _fn_not(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
 
 
 def _fn_count(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    """XPath count(node-set) = number of nodes. Only node-sets; scalars count as 1."""
     if len(node.args) != 1:
         return 0
     val = node.args[0].accept(self)
-    if isinstance(val, list):
+    if isinstance(val, list) and (not val or isinstance(val[0], Node)):
         return len(val)
-    return 1 if val not in (None, "") else 0
+    return 1
 
 
 def _fn_string(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
     if len(node.args) != 1:
         return ""
     v = node.args[0].accept(self)
+    vals = _node_set_values(v)
+    v = vals[0] if vals else None
     return "" if v is None else str(v)
 
 
 def _fn_number(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
     if len(node.args) != 1:
         return float('nan')
+    v = node.args[0].accept(self)
+    vals = _node_set_values(v)
+    v = vals[0] if vals else None
     try:
-        return float(node.args[0].accept(self))
+        return float(v)
     except (TypeError, ValueError):
         return float('nan')
 
@@ -151,11 +211,44 @@ def _fn_string_length(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
     if len(node.args) != 1:
         return 0
     v = node.args[0].accept(self)
+    vals = _node_set_values(v)
+    v = vals[0] if vals else None
     return 0 if v is None else len(str(v))
+
+
+def _fn_translate(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    """XPath translate(source, from_chars, to_chars): replace/delete chars in source."""
+    if len(node.args) != 3:
+        return ""
+    s = node.args[0].accept(self)
+    sv = _node_set_values(s)
+    source = str(sv[0] if sv else None or "")
+    from_chars = str(node.args[1].accept(self) or "").strip("'\"")
+    to_chars = str(node.args[2].accept(self) or "").strip("'\"")
+    if not from_chars:
+        return source
+    if not to_chars:
+        return "".join(c for c in source if c not in from_chars)
+    trans = {}
+    to_len = len(to_chars)
+    for i, c in enumerate(from_chars):
+        trans[ord(c)] = to_chars[i] if i < to_len else None
+    return source.translate(trans)
+
+
+def _fn_concat(self: 'ResolverVisitor', node: FunctionCallNode) -> Any:
+    """XPath concat(str1, str2, ...): string concatenation (use this instead of + for strings)."""
+    parts = []
+    for arg in node.args:
+        v = arg.accept(self)
+        vals = _node_set_values(v)
+        parts.append("" if not vals else str(vals[0]))
+    return "".join(parts)
 
 
 _FUNCTION_HANDLERS = {
     'current': _fn_current,
+    'concat': _fn_concat,
     'true': lambda self, node: True,
     'false': lambda self, node: False,
     'not': _fn_not,
@@ -164,6 +257,7 @@ _FUNCTION_HANDLERS = {
     'number': _fn_number,
     'bool': _fn_bool,
     'string-length': _fn_string_length,
+    'translate': _fn_translate,
 }
 
 
@@ -178,7 +272,9 @@ class ResolverVisitor(Visitor):
         module: Any = None,
         original_context_path: Optional[List[Any]] = None,
         original_data: Optional[Any] = None,
-    ):
+        initial_node: Optional[Node] = None,
+        current_from_outer: bool = False,
+    ) -> None:
         self.data = data
         self.context_path = list(context_path)
         self.root_data = root_data if root_data is not None else data
@@ -188,46 +284,119 @@ class ResolverVisitor(Visitor):
             else self.context_path
         )
         self.original_data = original_data if original_data is not None else data
+        self.initial_node = initial_node
+        self.current_from_outer = current_from_outer
         self._current_cache: dict = {}
 
     def resolve(self, node: Any) -> Any:
         """Resolve an AST node to a value. Entry point."""
         return node.accept(self)
 
+    def _build_initial_node(self, root_data: Any, path: List[Any]) -> Node:
+        """Build a Node at path from root; parent is always the actual parent (list or container)."""
+        if not path:
+            return Node(root_data, None)
+        cur_data = root_data
+        cur_node: Optional[Node] = Node(root_data, None)
+        for part in path:
+            if cur_data is None:
+                return Node(None, cur_node)
+            if isinstance(cur_data, dict) and part in cur_data:
+                cur_data = cur_data[part]
+            elif isinstance(cur_data, list) and isinstance(part, int) and 0 <= part < len(cur_data):
+                cur_data = cur_data[part]
+            else:
+                cur_data = None
+            cur_node = Node(cur_data, cur_node)
+        # Leaf-list value: path ends with list index and value is scalar. For .. we need the
+        # container (sibling of the list), not the list, so ../min_value etc. resolve.
+        if (
+            len(path) >= 2
+            and isinstance(path[-1], int)
+            and cur_data is not None
+            and not isinstance(cur_data, (dict, list))
+            and cur_node.parent is not None
+            and cur_node.parent.parent is not None
+        ):
+            cur_node = Node(cur_data, cur_node.parent.parent)
+        return cur_node
+
     def visit_path_node(self, node: PathNode) -> Any:
-        """Resolve path: navigate from current or root by segments."""
-        if node.is_absolute:
-            current = self.root_data
-            path: List[Any] = []
+        """Resolve path; returns node-set (list of Node). .. = actual parent; no collapsing."""
+        if self.initial_node is not None:
+            nodes: List[Node] = [self.initial_node]
+            path: List[Any] = []  # optional; not tracked for initial_node
+        elif node.is_absolute:
+            nodes = [Node(self.root_data, None)]
+            path = []
         else:
             if not self.context_path:
-                # Relative path with empty context (e.g. in predicate): start at self.data
-                current = self.data
-                path = []
+                nodes = [Node(self.data, None)]
             else:
-                current = self._get_at_path(
-                    self.root_data, self.context_path
-                )
-                path = list(self.context_path)
+                nodes = [self._build_initial_node(self.root_data, self.context_path)]
+            path = list(self.context_path)
         for seg in node.segments:
             if seg.step == '..':
-                path, current = self._go_up(path, current)
+                nodes = [n.parent for n in nodes if n.parent is not None]
+                if path:
+                    path = path[:-1]
             elif seg.step == '.':
                 pass
             else:
-                parent = current
-                current = self._step_down(current, seg.step, seg.predicate)
-                if current is None and isinstance(parent, dict) and seg.step in parent and parent[seg.step] is None:
-                    # Key present with value None: node exists (e.g. empty-type leaf), evaluate as present
-                    current = True
-                if current is None:
-                    return None
-                if isinstance(current, list) and len(current) == 1:
-                    current = current[0]
-                path = path + [seg.step]
-        if isinstance(current, list):
-            return current
-        return current if current is not None else ""
+                new_nodes: List[Node] = []
+                for n in nodes:
+                    parent_data = n.data
+                    raw = self._step_down_from_node(n, seg.step, seg.predicate)
+                    if raw is None and isinstance(parent_data, dict) and seg.step in parent_data and parent_data[seg.step] is None:
+                        raw = True
+                    if raw is None and self.module and len(nodes) == 1:
+                        full_path = path + [seg.step]
+                        default_val = self._get_schema_default_at_path(full_path)
+                        if default_val is not None:
+                            raw = default_val
+                    if raw is None:
+                        continue
+                    if isinstance(raw, list):
+                        for item in raw:
+                            new_nodes.append(Node(item, n))
+                    else:
+                        new_nodes.append(Node(raw, n))
+                nodes = new_nodes
+                if path is not None:
+                    path = (path + [seg.step]) if len(nodes) == 1 else None
+        return nodes
+
+    def _get_schema_default_at_path(self, path_parts: List[Any]) -> Optional[Any]:
+        """Return schema default for the leaf at path_parts, or None. Drops list indices."""
+        if not self.module or not path_parts:
+            return None
+        schema_path = [p for p in path_parts if not isinstance(p, int)]
+        if not schema_path:
+            return None
+        statements = getattr(self.module, 'statements', [])
+        for i, part in enumerate(schema_path):
+            if not isinstance(part, str):
+                continue
+            found = None
+            for stmt in statements:
+                if getattr(stmt, 'name', None) == part:
+                    found = stmt
+                    break
+            if found is None:
+                return None
+            if i == len(schema_path) - 1:
+                # Reached the target node; only leaves have default
+                default = getattr(found, 'default', None)
+                return default
+            if hasattr(found, 'statements') and found.statements:
+                statements = found.statements
+            elif hasattr(found, 'cases'):
+                statements = []
+                for case in getattr(found, 'cases', []):
+                    statements.extend(getattr(case, 'statements', []))
+            else:
+                return None
+        return None
 
     def _get_at_path(self, root: Any, path: List[Any]) -> Any:
         """Get value at path from root (path = list of keys/indices)."""
@@ -241,40 +410,25 @@ class ResolverVisitor(Visitor):
                 return None
         return cur
 
-    def _go_up(self, path: List[Any], current: Any) -> tuple:
-        """Go up one level; return (new_path, new_current).
-        - From a list or leaf-list item (path ends with int), ".." goes to parent of the list.
-        - From a single-segment path (e.g. ['data']), ".." stays so ../type means current's type.
-        - Otherwise pop one to get parent.
-        """
-        if not path:
-            return [], current
-        if isinstance(path[-1], int):
-            # List/leaf-list item: .. goes to parent of the list (e.g. ../min_value from values[i])
-            if len(path) >= 2:
-                new_path = path[:-2]
-                return new_path, self._get_at_path(self.root_data, new_path)
-            return path, current
-        if len(path) == 1:
-            return path, current
-        new_path = path[:-1]
-        return new_path, self._get_at_path(self.root_data, new_path)
-
-    def _step_down(
+    def _step_down_from_node(
         self,
-        current: Any,
+        n: Node,
         step: str,
         predicate: Optional[Any],
     ) -> Any:
-        """Step down into current by key (and optional predicate for lists)."""
+        """Step from node by key; returns value or list of values (node-set). Predicate context = list item as Node."""
+        current = n.data
         if isinstance(current, dict) and step in current:
             val = current[step]
             if isinstance(val, list) and predicate is not None:
-                return self._filter_list(val, predicate)
+                return self._filter_list(val, predicate, n)
+            # Type empty / presence: key present with value None is truthy (node exists)
+            if val is None:
+                return True
             return val
         if isinstance(current, list):
             if predicate is not None:
-                filtered = self._filter_list(current, predicate)
+                filtered = self._filter_list(current, predicate, n)
                 return [item.get(step) if isinstance(item, dict) else item for item in filtered]
             return [item.get(step) if isinstance(item, dict) else item for item in current]
         return None
@@ -283,9 +437,10 @@ class ResolverVisitor(Visitor):
         self,
         items: List[Any],
         predicate: Any,
+        parent_node: Node,
         key: Optional[str] = None,
     ) -> List[Any]:
-        """Filter list items by predicate (or by key if key given)."""
+        """Filter list items by predicate. Context node for predicate = each list item as Node(parent=parent_node)."""
         if key:
             out = []
             for item in items:
@@ -297,17 +452,16 @@ class ResolverVisitor(Visitor):
                     out.append(item)
             return out
         out = []
+        old_initial = self.initial_node
+        old_current_outer = self.current_from_outer
         for item in items:
-            sub = ResolverVisitor(
-                item if isinstance(item, dict) else {'value': item},
-                [],
-                self.root_data,
-                self.module,
-                original_context_path=self.original_context_path,
-                original_data=self.original_data,
-            )
-            if yang_bool(predicate.accept(sub)):
+            ctx_node = Node(item if isinstance(item, dict) else item, parent_node)
+            self.initial_node = ctx_node
+            self.current_from_outer = True
+            if yang_bool(predicate.accept(self)):
                 out.append(item)
+        self.initial_node = old_initial
+        self.current_from_outer = old_current_outer
         return out
 
     def visit_literal(self, node: LiteralNode) -> Any:
@@ -337,7 +491,12 @@ class ResolverVisitor(Visitor):
         return handler(self, node)
 
     def _current_value(self) -> Any:
-        """Value at original context path (current() semantics)."""
+        """Value at original context path (current() semantics). In predicates, current() is the outer context."""
+        if self.current_from_outer and self.original_context_path:
+            cur = self._get_at_path(self.original_data, self.original_context_path)
+            return cur if cur is not None else ""
+        if self.initial_node is not None:
+            return self.initial_node.data if self.initial_node.data is not None else ""
         path = self.original_context_path
         if not path:
             return self.original_data if self.original_data is not None else ""

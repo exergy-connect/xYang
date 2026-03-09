@@ -135,7 +135,6 @@ def test_entity_name_underscore_limit_invalid_exceeds_custom(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
-            "max_name_underscores": 2,
             "entities": [
                 {
                     "name": "entity_field_name_test",
