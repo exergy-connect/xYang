@@ -8,7 +8,7 @@ Note: The path ../../../../max_name_underscores goes up 4 levels from entities[0
 This is because from a list item context, we need to go: name -> fields[0] -> fields -> entities[0] -> entities -> data-model.
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

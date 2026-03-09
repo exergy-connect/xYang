@@ -5,7 +5,7 @@ Must statement: (not(../entity) and count(../../../../../fields[name = current()
 Location: entities/fields/computed/fields/field
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

@@ -5,7 +5,7 @@ Must statement: not(../default) or . = false()
 Location: entities/fields/required
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

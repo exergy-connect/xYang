@@ -5,7 +5,7 @@ Must statement: count(../../../../../fields[foreignKey/entity = current()]) = 1
 Location: entities/fields/computed/fields/entity
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

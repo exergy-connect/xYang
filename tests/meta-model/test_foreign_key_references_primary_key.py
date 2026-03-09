@@ -5,7 +5,7 @@ Must statement: deref(../entity)/../primary_key[. = current()]
 Location: entities/fields/foreignKey/field
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

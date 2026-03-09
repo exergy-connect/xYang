@@ -4,6 +4,8 @@ Standalone tests for deref() using the xyang package.
 Tests deref() explicitly in:
 - Path expressions: e.g. count(deref(...)) = 1, deref(...)/../child
 - Predicates: e.g. /path[node = string(deref(...))]
+- child_fk pattern: leafref path "../../fields/name", must "deref(current())/../foreignKeys"
+  (meta-model parents/child_fk: deref returns field name leaf, /.. is field, /foreignKeys must exist)
 """
 
 import pytest
@@ -142,4 +144,95 @@ def test_deref_in_predicate_invalid():
     assert not is_valid, "deref() in predicate should fail when referenced entity does not exist"
     assert any("deref" in e.lower() or "predicate" in e.lower() or "entity" in e.lower() or "leafref" in e.lower() for e in errors), (
         f"Expected deref/predicate/entity/leafref related error. Got: {errors}"
+    )
+
+
+# YANG for child_fk pattern: leafref "../../fields/name", must "deref(current())/../foreignKeys"
+CHILD_FK_DEREF_YANG = """
+module deref-child-fk {
+  yang-version 1.1;
+  namespace "urn:test:deref-child-fk";
+  prefix "dcf";
+
+  container data-model {
+    list entities {
+      key name;
+      leaf name { type string; mandatory true; }
+      leaf primary_key { type string; mandatory true; }
+      list fields {
+        key name;
+        leaf name { type string; mandatory true; }
+        leaf type { type string; }
+        list foreignKeys {
+          key entity;
+          leaf entity {
+            type leafref { path "/data-model/entities/name"; require-instance true; }
+            mandatory true;
+          }
+        }
+      }
+      list parents {
+        key child_fk;
+        leaf child_fk {
+          type leafref {
+            path "../../../fields/name";
+            require-instance true;
+          }
+          mandatory true;
+          must "deref(current())/../foreignKeys" {
+            error-message "Child foreign key field must have a foreignKeys definition";
+          }
+        }
+      }
+    }
+  }
+}
+"""
+
+
+def test_deref_child_fk_foreignKeys_valid():
+    """deref(current())/../foreignKeys passes when child_fk references a field that has foreignKeys."""
+    validator = YangValidator(parse_yang_string(CHILD_FK_DEREF_YANG))
+    data = {
+        "data-model": {
+            "entities": [
+                {"name": "parent", "primary_key": "id", "fields": [{"name": "id", "type": "string"}]},
+                {
+                    "name": "child",
+                    "primary_key": "id",
+                    "fields": [
+                        {"name": "id", "type": "string"},
+                        {"name": "parent_id", "type": "string", "foreignKeys": [{"entity": "parent"}]},
+                    ],
+                    "parents": [{"child_fk": "parent_id"}],
+                },
+            ]
+        }
+    }
+    is_valid, errors, _ = validator.validate(data)
+    assert is_valid, f"deref(current())/../foreignKeys should pass when field has foreignKeys. Errors: {errors}"
+
+
+def test_deref_child_fk_foreignKeys_invalid():
+    """deref(current())/../foreignKeys fails when child_fk references a field without foreignKeys."""
+    validator = YangValidator(parse_yang_string(CHILD_FK_DEREF_YANG))
+    data = {
+        "data-model": {
+            "entities": [
+                {
+                    "name": "one",
+                    "primary_key": "id",
+                    "fields": [
+                        {"name": "id", "type": "string"},
+                        {"name": "plain", "type": "string"},
+                    ],
+                    "parents": [{"child_fk": "plain"}],
+                },
+            ]
+        }
+    }
+    is_valid, errors, _ = validator.validate(data)
+    assert not is_valid, "deref(current())/../foreignKeys should fail when field has no foreignKeys"
+    assert any("foreignKeys" in e or "foreign key" in e.lower() for e in errors), (
+        f"Expected foreignKeys/foreign key error. Got: {errors}"
     )

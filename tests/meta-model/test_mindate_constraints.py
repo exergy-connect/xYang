@@ -10,7 +10,7 @@ Note: Date comparison uses direct string comparison (not number()) since
 date strings in YYYY-MM-DD format compare correctly lexicographically.
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 

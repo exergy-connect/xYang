@@ -5,7 +5,7 @@ Must statement: bool(../allow_unlimited_fields) = true() or count(fields[type !=
 Location: entities
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 
@@ -79,7 +79,7 @@ def test_entity_field_limit_valid_array_fields_excluded(meta_model):
 
 
 def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
-    """Test that entity with allow_unlimited_fields=true can exceed limit."""
+    """Test that entity with allow_unlimited_fields present (empty flag) can exceed limit."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -87,7 +87,7 @@ def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
-            "allow_unlimited_fields": True,
+            "allow_unlimited_fields": None,
             "entities": [
                 {
                     "name": "entity1",
@@ -109,11 +109,11 @@ def test_entity_field_limit_valid_allow_unlimited_true(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Entity with allow_unlimited_fields=true should pass. Errors: {errors}"
+    assert is_valid, f"Entity with allow_unlimited_fields present (empty) should pass. Errors: {errors}"
 
 
 def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
-    """Test that entity with allow_unlimited_fields='true' (string) can exceed limit."""
+    """Test that entity with allow_unlimited_fields present (empty; JSON null) can exceed limit."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -121,7 +121,7 @@ def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
-            "allow_unlimited_fields": "true",
+            "allow_unlimited_fields": None,
             "entities": [
                 {
                     "name": "entity1",
@@ -144,11 +144,11 @@ def test_entity_field_limit_valid_allow_unlimited_string_true(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Entity with allow_unlimited_fields='true' (string) should pass. Errors: {errors}"
+    assert is_valid, f"Entity with allow_unlimited_fields present (null) should pass. Errors: {errors}"
 
 
 def test_entity_field_limit_invalid_allow_unlimited_false(meta_model):
-    """Test that entity with allow_unlimited_fields=false still enforces limit."""
+    """Test that allow_unlimited_fields with value false is rejected (empty type has no value)."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -177,9 +177,9 @@ def test_entity_field_limit_invalid_allow_unlimited_false(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "Entity with allow_unlimited_fields=false should still enforce limit"
-    assert any("7 non-array fields" in str(err) or "field limit" in str(err).lower() for err in errors), \
-        f"Should have field limit error. Errors: {errors}"
+    assert not is_valid, "allow_unlimited_fields with value false should be rejected (empty type)"
+    assert any("empty" in str(err).lower() or "no value" in str(err).lower() for err in errors), \
+        f"Should have empty-type or value error. Errors: {errors}"
 
 
 def test_entity_field_limit_invalid_allow_unlimited_missing(meta_model):
@@ -218,7 +218,7 @@ def test_entity_field_limit_invalid_allow_unlimited_missing(meta_model):
 
 
 def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
-    """Test that allow_unlimited_fields applies to all entities in the model."""
+    """Test that allow_unlimited_fields (present, empty) applies to all entities in the model."""
     validator = YangValidator(meta_model)
     
     data = {
@@ -226,7 +226,7 @@ def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
             "name": "Test Model",
             "version": "25.01.27.1",
             "author": "Test",
-            "allow_unlimited_fields": True,
+            "allow_unlimited_fields": None,
             "entities": [
                 {
                     "name": "entity1",
@@ -263,7 +263,7 @@ def test_entity_field_limit_valid_allow_unlimited_multiple_entities(meta_model):
     }
     
     is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"All entities with allow_unlimited_fields=true should pass. Errors: {errors}"
+    assert is_valid, f"All entities with allow_unlimited_fields present should pass. Errors: {errors}"
 
 
 def test_entity_field_limit_invalid_exceeds_limit(meta_model):

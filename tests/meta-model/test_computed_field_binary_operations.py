@@ -5,7 +5,7 @@ Must statement: (operation != 'add' and operation != 'subtraction') or count(fie
 Location: entities/fields/computed
 """
 import pytest
-from xYang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file
 from pathlib import Path
 
 
