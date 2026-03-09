@@ -90,9 +90,17 @@ def coerce_pair(l: Any, r: Any):
         return str(l).strip(), str(r).strip()
 
 
+def _comparison_values(right: Any) -> List[Any]:
+    """Right-hand side values: node-set, XPath 2.0 value list (tuple), or single scalar."""
+    if isinstance(right, (list, tuple)) and (not right or not isinstance(right[0], Node)):
+        return list(right)
+    return node_set_values(right)
+
+
 def compare_eq(left: Any, right: Any) -> bool:
-    """XPath equality: node-set vs scalar; type coercion."""
-    lv, rv = node_set_values(left), node_set_values(right)
+    """XPath equality: node-set vs scalar or value list (tuple); type coercion."""
+    lv = node_set_values(left)
+    rv = _comparison_values(right)
     if not lv or not rv:
         return not lv and not rv
     for l in lv:

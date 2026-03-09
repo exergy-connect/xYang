@@ -92,9 +92,20 @@ class XPathEvaluator:
         """
         Step from node into child named key.
         List expansion is determined by schema type (YangListStmt / YangLeafListStmt).
+        When current node is a list (data is list), expand to entries then step key from each.
         """
-        schema_child = SchemaNav.child(node.schema, key)
         data = node.data
+        if isinstance(data, list) and (
+            SchemaNav.is_list(node.schema) or SchemaNav.is_leaf_list(node.schema)
+        ):
+            # At a list node; expand to list entries and step key from each
+            return [
+                n
+                for item in data
+                for n in self._step(node.step(item, node.schema), key)
+            ]
+
+        schema_child = SchemaNav.child(node.schema, key)
 
         if isinstance(data, dict):
             if key in data:
@@ -122,8 +133,18 @@ class XPathEvaluator:
         predicate: ASTNode,
         ctx: Context,
     ) -> List[Node]:
-        """Filter nodes by predicate. Each node becomes the cursor for its predicate."""
-        return [n for n in nodes if yang_bool(self.eval(predicate, ctx, n))]
+        """Filter nodes by predicate. Numeric predicate [N] keeps the Nth node (1-based)."""
+        if not nodes:
+            return []
+        results: List[Node] = []
+        for i, n in enumerate(nodes):
+            val = self.eval(predicate, ctx, n)
+            if isinstance(val, (int, float)) and not isinstance(val, bool):
+                if int(val) == i + 1:
+                    results.append(n)
+            elif yang_bool(val):
+                results.append(n)
+        return results
 
     # ------------------------------------------------------------------
     # Binary operators
@@ -133,14 +154,14 @@ class XPathEvaluator:
         op = ast.operator
 
         if op == "or":
-            return yang_bool(self.eval(ast.left, ctx, node)) or yang_bool(
-                self.eval(ast.right, ctx, node)
-            )
+            if yang_bool(self.eval(ast.left, ctx, node)):
+                return True
+            return yang_bool(self.eval(ast.right, ctx, node))
 
         if op == "and":
-            return yang_bool(self.eval(ast.left, ctx, node)) and yang_bool(
-                self.eval(ast.right, ctx, node)
-            )
+            if not yang_bool(self.eval(ast.left, ctx, node)):
+                return False
+            return yang_bool(self.eval(ast.right, ctx, node))
 
         if op == "/":
             return self._eval_composition(ast, ctx, node)

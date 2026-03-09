@@ -94,16 +94,22 @@ def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
     """
     deref(path): resolve a leafref to its target nodes.
     1. Evaluate path argument to get source nodes.
-    2. Read leafref path from schema of each source node.
-    3. Resolve that path from root.
+    2. Read leafref PathNode from schema of each source node.
+    3. Resolve that path — absolute from ctx.root, relative from src itself.
     4. Filter targets whose data matches the source value.
-    5. Return each match (the referenced node); use deref(...)/.. to get the container.
+    5. Return matching nodes; use deref(...)/.. to get the parent container.
     """
     if len(ast.args) != 1:
         return []
 
-    source_nodes = ev.eval(ast.args[0], ctx, node)
-    if not is_nodeset(source_nodes):
+    # Evaluate argument from context node so e.g. deref(../child_fk) in a predicate
+    # uses the node the must is attached to, not the predicate's cursor.
+    start = ctx.current if ctx.current is not None else node
+    raw = ev.eval(ast.args[0], ctx, start)
+    source_nodes = (
+        raw if is_nodeset(raw) else [raw] if isinstance(raw, Node) else []
+    )
+    if not source_nodes:
         return []
 
     from .schema_nav import SchemaNav
@@ -111,21 +117,12 @@ def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
     results: List[Node] = []
     for src in source_nodes:
         leafref_path = SchemaNav.leafref_path(src.schema)
-        if not leafref_path:
+        if leafref_path is None:
             continue
-
-        # YANG: path is relative to the node that contains the leafref (parent of the leaf)
-        start = (
-            ctx.root
-            if leafref_path.is_absolute
-            else (src.parent if src.parent is not None else node)
-        )
-        targets = ev.eval_path(leafref_path, ctx, start)
-
+        targets = ev.eval_path(leafref_path, ctx, src)
         for t in targets:
             if t.data == src.data:
                 results.append(t)
-
     return results
 
 

@@ -389,6 +389,26 @@ class DocumentValidator:
     # Tree walk
     # ------------------------------------------------------------------
 
+    def _allowed_child_names(self, data: Dict[str, Any], schema: YangStatementList) -> set:
+        """Return set of allowed key names for this schema (choice resolved to active case)."""
+        allowed: set = set()
+        for stmt in schema.statements:
+            if isinstance(stmt, YangChoiceStmt):
+                for case in stmt.cases:
+                    if any(
+                        getattr(s, "name", None) in data for s in case.statements
+                    ):
+                        for s in case.statements:
+                            n = getattr(s, "name", None)
+                            if n is not None:
+                                allowed.add(n)
+                        break
+            elif not isinstance(stmt, YangCaseStmt):
+                n = getattr(stmt, "name", None)
+                if n is not None:
+                    allowed.add(n)
+        return allowed
+
     def _visit_children(
         self,
         data: Any,
@@ -405,6 +425,15 @@ class DocumentValidator:
             self._visit_stmt(
                 stmt, data, parent_ctx, xpath_v, path, errors, root_data
             )
+        allowed = self._allowed_child_names(data, schema)
+        for key in data:
+            if key not in allowed:
+                errors.append(
+                    ValidationError(
+                        path=path.child(key),
+                        message=f"Unknown field '{key}'",
+                    )
+                )
 
     def _visit_stmt(
         self,

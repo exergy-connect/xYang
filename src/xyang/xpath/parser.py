@@ -4,7 +4,7 @@ XPath parser for xpath. Produces AST nodes with accept(ev, ctx, node).
 
 from __future__ import annotations
 
-from typing import List, Optional
+from typing import Any, List, Optional
 
 from ..errors import XPathSyntaxError
 
@@ -207,6 +207,28 @@ class XPathParser:
             return self._parse_path(is_absolute=True)
         if t.type == TokenType.PAREN_OPEN:
             self._consume(TokenType.PAREN_OPEN)
+            # XPath 2.0 value list: ( 'a', 'b', 'c' ) when first token is string/number
+            peek = self._current()
+            if peek.type in (TokenType.STRING, TokenType.NUMBER):
+                first = self._parse_primary()
+                if isinstance(first, LiteralNode) and self._current().type == TokenType.COMMA:
+                    values: List[Any] = [first.value]
+                    while self._current().type == TokenType.COMMA:
+                        self._consume(TokenType.COMMA)
+                        next_node = self._parse_primary()
+                        if not isinstance(next_node, LiteralNode):
+                            raise XPathSyntaxError(
+                                "Value list may only contain literals (string or number)",
+                                position=self._current().position,
+                                expression=self.expression,
+                            )
+                        values.append(next_node.value)
+                    self._consume(TokenType.PAREN_CLOSE)
+                    return LiteralNode(tuple(values))
+                if self._current().type == TokenType.PAREN_CLOSE:
+                    self._consume(TokenType.PAREN_CLOSE)
+                    return first
+            # Single expression in parentheses
             expr = self._parse_expression()
             self._consume(TokenType.PAREN_CLOSE)
             return expr
