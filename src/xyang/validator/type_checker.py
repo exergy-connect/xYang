@@ -139,7 +139,7 @@ class TypeChecker:
                     f"Leafref relative path {path_str!r} requires context node"
                 ]
             start_node = current_node
-        target_nodes = evaluator.eval_path(path_ast, leafref_ctx, start_node)
+        target_nodes, _ = evaluator.eval_path(path_ast, leafref_ctx, start_node)
         targets = [n.data for n in target_nodes]
         logger.debug("_check_leafref node_path=%s targets=%s", node_path, targets)
         if value not in targets:

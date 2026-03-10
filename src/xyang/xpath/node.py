@@ -16,7 +16,7 @@ class Context:
 
     current     -- the node being validated (what current() returns).
     root        -- root Node (entry point for absolute paths).
-    path_cache  -- dict for path result cache (key -> list of Node), or None to disable caching.
+    path_cache  -- dict for path result cache (key -> (value, cacheable)), or None to disable caching.
     """
 
     __slots__ = ("current", "root", "path_cache")

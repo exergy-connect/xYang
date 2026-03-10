@@ -27,29 +27,11 @@ from .utils import (
     compare_lt,
     first_value,
     is_nodeset,
+    node_chain,
     yang_bool,
 )
 
 logger = logging.getLogger(__name__)
-
-
-def _node_chain(n: "Node | None", max_steps: int = 20) -> str:
-    """Format node chain from node up to root for debug (node.data repr per step)."""
-    from .node import Node
-
-    parts: List[str] = []
-    cur: Node | None = n
-    while cur is not None and len(parts) < max_steps:
-        data = cur.data
-        if isinstance(data, dict):
-            keys = sorted(data.keys())[:5]
-            parts.append(f"dict({keys!r})")
-        elif isinstance(data, list):
-            parts.append(f"list(len={len(data)})")
-        else:
-            parts.append(repr(data))
-        cur = cur.parent
-    return " <- ".join(reversed(parts))
 
 
 def _bin_plus(left: Any, right: Any) -> Any:
@@ -87,22 +69,25 @@ class XPathEvaluator:
     Path results are cached per run in ctx.path_cache (absolute and relative).
     """
 
-    __slots__ = ("_cache_lookups", "_cache_hits")
+    __slots__ = ("_cache_lookups", "_cache_hits", "_cache_purged")
 
     def __init__(self) -> None:
         self._cache_lookups = 0
         self._cache_hits = 0
+        self._cache_purged = 0
 
     def clear_cache_stats(self) -> None:
         """Reset cache stats. Call at start of each validation run."""
         self._cache_lookups = 0
         self._cache_hits = 0
+        self._cache_purged = 0
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Return cache hit ratio and efficiency stats for the current run."""
         return {
             "lookups": self._cache_lookups,
             "hits": self._cache_hits,
+            "purged": self._cache_purged,
             "hit_ratio": (
                 self._cache_hits / self._cache_lookups
                 if self._cache_lookups else 0.0
@@ -110,7 +95,50 @@ class XPathEvaluator:
         }
 
     def eval(self, ast: ASTNode, ctx: Context, node: Node) -> Any:
-        return ast.accept(self, ctx, node)
+        """
+        Evaluate one XPath expression with a local path cache for this expression only.
+
+        Cache behaviour
+        --------------
+        If ctx.path_cache is not None, it is treated as the global (cross-expression)
+        cache. For the duration of this evaluation we replace it with a local dict
+        seeded from the global cache:
+
+        1. We save the global cache reference and set ctx.path_cache = dict(global_cache)
+           so that all path lookups during this expression see a mutable local dict
+           that starts with any previously cached (path_string -> (value, cacheable))
+           entries from the global cache.
+
+        2. We run the expression (ast.accept). Path resolution goes through eval_path,
+           which looks up and stores (nodes, cacheable) in ctx.path_cache (the local dict).
+           So repeated paths in the same expression (e.g. "/a/b = 1 and /a/b = 2") hit
+           the local cache; paths already in the global cache also hit on first use.
+
+        3. In a finally block we purge the local cache of entries that are not
+           cacheable (e.g. paths with context-dependent predicates). We iterate over
+           a snapshot (list(local_cache.items())) and delete entries where cacheable
+           is False. The local dict is left containing only cacheable results. We do
+           not flush these back into the global cache here; the caller can do that or
+           keep using the same context (ctx.path_cache remains the local dict after
+           eval, so subsequent eval() calls with the same context will seed from that
+           local dict if the caller does not replace ctx.path_cache again).
+
+        If ctx.path_cache is None, no caching is done and we just evaluate the
+        expression.
+        """
+        global_cache = ctx.path_cache
+        if global_cache is not None:
+            ctx.path_cache = dict(global_cache)
+        try:
+            return ast.accept(self, ctx, node)
+        finally:
+            if global_cache is not None:
+                local_cache = ctx.path_cache  # set to dict(global_cache) in try
+                assert local_cache is not None
+                for key, (value, cacheable) in list(local_cache.items()):
+                    if not cacheable:
+                        del local_cache[key]
+                        self._cache_purged += 1
 
     def _eval_inner(
         self, ast: ASTNode, ctx: Context, node: Node
@@ -119,8 +147,7 @@ class XPathEvaluator:
         if isinstance(ast, LiteralNode):
             return (ast.value, True)
         if isinstance(ast, PathNode):
-            nodes, cacheable = self._eval_path_inner(ast, ctx, node)
-            return (nodes, cacheable)
+            return self.eval_path(ast, ctx, node)
         if isinstance(ast, BinaryOpNode):
             return self._eval_binary_inner(ast, ctx, node)
         if isinstance(ast, FunctionCallNode):
@@ -132,29 +159,31 @@ class XPathEvaluator:
     # Path
     # ------------------------------------------------------------------
 
-    def eval_path(self, path: PathNode, ctx: Context, node: Node) -> List[Node]:
+    def eval_path(self, path: PathNode, ctx: Context, node: Node) -> Tuple[List[Node], bool]:
         """
-        Resolve a path expression. Returns a node-set (list of Node).
-        Uses and populates caches when path.is_cacheable is True (set by parser).
+        Resolve a path expression. Returns (node-set, cacheable).
+        Uses and populates the (local) expression cache. is_cacheable only
+        affects whether the result is flushed to the global cache after eval.
         """
-        if not path.is_cacheable:
-            nodes, _ = self._eval_path_inner(path, ctx, node)
-            return nodes
-
-        # TODO determine the longest static prefix of the path, then cache that
-        key = path.to_string() if path.is_absolute else None
-        if key is not None and ctx.path_cache is not None:
+        key = path.to_string()
+        if ctx.path_cache is not None:
             self._cache_lookups += 1
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("path_cache lookup #%d key=%r", self._cache_lookups, key)
             if key in ctx.path_cache:
                 self._cache_hits += 1
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("path_cache HIT #%d key=%r", self._cache_hits, key)
                 return ctx.path_cache[key]
 
         nodes, cacheable = self._eval_path_inner(path, ctx, node)
 
-        if key is not None and cacheable and ctx.path_cache is not None:
-            ctx.path_cache[key] = nodes
+        if ctx.path_cache is not None:
+            ctx.path_cache[key] = (nodes, cacheable)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("path_cache store key=%r cacheable=%s", key, cacheable)
 
-        return nodes
+        return (nodes, cacheable)
 
     def _eval_path_inner(
         self, path: PathNode, ctx: Context, node: Node
@@ -312,7 +341,7 @@ class XPathEvaluator:
                 "path composition produced empty result: left_nodes=%d right=%s node_chain=%s",
                 len(left_nodes),
                 right_str,
-                _node_chain(node),
+                node_chain(node),
             )
         return (results, cacheable)
 

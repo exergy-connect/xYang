@@ -220,14 +220,15 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 
 The XPath evaluator uses proper tokenization and AST-based parsing (not string-based), making it robust and maintainable. The implementation has been optimized and refactored for better performance and code organization.
 
-### Path result caching
+### Path result caching (per-expression)
 
-During document validation, path expression results are cached per run to avoid recomputing the same path from the same context. This speeds up validation when many `must` constraints or leafref `require-instance` checks share the same path expressions (e.g. repeated `/data-model/entities` or relative paths from list items).
+During document validation, path expression results are cached to avoid recomputing the same path. Caching is **per expression**: each time the evaluator runs one expression (e.g. a single `must` or leafref check), it uses a **local** cache for that expression only, seeded from a **global** cache shared across the run.
 
-- **Scope**: One cache per validation run, held in `Context.path_cache` (a dict). The same cache is shared for the root context and all child contexts created during the run.
-- **What is cached**: Resolved path results (node-sets). Absolute paths are keyed by path string only; relative paths are keyed by path string plus the current node’s identity so that `../foo` from different nodes is not confused.
-- **Cacheability**: A path is only cached if its evaluation does not depend on context-sensitive functions. Paths that use `current()` or `deref()` in predicates are not cached, because their result can change with context. Simple structural paths (e.g. `/data-model/entities`, `../type`) are cached.
-- **Observability**: `XPathEvaluator.get_cache_stats()` returns absolute/relative lookups, hits, and hit ratios for the current run. Call `clear_cache()` (or use a fresh evaluator) at the start of each validation run so stats reflect that run only.
+- **Per-expression local cache**: For each `eval(ast, ctx, node)`, if `Context.path_cache` is set, the evaluator replaces it temporarily with a new dict seeded from that global cache. All path lookups and stores during that expression use this local dict. Repeated paths in the same expression (e.g. `/top/flag = 1 or /top/flag = 2`) therefore hit the local cache. After the expression finishes, non-cacheable entries are **purged** from the local dict (entries whose evaluation depended on context-sensitive functions such as `current()` in a predicate). The global cache is not updated by default; the caller can keep or replace `ctx.path_cache` for the next expression.
+- **Keys**: Path results are keyed by the path string from `path.to_string()` (e.g. `/top/items`, `../flag`). Stored value is `(node-set, cacheable)`.
+
+- **Cacheability**: A path result is cacheable only if its evaluation (including any predicates) does not depend on context-sensitive functions. Paths whose predicates use `current()` or `deref()` yield `cacheable=False` and are purged at the end of the expression; they are never written to the global cache. The `is_cacheable` flag on the path AST affects only whether a result is eligible for the global cache (e.g. cross-expression reuse), not whether it is stored in the local cache during the expression.
+- **Observability**: `XPathEvaluator.get_cache_stats()` returns `lookups`, `hits`, `purged`, and `hit_ratio` for the current run. Call `clear_cache_stats()` at the start of each validation run so stats reflect that run only. Enable debug logging on `xyang.xpath.evaluator` to trace which path keys trigger each lookup, hit, and store.
 
 ## Error Reporting
 
@@ -303,7 +304,7 @@ The modular architecture separates concerns:
 
 - **XPath scope**: Only the XPath features used in `meta-model.yang` are implemented. Unsupported: axes (e.g. `child::`, `following-sibling::`), namespaces, and more complex location paths.
 - **Error reporting**: In constraint validation the evaluator catches exceptions and returns `False` or `None`, so detailed error information is not surfaced to the caller.
-- **Expression caching**: Caching applies only to short expressions; long or dynamic expressions are not cached.
+- **Expression caching**: Caching is per-expression (local cache per `eval()`); path results that depend on `current()` or similar in predicates are not retained (purged after the expression).
 - **Schema/document model**: The implementation is tied to the meta-model and document structure (e.g. schema-aware `Node`); it is not a general-purpose XPath 1.0 engine.
 
 ## Implementation notes

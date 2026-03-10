@@ -78,6 +78,23 @@ def is_nodeset(val: Any) -> bool:
     return isinstance(val, list) and (not val or isinstance(val[0], Node))
 
 
+def node_chain(n: Optional[Node], max_steps: int = 20) -> str:
+    """Format node chain from node up to root for debug (node.data repr per step)."""
+    parts: List[str] = []
+    cur: Optional[Node] = n
+    while cur is not None and len(parts) < max_steps:
+        data = cur.data
+        if isinstance(data, dict):
+            keys = sorted(data.keys())[:5]
+            parts.append(f"dict({keys!r})")
+        elif isinstance(data, list):
+            parts.append(f"list(len={len(data)})")
+        else:
+            parts.append(repr(data))
+        cur = cur.parent
+    return " <- ".join(reversed(parts))
+
+
 def coerce_pair(l: Any, r: Any):
     """Coerce left/right for comparison (bool, numeric, or string)."""
     if isinstance(l, bool) or isinstance(r, bool):

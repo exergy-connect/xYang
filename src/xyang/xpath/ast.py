@@ -54,7 +54,8 @@ class PathNode(ASTNode):
         self.is_cacheable = is_cacheable
 
     def accept(self, ev: "XPathEvaluator", ctx: "Context", node: "Node") -> Any:
-        return ev.eval_path(self, ctx, node)
+        nodes, _ = ev.eval_path(self, ctx, node)
+        return nodes
 
     def to_string(self) -> str:
         """Serialize path to string (e.g. for error messages)."""
