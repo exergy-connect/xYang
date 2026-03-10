@@ -8,6 +8,7 @@ node is replaced on every path step.
 
 from __future__ import annotations
 
+import logging
 from typing import Any, Callable, List, Tuple
 
 from .ast import (
@@ -28,6 +29,27 @@ from .utils import (
     is_nodeset,
     yang_bool,
 )
+
+logger = logging.getLogger(__name__)
+
+
+def _node_chain(n: "Node | None", max_steps: int = 20) -> str:
+    """Format node chain from node up to root for debug (node.data repr per step)."""
+    from .node import Node
+
+    parts: List[str] = []
+    cur: Node | None = n
+    while cur is not None and len(parts) < max_steps:
+        data = cur.data
+        if isinstance(data, dict):
+            keys = sorted(data.keys())[:5]
+            parts.append(f"dict({keys!r})")
+        elif isinstance(data, list):
+            parts.append(f"list(len={len(data)})")
+        else:
+            parts.append(repr(data))
+        cur = cur.parent
+    return " <- ".join(reversed(parts))
 
 
 def _bin_plus(left: Any, right: Any) -> Any:
@@ -283,6 +305,15 @@ class XPathEvaluator:
                 results.extend(r)
             elif isinstance(r, Node):
                 results.append(r)
+        if logger.isEnabledFor(logging.DEBUG) and not results:
+            right_repr = getattr(ast.right, "to_string", None)
+            right_str = (right_repr() if callable(right_repr) else None) or type(ast.right).__name__
+            logger.debug(
+                "path composition produced empty result: left_nodes=%d right=%s node_chain=%s",
+                len(left_nodes),
+                right_str,
+                _node_chain(node),
+            )
         return (results, cacheable)
 
     # ------------------------------------------------------------------

@@ -569,7 +569,7 @@ module meta-model {
           type field-name;
           mandatory true;
           description "Field name to reference.";
-          must "/data-model/consolidated = false() or ((not(../entity) and count(../../../../../../fields[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1))" {
+          must "/data-model/consolidated = false() or ((not(../entity) and count(../../../../fields[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1))" {
             error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
           }
@@ -580,7 +580,7 @@ module meta-model {
             require-instance true;
           }
           description "Entity name for cross-entity field reference (optional).";
-          must "/data-model/consolidated = false() or count(../../../../../../fields[foreignKeys/entity = current()]) = 1" {
+          must "/data-model/consolidated = false() or count(../../../../fields[foreignKeys/entity = current()]) = 1" {
             error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
             description "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
           }

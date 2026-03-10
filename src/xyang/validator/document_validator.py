@@ -339,6 +339,10 @@ class DocumentValidator:
         effective = self._effective_value(data, name, stmt)
 
         if isinstance(stmt, YangLeafStmt):
+            # YANG type empty: leaf has no value, only presence; treat as present when key is in data
+            type_name = getattr(getattr(stmt, "type", None), "name", None)
+            if type_name == "empty" and present:
+                return True
             if effective is None and stmt.mandatory:
                 self._errors.append(
                     ValidationError(
