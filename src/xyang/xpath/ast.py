@@ -43,15 +43,21 @@ class PathSegment:
 
 
 class PathNode(ASTNode):
-    def __init__(self, segments: List[PathSegment], is_absolute: bool = False):
+    def __init__(
+        self,
+        segments: List[PathSegment],
+        is_absolute: bool = False,
+        is_cacheable: bool = True,
+    ):
         self.segments = segments
         self.is_absolute = is_absolute
+        self.is_cacheable = is_cacheable
 
     def accept(self, ev: "XPathEvaluator", ctx: "Context", node: "Node") -> Any:
         return ev.eval_path(self, ctx, node)
 
     def to_string(self) -> str:
-        """Serialize path back to string (e.g. for error messages)."""
+        """Serialize path to string (e.g. for error messages)."""
         prefix = "/" if self.is_absolute else ""
         return prefix + "/".join(seg.step for seg in self.segments)
 

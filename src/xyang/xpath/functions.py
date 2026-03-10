@@ -5,46 +5,52 @@ Signature: (ev, ast, ctx, node) -> Any.
 ctx and node follow the same contract as evaluator methods.
 """
 
-from typing import Any, List, Optional
+from __future__ import annotations
 
-from .node import Node
+from typing import TYPE_CHECKING, Any, List, Optional
+
+from .ast import FunctionCallNode
+from .node import Context, Node
+
+if TYPE_CHECKING:
+    from .evaluator import XPathEvaluator
 from .utils import first_value, is_nodeset, yang_bool
 
 
-def f_current(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_current(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """current() returns the validation anchor (as a Node) so current()/child works."""
     return ctx.current if ctx.current is not None else None
 
 
-def f_not(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_not(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     if len(ast.args) != 1:
         return None
     return not yang_bool(ev.eval(ast.args[0], ctx, node))
 
 
-def f_true(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_true(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     return True
 
 
-def f_false(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_false(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     return False
 
 
-def f_count(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_count(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     if len(ast.args) != 1:
         return 0
     val = ev.eval(ast.args[0], ctx, node)
     return len(val) if is_nodeset(val) else 1
 
 
-def f_string(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_string(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     if len(ast.args) != 1:
         return ""
     v = first_value(ev.eval(ast.args[0], ctx, node))
     return "" if v is None else str(v)
 
 
-def f_number(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_number(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     if len(ast.args) != 1:
         return float("nan")
     v = first_value(ev.eval(ast.args[0], ctx, node))
@@ -54,7 +60,7 @@ def f_number(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
         return float("nan")
 
 
-def f_bool(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_bool(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     if len(ast.args) != 1:
         return False
     return yang_bool(ev.eval(ast.args[0], ctx, node))
@@ -67,7 +73,7 @@ def f_string_length(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
     return 0 if v is None else len(str(v))
 
 
-def f_concat(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_concat(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     parts = []
     for arg in ast.args:
         v = first_value(ev.eval(arg, ctx, node))
@@ -90,7 +96,7 @@ def f_translate(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
     return source.translate(trans)
 
 
-def f_deref(ev: Any, ast: Any, ctx: Any, node: Any) -> Any:
+def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """
     deref(path): resolve a leafref to its target nodes.
     1. Evaluate path argument to get source nodes.

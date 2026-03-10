@@ -49,7 +49,7 @@ def test_must_on_list_with_leafref_valid():
       }
       leaf ref_name {
         type leafref {
-          path "/data/items[id = current()/ref_id]/name";
+          path "/data/items[id = current()/../ref_id]/name";
           require-instance true;
         }
       }
@@ -469,7 +469,7 @@ def test_must_with_plus_operator_foreignkeys():
         list foreignKeys {
           key entity;
           must "/data-model/consolidated = false() or " +
-               "../../type = deref(current()/entity)/../fields[name = deref(current()/entity)/../primary_key]/type" {
+               "../type = deref(current()/entity)/../fields[name = deref(current()/entity)/../primary_key]/type" {
             error-message "Foreign key field type must match the referenced entity's primary key field type";
           }
           leaf entity {

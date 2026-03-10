@@ -8,7 +8,18 @@ from pathlib import Path
 from typing import List, Dict, Any
 
 from xyang import parse_yang_file, parse_yang_string, YangValidator
-from xyang.xpath import XPathEvaluator
+from xyang.xpath import Context, Node, XPathEvaluator, XPathParser
+
+
+def _xpath_context(data: Dict[str, Any], context_path: List[str]):
+    """Build root Node, context node at path, and Context for XPath evaluation."""
+    root = Node(data, None, None)
+    node = root
+    for key in context_path:
+        val = node.data.get(key) if isinstance(node.data, dict) else None
+        node = node.step(val, None)
+    ctx = Context(current=node, root=root, path_cache={})
+    return root, node, ctx
 
 
 class Benchmark:
@@ -116,23 +127,21 @@ def benchmark_validation():
 def print_path_cache_stats(validator: YangValidator) -> None:
     """Print XPath path cache hit ratio and efficiency stats."""
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    if stats["total_lookups"] == 0:
+    if stats["lookups"] == 0:
         print("  Path cache: no lookups (no path evaluation)")
         return
-    print("  Path cache:")
-    print(f"    absolute: {stats['abs_hits']}/{stats['abs_lookups']} hits ({stats['abs_hit_ratio']:.1%})")
-    print(f"    relative: {stats['rel_hits']}/{stats['rel_lookups']} hits ({stats['rel_hit_ratio']:.1%})")
-    print(f"    total:    {stats['total_hits']}/{stats['total_lookups']} hits ({stats['hit_ratio']:.1%})")
+    print(f"  Path cache: {stats['hits']}/{stats['lookups']} hits ({stats['hit_ratio']:.1%})")
 
 
 def benchmark_xpath_simple():
     """Benchmark simple XPath expressions."""
     data = {"name": "test_value_with_underscores"}
-    module = parse_yang_string("module test { }")
-    evaluator = XPathEvaluator(data, module, context_path=["name"])
+    root, node, ctx = _xpath_context(data, ["name"])
+    evaluator = XPathEvaluator()
+    ast = XPathParser("string-length(.)").parse()
 
     def evaluate():
-        return evaluator.evaluate('string-length(.)')
+        return evaluator.eval(ast, ctx, node)
     return evaluate
 
 
@@ -148,12 +157,14 @@ def benchmark_xpath_complex():
             ]
         }
     }
-    module = parse_yang_string("module test { }")
-    evaluator = XPathEvaluator(data, module, context_path=["entity", "name"])
+    root, node, ctx = _xpath_context(data, ["entity", "name"])
+    evaluator = XPathEvaluator()
+    ast = XPathParser(
+        'string-length(.) - string-length(translate(., "_", "")) <= ../../max_underscores'
+    ).parse()
 
     def evaluate():
-        expr = 'string-length(.) - string-length(translate(., "_", "")) <= ../../max_underscores'
-        return evaluator.evaluate(expr)
+        return evaluator.eval(ast, ctx, node)
     return evaluate
 
 
@@ -168,11 +179,13 @@ def benchmark_xpath_count():
             {"name": "tags", "type": "array"}
         ]
     }
-    module = parse_yang_string("module test { }")
-    evaluator = XPathEvaluator(data, module, context_path=["fields"])
+    # Context at root (container) so path "fields" resolves
+    root, node, ctx = _xpath_context(data, [])
+    evaluator = XPathEvaluator()
+    ast = XPathParser('count(fields[type != "array"])').parse()
 
     def evaluate():
-        return evaluator.evaluate('count(fields[type != "array"])')
+        return evaluator.eval(ast, ctx, node)
     return evaluate
 
 

@@ -88,7 +88,7 @@ class DocumentValidator:
         self._leafref_severity = leafref_severity
         self._root_data = data
         self._errors = []
-        self._evaluator.clear_cache()
+        self._evaluator.clear_cache_stats()
         path_cache: Dict[Any, Any] | None = {} if cache else None
         node = Node(data, self._root_schema, None)
         ctx = Context(current=node, root=node, path_cache=path_cache)
@@ -228,7 +228,7 @@ class DocumentValidator:
                 self._root_schema,
                 ctx=curr_ctx,
                 evaluator=self._evaluator,
-                leafref_current=parent_node,
+                leafref_current=curr_node,
             ):
                 severity = (
                     self._leafref_severity if type_name == "leafref" else Severity.ERROR
@@ -284,10 +284,9 @@ class DocumentValidator:
                 val, key_names, name, child_path
             ):
                 return  # duplicate key; skip per-entry validation
-            list_node = Node(val, stmt, parent_node)
             for entry in val:
                 path.push(name, self._entry_key_from_names(entry, key_names))
-                entry_node = list_node.step(entry, stmt)
+                entry_node = Node(entry, stmt, parent_node)
                 entry_ctx = curr_ctx.child(entry_node)
                 self._check_must(
                     stmt, entry_ctx, entry_node, path.current()

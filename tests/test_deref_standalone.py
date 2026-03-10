@@ -175,7 +175,7 @@ module deref-child-fk {
         key child_fk;
         leaf child_fk {
           type leafref {
-            path "../../../fields/name";
+            path "../../fields/name";
             require-instance true;
           }
           mandatory true;

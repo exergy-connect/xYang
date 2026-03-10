@@ -9,7 +9,7 @@ from xyang import parse_yang_string, YangValidator
 
 
 def test_primary_key_fields_name_equals_current():
-    """Must ../fields[name = current()]: current() is leaf value; path in predicate is relative to list item."""
+    """Must ../fields[name = current()]: current() = the primary_key leaf value."""
     yang = """
 module test {
   yang-version 1.1;
@@ -113,7 +113,7 @@ module test {
 
 
 def test_must_string_length_dot_gt_zero():
-    """Must string-length(.) > 0: . is current node, string-length() must be implemented."""
+    """Must string-length(.) > 0: . is current node (leaf value)."""
     yang = """
 module test {
   yang-version 1.1;

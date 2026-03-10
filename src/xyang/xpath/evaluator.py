@@ -8,10 +8,7 @@ node is replaced on every path step.
 
 from __future__ import annotations
 
-import logging
-from typing import Any, Callable, List, Optional, Tuple
-
-logger = logging.getLogger(__name__)
+from typing import Any, Callable, List, Tuple
 
 from .ast import (
     ASTNode,
@@ -60,8 +57,6 @@ _BINARY_OP_HANDLERS: dict[str, Callable[[Any, Any], Any]] = {
     "-": _bin_minus,
 }
 
-NON_CACHEABLE_FUNCTIONS = frozenset({"current", "deref"})
-
 
 class XPathEvaluator:
     """
@@ -70,46 +65,26 @@ class XPathEvaluator:
     Path results are cached per run in ctx.path_cache (absolute and relative).
     """
 
-    __slots__ = (
-        "_cache_abs_lookups",
-        "_cache_abs_hits",
-        "_cache_rel_lookups",
-        "_cache_rel_hits",
-    )
+    __slots__ = ("_cache_lookups", "_cache_hits")
 
     def __init__(self) -> None:
-        self._cache_abs_lookups = 0
-        self._cache_abs_hits = 0
-        self._cache_rel_lookups = 0
-        self._cache_rel_hits = 0
+        self._cache_lookups = 0
+        self._cache_hits = 0
 
-    def clear_cache(self) -> None:
+    def clear_cache_stats(self) -> None:
         """Reset cache stats. Call at start of each validation run."""
-        self._cache_abs_lookups = 0
-        self._cache_abs_hits = 0
-        self._cache_rel_lookups = 0
-        self._cache_rel_hits = 0
+        self._cache_lookups = 0
+        self._cache_hits = 0
 
     def get_cache_stats(self) -> dict[str, Any]:
         """Return cache hit ratio and efficiency stats for the current run."""
-        total_lookups = self._cache_abs_lookups + self._cache_rel_lookups
-        total_hits = self._cache_abs_hits + self._cache_rel_hits
         return {
-            "abs_lookups": self._cache_abs_lookups,
-            "abs_hits": self._cache_abs_hits,
-            "abs_hit_ratio": (
-                self._cache_abs_hits / self._cache_abs_lookups
-                if self._cache_abs_lookups else 0.0
+            "lookups": self._cache_lookups,
+            "hits": self._cache_hits,
+            "hit_ratio": (
+                self._cache_hits / self._cache_lookups
+                if self._cache_lookups else 0.0
             ),
-            "rel_lookups": self._cache_rel_lookups,
-            "rel_hits": self._cache_rel_hits,
-            "rel_hit_ratio": (
-                self._cache_rel_hits / self._cache_rel_lookups
-                if self._cache_rel_lookups else 0.0
-            ),
-            "total_lookups": total_lookups,
-            "total_hits": total_hits,
-            "hit_ratio": total_hits / total_lookups if total_lookups else 0.0,
         }
 
     def eval(self, ast: ASTNode, ctx: Context, node: Node) -> Any:
@@ -138,58 +113,24 @@ class XPathEvaluator:
     def eval_path(self, path: PathNode, ctx: Context, node: Node) -> List[Node]:
         """
         Resolve a path expression. Returns a node-set (list of Node).
-        Uses and populates caches when the path is cacheable.
-
-        Absolute paths with any predicate are not cached: predicates can contain
-        relative navigation (e.g. ../entity, current()) so the result is
-        context-dependent and must not be reused across evaluations.
+        Uses and populates caches when path.is_cacheable is True (set by parser).
         """
-        absolute_with_predicate = path.is_absolute and any(
-            seg.predicate is not None for seg in path.segments
-        )
-        if absolute_with_predicate:
+        if not path.is_cacheable:
             nodes, _ = self._eval_path_inner(path, ctx, node)
             return nodes
 
-        path_expr = path.to_string()
-        if path.is_absolute:
-            key = (path_expr,)
-        else:
-            key = (
-                path_expr,
-                id(node.data),
-                id(ctx.current.data) if ctx.current is not None else None,
-            )
-
-        if ctx.path_cache is not None:
-            if path.is_absolute:
-                self._cache_abs_lookups += 1
-            else:
-                self._cache_rel_lookups += 1
+        # TODO determine the longest static prefix of the path, then cache that
+        key = path.to_string() if path.is_absolute else None
+        if key is not None and ctx.path_cache is not None:
+            self._cache_lookups += 1
             if key in ctx.path_cache:
-                if path.is_absolute:
-                    self._cache_abs_hits += 1
-                else:
-                    self._cache_rel_hits += 1
-                cached = ctx.path_cache[key]
-                logger.debug(
-                    "path_cache hit: key=%r nodes=%d path=%s",
-                    key,
-                    len(cached),
-                    path_expr,
-                )
-                return cached
+                self._cache_hits += 1
+                return ctx.path_cache[key]
 
         nodes, cacheable = self._eval_path_inner(path, ctx, node)
 
-        if cacheable and ctx.path_cache is not None:
+        if key is not None and cacheable and ctx.path_cache is not None:
             ctx.path_cache[key] = nodes
-            logger.debug(
-                "path_cache store: key=%r nodes=%d path=%s",
-                key,
-                len(nodes),
-                path_expr,
-            )
 
         return nodes
 
@@ -253,10 +194,12 @@ class XPathEvaluator:
 
         if SchemaNav.is_list(schema_child) or SchemaNav.is_leaf_list(schema_child):
             if isinstance(val, list):
-                return [node.step(item, schema_child) for item in val]
-            return [node.step(val, schema_child)]
-
-        return [node.step(val, schema_child)]
+                result = [node.step(item, schema_child) for item in val]
+            else:
+                result = [node.step(val, schema_child)]
+        else:
+            result = [node.step(val, schema_child)]
+        return result
 
     def _apply_predicate(
         self,
@@ -272,10 +215,13 @@ class XPathEvaluator:
         for i, n in enumerate(nodes):
             val, c = self._eval_inner(predicate, ctx, n)
             cacheable = cacheable and c
+            keep = False
             if isinstance(val, (int, float)) and not isinstance(val, bool):
                 if int(val) == i + 1:
-                    results.append(n)
+                    keep = True
             elif yang_bool(val):
+                keep = True
+            if keep:
                 results.append(n)
         return (results, cacheable)
 
@@ -352,7 +298,6 @@ class XPathEvaluator:
     def _eval_function_inner(
         self, ast: FunctionCallNode, ctx: Context, node: Node
     ) -> Tuple[Any, bool]:
-        cacheable = ast.name.lower() not in NON_CACHEABLE_FUNCTIONS
         fn = FUNCTIONS.get(ast.name.lower())
         result = fn(self, ast, ctx, node) if fn is not None else None
-        return (result, cacheable)
+        return (result, False)  # for simplicity, functions are assumed not cacheable
