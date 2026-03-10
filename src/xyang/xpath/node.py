@@ -14,15 +14,26 @@ class Context:
     """
     Fixed for the lifetime of one expression evaluation.
 
-    current  -- the node being validated (what current() returns).
-    root     -- root Node (entry point for absolute paths).
+    current     -- the node being validated (what current() returns).
+    root        -- root Node (entry point for absolute paths).
+    path_cache  -- dict for path result cache (key -> list of Node), or None to disable caching.
     """
 
-    __slots__ = ("current", "root")
+    __slots__ = ("current", "root", "path_cache")
 
-    def __init__(self, current: Node, root: Node):
+    def __init__(
+        self,
+        current: Node,
+        root: Node,
+        path_cache: dict | None = None,
+    ):
         self.current = current
         self.root = root
+        self.path_cache = path_cache
+
+    def child(self, current: Node) -> Context:
+        """Return a new Context with current set to the child node, retaining root and path_cache."""
+        return Context(current=current, root=self.root, path_cache=self.path_cache)
 
 
 class Node:

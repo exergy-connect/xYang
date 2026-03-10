@@ -32,7 +32,6 @@ from .utils import (
 from .parser import XPathParser
 from .tokens import Token, TokenType
 from .tokenizer import XPathTokenizer
-from .validator import Validator
 
 __all__ = [
     "ASTNode",
@@ -45,7 +44,6 @@ __all__ = [
     "PathNode",
     "PathSegment",
     "SchemaNav",
-    "Validator",
     "XPathEvaluator",
     "XPathParser",
     "Token",

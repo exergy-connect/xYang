@@ -45,7 +45,7 @@ def _make_node_context(
                 data_val = SchemaNav.default(current_schema)
             current_data = data_val
         current_node = Node(current_data, current_schema, current_node)
-    ctx = Context(current=current_node, root=root)
+    ctx = Context(current=current_node, root=root, path_cache={})
     return ctx, current_node
 
 

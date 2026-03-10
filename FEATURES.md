@@ -220,6 +220,15 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 
 The XPath evaluator uses proper tokenization and AST-based parsing (not string-based), making it robust and maintainable. The implementation has been optimized and refactored for better performance and code organization.
 
+### Path result caching
+
+During document validation, path expression results are cached per run to avoid recomputing the same path from the same context. This speeds up validation when many `must` constraints or leafref `require-instance` checks share the same path expressions (e.g. repeated `/data-model/entities` or relative paths from list items).
+
+- **Scope**: One cache per validation run, held in `Context.path_cache` (a dict). The same cache is shared for the root context and all child contexts created during the run.
+- **What is cached**: Resolved path results (node-sets). Absolute paths are keyed by path string only; relative paths are keyed by path string plus the current node’s identity so that `../foo` from different nodes is not confused.
+- **Cacheability**: A path is only cached if its evaluation does not depend on context-sensitive functions. Paths that use `current()` or `deref()` in predicates are not cached, because their result can change with context. Simple structural paths (e.g. `/data-model/entities`, `../type`) are cached.
+- **Observability**: `XPathEvaluator.get_cache_stats()` returns absolute/relative lookups, hits, and hit ratios for the current run. Call `clear_cache()` (or use a fresh evaluator) at the start of each validation run so stats reflect that run only.
+
 ## Error Reporting
 
 xYang provides enhanced error reporting with line numbers and context:

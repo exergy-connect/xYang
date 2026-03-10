@@ -4,10 +4,8 @@ YANG document validator.
 Design
 ------
 The validator walks the data tree in lockstep with the schema tree,
-maintaining a Node stack as it descends.  At each evaluation point it
-calls xpath_validator.make_context() and passes the result directly to
-evaluator.eval().  The validator never constructs Node objects —
-that is the evaluator's domain.
+building Context and Node at the root and using Node.step / Context.child
+as it descends.  At each evaluation point it calls evaluator.eval(ctx, node).
 
 At each node the order is:
     1. when   -- evaluated in parent context; false on present node = error
@@ -20,7 +18,7 @@ At each node the order is:
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional
+from typing import Any, Dict, List, Optional, Tuple
 
 from ..ast import (
     YangCaseStmt,
@@ -38,11 +36,13 @@ from ..xpath.evaluator import XPathEvaluator
 from ..xpath.node import Context, Node
 from ..xpath.schema_nav import SchemaNav
 from ..xpath.utils import yang_bool
-from ..xpath.validator import Validator as XPathValidator
 
 from .path_builder import PathBuilder
 from .type_checker import TypeChecker
 from .validation_error import ValidationError, Severity
+
+# (Context, Node) for the current parent in the data/schema walk
+ParentCtx = Tuple[Context, Node]
 
 logger = logging.getLogger("xyang.validator")
 
@@ -51,10 +51,8 @@ class DocumentValidator:
     """
     Validates a data document against a YANG schema.
 
-    Maintains a Node stack via the XPathValidator as it descends.
-    All XPath evaluation goes through xpath_validator.make_context()
-    followed by evaluator.eval() — the validator never constructs
-    Node objects directly.
+    Builds the root Context and Node, then descends using Node.step
+    and Context.child(). XPath evaluation uses evaluator.eval(ctx, node).
 
     Usage:
         validator = DocumentValidator(root_schema)
@@ -71,14 +69,29 @@ class DocumentValidator:
         data: Any,
         *,
         leafref_severity: Severity = Severity.ERROR,
+        cache: bool = True,
     ) -> List[ValidationError]:
+        """Validate data against the root schema.
+
+        Walks the data tree in lockstep with the schema, evaluating when,
+        must, type constraints, and leafref. Collects errors and returns
+        them; does not raise.
+
+        Args:
+            data: Root data to validate (typically a dict or list).
+            leafref_severity: Severity for leafref violations (ERROR or WARNING).
+            cache: If True, cache XPath path results for reuse; if False, disable.
+
+        Returns:
+            List of ValidationError (empty when valid).
+        """
         self._leafref_severity = leafref_severity
-        self._xpath_v = XPathValidator(data, self._root_schema)
         self._root_data = data
         self._errors = []
-        ctx, node = self._xpath_v.make_context(
-            data, self._root_schema, parent=None
-        )
+        self._evaluator.clear_cache()
+        path_cache: Dict[Any, Any] | None = {} if cache else None
+        node = Node(data, self._root_schema, None)
+        ctx = Context(current=node, root=node, path_cache=path_cache)
         path = PathBuilder()
         self._visit_children(data, self._root_schema, (ctx, node), path)
         return self._errors
@@ -106,7 +119,7 @@ class DocumentValidator:
         self,
         data: Any,
         schema: YangStatementList,
-        parent_ctx: tuple,
+        parent_ctx: ParentCtx,
         path: PathBuilder,
     ) -> None:
         if not isinstance(data, dict):
@@ -128,7 +141,7 @@ class DocumentValidator:
         self,
         stmt: YangStatement,
         data: Dict[str, Any],
-        parent_ctx: tuple,
+        parent_ctx: ParentCtx,
         path: PathBuilder,
     ) -> None:
         logger.debug("_visit_stmt path=%s stmt=%s", path.current(), type(stmt).__name__)
@@ -151,9 +164,8 @@ class DocumentValidator:
             return
 
         val = self._effective_value(data, name, stmt)
-        curr_ctx, curr_node = self._xpath_v.make_context(
-            val, stmt, parent=parent_node
-        )
+        curr_node = parent_node.step(val, stmt)
+        curr_ctx = parent_ctx_obj.child(curr_node)
 
         # -- 1. when (context node is the node the when is attached to, so child) --
         logger.debug("phase 1 when path=%s", child_path)
@@ -189,9 +201,8 @@ class DocumentValidator:
                     else ([val] if val is not None else [])
                 )
                 for i, item in enumerate(items):
-                    item_ctx, item_node = self._xpath_v.make_context(
-                        item, stmt, parent=parent_node
-                    )
+                    item_node = parent_node.step(item, stmt)
+                    item_ctx = parent_ctx_obj.child(item_node)
                     item_path = f"{child_path}[{i}]"
                     self._check_must(stmt, item_ctx, item_node, item_path)
             else:
@@ -214,9 +225,9 @@ class DocumentValidator:
                 child_path,
                 self._root_data,
                 self._root_schema,
-                context_node=parent_node,
+                ctx=curr_ctx,
                 evaluator=self._evaluator,
-                root_node=self._xpath_v._root,
+                leafref_current=parent_node,
             ):
                 severity = (
                     self._leafref_severity if type_name == "leafref" else Severity.ERROR
@@ -234,6 +245,8 @@ class DocumentValidator:
             )
             leaf_list_leafref = getattr(stmt.type, "name", None) == "leafref"
             for i, item in enumerate(items):
+                item_node = parent_node.step(item, stmt)
+                item_ctx = parent_ctx_obj.child(item_node)
                 item_path = f"{child_path}[{i}]"
                 for msg in self._type_checker.check(
                     item,
@@ -241,9 +254,9 @@ class DocumentValidator:
                     item_path,
                     self._root_data,
                     self._root_schema,
-                    context_node=parent_node,
+                    ctx=item_ctx,
                     evaluator=self._evaluator,
-                    root_node=self._xpath_v._root,
+                    leafref_current=parent_node,
                 ):
                     severity = (
                         self._leafref_severity
@@ -273,9 +286,8 @@ class DocumentValidator:
             list_node = Node(val, stmt, parent_node)
             for entry in val:
                 path.push(name, self._entry_key_from_names(entry, key_names))
-                entry_ctx, entry_node = self._xpath_v.make_context(
-                    entry, stmt, parent=list_node
-                )
+                entry_node = list_node.step(entry, stmt)
+                entry_ctx = curr_ctx.child(entry_node)
                 self._check_must(
                     stmt, entry_ctx, entry_node, path.current()
                 )
@@ -288,7 +300,7 @@ class DocumentValidator:
         self,
         choice: YangChoiceStmt,
         data: Dict[str, Any],
-        parent_ctx: tuple,
+        parent_ctx: ParentCtx,
         path: PathBuilder,
     ) -> None:
         active_case = None

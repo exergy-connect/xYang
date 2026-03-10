@@ -27,23 +27,20 @@ class TypeChecker:
         path: str,
         root_data: Any,
         root_schema: Any,
-        context_node: Optional[Node] = None,
-        evaluator: Optional[Any] = None,
-        root_node: Optional[Node] = None,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node] = None,
     ) -> List[str]:
+        """
+        leafref_current: node to use as current() for leafref path resolution (typically
+        the parent of the leaf). If None, ctx.current is used.
+        """
         name = type_stmt.name
 
         if name == "union":
-            return self._check_union(value, type_stmt, path, root_data, root_schema)
+            return self._check_union(value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current)
         if name == "leafref":
-            return self._check_leafref(
-                value,
-                type_stmt,
-                path,
-                context_node=context_node,
-                evaluator=evaluator,
-                root_node=root_node,
-            )
+            return self._check_leafref(value, type_stmt, path, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current)
         if name in (
             "string",
             "entity-name",
@@ -85,9 +82,9 @@ class TypeChecker:
                     path,
                     root_data,
                     root_schema,
-                    context_node=context_node,
+                    ctx=ctx,
                     evaluator=evaluator,
-                    root_node=root_node,
+                    leafref_current=leafref_current,
                 )
         return []
 
@@ -98,9 +95,12 @@ class TypeChecker:
         path: str,
         root_data: Any,
         root_schema: Any,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node] = None,
     ) -> List[str]:
         for member in type_stmt.types:
-            if not self.check(value, member, path, root_data, root_schema):
+            if not self.check(value, member, path, root_data, root_schema, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current):
                 return []
         names = ", ".join(t.name for t in type_stmt.types)
         return [f"Value {value!r} does not match any union member type ({names})"]
@@ -110,9 +110,9 @@ class TypeChecker:
         value: Any,
         type_stmt: YangTypeStmt,
         node_path: str,
-        context_node: Optional[Node] = None,
-        evaluator: Optional[Any] = None,
-        root_node: Optional[Node] = None,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node] = None,
     ) -> List[str]:
         if not type_stmt.require_instance or not type_stmt.path:
             return []
@@ -124,26 +124,22 @@ class TypeChecker:
             value,
             path_str,
         )
-        if evaluator is None or root_node is None:
-            logger.debug("_check_leafref FAIL node_path=%s (no evaluator/root)", node_path)
-            return [
-                "Leafref require-instance check requires evaluator and root node"
-            ]
-        if path_ast.is_absolute:
-            start_node = root_node
+        # For relative paths and current() in predicates, use leafref_current (parent of leaf) when provided
+        current_node = leafref_current if leafref_current is not None else ctx.current
+        if leafref_current is not None and leafref_current is not ctx.current:
+            leafref_ctx = Context(current=leafref_current, root=ctx.root, path_cache=ctx.path_cache)
         else:
-            if context_node is None:
+            leafref_ctx = ctx
+        if path_ast.is_absolute:
+            start_node = ctx.root
+        else:
+            if current_node is None:
                 logger.debug("_check_leafref FAIL node_path=%s (no context node for relative path)", node_path)
                 return [
                     f"Leafref relative path {path_str!r} requires context node"
                 ]
-            start_node = context_node
-        # current() in path predicates must refer to the node containing this leaf
-        ctx = Context(
-            current=context_node if context_node is not None else start_node,
-            root=root_node,
-        )
-        target_nodes = evaluator.eval_path(path_ast, ctx, start_node)
+            start_node = current_node
+        target_nodes = evaluator.eval_path(path_ast, leafref_ctx, start_node)
         targets = [n.data for n in target_nodes]
         logger.debug("_check_leafref node_path=%s targets=%s", node_path, targets)
         if value not in targets:

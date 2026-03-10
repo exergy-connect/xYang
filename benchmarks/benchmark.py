@@ -83,7 +83,7 @@ def benchmark_parse_string():
 
 
 def benchmark_validation():
-    """Benchmark data validation."""
+    """Benchmark data validation. Returns (validate_callable, validator) for cache stats."""
     file_path = Path("examples/meta-model.yang")
     module = parse_yang_file(str(file_path))
     validator = YangValidator(module)
@@ -93,7 +93,6 @@ def benchmark_validation():
         "data-model": {
             "name": "test",
             "version": "26.01.15.1",
-            "max_name_underscores": 2,
             "entities": [
                 {
                     "name": "server",
@@ -110,7 +109,20 @@ def benchmark_validation():
 
     def validate():
         return validator.validate(data)
-    return validate
+
+    return validate, validator
+
+
+def print_path_cache_stats(validator: YangValidator) -> None:
+    """Print XPath path cache hit ratio and efficiency stats."""
+    stats = validator._doc_validator._evaluator.get_cache_stats()
+    if stats["total_lookups"] == 0:
+        print("  Path cache: no lookups (no path evaluation)")
+        return
+    print("  Path cache:")
+    print(f"    absolute: {stats['abs_hits']}/{stats['abs_lookups']} hits ({stats['abs_hit_ratio']:.1%})")
+    print(f"    relative: {stats['rel_hits']}/{stats['rel_lookups']} hits ({stats['rel_hit_ratio']:.1%})")
+    print(f"    total:    {stats['total_hits']}/{stats['total_lookups']} hits ({stats['hit_ratio']:.1%})")
 
 
 def benchmark_xpath_simple():
@@ -129,7 +141,6 @@ def benchmark_xpath_complex():
     data = {
         "entity": {
             "name": "server",
-            "max_underscores": 2,
             "fields": [
                 {"name": "id", "type": "string"},
                 {"name": "name", "type": "string"},
@@ -201,7 +212,9 @@ def main():
     # Validation benchmarks
     print("Validation Benchmarks:")
     print("-" * 60)
-    bench.run_benchmark("Validate Data", benchmark_validation(), iterations=20)
+    validate, validator = benchmark_validation()
+    bench.run_benchmark("Validate Data", validate, iterations=20)
+    print_path_cache_stats(validator)
 
     # XPath benchmarks
     print("XPath Evaluation Benchmarks:")
