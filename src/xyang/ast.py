@@ -47,6 +47,9 @@ class YangStatement(YangStatementList):
     name: str = ""
     description: str = ""
 
+    def child_names(self, data: dict) -> set[str]:
+        return {self.name} if getattr(self, "name", None) else set()
+
 
 @dataclass
 class YangStatementWithMust(YangStatement):
@@ -160,8 +163,16 @@ class YangChoiceStmt(YangStatement):
     mandatory: bool = False
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
+    def child_names(self, data: dict) -> set[str]:
+        for case in self.cases:
+            if any(getattr(s, "name", None) in data for s in case.statements):
+                return {s.name for s in case.statements if getattr(s, "name", None)}
+        return set()
+
 
 @dataclass
 class YangCaseStmt(YangStatement):
     """Case statement - defines one alternative in a choice."""
-    pass
+
+    def child_names(self, data: dict) -> set[str]:
+        return {s.name for s in self.statements if getattr(s, "name", None)}
