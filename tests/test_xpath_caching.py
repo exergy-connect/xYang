@@ -95,9 +95,9 @@ def test_absolute_cacheable_two_documents(validator_with_cache_stats):
     assert not valid2, errors2
     assert any("ref_abs" in str(e) or "flag" in str(e) for e in errors2)
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    assert stats["lookups"] == 2
-    assert stats["hits"] == 1
-    assert stats["purged"] == 0
+    # validate() clears cache stats at start of each run; stats are from last (doc2) run only
+    assert stats["lookups"] == 1
+    assert stats["hits"] == 0
 
 
 def test_absolute_with_predicate_cacheable_two_documents(validator_with_cache_stats):
@@ -121,9 +121,9 @@ def test_absolute_with_predicate_cacheable_two_documents(validator_with_cache_st
     assert not valid2, errors2
     assert any("ref_abs_pred" in str(e) for e in errors2)
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    assert stats["lookups"] == 3
-    assert stats["hits"] == 1
-    assert stats["purged"] == 0
+    # Path /top/items[id=1] has predicate with relative "id", so is_cacheable=False; no cache use
+    assert stats["lookups"] == 0
+    assert stats["hits"] == 0
 
 
 def test_relative_two_documents(validator_with_cache_stats):
@@ -147,9 +147,9 @@ def test_relative_two_documents(validator_with_cache_stats):
     assert not valid2, errors2
     assert any("ref_rel" in str(e) for e in errors2)
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    assert stats["lookups"] == 2
-    assert stats["hits"] == 1
-    assert stats["purged"] == 0
+    # Relative paths are never cached
+    assert stats["lookups"] == 0
+    assert stats["hits"] == 0
 
 
 def test_absolute_with_relative_predicate_two_documents(validator_with_cache_stats):
@@ -173,11 +173,9 @@ def test_absolute_with_relative_predicate_two_documents(validator_with_cache_sta
     assert not valid2, errors2
     assert any("ref_abs_rel_pred" in str(e) for e in errors2)
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    # Trace with: pytest -s --log-cli-level=DEBUG -k test_absolute_with_relative_predicate
-    # 3 lookups: #1 /top/items (miss), #2 ../flag (miss), #3 /top/items (hit from same validate)
-    assert stats["lookups"] == 3
-    assert stats["hits"] == 1
-    assert stats["purged"] == 0
+    # Absolute path with relative predicate: not cacheable (is_cacheable=False)
+    assert stats["lookups"] == 0
+    assert stats["hits"] == 0
 
 
 def test_absolute_with_current_two_documents(validator_with_cache_stats):
@@ -203,11 +201,10 @@ def test_absolute_with_current_two_documents(validator_with_cache_stats):
     stats = validator._doc_validator._evaluator.get_cache_stats()
     assert stats["lookups"] == 0, "current() does not use path cache"
     assert stats["hits"] == 0
-    assert stats["purged"] == 0
 
 
-def test_non_cacheable_path_purged(validator_with_cache_stats):
-    """Path with current() in predicate is not cacheable; one entry is purged after eval."""
+def test_non_cacheable_path_not_cached(validator_with_cache_stats):
+    """Path with current() in predicate is not cacheable; no path cache use."""
     validator = validator_with_cache_stats
     doc = {
         "top": {
@@ -218,9 +215,8 @@ def test_non_cacheable_path_purged(validator_with_cache_stats):
     valid, errors, _ = validator.validate(doc)
     assert valid, errors
     stats = validator._doc_validator._evaluator.get_cache_stats()
-    assert stats["lookups"] == 2
+    assert stats["lookups"] == 0
     assert stats["hits"] == 0
-    assert stats["purged"] == 2
 
 
 def test_local_expression_cache_hit(xpath_caching_module):
@@ -236,5 +232,4 @@ def test_local_expression_cache_hit(xpath_caching_module):
     stats = ev.get_cache_stats()
     assert stats["lookups"] == 2
     assert stats["hits"] == 1
-    assert stats["purged"] == 0
     print(f"\n  Cache stats: {stats}")

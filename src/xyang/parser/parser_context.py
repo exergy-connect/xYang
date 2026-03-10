@@ -5,13 +5,22 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 """
 
 from enum import Enum
-from typing import List, Tuple, Optional, TYPE_CHECKING
+from typing import List, Tuple, Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
 from ..errors import YangSyntaxError
 
 if TYPE_CHECKING:
     from ..module import YangModule
-    from ..ast import YangStatement, YangStatementList
+    from ..ast import (
+        YangStatement,
+        YangStatementList,
+        YangTypeStmt,
+        YangMustStmt,
+    )
+
+
+# Type for parser context parent: statement lists or nested statement contexts (type/must)
+_ParserParent = Union["YangStatementList", "YangTypeStmt", "YangMustStmt"]
 
 
 class YangTokenType(Enum):
@@ -227,9 +236,9 @@ class TokenStream:
 @dataclass
 class ParserContext:
     """Context for parsing, holds module and current state."""
-    module: 'YangModule'
-    current_parent: 'YangStatementList'
+    module: "YangModule"
+    current_parent: _ParserParent
 
-    def push_parent(self, parent: 'YangStatementList') -> 'ParserContext':
+    def push_parent(self, parent: _ParserParent) -> "ParserContext":
         """Create new context with updated parent."""
         return ParserContext(module=self.module, current_parent=parent)

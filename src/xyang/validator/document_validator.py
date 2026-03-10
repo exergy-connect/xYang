@@ -412,7 +412,11 @@ class DocumentValidator:
     ) -> None:
         for must in stmt.must_statements:
             result = self._eval_expr(must.ast, ctx, node)
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug("must result path=%s result=%s", path, result)
             if result is None:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("must ERROR (eval failed) path=%s", path)
                 self._errors.append(
                     ValidationError(
                         path=path,
@@ -421,6 +425,8 @@ class DocumentValidator:
                     )
                 )
             elif not result:
+                if logger.isEnabledFor(logging.DEBUG):
+                    logger.debug("must FAIL (constraint not satisfied) path=%s", path)
                 self._errors.append(
                     ValidationError(
                         path=path,

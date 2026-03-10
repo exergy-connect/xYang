@@ -220,15 +220,14 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 
 The XPath evaluator uses proper tokenization and AST-based parsing (not string-based), making it robust and maintainable. The implementation has been optimized and refactored for better performance and code organization.
 
-### Path result caching (per-expression)
+### Path result caching
 
-During document validation, path expression results are cached to avoid recomputing the same path. Caching is **per expression**: each time the evaluator runs one expression (e.g. a single `must` or leafref check), it uses a **local** cache for that expression only, seeded from a **global** cache shared across the run.
+During document validation, path expression results are cached to avoid recomputing the same path. Only **absolute, cacheable** paths use the cache; relative and context-dependent paths are never cached.
 
-- **Per-expression local cache**: For each `eval(ast, ctx, node)`, if `Context.path_cache` is set, the evaluator replaces it temporarily with a new dict seeded from that global cache. All path lookups and stores during that expression use this local dict. Repeated paths in the same expression (e.g. `/top/flag = 1 or /top/flag = 2`) therefore hit the local cache. After the expression finishes, non-cacheable entries are **purged** from the local dict (entries whose evaluation depended on context-sensitive functions such as `current()` in a predicate). The global cache is not updated by default; the caller can keep or replace `ctx.path_cache` for the next expression.
-- **Keys**: Path results are keyed by the path string from `path.to_string()` (e.g. `/top/items`, `../flag`). Stored value is `(node-set, cacheable)`.
-
-- **Cacheability**: A path result is cacheable only if its evaluation (including any predicates) does not depend on context-sensitive functions. Paths whose predicates use `current()` or `deref()` yield `cacheable=False` and are purged at the end of the expression; they are never written to the global cache. The `is_cacheable` flag on the path AST affects only whether a result is eligible for the global cache (e.g. cross-expression reuse), not whether it is stored in the local cache during the expression.
-- **Observability**: `XPathEvaluator.get_cache_stats()` returns `lookups`, `hits`, `purged`, and `hit_ratio` for the current run. Call `clear_cache_stats()` at the start of each validation run so stats reflect that run only. Enable debug logging on `xyang.xpath.evaluator` to trace which path keys trigger each lookup, hit, and store.
+- **Global cache**: If `Context.path_cache` is set (e.g. by the document validator), it is used as a single global cache for the run. There is no per-expression local cache; each `eval(ast, ctx, node)` reads and writes directly to this cache when the path is cacheable.
+- **Keys**: Path results are keyed by the path string from `path.to_string()` (e.g. `/top/flag`, `/top/items`). Stored value is the **node list** only.
+- **Cacheability (static)**: Whether a path is cacheable is determined **during parsing**, not at evaluation time. The parser sets `PathNode.is_cacheable` to `False` when the path is relative or when any predicate uses context-sensitive constructs (e.g. `current()`, relative steps like `../flag`). Only when `path.is_absolute` and `path.is_cacheable` are both true does the evaluator look up or store in the cache. Relative paths are never cached because their result depends on the starting node.
+- **Observability**: `XPathEvaluator.get_cache_stats()` returns `lookups`, `hits`, and `hit_ratio` for the current run. Call `clear_cache_stats()` at the start of each validation run so stats reflect that run only. Enable debug logging on `xyang.xpath.evaluator` to trace which path keys trigger each lookup, hit, and store.
 
 ## Error Reporting
 

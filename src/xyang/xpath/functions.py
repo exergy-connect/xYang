@@ -125,7 +125,7 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
         leafref_path = SchemaNav.leafref_path(src.schema)
         if leafref_path is None:
             continue
-        targets, _ = ev.eval_path(leafref_path, ctx, src)
+        targets = ev.eval_path(leafref_path, ctx, src)
         for t in targets:
             if t.data == src.data:
                 results.append(t)

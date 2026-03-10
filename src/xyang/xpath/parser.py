@@ -4,6 +4,7 @@ XPath parser for xpath. Produces AST nodes with accept(ev, ctx, node).
 
 from __future__ import annotations
 
+import logging
 from typing import Any, List, Optional, Tuple
 
 from ..errors import XPathSyntaxError
@@ -19,6 +20,8 @@ from .ast import (
     PathNode,
     PathSegment,
 )
+
+logger = logging.getLogger(__name__)
 
 _COMPARISON_OPS = {"=", "!=", "<", ">", "<=", ">="}
 _ADDITIVE_OPS = {"+", "-"}

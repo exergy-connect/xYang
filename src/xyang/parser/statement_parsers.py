@@ -2,13 +2,13 @@
 Statement parsers for YANG statements.
 """
 
-from typing import Optional, TYPE_CHECKING
+from typing import Optional, TYPE_CHECKING, TypeVar, cast, List
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
-    YangStatementWithMust,
+    YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
 )
 from ..xpath import XPathParser
@@ -18,6 +18,8 @@ if TYPE_CHECKING:
     from ..ast import YangStatement
     from ..module import YangModule
 
+_StatementT = TypeVar("_StatementT", bound=YangStatementList)
+
 
 class StatementParsers:
     """Collection of statement parsing methods."""
@@ -25,7 +27,9 @@ class StatementParsers:
     def __init__(self, registry):
         self.registry = registry
 
-    def _add_to_parent_or_module(self, context: ParserContext, stmt: 'YangStatement') -> None:
+    def _add_to_parent_or_module(
+        self, context: ParserContext, stmt: YangStatementList
+    ) -> None:
         """Add statement to current_parent.statements (module or nested statement)."""
         context.current_parent.statements.append(stmt)
 
@@ -95,8 +99,8 @@ class StatementParsers:
         """Parse description statement."""
         tokens.consume_type(YangTokenType.DESCRIPTION)
         desc = tokens.consume_type(YangTokenType.STRING)
-        if hasattr(context.current_parent, 'description'):
-            context.current_parent.description = desc
+        if context.current_parent and hasattr(context.current_parent, "description"):
+            setattr(context.current_parent, "description", desc)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -161,61 +165,53 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return container_stmt
 
+    def _parse_block(
+        self,
+        tokens: TokenStream,
+        context: ParserContext,
+        block_type: str,
+        stmt: _StatementT,
+        name: str,
+    ) -> _StatementT:
+        """Parse a braced block of statements, add stmt to parent, consume semicolon.
+        Handler prefix is block_type (e.g. 'leaf-list', 'list', 'leaf').
+        For block_type 'list', marks key leaf/leaves on stmt after parsing the block.
+        Returns stmt.
+        """
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            new_context = context.push_parent(stmt)
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                handler = self.registry.get_handler(f"{block_type}:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in {block_type} '{name}': {tokens.peek()}"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+        self._add_to_parent_or_module(context, stmt)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        return stmt
+
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         """Parse list statement."""
         tokens.consume_type(YangTokenType.LIST)
         list_name = tokens.consume()  # identifier or keyword
-        list_stmt = YangListStmt(name=list_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(list_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"list:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                else:
-                    raise tokens._make_error(f"Unknown statement in list '{list_name}': {tokens.peek()}")
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, list_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return list_stmt
+        return self._parse_block(tokens, context, "list", YangListStmt(name=list_name), list_name)
 
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
         """Parse leaf statement."""
         tokens.consume_type(YangTokenType.LEAF)
         leaf_name = tokens.consume()  # identifier or keyword (e.g. type)
-        leaf_stmt = YangLeafStmt(name=leaf_name)
-        
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(leaf_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"leaf:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                else:
-                    raise tokens._make_error(f"Unknown statement in leaf '{leaf_name}': {tokens.peek()}")
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, leaf_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return leaf_stmt
+        return self._parse_block(tokens, context, "leaf", YangLeafStmt(name=leaf_name), leaf_name)
 
     def parse_leaf_list(self, tokens: TokenStream, context: ParserContext) -> YangLeafListStmt:
         """Parse leaf-list statement."""
         tokens.consume_type(YangTokenType.LEAF_LIST)
         leaf_list_name = tokens.consume()  # identifier or keyword
-        leaf_list_stmt = YangLeafListStmt(name=leaf_list_name)
-        
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(leaf_list_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"leaf-list:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                else:
-                    raise tokens._make_error(f"Unknown statement in leaf-list '{leaf_list_name}': {tokens.peek()}")
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, leaf_list_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return leaf_list_stmt
+        return self._parse_block(
+            tokens, context, "leaf-list", YangLeafListStmt(name=leaf_list_name), leaf_list_name
+        )
 
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
@@ -246,28 +242,28 @@ class StatementParsers:
                         raise tokens._make_error(f"Unknown statement in type '{type_name}': {tokens.peek()}")
                 else:
                     tokens.consume()  # Skip nested braces content
-        # Assign to parent
-        if context.current_parent:
-            # Check if parent is a union type statement - add nested types to union.types
-            if isinstance(context.current_parent, YangTypeStmt) and context.current_parent.name == 'union':
-                if not hasattr(context.current_parent, 'types'):
-                    context.current_parent.types = []
-                context.current_parent.types.append(type_stmt)
-                # Debug: print what we're adding
-                # print(f"DEBUG: Adding {type_stmt.name} to union.types (now has {len(context.current_parent.types)} types)")
-            elif hasattr(context.current_parent, 'type') and not context.current_parent.type:
-                context.current_parent.type = type_stmt
-            elif hasattr(context.current_parent, 'types'):
-                if not context.current_parent.types:
-                    context.current_parent.types = []
-                context.current_parent.types.append(type_stmt)
-            elif hasattr(context.current_parent, 'type') and context.current_parent.type:
-                # For union types nested in other structures, add to types list
-                if not hasattr(type_stmt, 'types'):
-                    type_stmt.types = []
-                if not hasattr(context.current_parent.type, 'types'):
-                    context.current_parent.type.types = []
-                context.current_parent.type.types.append(type_stmt)
+        # Assign to parent (use setattr: current_parent is typed as YangStatementList which has no type/types)
+        parent = context.current_parent
+        if parent:
+            if isinstance(parent, YangTypeStmt) and parent.name == 'union':
+                types_list = getattr(parent, 'types', None) or []
+                if not getattr(parent, 'types', None):
+                    setattr(parent, 'types', types_list)
+                types_list.append(type_stmt)
+            elif hasattr(parent, 'type') and not getattr(parent, 'type', None):
+                setattr(parent, 'type', type_stmt)
+            elif hasattr(parent, 'types'):
+                types_list = getattr(parent, 'types', None) or []
+                if not getattr(parent, 'types', None):
+                    setattr(parent, 'types', types_list)
+                types_list.append(type_stmt)
+            elif hasattr(parent, 'type') and getattr(parent, 'type', None):
+                parent_type = getattr(parent, 'type', None)
+                if parent_type is not None:
+                    type_types = getattr(parent_type, 'types', None) or []
+                    if not getattr(parent_type, 'types', None):
+                        setattr(parent_type, 'types', type_types)
+                    type_types.append(type_stmt)
         
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return type_stmt
@@ -310,7 +306,7 @@ class StatementParsers:
         """Parse path constraint (for leafref). Path is parsed to XPath PathNode during parsing."""
         tokens.consume_type(YangTokenType.PATH)
         path_str = tokens.consume_type(YangTokenType.STRING)
-        type_stmt.path = XPathParser(path_str).parse()
+        setattr(type_stmt, "path", XPathParser(path_str).parse())
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
@@ -328,28 +324,28 @@ class StatementParsers:
             context.current_parent.key = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_list_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse min-elements in list statement."""
+    def parse_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse min-elements (list or leaf-list)."""
         tokens.consume_type(YangTokenType.MIN_ELEMENTS)
-        if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            context.current_parent.min_elements = int(tokens.consume_type(YangTokenType.INTEGER))
+        if context.current_parent and hasattr(context.current_parent, "min_elements"):
+            setattr(
+                context.current_parent,
+                "min_elements",
+                int(tokens.consume_type(YangTokenType.INTEGER)),
+            )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_list_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse max-elements in list statement."""
+    def parse_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse max-elements (list or leaf-list)."""
         tokens.consume_type(YangTokenType.MAX_ELEMENTS)
-        if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            context.current_parent.max_elements = int(tokens.consume_type(YangTokenType.INTEGER))
+        if context.current_parent and hasattr(context.current_parent, "max_elements"):
+            setattr(
+                context.current_parent,
+                "max_elements",
+                int(tokens.consume_type(YangTokenType.INTEGER)),
+            )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
-    def parse_list_must(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse must in list statement."""
-        must_stmt = self.parse_must(tokens, context)
-        if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            if not hasattr(context.current_parent, 'must_statements'):
-                context.current_parent.must_statements = []
-            context.current_parent.must_statements.append(must_stmt)
-    
+
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in leaf statement."""
         tokens.consume_type(YangTokenType.MANDATORY)
@@ -381,39 +377,6 @@ class StatementParsers:
                     f"got {tt.name if tt else 'end'}"
                 )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
-    def parse_leaf_must(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse must in leaf statement."""
-        must_stmt = self.parse_must(tokens, context)
-        if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
-            context.current_parent.must_statements.append(must_stmt)
-    
-    def parse_leaf_list_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse min-elements in leaf-list statement."""
-        tokens.consume_type(YangTokenType.MIN_ELEMENTS)
-        if context.current_parent and isinstance(context.current_parent, YangLeafListStmt):
-            context.current_parent.min_elements = int(tokens.consume_type(YangTokenType.INTEGER))
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_leaf_list_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse max-elements in leaf-list statement."""
-        tokens.consume_type(YangTokenType.MAX_ELEMENTS)
-        if context.current_parent and isinstance(context.current_parent, YangLeafListStmt):
-            context.current_parent.max_elements = int(tokens.consume_type(YangTokenType.INTEGER))
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
-    def parse_leaf_list_type(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse type in leaf-list statement."""
-        # parse_type will assign to current_parent automatically
-        self.parse_type(tokens, context)
-    
-    def parse_leaf_list_must(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse must in leaf-list statement."""
-        must_stmt = self.parse_must(tokens, context)
-        if context.current_parent and isinstance(context.current_parent, YangLeafListStmt):
-            if not hasattr(context.current_parent, 'must_statements'):
-                context.current_parent.must_statements = []
-            context.current_parent.must_statements.append(must_stmt)
     
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse presence statement for container."""
@@ -615,7 +578,12 @@ class StatementParsers:
             context.current_parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
-    def _expand_uses(self, grouping: 'YangStatement', refines: list, module: 'YangModule' = None) -> list:
+    def _expand_uses(
+        self,
+        grouping: "YangStatement",
+        refines: list,
+        module: Optional["YangModule"] = None,
+    ) -> list:
         """Expand a uses statement by copying statements from grouping and applying refines.
         
         Recursively expands nested uses statements within the grouping.
@@ -648,7 +616,12 @@ class StatementParsers:
         
         return expanded
     
-    def _expand_uses_with_statements(self, statements, refines: list, module: 'YangModule' = None) -> list:
+    def _expand_uses_with_statements(
+        self,
+        statements: list,
+        refines: list,
+        module: Optional["YangModule"] = None,
+    ) -> list:
         """Expand uses statements from a list of already-expanded statements.
         
         This is used when expanding uses statements that reference groupings
@@ -725,13 +698,15 @@ class StatementParsers:
             )
         elif isinstance(stmt, YangChoiceStmt):
             # Copy cases recursively
-            copied_cases = [self._copy_statement(c) for c in stmt.cases]
+            copied_cases: List[YangCaseStmt] = [
+                cast(YangCaseStmt, self._copy_statement(c)) for c in stmt.cases
+            ]
             return YangChoiceStmt(
                 name=stmt.name,
                 description=stmt.description,
                 statements=copied_statements,
                 mandatory=stmt.mandatory,
-                cases=copied_cases
+                cases=copied_cases,
             )
         elif isinstance(stmt, YangCaseStmt):
             return YangCaseStmt(
@@ -759,8 +734,8 @@ class StatementParsers:
         
         # Apply must statements from refine
         for refine_stmt in refine.must_statements:
-            if not hasattr(stmt, 'must_statements'):
-                stmt.must_statements = []
-            if stmt.must_statements is None:
-                stmt.must_statements = []
-            stmt.must_statements.append(refine_stmt)
+            must_list = getattr(stmt, "must_statements", None)
+            if must_list is None:
+                setattr(stmt, "must_statements", [])
+                must_list = getattr(stmt, "must_statements")
+            must_list.append(refine_stmt)

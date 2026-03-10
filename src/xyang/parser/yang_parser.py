@@ -57,15 +57,15 @@ class YangParser:
         
         # List body statements
         self.registry.register('list:key', self.parsers.parse_list_key)
-        self.registry.register('list:min-elements', self.parsers.parse_list_min_elements)
-        self.registry.register('list:max-elements', self.parsers.parse_list_max_elements)
+        self.registry.register('list:min-elements', self.parsers.parse_min_elements)
+        self.registry.register('list:max-elements', self.parsers.parse_max_elements)
         self.registry.register('list:description', self.parsers.parse_description)
         self.registry.register('list:when', self.parsers.parse_when)
         self.registry.register('list:leaf', self.parsers.parse_leaf)
         self.registry.register('list:container', self.parsers.parse_container)
         self.registry.register('list:list', self.parsers.parse_list)
         self.registry.register('list:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('list:must', self.parsers.parse_list_must)
+        self.registry.register('list:must', self.parsers.parse_must)
         self.registry.register('list:uses', self.parsers.parse_uses)
         self.registry.register('list:choice', self.parsers.parse_choice)
         
@@ -74,15 +74,15 @@ class YangParser:
         self.registry.register('leaf:mandatory', self.parsers.parse_leaf_mandatory)
         self.registry.register('leaf:default', self.parsers.parse_leaf_default)
         self.registry.register('leaf:description', self.parsers.parse_description)
-        self.registry.register('leaf:must', self.parsers.parse_leaf_must)
+        self.registry.register('leaf:must', self.parsers.parse_must)
         self.registry.register('leaf:when', self.parsers.parse_when)
         
         # Leaf-list body statements
-        self.registry.register('leaf-list:type', self.parsers.parse_leaf_list_type)
-        self.registry.register('leaf-list:min-elements', self.parsers.parse_leaf_list_min_elements)
-        self.registry.register('leaf-list:max-elements', self.parsers.parse_leaf_list_max_elements)
+        self.registry.register('leaf-list:type', self.parsers.parse_type)
+        self.registry.register('leaf-list:min-elements', self.parsers.parse_min_elements)
+        self.registry.register('leaf-list:max-elements', self.parsers.parse_max_elements)
         self.registry.register('leaf-list:description', self.parsers.parse_description)
-        self.registry.register('leaf-list:must', self.parsers.parse_leaf_list_must)
+        self.registry.register('leaf-list:must', self.parsers.parse_must)
         
         # Typedef body statements
         self.registry.register('typedef:type', self.parsers.parse_type)

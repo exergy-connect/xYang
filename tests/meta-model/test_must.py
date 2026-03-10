@@ -557,7 +557,7 @@ def test_computed_reference_missing_invalid(meta_model):
 
 
 def test_computed_cross_entity_fk_valid(meta_model):
-    """Cross-entity computed with FK in current entity passes when consolidated."""
+    """Cross-entity computed with FK in current entity passes when consolidated=True (price_per_sqft-style: division, same-entity + cross-entity)."""
     data = {
         "data-model": {
             "name": "M",
@@ -566,27 +566,27 @@ def test_computed_cross_entity_fk_valid(meta_model):
             "consolidated": True,
             "entities": [
                 {
-                    "name": "entity1",
-                    "primary_key": "id",
+                    "name": "property_detail",
+                    "primary_key": "mls_number",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"},
+                        {"name": "mls_number", "type": "integer"},
+                        {"name": "sqft", "type": "integer"},
                     ],
                 },
                 {
-                    "name": "entity2",
-                    "primary_key": "id",
+                    "name": "property_economics",
+                    "primary_key": "mls_number",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "entity1_id", "type": "integer", "foreignKeys": [{"entity": "entity1"}]},
+                        {"name": "mls_number", "type": "integer", "foreignKeys": [{"entity": "property_detail"}]},
+                        {"name": "price", "type": "integer"},
                         {
-                            "name": "diff",
-                            "type": "integer",
+                            "name": "price_per_sqft",
+                            "type": "number",
                             "computed": {
-                                "operation": "subtraction",
+                                "operation": "division",
                                 "fields": [
-                                    {"field": "field1", "entity": "entity1"},
-                                    {"field": "id"},
+                                    {"field": "price"},
+                                    {"field": "sqft", "entity": "property_detail"},
                                 ],
                             },
                         },
