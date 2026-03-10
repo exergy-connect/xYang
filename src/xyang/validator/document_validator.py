@@ -7,9 +7,9 @@ The validator walks the data tree in lockstep with the schema tree,
 building Context and Node at the root and using Node.step / Context.child
 as it descends.  At each evaluation point it calls evaluator.eval(ctx, node).
 
-At each node the order is:
-    1. when   -- evaluated in parent context; false on present node = error
-    2. structural -- mandatory, cardinality
+At each node the order is (RFC 7950: when before structural):
+    1. when   -- evaluated in current node context; false + present = error; false + absent = skip node
+    2. structural -- mandatory, min/max-elements, presence
     3. must   -- evaluated in current node context, per entry for lists
     4. type   -- pattern, range, length, enum, leafref require-instance
     5. descend
@@ -158,16 +158,12 @@ class DocumentValidator:
         child_path = path.child(name)
         parent_ctx_obj, parent_node = parent_ctx
 
-        # -- 2. Structural checks (need before when so we have val for context) --
-        logger.debug("phase 2 structural path=%s", child_path)
-        if not self._check_structural(stmt, name, data, child_path):
-            return
-
+        # Need val and (curr_node, curr_ctx) for when, must, and type checks
         val = self._effective_value(data, name, stmt)
         curr_node = parent_node.step(val, stmt)
         curr_ctx = parent_ctx_obj.child(curr_node)
 
-        # -- 1. when (context node is the node the when is attached to, so child) --
+        # -- 1. when (RFC 7950: applicability first; report when-false before structural) --
         logger.debug("phase 1 when path=%s", child_path)
         if isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
             when_ok = self._eval_expr(stmt.when.ast, curr_ctx, curr_node)
@@ -187,6 +183,11 @@ class DocumentValidator:
                 return
             if not when_ok:
                 return
+
+        # -- 2. Structural (mandatory, min/max-elements, presence) —
+        logger.debug("phase 2 structural path=%s", child_path)
+        if not self._check_structural(stmt, name, data, child_path):
+            return
 
         # -- 3. must (evaluated in current node context) --
         logger.debug("phase 3 must path=%s", child_path)

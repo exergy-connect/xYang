@@ -262,67 +262,76 @@ xYang provides enhanced error reporting with line numbers and context:
 The XPath implementation is organized in a modular architecture for better maintainability:
 
 ```
-xYang/
+src/xyang/
 ├── xpath/
-│   ├── __init__.py              # Exports XPathEvaluator
+│   ├── __init__.py              # Exports XPathEvaluator, Node, Context, SchemaNav, etc.
 │   ├── evaluator.py             # Main XPath evaluator (orchestrator)
-│   ├── parser.py                # Tokenizer and recursive descent parser
+│   ├── tokenizer.py             # XPath expression tokenizer
+│   ├── tokens.py                # Token type definitions
+│   ├── parser.py                # Recursive descent parser (XPathParser)
 │   ├── ast.py                   # AST node definitions
-│   ├── path_evaluator.py        # Path navigation logic
-│   ├── schema_leafref_resolver.py  # Schema and leafref resolution utilities
-│   ├── predicate_evaluator.py   # Predicate filtering logic
-│   ├── function_evaluator.py    # XPath function implementations
-│   ├── comparison_evaluator.py  # Comparison operations
-│   └── utils.py                 # Utility functions (yang_bool, etc.)
+│   ├── node.py                  # Context and Node (data/schema cursor)
+│   ├── schema_nav.py            # Schema navigation and leafref resolution (SchemaNav)
+│   ├── functions.py             # XPath function implementations (FUNCTIONS)
+│   └── utils.py                 # Utility functions (yang_bool, compare_*, etc.)
+├── parser/                      # YANG parser
+│   ├── yang_parser.py           # YANG file/module parsing
+│   ├── tokenizer.py             # YANG tokenizer
+│   ├── statement_parsers.py     # Statement-level parsers
+│   ├── statement_registry.py    # Statement registry
+│   └── parser_context.py        # Parser context
+├── validator/                   # Validation engine
+│   ├── yang_validator.py       # Top-level YANG validator
+│   ├── document_validator.py   # Document/node validation (must, leafref, etc.)
+│   ├── type_checker.py         # Type checking
+│   ├── path_builder.py         # Path building utilities
+│   └── validation_error.py      # Validation error types
 ├── errors.py                    # Custom exception classes
-├── parser.py                    # YANG parser
-├── validator.py                 # Validation engine
-└── ...
+├── ast.py                       # YANG AST node definitions
+├── types.py                     # Type utilities
+└── module.py                    # Module handling
 ```
 
 The modular architecture separates concerns:
-- **Path evaluation**: Handles all path navigation and context management
-- **Deref resolution**: Specialized logic for resolving leafref paths
-- **Predicate evaluation**: Handles filtering and indexing of lists
-- **Function evaluation**: Dictionary-based dispatch for XPath functions
-- **Comparison operations**: Type-coercion aware comparisons
+- **evaluator**: Path evaluation, predicate filtering, and expression orchestration; manages context and Node cursor
+- **schema_nav**: Schema navigation and leafref/deref resolution
+- **functions**: Dictionary-based dispatch for XPath functions (e.g. `count`, `current`, `deref`)
+- **utils**: Type-coercion aware comparisons (`compare_eq`, `compare_lt`, `compare_gt`), `yang_bool`, node-set helpers
+- **parser / tokenizer / ast**: XPath expression parsing; **node**: Context and Node (data/schema cursor) for evaluation
 
 ## Limitations
 
-1. **Leafref Resolution**: `deref()` is implemented with full support for nested paths and cross-entity references. It correctly resolves:
-   - Simple leafrefs: `deref(../entity)`
-   - Nested leafrefs: `deref(deref(current())/../foreignKey/entity)`
-   - Relative paths from any context
-   - Entity and field lookups in the schema
+- **XPath scope**: Only the XPath features used in `meta-model.yang` are implemented. Unsupported: axes (e.g. `child::`, `following-sibling::`), namespaces, and more complex location paths.
+- **Error reporting**: In constraint validation the evaluator catches exceptions and returns `False` or `None`, so detailed error information is not surfaced to the caller.
+- **Expression caching**: Caching applies only to short expressions; long or dynamic expressions are not cached.
+- **Schema/document model**: The implementation is tied to the meta-model and document structure (e.g. schema-aware `Node`); it is not a general-purpose XPath 1.0 engine.
 
-2. **XPath Scope**: Only the XPath features actually used in `meta-model.yang` are implemented. More complex XPath features (e.g., axes, namespaces, complex location paths) are not supported.
+## Implementation notes
 
-3. **Error Handling**: The XPath evaluator catches exceptions during evaluation and returns `False` or `None` for constraint validation. This ensures validation doesn't crash on invalid expressions, but detailed error information may be lost in constraint evaluation contexts.
-
-4. **Performance**: The evaluator includes optimizations such as:
-   - Expression caching for short expressions
-   - Efficient context path management
-   - Set-based operator lookups
-   - Early returns for common cases
+- **Leafref / deref**: `deref()` supports nested paths and cross-entity references: simple leafrefs (`deref(../entity)`), nested (`deref(deref(current())/../foreignKey/entity)`), relative paths, and entity/field lookups in the schema.
+- **Performance**: The evaluator uses expression caching (short expressions), efficient context path handling, set-based operator lookups, and early returns where applicable.
 
 ## Usage Statistics from meta-model.yang
 
-- `must`: 60+ occurrences (including constraints on lists with leafref)
-- `default`: 29 occurrences
-- `mandatory`: 15 occurrences
-- `leafref`: 11 occurrences
-- `pattern`: 7 occurrences
-- `enumeration`: 6 occurrences
-- `min-elements`: 5 occurrences
-- `presence`: 4 occurrences
-- `union`: 3 occurrences (fully supported in typedefs)
-- `choice`: 1 occurrence
-- `case`: 2 occurrences
-- `max-elements`: 2 occurrences
-- `decimal64`: 2 occurrences
-- `fraction-digits`: 2 occurrences
-- `when`: 1 occurrence
-- `range`: 1 occurrence
+Counts below are from `examples/meta-model.yang` (statement or keyword occurrences):
+
+- `must`: 30
+- `default`: 28
+- `mandatory`: 14
+- `pattern`: 7
+- `length`: 8
+- `enumeration`: 8
+- `leafref`: 6 (in `type` / path)
+- `union`: 7 (fully supported in typedefs)
+- `min-elements`: 6
+- `case`: 6
+- `choice`: 2
+- `decimal64`: 4
+- `fraction-digits`: 4
+- `when`: 4
+- `presence`: 1
+- `max-elements`: 1
+- `range`: 1
 
 ## Test Coverage
 
