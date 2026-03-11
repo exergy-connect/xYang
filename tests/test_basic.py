@@ -29,6 +29,37 @@ module test {
     assert module.prefix == "t"
 
 
+def test_parse_block_comments():
+    """Block comments /* ... */ are stripped; /* inside strings is preserved."""
+    yang_content = """
+module test {
+  /* single-line block comment */
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+  /*
+   * multi-line
+   * block comment
+   */
+  container data {
+    leaf name {
+      type string;
+      description "path /* not a comment */ here";
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    assert module.name == "test"
+    assert module.yang_version == "1.1"
+    # Description string must still contain the literal /* ... */ (not stripped as comment)
+    data = module.find_statement("data")
+    assert data is not None
+    name_leaf = data.find_statement("name")
+    assert name_leaf is not None
+    assert name_leaf.description and "/* not a comment */" in name_leaf.description
+
+
 def test_parse_typedef():
     """Test parsing typedef."""
     yang_content = """

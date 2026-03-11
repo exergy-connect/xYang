@@ -26,7 +26,7 @@ class YangTokenizer:
         """
         lines = content.split("\n")
 
-        # Remove single-line comments, keep line structure for positions
+        # Remove single-line comments // to EOL, keep line structure for positions
         cleaned_lines = []
         for line in lines:
             comment_idx = line.find("//")
@@ -69,6 +69,18 @@ class YangTokenizer:
         while i < content_len:
             if content[i].isspace():
                 advance()
+                continue
+
+            # Block comment: /* ... */ — recognize and skip (do not emit tokens)
+            if content[i] == "/" and i + 1 < content_len and content[i + 1] == "*":
+                advance()
+                advance()
+                while i < content_len:
+                    if i + 1 < content_len and content[i] == "*" and content[i + 1] == "/":
+                        advance()
+                        advance()
+                        break
+                    advance()
                 continue
 
             char = content[i]
@@ -137,6 +149,7 @@ class YangTokenizer:
                 add_token(YangTokenType.PLUS, "+", i, current_line, line_start)
                 advance()
             elif char == "/":
+                # Not /* (block comment already handled above)
                 add_token(YangTokenType.SLASH, "/", i, current_line, line_start)
                 advance()
             else:
