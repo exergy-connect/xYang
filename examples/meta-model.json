@@ -237,18 +237,26 @@
           "type": "array",
           "items": { "$ref": "#/$defs/field-definition-entry" },
           "description": "Optional reusable field type and constraint definitions for this entity. Entity fields may reference these by setting type to this name; when type is a definition name, min, max, etc. must not be set inline. Names are unique within this entity only.",
-          "x-yang": { "type": "list", "key": "name", "uses": "#/$defs/field-constraints" }
+          "x-yang": { "type": "list", "key": "name" }
         },
         "fields": {
           "type": "array",
           "minItems": 1,
-          "items": { "$ref": "#/$defs/field-definition" },
+          "items": {
+            "allOf": [
+              { "$ref": "#/$defs/field-definition" },
+              {
+                "type": "object",
+                "properties": {
+                  "type": { "$ref": "#/$defs/type-or-definition-ref", "description": "Field data type", "x-yang": { "type": "leaf" } }
+                }
+              }
+            ]
+          },
           "description": "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.",
           "x-yang": {
             "type": "list",
             "key": "name",
-            "uses": "#/$defs/field-definition",
-            "refine": { "type": "type-or-definition-ref" },
             "must": [
               {
                 "must": "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)",

@@ -239,36 +239,6 @@ def _convert_property(
             )
             if child is not None:
                 child_statements.append(child)
-        # Expand uses: inline grouping content so AST matches YANG (no YangUsesStmt/YangRefineStmt)
-        uses_ref = xyang.get("usesRef") or (
-            xyang.get("uses") if isinstance(xyang.get("uses"), str) and str(xyang.get("uses", "")).startswith("#/$defs/") else None
-        )
-        refine = xyang.get("refine") if isinstance(xyang.get("refine"), dict) else {}
-        if uses_ref:
-            ref_name = _ref_to_typedef_name(uses_ref)
-            if ref_name and ref_name in defs:
-                grouping_schema = _resolve_schema(defs[ref_name], defs)
-                existing_names = {s.name for s in child_statements}
-                for prop_name, prop_val in (grouping_schema.get("properties") or {}).items():
-                    if prop_name in existing_names:
-                        continue
-                    child = _convert_property(prop_name, prop_val, defs, f"{parent_path}/{name}/{prop_name}")
-                    if child is not None:
-                        if refine.get(prop_name) and isinstance(child, YangLeafStmt):
-                            refined_type = refine[prop_name]
-                            if isinstance(refined_type, str):
-                                child.type = YangTypeStmt(name=refined_type)
-                        if isinstance(child, YangLeafStmt) and prop_name in (grouping_schema.get("required") or []):
-                            child.mandatory = True
-                        child_statements.append(child)
-        # Apply refine to list item children (e.g. type -> type-or-definition-ref for fields list)
-        for prop_name, refined_type in refine.items():
-            if not isinstance(refined_type, str):
-                continue
-            for stmt in child_statements:
-                if getattr(stmt, "name", None) == prop_name and isinstance(stmt, YangLeafStmt):
-                    stmt.type = YangTypeStmt(name=refined_type)
-                    break
         lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
         lst.must_statements = must_list
         return lst
