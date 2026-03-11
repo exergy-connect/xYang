@@ -83,13 +83,18 @@
           "minItems": 1,
           "items": { "$ref": "#/$defs/entity" },
           "description": "List of entity definitions",
-          "x-yang": { "type": "list" }
+          "x-yang": {
+            "type": "list",
+            "key": "name",
+            "must": "/data-model/consolidated = true() or ../allow_unlimited_fields or count(fields[type != 'array']) <= 7",
+            "error-message": "Entity has more than 7 non-array fields. Array fields are excluded from this count as they represent relationships to child entities. Consider splitting into multiple entities with foreign key relationships, or set allow_unlimited_fields (present) to bypass this limit."
+          }
         },
         "changes": {
           "type": "array",
           "items": { "$ref": "#/$defs/change-record" },
           "description": "Change tracking records (auto-generated during consolidation).",
-          "x-yang": { "type": "list" }
+          "x-yang": { "type": "list", "key": "id" }
         }
       },
       "additionalProperties": false
@@ -144,26 +149,43 @@
       "type": "object",
       "required": ["name", "primary_key"],
       "properties": {
-        "name": { "$ref": "#/$defs/entity-name", "x-yang": { "type": "leaf" } },
+        "name": {
+          "$ref": "#/$defs/entity-name",
+          "x-yang": {
+            "type": "leaf",
+            "must": "string-length(.) - string-length(translate(., '_', '')) <= number(/data-model/max_name_underscores)",
+            "error-message": "Entity name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead."
+          }
+        },
         "brief": { "type": "string", "x-yang": { "type": "leaf" } },
         "description": { "type": "string", "x-yang": { "type": "leaf" } },
         "source": { "type": "string", "x-yang": { "type": "leaf" } },
-        "primary_key": { "$ref": "#/$defs/field-name", "x-yang": { "type": "leaf" } },
+        "primary_key": { "$ref": "#/$defs/field-name", "x-yang": { "type": "leafref", "path": "../fields/name", "require-instance": true } },
         "required_fields": {
           "type": "array",
-          "items": { "$ref": "#/$defs/field-name" },
+          "items": {
+            "$ref": "#/$defs/field-name",
+            "x-yang": { "type": "leafref", "path": "../fields/name", "require-instance": true }
+          },
           "x-yang": { "type": "leaf-list" }
         },
         "field_definitions": {
           "type": "array",
           "items": { "$ref": "#/$defs/field-definition-entry" },
-          "x-yang": { "type": "list", "key": "name", "uses": "field-constraints" }
+          "x-yang": { "type": "list", "key": "name", "uses": "field-constraints", "usesRef": "#/$defs/field-constraints" }
         },
         "fields": {
           "type": "array",
           "minItems": 1,
           "items": { "$ref": "#/$defs/field-entry" },
-          "x-yang": { "type": "list", "key": "name", "uses": "field-definition", "refine": { "type": "type-or-definition-ref" } }
+          "x-yang": {
+            "type": "list",
+            "key": "name",
+            "uses": "field-definition",
+            "refine": { "type": "type-or-definition-ref" },
+            "must": "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)",
+            "error-message": "When type references a field_definition, min, max, minDate, maxDate, enum, default, item_type, and composite must not be specified (description and brief may be used at the reference site)."
+          }
         },
         "change_history": { "$ref": "#/$defs/change-history-policy", "x-yang": { "type": "leaf" } },
         "v": { "$ref": "#/$defs/version-string", "x-yang": { "type": "leaf" } },
@@ -197,13 +219,109 @@
       },
       "additionalProperties": false
     },
-    "field-definition-entry": {
+    "composite-field-entry": {
       "type": "object",
-      "required": ["name"],
+      "required": ["name", "type"],
+      "description": "Subcomponent of a composite field (YANG composite-field grouping).",
       "properties": {
-        "name": { "$ref": "#/$defs/field-name", "x-yang": { "type": "leaf" } }
+        "name": {
+          "$ref": "#/$defs/field-name",
+          "x-yang": {
+            "type": "leaf",
+            "must": "string-length(.) - string-length(translate(., '_', '')) <= number(/data-model/max_name_underscores)",
+            "error-message": "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead."
+          }
+        },
+        "type": {
+          "type": "string",
+          "enum": ["string", "integer", "number", "boolean", "date", "datetime"],
+          "x-yang": {
+            "type": "leaf",
+            "must": ". != 'composite'",
+            "error-message": "Subcomponents of a composite field cannot themselves be composite (no nested composites)"
+          }
+        },
+        "description": { "type": "string", "x-yang": { "type": "leaf" } },
+        "source": { "type": "string", "x-yang": { "type": "leaf" } },
+        "brief": { "type": "string", "x-yang": { "type": "leaf" } }
       },
       "additionalProperties": false
+    },
+    "field-constraints": {
+      "type": "object",
+      "description": "Reusable type and constraint definition (YANG grouping field-constraints): type, min, max, minDate, maxDate, enum, default, item_type, validation, composite.",
+      "properties": {
+        "type": { "type": "string", "enum": ["string", "integer", "number", "boolean", "date", "datetime", "array", "composite"], "x-yang": { "type": "leaf" } },
+        "description": { "type": "string", "x-yang": { "type": "leaf" } },
+        "source": { "type": "string", "x-yang": { "type": "leaf" } },
+        "brief": { "type": "string", "x-yang": { "type": "leaf" } },
+        "min": { "type": "integer", "x-yang": { "type": "leaf" } },
+        "max": { "type": "integer", "x-yang": { "type": "leaf" } },
+        "minDate": {
+          "$ref": "#/$defs/date",
+          "x-yang": {
+            "type": "leaf",
+            "must": [
+              "../type = ('date','datetime')",
+              "not(../maxDate) or . <= ../maxDate"
+            ],
+            "error-message": [
+              "minDate can only be used with fields of type 'date' or 'datetime'",
+              "minDate must be less than or equal to maxDate when both are specified"
+            ]
+          }
+        },
+        "maxDate": {
+          "$ref": "#/$defs/date",
+          "x-yang": {
+            "type": "leaf",
+            "must": [
+              "../type = ('date','datetime')",
+              "not(../minDate) or . >= ../minDate"
+            ],
+            "error-message": [
+              "maxDate can only be used with fields of type 'date' or 'datetime'",
+              "maxDate must be greater than or equal to minDate when both are specified"
+            ]
+          }
+        },
+        "enum": {
+          "type": "array",
+          "items": {
+            "anyOf": [
+              { "type": "string" },
+              { "type": "integer" },
+              { "type": "number" }
+            ]
+          },
+          "x-yang": {
+            "type": "leaf-list",
+            "must": "../type = ('string', 'integer', 'number') or (../type = 'array' and ../item_type/primitive = ('string', 'integer', 'number')) or (../type = 'composite' and count(../composite[type = ('string', 'integer', 'number')]) > 0)",
+            "error-message": "enum can only be used with fields of type 'string', 'integer', 'number', 'array' with item_type primitive 'string', 'integer', or 'number', or 'composite' with at least one subcomponent of type 'string', 'integer', or 'number'"
+          }
+        },
+        "default": {}, "x-yang": { "type": "leaf" },
+        "item_type": { "type": "object", "properties": { "primitive": { "type": "string" }, "entity": { "$ref": "#/$defs/entity-name" } }, "x-yang": { "type": "container" } },
+        "validation": { "type": "string", "enum": ["enforce", "filter"], "default": "enforce", "x-yang": { "type": "leaf" } },
+        "composite": {
+          "type": "array",
+          "items": { "$ref": "#/$defs/composite-field-entry" },
+          "x-yang": {
+            "type": "list",
+            "key": "name",
+            "must": "count(../composite) <= 7 or /data-model/allow_unlimited_fields",
+            "error-message": "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit)."
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "field-definition-entry": {
+      "allOf": [
+        { "type": "object", "required": ["name"], "properties": { "name": { "$ref": "#/$defs/field-name", "x-yang": { "type": "leaf" } } },
+          "additionalProperties": false },
+        { "$ref": "#/$defs/field-constraints" }
+      ]
     },
     "field-entry": {
       "type": "object",

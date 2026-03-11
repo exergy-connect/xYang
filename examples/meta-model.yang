@@ -249,7 +249,7 @@ module meta-model {
     leaf minDate {
       type date;
       description "Minimum date value for date or datetime fields (YYYY-MM-DD format).";
-      must "../type = 'date' or ../type = 'datetime'" {
+      must "../type = ('date','datetime')" {
         error-message "minDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that minDate is only specified for date or datetime fields";
       }
@@ -261,7 +261,7 @@ module meta-model {
     leaf maxDate {
       type date;
       description "Maximum date value for date or datetime fields (YYYY-MM-DD format).";
-      must "../type = 'date' or ../type = 'datetime'" {
+      must "../type = ('date','datetime')" {
         error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that maxDate is only specified for date or datetime fields";
       }
@@ -326,7 +326,11 @@ module meta-model {
       when "../type = 'composite'";
       key name;
       min-elements 1;
-      description "Subcomponent fields when type is composite. No nested composites.";
+      must "count(../composite) <= 7 or /data-model/allow_unlimited_fields" {
+        error-message "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).";
+        description "Maximum 7 subcomponents unless allow_unlimited_fields is set.";
+      }
+      description "Subcomponent fields when type is composite. Maximum 7 subcomponents unless allow_unlimited_fields is set (same as entity non-array field limit). No nested composites.";
       uses composite-field {
         refine type {
           must ". != 'composite'" {
@@ -355,7 +359,11 @@ module meta-model {
       when "../type = 'composite'";
       key name;
       min-elements 1;
-      description "Subcomponent fields when type is composite. No nested composites.";
+      must "count(../composite) <= 7 or /data-model/allow_unlimited_fields" {
+        error-message "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).";
+        description "Maximum 7 subcomponents unless allow_unlimited_fields is set.";
+      }
+      description "Subcomponent fields when type is composite. Maximum 7 subcomponents unless allow_unlimited_fields is set (same as entity non-array field limit). No nested composites.";
       uses composite-field {
         refine type {
           must ". != 'composite'" {
@@ -453,7 +461,7 @@ module meta-model {
     leaf minDate {
       type date;
       description "Minimum date value for date or datetime fields (YYYY-MM-DD format). Values must be on or after this date. Only applicable to fields with type 'date' or 'datetime'.";
-      must "../type = 'date' or ../type = 'datetime'" {
+      must "../type = ('date','datetime')" {
         error-message "minDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that minDate is only specified for date or datetime fields";
       }
@@ -465,7 +473,7 @@ module meta-model {
     leaf maxDate {
       type date;
       description "Maximum date value for date or datetime fields (YYYY-MM-DD format). Values must be on or before this date. Only applicable to fields with type 'date' or 'datetime'.";
-      must "../type = 'date' or ../type = 'datetime'" {
+      must "../type = ('date','datetime')" {
         error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
         description "Validates that maxDate is only specified for date or datetime fields";
       }
@@ -684,16 +692,18 @@ module meta-model {
         description "Optional documentation of where this entity's data comes from (e.g. URL, Excel sheet, API endpoint).";
       }
       leaf primary_key {
-        type field-name;
+        type leafref {
+          path "../fields/name";
+          require-instance true;
+        }
         mandatory true;
         description "Primary key field for this entity. Can be a simple field or a composite field.";
-        must "../fields[name = current()]" {
-          error-message "primary_key must reference an existing field in the entity's fields list";
-          description "Validates that primary_key references an existing field in the entity's fields list, which can be a simple field or a composite field";
-        }
       }
       leaf-list required_fields {
-        type field-name;
+        type leafref {
+          path "../fields/name";
+          require-instance true;
+        }
         description "List of required field names (auto-generated)";
       }
       must "/data-model/consolidated = true() or ../allow_unlimited_fields or count(fields[type != 'array']) <= 7" {
@@ -742,10 +752,8 @@ module meta-model {
       }
       leaf-list m {
         type int32;
-        description
-          "List of change IDs when this entity was modified (history).
-           The size of this list is controlled by the change_history policy.
-           NOTE: This field is automatically added during consolidation and should NOT be included in source YAML files.";
+        description "List of change IDs when this entity was modified (history). The size of this list is controlled by the change_history policy.
+                     NOTE: This field is automatically added during consolidation and should NOT be included in source YAML files.";
         must "/data-model/consolidated = false() or /data-model/changes[id = current()]" {
           error-message "Each m value must reference a valid change ID in the changes list";
           description "Each m value must reference a valid change ID in the changes list. Only enforced during consolidated validation (Phase 2) when change IDs are available.";
