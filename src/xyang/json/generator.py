@@ -367,25 +367,32 @@ def _statement_to_property(
         return out
 
     if isinstance(stmt, YangChoiceStmt):
-        one_of: list[dict[str, Any]] = []
+        # Single object with merged properties; optional vs mandatory via not/oneOf.
+        properties: dict[str, Any] = {}
+        case_required_list: list[list[str]] = []
         for case in getattr(stmt, "cases", []) or []:
             if not isinstance(case, YangCaseStmt):
                 continue
-            case_props: dict[str, Any] = {}
+            case_keys: list[str] = []
             for s in case.statements:
                 child_prop = _statement_to_property(s, typedef_names, module)
                 if child_prop is not None:
-                    case_props[s.name] = child_prop
-            entry: dict[str, Any] = {"properties": case_props}
-            if case_props:
-                entry["required"] = list(case_props.keys())
-            one_of.append(entry)
-        return {
+                    properties[s.name] = child_prop
+                    case_keys.append(s.name)
+            if case_keys:
+                case_required_list.append(case_keys)
+        out = {
             "type": "object",
             "description": stmt.description or "",
-            "oneOf": one_of,
-            "x-yang": {"type": "choice", "mandatory": getattr(stmt, "mandatory", False)},
+            "properties": properties,
         }
+        mandatory = getattr(stmt, "mandatory", False)
+        all_keys = list(properties.keys())
+        if mandatory and case_required_list:
+            out["oneOf"] = [{"required": keys} for keys in case_required_list]
+        elif not mandatory and len(all_keys) > 1:
+            out["not"] = {"required": all_keys}
+        return out
 
     return None
 

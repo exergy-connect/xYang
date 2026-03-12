@@ -1,0 +1,47 @@
+module choice-cases-test {
+  yang-version 1.1;
+  namespace "urn:test:choice-cases";
+  prefix "cc";
+
+  container data-model {
+    description "Root container with mandatory and optional choices";
+
+    container req_choice_container {
+      description "Mandatory choice: exactly one of primitive or entity";
+      choice req_choice {
+        mandatory true;
+        case primitive-case {
+          leaf primitive {
+            type string;
+            description "Primitive type name";
+          }
+        }
+        case entity-case {
+          leaf entity {
+            type string;
+            description "Entity name";
+          }
+        }
+      }
+    }
+
+    container opt_choice_container {
+      description "Optional choice: zero or one of a or b";
+      choice opt_choice {
+        mandatory false;
+        case a-case {
+          leaf a {
+            type string;
+            description "Option A";
+          }
+        }
+        case b-case {
+          leaf b {
+            type string;
+            description "Option B";
+          }
+        }
+      }
+    }
+  }
+}
