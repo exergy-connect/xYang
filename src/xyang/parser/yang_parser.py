@@ -12,17 +12,23 @@ from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
-from ..errors import YangSyntaxError
 from ..ast import YangUsesStmt
 
 
 class YangParser:
     """Parser for YANG modules."""
-    
-    def __init__(self):
+
+    def __init__(self, *, expand_uses: bool = True):
+        """
+        Args:
+            expand_uses: If True (default), expand uses and refine statements after
+                parsing so that grouping content is inlined. If False, uses/refine
+                statements are left as-is in the AST.
+        """
         self.tokenizer = YangTokenizer()
         self.registry = StatementRegistry()
         self.parsers = StatementParsers(self.registry)
+        self.expand_uses = expand_uses
         self._register_handlers()
     
     def _register_handlers(self):
@@ -150,10 +156,11 @@ class YangParser:
         
         # Parse module
         self.parsers.parse_module(tokens, context)
-        
-        # Expand all uses statements now that all groupings have been parsed
-        self._expand_all_uses(module)
-        
+
+        # Expand uses and refine statements if enabled (default)
+        if self.expand_uses:
+            self._expand_all_uses(module)
+
         return module
     
     def _expand_all_uses(self, module: YangModule) -> None:

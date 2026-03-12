@@ -41,6 +41,9 @@ Homepage = "https://github.com/exergy-connect/xYang"
 Repository = "https://github.com/exergy-connect/xYang.git"
 Issues = "https://github.com/exergy-connect/xYang/issues"
 
+[project.scripts]
+xyang = "xyang.__main__:main"
+
 [tool.setuptools]
 packages = ["xyang"]
 

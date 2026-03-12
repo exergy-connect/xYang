@@ -190,6 +190,116 @@ def _property_schema_and_xyang(prop_value: dict[str, Any], defs: dict[str, Any])
     return prop_value, _get_xyang(prop_value)
 
 
+def _convert_container(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    defs: dict[str, Any],
+    parent_path: str,
+    must_list: list[YangMustStmt],
+) -> YangContainerStmt:
+    """Convert a container property to YangContainerStmt."""
+    description = schema.get("description", "")
+    child_statements = []
+    container_required = set(schema.get("required") or [])
+    for child_name, child_val in (schema.get("properties") or {}).items():
+        child = _convert_property(
+            child_name,
+            child_val,
+            defs,
+            f"{parent_path}/{child_name}",
+            mandatory_override=child_name in container_required,
+        )
+        if child is not None:
+            child_statements.append(child)
+    c = YangContainerStmt(name=name, description=description, statements=child_statements)
+    c.must_statements = must_list
+    return c
+
+
+def _convert_list(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    defs: dict[str, Any],
+    parent_path: str,
+    must_list: list[YangMustStmt],
+) -> YangListStmt:
+    """Convert a list property to YangListStmt."""
+    description = schema.get("description", "")
+    key = xyang.get("key")
+    items = _resolve_schema(schema.get("items") or {}, defs)
+    child_statements = []
+    item_required = set(items.get("required") or [])
+    item_props = items.get("properties") or {}
+    for child_name, child_val in item_props.items():
+        child = _convert_property(
+            child_name,
+            child_val,
+            defs,
+            f"{parent_path}/{name}/{child_name}",
+            mandatory_override=child_name in item_required,
+        )
+        if child is not None:
+            child_statements.append(child)
+    lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
+    lst.must_statements = must_list
+    return lst
+
+
+def _convert_leaf(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    prop_value: dict[str, Any],
+    defs: dict[str, Any],
+    mandatory_override: bool | None,
+    must_list: list[YangMustStmt],
+) -> YangLeafStmt:
+    """Convert a leaf property to YangLeafStmt."""
+    description = schema.get("description", "")
+    type_schema = schema
+    if "$ref" in prop_value:
+        ref_name = _ref_to_typedef_name(prop_value["$ref"])
+        if ref_name and ref_name in defs and _get_xyang(defs[ref_name]).get("type") == "typedef":
+            type_schema = prop_value
+    type_stmt = _type_from_schema(defs, type_schema, xyang)
+    if type_stmt is None:
+        type_stmt = YangTypeStmt(name="string")
+    mandatory = mandatory_override if mandatory_override is not None else (name in (schema.get("required") or []))
+    default = schema.get("default")
+    if default is not None:
+        default = str(default).lower() if isinstance(default, bool) else str(default)
+    leaf = YangLeafStmt(
+        name=name,
+        description=description,
+        type=type_stmt,
+        mandatory=mandatory,
+        default=default,
+    )
+    leaf.must_statements = must_list
+    return leaf
+
+
+def _convert_leaf_list(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    defs: dict[str, Any],
+    must_list: list[YangMustStmt],
+) -> YangLeafListStmt:
+    """Convert a leaf-list property to YangLeafListStmt."""
+    description = schema.get("description", "")
+    items_schema = schema.get("items") or schema
+    items_xyang = (items_schema.get("x-yang") or {}) if isinstance(items_schema, dict) else {}
+    type_stmt = _type_from_schema(defs, items_schema, items_xyang or xyang)
+    if type_stmt is None:
+        type_stmt = YangTypeStmt(name="string")
+    ll = YangLeafListStmt(name=name, description=description, type=type_stmt)
+    ll.must_statements = must_list
+    return ll
+
+
 def _convert_property(
     name: str,
     prop_value: dict[str, Any],
@@ -202,81 +312,16 @@ def _convert_property(
     node_type = xyang.get("type")
     if node_type == "leafref":
         node_type = "leaf"
-    description = schema.get("description", "")
-
     must_list = _build_must_list(xyang) if node_type in ("leaf", "leaf-list", "container", "list") else []
 
     if node_type == "container":
-        child_statements = []
-        container_required = set(schema.get("required") or [])
-        for child_name, child_val in (schema.get("properties") or {}).items():
-            child = _convert_property(
-                child_name,
-                child_val,
-                defs,
-                f"{parent_path}/{child_name}",
-                mandatory_override=child_name in container_required,
-            )
-            if child is not None:
-                child_statements.append(child)
-        c = YangContainerStmt(name=name, description=description, statements=child_statements)
-        c.must_statements = must_list
-        return c
-
+        return _convert_container(name, schema, xyang, defs, parent_path, must_list)
     if node_type == "list":
-        key = xyang.get("key")
-        items = _resolve_schema(schema.get("items") or {}, defs)
-        child_statements = []
-        item_required = set(items.get("required") or [])
-        item_props = items.get("properties") or {}
-        for child_name, child_val in item_props.items():
-            child = _convert_property(
-                child_name,
-                child_val,
-                defs,
-                f"{parent_path}/{name}/{child_name}",
-                mandatory_override=child_name in item_required,
-            )
-            if child is not None:
-                child_statements.append(child)
-        lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
-        lst.must_statements = must_list
-        return lst
-
+        return _convert_list(name, schema, xyang, defs, parent_path, must_list)
     if node_type == "leaf":
-        # Use prop_value for type when it's a $ref to a typedef, so we emit typedef name (e.g. rate-of-change) not base type
-        type_schema = schema
-        if "$ref" in prop_value:
-            ref_name = _ref_to_typedef_name(prop_value["$ref"])
-            if ref_name and ref_name in defs and _get_xyang(defs.get(ref_name)).get("type") == "typedef":
-                type_schema = prop_value
-        type_stmt = _type_from_schema(defs, type_schema, xyang)
-        if type_stmt is None:
-            type_stmt = YangTypeStmt(name="string")
-        mandatory = mandatory_override if mandatory_override is not None else (name in (schema.get("required") or []))
-        default = schema.get("default")
-        if default is not None:
-            default = str(default).lower() if isinstance(default, bool) else str(default)
-        leaf = YangLeafStmt(
-            name=name,
-            description=description,
-            type=type_stmt,
-            mandatory=mandatory,
-            default=default,
-        )
-        leaf.must_statements = must_list
-        return leaf
-
+        return _convert_leaf(name, schema, xyang, prop_value, defs, mandatory_override, must_list)
     if node_type == "leaf-list":
-        items_schema = schema.get("items") or schema
-        items_xyang = (items_schema.get("x-yang") or {}) if isinstance(items_schema, dict) else {}
-        type_stmt = _type_from_schema(defs, items_schema, items_xyang or xyang)
-        if type_stmt is None:
-            type_stmt = YangTypeStmt(name="string")
-        ll = YangLeafListStmt(name=name, description=description, type=type_stmt)
-        ll.must_statements = must_list
-        return ll
-
+        return _convert_leaf_list(name, schema, xyang, defs, must_list)
     return None
 
 
