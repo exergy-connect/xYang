@@ -39,11 +39,7 @@ def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     when_str = xyang.get("when")
     if not when_str or not isinstance(when_str, str):
         return None
-    try:
-        ast = XPathParser(when_str).parse()
-    except Exception:
-        ast = None
-    return YangWhenStmt(condition=when_str, ast=ast)
+    return YangWhenStmt(condition=when_str)
 
 
 def _ref_to_typedef_name(ref: str) -> str | None:

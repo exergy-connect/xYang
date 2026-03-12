@@ -14,6 +14,7 @@ import pytest
 
 from xyang import YangValidator, parse_yang_file
 from xyang.json import parse_json_schema
+from xyang.ast import YangStatementList
 
 
 _EXAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "examples"
@@ -102,13 +103,28 @@ def _validate(module, data: dict) -> tuple[bool, list]:
     return is_valid, list(errors)
 
 
+def _debug_print_must_asts(module, label: str) -> None:
+    """Debug helper: print all must expressions and their parsed AST objects."""
+    def _walk(stmt_list: YangStatementList) -> None:
+        for stmt in stmt_list.statements:
+            musts = getattr(stmt, "must_statements", [])
+            for m in musts:
+                print(f"[{label}] must on {getattr(stmt, 'name', '<noname>')}: expr={m.expression!r} ast={m.ast!r}")
+            if isinstance(stmt, YangStatementList):
+                _walk(stmt)
+
+    _walk(module)
+
+
 # ---- Positive: type=array with item_type.primitive ----
 def test_item_type_primitive_valid(module_from_yang, module_from_yang_json):
     """Both encodings: array field with item_type.primitive is valid."""
+    _debug_print_must_asts(module_from_yang, "YANG-primitive")
+    _debug_print_must_asts(module_from_yang_json, "JSON-primitive")
     valid_yang, errors_yang = _validate(module_from_yang, DATA_ITEM_TYPE_PRIMITIVE_VALID)
     valid_json, errors_json = _validate(module_from_yang_json, DATA_ITEM_TYPE_PRIMITIVE_VALID)
     assert valid_yang == valid_json, "YANG and YANG.json encodings must agree"
-    assert valid_yang, errors_yang
+    assert valid_yang, (errors_yang, errors_json)
 
 
 # ---- Positive: type=array with item_type.entity ----
@@ -117,7 +133,7 @@ def test_item_type_entity_valid(module_from_yang, module_from_yang_json):
     valid_yang, errors_yang = _validate(module_from_yang, DATA_ITEM_TYPE_ENTITY_VALID)
     valid_json, errors_json = _validate(module_from_yang_json, DATA_ITEM_TYPE_ENTITY_VALID)
     assert valid_yang == valid_json, "YANG and YANG.json encodings must agree"
-    assert valid_yang, errors_yang
+    assert valid_yang, (errors_yang, errors_json)
 
 
 # ---- Negative: type=array but item_type empty (mandatory choice missing) ----

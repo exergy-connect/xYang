@@ -8,7 +8,7 @@ from typing import TYPE_CHECKING, Any, List, Optional
 from dataclasses import dataclass, field
 
 if TYPE_CHECKING:
-    from .xpath.ast import PathNode
+    from .xpath.ast import ASTNode, PathNode
 
 
 @dataclass
@@ -114,20 +114,35 @@ class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
 
 
 @dataclass
-class YangMustStmt:
-    """Must statement (constraint)."""
+class YangParsedXPathBase:
+    """Base class for statements that carry a parsed XPath expression."""
     expression: str
-    error_message: str = ""
     description: str = ""
-    ast: Optional[Any] = None  # Parsed XPath AST for reuse
+
+    ast: ASTNode | None = None  # Parsed XPath AST for reuse; always set in __post_init__
+
+    def __post_init__(self) -> None:
+        # Lazily import to avoid circular dependencies at module import time.
+        if self.expression:
+            from .xpath import XPathParser
+            self.ast = XPathParser(self.expression).parse()
+
+@dataclass
+class YangMustStmt(YangParsedXPathBase):
+    """Must statement (constraint)."""
+    error_message: str = ""
 
 
 @dataclass
-class YangWhenStmt:
+class YangWhenStmt(YangParsedXPathBase):
     """When statement (conditional)."""
-    condition: str
-    description: str = ""
-    ast: Optional[Any] = None  # Parsed XPath AST for reuse
+    def __init__(self, condition: str, description: str = ""):
+        super().__init__(expression=condition)
+        self.description = description
+
+    @property
+    def condition(self) -> str:
+        return self.expression
 
 
 @dataclass

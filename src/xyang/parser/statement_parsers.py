@@ -18,7 +18,11 @@ if TYPE_CHECKING:
     from ..ast import YangStatement
     from ..module import YangModule
 
-_StatementT = TypeVar("_StatementT", bound=YangStatementList)
+# Generic statement type used for blocks like container/list/leaf/leaf-list.
+# These concrete statement classes all inherit from YangStatement, so bind
+# the type variable to YangStatement (not YangStatementList) to satisfy
+# type checkers when passing instances to _add_to_parent_or_module.
+_StatementT = TypeVar("_StatementT", bound="YangStatement")
 
 
 class StatementParsers:
@@ -27,11 +31,28 @@ class StatementParsers:
     def __init__(self, registry):
         self.registry = registry
 
+    # ------------------------------------------------------------------
+    # Small helpers for common patterns
+    # ------------------------------------------------------------------
+
     def _add_to_parent_or_module(
-        self, context: ParserContext, stmt: YangStatementList
+        self, context: ParserContext, stmt: "YangStatement"
     ) -> None:
-        """Add statement to current_parent.statements (module or nested statement)."""
-        context.current_parent.statements.append(stmt)
+        """Add statement to the current parent (if it can contain statements) or to the module."""
+        parent = context.current_parent
+        if isinstance(parent, YangStatementList):
+            parent.statements.append(stmt)
+        else:
+            # Fallback to module-level statements (e.g. when no parent or parent is a type).
+            context.module.statements.append(stmt)
+
+    def _append_attr_list(self, obj: object, attr: str, value: object) -> None:
+        """Append value to a list attribute on obj, creating the list if needed."""
+        current = getattr(obj, attr, None)
+        if current is None:
+            current = []
+            setattr(obj, attr, current)
+        current.append(value)
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
@@ -246,24 +267,15 @@ class StatementParsers:
         parent = context.current_parent
         if parent:
             if isinstance(parent, YangTypeStmt) and parent.name == 'union':
-                types_list = getattr(parent, 'types', None) or []
-                if not getattr(parent, 'types', None):
-                    setattr(parent, 'types', types_list)
-                types_list.append(type_stmt)
+                self._append_attr_list(parent, 'types', type_stmt)
             elif hasattr(parent, 'type') and not getattr(parent, 'type', None):
                 setattr(parent, 'type', type_stmt)
             elif hasattr(parent, 'types'):
-                types_list = getattr(parent, 'types', None) or []
-                if not getattr(parent, 'types', None):
-                    setattr(parent, 'types', types_list)
-                types_list.append(type_stmt)
+                self._append_attr_list(parent, 'types', type_stmt)
             elif hasattr(parent, 'type') and getattr(parent, 'type', None):
                 parent_type = getattr(parent, 'type', None)
                 if parent_type is not None:
-                    type_types = getattr(parent_type, 'types', None) or []
-                    if not getattr(parent_type, 'types', None):
-                        setattr(parent_type, 'types', type_types)
-                    type_types.append(type_stmt)
+                    self._append_attr_list(parent_type, 'types', type_stmt)
         
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return type_stmt
@@ -397,8 +409,7 @@ class StatementParsers:
         """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
         tokens.consume_type(YangTokenType.MUST)
         expression = self._parse_string_concatenation(tokens)
-        ast = XPathParser(expression).parse()
-        must_stmt = YangMustStmt(expression=expression, ast=ast)
+        must_stmt = YangMustStmt(expression=expression)
         
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(must_stmt)
@@ -433,8 +444,7 @@ class StatementParsers:
         """Parse when statement. Argument is string (with optional + concatenation). Uses xpath."""
         tokens.consume_type(YangTokenType.WHEN)
         condition = self._parse_string_concatenation(tokens)
-        ast = XPathParser(condition).parse()
-        when_stmt = YangWhenStmt(condition=condition, ast=ast)
+        when_stmt = YangWhenStmt(condition=condition)
         if context.current_parent and isinstance(context.current_parent, YangStatementWithWhen):
             context.current_parent.when = when_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -488,8 +498,7 @@ class StatementParsers:
                 else:
                     raise tokens._make_error(f"Unknown statement in uses '{grouping_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
-        if context.current_parent:
-            context.current_parent.statements.append(uses_stmt)
+        self._add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return uses_stmt
     
@@ -715,14 +724,10 @@ class StatementParsers:
                 statements=copied_statements
             )
         else:
-            # Generic statement copy
-            new_stmt = type(stmt)(name=stmt.name, description=stmt.description, statements=copied_statements)
-            # Copy other attributes if they exist
-            for attr in ['type', 'mandatory', 'default', 'key', 'presence', 'when',
-                        'min_elements', 'max_elements', 'must_statements']:
-                if hasattr(stmt, attr):
-                    setattr(new_stmt, attr, getattr(stmt, attr))
-            return new_stmt
+            # Unknown / unsupported statement type inside grouping/uses expansion.
+            # This should not happen for known YANG statements; fail loudly so
+            # new statement kinds get explicit copy logic instead of a silent fallback.
+            raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")
     
     def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
         """Apply refine modifications to a statement."""
