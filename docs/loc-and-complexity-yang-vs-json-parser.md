@@ -11,15 +11,15 @@ Both outputs feed the same validation pipeline (`YangValidator`, `DocumentValida
 
 | Metric | Native YANG parser | JSON/YANG parser |
 |--------|-------------------|------------------|
-| **LOC (parser only)** | **1,409** | **390** |
-| **LOC (including shared AST + module)** | **1,623** | **604** |
+| **LOC (parser only)** | **1,414** | **474** |
+| **LOC (including shared AST + module)** | **1,643** | **703** |
 | **Files** | 6 | 1 |
 | **Classes** | 8 | 0 |
 | **Top-level functions** | 2 | 14 |
 | **Statement/context types** | Token stream, context, registry, 45+ parse methods | Dict walk + helpers |
 | **Input format** | YANG 1.1 text | JSON (pre-flattened schema) |
 
-The JSON parser is **~3.6× fewer LOC** (parser-only) and **single-file** with no lexer or grammar layer.
+The JSON parser is **~3× fewer LOC** (parser-only) and **single-file** with no lexer or grammar layer.
 
 ---
 
@@ -29,29 +29,29 @@ The JSON parser is **~3.6× fewer LOC** (parser-only) and **single-file** with n
 
 | File | LOC | Role |
 |------|-----|------|
-| `parser/statement_parsers.py` | 740 | One parse method per statement kind (module, container, list, leaf, leaf-list, typedef, grouping, uses, refine, choice, case, type, must, when, key, …). |
+| `parser/statement_parsers.py` | 745 | One parse method per statement kind (module, container, list, leaf, leaf-list, typedef, grouping, uses, refine, choice, case, type, must, when, key, …). |
 | `parser/parser_context.py` | 243 | Token types, `Token`, `YangToken`, `TokenStream`, `ParserContext` (current statement stack, expectations). |
 | `parser/yang_parser.py` | 219 | `YangParser`: registry setup, driver, uses-expansion hook, `parse_file` / `parse_string`. |
 | `parser/tokenizer.py` | 167 | `YangTokenizer`: lexer for YANG keywords, identifiers, strings, numbers, braces, semicolons. |
 | `parser/statement_registry.py` | 29 | `StatementRegistry`: map (parent, statement_name) → parse function. |
 | `parser/__init__.py` | 11 | Re-exports. |
-| **Subtotal (parser)** | **1,409** | |
-| `ast.py` | 177 | Shared AST node types (container, list, leaf, leaf-list, typedef, type, must, uses, …). |
+| **Subtotal (parser)** | **1,414** | |
+| `ast.py` | 192 | Shared AST node types (container, list, leaf, leaf-list, typedef, type, must, when, uses, …) plus shared parsed XPath storage for `must`/`when`. |
 | `module.py` | 37 | `YangModule` (name, namespace, prefix, typedefs, statements). |
-| **Total (parser + shared)** | **1,623** | |
+| **Total (parser + shared)** | **1,643** | |
 
 ### JSON/YANG parser
 
 | File | LOC | Role |
 |------|-----|------|
-| `json/parser.py` | 390 | Load JSON, resolve `$ref`/`allOf`, map properties + `x-yang` to AST nodes, build `YangModule`. |
-| **Subtotal (parser)** | **390** | |
-| Shared `ast.py` + `module.py` | 214 | Same as above (both parsers produce the same AST). |
-| **Total (parser + shared)** | **604** | |
+| `json/parser.py` | 474 | Load JSON, resolve `$ref`/`allOf`, map properties + `x-yang` to AST nodes, build `YangModule`. Also feeds `must`/`when` expressions into the shared XPath parser. |
+| **Subtotal (parser)** | **474** | |
+| Shared `ast.py` + `module.py` | 229 | Same as above (both parsers produce the same AST). |
+| **Total (parser + shared)** | **703** | |
 
 ### Shared components (counted once)
 
-- **`ast.py`** (177 LOC): Defines `YangContainerStmt`, `YangListStmt`, `YangLeafStmt`, `YangLeafListStmt`, `YangTypedefStmt`, `YangTypeStmt`, `YangMustStmt`, and related nodes. Used by **both** parsers and by the validator.
+- **`ast.py`** (192 LOC): Defines `YangContainerStmt`, `YangListStmt`, `YangLeafStmt`, `YangLeafListStmt`, `YangTypedefStmt`, `YangTypeStmt`, `YangMustStmt`, `YangWhenStmt`, and related nodes, plus a shared base that parses and caches XPath for `must`/`when`. Used by **both** parsers and by the validator.
 - **`module.py`** (37 LOC): `YangModule` (name, namespace, prefix, typedefs, statements). Same for both.
 
 ---
@@ -84,7 +84,7 @@ The JSON parser is **~3.6× fewer LOC** (parser-only) and **single-file** with n
 - **Complexity drivers:**
   - Mapping JSON Schema types + x-yang into AST (string, integer, enum, leafref, $ref to typedefs, oneOf for union).
   - Resolving `$ref` and `allOf` so nested and reused definitions become a single resolved schema before conversion.
-  - **No grouping/uses/refine/choice/case** in the JSON path: the `.yang.json` format is produced by the **generator** from an already-expanded or expand-at-emit AST. So the JSON parser only sees the flattened schema.
+- **Greatly simplified grouping/uses/refine/choice/case handling** in the JSON path: the `.yang.json` format is produced by the **generator**, which can expand or normalize these constructs at emit time, so the JSON parser mostly sees an already-structured schema and does not need to mirror the full native YANG grammar.
 
 ---
 
@@ -95,7 +95,7 @@ The JSON parser is **~3.6× fewer LOC** (parser-only) and **single-file** with n
 3. **Flattened schema:** Grouping/uses/refine and choice/case are handled when **emitting** `.yang.json` (in `json/generator.py`); the JSON parser only consumes the result. So it doesn’t need grouping expansion, refine, or choice/case parsing.
 4. **Single responsibility:** One file: “given this dict, produce a `YangModule`.” No separate context, token types, or registry.
 
-The **generator** (`json/generator.py`, ~403 LOC) does the heavy work of turning a YANG AST (possibly with uses) into the hybrid JSON Schema. So the total “YANG ↔ JSON schema” path is: **native parser (1,409) + generator (403)** vs **JSON parser (390)** for the read direction only. If you already have `.yang.json`, loading it is 390 LOC; if you start from `.yang`, you use the native parser (and optionally the generator to produce `.yang.json` for other tools).
+The **generator** (`json/generator.py`, ~467 LOC) does the heavy work of turning a YANG AST (possibly with uses) into the hybrid JSON Schema. So the total “YANG ↔ JSON schema” path is: **native parser (1,414) + generator (467)** vs **JSON parser (474)** for the read direction only. If you already have `.yang.json`, loading it is 474 LOC; if you start from `.yang`, you use the native parser (and optionally the generator to produce `.yang.json` for other tools).
 
 ---
 
