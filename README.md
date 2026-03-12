@@ -18,6 +18,8 @@ xYang implements only the YANG features actually used in `meta-model.yang`:
   - Type constraints: `pattern`, `length`, `range`, `fraction-digits`
 - **Type References**: Leafref with path and require-instance
 - **Container Presence**: Presence statements
+- **CLI**: `xyang` with `parse`, `validate`, `convert` (YANG → `.yang.json`)
+- **JSON Schema export**: YANG → JSON Schema (draft 2020-12) with `x-yang` annotations; see [FEATURES.md](FEATURES.md) for the full feature list and the YANG.json hybrid format.
 
 ## Installation
 
@@ -26,6 +28,17 @@ pip install -e .
 ```
 
 ## Usage
+
+### Command-line (xyang)
+
+```bash
+xyang -h                    # help
+xyang parse <file.yang>     # print module info
+xyang validate <file.yang> [data.json]   # validate JSON (stdin if no file)
+xyang convert <file.yang> [-o path]     # convert .yang to .yang.json (output path always ends with .yang.json)
+```
+
+Without installing, run from the repo root: `PYTHONPATH=src python3 -m xyang -h`
 
 ### Parsing a YANG Module
 
@@ -114,30 +127,44 @@ is_valid, error = type_system.validate("server_name", "entity-name")
 print(f"Valid: {is_valid}")
 ```
 
+### Converting YANG to JSON Schema (.yang.json)
+
+Convert a YANG module to JSON Schema (draft 2020-12) with `x-yang` annotations. Output is valid JSON Schema for structure and types; YANG-specific semantics (leafref, must, when) live in `x-yang` for use by the validator. See [FEATURES.md](FEATURES.md#yangjson-hybrid-format) for the hybrid format.
+
+```python
+from xyang.parser import YangParser
+from xyang.json import schema_to_yang_json
+
+parser = YangParser(expand_uses=False)
+module = parser.parse_file("examples/meta-model.yang")
+schema_to_yang_json(module, output_path="meta-model.yang.json")
+```
+
+Or use the CLI: `xyang convert examples/meta-model.yang -o meta-model.yang.json`
+
 ## Project Structure
 
 ```
 xYang/
-├── xYang/
+├── src/xyang/
 │   ├── __init__.py      # Package exports
-│   ├── parser.py        # YANG parser
-│   ├── module.py        # Module representation
-│   ├── ast.py           # Abstract syntax tree nodes
-│   ├── types.py         # Type system
-│   ├── validator.py     # Validation engine
-│   ├── xpath/           # XPath evaluator module
-│   ├── errors.py        # Error classes
-│   └── xpath/           # XPath implementation
-│       ├── __init__.py
-│       ├── parser.py    # XPath parser
-│       ├── ast.py       # XPath AST nodes
-│       └── evaluator.py # XPath evaluator
+│   ├── __main__.py      # CLI (parse, validate, convert)
+│   ├── parser/          # YANG parser
+│   ├── json/             # JSON Schema export (generator, parser)
+│   ├── validator/        # Validation engine
+│   ├── xpath/            # XPath implementation
+│   ├── ast.py            # YANG AST nodes
+│   ├── types.py          # Type system
+│   ├── module.py         # Module representation
+│   └── errors.py         # Error classes
 ├── examples/
 │   ├── basic_usage.py   # Usage examples
-│   └── meta-model.yang  # Example YANG module
+│   ├── meta-model.yang   # Example YANG module
+│   └── meta-model.yang.json  # Generated JSON Schema
 ├── tests/               # Test suite
-├── benchmarks/          # Performance benchmarks
-├── setup.py
+├── benchmarks/           # Performance benchmarks
+├── pyproject.toml
+├── FEATURES.md           # Feature list and YANG.json hybrid format
 └── README.md
 ```
 
@@ -214,7 +241,7 @@ pip install -e ".[dev]"
 pytest
 
 # Format code
-black xYang/
+black src/xyang/
 ```
 
 ## License

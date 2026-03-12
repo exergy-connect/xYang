@@ -12,6 +12,8 @@ from pathlib import Path
 from typing import Any
 
 from ..ast import (
+    YangCaseStmt,
+    YangChoiceStmt,
     YangContainerStmt,
     YangLeafListStmt,
     YangLeafStmt,
@@ -135,6 +137,7 @@ def _build_xyang(
     node_type: str,
     key: str | None = None,
     must_list: list[YangMustStmt] | None = None,
+    when_condition: str | None = None,
 ) -> dict[str, Any]:
     """Build x-yang object for a node."""
     xyang: dict[str, Any] = {"type": node_type}
@@ -142,6 +145,8 @@ def _build_xyang(
         xyang["key"] = key
     if must_list:
         xyang["must"] = [_must_to_json(m) for m in must_list]
+    if when_condition:
+        xyang["when"] = when_condition
     return xyang
 
 
@@ -249,10 +254,17 @@ def _statement_to_property(
                 props[child.name] = child_prop
                 if isinstance(child, YangLeafStmt) and child.mandatory:
                     required.append(child.name)
+        when_cond = None
+        if getattr(stmt, "when", None) is not None:
+            when_cond = getattr(stmt.when, "condition", None)
         out = {
             "type": "object",
             "description": stmt.description or "",
-            "x-yang": _build_xyang("container", must_list=getattr(stmt, "must_statements", None) or []),
+            "x-yang": _build_xyang(
+                "container",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_condition=when_cond,
+            ),
         }
         if props:
             out["properties"] = props
@@ -274,6 +286,9 @@ def _statement_to_property(
         if item_required:
             items["required"] = item_required
         items["additionalProperties"] = False
+        when_cond = None
+        if getattr(stmt, "when", None) is not None:
+            when_cond = getattr(stmt.when, "condition", None)
         out = {
             "type": "array",
             "items": items,
@@ -282,6 +297,7 @@ def _statement_to_property(
                 "list",
                 key=stmt.key,
                 must_list=getattr(stmt, "must_statements", None) or [],
+                when_condition=when_cond,
             ),
         }
         if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
@@ -292,17 +308,28 @@ def _statement_to_property(
 
     if isinstance(stmt, YangLeafStmt):
         type_stmt = stmt.type
+        when_cond = None
+        if getattr(stmt, "when", None) is not None:
+            when_cond = getattr(stmt.when, "condition", None)
         if type_stmt and type_stmt.name in typedef_names:
             out = {
                 "$ref": f"#/$defs/{type_stmt.name}",
                 "description": stmt.description or "",
-                "x-yang": _build_xyang("leaf", must_list=getattr(stmt, "must_statements", None) or []),
+                "x-yang": _build_xyang(
+                    "leaf",
+                    must_list=getattr(stmt, "must_statements", None) or [],
+                    when_condition=when_cond,
+                ),
             }
         else:
             out = {
                 **_type_to_schema(type_stmt, typedef_names),
                 "description": stmt.description or "",
-                "x-yang": _build_xyang("leaf", must_list=getattr(stmt, "must_statements", None) or []),
+                "x-yang": _build_xyang(
+                    "leaf",
+                    must_list=getattr(stmt, "must_statements", None) or [],
+                    when_condition=when_cond,
+                ),
             }
         if stmt.default is not None:
             out["default"] = stmt.default
@@ -311,17 +338,45 @@ def _statement_to_property(
     if isinstance(stmt, YangLeafListStmt):
         type_stmt = stmt.type
         items_schema = _type_to_schema(type_stmt, typedef_names)
+        when_cond = None
+        if getattr(stmt, "when", None) is not None:
+            when_cond = getattr(stmt.when, "condition", None)
         out = {
             "type": "array",
             "items": items_schema,
             "description": stmt.description or "",
-            "x-yang": _build_xyang("leaf-list", must_list=getattr(stmt, "must_statements", None) or []),
+            "x-yang": _build_xyang(
+                "leaf-list",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_condition=when_cond,
+            ),
         }
         if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
             out["minItems"] = stmt.min_elements
         if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
             out["maxItems"] = stmt.max_elements
         return out
+
+    if isinstance(stmt, YangChoiceStmt):
+        one_of: list[dict[str, Any]] = []
+        for case in getattr(stmt, "cases", []) or []:
+            if not isinstance(case, YangCaseStmt):
+                continue
+            case_props: dict[str, Any] = {}
+            for s in case.statements:
+                child_prop = _statement_to_property(s, typedef_names, module)
+                if child_prop is not None:
+                    case_props[s.name] = child_prop
+            entry: dict[str, Any] = {"properties": case_props}
+            if case_props:
+                entry["required"] = list(case_props.keys())
+            one_of.append(entry)
+        return {
+            "type": "object",
+            "description": stmt.description or "",
+            "oneOf": one_of,
+            "x-yang": {"type": "choice", "mandatory": getattr(stmt, "mandatory", False)},
+        }
 
     return None
 

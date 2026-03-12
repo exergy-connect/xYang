@@ -1,0 +1,22 @@
+module version-typedef-test {
+  yang-version 1.1;
+  namespace "urn:test:version";
+  prefix "v";
+
+  typedef version-string {
+    type string {
+      pattern '\d{2}\.\d{2}\.\d{2}\.\d+' {
+        description "Version format: YY.MM.DD.N";
+      }
+    }
+    description "Version string type";
+  }
+
+  container data-model {
+    description "Root container";
+    leaf version {
+      type version-string;
+      description "Version string";
+    }
+  }
+}

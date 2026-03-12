@@ -46,12 +46,12 @@ class TypeChecker:
             "entity-name",
             "field-name",
             "identifier",
-            "version-string",
             "date",
             "date-and-time",
             "qualified-source",
         ):
             return self._check_string(value, type_stmt)
+        # version-string and other typedefs: resolve via get_typedef so pattern/constraints apply
         if name in (
             "int8",
             "int16",

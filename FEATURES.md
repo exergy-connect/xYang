@@ -67,6 +67,16 @@ This document lists the YANG features implemented in xYang, based on actual usag
 ### Container Features
 - ✅ `presence` - Container presence (4 occurrences)
 
+### CLI and JSON Schema Export
+- ✅ **CLI** (`xyang` or `python -m xyang`): `parse`, `validate`, `convert`
+  - `xyang parse <file.yang>` — parse and print module info
+  - `xyang validate <file.yang> [data.json]` — validate JSON (file or stdin) against the module
+  - `xyang convert <file.yang> [-o path]` — convert .yang to JSON Schema (output path always ends with `.yang.json`)
+- ✅ **JSON Schema generator**: YANG AST → JSON Schema (draft 2020-12) with `x-yang` annotations
+  - `generate_json_schema(module)`, `schema_to_yang_json(module, output_path=...)`
+  - Uses expansion during emission when parsing with `expand_uses=False`
+  - Round-trip: parse YANG → generate JSON → parse JSON schema → equivalent AST where supported
+
 ## Features NOT Implemented
 
 The following YANG features are not used in `meta-model.yang` and are not implemented:
@@ -149,6 +159,70 @@ Groupings can use other groupings, allowing for composition and extension of sch
 
 ### Context Preservation
 When groupings are expanded via `uses`, must constraints and XPath expressions are evaluated in the context where the grouping is used, not where it was defined. This ensures that relative paths like `../type` correctly reference the expanded location.
+
+## YANG.json hybrid format
+
+The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is a **hybrid** of standard JSON Schema and YANG-specific annotations. It is valid JSON Schema (draft 2020-12) so generic tools can validate structure and types, while an **`x-yang`** custom property carries the semantics that JSON Schema does not natively express.
+
+### Structure
+
+- **Root**: Standard `$schema`, `$id`, `description`, `type`, `properties`, `additionalProperties`, and optional `$defs` (typedefs). A root **`x-yang`** object holds module metadata: `module`, `yang-version`, `namespace`, `prefix`, `organization`, `contact`.
+- **Nodes**: Each schema node (container, list, leaf, leaf-list) has an **`x-yang`** object alongside the JSON Schema keywords. It always includes `type` (e.g. `"container"`, `"leaf"`, `"list"`, `"leaf-list"`). Lists include `key`; nodes with `must` constraints include a **`must`** array of `{ "must", "error-message", "description" }`.
+- **Typedefs**: In `$defs`, each typedef has `"x-yang": { "type": "typedef" }` plus the usual JSON Schema type/pattern/enum/etc.
+
+### What lives in JSON Schema vs x-yang
+
+| Concern | JSON Schema | x-yang |
+|--------|-------------|--------|
+| Structure (object, array, types) | ✅ `type`, `properties`, `items`, `$ref`, `$defs` | — |
+| Simple constraints | ✅ `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `enum`, `default` | — |
+| Node kind | — | ✅ `type`: container, list, leaf, leaf-list |
+| List key | — | ✅ `key` |
+| Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |
+| Must constraints | — | ✅ `must`: array of expression + error-message + description |
+| Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
+
+### Leafref in hybrid form
+
+A leafref is emitted as a string type in JSON Schema (so the value is still validated as a string), with the reference semantics in **x-yang**:
+
+```json
+{
+  "type": "string",
+  "x-yang": {
+    "type": "leafref",
+    "path": "../fields/name",
+    "require-instance": true
+  }
+}
+```
+
+Full validation (reference existence, deref, etc.) is done by the YANG validator using the x-yang metadata, not by a plain JSON Schema validator.
+
+### Must constraints in hybrid form
+
+Must constraints are not expressible in JSON Schema, so they appear only under **x-yang**:
+
+```json
+"x-yang": {
+  "type": "leaf",
+  "must": [
+    {
+      "must": "not(../maxDate) or . <= ../maxDate",
+      "error-message": "minDate must be less than or equal to maxDate when both are specified",
+      "description": "..."
+    }
+  ]
+}
+```
+
+The XPath expression is preserved as a string; the YANG validator evaluates it during validation.
+
+### Round-trip and tooling
+
+- **Generate**: Parse `.yang` with `YangParser(expand_uses=False)` → `generate_json_schema(module)` or `schema_to_yang_json(module, output_path=...)` → `.yang.json`.
+- **Parse back**: `parse_json_schema(data)` reads the same file and reconstructs a `YangModule` (equivalent where supported); the json parser understands `x-yang` and `$defs`.
+- **Generic JSON Schema tools**: Can use the file for structure and type checking; they ignore `x-yang`. Full YANG semantics (must, when, leafref resolution) require xYang’s validator.
 
 ## XPath Implementation
 
@@ -263,6 +337,7 @@ The XPath implementation is organized in a modular architecture for better maint
 
 ```
 src/xyang/
+├── __main__.py                  # CLI entry point (parse, validate, convert)
 ├── xpath/
 │   ├── __init__.py              # Exports XPathEvaluator, Node, Context, SchemaNav, etc.
 │   ├── evaluator.py             # Main XPath evaluator (orchestrator)
@@ -280,6 +355,10 @@ src/xyang/
 │   ├── statement_parsers.py     # Statement-level parsers
 │   ├── statement_registry.py    # Statement registry
 │   └── parser_context.py        # Parser context
+├── json/                        # JSON Schema export
+│   ├── __init__.py              # generate_json_schema, schema_to_yang_json, parse_json_schema
+│   ├── generator.py             # YANG AST → JSON Schema (with x-yang annotations)
+│   └── parser.py                # JSON Schema → YANG AST (round-trip)
 ├── validator/                   # Validation engine
 │   ├── yang_validator.py       # Top-level YANG validator
 │   ├── document_validator.py   # Document/node validation (must, leafref, etc.)
@@ -351,8 +430,17 @@ xYang has comprehensive test coverage with **195+ passing tests** covering:
 - Must constraints on leafref lists
 - Current context preservation in predicates
 - Relative and absolute path resolution
+- JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
 
 ## Recent Improvements
+
+### CLI, Convert, and JSON Schema (2026-03)
+- ✅ **CLI**: `xyang` (or `python -m xyang`) with subcommands
+  - `parse <file.yang>` — print module name, namespace, prefix, typedef count, etc.
+  - `validate <file.yang> [data.json]` — validate JSON against the YANG module (stdin if no file)
+  - `convert <file.yang> [-o path]` — convert .yang to JSON Schema; output path always ends with `.yang.json` (default: `<stem>.yang.json` alongside input)
+- ✅ **Convert**: Uses `YangParser(expand_uses=False)` so the JSON generator expands uses when emitting; produces draft 2020-12 JSON Schema with `x-yang` annotations.
+- ✅ **JSON Schema pattern fix**: Pattern strings are written as-is; `json.dumps()` performs the single escape needed for JSON. Previously patterns were double-escaped, producing invalid regex in the output (e.g. `\\\\d` instead of `\\d`).
 
 ### Union Types with Leafref and XPath String Functions (2026-02-26)
 - ✅ **Union types with leafref**: Added support for union types containing leafref members

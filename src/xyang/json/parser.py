@@ -14,6 +14,8 @@ from typing import Any
 
 from ..module import YangModule
 from ..ast import (
+    YangCaseStmt,
+    YangChoiceStmt,
     YangContainerStmt,
     YangListStmt,
     YangLeafStmt,
@@ -21,12 +23,26 @@ from ..ast import (
     YangTypedefStmt,
     YangTypeStmt,
     YangMustStmt,
+    YangWhenStmt,
 )
+from ..xpath import XPathParser
 
 
 def _get_xyang(schema: dict[str, Any]) -> dict[str, Any]:
     """Extract x-yang object from a schema node (property or $def)."""
     return schema.get("x-yang") or {}
+
+
+def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
+    """Build YangWhenStmt from x-yang 'when' condition string, or None if absent."""
+    when_str = xyang.get("when")
+    if not when_str or not isinstance(when_str, str):
+        return None
+    try:
+        ast = XPathParser(when_str).parse()
+    except Exception:
+        ast = None
+    return YangWhenStmt(condition=when_str, ast=ast)
 
 
 def _ref_to_typedef_name(ref: str) -> str | None:
@@ -67,10 +83,20 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
         if path:
             type_stmt.path = path  # str for JSON; normalizer accepts str for comparison
         return type_stmt
-    # Resolve $ref to typedef name
+    # $ref to typedef: preserve typedef name; copy range so AST matches YANG (pattern left None so validator resolves typedef)
     ref = schema.get("$ref")
     if ref:
         name = _ref_to_typedef_name(ref)
+        if name and name in defs:
+            def_schema = defs[name]
+            if isinstance(def_schema, dict):
+                resolved = _type_from_schema(defs, def_schema, _get_xyang(def_schema))
+                if resolved is not None:
+                    out = YangTypeStmt(name=name)
+                    if getattr(resolved, "range", None):
+                        out.range = resolved.range
+                    return out
+            return YangTypeStmt(name=name)
         if name:
             return YangTypeStmt(name=name)
     # Inline type
@@ -214,6 +240,9 @@ def _convert_container(
             child_statements.append(child)
     c = YangContainerStmt(name=name, description=description, statements=child_statements)
     c.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        c.when = when_stmt
     return c
 
 
@@ -244,6 +273,9 @@ def _convert_list(
             child_statements.append(child)
     lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
     lst.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        lst.when = when_stmt
     return lst
 
 
@@ -268,7 +300,7 @@ def _convert_leaf(
         type_stmt = YangTypeStmt(name="string")
     mandatory = mandatory_override if mandatory_override is not None else (name in (schema.get("required") or []))
     default = schema.get("default")
-    if default is not None:
+    if default is not None and schema.get("type") != "boolean":
         default = str(default).lower() if isinstance(default, bool) else str(default)
     leaf = YangLeafStmt(
         name=name,
@@ -278,6 +310,9 @@ def _convert_leaf(
         default=default,
     )
     leaf.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        leaf.when = when_stmt
     return leaf
 
 
@@ -297,7 +332,50 @@ def _convert_leaf_list(
         type_stmt = YangTypeStmt(name="string")
     ll = YangLeafListStmt(name=name, description=description, type=type_stmt)
     ll.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        ll.when = when_stmt
     return ll
+
+
+def _convert_choice(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    defs: dict[str, Any],
+    parent_path: str,
+) -> YangChoiceStmt:
+    """Convert a JSON schema property with x-yang type 'choice' to YangChoiceStmt. Uses oneOf (valid JSON Schema)."""
+    description = schema.get("description", "")
+    mandatory = xyang.get("mandatory", False)
+    one_of = schema.get("oneOf") or []
+    cases: list[YangCaseStmt] = []
+    for case_schema in one_of:
+        if not isinstance(case_schema, dict):
+            continue
+        case_xyang = _get_xyang(case_schema)
+        case_name = case_xyang.get("name") or ""
+        if not case_name and case_schema.get("required"):
+            req = case_schema["required"]
+            case_name = req[0] + "-case" if (isinstance(req, list) and len(req) == 1) else ""
+        if not case_name:
+            case_props = case_schema.get("properties") or {}
+            keys = list(case_props.keys())
+            case_name = keys[0] + "-case" if len(keys) == 1 else ""
+        case_props = case_schema.get("properties") or {}
+        case_statements: list[YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt] = []
+        for prop_name, prop_val in case_props.items():
+            stmt = _convert_property(
+                prop_name,
+                prop_val,
+                defs,
+                f"{parent_path}/{name}/{case_name}/{prop_name}",
+                mandatory_override=None,
+            )
+            if stmt is not None:
+                case_statements.append(stmt)
+        cases.append(YangCaseStmt(name=case_name, description="", statements=case_statements))
+    return YangChoiceStmt(name=name, description=description, mandatory=mandatory, cases=cases)
 
 
 def _convert_property(
@@ -306,7 +384,7 @@ def _convert_property(
     defs: dict[str, Any],
     parent_path: str,
     mandatory_override: bool | None = None,
-) -> YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt | None:
+) -> YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt | YangChoiceStmt | None:
     """Convert one JSON schema property to a YANG AST statement. Returns None if not x-yang mapped."""
     schema, xyang = _property_schema_and_xyang(prop_value, defs)
     node_type = xyang.get("type")
@@ -322,6 +400,8 @@ def _convert_property(
         return _convert_leaf(name, schema, xyang, prop_value, defs, mandatory_override, must_list)
     if node_type == "leaf-list":
         return _convert_leaf_list(name, schema, xyang, defs, must_list)
+    if node_type == "choice":
+        return _convert_choice(name, schema, xyang, defs, parent_path)
     return None
 
 

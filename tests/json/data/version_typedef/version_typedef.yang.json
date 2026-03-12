@@ -1,0 +1,44 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:test:version",
+  "description": "",
+  "x-yang": {
+    "module": "version-typedef-test",
+    "yang-version": "1.1",
+    "namespace": "urn:test:version",
+    "prefix": "v",
+    "organization": "",
+    "contact": ""
+  },
+  "type": "object",
+  "properties": {
+    "data-model": {
+      "type": "object",
+      "description": "Root container",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "version": {
+          "$ref": "#/$defs/version-string",
+          "description": "Version string",
+          "x-yang": {
+            "type": "leaf"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "version-string": {
+      "type": "string",
+      "pattern": "^\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+$",
+      "description": "Version string type",
+      "x-yang": {
+        "type": "typedef"
+      }
+    }
+  }
+}

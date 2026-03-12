@@ -313,7 +313,48 @@
                       "type": "object",
                       "description": "Required for array fields - specifies the type of each item",
                       "x-yang": {
-                        "type": "container"
+                        "type": "container",
+                        "when": "../type = 'array'"
+                      },
+                      "properties": {
+                        "item-type-choice": {
+                          "type": "object",
+                          "description": "Type of array items - must be one of: primitive or entity",
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "primitive": {
+                                  "$ref": "#/$defs/primitive-type",
+                                  "description": "Primitive type (string, integer, etc.)",
+                                  "x-yang": {
+                                    "type": "leaf"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "primitive"
+                              ]
+                            },
+                            {
+                              "properties": {
+                                "entity": {
+                                  "$ref": "#/$defs/entity-name",
+                                  "description": "Entity (array items may be full object or primary key value)",
+                                  "x-yang": {
+                                    "type": "leaf"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "entity"
+                              ]
+                            }
+                          ],
+                          "x-yang": {
+                            "type": "choice",
+                            "mandatory": true
+                          }
+                        }
                       },
                       "additionalProperties": false
                     },
@@ -540,7 +581,48 @@
                             "type": "object",
                             "description": "Required for array fields - specifies the type of each item",
                             "x-yang": {
-                              "type": "container"
+                              "type": "container",
+                              "when": "../type = 'array'"
+                            },
+                            "properties": {
+                              "item-type-choice": {
+                                "type": "object",
+                                "description": "Type of array items - must be one of: primitive or entity",
+                                "oneOf": [
+                                  {
+                                    "properties": {
+                                      "primitive": {
+                                        "$ref": "#/$defs/primitive-type",
+                                        "description": "Primitive type (string, integer, etc.)",
+                                        "x-yang": {
+                                          "type": "leaf"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "primitive"
+                                    ]
+                                  },
+                                  {
+                                    "properties": {
+                                      "entity": {
+                                        "$ref": "#/$defs/entity-name",
+                                        "description": "Entity (array items may be full object or primary key value)",
+                                        "x-yang": {
+                                          "type": "leaf"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "entity"
+                                    ]
+                                  }
+                                ],
+                                "x-yang": {
+                                  "type": "choice",
+                                  "mandatory": true
+                                }
+                              }
                             },
                             "additionalProperties": false
                           },
@@ -674,7 +756,8 @@
                             "error-message": "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).",
                             "description": "Maximum 7 subcomponents unless allow_unlimited_fields is set."
                           }
-                        ]
+                        ],
+                        "when": "../type = 'composite'"
                       },
                       "minItems": 1
                     }
@@ -899,7 +982,48 @@
                       "type": "object",
                       "description": "Required for array fields - specifies the type of each item",
                       "x-yang": {
-                        "type": "container"
+                        "type": "container",
+                        "when": "../type = 'array'"
+                      },
+                      "properties": {
+                        "item-type-choice": {
+                          "type": "object",
+                          "description": "Type of array items - must be one of: primitive or entity",
+                          "oneOf": [
+                            {
+                              "properties": {
+                                "primitive": {
+                                  "$ref": "#/$defs/primitive-type",
+                                  "description": "Primitive type (string, integer, etc.)",
+                                  "x-yang": {
+                                    "type": "leaf"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "primitive"
+                              ]
+                            },
+                            {
+                              "properties": {
+                                "entity": {
+                                  "$ref": "#/$defs/entity-name",
+                                  "description": "Entity (array items may be full object or primary key value)",
+                                  "x-yang": {
+                                    "type": "leaf"
+                                  }
+                                }
+                              },
+                              "required": [
+                                "entity"
+                              ]
+                            }
+                          ],
+                          "x-yang": {
+                            "type": "choice",
+                            "mandatory": true
+                          }
+                        }
                       },
                       "additionalProperties": false
                     },
@@ -1246,7 +1370,48 @@
                             "type": "object",
                             "description": "Required for array fields - specifies the type of each item",
                             "x-yang": {
-                              "type": "container"
+                              "type": "container",
+                              "when": "../type = 'array'"
+                            },
+                            "properties": {
+                              "item-type-choice": {
+                                "type": "object",
+                                "description": "Type of array items - must be one of: primitive or entity",
+                                "oneOf": [
+                                  {
+                                    "properties": {
+                                      "primitive": {
+                                        "$ref": "#/$defs/primitive-type",
+                                        "description": "Primitive type (string, integer, etc.)",
+                                        "x-yang": {
+                                          "type": "leaf"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "primitive"
+                                    ]
+                                  },
+                                  {
+                                    "properties": {
+                                      "entity": {
+                                        "$ref": "#/$defs/entity-name",
+                                        "description": "Entity (array items may be full object or primary key value)",
+                                        "x-yang": {
+                                          "type": "leaf"
+                                        }
+                                      }
+                                    },
+                                    "required": [
+                                      "entity"
+                                    ]
+                                  }
+                                ],
+                                "x-yang": {
+                                  "type": "choice",
+                                  "mandatory": true
+                                }
+                              }
                             },
                             "additionalProperties": false
                           },
@@ -1380,7 +1545,8 @@
                             "error-message": "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).",
                             "description": "Maximum 7 subcomponents unless allow_unlimited_fields is set."
                           }
-                        ]
+                        ],
+                        "when": "../type = 'composite'"
                       },
                       "minItems": 1
                     }
