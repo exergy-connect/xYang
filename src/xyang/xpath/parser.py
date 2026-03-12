@@ -57,6 +57,37 @@ class XPathParser:
             )
         return node
 
+    def parse_path(self) -> PathNode:
+        """
+        Parse the expression *strictly* as a path and return a PathNode.
+
+        This uses the internal _parse_path() helper directly instead of the full
+        expression grammar, so only simple path expressions are accepted:
+        - absolute paths starting with '/'
+        - relative paths starting with '.', '..', or an identifier
+        Predicates (e.g. [cond]) are explicitly rejected here.
+        """
+        if not self.tokens or self.tokens[0].type == TokenType.EOF:
+            raise XPathSyntaxError("Empty path expression")
+
+        t = self._current()
+        # Absolute path: leading '/'
+        is_absolute = t.type == TokenType.SLASH
+        if is_absolute:
+            self._consume(TokenType.SLASH)
+        # First step parsed by _parse_path (absolute or relative)
+        path, _ = self._parse_path(is_absolute=is_absolute, allow_predicate=False)
+
+        # Ensure we've consumed the entire input
+        if self._current().type != TokenType.EOF:
+            t = self._current()
+            raise XPathSyntaxError(
+                f"Unexpected token after path: {t.type.name} ({t.value!r})",
+                position=t.position,
+                expression=self.expression,
+            )
+        return path
+
     def _current(self) -> Token:
         if self.position < len(self.tokens):
             return self.tokens[self.position]
@@ -253,65 +284,45 @@ class XPathParser:
         return FunctionCallNode(name, args), False
 
     def _parse_path(
-        self, is_absolute: bool, first_step: Optional[str] = None
+        self,
+        is_absolute: bool,
+        first_step: Optional[str] = None,
+        allow_predicate: bool = True,
     ) -> Tuple[PathNode, bool]:
-        steps: List[str] = []
-        predicates: List[Optional[ASTNode]] = []
+        segments: List[PathSegment] = []
         cacheable = is_absolute
-        if first_step is not None:
-            steps.append(first_step)
-            predicates.append(None)
+
+        def _add_step_and_optional_predicate(step: str) -> bool:
+            """
+            Append a step (segment) with an optional predicate, and then
+            consume a trailing '/' if present.
+
+            Returns True if a '/' was consumed (meaning another step may follow),
+            otherwise False.
+            """
+            nonlocal cacheable
+            seg = PathSegment(step, None)
+            segments.append(seg)
             if self._current().type == TokenType.BRACKET_OPEN:
+                if not allow_predicate:
+                    raise XPathSyntaxError(
+                        "Predicates are not allowed in this path context",
+                        position=self._current().position,
+                        expression=self.expression,
+                    )
                 self._consume(TokenType.BRACKET_OPEN)
                 pred_node, pred_cacheable = self._parse_expression()
-                predicates[-1] = pred_node
+                seg.predicate = pred_node
                 cacheable = cacheable and pred_cacheable
                 self._consume(TokenType.BRACKET_CLOSE)
             if self._current().type == TokenType.SLASH:
                 self._consume()
-        while True:
-            t = self._current()
-            if t.type == TokenType.DOTDOT:
-                steps.append(self._consume().value)
-                predicates.append(None)
-                if self._current().type == TokenType.BRACKET_OPEN:
-                    self._consume(TokenType.BRACKET_OPEN)
-                    pred_node, pred_cacheable = self._parse_expression()
-                    predicates[-1] = pred_node
-                    cacheable = cacheable and pred_cacheable
-                    self._consume(TokenType.BRACKET_CLOSE)
-                if self._current().type == TokenType.SLASH:
-                    self._consume()
-                else:
-                    break
-            elif t.type == TokenType.DOT:
-                self._consume()
-                steps.append(".")
-                predicates.append(None)
-                if self._current().type == TokenType.BRACKET_OPEN:
-                    self._consume(TokenType.BRACKET_OPEN)
-                    pred_node, pred_cacheable = self._parse_expression()
-                    predicates[-1] = pred_node
-                    cacheable = cacheable and pred_cacheable
-                    self._consume(TokenType.BRACKET_CLOSE)
-                if self._current().type == TokenType.SLASH:
-                    self._consume()
-                else:
-                    break
-            elif t.type == TokenType.IDENTIFIER:
-                steps.append(self._consume().value)
-                predicates.append(None)
-                if self._current().type == TokenType.BRACKET_OPEN:
-                    self._consume(TokenType.BRACKET_OPEN)
-                    pred_node, pred_cacheable = self._parse_expression()
-                    predicates[-1] = pred_node
-                    cacheable = cacheable and pred_cacheable
-                    self._consume(TokenType.BRACKET_CLOSE)
-                if self._current().type == TokenType.SLASH:
-                    self._consume()
-                else:
-                    break
-            else:
+                return True
+            return False
+        if first_step is not None:
+            _add_step_and_optional_predicate(first_step)
+        while self._current().type in (TokenType.DOT, TokenType.DOTDOT, TokenType.IDENTIFIER):
+            step = self._consume().value
+            if not _add_step_and_optional_predicate(step):
                 break
-        segments = [PathSegment(step, pred) for step, pred in zip(steps, predicates)]
         return PathNode(segments, is_absolute, is_cacheable=cacheable), cacheable

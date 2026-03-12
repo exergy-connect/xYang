@@ -138,6 +138,7 @@ def _build_xyang(
     key: str | None = None,
     must_list: list[YangMustStmt] | None = None,
     when_condition: str | None = None,
+    presence: str | None = None,
 ) -> dict[str, Any]:
     """Build x-yang object for a node."""
     xyang: dict[str, Any] = {"type": node_type}
@@ -147,6 +148,8 @@ def _build_xyang(
         xyang["must"] = [_must_to_json(m) for m in must_list]
     if when_condition:
         xyang["when"] = when_condition
+    if presence:
+        xyang["presence"] = presence
     return xyang
 
 
@@ -264,6 +267,7 @@ def _statement_to_property(
                 "container",
                 must_list=getattr(stmt, "must_statements", None) or [],
                 when_condition=when_cond,
+                presence=getattr(stmt, "presence", None),
             ),
         }
         if props:
@@ -322,14 +326,19 @@ def _statement_to_property(
                 ),
             }
         else:
+            type_schema = _type_to_schema(type_stmt, typedef_names)
+            leaf_xyang = _build_xyang(
+                "leaf",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_condition=when_cond,
+            )
+            # Preserve leafref (type, path, require-instance) from type_schema x-yang
+            if type_schema.get("x-yang"):
+                leaf_xyang = {**leaf_xyang, **type_schema.get("x-yang", {})}
             out = {
-                **_type_to_schema(type_stmt, typedef_names),
+                **{k: v for k, v in type_schema.items() if k != "x-yang"},
                 "description": stmt.description or "",
-                "x-yang": _build_xyang(
-                    "leaf",
-                    must_list=getattr(stmt, "must_statements", None) or [],
-                    when_condition=when_cond,
-                ),
+                "x-yang": leaf_xyang,
             }
         if stmt.default is not None:
             out["default"] = stmt.default

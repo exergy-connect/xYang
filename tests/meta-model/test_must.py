@@ -35,7 +35,7 @@ def test_allow_unlimited_fields_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "allow_unlimited_fields": None,
             "entities": [
@@ -59,7 +59,7 @@ def test_allow_unlimited_fields_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "allow_unlimited_fields": None,
             "entities": [
@@ -85,7 +85,7 @@ def test_entity_field_limit_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -105,7 +105,7 @@ def test_entity_field_limit_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -133,7 +133,7 @@ def test_entity_name_underscore_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [{"name": "entity_a", "primary_key": "id", "fields": [{"name": "id", "type": "integer"}]}],
         }
@@ -147,7 +147,7 @@ def test_entity_name_underscore_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {"name": "a_b_c_d", "primary_key": "id", "fields": [{"name": "id", "type": "integer"}]}
@@ -168,7 +168,7 @@ def test_primary_key_reference_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {"name": "e", "primary_key": "id", "fields": [{"name": "id", "type": "integer"}]}
@@ -184,7 +184,7 @@ def test_primary_key_reference_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -209,7 +209,7 @@ def test_mindate_type_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -232,7 +232,7 @@ def test_mindate_type_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -260,7 +260,7 @@ def test_maxdate_type_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -283,7 +283,7 @@ def test_maxdate_ordering_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -316,7 +316,7 @@ def test_foreign_key_type_match_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {"name": "parent", "primary_key": "id", "fields": [{"name": "id", "type": "integer"}]},
@@ -340,7 +340,7 @@ def test_foreign_key_type_match_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "entities": [
@@ -370,7 +370,7 @@ def test_computed_binary_two_fields_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -399,7 +399,7 @@ def test_computed_binary_two_fields_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -432,7 +432,7 @@ def test_computed_aggregation_min_two_fields_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -461,7 +461,7 @@ def test_computed_aggregation_min_two_fields_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -494,7 +494,7 @@ def test_computed_reference_exists_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "entities": [
@@ -524,7 +524,7 @@ def test_computed_reference_missing_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "entities": [
@@ -561,7 +561,7 @@ def test_computed_cross_entity_fk_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "entities": [
@@ -604,7 +604,7 @@ def test_computed_cross_entity_no_fk_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "entities": [
@@ -648,7 +648,7 @@ def test_field_name_underscore_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -668,7 +668,7 @@ def test_field_name_underscore_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -696,7 +696,7 @@ def test_required_no_default_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -719,7 +719,7 @@ def test_required_with_default_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -747,7 +747,7 @@ def test_composite_subcomponent_type_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -776,7 +776,7 @@ def test_composite_subcomponent_type_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "entities": [
                 {
@@ -811,7 +811,7 @@ def test_change_id_valid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "changes": [{"id": 1, "timestamp": "2025-01-01T00:00:00Z"}],
@@ -834,7 +834,7 @@ def test_change_id_invalid(meta_model):
     data = {
         "data-model": {
             "name": "M",
-            "version": "1.0",
+            "version": "25.03.11.1",
             "author": "A",
             "consolidated": True,
             "changes": [{"id": 1, "timestamp": "2025-01-01T00:00:00Z"}],

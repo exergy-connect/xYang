@@ -148,10 +148,12 @@
               },
               "primary_key": {
                 "type": "string",
+                "description": "Primary key field for this entity. Can be a simple field or a composite field.",
                 "x-yang": {
-                  "type": "leaf"
-                },
-                "description": "Primary key field for this entity. Can be a simple field or a composite field."
+                  "type": "leafref",
+                  "path": "../fields/name",
+                  "require-instance": true
+                }
               },
               "required_fields": {
                 "type": "array",
@@ -427,24 +429,28 @@
                               "properties": {
                                 "entity": {
                                   "type": "string",
+                                  "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                                   "x-yang": {
-                                    "type": "leaf"
-                                  },
-                                  "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key."
+                                    "type": "leafref",
+                                    "path": "/data-model/entities/name",
+                                    "require-instance": true
+                                  }
                                 },
                                 "parent_array": {
                                   "type": "string",
+                                  "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'.",
                                   "x-yang": {
-                                    "type": "leaf",
+                                    "type": "leafref",
                                     "must": [
                                       {
                                         "must": "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or count(/data-model/entities[name = ../entity]/fields[name = current()]/type) != 1 or /data-model/entities[name = ../entity]/fields[name = current()]/type = 'array'",
                                         "error-message": "Parent array field must be of type 'array' (entity: {../../name}, field: {../name})",
                                         "description": "Validates that the referenced field is array. Skipped when type references a field_definition."
                                       }
-                                    ]
-                                  },
-                                  "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'."
+                                    ],
+                                    "path": "/data-model/entities/fields/name",
+                                    "require-instance": true
+                                  }
                                 }
                               },
                               "required": [
@@ -660,7 +666,8 @@
                                   "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
                                   "description": "Validates that aggregation operations have at least 2 field references"
                                 }
-                              ]
+                              ],
+                              "presence": "Computed field is defined"
                             },
                             "properties": {
                               "operation": {
@@ -700,17 +707,19 @@
                                     },
                                     "entity": {
                                       "type": "string",
+                                      "description": "Entity name for cross-entity field reference (optional).",
                                       "x-yang": {
-                                        "type": "leaf",
+                                        "type": "leafref",
                                         "must": [
                                           {
                                             "must": "/data-model/consolidated = false() or count(../../../../fields[foreignKeys/entity = current()]) = 1",
                                             "error-message": "Cross-entity computed field references require a foreign key field in the current entity that references the target entity",
                                             "description": "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved."
                                           }
-                                        ]
-                                      },
-                                      "description": "Entity name for cross-entity field reference (optional)."
+                                        ],
+                                        "path": "/data-model/entities/name",
+                                        "require-instance": true
+                                      }
                                     }
                                   },
                                   "required": [
@@ -828,24 +837,28 @@
                         "properties": {
                           "entity": {
                             "type": "string",
+                            "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                             "x-yang": {
-                              "type": "leaf"
-                            },
-                            "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key."
+                              "type": "leafref",
+                              "path": "/data-model/entities/name",
+                              "require-instance": true
+                            }
                           },
                           "parent_array": {
                             "type": "string",
+                            "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'.",
                             "x-yang": {
-                              "type": "leaf",
+                              "type": "leafref",
                               "must": [
                                 {
                                   "must": "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or count(/data-model/entities[name = ../entity]/fields[name = current()]/type) != 1 or /data-model/entities[name = ../entity]/fields[name = current()]/type = 'array'",
                                   "error-message": "Parent array field must be of type 'array' (entity: {../../name}, field: {../name})",
                                   "description": "Validates that the referenced field is array. Skipped when type references a field_definition."
                                 }
-                              ]
-                            },
-                            "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'."
+                              ],
+                              "path": "/data-model/entities/fields/name",
+                              "require-instance": true
+                            }
                           }
                         },
                         "required": [
@@ -1061,7 +1074,8 @@
                             "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
                             "description": "Validates that aggregation operations have at least 2 field references"
                           }
-                        ]
+                        ],
+                        "presence": "Computed field is defined"
                       },
                       "properties": {
                         "operation": {
@@ -1101,17 +1115,19 @@
                               },
                               "entity": {
                                 "type": "string",
+                                "description": "Entity name for cross-entity field reference (optional).",
                                 "x-yang": {
-                                  "type": "leaf",
+                                  "type": "leafref",
                                   "must": [
                                     {
                                       "must": "/data-model/consolidated = false() or count(../../../../fields[foreignKeys/entity = current()]) = 1",
                                       "error-message": "Cross-entity computed field references require a foreign key field in the current entity that references the target entity",
                                       "description": "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved."
                                     }
-                                  ]
-                                },
-                                "description": "Entity name for cross-entity field reference (optional)."
+                                  ],
+                                  "path": "/data-model/entities/name",
+                                  "require-instance": true
+                                }
                               }
                             },
                             "required": [
@@ -1216,24 +1232,28 @@
                               "properties": {
                                 "entity": {
                                   "type": "string",
+                                  "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                                   "x-yang": {
-                                    "type": "leaf"
-                                  },
-                                  "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key."
+                                    "type": "leafref",
+                                    "path": "/data-model/entities/name",
+                                    "require-instance": true
+                                  }
                                 },
                                 "parent_array": {
                                   "type": "string",
+                                  "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'.",
                                   "x-yang": {
-                                    "type": "leaf",
+                                    "type": "leafref",
                                     "must": [
                                       {
                                         "must": "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or count(/data-model/entities[name = ../entity]/fields[name = current()]/type) != 1 or /data-model/entities[name = ../entity]/fields[name = current()]/type = 'array'",
                                         "error-message": "Parent array field must be of type 'array' (entity: {../../name}, field: {../name})",
                                         "description": "Validates that the referenced field is array. Skipped when type references a field_definition."
                                       }
-                                    ]
-                                  },
-                                  "description": "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'."
+                                    ],
+                                    "path": "/data-model/entities/fields/name",
+                                    "require-instance": true
+                                  }
                                 }
                               },
                               "required": [
@@ -1449,7 +1469,8 @@
                                   "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
                                   "description": "Validates that aggregation operations have at least 2 field references"
                                 }
-                              ]
+                              ],
+                              "presence": "Computed field is defined"
                             },
                             "properties": {
                               "operation": {
@@ -1489,17 +1510,19 @@
                                     },
                                     "entity": {
                                       "type": "string",
+                                      "description": "Entity name for cross-entity field reference (optional).",
                                       "x-yang": {
-                                        "type": "leaf",
+                                        "type": "leafref",
                                         "must": [
                                           {
                                             "must": "/data-model/consolidated = false() or count(../../../../fields[foreignKeys/entity = current()]) = 1",
                                             "error-message": "Cross-entity computed field references require a foreign key field in the current entity that references the target entity",
                                             "description": "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved."
                                           }
-                                        ]
-                                      },
-                                      "description": "Entity name for cross-entity field reference (optional)."
+                                        ],
+                                        "path": "/data-model/entities/name",
+                                        "require-instance": true
+                                      }
                                     }
                                   },
                                   "required": [

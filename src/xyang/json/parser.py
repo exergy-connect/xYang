@@ -20,6 +20,7 @@ from ..ast import (
     YangListStmt,
     YangLeafStmt,
     YangLeafListStmt,
+    YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
     YangMustStmt,
@@ -75,28 +76,21 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
 
 def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     """Build YangTypeStmt from JSON schema (+ $ref) and x-yang (e.g. leafref)."""
-    # Leafref from x-yang
+    # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
     if xyang.get("type") == "leafref":
-        path = xyang.get("path", "") or ""
+        path_val = xyang.get("path")
         require = xyang.get("require-instance", True)
-        type_stmt = YangTypeStmt(name="leafref", path=None, require_instance=bool(require))
-        if path:
-            type_stmt.path = path  # str for JSON; normalizer accepts str for comparison
+        path_node = None
+        if path_val is not None and isinstance(path_val, str) and path_val.strip():
+            # Let XPathParser errors surface: invalid leafref paths from JSON
+            # schema are programmer / schema bugs and should abort parsing.
+            path_node = XPathParser(path_val.strip()).parse_path()
+        type_stmt = YangTypeStmt(name="leafref", path=path_node, require_instance=bool(require))
         return type_stmt
-    # $ref to typedef: preserve typedef name; copy range so AST matches YANG (pattern left None so validator resolves typedef)
+    # $ref to typedef: preserve typedef name only (no range/pattern; matches YANG leaf type reference)
     ref = schema.get("$ref")
     if ref:
         name = _ref_to_typedef_name(ref)
-        if name and name in defs:
-            def_schema = defs[name]
-            if isinstance(def_schema, dict):
-                resolved = _type_from_schema(defs, def_schema, _get_xyang(def_schema))
-                if resolved is not None:
-                    out = YangTypeStmt(name=name)
-                    if getattr(resolved, "range", None):
-                        out.range = resolved.range
-                    return out
-            return YangTypeStmt(name=name)
         if name:
             return YangTypeStmt(name=name)
     # Inline type
@@ -132,7 +126,7 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
         max_val = schema.get("maximum")
         if min_val == 0 and max_val == 255:
             type_stmt = YangTypeStmt(name="uint8")
-            type_stmt.range = "0..255"
+            # Leave range unset to match YANG (built-in uint8 has no range on leaf type)
         else:
             type_stmt = YangTypeStmt(name="int32")
             if min_val is not None and max_val is not None:
@@ -243,6 +237,8 @@ def _convert_container(
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         c.when = when_stmt
+    if xyang.get("presence") is not None:
+        c.presence = xyang.get("presence")
     return c
 
 
@@ -276,6 +272,10 @@ def _convert_list(
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         lst.when = when_stmt
+    if "minItems" in schema and schema["minItems"] is not None:
+        lst.min_elements = int(schema["minItems"])
+    if "maxItems" in schema and schema["maxItems"] is not None:
+        lst.max_elements = int(schema["maxItems"])
     return lst
 
 
@@ -329,12 +329,20 @@ def _convert_leaf_list(
     items_xyang = (items_schema.get("x-yang") or {}) if isinstance(items_schema, dict) else {}
     type_stmt = _type_from_schema(defs, items_schema, items_xyang or xyang)
     if type_stmt is None:
-        type_stmt = YangTypeStmt(name="string")
-    ll = YangLeafListStmt(name=name, description=description, type=type_stmt)
-    ll.must_statements = must_list
+        type_stmt = YangTypeStmt("string")
     when_stmt = _when_from_xyang(xyang)
-    if when_stmt is not None:
-        ll.when = when_stmt
+    ll = YangLeafListStmt(
+        statements=[],
+        name=name,
+        description=description,
+        must_statements=must_list,
+        when=when_stmt,
+        type=type_stmt,
+    )
+    if "minItems" in schema and schema["minItems"] is not None:
+        ll.min_elements = int(schema["minItems"])
+    if "maxItems" in schema and schema["maxItems"] is not None:
+        ll.max_elements = int(schema["maxItems"])
     return ll
 
 
@@ -363,7 +371,7 @@ def _convert_choice(
             keys = list(case_props.keys())
             case_name = keys[0] + "-case" if len(keys) == 1 else ""
         case_props = case_schema.get("properties") or {}
-        case_statements: list[YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt] = []
+        case_statements: list[YangStatement] = []
         for prop_name, prop_val in case_props.items():
             stmt = _convert_property(
                 prop_name,
