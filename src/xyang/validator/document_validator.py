@@ -321,7 +321,12 @@ class DocumentValidator:
                 )
             return
 
-        self._visit_children(data, active_case, parent_ctx, path)
+        # Validate only statements in the active case.
+        # Do not call _visit_children here: its unknown-field check is scoped to the
+        # provided schema node and would incorrectly flag sibling fields (outside this
+        # choice) as unknown when validating list/container entries.
+        for stmt in active_case.statements:
+            self._visit_stmt(stmt, data, parent_ctx, path)
 
     # ------------------------------------------------------------------
     # Structural checks

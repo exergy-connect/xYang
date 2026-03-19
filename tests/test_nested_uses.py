@@ -6,8 +6,6 @@ B uses C) and checks that xYang parses it and can validate data against it.
 """
 from __future__ import annotations
 
-import pytest
-
 from xyang import parse_yang_string, YangValidator
 
 
