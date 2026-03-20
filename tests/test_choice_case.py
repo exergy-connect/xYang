@@ -374,12 +374,7 @@ module test {
 
 
 def test_choice_case_missing_mandatory():
-    """Test invalid data - missing mandatory choice.
-    
-    Note: This test documents expected behavior. Currently, mandatory choice
-    validation may not be fully implemented. This test should fail validation
-    when choice/case support is complete.
-    """
+    """RFC 7950 §7.9.4: ``mandatory true`` on a choice — empty ``item_type`` is invalid."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -424,16 +419,16 @@ module test {
         }
     }
     is_valid, errors, warnings = validator.validate(invalid_data)
-    # TODO: When choice/case mandatory validation is implemented, this should fail
-    # For now, we document the expected behavior
-    # assert not is_valid, "Expected invalid due to missing mandatory choice"
-    # assert len(errors) > 0
-    # Current behavior: may pass (needs implementation)
-    assert isinstance(is_valid, bool)
+    assert not is_valid, "Expected invalid due to missing mandatory choice (§7.9.4)"
+    assert errors, f"Expected validation errors, got: {errors!r}"
+    joined = " ".join(errors).lower()
+    assert "mandatory" in joined and "choice" in joined, (
+        f"Expected mandatory-choice error in: {errors!r}"
+    )
 
 
 def test_choice_case_both_cases_invalid():
-    """Test invalid data - both cases present (should only have one)."""
+    """RFC 7950 §7.9: at most one case may have instantiated child nodes in the data tree."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -481,11 +476,12 @@ module test {
         }
     }
     is_valid, errors, warnings = validator.validate(invalid_data)
-    # Note: Depending on implementation, this might be valid (last one wins)
-    # or invalid (both present). Testing current behavior.
-    # If choice validation is strict, this should fail
-    # For now, we'll just verify it doesn't crash
-    assert isinstance(is_valid, bool)
+    assert not is_valid, "RFC 7950: at most one case of a choice may have nodes in the data tree"
+    assert errors, f"Expected validation errors, got: {errors!r}"
+    joined = " ".join(errors).lower()
+    assert "only one case" in joined or "multiple cases" in joined, (
+        f"Expected multi-branch choice error in: {errors!r}"
+    )
 
 
 def test_choice_case_invalid_primitive_value():

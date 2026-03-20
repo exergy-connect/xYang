@@ -13,6 +13,11 @@ At each node the order is (RFC 7950: when before structural):
     3. must   -- evaluated in current node context, per entry for lists
     4. type   -- pattern, range, length, enum, leafref require-instance
     5. descend
+
+RFC 7950 §7.9.4 mandatory ``choice`` / §7.6.5 mandatory ``leaf`` under a ``case``:
+    Propagate ``enforce_mandatory_choice`` (bool): strict enforcement when true; when false,
+    defer to sibling checks using the innermost ``case`` on ``_case_stack`` (pushed while
+    visiting an active ``case``).
 """
 
 from __future__ import annotations
@@ -32,6 +37,7 @@ from ..ast import (
     YangStatementWithMust,
     YangStatementWithWhen,
 )
+from ..module import YangModule
 from ..xpath.evaluator import XPathEvaluator
 from ..xpath.node import Context, Node
 from ..xpath.schema_nav import SchemaNav
@@ -88,12 +94,16 @@ class DocumentValidator:
         self._leafref_severity = leafref_severity
         self._root_data = data
         self._errors = []
+        self._case_stack: list[YangCaseStmt] = []
+        self._case_level_data_stack: list[dict[str, Any]] = []
         self._evaluator.clear_cache_stats()
         path_cache: Dict[Any, Any] | None = {} if cache else None
         node = Node(data, self._root_schema, None)
         ctx = Context(current=node, root=node, path_cache=path_cache)
         path = PathBuilder()
-        self._visit_children(data, self._root_schema, (ctx, node), path)
+        self._visit_children(
+            data, self._root_schema, (ctx, node), path, enforce_mandatory_choice=True
+        )
         return self._errors
 
     def _effective_value(
@@ -111,6 +121,108 @@ class DocumentValidator:
             return data[name]
         return SchemaNav.default(stmt)
 
+    def _child_enforce_mandatory_choice(
+        self, owner: YangStatementList, parent_enforce: bool
+    ) -> bool:
+        """RFC 7950 §7.9.4: whether mandatory ``choice`` is enforced without case-sibling deferral.
+
+        When ``False``, the innermost ``case`` on ``_case_stack`` (with data from
+        ``_case_level_data_stack``) supplies §7.9.4 sibling checks at the case's JSON level.
+        Non-presence containers inherit the parent flag; presence containers and lists reset to
+        strict enforcement.
+        """
+        if isinstance(owner, YangModule):
+            return True
+        if isinstance(owner, YangCaseStmt):
+            return False
+        if isinstance(owner, YangContainerStmt):
+            if owner.presence is None:
+                return parent_enforce
+            return True
+        if isinstance(owner, YangListStmt):
+            return True
+        return parent_enforce
+
+    def _statement_has_matching_data(
+        self, stmt: YangStatement, data: dict[str, Any]
+    ) -> bool:
+        """True if this statement (or a nested choice branch) has a key in ``data``."""
+        if isinstance(stmt, YangLeafStmt):
+            return stmt.name in data
+        if isinstance(stmt, YangLeafListStmt):
+            return stmt.name in data
+        if isinstance(stmt, YangContainerStmt):
+            return stmt.name in data
+        if isinstance(stmt, YangListStmt):
+            return stmt.name in data
+        if isinstance(stmt, YangChoiceStmt):
+            for case in stmt.cases:
+                for ch in case.statements:
+                    if self._statement_has_matching_data(ch, data):
+                        return True
+            return False
+        return False
+
+    def _case_has_other_stmt_data(
+        self,
+        case: YangCaseStmt,
+        data: dict[str, Any],
+        skip: YangChoiceStmt,
+    ) -> bool:
+        """§7.9.4: any sibling under the same case has data (excluding ``skip`` choice)."""
+        for s in case.statements:
+            if s is skip:
+                continue
+            if self._statement_has_matching_data(s, data):
+                return True
+        return False
+
+    def _case_has_any_stmt_data(
+        self, case: YangCaseStmt, data: dict[str, Any]
+    ) -> bool:
+        """§7.6.5: any node from this case appears in ``data`` at the current level."""
+        return any(self._statement_has_matching_data(s, data) for s in case.statements)
+
+    def _case_level_data(self) -> dict[str, Any]:
+        """Dict containing all nodes from the innermost active ``case`` (sibling keys)."""
+        if self._case_level_data_stack:
+            return self._case_level_data_stack[-1]
+        return {}
+
+    def _mandatory_choice_violation(
+        self,
+        choice: YangChoiceStmt,
+        data: dict[str, Any],
+        enforce_mandatory_choice: bool,
+    ) -> bool:
+        """True if mandatory ``choice`` with no active case should be reported (§7.9.4)."""
+        if not choice.mandatory:
+            return False
+        if enforce_mandatory_choice:
+            return True
+        if not self._case_stack:
+            return True
+        return self._case_has_other_stmt_data(
+            self._case_stack[-1], self._case_level_data(), skip=choice
+        )
+
+    def _leaf_mandatory_must_exist(
+        self,
+        leaf: YangLeafStmt,
+        data: dict[str, Any],
+        enforce_mandatory_choice: bool,
+    ) -> bool:
+        """RFC 7950 §7.6.5: when a mandatory leaf's absence is invalid."""
+        if not leaf.mandatory:
+            return False
+        if enforce_mandatory_choice:
+            return True
+        if not self._case_stack:
+            return True
+        return self._case_has_any_stmt_data(
+            self._case_stack[-1], self._case_level_data()
+        )
+
     # ------------------------------------------------------------------
     # Tree walk
     # ------------------------------------------------------------------
@@ -121,13 +233,17 @@ class DocumentValidator:
         schema: YangStatementList,
         parent_ctx: ParentCtx,
         path: PathBuilder,
+        enforce_mandatory_choice: bool,
     ) -> None:
         if not isinstance(data, dict):
             return
+        child_enforce = self._child_enforce_mandatory_choice(
+            schema, enforce_mandatory_choice
+        )
         visited_names: set[str] = set()
         for stmt in schema.statements:
             visited_names.update(stmt.child_names(data))
-            self._visit_stmt(stmt, data, parent_ctx, path)
+            self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
         for key in data:
             if key not in visited_names:
                 self._errors.append(
@@ -143,14 +259,24 @@ class DocumentValidator:
         data: Dict[str, Any],
         parent_ctx: ParentCtx,
         path: PathBuilder,
+        enforce_mandatory_choice: bool,
     ) -> None:
         logger.debug("_visit_stmt path=%s stmt=%s", path.current(), type(stmt).__name__)
 
         if isinstance(stmt, YangChoiceStmt):
-            self._visit_choice(stmt, data, parent_ctx, path)
+            self._visit_choice(stmt, data, parent_ctx, path, enforce_mandatory_choice)
             return
         if isinstance(stmt, YangCaseStmt):
-            self._visit_children(data, stmt, parent_ctx, path)
+            self._case_stack.append(stmt)
+            self._case_level_data_stack.append(data)
+            try:
+                ce = self._child_enforce_mandatory_choice(
+                    stmt, enforce_mandatory_choice
+                )
+                self._visit_children(data, stmt, parent_ctx, path, ce)
+            finally:
+                self._case_level_data_stack.pop()
+                self._case_stack.pop()
             return
 
         name = stmt.name
@@ -186,7 +312,9 @@ class DocumentValidator:
 
         # -- 2. Structural (mandatory, min/max-elements, presence) —
         logger.debug("phase 2 structural path=%s", child_path)
-        if not self._check_structural(stmt, name, data, child_path):
+        if not self._check_structural(
+            stmt, name, data, child_path, enforce_mandatory_choice
+        ):
             return
 
         # -- 3. must (evaluated in current node context) --
@@ -276,7 +404,12 @@ class DocumentValidator:
         logger.debug("phase 5 descend path=%s", child_path)
         if isinstance(stmt, YangContainerStmt) and isinstance(val, dict):
             path.push(name)
-            self._visit_children(val, stmt, (curr_ctx, curr_node), path)
+            child_enforce = self._child_enforce_mandatory_choice(
+                stmt, enforce_mandatory_choice
+            )
+            self._visit_children(
+                val, stmt, (curr_ctx, curr_node), path, child_enforce
+            )
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
@@ -291,8 +424,11 @@ class DocumentValidator:
                 self._check_must(
                     stmt, entry_ctx, entry_node, path.current()
                 )
+                entry_enforce = self._child_enforce_mandatory_choice(
+                    stmt, enforce_mandatory_choice
+                )
                 self._visit_children(
-                    entry, stmt, (entry_ctx, entry_node), path
+                    entry, stmt, (entry_ctx, entry_node), path, entry_enforce
                 )
                 path.pop()
 
@@ -302,17 +438,34 @@ class DocumentValidator:
         data: Dict[str, Any],
         parent_ctx: ParentCtx,
         path: PathBuilder,
+        enforce_mandatory_choice: bool,
     ) -> None:
-        active_case = None
+        active_cases: list[YangCaseStmt] = []
         for case in choice.cases:
             if any(
                 getattr(s, "name", None) in data for s in case.statements
             ):
-                active_case = case
-                break
+                active_cases.append(case)
+
+        if len(active_cases) > 1:
+            names = ", ".join(c.name for c in active_cases)
+            self._errors.append(
+                ValidationError(
+                    path=path.current(),
+                    message=(
+                        f"Choice '{choice.name}' allows only one case; "
+                        f"data matches multiple cases: {names}"
+                    ),
+                )
+            )
+            return
+
+        active_case = active_cases[0] if active_cases else None
 
         if active_case is None:
-            if choice.mandatory:
+            if self._mandatory_choice_violation(
+                choice, data, enforce_mandatory_choice
+            ):
                 self._errors.append(
                     ValidationError(
                         path=path.current(),
@@ -325,8 +478,17 @@ class DocumentValidator:
         # Do not call _visit_children here: its unknown-field check is scoped to the
         # provided schema node and would incorrectly flag sibling fields (outside this
         # choice) as unknown when validating list/container entries.
-        for stmt in active_case.statements:
-            self._visit_stmt(stmt, data, parent_ctx, path)
+        self._case_stack.append(active_case)
+        self._case_level_data_stack.append(data)
+        try:
+            inner_enforce = self._child_enforce_mandatory_choice(
+                active_case, enforce_mandatory_choice
+            )
+            for stmt in active_case.statements:
+                self._visit_stmt(stmt, data, parent_ctx, path, inner_enforce)
+        finally:
+            self._case_level_data_stack.pop()
+            self._case_stack.pop()
 
     # ------------------------------------------------------------------
     # Structural checks
@@ -339,6 +501,7 @@ class DocumentValidator:
         name: str,
         data: Dict[str, Any],
         path: str,
+        enforce_mandatory_choice: bool,
     ) -> bool:
         present = name in data
         effective = self._effective_value(data, name, stmt)
@@ -349,12 +512,15 @@ class DocumentValidator:
             if type_name == "empty" and present:
                 return True
             if effective is None and stmt.mandatory:
-                self._errors.append(
-                    ValidationError(
-                        path=path,
-                        message=f"Mandatory leaf '{name}' is missing",
+                if self._leaf_mandatory_must_exist(
+                    stmt, data, enforce_mandatory_choice
+                ):
+                    self._errors.append(
+                        ValidationError(
+                            path=path,
+                            message=f"Mandatory leaf '{name}' is missing",
+                        )
                     )
-                )
             return effective is not None
 
         if isinstance(stmt, YangContainerStmt):
