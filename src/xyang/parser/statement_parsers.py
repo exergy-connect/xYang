@@ -654,8 +654,16 @@ class StatementParsers:
     def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
         """Create a copy of a statement, handling AST nodes properly."""
         from ..ast import (
-            YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt,
-            YangTypeStmt, YangMustStmt, YangWhenStmt, YangChoiceStmt, YangCaseStmt
+            YangContainerStmt,
+            YangListStmt,
+            YangLeafStmt,
+            YangLeafListStmt,
+            YangTypeStmt,
+            YangMustStmt,
+            YangWhenStmt,
+            YangChoiceStmt,
+            YangCaseStmt,
+            YangUsesStmt,
         )
         
         # Copy child statements recursively
@@ -722,6 +730,14 @@ class StatementParsers:
                 name=stmt.name,
                 description=stmt.description,
                 statements=copied_statements
+            )
+        elif isinstance(stmt, YangUsesStmt):
+            return YangUsesStmt(
+                name=stmt.name,
+                description=stmt.description,
+                statements=copied_statements,
+                grouping_name=stmt.grouping_name,
+                refines=list(stmt.refines) if stmt.refines else [],
             )
         else:
             # Unknown / unsupported statement type inside grouping/uses expansion.
