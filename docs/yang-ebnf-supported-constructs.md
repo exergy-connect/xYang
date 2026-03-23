@@ -27,12 +27,15 @@ DOTTED_NUMBER = digit { digit } "." digit { digit } ;
 (* Identifiers and reserved words: RFC 7950 / YANG 1.1 ``identifier`` *)
 identifier   = ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." ) ;
 
-(* Keywords are reserved lexemes mapped to keyword tokens (see list below). *)
+(* Keywords: statement / constraint tokens plus RFC 7950 built-in types (Sec. 4.2.4). *)
 keyword      = "module" | "yang-version" | "namespace" | "prefix" | "organization" | "contact"
-             | "description" | "revision" | "typedef" | "type" | "union" | "leafref" | "path"
-             | "require-instance" | "enum" | "enumeration" | "string" | "pattern" | "length"
-             | "int32" | "uint8" | "decimal64" | "fraction-digits" | "range" | "grouping"
-             | "uses" | "refine" | "container" | "list" | "leaf" | "leaf-list" | "choice" | "case"
+             | "description" | "revision" | "typedef" | "type"
+             | "binary" | "bits" | "boolean" | "decimal64" | "empty" | "enumeration"
+             | "identityref" | "instance-identifier" | "int8" | "int16" | "int32" | "int64"
+             | "leafref" | "string" | "uint8" | "uint16" | "uint32" | "uint64" | "union"
+             | "path" | "require-instance" | "enum" | "pattern" | "length"
+             | "fraction-digits" | "range" | "grouping" | "uses" | "refine"
+             | "container" | "list" | "leaf" | "leaf-list" | "choice" | "case"
              | "must" | "when" | "presence" | "key" | "min-elements" | "max-elements"
              | "mandatory" | "default" | "error-message" | "true" | "false" ;
 
@@ -43,7 +46,7 @@ punctuation  = "{" | "}" | ";" | "=" | "+" | "/" ;
 
 - The first character of an `identifier` must be **A–Z, a–z, or `_`**; inner `-` and `.` match RFC 7950.
 - Digit-led lexemes are **`INTEGER`** or **`DOTTED_NUMBER`** (e.g. `yang-version 1.1;`), never `IDENTIFIER`.
-- Built-in type names that are **not** keywords (e.g. `boolean`) are tokenized as ordinary identifiers when used after `type`.
+- All RFC 7950 built-in type names are **keywords** in the lexer (see `YangTokenType` in `parser_context.py`). They still produce the correct spellings for `type` statements via `token.value`. Typedef and grouping **names** must not use those spellings, because those contexts require a bare `IDENTIFIER` token.
 - `+` concatenates adjacent string literals in `must` and `when` arguments (see `_parse_string_concatenation`).
 
 ---
@@ -105,14 +108,18 @@ The body must include a `type` statement (enforced by validation usage patterns 
 ```ebnf
 type_stmt     = "type" type_name [ "{" type_body "}" ] [ ";" ] ;
 
-(* type_name: typedef identifier, or a built-in type keyword from the lexer — e.g. string, int32,
-   union, leafref, enumeration, decimal64. Names like boolean are plain identifiers, not keywords. *)
-type_name     = identifier ;
+(* Built-in keywords use the same spelling as in YANG source; typedefs use identifier. *)
+type_name     = builtin_type_keyword | identifier ;
+
+builtin_type_keyword
+              = "binary" | "bits" | "boolean" | "decimal64" | "empty" | "enumeration"
+              | "identityref" | "instance-identifier" | "int8" | "int16" | "int32" | "int64"
+              | "leafref" | "string" | "uint8" | "uint16" | "uint32" | "uint64" | "union" ;
 
 type_body     = { type_substmt } ;
 
 type_substmt  = "type" type_stmt              (* union member types, including nested leafref *)
-              | "enum" identifier [ ";" ]
+              | enum_stmt                     (* only in ``enumeration`` — forms enum_specification *)
               | "pattern" STRING [ ";" ]
               | "length" ( STRING | identifier ) [ ";" ]
               | "range" STRING [ ";" ]
@@ -120,18 +127,26 @@ type_substmt  = "type" type_stmt              (* union member types, including n
               | "path" STRING [ ";" ]
               | "require-instance" ( "true" | "false" ) [ ";" ]
               | description_stmt ;
+
+(* RFC 7950: enum-specification = 1*enum-stmt. Fills ``type enumeration { … }``. *)
+enum_specification = enum_stmt { enum_stmt } ;
+
+enum_stmt     = "enum" enum_name [ ";" ] ;   (* RFC 7950 allows a braced enum-stmt body; xYang is flat-only today. *)
+
+(* Enum value: lexer token — identifier or any built-in type keyword spelling. *)
+enum_name     = identifier | builtin_type_keyword ;
 ```
 
-**Supported type names** (after `type`) include at least:
+**Supported type names** (after `type`):
 
-- Keywords wired in the tokenizer / parser: `string`, `int32`, `uint8`, `boolean` is **not** a keyword — use identifier `boolean`, `union`, `leafref`, `enumeration`, `decimal64`.
-- Typedef names: any identifier resolving to a `typedef` in the module.
+- Any **built-in type keyword** (RFC 7950 Section 4.2.4; see `builtin_type_keyword` above).
+- Any **typedef** name (`identifier` token).
 
 **Union:** `type union {` … one or more nested `type … ;` members … `}`.
 
 **Leafref:** `type leafref { "path" STRING ; [ "require-instance" ( "true" | "false" ) ; ] }`.
 
-**Enumeration:** `type enumeration {` zero or more `enum` **identifier** `;` … `}` (optional per-enum description blocks are not expanded in the EBNF here; the parser accepts `enum` name then `;`).
+**Enumeration:** `type enumeration {` **enum-specification** `}` where **enum-specification** is **one or more** **enum-stmt** (each `enum` *enum-name* `;`, or a braced variant if supported). The parser currently takes a single token per `enum` name then `;` (optional nested description blocks are limited; see `parse_type_enum`).
 
 **String:** optional `{ length … ; pattern … ; description … }`.
 

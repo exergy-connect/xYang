@@ -19,6 +19,9 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `type` - Type references
 
 ### Built-in Types
+The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserved keywords: `binary`, `bits`, `boolean`, `decimal64`, `empty`, `enumeration`, `identityref`, `instance-identifier`, `int8`, `int16`, `int32`, `int64`, `leafref`, `string`, `uint8`, `uint16`, `uint32`, `uint64`, `union`.
+
+Validation / JSON Schema coverage varies by type; commonly used in `meta-model.yang`:
 - ✅ `string` - String type
 - ✅ `int32` - 32-bit integer
 - ✅ `uint8` - 8-bit unsigned integer
@@ -26,7 +29,7 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `decimal64` - Decimal64 type (2 occurrences)
 
 ### Derived Types
-- ✅ `enumeration` - Enumeration type (6 occurrences)
+- ✅ `enumeration` - Enumeration type (6 occurrences) (built-in keyword; `enum` is the substatement keyword inside the block)
 - ✅ `union` - Union type (3 occurrences) - **Full support in typedefs with validation, including union types with leafref members**
 
 ### Data Structures
@@ -78,6 +81,8 @@ This document lists the YANG features implemented in xYang, based on actual usag
   - Round-trip: parse YANG → generate JSON → parse JSON schema → equivalent AST where supported
 
 ## Features NOT Implemented
+
+All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built-in Types** above), even when validation or JSON Schema support is incomplete.
 
 The following YANG features are not used in `meta-model.yang` and are not implemented:
 

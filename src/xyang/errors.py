@@ -2,12 +2,20 @@
 Custom exception classes for YANG parsing and validation errors.
 """
 
+from __future__ import annotations
+
 
 class YangSyntaxError(SyntaxError):
     """YANG syntax error with line number and context."""
 
-    def __init__(self, message: str, line_num: int = None, line: str = None,
-                 context_lines: list = None, filename: str = None):
+    def __init__(
+        self,
+        message: str,
+        line_num: int | None = None,
+        line: str | None = None,
+        context_lines: list[tuple[int, str]] | None = None,
+        filename: str | None = None,
+    ):
         """
         Initialize syntax error.
 

@@ -8,7 +8,10 @@ from pathlib import Path
 
 import pytest
 
-from xyang import parse_yang_file, YangValidator
+import pytest
+
+from xyang import parse_yang_file, parse_yang_string, YangValidator
+from xyang.errors import YangSyntaxError
 
 
 def test_invalid_enum_value():
@@ -109,7 +112,27 @@ def test_valid_enum_value():
     assert is_valid, f"Should pass validation for valid enum value, got errors: {errors}"
 
 
+def test_empty_enumeration_type_rejected():
+    """RFC 7950: enum-specification is one or more enum-stmt; empty body is invalid."""
+    yang = """
+module test_empty_enum {
+  yang-version 1.1;
+  namespace "urn:test:empty-enum";
+  prefix "t";
+
+  leaf x {
+    type enumeration {
+    }
+  }
+}
+"""
+    with pytest.raises(YangSyntaxError) as exc_info:
+        parse_yang_string(yang)
+    assert "enum" in str(exc_info.value).lower()
+
+
 if __name__ == "__main__":
     test_invalid_enum_value()
     test_valid_enum_value()
+    test_empty_enumeration_type_rejected()
     print("✓ All enum validation tests passed")

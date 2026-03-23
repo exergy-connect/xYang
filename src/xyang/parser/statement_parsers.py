@@ -265,6 +265,10 @@ class StatementParsers:
                         raise tokens._make_error(f"Unknown statement in type '{type_name}': {tokens.peek()}")
                 else:
                     tokens.consume()  # Skip nested braces content
+        if type_stmt.name == "enumeration" and not type_stmt.enums:
+            raise tokens._make_error(
+                'enumeration type requires at least one "enum" statement (RFC 7950)'
+            )
         # Assign to parent (use setattr: current_parent is typed as YangStatementList which has no type/types)
         parent = context.current_parent
         if parent:
