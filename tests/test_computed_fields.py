@@ -80,11 +80,8 @@ module meta-model {
               }
             }
           }
-          must "(operation != 'add' and operation != 'subtraction') or count(fields) = 2" {
-            error-message "Binary operations (add, subtraction) require exactly 2 fields";
-          }
-          must "(operation != 'min' and operation != 'max') or count(fields) >= 2" {
-            error-message "Aggregation operations (min, max) require at least 2 fields";
+          must "count(fields) >= 2" {
+            error-message "Computed operation requires at least 2 field references";
           }
         }
       }

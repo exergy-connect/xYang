@@ -18,18 +18,17 @@ Each test file covers a specific `must` constraint with both positive (valid) an
 10. **test_array_item_type_foreign_key.py** - Array item_type foreignKey constraints
 11. **test_computed_field_reference.py** - Computed field reference existence
 12. **test_computed_field_cross_entity_foreign_key.py** - Cross-entity computed field requires foreign key
-13. **test_computed_field_binary_operations.py** - Binary operations require exactly 2 fields
-14. **test_computed_field_aggregation_operations.py** - Aggregation operations require 2+ fields
-15. **test_parents_child_fk_foreign_key.py** - Parents child_fk must have foreignKey
-16. **test_parents_foreign_key_entity_exists.py** - Parents foreign key entity must exist
-17. **test_parents_foreign_key_field_exists.py** - Parents foreign key field must exist
-18. **test_parents_primary_key_exists.py** - Parent entity must have primary key
-19. **test_parents_foreign_key_references_primary_key.py** - Parents foreign key must reference primary key
-20. **test_parents_field_name_matching.py** - Parents field name matching for cross-entity
-21. **test_parents_type_matching.py** - Parents type matching constraint
-22. **test_parent_array_type.py** - Parent array must be array type
-23. **test_parent_array_exists.py** - Parent array must exist in parent entity
-24. **test_change_id_reference.py** - Change ID (c and m) must reference valid change
+13. **test_must.py** (`test_computed_*_two_fields_*`) - Computed `fields` list: at least 2 entries (`count(fields) >= 2`, plus list `min-elements 2`)
+14. **test_parents_child_fk_foreign_key.py** - Parents child_fk must have foreignKey
+15. **test_parents_foreign_key_entity_exists.py** - Parents foreign key entity must exist
+16. **test_parents_foreign_key_field_exists.py** - Parents foreign key field must exist
+17. **test_parents_primary_key_exists.py** - Parent entity must have primary key
+18. **test_parents_foreign_key_references_primary_key.py** - Parents foreign key must reference primary key
+19. **test_parents_field_name_matching.py** - Parents field name matching for cross-entity
+20. **test_parents_type_matching.py** - Parents type matching constraint
+21. **test_parent_array_type.py** - Parent array must be array type
+22. **test_parent_array_exists.py** - Parent array must exist in parent entity
+23. **test_change_id_reference.py** - Change ID (c and m) must reference valid change
 
 ## Test Structure
 

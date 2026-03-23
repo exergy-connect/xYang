@@ -361,8 +361,7 @@ def test_foreign_key_type_match_invalid(meta_model):
     assert any("primary key" in str(e).lower() or "type" in str(e).lower() for e in errors)
 
 
-# ---- computed: binary op count(fields)=2 ----
-# must "(operation != 'add' and operation != 'subtraction') or count(fields) = 2"
+# ---- computed: count(fields) >= 2 (container must; list also has min-elements 2) ----
 
 
 def test_computed_binary_two_fields_valid(meta_model):
@@ -420,11 +419,7 @@ def test_computed_binary_two_fields_invalid(meta_model):
     }
     valid, errors = _validate(meta_model, data)
     assert not valid
-    assert any("2" in str(e) or "Binary" in str(e) or "field" in str(e).lower() for e in errors)
-
-
-# ---- computed: aggregation count(fields)>=2 ----
-# must "(operation != 'min' and ... != 'max' and ... != 'average') or count(fields) >= 2"
+    assert any("2" in str(e) or "field" in str(e).lower() for e in errors)
 
 
 def test_computed_aggregation_min_two_fields_valid(meta_model):
@@ -482,7 +477,7 @@ def test_computed_aggregation_min_two_fields_invalid(meta_model):
     }
     valid, errors = _validate(meta_model, data)
     assert not valid
-    assert any("2" in str(e) or "Aggregation" in str(e) or "field" in str(e).lower() for e in errors)
+    assert any("2" in str(e) or "field" in str(e).lower() for e in errors)
 
 
 # ---- computed/fields/field: reference must exist (when consolidated) ----

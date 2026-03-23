@@ -598,13 +598,9 @@ module meta-model {
           description "When operation is average, each referenced field (same-entity or cross-entity) must be numeric (integer or number). Only enforced during consolidated validation (Phase 2).";
         }
       }
-      must "(operation != 'add' and operation != 'subtraction') or count(fields) = 2" {
-        error-message "Binary operations (add, subtraction) require exactly 2 fields";
-        description "Validates that binary operations have exactly 2 field references";
-      }
-      must "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2" {
-        error-message "Aggregation operations (min, max, average) require at least 2 fields";
-        description "Validates that aggregation operations have at least 2 field references";
+      must "count(fields) >= 2" {
+        error-message "Computed operation requires at least 2 field references";
+        description "Ensures the fields list has at least two entries (aligned with min-elements 2).";
       }
     }
   }
