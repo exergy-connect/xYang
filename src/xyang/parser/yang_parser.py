@@ -12,7 +12,7 @@ from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
-from ..ast import YangUsesStmt
+from ..ast import YangChoiceStmt, YangUsesStmt
 
 
 class YangParser:
@@ -199,6 +199,13 @@ class YangParser:
                     import logging
                     logger = logging.getLogger(__name__)
                     logger.warning(f"Grouping '{stmt.grouping_name}' not found when expanding uses statement")
+            elif isinstance(stmt, YangChoiceStmt):
+                # Case bodies are on YangCaseStmt.statements, not choice.statements (often empty).
+                for case in stmt.cases:
+                    case.statements = self._expand_uses_in_statements(
+                        case.statements, module
+                    )
+                expanded.append(stmt)
             elif hasattr(stmt, 'statements'):
                 # Recursively expand uses in child statements
                 stmt.statements = self._expand_uses_in_statements(stmt.statements, module)
