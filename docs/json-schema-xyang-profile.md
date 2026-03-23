@@ -28,7 +28,7 @@ Generated schemas include:
 - **`$id`**: module namespace (or a generated URN) — see `generate_json_schema()` in `generator.py`
 - **`description`**: module-level description when present
 - **`type`**: `"object"` at the root
-- **`properties`**: top-level data nodes (typically one root `container` per module pattern)
+- **`properties`**: top-level data nodes — one JSON property per module-level `container` / `list` / leaf / … (any identifier; `parse_json_schema` imports **all** x-yang–mapped root properties, not only `data-model`)
 - **`additionalProperties`**: `false` at root (and on emitted object shapes where applicable)
 - **`$defs`**: optional map of **typedef** names → schema fragments
 

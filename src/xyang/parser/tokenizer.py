@@ -24,18 +24,6 @@ class YangTokenizer:
         Returns:
             TokenStream with typed tokens and position information
         """
-        lines = content.split("\n")
-
-        # Remove single-line comments // to EOL, keep line structure for positions
-        cleaned_lines = []
-        for line in lines:
-            comment_idx = line.find("//")
-            if comment_idx >= 0:
-                line = line[:comment_idx]
-            cleaned_lines.append(line.rstrip())
-
-        content = "\n".join(cleaned_lines)
-
         token_list: List[YangToken] = []
         i = 0
         content_len = len(content)
@@ -80,6 +68,14 @@ class YangTokenizer:
                         advance()
                         advance()
                         break
+                    advance()
+                continue
+
+            # Line comment: // ... EOL (only here — never inside quoted-string lexing)
+            if content[i] == "/" and i + 1 < content_len and content[i + 1] == "/":
+                advance()
+                advance()
+                while i < content_len and content[i] != "\n":
                     advance()
                 continue
 
@@ -190,10 +186,10 @@ class YangTokenizer:
                 add_token(YangTokenType.PLUS, "+", i, current_line, line_start)
                 advance()
             elif char == "/":
-                # Not /* (block comment already handled above)
+                # Not // or /* (handled above)
                 add_token(YangTokenType.SLASH, "/", i, current_line, line_start)
                 advance()
             else:
                 advance()
 
-        return TokenStream(token_list=token_list, lines=lines, filename=filename)
+        return TokenStream(token_list=token_list, source=content, filename=filename)

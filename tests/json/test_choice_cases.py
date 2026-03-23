@@ -8,12 +8,16 @@ choice node and validates payloads against the YANG module.
 
 from __future__ import annotations
 
+from collections.abc import Iterator
 from pathlib import Path
+from typing import Any
 
 import pytest
 
 from xyang import YangValidator, parse_yang_file
+from xyang.ast import YangChoiceStmt
 from xyang.json import generate_json_schema
+from xyang.module import YangModule
 
 _DATA_DIR = Path(__file__).resolve().parent / "data" / "choice_cases"
 YANG_FILE = _DATA_DIR / "choice_cases.yang"
@@ -71,6 +75,103 @@ def _get_choice_schemas(schema: dict) -> tuple[dict, dict]:
     req_container = props.get("req_choice_container", {})
     opt_container = props.get("opt_choice_container", {})
     return req_container, opt_container
+
+
+def _collect_xyang_choice_schema_paths(node: Any, path: str = "$") -> list[str]:
+    """
+    DFS over JSON Schema dicts: paths where ``x-yang.type`` is ``choice``.
+
+    That shape implies a named instance property for the YANG choice; hoisted
+    choices must use ``oneOf`` on the parent plus ``x-yang.choice`` metadata instead.
+    """
+    found: list[str] = []
+    if isinstance(node, dict):
+        xy = node.get("x-yang")
+        if isinstance(xy, dict) and xy.get("type") == "choice":
+            found.append(path)
+        props = node.get("properties")
+        if isinstance(props, dict):
+            for key, val in props.items():
+                found.extend(
+                    _collect_xyang_choice_schema_paths(val, f"{path}.properties.{key}")
+                )
+        items = node.get("items")
+        if isinstance(items, dict):
+            found.extend(_collect_xyang_choice_schema_paths(items, f"{path}.items"))
+        for combo in ("oneOf", "anyOf", "allOf"):
+            branch = node.get(combo)
+            if isinstance(branch, list):
+                for i, item in enumerate(branch):
+                    if isinstance(item, dict):
+                        found.extend(
+                            _collect_xyang_choice_schema_paths(item, f"{path}.{combo}[{i}]")
+                        )
+        defs = node.get("$defs")
+        if isinstance(defs, dict):
+            for dname, dval in defs.items():
+                if isinstance(dval, dict):
+                    found.extend(
+                        _collect_xyang_choice_schema_paths(dval, f"{path}.$defs.{dname}")
+                    )
+    return found
+
+
+def _iter_json_schema_property_keys(node: Any) -> Iterator[str]:
+    """Yield every key that appears under a JSON Schema ``properties`` object (any depth)."""
+    if not isinstance(node, dict):
+        return
+    props = node.get("properties")
+    if isinstance(props, dict):
+        yield from props.keys()
+        for val in props.values():
+            yield from _iter_json_schema_property_keys(val)
+    items = node.get("items")
+    if isinstance(items, dict):
+        yield from _iter_json_schema_property_keys(items)
+    for combo in ("oneOf", "anyOf", "allOf"):
+        branch = node.get(combo)
+        if isinstance(branch, list):
+            for item in branch:
+                yield from _iter_json_schema_property_keys(item)
+    defs = node.get("$defs")
+    if isinstance(defs, dict):
+        for dval in defs.values():
+            yield from _iter_json_schema_property_keys(dval)
+
+
+def _yang_choice_statement_names(module: YangModule) -> set[str]:
+    """All ``choice`` statement names in the module (any depth)."""
+    names: set[str] = set()
+
+    def visit(stmts: list[Any]) -> None:
+        for s in stmts:
+            if isinstance(s, YangChoiceStmt):
+                names.add(s.name)
+            children = getattr(s, "statements", None) or []
+            if children:
+                visit(children)
+
+    visit(getattr(module, "statements", []) or [])
+    return names
+
+
+def test_yang_choices_are_not_json_schema_property_nodes(
+    module_from_yang, generated_schema
+):
+    """Hoisted choices: no ``x-yang.type: choice`` subtree and no property named like the YANG choice."""
+    xyang_choice_paths = _collect_xyang_choice_schema_paths(generated_schema)
+    assert not xyang_choice_paths, (
+        "YANG choice must not be emitted as a JSON Schema node with x-yang.type "
+        f"'choice' (implies a bogus instance key). Found: {xyang_choice_paths}"
+    )
+
+    choice_names = _yang_choice_statement_names(module_from_yang)
+    prop_keys = set(_iter_json_schema_property_keys(generated_schema))
+    clash = choice_names & prop_keys
+    assert not clash, (
+        "YANG choice statement names must not appear as JSON Schema property keys "
+        f"(choices are not data nodes). Clash: {sorted(clash)}"
+    )
 
 
 # ---- Generated schema structure (choice hoisted: oneOf only, no merged properties) ----

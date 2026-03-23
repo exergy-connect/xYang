@@ -102,6 +102,13 @@ class YangTokenType(Enum):
     FALSE = "false"
 
 
+def diagnostic_source_lines(content: str) -> List[str]:
+    """Split source on newlines for error snippets (verbatim text, comments included)."""
+    if not content:
+        return []
+    return [segment.rstrip("\r") for segment in content.split("\n")]
+
+
 # Map keyword lexeme -> YangTokenType for tokenizer
 YANG_KEYWORDS = {
     tt.value: tt
@@ -148,13 +155,14 @@ class TokenStream:
     def __init__(
         self,
         token_list: List[YangToken],
-        lines: List[str],
+        source: str,
         filename: Optional[str] = None,
     ):
         self._token_list = token_list
         self.tokens = [t.value for t in token_list]
         self.positions = [(t.line_num, t.char_pos) for t in token_list]
-        self.lines = lines
+        self._source = source
+        self._diagnostic_lines: Optional[List[str]] = None
         self.filename = filename
         self.index = 0
 
@@ -236,20 +244,26 @@ class TokenStream:
             return self.positions[-1]
         return (1, 0)
     
+    def _diagnostic_lines_once(self) -> List[str]:
+        """Build per-line source text for errors (lazy, at most once per stream)."""
+        if self._diagnostic_lines is None:
+            self._diagnostic_lines = diagnostic_source_lines(self._source)
+        return self._diagnostic_lines
+
     def _make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
         """Create a syntax error at current position."""
-        line_num, char_pos = self.position()
-        
-        # Get context lines
+        line_num, _ = self.position()
+        lines = self._diagnostic_lines_once()
+
         context = []
         start_line = max(1, line_num - context_lines)
-        end_line = min(len(self.lines), line_num + context_lines)
-        
+        end_line = min(len(lines), line_num + context_lines)
+
         for ctx_line_num in range(start_line, end_line + 1):
-            if ctx_line_num <= len(self.lines):
-                context.append((ctx_line_num, self.lines[ctx_line_num - 1]))
-        
-        line = self.lines[line_num - 1] if line_num <= len(self.lines) else ""
+            if ctx_line_num <= len(lines):
+                context.append((ctx_line_num, lines[ctx_line_num - 1]))
+
+        line = lines[line_num - 1] if line_num <= len(lines) else ""
         
         return YangSyntaxError(
             message=message,

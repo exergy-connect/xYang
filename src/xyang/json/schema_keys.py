@@ -35,6 +35,7 @@ class JsonSchemaKey:
     MAX_ITEMS = "maxItems"
     ADDITIONAL_PROPERTIES = "additionalProperties"
     X_YANG = "x-yang"
+    # Common root container name in xFrame meta-model instances (not required by the parser).
     DATA_MODEL = "data-model"
     NAME = "name"
 

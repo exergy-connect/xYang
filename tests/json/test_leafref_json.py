@@ -98,7 +98,7 @@ def test_leafref_json_invalid_path_expression_raises():
 
 def test_leafref_to_integer_leaf_emits_integer_in_generated_schema():
     """YANG leafref to an integer leaf is emitted as JSON Schema type integer (not string)."""
-    # Root container must be named data-model for parse_json_schema to rebuild the module.
+    # Root container name is arbitrary; paths use /data-model/... to match this module.
     yang = """
 module lr-int {
   yang-version 1.1;

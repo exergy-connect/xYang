@@ -287,27 +287,50 @@ def _parse_hoisted_choice_oneof(
     defs: dict[str, Any],
     parent_path: str,
     *,
-    mandatory: bool,
+    mandatory: bool | None,
     choice_name: str = "hoisted-choice",
     choice_description: str = "",
-) -> YangChoiceStmt:
-    """Rebuild choice from hoisted ``oneOf`` (schemas live only inside each branch)."""
-    branches = list(one_of)
-    if not mandatory:
-        if branches:
-            branches = branches[1:]
-    cases: list[YangCaseStmt] = []
-    for branch in branches:
-        if not isinstance(branch, dict):
-            continue
-        bprops = branch.get(JsonSchemaKey.PROPERTIES) or {}
-        req = branch.get(JsonSchemaKey.REQUIRED) or []
-        if not bprops or not req:
-            continue
-        stmts: list[YangStatement] = []
-        for k in req:
-            k = str(k)
-            prop_val = bprops.get(k)
+) -> list[YangStatement]:
+    """
+    Rebuild hoisted YANG choice from ``oneOf`` on the parent object.
+
+    Returns sibling statements in schema order: common leaves (shared across
+    branches), then a single ``YangChoiceStmt``. YANG choices are not instance
+    nodes; case keys sit beside sibling leaves in instance data.
+    """
+    branches = [b for b in one_of if isinstance(b, dict)]
+    branches_with_props = [b for b in branches if not _empty_optional_choice_branch(b)]
+    if not branches_with_props:
+        branches_with_props = branches
+
+    req_sets_all = [set(b.get(JsonSchemaKey.REQUIRED) or []) for b in branches]
+    common_req = set.intersection(*req_sets_all) if req_sets_all else set()
+
+    if mandatory is None:
+        mandatory = not any(rs == common_req for rs in req_sets_all)
+
+    case_branches = [
+        b
+        for b in branches_with_props
+        if set(b.get(JsonSchemaKey.REQUIRED) or []) - common_req
+    ]
+
+    prop_key_sets = [
+        set((b.get(JsonSchemaKey.PROPERTIES) or {}).keys()) for b in branches_with_props
+    ]
+    common_prop_keys = set.intersection(*prop_key_sets) if prop_key_sets else set()
+
+    common_mandatory: set[str] = set()
+    if case_branches:
+        reqs_case = [set(b.get(JsonSchemaKey.REQUIRED) or []) for b in case_branches]
+        common_mandatory = set.intersection(*reqs_case) if reqs_case else set()
+
+    common_children: list[YangStatement] = []
+    if common_prop_keys and branches_with_props:
+        template = branches_with_props[0]
+        tb_props = template.get(JsonSchemaKey.PROPERTIES) or {}
+        for k in sorted(common_prop_keys):
+            prop_val = tb_props.get(k)
             if prop_val is None:
                 continue
             stmt = _convert_property(
@@ -315,19 +338,41 @@ def _parse_hoisted_choice_oneof(
                 prop_val,
                 defs,
                 f"{parent_path}/{k}",
+                mandatory_override=k in common_mandatory,
+            )
+            if stmt is not None:
+                common_children.append(stmt)
+
+    cases: list[YangCaseStmt] = []
+    for branch in case_branches:
+        bprops = branch.get(JsonSchemaKey.PROPERTIES) or {}
+        breq = set(branch.get(JsonSchemaKey.REQUIRED) or [])
+        disc_keys = sorted(breq - common_mandatory)
+        case_statements: list[YangStatement] = []
+        for dk in disc_keys:
+            prop_val = bprops.get(dk)
+            if prop_val is None:
+                continue
+            stmt = _convert_property(
+                dk,
+                prop_val,
+                defs,
+                f"{parent_path}/{dk}",
                 mandatory_override=None,
             )
             if stmt is not None:
-                stmts.append(stmt)
-        if stmts:
-            case_name = "-".join(str(x) for x in req) + "-case"
-            cases.append(YangCaseStmt(name=case_name, description="", statements=stmts))
-    return YangChoiceStmt(
+                case_statements.append(stmt)
+        if case_statements:
+            label = disc_keys[0] if disc_keys else "case"
+            cases.append(YangCaseStmt(name=f"{label}-case", description="", statements=case_statements))
+
+    choice_stmt = YangChoiceStmt(
         name=choice_name,
         description=choice_description,
         mandatory=mandatory,
         cases=cases,
     )
+    return [*common_children, choice_stmt]
 
 
 def _convert_container(
@@ -344,22 +389,17 @@ def _convert_container(
     one_of = schema.get(JsonSchemaKey.ONE_OF)
 
     if _hoisted_container_is_choice_oneof(schema, xyang) and isinstance(one_of, list):
-        mandatory = not (
-            one_of
-            and isinstance(one_of[0], dict)
-            and _empty_optional_choice_branch(one_of[0])
-        )
         meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
-        child_statements: list[YangStatement] = [
-            _parse_hoisted_choice_oneof(
-                one_of,
-                defs,
-                parent_path,
-                mandatory=mandatory,
-                choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
-                choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
-            )
-        ]
+        meta_m = meta.get(XYangKey.MANDATORY)
+        man: bool | None = None if meta_m is None else bool(meta_m)
+        child_statements = _parse_hoisted_choice_oneof(
+            one_of,
+            defs,
+            parent_path,
+            mandatory=man,
+            choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
+            choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+        )
     else:
         child_statements = []
         container_required = set(schema.get(JsonSchemaKey.REQUIRED) or [])
@@ -400,22 +440,17 @@ def _convert_list(
     item_base = f"{parent_path}/{name}"
 
     if _hoisted_list_items_are_choice_oneof(items) and isinstance(items_one, list):
-        mandatory = not (
-            items_one
-            and isinstance(items_one[0], dict)
-            and _empty_optional_choice_branch(items_one[0])
-        )
         meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
-        child_statements: list[YangStatement] = [
-            _parse_hoisted_choice_oneof(
-                items_one,
-                defs,
-                item_base,
-                mandatory=mandatory,
-                choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
-                choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
-            )
-        ]
+        meta_m = meta.get(XYangKey.MANDATORY)
+        man: bool | None = None if meta_m is None else bool(meta_m)
+        child_statements = _parse_hoisted_choice_oneof(
+            items_one,
+            defs,
+            item_base,
+            mandatory=man,
+            choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
+            choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+        )
     else:
         child_statements = []
         item_required = set(items.get(JsonSchemaKey.REQUIRED) or [])
@@ -590,7 +625,8 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
         source: Path to a .json file, or JSON string, or parsed dict.
 
     Returns:
-        YangModule with .statements (e.g. data-model container), .typedefs.
+        YangModule with .statements (one per root JSON Schema property, e.g.
+        ``data-model`` or ``program``), and .typedefs.
     """
     if isinstance(source, dict):
         data = source
@@ -627,20 +663,11 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
             module.typedefs[def_name] = td
 
     root_props = data.get(JsonSchemaKey.PROPERTIES) or {}
-    if JsonSchemaKey.DATA_MODEL in root_props:
-        dm = root_props[JsonSchemaKey.DATA_MODEL]
-        if isinstance(dm, dict):
-            dm_props = dm.get(JsonSchemaKey.PROPERTIES) or {}
-            statements = []
-            for prop_name, prop_val in dm_props.items():
-                stmt = _convert_property(prop_name, prop_val, defs, f"/data-model/{prop_name}")
-                if stmt is not None:
-                    statements.append(stmt)
-            container = YangContainerStmt(
-                name=JsonSchemaKey.DATA_MODEL,
-                description=(dm.get(JsonSchemaKey.DESCRIPTION) or ""),
-                statements=statements,
-            )
-            module.statements.append(container)
+    for root_name, root_val in root_props.items():
+        if not isinstance(root_val, dict):
+            continue
+        stmt = _convert_property(root_name, root_val, defs, f"/{root_name}")
+        if stmt is not None:
+            module.statements.append(stmt)
 
     return module
