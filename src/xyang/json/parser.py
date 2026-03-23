@@ -29,15 +29,23 @@ from ..ast import (
 )
 from ..xpath import XPathParser
 
+from .schema_keys import (
+    JSON_SCHEMA_DEFS_URI_PREFIX,
+    JsonSchemaKey,
+    XYangKey,
+    XYangMustEntryKey,
+    XYangTypeValue,
+)
+
 
 def _get_xyang(schema: dict[str, Any]) -> dict[str, Any]:
     """Extract x-yang object from a schema node (property or $def)."""
-    return schema.get("x-yang") or {}
+    return schema.get(JsonSchemaKey.X_YANG) or {}
 
 
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     """Build YangWhenStmt from x-yang 'when' condition string, or None if absent."""
-    when_str = xyang.get("when")
+    when_str = xyang.get(XYangKey.WHEN)
     if not when_str or not isinstance(when_str, str):
         return None
     return YangWhenStmt(condition=when_str)
@@ -45,9 +53,9 @@ def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
 
 def _ref_to_typedef_name(ref: str) -> str | None:
     """Return typedef name from $ref like '#/$defs/entity-name' or None."""
-    if not ref or not ref.startswith("#/$defs/"):
+    if not ref or not ref.startswith(JSON_SCHEMA_DEFS_URI_PREFIX):
         return None
-    return ref.replace("#/$defs/", "", 1)
+    return ref.removeprefix(JSON_SCHEMA_DEFS_URI_PREFIX)
 
 
 def _fraction_digits_from_multiple_of(value: Any) -> int | None:
@@ -72,18 +80,21 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
     """Resolve $ref and allOf to a single schema with merged properties (for list items / groupings)."""
     if not schema or not isinstance(schema, dict):
         return {}
-    if "$ref" in schema and len(schema) <= 2:
-        name = _ref_to_typedef_name(schema["$ref"])
+    if JsonSchemaKey.REF in schema and len(schema) <= 2:
+        name = _ref_to_typedef_name(schema[JsonSchemaKey.REF])
         if name and name in defs:
             return _resolve_schema(defs[name], defs)
-    if "allOf" in schema:
-        merged: dict[str, Any] = {"properties": {}}
-        for part in schema.get("allOf") or []:
+    if JsonSchemaKey.ALL_OF in schema:
+        merged: dict[str, Any] = {JsonSchemaKey.PROPERTIES: {}}
+        for part in schema.get(JsonSchemaKey.ALL_OF) or []:
             if isinstance(part, dict):
                 resolved = _resolve_schema(part, defs)
-                merged["properties"] = {**merged.get("properties", {}), **resolved.get("properties", {})}
+                merged[JsonSchemaKey.PROPERTIES] = {
+                    **merged.get(JsonSchemaKey.PROPERTIES, {}),
+                    **resolved.get(JsonSchemaKey.PROPERTIES, {}),
+                }
                 for k, v in resolved.items():
-                    if k != "properties":
+                    if k != JsonSchemaKey.PROPERTIES:
                         merged[k] = v
         return merged
     return schema
@@ -92,26 +103,26 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
 def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     """Build YangTypeStmt from JSON schema (+ $ref) and x-yang (e.g. leafref)."""
     # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
-    if xyang.get("type") == "leafref":
-        path_val = xyang.get("path")
-        require = xyang.get("require-instance", True)
+    if xyang.get(XYangKey.TYPE) == "leafref":
+        path_val = xyang.get(XYangKey.PATH)
+        require = xyang.get(XYangKey.REQUIRE_INSTANCE, True)
         path_node = None
         if path_val is not None and isinstance(path_val, str) and path_val.strip():
             # Let XPathParser errors surface: invalid leafref paths from JSON
             # schema are programmer / schema bugs and should abort parsing.
             path_node = XPathParser(path_val.strip()).parse_path()
-        type_stmt = YangTypeStmt(name="leafref", path=path_node, require_instance=bool(require))
+        type_stmt = YangTypeStmt(name=XYangTypeValue.LEAFREF, path=path_node, require_instance=bool(require))
         return type_stmt
     # $ref to typedef: preserve typedef name only (no range/pattern; matches YANG leaf type reference)
-    ref = schema.get("$ref")
+    ref = schema.get(JsonSchemaKey.REF)
     if ref:
         name = _ref_to_typedef_name(ref)
         if name:
             return YangTypeStmt(name=name)
     # Inline type
-    t = schema.get("type")
-    if "enum" in schema:
-        enums = list(schema["enum"]) if isinstance(schema["enum"], list) else []
+    t = schema.get(JsonSchemaKey.TYPE)
+    if JsonSchemaKey.ENUM in schema:
+        enums = list(schema[JsonSchemaKey.ENUM]) if isinstance(schema[JsonSchemaKey.ENUM], list) else []
         if len(enums) > 1:
             type_stmt = YangTypeStmt(name="enumeration")
             type_stmt.enums = enums
@@ -122,13 +133,13 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             return type_stmt
     if t == "string":
         type_stmt = YangTypeStmt(name="string")
-        if "pattern" in schema:
-            p = schema["pattern"]
+        if JsonSchemaKey.PATTERN in schema:
+            p = schema[JsonSchemaKey.PATTERN]
             if isinstance(p, str) and p.startswith("^") and p.endswith("$"):
                 p = p[1:-1]
             type_stmt.pattern = p
-        min_len = schema.get("minLength")
-        max_len = schema.get("maxLength")
+        min_len = schema.get(JsonSchemaKey.MIN_LENGTH)
+        max_len = schema.get(JsonSchemaKey.MAX_LENGTH)
         if min_len is not None and max_len is not None:
             type_stmt.length = f"{min_len}..{max_len}"
         elif max_len is not None:
@@ -137,8 +148,8 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             type_stmt.length = f"{min_len}.."
         return type_stmt
     if t == "integer":
-        min_val = schema.get("minimum")
-        max_val = schema.get("maximum")
+        min_val = schema.get(JsonSchemaKey.MINIMUM)
+        max_val = schema.get(JsonSchemaKey.MAXIMUM)
         if min_val == 0 and max_val == 255:
             type_stmt = YangTypeStmt(name="uint8")
             # Leave range unset to match YANG (built-in uint8 has no range on leaf type)
@@ -153,24 +164,24 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
         return type_stmt
     if t == "number":
         type_stmt = YangTypeStmt(name="decimal64")
-        legacy_fd = schema.get("x-fraction-digits")
+        legacy_fd = schema.get(JsonSchemaKey.X_FRACTION_DIGITS)
         if isinstance(legacy_fd, int) and legacy_fd > 0:
             type_stmt.fraction_digits = legacy_fd
         else:
-            mo = schema.get("multipleOf")
+            mo = schema.get(JsonSchemaKey.MULTIPLE_OF)
             fd = _fraction_digits_from_multiple_of(mo)
             if fd is not None:
                 type_stmt.fraction_digits = fd
         return type_stmt
     if t == "boolean":
         return YangTypeStmt(name="boolean")
-    if t == "object" and schema.get("maxProperties") == 0:
+    if t == "object" and schema.get(JsonSchemaKey.MAX_PROPERTIES) == 0:
         return YangTypeStmt(name="empty")
-    if "oneOf" in schema:
+    if JsonSchemaKey.ONE_OF in schema:
         union_types = []
-        for branch in schema.get("oneOf") or []:
+        for branch in schema.get(JsonSchemaKey.ONE_OF) or []:
             if isinstance(branch, dict):
-                branch_xyang = branch.get("x-yang") or {}
+                branch_xyang = branch.get(JsonSchemaKey.X_YANG) or {}
                 bt = _type_from_schema(defs, branch, branch_xyang)
                 if bt:
                     union_types.append(bt)
@@ -182,9 +193,9 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
 def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, Any]) -> YangTypedefStmt | None:
     """Build YangTypedefStmt from a $defs entry with x-yang type typedef."""
     xyang = _get_xyang(def_schema)
-    if xyang.get("type") != "typedef":
+    if xyang.get(XYangKey.TYPE) != "typedef":
         return None
-    desc = def_schema.get("description", "")
+    desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
     type_stmt = _type_from_schema(defs, def_schema, xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt(name="string")
@@ -195,13 +206,13 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
 def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
     """Build list of YangMustStmt from x-yang must (list of {must, error-message, description})."""
     out = []
-    for m in xyang.get("must") or []:
+    for m in xyang.get(XYangKey.MUST) or []:
         if isinstance(m, dict):
             out.append(
                 YangMustStmt(
-                    expression=m.get("must", ""),
-                    error_message=m.get("error-message", ""),
-                    description=m.get("description", ""),
+                    expression=m.get(XYangMustEntryKey.MUST, ""),
+                    error_message=m.get(XYangMustEntryKey.ERROR_MESSAGE, ""),
+                    description=m.get(JsonSchemaKey.DESCRIPTION, ""),
                 )
             )
     return out
@@ -209,29 +220,114 @@ def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
 
 def _property_schema_and_xyang(prop_value: dict[str, Any], defs: dict[str, Any]) -> tuple[dict, dict]:
     """Resolve property value (maybe with $ref + allOf) to one schema and merged x-yang."""
-    if "$ref" in prop_value and "x-yang" in prop_value:
-        ref_name = _ref_to_typedef_name(prop_value["$ref"])
+    if JsonSchemaKey.REF in prop_value and JsonSchemaKey.X_YANG in prop_value:
+        ref_name = _ref_to_typedef_name(prop_value[JsonSchemaKey.REF])
         base = defs.get(ref_name, {}) if ref_name else {}
         # Merge: base schema + prop_value overrides; x-yang from base merged with prop_value (so must, etc. from def are kept)
-        schema = {**base, **{k: v for k, v in prop_value.items() if k != "x-yang"}}
-        base_xyang = base.get("x-yang") or {}
-        prop_xyang = prop_value.get("x-yang") or {}
+        schema = {
+            **base,
+            **{k: v for k, v in prop_value.items() if k != JsonSchemaKey.X_YANG},
+        }
+        base_xyang = base.get(JsonSchemaKey.X_YANG) or {}
+        prop_xyang = prop_value.get(JsonSchemaKey.X_YANG) or {}
         merged_xyang = {**base_xyang, **prop_xyang}
         return schema, merged_xyang
-    if "allOf" in prop_value:
+    if JsonSchemaKey.ALL_OF in prop_value:
         merged = {}
         xyang = {}
-        for part in prop_value["allOf"]:
+        for part in prop_value[JsonSchemaKey.ALL_OF]:
             if isinstance(part, dict):
-                if "$ref" in part:
-                    name = _ref_to_typedef_name(part["$ref"])
+                if JsonSchemaKey.REF in part:
+                    name = _ref_to_typedef_name(part[JsonSchemaKey.REF])
                     if name:
                         merged.update(defs.get(name, {}))
                 else:
                     merged.update(part)
-                xyang.update(part.get("x-yang") or {})
+                xyang.update(part.get(JsonSchemaKey.X_YANG) or {})
         return merged, xyang
     return prop_value, _get_xyang(prop_value)
+
+
+def _empty_optional_choice_branch(branch: Any) -> bool:
+    """First branch of optional hoisted choice: instance may omit all case leaves."""
+    return (
+        isinstance(branch, dict)
+        and branch.get(JsonSchemaKey.TYPE) == "object"
+        and branch.get(JsonSchemaKey.MAX_PROPERTIES) == 0
+    )
+
+
+def _hoisted_container_is_choice_oneof(schema: dict[str, Any], xyang: dict[str, Any]) -> bool:
+    """Container whose only data shape is ``oneOf`` (no merged ``properties`` for cases)."""
+    if xyang.get(XYangKey.TYPE) != "container":
+        return False
+    one_of = schema.get(JsonSchemaKey.ONE_OF)
+    if not isinstance(one_of, list) or not one_of:
+        return False
+    props = schema.get(JsonSchemaKey.PROPERTIES)
+    if props:
+        return False
+    return True
+
+
+def _hoisted_list_items_are_choice_oneof(items: dict[str, Any]) -> bool:
+    """List entry object whose only data shape is ``oneOf`` (no merged ``properties``)."""
+    if items.get(JsonSchemaKey.TYPE) != "object":
+        return False
+    one_of = items.get(JsonSchemaKey.ONE_OF)
+    if not isinstance(one_of, list) or not one_of:
+        return False
+    if items.get(JsonSchemaKey.PROPERTIES):
+        return False
+    return True
+
+
+def _parse_hoisted_choice_oneof(
+    one_of: list[Any],
+    defs: dict[str, Any],
+    parent_path: str,
+    *,
+    mandatory: bool,
+    choice_name: str = "hoisted-choice",
+    choice_description: str = "",
+) -> YangChoiceStmt:
+    """Rebuild choice from hoisted ``oneOf`` (schemas live only inside each branch)."""
+    branches = list(one_of)
+    if not mandatory:
+        if branches:
+            branches = branches[1:]
+    cases: list[YangCaseStmt] = []
+    for branch in branches:
+        if not isinstance(branch, dict):
+            continue
+        bprops = branch.get(JsonSchemaKey.PROPERTIES) or {}
+        req = branch.get(JsonSchemaKey.REQUIRED) or []
+        if not bprops or not req:
+            continue
+        stmts: list[YangStatement] = []
+        for k in req:
+            k = str(k)
+            prop_val = bprops.get(k)
+            if prop_val is None:
+                continue
+            stmt = _convert_property(
+                k,
+                prop_val,
+                defs,
+                f"{parent_path}/{k}",
+                mandatory_override=None,
+            )
+            if stmt is not None:
+                stmts.append(stmt)
+        if stmts:
+            case_name = "-".join(str(x) for x in req) + "-case"
+            cases.append(YangCaseStmt(name=case_name, description="", statements=stmts))
+    return YangChoiceStmt(
+        name=choice_name,
+        description=choice_description,
+        mandatory=mandatory,
+        cases=cases,
+    )
 
 
 def _convert_container(
@@ -243,26 +339,47 @@ def _convert_container(
     must_list: list[YangMustStmt],
 ) -> YangContainerStmt:
     """Convert a container property to YangContainerStmt."""
-    description = schema.get("description", "")
-    child_statements = []
-    container_required = set(schema.get("required") or [])
-    for child_name, child_val in (schema.get("properties") or {}).items():
-        child = _convert_property(
-            child_name,
-            child_val,
-            defs,
-            f"{parent_path}/{child_name}",
-            mandatory_override=child_name in container_required,
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    props_raw = schema.get(JsonSchemaKey.PROPERTIES) or {}
+    one_of = schema.get(JsonSchemaKey.ONE_OF)
+
+    if _hoisted_container_is_choice_oneof(schema, xyang) and isinstance(one_of, list):
+        mandatory = not (
+            one_of
+            and isinstance(one_of[0], dict)
+            and _empty_optional_choice_branch(one_of[0])
         )
-        if child is not None:
-            child_statements.append(child)
+        meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
+        child_statements: list[YangStatement] = [
+            _parse_hoisted_choice_oneof(
+                one_of,
+                defs,
+                parent_path,
+                mandatory=mandatory,
+                choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
+                choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+            )
+        ]
+    else:
+        child_statements = []
+        container_required = set(schema.get(JsonSchemaKey.REQUIRED) or [])
+        for child_name, child_val in props_raw.items():
+            child = _convert_property(
+                child_name,
+                child_val,
+                defs,
+                f"{parent_path}/{child_name}",
+                mandatory_override=child_name in container_required,
+            )
+            if child is not None:
+                child_statements.append(child)
     c = YangContainerStmt(name=name, description=description, statements=child_statements)
     c.must_statements = must_list
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         c.when = when_stmt
-    if xyang.get("presence") is not None:
-        c.presence = xyang.get("presence")
+    if xyang.get(XYangKey.PRESENCE) is not None:
+        c.presence = xyang.get(XYangKey.PRESENCE)
     return c
 
 
@@ -275,31 +392,52 @@ def _convert_list(
     must_list: list[YangMustStmt],
 ) -> YangListStmt:
     """Convert a list property to YangListStmt."""
-    description = schema.get("description", "")
-    key = xyang.get("key")
-    items = _resolve_schema(schema.get("items") or {}, defs)
-    child_statements = []
-    item_required = set(items.get("required") or [])
-    item_props = items.get("properties") or {}
-    for child_name, child_val in item_props.items():
-        child = _convert_property(
-            child_name,
-            child_val,
-            defs,
-            f"{parent_path}/{name}/{child_name}",
-            mandatory_override=child_name in item_required,
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    key = xyang.get(XYangKey.KEY)
+    items = _resolve_schema(schema.get(JsonSchemaKey.ITEMS) or {}, defs)
+    item_props = items.get(JsonSchemaKey.PROPERTIES) or {}
+    items_one = items.get(JsonSchemaKey.ONE_OF)
+    item_base = f"{parent_path}/{name}"
+
+    if _hoisted_list_items_are_choice_oneof(items) and isinstance(items_one, list):
+        mandatory = not (
+            items_one
+            and isinstance(items_one[0], dict)
+            and _empty_optional_choice_branch(items_one[0])
         )
-        if child is not None:
-            child_statements.append(child)
+        meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
+        child_statements: list[YangStatement] = [
+            _parse_hoisted_choice_oneof(
+                items_one,
+                defs,
+                item_base,
+                mandatory=mandatory,
+                choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
+                choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+            )
+        ]
+    else:
+        child_statements = []
+        item_required = set(items.get(JsonSchemaKey.REQUIRED) or [])
+        for child_name, child_val in item_props.items():
+            child = _convert_property(
+                child_name,
+                child_val,
+                defs,
+                f"{parent_path}/{name}/{child_name}",
+                mandatory_override=child_name in item_required,
+            )
+            if child is not None:
+                child_statements.append(child)
     lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
     lst.must_statements = must_list
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         lst.when = when_stmt
-    if "minItems" in schema and schema["minItems"] is not None:
-        lst.min_elements = int(schema["minItems"])
-    if "maxItems" in schema and schema["maxItems"] is not None:
-        lst.max_elements = int(schema["maxItems"])
+    if JsonSchemaKey.MIN_ITEMS in schema and schema[JsonSchemaKey.MIN_ITEMS] is not None:
+        lst.min_elements = int(schema[JsonSchemaKey.MIN_ITEMS])
+    if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
+        lst.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
     return lst
 
 
@@ -313,18 +451,20 @@ def _convert_leaf(
     must_list: list[YangMustStmt],
 ) -> YangLeafStmt:
     """Convert a leaf property to YangLeafStmt."""
-    description = schema.get("description", "")
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
     type_schema = schema
-    if "$ref" in prop_value:
-        ref_name = _ref_to_typedef_name(prop_value["$ref"])
-        if ref_name and ref_name in defs and _get_xyang(defs[ref_name]).get("type") == "typedef":
+    if JsonSchemaKey.REF in prop_value:
+        ref_name = _ref_to_typedef_name(prop_value[JsonSchemaKey.REF])
+        if ref_name and ref_name in defs and _get_xyang(defs[ref_name]).get(XYangKey.TYPE) == "typedef":
             type_schema = prop_value
     type_stmt = _type_from_schema(defs, type_schema, xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt(name="string")
-    mandatory = mandatory_override if mandatory_override is not None else (name in (schema.get("required") or []))
-    default = schema.get("default")
-    if default is not None and schema.get("type") != "boolean":
+    mandatory = mandatory_override if mandatory_override is not None else (
+        name in (schema.get(JsonSchemaKey.REQUIRED) or [])
+    )
+    default = schema.get(JsonSchemaKey.DEFAULT)
+    if default is not None and schema.get(JsonSchemaKey.TYPE) != "boolean":
         default = str(default).lower() if isinstance(default, bool) else str(default)
     leaf = YangLeafStmt(
         name=name,
@@ -348,9 +488,11 @@ def _convert_leaf_list(
     must_list: list[YangMustStmt],
 ) -> YangLeafListStmt:
     """Convert a leaf-list property to YangLeafListStmt."""
-    description = schema.get("description", "")
-    items_schema = schema.get("items") or schema
-    items_xyang = (items_schema.get("x-yang") or {}) if isinstance(items_schema, dict) else {}
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    items_schema = schema.get(JsonSchemaKey.ITEMS) or schema
+    items_xyang = (
+        (items_schema.get(JsonSchemaKey.X_YANG) or {}) if isinstance(items_schema, dict) else {}
+    )
     type_stmt = _type_from_schema(defs, items_schema, items_xyang or xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt("string")
@@ -363,10 +505,10 @@ def _convert_leaf_list(
         when=when_stmt,
         type=type_stmt,
     )
-    if "minItems" in schema and schema["minItems"] is not None:
-        ll.min_elements = int(schema["minItems"])
-    if "maxItems" in schema and schema["maxItems"] is not None:
-        ll.max_elements = int(schema["maxItems"])
+    if JsonSchemaKey.MIN_ITEMS in schema and schema[JsonSchemaKey.MIN_ITEMS] is not None:
+        ll.min_elements = int(schema[JsonSchemaKey.MIN_ITEMS])
+    if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
+        ll.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
     return ll
 
 
@@ -378,23 +520,25 @@ def _convert_choice(
     parent_path: str,
 ) -> YangChoiceStmt:
     """Convert a JSON schema property with x-yang type 'choice' to YangChoiceStmt. Uses oneOf (valid JSON Schema)."""
-    description = schema.get("description", "")
-    mandatory = xyang.get("mandatory", False)
-    one_of = schema.get("oneOf") or []
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    mandatory = xyang.get(XYangKey.MANDATORY, False)
+    one_of = schema.get(JsonSchemaKey.ONE_OF) or []
     cases: list[YangCaseStmt] = []
     for case_schema in one_of:
         if not isinstance(case_schema, dict):
             continue
+        if _empty_optional_choice_branch(case_schema):
+            continue
         case_xyang = _get_xyang(case_schema)
-        case_name = case_xyang.get("name") or ""
-        if not case_name and case_schema.get("required"):
-            req = case_schema["required"]
+        case_name = case_xyang.get(JsonSchemaKey.NAME) or ""
+        if not case_name and case_schema.get(JsonSchemaKey.REQUIRED):
+            req = case_schema[JsonSchemaKey.REQUIRED]
             case_name = req[0] + "-case" if (isinstance(req, list) and len(req) == 1) else ""
         if not case_name:
-            case_props = case_schema.get("properties") or {}
+            case_props = case_schema.get(JsonSchemaKey.PROPERTIES) or {}
             keys = list(case_props.keys())
             case_name = keys[0] + "-case" if len(keys) == 1 else ""
-        case_props = case_schema.get("properties") or {}
+        case_props = case_schema.get(JsonSchemaKey.PROPERTIES) or {}
         case_statements: list[YangStatement] = []
         for prop_name, prop_val in case_props.items():
             stmt = _convert_property(
@@ -419,8 +563,8 @@ def _convert_property(
 ) -> YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt | YangChoiceStmt | None:
     """Convert one JSON schema property to a YANG AST statement. Returns None if not x-yang mapped."""
     schema, xyang = _property_schema_and_xyang(prop_value, defs)
-    node_type = xyang.get("type")
-    if node_type == "leafref":
+    node_type = xyang.get(XYangKey.TYPE)
+    if node_type == XYangTypeValue.LEAFREF:
         node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in ("leaf", "leaf-list", "container", "list") else []
 
@@ -462,17 +606,17 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     else:
         raise TypeError("source must be path, JSON string, or dict")
 
-    root_xyang = data.get("x-yang") or {}
-    defs = data.get("$defs") or {}
+    root_xyang = data.get(JsonSchemaKey.X_YANG) or {}
+    defs = data.get(JsonSchemaKey.DEFS) or {}
 
     module = YangModule(
-        name=root_xyang.get("module", "unknown"),
-        yang_version=root_xyang.get("yang-version", "1.1"),
-        namespace=root_xyang.get("namespace", ""),
-        prefix=root_xyang.get("prefix", ""),
-        organization=root_xyang.get("organization", ""),
-        contact=root_xyang.get("contact", ""),
-        description=data.get("description", ""),
+        name=root_xyang.get(XYangKey.MODULE, "unknown"),
+        yang_version=root_xyang.get(XYangKey.YANG_VERSION, "1.1"),
+        namespace=root_xyang.get(XYangKey.NAMESPACE, ""),
+        prefix=root_xyang.get(XYangKey.PREFIX, ""),
+        organization=root_xyang.get(XYangKey.ORGANIZATION, ""),
+        contact=root_xyang.get(XYangKey.CONTACT, ""),
+        description=data.get(JsonSchemaKey.DESCRIPTION, ""),
     )
 
     for def_name, def_schema in defs.items():
@@ -482,19 +626,19 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
         if td is not None:
             module.typedefs[def_name] = td
 
-    root_props = (data.get("properties") or {})
-    if "data-model" in root_props:
-        dm = root_props["data-model"]
+    root_props = data.get(JsonSchemaKey.PROPERTIES) or {}
+    if JsonSchemaKey.DATA_MODEL in root_props:
+        dm = root_props[JsonSchemaKey.DATA_MODEL]
         if isinstance(dm, dict):
-            dm_props = dm.get("properties") or {}
+            dm_props = dm.get(JsonSchemaKey.PROPERTIES) or {}
             statements = []
             for prop_name, prop_val in dm_props.items():
                 stmt = _convert_property(prop_name, prop_val, defs, f"/data-model/{prop_name}")
                 if stmt is not None:
                     statements.append(stmt)
             container = YangContainerStmt(
-                name="data-model",
-                description=(dm.get("description") or ""),
+                name=JsonSchemaKey.DATA_MODEL,
+                description=(dm.get(JsonSchemaKey.DESCRIPTION) or ""),
                 statements=statements,
             )
             module.statements.append(container)

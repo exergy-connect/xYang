@@ -316,49 +316,46 @@
                       "description": "Required for array fields - specifies the type of each item",
                       "x-yang": {
                         "type": "container",
-                        "when": "../type = 'array'"
-                      },
-                      "properties": {
-                        "item-type-choice": {
-                          "type": "object",
-                          "description": "Type of array items - must be one of: primitive or entity",
-                          "oneOf": [
-                            {
-                              "properties": {
-                                "primitive": {
-                                  "$ref": "#/$defs/primitive-type",
-                                  "description": "Primitive type (string, integer, etc.)",
-                                  "x-yang": {
-                                    "type": "leaf"
-                                  }
-                                }
-                              },
-                              "required": [
-                                "primitive"
-                              ]
-                            },
-                            {
-                              "properties": {
-                                "entity": {
-                                  "$ref": "#/$defs/entity-name",
-                                  "description": "Entity (array items may be full object or primary key value)",
-                                  "x-yang": {
-                                    "type": "leaf"
-                                  }
-                                }
-                              },
-                              "required": [
-                                "entity"
-                              ]
-                            }
-                          ],
-                          "x-yang": {
-                            "type": "choice",
-                            "mandatory": true
-                          }
+                        "when": "../type = 'array'",
+                        "choice": {
+                          "name": "item-type-choice",
+                          "description": "Type of array items - must be one of: primitive or entity"
                         }
                       },
-                      "additionalProperties": false
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "primitive": {
+                              "$ref": "#/$defs/primitive-type",
+                              "description": "Primitive type (string, integer, etc.)",
+                              "x-yang": {
+                                "type": "leaf"
+                              }
+                            }
+                          },
+                          "required": [
+                            "primitive"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "entity": {
+                              "$ref": "#/$defs/entity-name",
+                              "description": "Entity (array items may be full object or primary key value)",
+                              "x-yang": {
+                                "type": "leaf"
+                              }
+                            }
+                          },
+                          "required": [
+                            "entity"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
                     },
                     "validation": {
                       "$ref": "#/$defs/field-validation-mode",
@@ -428,7 +425,7 @@
                               "type": "object",
                               "properties": {
                                 "entity": {
-                                  "type": "string",
+                                  "$ref": "#/$defs/entity-name",
                                   "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                                   "x-yang": {
                                     "type": "leafref",
@@ -588,49 +585,46 @@
                             "description": "Required for array fields - specifies the type of each item",
                             "x-yang": {
                               "type": "container",
-                              "when": "../type = 'array'"
-                            },
-                            "properties": {
-                              "item-type-choice": {
-                                "type": "object",
-                                "description": "Type of array items - must be one of: primitive or entity",
-                                "oneOf": [
-                                  {
-                                    "properties": {
-                                      "primitive": {
-                                        "$ref": "#/$defs/primitive-type",
-                                        "description": "Primitive type (string, integer, etc.)",
-                                        "x-yang": {
-                                          "type": "leaf"
-                                        }
-                                      }
-                                    },
-                                    "required": [
-                                      "primitive"
-                                    ]
-                                  },
-                                  {
-                                    "properties": {
-                                      "entity": {
-                                        "$ref": "#/$defs/entity-name",
-                                        "description": "Entity (array items may be full object or primary key value)",
-                                        "x-yang": {
-                                          "type": "leaf"
-                                        }
-                                      }
-                                    },
-                                    "required": [
-                                      "entity"
-                                    ]
-                                  }
-                                ],
-                                "x-yang": {
-                                  "type": "choice",
-                                  "mandatory": true
-                                }
+                              "when": "../type = 'array'",
+                              "choice": {
+                                "name": "item-type-choice",
+                                "description": "Type of array items - must be one of: primitive or entity"
                               }
                             },
-                            "additionalProperties": false
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "primitive": {
+                                    "$ref": "#/$defs/primitive-type",
+                                    "description": "Primitive type (string, integer, etc.)",
+                                    "x-yang": {
+                                      "type": "leaf"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "primitive"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "entity": {
+                                    "$ref": "#/$defs/entity-name",
+                                    "description": "Entity (array items may be full object or primary key value)",
+                                    "x-yang": {
+                                      "type": "leaf"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "entity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
                           },
                           "aliases": {
                             "type": "array",
@@ -706,7 +700,7 @@
                                       }
                                     },
                                     "entity": {
-                                      "type": "string",
+                                      "$ref": "#/$defs/entity-name",
                                       "description": "Entity name for cross-entity field reference (optional).",
                                       "x-yang": {
                                         "type": "leafref",
@@ -836,7 +830,7 @@
                         "type": "object",
                         "properties": {
                           "entity": {
-                            "type": "string",
+                            "$ref": "#/$defs/entity-name",
                             "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                             "x-yang": {
                               "type": "leafref",
@@ -996,49 +990,46 @@
                       "description": "Required for array fields - specifies the type of each item",
                       "x-yang": {
                         "type": "container",
-                        "when": "../type = 'array'"
-                      },
-                      "properties": {
-                        "item-type-choice": {
-                          "type": "object",
-                          "description": "Type of array items - must be one of: primitive or entity",
-                          "oneOf": [
-                            {
-                              "properties": {
-                                "primitive": {
-                                  "$ref": "#/$defs/primitive-type",
-                                  "description": "Primitive type (string, integer, etc.)",
-                                  "x-yang": {
-                                    "type": "leaf"
-                                  }
-                                }
-                              },
-                              "required": [
-                                "primitive"
-                              ]
-                            },
-                            {
-                              "properties": {
-                                "entity": {
-                                  "$ref": "#/$defs/entity-name",
-                                  "description": "Entity (array items may be full object or primary key value)",
-                                  "x-yang": {
-                                    "type": "leaf"
-                                  }
-                                }
-                              },
-                              "required": [
-                                "entity"
-                              ]
-                            }
-                          ],
-                          "x-yang": {
-                            "type": "choice",
-                            "mandatory": true
-                          }
+                        "when": "../type = 'array'",
+                        "choice": {
+                          "name": "item-type-choice",
+                          "description": "Type of array items - must be one of: primitive or entity"
                         }
                       },
-                      "additionalProperties": false
+                      "oneOf": [
+                        {
+                          "type": "object",
+                          "properties": {
+                            "primitive": {
+                              "$ref": "#/$defs/primitive-type",
+                              "description": "Primitive type (string, integer, etc.)",
+                              "x-yang": {
+                                "type": "leaf"
+                              }
+                            }
+                          },
+                          "required": [
+                            "primitive"
+                          ],
+                          "additionalProperties": false
+                        },
+                        {
+                          "type": "object",
+                          "properties": {
+                            "entity": {
+                              "$ref": "#/$defs/entity-name",
+                              "description": "Entity (array items may be full object or primary key value)",
+                              "x-yang": {
+                                "type": "leaf"
+                              }
+                            }
+                          },
+                          "required": [
+                            "entity"
+                          ],
+                          "additionalProperties": false
+                        }
+                      ]
                     },
                     "aliases": {
                       "type": "array",
@@ -1114,7 +1105,7 @@
                                 }
                               },
                               "entity": {
-                                "type": "string",
+                                "$ref": "#/$defs/entity-name",
                                 "description": "Entity name for cross-entity field reference (optional).",
                                 "x-yang": {
                                   "type": "leafref",
@@ -1231,7 +1222,7 @@
                               "type": "object",
                               "properties": {
                                 "entity": {
-                                  "type": "string",
+                                  "$ref": "#/$defs/entity-name",
                                   "description": "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.",
                                   "x-yang": {
                                     "type": "leafref",
@@ -1391,49 +1382,46 @@
                             "description": "Required for array fields - specifies the type of each item",
                             "x-yang": {
                               "type": "container",
-                              "when": "../type = 'array'"
-                            },
-                            "properties": {
-                              "item-type-choice": {
-                                "type": "object",
-                                "description": "Type of array items - must be one of: primitive or entity",
-                                "oneOf": [
-                                  {
-                                    "properties": {
-                                      "primitive": {
-                                        "$ref": "#/$defs/primitive-type",
-                                        "description": "Primitive type (string, integer, etc.)",
-                                        "x-yang": {
-                                          "type": "leaf"
-                                        }
-                                      }
-                                    },
-                                    "required": [
-                                      "primitive"
-                                    ]
-                                  },
-                                  {
-                                    "properties": {
-                                      "entity": {
-                                        "$ref": "#/$defs/entity-name",
-                                        "description": "Entity (array items may be full object or primary key value)",
-                                        "x-yang": {
-                                          "type": "leaf"
-                                        }
-                                      }
-                                    },
-                                    "required": [
-                                      "entity"
-                                    ]
-                                  }
-                                ],
-                                "x-yang": {
-                                  "type": "choice",
-                                  "mandatory": true
-                                }
+                              "when": "../type = 'array'",
+                              "choice": {
+                                "name": "item-type-choice",
+                                "description": "Type of array items - must be one of: primitive or entity"
                               }
                             },
-                            "additionalProperties": false
+                            "oneOf": [
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "primitive": {
+                                    "$ref": "#/$defs/primitive-type",
+                                    "description": "Primitive type (string, integer, etc.)",
+                                    "x-yang": {
+                                      "type": "leaf"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "primitive"
+                                ],
+                                "additionalProperties": false
+                              },
+                              {
+                                "type": "object",
+                                "properties": {
+                                  "entity": {
+                                    "$ref": "#/$defs/entity-name",
+                                    "description": "Entity (array items may be full object or primary key value)",
+                                    "x-yang": {
+                                      "type": "leaf"
+                                    }
+                                  }
+                                },
+                                "required": [
+                                  "entity"
+                                ],
+                                "additionalProperties": false
+                              }
+                            ]
                           },
                           "aliases": {
                             "type": "array",
@@ -1509,7 +1497,7 @@
                                       }
                                     },
                                     "entity": {
-                                      "type": "string",
+                                      "$ref": "#/$defs/entity-name",
                                       "description": "Entity name for cross-entity field reference (optional).",
                                       "x-yang": {
                                         "type": "leafref",

@@ -61,31 +61,51 @@ def generated_schema(module_from_yang):
 
 
 def _get_choice_schemas(schema: dict) -> tuple[dict, dict]:
-    """Return (req_choice_schema, opt_choice_schema) from generated root."""
+    """Return (req_container_schema, opt_container_schema) from generated root.
+
+    Choice is hoisted into the parent container (no ``choice`` data node in YANG).
+    ``oneOf`` / ``not`` sit on the same object as ``x-yang.type: container``.
+    """
     dm = schema.get("properties", {}).get("data-model", {})
     props = dm.get("properties", {})
     req_container = props.get("req_choice_container", {})
     opt_container = props.get("opt_choice_container", {})
-    req_choice = req_container.get("properties", {}).get("req_choice", {})
-    opt_choice = opt_container.get("properties", {}).get("opt_choice", {})
-    return req_choice, opt_choice
+    return req_container, opt_container
 
 
-# ---- Generated schema structure (no x-yang on choice; oneOf / not) ----
-def test_choice_mandatory_schema_has_one_of_and_no_xyang(generated_schema):
-    """Mandatory choice is emitted with oneOf and without x-yang."""
+# ---- Generated schema structure (choice hoisted: oneOf only, no merged properties) ----
+def test_choice_mandatory_schema_has_one_of_on_container(generated_schema):
+    """Mandatory choice: oneOf on parent container; each branch is self-contained."""
     req, _ = _get_choice_schemas(generated_schema)
-    assert "oneOf" in req, "Mandatory choice must have oneOf"
-    assert [{"required": ["primitive"]}, {"required": ["entity"]}] == req["oneOf"]
-    assert "x-yang" not in req, "Choice node must not have x-yang"
+    assert "oneOf" in req, "Mandatory choice must have oneOf on hoisted container"
+    assert "properties" not in req or not req["properties"]
+    one_of = req["oneOf"]
+    assert len(one_of) == 2
+    keys_seen = set()
+    for br in one_of:
+        assert br.get("type") == "object"
+        assert br.get("additionalProperties") is False
+        assert set(br["required"]) == set(br["properties"])
+        keys_seen |= set(br["properties"])
+    assert keys_seen == {"primitive", "entity"}
+    assert "req_choice" not in req.get("properties", {})
 
 
-def test_choice_optional_schema_has_not_and_no_xyang(generated_schema):
-    """Optional choice is emitted with not.required and without x-yang."""
+def test_choice_optional_schema_has_one_of_with_empty_branch(generated_schema):
+    """Optional choice: oneOf with empty object branch, then one branch per case."""
     _, opt = _get_choice_schemas(generated_schema)
-    assert "not" in opt, "Optional choice must have not"
-    assert opt["not"] == {"required": ["a", "b"]}
-    assert "x-yang" not in opt, "Choice node must not have x-yang"
+    assert "not" not in opt
+    assert "properties" not in opt or not opt["properties"]
+    branches = opt["oneOf"]
+    assert len(branches) == 3
+    assert branches[0] == {"type": "object", "maxProperties": 0}
+    keys_seen = set()
+    for br in branches[1:]:
+        assert br.get("type") == "object"
+        assert br.get("additionalProperties") is False
+        assert set(br["required"]) == set(br["properties"])
+        keys_seen |= set(br["properties"])
+    assert keys_seen == {"a", "b"}
 
 
 # ---- Validation: mandatory choice ----

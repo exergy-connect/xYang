@@ -43,5 +43,28 @@ module choice-cases-test {
         }
       }
     }
+
+    container item_type_container {
+      description "Nested container with mandatory choice (meta-model item_type pattern)";
+      container item_type {
+        description "Inner container holds only the choice";
+        choice item-type-choice {
+          mandatory true;
+          description "Exactly one of primitive or entity";
+          case primitive-case {
+            leaf primitive {
+              type string;
+              description "Primitive type name";
+            }
+          }
+          case entity-case {
+            leaf entity {
+              type string;
+              description "Entity name";
+            }
+          }
+        }
+      }
+    }
   }
 }

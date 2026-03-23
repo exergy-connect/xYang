@@ -62,6 +62,7 @@ For **container**, **list**, **leaf**, **leaf-list**, and leaves whose YANG type
 | `must` | When present | Array of `{ "must", "error-message", "description" }` (XPath strings) |
 | `when` | When present | XPath condition string |
 | `presence` | `container` | Presence string when the container is presence container |
+| `choice` | `container` / `list` | When the choice is **hoisted**: `{ "name", "description" }` of the YANG `choice` (round-trip metadata) |
 | `path`, `require-instance` | Leafref leaf | Leafref target path (string) and `require-instance` flag |
 
 **`must` entries** mirror `must_stmt` + optional `error-message` and `description` substatements from YANG.
@@ -85,14 +86,21 @@ For **container**, **list**, **leaf**, **leaf-list**, and leaves whose YANG type
 
 ---
 
-## `choice` / `case` (no `x-yang` on the choice)
+## `choice` / `case` (hoisted into the parent object)
 
-`choice` is encoded with **pure JSON Schema** composition — there is **no** `x-yang` object on the choice node itself:
+In YANG instance data there is **no node** for `choice` or `case` (and a container without `presence` does not add an extra semantic layer for the choice). Case leaves appear as **siblings** on the **parent container** (or list entry object).
 
-- **Mandatory choice:** `oneOf` with one branch per case, each branch `{ "required": [ "<member-names-in-that-case>" ] }` (see tests in `tests/json/test_choice_cases.py`).
-- **Optional choice (multiple cases):** `not: { "required": [ all branch property names ] }` so “all at once” is excluded; individual branches remain optional.
+When a container or list has **only** a `choice` as its child statement, the generator **hoists** the choice into that object:
 
-Cases flatten into a single `properties` map on the parent object. This differs from the EBNF’s nested `case` blocks but matches the generator’s output.
+- **No merged `properties`:** case leaves are **not** listed once at the parent; each alternative lives only inside its `oneOf` branch.
+- **Mandatory choice:** `oneOf` with one branch per case; each branch is a full object schema: `type: "object"`, `properties` (only that case’s leaves), `required`, `additionalProperties: false`, on the **same** object as `x-yang.type: "container"` (or on list `items`).
+- **Optional choice (≥2 cases):** `oneOf` whose first branch is `{ "type": "object", "maxProperties": 0 }` (empty instance), followed by the same per-case object branches as mandatory.
+
+The parent container or list carries **`x-yang.choice`**: `{ "name": "<yang-choice-name>", "description": "<text>" }`, so round-trip parsing restores the real YANG `choice` identifier and its `description` (the hoisted JSON object has no `choice` data node).
+
+If a container mixes a choice with other statements, the generator still emits a nested object keyed by the **choice** name (legacy shape) with `x-yang.type: "choice"` and `mandatory`; `parse_json_schema` supports that nested style as well.
+
+See `tests/json/test_choice_cases.py` and `tests/json/test_issue_choice_flat_instance_json_schema.py`.
 
 ---
 
