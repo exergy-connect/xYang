@@ -73,7 +73,7 @@ must_expr           = string ;
 when_block          = "when" string [ "{" [ description_stmt ] "}" ] ";" ;
 
 (* === Lexical === *)
-identifier          = ( letter | "_" ) { letter | digit | "_" } ;
+identifier          = ( letter | "_" ) { letter | digit | "_" | "-" | "." } ;
 letter              = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
                     | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
                     | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"

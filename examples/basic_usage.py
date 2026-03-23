@@ -1,8 +1,10 @@
 """
-Basic usage examples for xYang library.
+Basic usage examples for the xYang Python library.
 
-Note: This is a minimal implementation. Must/when statements are parsed
-but not evaluated (would require a full XPath engine).
+Parsing builds a module AST; ``YangValidator`` walks instance data against
+that schema (types, mandatory nodes, lists, and related rules). ``when``
+and ``must`` are evaluated during validation using the built-in XPath
+evaluator (coverage grows with the expression subset the parser supports).
 """
 
 from xyang import parse_yang_file, parse_yang_string, YangValidator

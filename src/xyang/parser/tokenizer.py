@@ -111,8 +111,51 @@ class YangTokenizer:
                 advance()
                 continue
 
-            # Identifier or keyword (letter | _ | - | . then alnum | _ | - | .)
-            if char.isalnum() or char in ("_", "-", "."):
+            # Negative integer: - DIGIT+
+            if char == "-" and i + 1 < content_len and content[i + 1].isdigit():
+                token_start = i
+                token_line = current_line
+                token_line_start = line_start
+                advance()
+                start = i
+                while i < content_len and content[i].isdigit():
+                    advance()
+                lexeme = "-" + content[start:i]
+                add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
+                continue
+
+            # Unsigned integer or dotted decimal (e.g. yang-version 1.1 — not an identifier in RFC 7950)
+            if char.isdigit():
+                token_start = i
+                token_line = current_line
+                token_line_start = line_start
+                start = i
+                while i < content_len and content[i].isdigit():
+                    advance()
+                if (
+                    i < content_len
+                    and content[i] == "."
+                    and i + 1 < content_len
+                    and content[i + 1].isdigit()
+                ):
+                    advance()
+                    while i < content_len and content[i].isdigit():
+                        advance()
+                    lexeme = content[start:i]
+                    add_token(
+                        YangTokenType.DOTTED_NUMBER,
+                        lexeme,
+                        token_start,
+                        token_line,
+                        token_line_start,
+                    )
+                else:
+                    lexeme = content[start:i]
+                    add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
+                continue
+
+            # Identifier / keyword: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
+            if char.isalpha() or char == "_":
                 token_start = i
                 token_line = current_line
                 token_line_start = line_start
@@ -126,8 +169,6 @@ class YangTokenizer:
                 lexeme = content[start:i]
                 if lexeme in YANG_KEYWORDS:
                     add_token(YANG_KEYWORDS[lexeme], lexeme, token_start, token_line, token_line_start)
-                elif self._is_integer(lexeme):
-                    add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
                 else:
                     add_token(YangTokenType.IDENTIFIER, lexeme, token_start, token_line, token_line_start)
                 continue
@@ -156,12 +197,3 @@ class YangTokenizer:
                 advance()
 
         return TokenStream(token_list=token_list, lines=lines, filename=filename)
-
-    @staticmethod
-    def _is_integer(lexeme: str) -> bool:
-        """True if lexeme is an integer (optional minus + digits)."""
-        if not lexeme:
-            return False
-        if lexeme[0] == "-":
-            return len(lexeme) > 1 and lexeme[1:].isdigit()
-        return lexeme.isdigit()

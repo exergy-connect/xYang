@@ -84,7 +84,9 @@ class StatementParsers:
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse yang-version statement."""
         tokens.consume_type(YangTokenType.YANG_VERSION)
-        version = tokens.consume_type(YangTokenType.IDENTIFIER)
+        version, _ = tokens.consume_oneof(
+            [YangTokenType.IDENTIFIER, YangTokenType.DOTTED_NUMBER]
+        )
         context.module.yang_version = version
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

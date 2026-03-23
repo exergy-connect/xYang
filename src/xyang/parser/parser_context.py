@@ -38,6 +38,8 @@ class YangTokenType(Enum):
     STRING = "STRING"
     IDENTIFIER = "IDENTIFIER"
     INTEGER = "INTEGER"
+    # Unquoted \d+(\.\d+)+ — e.g. yang-version 1.1; not an identifier per RFC 7950.
+    DOTTED_NUMBER = "DOTTED_NUMBER"
 
     # Keywords (value in token is the keyword string)
     MODULE = "module"
@@ -90,10 +92,21 @@ class YangTokenType(Enum):
 YANG_KEYWORDS = {
     tt.value: tt
     for tt in YangTokenType
-    if tt not in (YangTokenType.STRING, YangTokenType.IDENTIFIER, YangTokenType.INTEGER)
-    and tt not in (
-        YangTokenType.LBRACE, YangTokenType.RBRACE, YangTokenType.SEMICOLON,
-        YangTokenType.EQUALS, YangTokenType.PLUS, YangTokenType.SLASH,
+    if tt
+    not in (
+        YangTokenType.STRING,
+        YangTokenType.IDENTIFIER,
+        YangTokenType.INTEGER,
+        YangTokenType.DOTTED_NUMBER,
+    )
+    and tt
+    not in (
+        YangTokenType.LBRACE,
+        YangTokenType.RBRACE,
+        YangTokenType.SEMICOLON,
+        YangTokenType.EQUALS,
+        YangTokenType.PLUS,
+        YangTokenType.SLASH,
     )
 }
 
