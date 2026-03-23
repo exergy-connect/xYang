@@ -9,6 +9,7 @@ YangLeafStmt, YangLeafListStmt, YangTypedefStmt, YangTypeStmt, YangMustStmt.
 from __future__ import annotations
 
 import json
+from decimal import Decimal, InvalidOperation
 from pathlib import Path
 from typing import Any
 
@@ -47,6 +48,24 @@ def _ref_to_typedef_name(ref: str) -> str | None:
     if not ref or not ref.startswith("#/$defs/"):
         return None
     return ref.replace("#/$defs/", "", 1)
+
+
+def _fraction_digits_from_multiple_of(value: Any) -> int | None:
+    """If value equals 10^-n for integer n in 1..18, return n; else None."""
+    try:
+        d = Decimal(str(value))
+    except (InvalidOperation, TypeError, ValueError):
+        return None
+    if d <= 0 or d >= 1:
+        return None
+    n = 0
+    t = d
+    while t < 1 and n < 18:
+        t *= 10
+        n += 1
+    if t == 1:
+        return n
+    return None
 
 
 def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, Any]:
@@ -133,7 +152,16 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
                 type_stmt.range = f"{min_val}..max"
         return type_stmt
     if t == "number":
-        return YangTypeStmt(name="decimal64")
+        type_stmt = YangTypeStmt(name="decimal64")
+        legacy_fd = schema.get("x-fraction-digits")
+        if isinstance(legacy_fd, int) and legacy_fd > 0:
+            type_stmt.fraction_digits = legacy_fd
+        else:
+            mo = schema.get("multipleOf")
+            fd = _fraction_digits_from_multiple_of(mo)
+            if fd is not None:
+                type_stmt.fraction_digits = fd
+        return type_stmt
     if t == "boolean":
         return YangTypeStmt(name="boolean")
     if t == "object" and schema.get("maxProperties") == 0:

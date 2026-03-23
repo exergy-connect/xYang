@@ -13,9 +13,9 @@ from typing import Any
 
 import pytest
 
-from xyang import YangValidator
+from xyang import YangValidator, parse_yang_string
 from xyang.errors import XPathSyntaxError
-from xyang.json import parse_json_schema
+from xyang.json import generate_json_schema, parse_json_schema
 
 
 def _make_schema(path: str) -> dict[str, Any]:
@@ -94,4 +94,39 @@ def test_leafref_json_invalid_path_expression_raises():
 
     with pytest.raises(XPathSyntaxError):
         parse_json_schema(schema)
+
+
+def test_leafref_to_integer_leaf_emits_integer_in_generated_schema():
+    """YANG leafref to an integer leaf is emitted as JSON Schema type integer (not string)."""
+    # Root container must be named data-model for parse_json_schema to rebuild the module.
+    yang = """
+module lr-int {
+  yang-version 1.1;
+  namespace "urn:lr-int";
+  prefix "lri";
+  container data-model {
+    leaf port {
+      type int32;
+    }
+    leaf peer {
+      type leafref {
+        path "/data-model/port";
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    schema = generate_json_schema(module)
+    peer = schema["properties"]["data-model"]["properties"]["peer"]
+    assert peer["type"] == "integer"
+    assert peer["x-yang"]["type"] == "leafref"
+    assert peer["x-yang"]["path"] == "/data-model/port"
+
+    round_module = parse_json_schema(schema)
+    validator = YangValidator(round_module)
+    ok, errors, _ = validator.validate(
+        {"data-model": {"port": 42, "peer": 42}}
+    )
+    assert ok, f"Expected valid instance data, got: {errors}"
 

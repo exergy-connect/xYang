@@ -13,6 +13,7 @@ from typing import TYPE_CHECKING
 
 import pytest
 
+from xyang import parse_yang_string
 from xyang.json import generate_json_schema, parse_json_schema, schema_to_yang_json
 from xyang.parser.yang_parser import YangParser
 
@@ -70,3 +71,29 @@ def test_roundtrip_yang_to_json_to_ast():
     # Root container present
     dm = module2.find_statement("data-model")
     assert dm is not None
+
+
+def test_decimal64_emits_multiple_of_and_roundtrip_restores_fraction_digits():
+    """decimal64 fraction-digits n maps to multipleOf 10^-n in JSON Schema."""
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  container data-model {
+    leaf x { type decimal64 { fraction-digits 3; } }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    schema = generate_json_schema(module)
+    x = schema["properties"]["data-model"]["properties"]["x"]
+    assert x["type"] == "number"
+    assert x["multipleOf"] == 0.001
+
+    module2 = parse_json_schema(schema)
+    dm = module2.statements[0]
+    leaf = next(c for c in dm.statements if getattr(c, "name", None) == "x")
+    assert leaf.type is not None
+    assert leaf.type.name == "decimal64"
+    assert leaf.type.fraction_digits == 3

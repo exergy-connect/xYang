@@ -26,6 +26,8 @@ from ..ast import (
     YangUsesStmt,
 )
 from ..module import YangModule
+from ..xpath.ast import PathNode
+from ..xpath.schema_nav import SchemaNav
 
 
 def _leafref_path_string(path: Any) -> str:
@@ -37,9 +39,104 @@ def _leafref_path_string(path: Any) -> str:
     return str(path)
 
 
+def _locate_stmt_with_parent(
+    stmts: list[YangStatement],
+    parent: YangStatement | YangModule,
+    target: YangStatement,
+) -> YangStatement | YangModule | None:
+    """Return the immediate parent of target under stmts, or None if not found."""
+    for s in stmts:
+        if s is target:
+            return parent
+        if isinstance(s, YangChoiceStmt):
+            for case in s.cases:
+                if case is target:
+                    return s
+                found = _locate_stmt_with_parent(case.statements, case, target)
+                if found is not None:
+                    return found
+        elif hasattr(s, "statements") and not isinstance(
+            s, (YangLeafStmt, YangLeafListStmt)
+        ):
+            found = _locate_stmt_with_parent(s.statements, s, target)
+            if found is not None:
+                return found
+    return None
+
+
+def _schema_parent_of(
+    module: YangModule,
+    node: YangStatement | YangModule,
+) -> YangStatement | YangModule | None:
+    """Parent of node in the module tree, or None if node is the module root."""
+    if node is module:
+        return None
+    return _locate_stmt_with_parent(module.statements, module, node)
+
+
+def _leafref_context_parent(
+    module: YangModule,
+    immediate_parent: YangStatement | YangModule | None,
+) -> YangStatement | YangModule | None:
+    """Instance parent for leafref path resolution (choice/case lifted to enclosing node)."""
+    if immediate_parent is None:
+        return None
+    if isinstance(immediate_parent, YangCaseStmt):
+        choice = _schema_parent_of(module, immediate_parent)
+        if choice is None:
+            return None
+        return _schema_parent_of(module, choice)
+    return immediate_parent
+
+
+def _resolve_leafref_target_leaf(
+    module: YangModule | None,
+    path_node: PathNode | None,
+    leafref_anchor: YangStatement | YangModule | None,
+) -> YangLeafStmt | None:
+    """
+    Resolve a leafref path to the target YangLeafStmt when the path is cacheable:
+    no predicates, only identifier / . / .. steps.
+    """
+    if module is None or path_node is None or not path_node.segments:
+        return None
+    for seg in path_node.segments:
+        if seg.predicate is not None:
+            return None
+
+    if path_node.is_absolute:
+        current: YangStatement | YangModule = module
+    else:
+        if leafref_anchor is None:
+            return None
+        current = leafref_anchor
+
+    for seg in path_node.segments:
+        if seg.step == ".":
+            continue
+        if seg.step == "..":
+            current = (
+                _schema_parent_of(module, current)
+                if current is not module
+                else None
+            )
+            if current is None:
+                return None
+            continue
+        stmts = getattr(current, "statements", [])
+        nxt = SchemaNav._find(stmts, seg.step)
+        if nxt is None:
+            return None
+        current = nxt
+
+    return current if isinstance(current, YangLeafStmt) else None
+
+
 def _type_to_schema(
     type_stmt: YangTypeStmt | None,
     typedef_names: set[str],
+    module: YangModule | None = None,
+    leafref_anchor: YangStatement | YangModule | None = None,
 ) -> dict[str, Any]:
     """Build JSON Schema for a type. Uses $ref for typedef names when in typedef_names."""
     if type_stmt is None:
@@ -50,13 +147,25 @@ def _type_to_schema(
         return {"$ref": f"#/$defs/{name}"}
 
     if name == "leafref":
-        path = _leafref_path_string(type_stmt.path)
+        path_str = _leafref_path_string(type_stmt.path)
         require = getattr(type_stmt, "require_instance", True)
+        path_node = type_stmt.path if isinstance(type_stmt.path, PathNode) else None
+        target_leaf = _resolve_leafref_target_leaf(
+            module, path_node, leafref_anchor
+        )
+        target_type = target_leaf.type if target_leaf and target_leaf.type else None
+        if target_type is not None and module is not None:
+            inner = _type_to_schema(
+                target_type, typedef_names, module=module, leafref_anchor=None
+            )
+        else:
+            inner = {"type": "string"}
+        inner_clean = {k: v for k, v in inner.items() if k != "x-yang"}
         return {
-            "type": "string",
+            **inner_clean,
             "x-yang": {
                 "type": "leafref",
-                "path": path,
+                "path": path_str,
                 "require-instance": require,
             },
         }
@@ -110,15 +219,25 @@ def _type_to_schema(
                     pass
         return out
     if name == "decimal64":
-        out = {"type": "number"}
+        out: dict[str, Any] = {"type": "number"}
         if type_stmt.fraction_digits is not None:
-            out["x-fraction-digits"] = type_stmt.fraction_digits
+            fd = int(type_stmt.fraction_digits)
+            if fd > 0:
+                out["multipleOf"] = 10**-fd
         return out
     if name == "empty":
         return {"type": "object", "maxProperties": 0}
     if name == "union" and type_stmt.types:
         return {
-            "oneOf": [_type_to_schema(t, typedef_names) for t in type_stmt.types],
+            "oneOf": [
+                _type_to_schema(
+                    t,
+                    typedef_names,
+                    module=module,
+                    leafref_anchor=leafref_anchor,
+                )
+                for t in type_stmt.types
+            ],
         }
     # Default: string
     return {"type": "string"}
@@ -243,6 +362,7 @@ def _statement_to_property(
     stmt: YangStatement,
     typedef_names: set[str],
     module: YangModule,
+    parent: YangStatement | YangModule | None = None,
 ) -> dict[str, Any] | None:
     """Convert an AST statement to a JSON Schema property. Returns None for unsupported nodes. Expands uses when present."""
     from ..ast import YangContainerStmt, YangLeafListStmt, YangLeafStmt, YangListStmt
@@ -252,7 +372,7 @@ def _statement_to_property(
         props: dict[str, Any] = {}
         required: list[str] = []
         for child in children:
-            child_prop = _statement_to_property(child, typedef_names, module)
+            child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
             if child_prop is not None:
                 props[child.name] = child_prop
                 if isinstance(child, YangLeafStmt) and child.mandatory:
@@ -282,7 +402,7 @@ def _statement_to_property(
         items: dict[str, Any] = {"type": "object", "properties": {}}
         item_required: list[str] = []
         for child in list_children:
-            child_prop = _statement_to_property(child, typedef_names, module)
+            child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
             if child_prop is not None:
                 items["properties"][child.name] = child_prop
                 if isinstance(child, YangLeafStmt) and child.mandatory:
@@ -326,7 +446,13 @@ def _statement_to_property(
                 ),
             }
         else:
-            type_schema = _type_to_schema(type_stmt, typedef_names)
+            lr_anchor = _leafref_context_parent(module, parent)
+            type_schema = _type_to_schema(
+                type_stmt,
+                typedef_names,
+                module=module,
+                leafref_anchor=lr_anchor,
+            )
             leaf_xyang = _build_xyang(
                 "leaf",
                 must_list=getattr(stmt, "must_statements", None) or [],
@@ -346,7 +472,13 @@ def _statement_to_property(
 
     if isinstance(stmt, YangLeafListStmt):
         type_stmt = stmt.type
-        items_schema = _type_to_schema(type_stmt, typedef_names)
+        lr_anchor = _leafref_context_parent(module, parent)
+        items_schema = _type_to_schema(
+            type_stmt,
+            typedef_names,
+            module=module,
+            leafref_anchor=lr_anchor,
+        )
         when_cond = None
         if getattr(stmt, "when", None) is not None:
             when_cond = getattr(stmt.when, "condition", None)
@@ -397,10 +529,15 @@ def _statement_to_property(
     return None
 
 
-def _typedef_to_def(name: str, typedef: YangTypedefStmt) -> dict[str, Any]:
+def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> dict[str, Any]:
     """Convert YangTypedefStmt to a $defs entry."""
     type_stmt = typedef.type
-    schema = _type_to_schema(type_stmt, set())  # no $ref inside typedef def
+    schema = _type_to_schema(
+        type_stmt,
+        set(),
+        module=module,
+        leafref_anchor=None,
+    )  # no $ref inside typedef def
     schema["description"] = typedef.description or ""
     schema["x-yang"] = {"type": "typedef"}
     return schema
@@ -426,14 +563,14 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     for stmt in module.statements:
         if not getattr(stmt, "name", None):
             continue
-        prop = _statement_to_property(stmt, typedef_names, module)
+        prop = _statement_to_property(stmt, typedef_names, module, parent=module)
         if prop is not None:
             properties[stmt.name] = prop
 
     defs: dict[str, Any] = {}
     for name, typedef in module.typedefs.items():
         if isinstance(typedef, YangTypedefStmt):
-            defs[name] = _typedef_to_def(name, typedef)
+            defs[name] = _typedef_to_def(name, typedef, module)
 
     root: dict[str, Any] = {
         "$schema": "https://json-schema.org/draft/2020-12/schema",

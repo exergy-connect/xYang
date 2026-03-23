@@ -180,7 +180,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | Concern | JSON Schema | x-yang |
 |--------|-------------|--------|
 | Structure (object, array, types) | ✅ `type`, `properties`, `items`, `$ref`, `$defs` | — |
-| Simple constraints | ✅ `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `enum`, `default` | — |
+| Simple constraints | ✅ `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `enum`, `default`, `multipleOf` (decimal64: `10^-fraction-digits`) | — |
 | Node kind | — | ✅ `type`: container, list, leaf, leaf-list |
 | List key | — | ✅ `key` |
 | Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |

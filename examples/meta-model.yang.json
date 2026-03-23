@@ -274,7 +274,7 @@
                           },
                           {
                             "type": "number",
-                            "x-fraction-digits": 2
+                            "multipleOf": 0.01
                           }
                         ]
                       },
@@ -300,7 +300,7 @@
                         },
                         {
                           "type": "number",
-                          "x-fraction-digits": 2
+                          "multipleOf": 0.01
                         },
                         {
                           "type": "boolean"
@@ -546,7 +546,7 @@
                                 },
                                 {
                                   "type": "number",
-                                  "x-fraction-digits": 2
+                                  "multipleOf": 0.01
                                 }
                               ]
                             },
@@ -572,7 +572,7 @@
                               },
                               {
                                 "type": "number",
-                                "x-fraction-digits": 2
+                                "multipleOf": 0.01
                               },
                               {
                                 "type": "boolean"
@@ -954,7 +954,7 @@
                           },
                           {
                             "type": "number",
-                            "x-fraction-digits": 2
+                            "multipleOf": 0.01
                           }
                         ]
                       },
@@ -980,7 +980,7 @@
                         },
                         {
                           "type": "number",
-                          "x-fraction-digits": 2
+                          "multipleOf": 0.01
                         },
                         {
                           "type": "boolean"
@@ -1349,7 +1349,7 @@
                                 },
                                 {
                                   "type": "number",
-                                  "x-fraction-digits": 2
+                                  "multipleOf": 0.01
                                 }
                               ]
                             },
@@ -1375,7 +1375,7 @@
                               },
                               {
                                 "type": "number",
-                                "x-fraction-digits": 2
+                                "multipleOf": 0.01
                               },
                               {
                                 "type": "boolean"
