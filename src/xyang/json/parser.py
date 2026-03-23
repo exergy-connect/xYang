@@ -389,7 +389,8 @@ def _convert_container(
     one_of = schema.get(JsonSchemaKey.ONE_OF)
 
     if _hoisted_container_is_choice_oneof(schema, xyang) and isinstance(one_of, list):
-        meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
+        choice_meta = xyang.get(XYangKey.CHOICE)
+        meta: dict[str, Any] = choice_meta if isinstance(choice_meta, dict) else {}
         meta_m = meta.get(XYangKey.MANDATORY)
         man: bool | None = None if meta_m is None else bool(meta_m)
         child_statements = _parse_hoisted_choice_oneof(
@@ -440,7 +441,8 @@ def _convert_list(
     item_base = f"{parent_path}/{name}"
 
     if _hoisted_list_items_are_choice_oneof(items) and isinstance(items_one, list):
-        meta = xyang.get(XYangKey.CHOICE) if isinstance(xyang.get(XYangKey.CHOICE), dict) else {}
+        choice_meta = xyang.get(XYangKey.CHOICE)
+        meta: dict[str, Any] = choice_meta if isinstance(choice_meta, dict) else {}
         meta_m = meta.get(XYangKey.MANDATORY)
         man: bool | None = None if meta_m is None else bool(meta_m)
         child_statements = _parse_hoisted_choice_oneof(
