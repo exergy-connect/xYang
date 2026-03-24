@@ -98,6 +98,14 @@ def expand_uses_in_statements(
                     apply_refine_to_node(stmt, r)
                     del refines[i]
 
+        # ``must false()`` marks a subtree as unreachable in the schema. Do not expand nested
+        # ``uses`` or recurse into children—same rationale as skipping list bodies with
+        # ``max-elements 0``: avoids infinite or cyclic grouping expansion when a refine
+        # rules out a branch (e.g. disallowing ``field_type`` array under a specific ``uses``).
+        if stmt.has_must_false():
+            expanded.append(stmt)
+            continue
+
         if isinstance(stmt, YangUsesStmt):
             repl = _expand_one_uses_stmt(stmt, module, expanding_chain)
             repl = expand_uses_in_statements(

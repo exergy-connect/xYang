@@ -50,11 +50,21 @@ class YangStatement(YangStatementList):
     def child_names(self, data: dict) -> set[str]:
         return {self.name} if getattr(self, "name", None) else set()
 
+    def has_must_false(self) -> bool:
+        """True if this node has a ``must`` with expression ``false()`` (unreachable schema)."""
+        return False
+
 
 @dataclass
 class YangStatementWithMust(YangStatement):
     """Statement that can have must constraints (leaf, leaf-list, container, list)."""
     must_statements: List['YangMustStmt'] = field(default_factory=list)
+
+    def has_must_false(self) -> bool:
+        for m in self.must_statements:
+            if (m.expression or "").strip() == "false()":
+                return True
+        return False
 
 
 @dataclass
