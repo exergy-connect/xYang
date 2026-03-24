@@ -14,6 +14,7 @@ from ..refine_expand import (
     apply_refines_by_path,
     apply_refines_list_cardinality,
     copy_yang_statement,
+    inline_uses_for_list_cardinality,
     uses_refine_fingerprint,
 )
 from .tokenizer import YangTokenizer
@@ -211,6 +212,7 @@ class YangParser:
                         raise YangCircularUsesError(expanding_chain, link)
                     inner_chain = expanding_chain + (link,)
                     body_copies = [copy_yang_statement(s) for s in grouping.statements]
+                    inline_uses_for_list_cardinality(body_copies, module)
                     apply_refines_list_cardinality(body_copies, stmt.refines)
                     expanded_grouping_statements = self._expand_uses_in_statements(
                         body_copies, module, inner_chain

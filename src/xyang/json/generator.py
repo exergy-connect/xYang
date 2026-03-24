@@ -31,6 +31,7 @@ from ..refine_expand import (
     apply_refines_by_path,
     apply_refines_list_cardinality,
     copy_yang_statement,
+    inline_uses_for_list_cardinality,
     uses_refine_fingerprint,
 )
 from ..xpath.ast import PathNode
@@ -303,6 +304,8 @@ def _expand_uses_in_statements(
                     raise YangCircularUsesError(expanding_chain, link)
                 inner = expanding_chain + (link,)
                 body_copies = [_copy_statement(s) for s in grouping.statements]
+                inline_uses_for_list_cardinality(body_copies, module)
+                apply_refines_list_cardinality(body_copies, stmt.refines)
                 nested = _expand_uses_in_statements(body_copies, module, inner)
                 apply_refines_by_path(nested, stmt.refines)
                 expanded.extend(nested)
@@ -545,7 +548,12 @@ def _statement_to_property(
         return out
 
     if isinstance(stmt, YangListStmt):
-        list_children = _expand_uses_in_statements(stmt.statements, module)
+        # Match parser/yang_parser: do not expand uses under lists refined to max-elements 0
+        # (xFrame meta-model breaks composite recursion that way).
+        if getattr(stmt, "max_elements", None) == 0:
+            list_children = [_copy_statement(s) for s in stmt.statements]
+        else:
+            list_children = _expand_uses_in_statements(stmt.statements, module)
         when_cond = None
         if getattr(stmt, "when", None) is not None:
             when_cond = getattr(stmt.when, "condition", None)
@@ -558,14 +566,14 @@ def _statement_to_property(
         items: dict[str, Any]
         others_lc, hoisted_list_ch = _partition_choice_sibling_statements(list_children)
         if hoisted_list_ch is not None and others_lc:
-            base_props: dict[str, Any] = {}
-            base_required: list[str] = []
+            list_base_props: dict[str, Any] = {}
+            list_base_required: list[str] = []
             for child in others_lc:
                 child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
                 if child_prop is not None:
-                    base_props[child.name] = child_prop
+                    list_base_props[child.name] = child_prop
                     if isinstance(child, YangLeafStmt) and child.mandatory:
-                        base_required.append(child.name)
+                        list_base_required.append(child.name)
             ch_body = _choice_to_object_body(
                 hoisted_list_ch, typedef_names, module, leafref_parent=stmt
             )
@@ -573,15 +581,15 @@ def _statement_to_property(
             items = {JsonSchemaKey.TYPE: "object"}
             if JsonSchemaKey.ONE_OF in ch_body:
                 items[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
-                    ch_body[JsonSchemaKey.ONE_OF], base_props, base_required
+                    ch_body[JsonSchemaKey.ONE_OF], list_base_props, list_base_required
                 )
             else:
                 items[JsonSchemaKey.PROPERTIES] = {
-                    **base_props,
+                    **list_base_props,
                     **(ch_body.get(JsonSchemaKey.PROPERTIES) or {}),
                 }
                 items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-                req = list(base_required)
+                req = list(list_base_required)
                 if ch_body.get(JsonSchemaKey.REQUIRED):
                     req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
                 if req:

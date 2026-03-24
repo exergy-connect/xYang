@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import List, cast
+from typing import Any, List, cast
 
 from .ast import (
     YangCaseStmt,
@@ -70,7 +70,20 @@ def _find_from_node(
     if getattr(stmt, "name", None) == want:
         if last:
             return [stmt]
-        matches: list[YangStatement] = []
+        # A refine path may name the case after the choice (e.g. .../field-type-choice/composite-case/composite).
+        # statement_children() flattens choice branches and drops case nodes, so we must walk cases by name.
+        if isinstance(stmt, YangChoiceStmt) and idx + 1 < len(segments):
+            case_name = segments[idx + 1]
+            matches: list[YangStatement] = []
+            for case in stmt.cases:
+                if case.name == case_name:
+                    case_last = idx + 1 == len(segments) - 1
+                    if case_last:
+                        return [case]
+                    for ch in case.statements:
+                        matches.extend(_find_from_node(ch, segments, idx + 2))
+            return matches
+        matches = []
         for ch in statement_children(stmt):
             matches.extend(_find_from_node(ch, segments, idx + 1))
         return matches
@@ -107,6 +120,36 @@ def apply_refines_list_cardinality(
                     node.min_elements = r.min_elements
                 if r.max_elements is not None:
                     node.max_elements = r.max_elements
+
+
+def inline_uses_for_list_cardinality(
+    statements: list[YangStatement],
+    module: Any,
+) -> None:
+    """Splice in used grouping bodies when ``uses`` carries min/max refines.
+
+    Path-based ``apply_refines_list_cardinality`` only sees nodes already present under
+    ``statements``. If the parent grouping is a single ``uses foo { refine .../list {
+    max-elements 0; } }``, the list lives under ``foo``'s grouping and must be inlined
+    first (xFrame ``meta-model.yang`` breaks composite recursion this way).
+    """
+    i = 0
+    while i < len(statements):
+        stmt = statements[i]
+        if isinstance(stmt, YangUsesStmt) and stmt.refines:
+            if any(
+                r.min_elements is not None or r.max_elements is not None
+                for r in stmt.refines
+            ):
+                inner_grouping = module.get_grouping(stmt.grouping_name)
+                if inner_grouping is not None and inner_grouping.statements:
+                    inner = [
+                        copy_yang_statement(s) for s in inner_grouping.statements
+                    ]
+                    apply_refines_list_cardinality(inner, stmt.refines)
+                    statements[i : i + 1] = inner
+                    continue
+        i += 1
 
 
 def apply_refines_by_path(
