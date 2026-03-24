@@ -753,7 +753,7 @@ def schema_to_yang_json(
         JSON string of the schema.
     """
     data = generate_json_schema(module)
-    text = json.dumps(data, indent=indent, ensure_ascii=False)
+    text = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
     if output_path is not None:
         path = Path(output_path)
         path.parent.mkdir(parents=True, exist_ok=True)
