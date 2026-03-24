@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from typing import Any, List, cast
 
+from .errors import YangRefineTargetNotFoundError
 from .ast import (
     YangCaseStmt,
     YangChoiceStmt,
@@ -114,7 +115,10 @@ def apply_refines_list_cardinality(
     for r in refines:
         if r.min_elements is None and r.max_elements is None:
             continue
-        for node in find_nodes_by_refine_path(statements, r.target_path):
+        nodes = find_nodes_by_refine_path(statements, r.target_path)
+        if not nodes:
+            raise YangRefineTargetNotFoundError(r.target_path)
+        for node in nodes:
             if isinstance(node, (YangListStmt, YangLeafListStmt)):
                 if r.min_elements is not None:
                     node.min_elements = r.min_elements
@@ -157,7 +161,10 @@ def apply_refines_by_path(
 ) -> None:
     """Apply type, must, min/max-elements refinements to all nodes matching each path."""
     for r in refines:
-        for node in find_nodes_by_refine_path(statements, r.target_path):
+        nodes = find_nodes_by_refine_path(statements, r.target_path)
+        if not nodes:
+            raise YangRefineTargetNotFoundError(r.target_path)
+        for node in nodes:
             apply_refine_to_node(node, r)
 
 

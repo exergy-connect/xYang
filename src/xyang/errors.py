@@ -67,6 +67,16 @@ def _format_uses_expand_link(link: tuple[str, tuple]) -> str:
     return f"{g}{fp}"
 
 
+class YangRefineTargetNotFoundError(YangSemanticError):
+    """Raised when a ``uses`` ``refine`` target path matches no schema node."""
+
+    def __init__(self, target_path: str) -> None:
+        self.target_path = target_path
+        super().__init__(
+            f"Refine target path matches no node in the used grouping: {target_path!r}"
+        )
+
+
 class YangCircularUsesError(YangSemanticError):
     """Raised when ``uses`` expansion would follow a cyclic grouping chain."""
 

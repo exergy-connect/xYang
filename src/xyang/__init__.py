@@ -5,7 +5,11 @@ Based on xYang; uses xpath for parsing must/when expressions and for
 document validation (when, structure, must, type checks).
 """
 
-from .errors import YangCircularUsesError, YangSemanticError
+from .errors import (
+    YangCircularUsesError,
+    YangRefineTargetNotFoundError,
+    YangSemanticError,
+)
 from .parser import parse_yang_file, parse_yang_string
 from .validator.yang_validator import YangValidator
 
@@ -22,4 +26,5 @@ __all__ = [
     "TypeSystem",
     "YangSemanticError",
     "YangCircularUsesError",
+    "YangRefineTargetNotFoundError",
 ]
