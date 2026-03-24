@@ -79,3 +79,13 @@ class FunctionCallNode(ASTNode):
 
     def accept(self, ev: "XPathEvaluator", ctx: "Context", node: "Node") -> Any:
         return ev.eval_function(self, ctx, node)
+
+
+def ast_is_const_false(node: Optional[ASTNode]) -> bool:
+    """True if *node* is an XPath AST that always evaluates to false.
+
+    Used for schema pruning (e.g. ``must`` under ``uses`` expansion).
+    :class:`~xyang.xpath.parser.XPathParser` turns ``false`` / ``false()`` into
+    :class:`LiteralNode` with ``value is False`` (not :class:`FunctionCallNode`).
+    """
+    return isinstance(node, LiteralNode) and node.value is False

@@ -61,8 +61,11 @@ class YangStatementWithMust(YangStatement):
     must_statements: List['YangMustStmt'] = field(default_factory=list)
 
     def has_must_false(self) -> bool:
+        from .xpath.ast import ast_is_const_false
+
+        # TODO use XPathEvaluator for more sophisticated must expression evaluation.
         for m in self.must_statements:
-            if (m.expression or "").strip() == "false()":
+            if ast_is_const_false(m.ast):
                 return True
         return False
 

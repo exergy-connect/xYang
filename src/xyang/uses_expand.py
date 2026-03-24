@@ -15,6 +15,32 @@ from .refine_expand import (
 
 logger = logging.getLogger(__name__)
 
+# Set logging.getLogger("xyang.uses_expand").setLevel(logging.DEBUG) to trace
+# ``must false()`` / refine interaction and ``uses`` expansion cycles.
+
+
+def _must_expressions(stmt: YangStatement) -> tuple[str, ...]:
+    """Snapshot of ``must`` XPath strings on *stmt* (for debug)."""
+    musts = getattr(stmt, "must_statements", None) or []
+    return tuple((getattr(m, "expression", "") or "").strip() for m in musts)
+
+
+def _debug_array_branch(stmt: YangStatement, stmt_path: str, phase: str) -> None:
+    """Log state of the explicit ``field_type`` array container (refine target tail ``.../array-case/array``)."""
+    if not logger.isEnabledFor(logging.DEBUG):
+        return
+    if not stmt_path.endswith("/array-case/array"):
+        return
+    kind = type(stmt).__name__
+    logger.debug(
+        "uses_expand array-branch %s: stmt_path=%r kind=%s has_must_false=%s musts=%s",
+        phase,
+        stmt_path,
+        kind,
+        stmt.has_must_false(),
+        _must_expressions(stmt),
+    )
+
 
 def _extend_refine_path(prefix: str, segment: str) -> str:
     return f"{prefix}/{segment}" if prefix else segment
@@ -43,7 +69,22 @@ def _expand_one_uses_stmt(
         return []
     link = (gname, uses_refine_fingerprint(stmt.refines))
     if link in expanding_chain:
+        if logger.isEnabledFor(logging.DEBUG):
+            logger.debug(
+                "uses_expand circular uses: grouping=%r fingerprint=%s chain=%s",
+                gname,
+                link[1],
+                tuple((x[0], x[1]) for x in expanding_chain),
+            )
         raise YangCircularUsesError(expanding_chain, link)
+    if logger.isEnabledFor(logging.DEBUG):
+        logger.debug(
+            "uses_expand enter uses: grouping=%r fingerprint=%s chain_depth=%d pending_refines=%d",
+            gname,
+            link[1],
+            len(expanding_chain),
+            len(stmt.refines),
+        )
     inner_chain = expanding_chain + (link,)
     body = [copy_yang_statement(s) for s in grouping.statements]
     pending_refines = list(stmt.refines)
@@ -95,16 +136,43 @@ def expand_uses_in_statements(
                 r = refines[i]
                 tp = getattr(r, "target_path", None) or ""
                 if _refine_target_matches_stmt_path(tp, stmt_path):
+                    must_before = _must_expressions(stmt)
                     apply_refine_to_node(stmt, r)
+                    if logger.isEnabledFor(logging.DEBUG):
+                        added = tuple(
+                            (getattr(m, "expression", "") or "").strip()
+                            for m in (getattr(r, "must_statements", None) or [])
+                        )
+                        logger.debug(
+                            "uses_expand applied refine: target_path=%r stmt_path=%r "
+                            "node=%s must_before=%s must_after=%s refine_musts=%s",
+                            tp,
+                            stmt_path,
+                            type(stmt).__name__,
+                            must_before,
+                            _must_expressions(stmt),
+                            added,
+                        )
                     del refines[i]
+
+        _debug_array_branch(stmt, stmt_path, "after_refines")
 
         # ``must false()`` marks a subtree as unreachable in the schema. Do not expand nested
         # ``uses`` or recurse into children—same rationale as skipping list bodies with
         # ``max-elements 0``: avoids infinite or cyclic grouping expansion when a refine
         # rules out a branch (e.g. disallowing ``field_type`` array under a specific ``uses``).
         if stmt.has_must_false():
+            if logger.isEnabledFor(logging.DEBUG):
+                logger.debug(
+                    "uses_expand skip must_false: stmt_path=%r kind=%s musts=%s",
+                    stmt_path,
+                    type(stmt).__name__,
+                    _must_expressions(stmt),
+                )
             expanded.append(stmt)
             continue
+
+        _debug_array_branch(stmt, stmt_path, "expand_children")
 
         if isinstance(stmt, YangUsesStmt):
             repl = _expand_one_uses_stmt(stmt, module, expanding_chain)
