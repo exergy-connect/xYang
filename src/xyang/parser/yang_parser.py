@@ -136,6 +136,7 @@ class YangParser:
         
         # Case body statements
         self.registry.register('case:description', self.parsers.parse_description)
+        self.registry.register('case:uses', self.parsers.parse_uses)
     
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file."""
