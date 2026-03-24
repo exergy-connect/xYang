@@ -59,6 +59,7 @@ def _expand_one_uses_stmt(
     stmt: YangUsesStmt,
     module: YangModule,
     expanding_chain: tuple[tuple[str, tuple], ...],
+    refine_path_prefix: str,
 ) -> list[YangStatement]:
     gname = stmt.grouping_name
     grouping = module.get_grouping(gname)
@@ -88,12 +89,14 @@ def _expand_one_uses_stmt(
     inner_chain = expanding_chain + (link,)
     body = [copy_yang_statement(s) for s in grouping.statements]
     pending_refines = list(stmt.refines)
+    # Prefix is the schema path to the ``uses`` insertion point so refine target paths
+    # (relative to the used grouping) match stmt_path while walking nested ``uses``.
     out = expand_uses_in_statements(
         body,
         module,
         inner_chain,
         pending_refines,
-        refine_path_prefix="",
+        refine_path_prefix,
     )
     if pending_refines:
         raise YangRefineTargetNotFoundError(pending_refines[0].target_path)
@@ -124,12 +127,14 @@ def expand_uses_in_statements(
 ) -> list[YangStatement]:
     expanded: list[YangStatement] = []
     for stmt in statements:
-        name = getattr(stmt, "name", "") or ""
+        segment = stmt.get_schema_node()
         stmt_path = (
-            _extend_refine_path(refine_path_prefix, name) if name else refine_path_prefix
+            _extend_refine_path(refine_path_prefix, segment)
+            if segment
+            else refine_path_prefix
         )
 
-        if name and refines:
+        if refines:
             i = len(refines)
             while i:
                 i -= 1
@@ -175,13 +180,13 @@ def expand_uses_in_statements(
         _debug_array_branch(stmt, stmt_path, "expand_children")
 
         if isinstance(stmt, YangUsesStmt):
-            repl = _expand_one_uses_stmt(stmt, module, expanding_chain)
+            repl = _expand_one_uses_stmt(stmt, module, expanding_chain, stmt_path)
             repl = expand_uses_in_statements(
                 repl,
                 module,
                 expanding_chain,
                 refines,
-                refine_path_prefix,
+                stmt_path,
             )
             expanded.extend(repl)
         elif isinstance(stmt, YangChoiceStmt):

@@ -47,6 +47,14 @@ class YangStatement(YangStatementList):
     name: str = ""
     description: str = ""
 
+    def get_schema_node(self) -> Optional[str]:
+        """Path segment for this statement in the schema tree, or None if it adds no node.
+
+        Used when assembling paths for ``refine`` targets and similar (e.g. ``uses`` is
+        not a schema node; see :class:`YangUsesStmt`).
+        """
+        return None
+
     def child_names(self, data: dict) -> set[str]:
         return {self.name} if getattr(self, "name", None) else set()
 
@@ -81,6 +89,9 @@ class YangTypedefStmt(YangStatement):
     """Typedef statement."""
     type: Optional['YangTypeStmt'] = None
 
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
+
 
 @dataclass
 class YangTypeStmt:
@@ -101,6 +112,9 @@ class YangContainerStmt(YangStatementWithMust, YangStatementWithWhen):
     """Container statement."""
     presence: Optional[str] = None
 
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
+
 
 @dataclass
 class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
@@ -108,6 +122,9 @@ class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
 
 
 @dataclass
@@ -117,6 +134,9 @@ class YangLeafStmt(YangStatementWithMust, YangStatementWithWhen):
     mandatory: bool = False
     default: Optional[Any] = None
 
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
+
 
 @dataclass
 class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
@@ -124,6 +144,9 @@ class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
     type: Optional[YangTypeStmt] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
 
 
 @dataclass
@@ -177,6 +200,9 @@ class YangUsesStmt(YangStatement):
     grouping_name: str = ""
     refines: List['YangRefineStmt'] = field(default_factory=list)
 
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
 
 @dataclass
 class YangRefineStmt(YangStatementWithMust):
@@ -193,6 +219,9 @@ class YangChoiceStmt(YangStatement):
     mandatory: bool = False
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
+
     def child_names(self, data: dict) -> set[str]:
         for case in self.cases:
             if any(getattr(s, "name", None) in data for s in case.statements):
@@ -203,6 +232,9 @@ class YangChoiceStmt(YangStatement):
 @dataclass
 class YangCaseStmt(YangStatement):
     """Case statement - defines one alternative in a choice."""
+
+    def get_schema_node(self) -> Optional[str]:
+        return self.name or None
 
     def child_names(self, data: dict) -> set[str]:
         return {s.name for s in self.statements if getattr(s, "name", None)}
