@@ -23,17 +23,10 @@ from ..ast import (
     YangStatement,
     YangTypeStmt,
     YangTypedefStmt,
-    YangUsesStmt,
 )
 from ..module import YangModule
-from ..errors import YangCircularUsesError
-from ..refine_expand import (
-    apply_refines_by_path,
-    apply_refines_list_cardinality,
-    copy_yang_statement,
-    inline_uses_for_list_cardinality,
-    uses_refine_fingerprint,
-)
+from ..refine_expand import copy_yang_statement
+from ..uses_expand import expand_uses_in_statements
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 
@@ -287,48 +280,16 @@ def _copy_statement(stmt: YangStatement) -> YangStatement:
     return copy_yang_statement(stmt)
 
 
-def _expand_uses_in_statements(
-    statements: list[YangStatement],
-    module: YangModule,
-    expanding_chain: tuple[tuple[str, tuple], ...] = (),
+def _expand_uses_for_json(
+    statements: list[YangStatement], module: YangModule
 ) -> list[YangStatement]:
-    """Expand uses statements in place: resolve groupings and apply refines. Returns a flat list of statements."""
-    expanded: list[YangStatement] = []
-    for stmt in statements:
-        if isinstance(stmt, YangUsesStmt):
-            gname = stmt.grouping_name
-            grouping = module.get_grouping(gname)
-            if grouping:
-                link = (gname, uses_refine_fingerprint(stmt.refines))
-                if link in expanding_chain:
-                    raise YangCircularUsesError(expanding_chain, link)
-                inner = expanding_chain + (link,)
-                body_copies = [_copy_statement(s) for s in grouping.statements]
-                inline_uses_for_list_cardinality(body_copies, module)
-                apply_refines_list_cardinality(body_copies, stmt.refines)
-                nested = _expand_uses_in_statements(body_copies, module, inner)
-                apply_refines_by_path(nested, stmt.refines)
-                expanded.extend(nested)
-        elif isinstance(stmt, YangChoiceStmt):
-            stmt_copy = _copy_statement(stmt)
-            for case in stmt_copy.cases:
-                case.statements = _expand_uses_in_statements(
-                    case.statements, module, expanding_chain
-                )
-            expanded.append(stmt_copy)
-        elif isinstance(stmt, (YangListStmt, YangLeafListStmt)) and getattr(
-            stmt, "max_elements", None
-        ) == 0:
-            expanded.append(_copy_statement(stmt))
-        elif hasattr(stmt, "statements"):
-            stmt_copy = _copy_statement(stmt)
-            stmt_copy.statements = _expand_uses_in_statements(
-                stmt.statements, module, expanding_chain
-            )
-            expanded.append(stmt_copy)
-        else:
-            expanded.append(stmt)
-    return expanded
+    """Expand ``uses`` on a deep-copied subtree so the module AST is not mutated."""
+    return expand_uses_in_statements(
+        [_copy_statement(s) for s in statements],
+        module,
+        (),
+        [],
+    )
 
 
 def _partition_choice_sibling_statements(
@@ -449,7 +410,7 @@ def _statement_to_property(
     from ..ast import YangContainerStmt, YangLeafListStmt, YangLeafStmt, YangListStmt
 
     if isinstance(stmt, YangContainerStmt):
-        children = _expand_uses_in_statements(stmt.statements, module)
+        children = _expand_uses_for_json(stmt.statements, module)
         when_cond = None
         if getattr(stmt, "when", None) is not None:
             when_cond = getattr(stmt.when, "condition", None)
@@ -553,7 +514,7 @@ def _statement_to_property(
         if getattr(stmt, "max_elements", None) == 0:
             list_children = [_copy_statement(s) for s in stmt.statements]
         else:
-            list_children = _expand_uses_in_statements(stmt.statements, module)
+            list_children = _expand_uses_for_json(stmt.statements, module)
         when_cond = None
         if getattr(stmt, "when", None) is not None:
             when_cond = getattr(stmt.when, "condition", None)

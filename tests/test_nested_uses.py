@@ -46,6 +46,88 @@ module nested_uses {
 }
 """
 
+# Refine targets list ``L`` behind ``uses list_g``; path includes choice ``outer_ch`` then case ``oc``.
+YANG_REFINE_NESTED_LIST_PATH = """
+module refine_nested_list_path {
+  yang-version 1.1;
+  namespace "urn:test:refine-nested-list-path";
+  prefix "rnlp";
+
+  grouping list_g {
+    list L {
+      key k;
+      leaf k {
+        type string;
+      }
+    }
+  }
+
+  grouping base_g {
+    choice outer_ch {
+      case oc {
+        uses list_g;
+      }
+    }
+  }
+
+  grouping refined_g {
+    uses base_g {
+      refine outer_ch/oc/L {
+        max-elements 0;
+        min-elements 0;
+      }
+    }
+  }
+
+  container root {
+    uses refined_g;
+  }
+}
+"""
+
+# Same cyclic shape as ``core``/``loop_back``, but ``loop_back`` refines ``hold`` to
+# ``max-elements 0`` / ``min-elements 0`` so expansion must not descend into the list
+# body (the edge that would close the grouping cycle).
+YANG_USES_CYCLE_BROKEN_BY_REFINE_ON_LIST = """
+module uses_cycle_broken_by_refine {
+  yang-version 1.1;
+  namespace "urn:test:uses-cycle-broken-by-refine";
+  prefix "ucbr";
+
+  grouping sink {
+    leaf ok { type string; }
+  }
+
+  grouping core {
+    choice branch {
+      case escape {
+        uses sink;
+      }
+      case recurse {
+        list hold {
+          key id;
+          leaf id { type string; }
+          uses loop_back;
+        }
+      }
+    }
+  }
+
+  grouping loop_back {
+    uses core {
+      refine branch/recurse/hold {
+        max-elements 0;
+        min-elements 0;
+      }
+    }
+  }
+
+  container root {
+    uses loop_back;
+  }
+}
+"""
+
 
 def test_parse_nested_uses_module():
     """xYang parses a YANG module that contains nested uses statements."""
@@ -63,3 +145,19 @@ def test_validate_data_against_nested_uses():
     data = {"root": {"x": "a", "y": "b", "z": "c"}}
     is_valid, errors, _ = validator.validate(data)
     assert is_valid, errors
+
+
+def test_parse_refine_targets_list_behind_uses():
+    """Refine path reaches a list that lives under a nested ``uses`` (not yet expanded)."""
+    module = parse_yang_string(YANG_REFINE_NESTED_LIST_PATH)
+    assert module.name == "refine_nested_list_path"
+    root = module.find_statement("root")
+    assert root is not None
+
+
+def test_parse_uses_cycle_broken_by_refine_on_list():
+    """Grouping cycle through a list is cut by ``max-elements`` / ``min-elements`` refine on that list."""
+    module = parse_yang_string(YANG_USES_CYCLE_BROKEN_BY_REFINE_ON_LIST)
+    assert module.name == "uses_cycle_broken_by_refine"
+    root = module.find_statement("root")
+    assert root is not None

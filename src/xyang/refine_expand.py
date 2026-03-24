@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from typing import Any, List, cast
+from typing import List, cast
 
 from .errors import YangRefineTargetNotFoundError
 from .ast import (
@@ -109,8 +109,8 @@ def apply_refines_list_cardinality(
 ) -> None:
     """Apply only ``min-elements`` / ``max-elements`` from refines to matching lists.
 
-    Run on a ``uses`` grouping copy **before** expanding nested ``uses`` so lists
-    refined to ``max-elements 0`` are not descended into during expansion.
+    Callers must ensure refine target paths are already visible (nested ``uses``
+    expanded first); see ``uses_expand`` preprocessing.
     """
     for r in refines:
         if r.min_elements is None and r.max_elements is None:
@@ -124,36 +124,6 @@ def apply_refines_list_cardinality(
                     node.min_elements = r.min_elements
                 if r.max_elements is not None:
                     node.max_elements = r.max_elements
-
-
-def inline_uses_for_list_cardinality(
-    statements: list[YangStatement],
-    module: Any,
-) -> None:
-    """Splice in used grouping bodies when ``uses`` carries min/max refines.
-
-    Path-based ``apply_refines_list_cardinality`` only sees nodes already present under
-    ``statements``. If the parent grouping is a single ``uses foo { refine .../list {
-    max-elements 0; } }``, the list lives under ``foo``'s grouping and must be inlined
-    first (xFrame ``meta-model.yang`` breaks composite recursion this way).
-    """
-    i = 0
-    while i < len(statements):
-        stmt = statements[i]
-        if isinstance(stmt, YangUsesStmt) and stmt.refines:
-            if any(
-                r.min_elements is not None or r.max_elements is not None
-                for r in stmt.refines
-            ):
-                inner_grouping = module.get_grouping(stmt.grouping_name)
-                if inner_grouping is not None and inner_grouping.statements:
-                    inner = [
-                        copy_yang_statement(s) for s in inner_grouping.statements
-                    ]
-                    apply_refines_list_cardinality(inner, stmt.refines)
-                    statements[i : i + 1] = inner
-                    continue
-        i += 1
 
 
 def apply_refines_by_path(

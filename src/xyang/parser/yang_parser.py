@@ -4,26 +4,15 @@ YANG parser implementation (refactored).
 Parses YANG module files and builds an in-memory representation.
 """
 
-import logging
 from pathlib import Path
 from typing import Optional
 
-from ..errors import YangCircularUsesError
 from ..module import YangModule
-from ..refine_expand import (
-    apply_refines_by_path,
-    apply_refines_list_cardinality,
-    copy_yang_statement,
-    inline_uses_for_list_cardinality,
-    uses_refine_fingerprint,
-)
+from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
-from ..ast import YangChoiceStmt, YangLeafListStmt, YangListStmt, YangUsesStmt
-
-logger = logging.getLogger(__name__)
 
 
 class YangParser:
@@ -173,75 +162,9 @@ class YangParser:
 
         # Expand uses and refine statements if enabled (default)
         if self.expand_uses:
-            self._expand_all_uses(module)
+            expand_all_uses_in_module(module)
 
         return module
-    
-    def _expand_all_uses(self, module: YangModule) -> None:
-        """Expand all uses statements in the module after parsing is complete.
-        
-        This recursively finds all YangUsesStmt nodes and replaces them with
-        the expanded statements from their groupings.
-        """
-        # Expand uses statements in module-level statements
-        module.statements = self._expand_uses_in_statements(module.statements, module, ())
-        
-        # Expand uses statements in groupings (for nested uses)
-        for grouping_name, grouping in module.groupings.items():
-            grouping.statements = self._expand_uses_in_statements(grouping.statements, module, ())
-    
-    def _expand_uses_in_statements(
-        self,
-        statements,
-        module: YangModule,
-        expanding_chain: tuple[tuple[str, tuple], ...],
-    ):
-        """Recursively expand uses statements in a list of statements.
-
-        ``expanding_chain`` is the stack of ``(grouping_name, refine_fingerprint)``
-        for each ``uses`` being expanded; the same grouping may appear twice if
-        refine fingerprints differ. A true cycle repeats the same link.
-        """
-        expanded = []
-        for stmt in statements:
-            if isinstance(stmt, YangUsesStmt):
-                gname = stmt.grouping_name
-                grouping = module.get_grouping(gname)
-                if grouping:
-                    link = (gname, uses_refine_fingerprint(stmt.refines))
-                    if link in expanding_chain:
-                        raise YangCircularUsesError(expanding_chain, link)
-                    inner_chain = expanding_chain + (link,)
-                    body_copies = [copy_yang_statement(s) for s in grouping.statements]
-                    inline_uses_for_list_cardinality(body_copies, module)
-                    apply_refines_list_cardinality(body_copies, stmt.refines)
-                    expanded_grouping_statements = self._expand_uses_in_statements(
-                        body_copies, module, inner_chain
-                    )
-                    apply_refines_by_path(expanded_grouping_statements, stmt.refines)
-                    expanded.extend(expanded_grouping_statements)
-                else:
-                    logger.warning(
-                        "Grouping '%s' not found when expanding uses statement", gname
-                    )
-            elif isinstance(stmt, YangChoiceStmt):
-                for case in stmt.cases:
-                    case.statements = self._expand_uses_in_statements(
-                        case.statements, module, expanding_chain
-                    )
-                expanded.append(stmt)
-            elif isinstance(stmt, (YangListStmt, YangLeafListStmt)) and getattr(
-                stmt, "max_elements", None
-            ) == 0:
-                expanded.append(stmt)
-            elif hasattr(stmt, "statements"):
-                stmt.statements = self._expand_uses_in_statements(
-                    stmt.statements, module, expanding_chain
-                )
-                expanded.append(stmt)
-            else:
-                expanded.append(stmt)
-        return expanded
 
 
 def parse_yang_file(file_path: str) -> YangModule:
