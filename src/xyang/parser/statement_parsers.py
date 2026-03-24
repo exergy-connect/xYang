@@ -2,7 +2,7 @@
 Statement parsers for YANG statements.
 """
 
-from typing import Optional, TYPE_CHECKING, TypeVar, cast, List
+from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
@@ -12,6 +12,9 @@ from ..ast import (
     YangStatementWithWhen,
 )
 from ..xpath import XPathParser
+from types import SimpleNamespace
+
+from ..refine_expand import apply_refines_by_path, copy_yang_statement
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -343,25 +346,25 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse min-elements (list or leaf-list)."""
+        """Parse min-elements (list, leaf-list, or refine)."""
         tokens.consume_type(YangTokenType.MIN_ELEMENTS)
-        if context.current_parent and hasattr(context.current_parent, "min_elements"):
-            setattr(
-                context.current_parent,
-                "min_elements",
-                int(tokens.consume_type(YangTokenType.INTEGER)),
-            )
+        value = int(tokens.consume_type(YangTokenType.INTEGER))
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.min_elements = value
+        elif parent and hasattr(parent, "min_elements"):
+            setattr(parent, "min_elements", value)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse max-elements (list or leaf-list)."""
+        """Parse max-elements (list, leaf-list, or refine)."""
         tokens.consume_type(YangTokenType.MAX_ELEMENTS)
-        if context.current_parent and hasattr(context.current_parent, "max_elements"):
-            setattr(
-                context.current_parent,
-                "max_elements",
-                int(tokens.consume_type(YangTokenType.INTEGER)),
-            )
+        value = int(tokens.consume_type(YangTokenType.INTEGER))
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.max_elements = value
+        elif parent and hasattr(parent, "max_elements"):
+            setattr(parent, "max_elements", value)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -509,9 +512,13 @@ class StatementParsers:
         return uses_stmt
     
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse refine statement."""
+        """Parse refine statement (supports descendant paths ``a/b``)."""
         tokens.consume_type(YangTokenType.REFINE)
-        target_path = tokens.consume()  # identifier or keyword (e.g. type)
+        parts = [tokens.consume()]
+        while tokens.peek_type() == YangTokenType.SLASH:
+            tokens.consume_type(YangTokenType.SLASH)
+            parts.append(tokens.consume())
+        target_path = "/".join(parts)
         refine_stmt = YangRefineStmt(name="refine", target_path=target_path)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(refine_stmt)
@@ -599,36 +606,24 @@ class StatementParsers:
         refines: list,
         module: Optional["YangModule"] = None,
     ) -> list:
-        """Expand a uses statement by copying statements from grouping and applying refines.
-        
-        Recursively expands nested uses statements within the grouping.
-        """
+        """Legacy helper: expand nested ``uses`` inside a grouping (rarely used)."""
         from ..ast import YangUsesStmt
-        
+
         expanded = []
         for stmt in grouping.statements:
-            # If this statement is itself a uses statement, recursively expand it
             if isinstance(stmt, YangUsesStmt):
                 nested_grouping = module.get_grouping(stmt.grouping_name) if module else None
                 if nested_grouping:
-                    # Recursively expand the nested uses statement
-                    nested_expanded = self._expand_uses(nested_grouping, stmt.refines, module)
+                    body = [copy_yang_statement(s) for s in nested_grouping.statements]
+                    nested_expanded = self._expand_uses(
+                        SimpleNamespace(statements=body), stmt.refines, module
+                    )
                     expanded.extend(nested_expanded)
-                else:
-                    # Grouping not found - skip or log warning
-                    pass
             else:
-                # Create a shallow copy of the statement
                 stmt_copy = self._copy_statement(stmt)
-                
-                # Apply refines if any match this statement
-                for refine in refines:
-                    if refine.target_path == stmt.name:
-                        # Apply refine modifications
-                        self._apply_refine(stmt_copy, refine)
-                
+                apply_refines_by_path([stmt_copy], refines)
                 expanded.append(stmt_copy)
-        
+
         return expanded
     
     def _expand_uses_with_statements(
@@ -637,132 +632,16 @@ class StatementParsers:
         refines: list,
         module: Optional["YangModule"] = None,
     ) -> list:
-        """Expand uses statements from a list of already-expanded statements.
-        
-        This is used when expanding uses statements that reference groupings
-        whose uses statements have already been expanded.
-        """
-        expanded = []
-        for stmt in statements:
-            # Create a shallow copy of the statement
-            stmt_copy = self._copy_statement(stmt)
-            
-            # Apply refines if any match this statement
-            for refine in refines:
-                if refine.target_path == stmt.name:
-                    # Apply refine modifications
-                    self._apply_refine(stmt_copy, refine)
-            
-            expanded.append(stmt_copy)
-        
-        return expanded
+        """Apply path-based refines to an already-expanded statement list (legacy helper)."""
+        apply_refines_by_path(statements, refines)
+        return statements
     
     def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
         """Create a copy of a statement, handling AST nodes properly."""
-        from ..ast import (
-            YangContainerStmt,
-            YangListStmt,
-            YangLeafStmt,
-            YangLeafListStmt,
-            YangTypeStmt,
-            YangMustStmt,
-            YangWhenStmt,
-            YangChoiceStmt,
-            YangCaseStmt,
-            YangUsesStmt,
-        )
-        
-        # Copy child statements recursively
-        copied_statements = [self._copy_statement(s) for s in stmt.statements]
-        
-        if isinstance(stmt, YangContainerStmt):
-            return YangContainerStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                presence=stmt.presence,
-                when=stmt.when,  # When statements contain AST, but we'll keep the reference
-                must_statements=stmt.must_statements[:] if stmt.must_statements else []
-            )
-        elif isinstance(stmt, YangListStmt):
-            return YangListStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                key=stmt.key,
-                min_elements=stmt.min_elements,
-                max_elements=stmt.max_elements,
-                must_statements=stmt.must_statements[:] if stmt.must_statements else [],
-                when=stmt.when
-            )
-        elif isinstance(stmt, YangLeafStmt):
-            # Copy must_statements list
-            must_statements = list(stmt.must_statements) if stmt.must_statements else []
-            return YangLeafStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                type=stmt.type,  # TypeStmt doesn't need deep copy
-                mandatory=stmt.mandatory,
-                default=stmt.default,
-                must_statements=must_statements,
-                when=stmt.when
-            )
-        elif isinstance(stmt, YangLeafListStmt):
-            return YangLeafListStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                type=stmt.type,
-                min_elements=stmt.min_elements,
-                max_elements=stmt.max_elements,
-                must_statements=stmt.must_statements[:] if stmt.must_statements else [],
-                when=stmt.when
-            )
-        elif isinstance(stmt, YangChoiceStmt):
-            # Copy cases recursively
-            copied_cases: List[YangCaseStmt] = [
-                cast(YangCaseStmt, self._copy_statement(c)) for c in stmt.cases
-            ]
-            return YangChoiceStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                mandatory=stmt.mandatory,
-                cases=copied_cases,
-            )
-        elif isinstance(stmt, YangCaseStmt):
-            return YangCaseStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements
-            )
-        elif isinstance(stmt, YangUsesStmt):
-            return YangUsesStmt(
-                name=stmt.name,
-                description=stmt.description,
-                statements=copied_statements,
-                grouping_name=stmt.grouping_name,
-                refines=list(stmt.refines) if stmt.refines else [],
-            )
-        else:
-            # Unknown / unsupported statement type inside grouping/uses expansion.
-            # This should not happen for known YANG statements; fail loudly so
-            # new statement kinds get explicit copy logic instead of a silent fallback.
-            raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")
-    
+        return copy_yang_statement(stmt)
+
     def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
         """Apply refine modifications to a statement."""
-        from ..ast import YangLeafStmt, YangContainerStmt, YangListStmt
-        
-        # Apply refined type when target is a leaf
-        if getattr(refine, 'type', None) is not None and isinstance(stmt, YangLeafStmt):
-            stmt.type = refine.type
-        
-        # Apply must statements from refine
-        for refine_stmt in refine.must_statements:
-            must_list = getattr(stmt, "must_statements", None)
-            if must_list is None:
-                setattr(stmt, "must_statements", [])
-                must_list = getattr(stmt, "must_statements")
-            must_list.append(refine_stmt)
+        from ..refine_expand import apply_refine_to_node
+
+        apply_refine_to_node(stmt, refine)

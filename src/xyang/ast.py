@@ -168,8 +168,10 @@ class YangUsesStmt(YangStatement):
 @dataclass
 class YangRefineStmt(YangStatementWithMust):
     """Refine statement - modifies nodes from a grouping when using it."""
-    target_path: str = ""  # Path to the node being refined (e.g., "type", "required")
+    target_path: str = ""  # Descendant path (e.g. "type", or schema path through choice/case nodes)
     type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
+    min_elements: Optional[int] = None  # Refined min-elements (list / leaf-list)
+    max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)
 
 
 @dataclass

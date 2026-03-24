@@ -1,0 +1,205 @@
+"""Path-based refine application for ``uses`` expansion."""
+
+from __future__ import annotations
+
+from typing import List, cast
+
+from .ast import (
+    YangCaseStmt,
+    YangChoiceStmt,
+    YangContainerStmt,
+    YangLeafListStmt,
+    YangLeafStmt,
+    YangListStmt,
+    YangRefineStmt,
+    YangStatement,
+    YangStatementWithMust,
+    YangUsesStmt,
+)
+
+
+def uses_refine_fingerprint(refines: list[YangRefineStmt]) -> tuple:
+    """Hashable summary of ``uses`` refine blocks (order-preserving)."""
+    if not refines:
+        return ()
+    parts: list[tuple] = []
+    for r in refines:
+        t = getattr(r, "type", None)
+        type_name = t.name if t is not None else None
+        musts = tuple(m.expression for m in (getattr(r, "must_statements", None) or []))
+        parts.append(
+            (
+                r.target_path,
+                getattr(r, "min_elements", None),
+                getattr(r, "max_elements", None),
+                type_name,
+                musts,
+            )
+        )
+    return tuple(parts)
+
+
+def statement_children(stmt: YangStatement) -> list[YangStatement]:
+    """Direct schema children (choice branches flatten to case bodies)."""
+    if isinstance(stmt, YangChoiceStmt):
+        ch: list[YangStatement] = []
+        for c in stmt.cases:
+            ch.extend(c.statements)
+        return ch
+    return list(stmt.statements)
+
+
+def find_nodes_by_refine_path(
+    statements: list[YangStatement], target_path: str
+) -> list[YangStatement]:
+    """Resolve a descendant path (``a/b/c``) from roots; walk through choices/cases."""
+    segments = [p for p in target_path.split("/") if p]
+    if not segments:
+        return []
+    out: list[YangStatement] = []
+    for root in statements:
+        out.extend(_find_from_node(root, segments, 0))
+    return out
+
+
+def _find_from_node(
+    stmt: YangStatement, segments: list[str], idx: int
+) -> list[YangStatement]:
+    want = segments[idx]
+    last = idx == len(segments) - 1
+    if getattr(stmt, "name", None) == want:
+        if last:
+            return [stmt]
+        matches: list[YangStatement] = []
+        for ch in statement_children(stmt):
+            matches.extend(_find_from_node(ch, segments, idx + 1))
+        return matches
+    # Refine paths follow the schema tree: choice/case nodes may appear as segments.
+    if isinstance(stmt, YangChoiceStmt):
+        for case in stmt.cases:
+            if case.name == want:
+                if last:
+                    return [case]
+                case_matches: list[YangStatement] = []
+                for ch in case.statements:
+                    case_matches.extend(_find_from_node(ch, segments, idx + 1))
+                return case_matches
+    matches = []
+    for ch in statement_children(stmt):
+        matches.extend(_find_from_node(ch, segments, idx))
+    return matches
+
+
+def apply_refines_list_cardinality(
+    statements: list[YangStatement], refines: list[YangRefineStmt]
+) -> None:
+    """Apply only ``min-elements`` / ``max-elements`` from refines to matching lists.
+
+    Run on a ``uses`` grouping copy **before** expanding nested ``uses`` so lists
+    refined to ``max-elements 0`` are not descended into during expansion.
+    """
+    for r in refines:
+        if r.min_elements is None and r.max_elements is None:
+            continue
+        for node in find_nodes_by_refine_path(statements, r.target_path):
+            if isinstance(node, (YangListStmt, YangLeafListStmt)):
+                if r.min_elements is not None:
+                    node.min_elements = r.min_elements
+                if r.max_elements is not None:
+                    node.max_elements = r.max_elements
+
+
+def apply_refines_by_path(
+    statements: list[YangStatement], refines: list[YangRefineStmt]
+) -> None:
+    """Apply type, must, min/max-elements refinements to all nodes matching each path."""
+    for r in refines:
+        for node in find_nodes_by_refine_path(statements, r.target_path):
+            apply_refine_to_node(node, r)
+
+
+def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
+    if getattr(refine, "type", None) is not None and isinstance(stmt, YangLeafStmt):
+        stmt.type = refine.type
+    if isinstance(stmt, YangStatementWithMust):
+        for refine_must in refine.must_statements:
+            stmt.must_statements.append(refine_must)
+    if isinstance(stmt, (YangListStmt, YangLeafListStmt)):
+        if refine.min_elements is not None:
+            stmt.min_elements = refine.min_elements
+        if refine.max_elements is not None:
+            stmt.max_elements = refine.max_elements
+
+
+def copy_yang_statement(stmt: YangStatement) -> YangStatement:
+    """Deep copy of a YANG statement subtree (for ``uses`` expansion without mutating groupings)."""
+    copied_statements = [copy_yang_statement(s) for s in stmt.statements]
+
+    if isinstance(stmt, YangContainerStmt):
+        return YangContainerStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            presence=stmt.presence,
+            when=stmt.when,
+            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
+        )
+    if isinstance(stmt, YangListStmt):
+        return YangListStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            key=stmt.key,
+            min_elements=stmt.min_elements,
+            max_elements=stmt.max_elements,
+            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
+            when=stmt.when,
+        )
+    if isinstance(stmt, YangLeafStmt):
+        return YangLeafStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            type=stmt.type,
+            mandatory=stmt.mandatory,
+            default=stmt.default,
+            must_statements=list(stmt.must_statements) if stmt.must_statements else [],
+            when=stmt.when,
+        )
+    if isinstance(stmt, YangLeafListStmt):
+        return YangLeafListStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            type=stmt.type,
+            min_elements=stmt.min_elements,
+            max_elements=stmt.max_elements,
+            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
+            when=stmt.when,
+        )
+    if isinstance(stmt, YangChoiceStmt):
+        copied_cases: List[YangCaseStmt] = [
+            cast(YangCaseStmt, copy_yang_statement(c)) for c in stmt.cases
+        ]
+        return YangChoiceStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            mandatory=stmt.mandatory,
+            cases=copied_cases,
+        )
+    if isinstance(stmt, YangCaseStmt):
+        return YangCaseStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+        )
+    if isinstance(stmt, YangUsesStmt):
+        return YangUsesStmt(
+            name=stmt.name,
+            description=stmt.description,
+            statements=copied_statements,
+            grouping_name=stmt.grouping_name,
+            refines=list(stmt.refines) if stmt.refines else [],
+        )
+    raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")

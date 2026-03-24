@@ -56,6 +56,37 @@ class YangSyntaxError(SyntaxError):
         return self.message
 
 
+class YangSemanticError(ValueError):
+    """YANG semantic error: invalid module structure, illegal references, etc."""
+
+
+def _format_uses_expand_link(link: tuple[str, tuple]) -> str:
+    g, fp = link
+    if fp == ():
+        return g
+    return f"{g}{fp}"
+
+
+class YangCircularUsesError(YangSemanticError):
+    """Raised when ``uses`` expansion would follow a cyclic grouping chain."""
+
+    def __init__(
+        self,
+        prefix_chain: tuple[tuple[str, tuple], ...],
+        repeated: tuple[str, tuple],
+    ) -> None:
+        self.prefix_chain = prefix_chain
+        self.repeated_link = repeated
+        self.repeated = repeated[0]
+        cycle = " -> ".join(
+            _format_uses_expand_link(x) for x in (*prefix_chain, repeated)
+        )
+        super().__init__(
+            "Circular uses chain: groupings are expanded at compile-time and this "
+            f"cycle would not terminate ({cycle}). Restructure groupings to break the cycle."
+        )
+
+
 class XPathSyntaxError(ValueError):
     """XPath syntax error with position and context."""
 

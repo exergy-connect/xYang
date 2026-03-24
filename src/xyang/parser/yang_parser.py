@@ -4,15 +4,25 @@ YANG parser implementation (refactored).
 Parses YANG module files and builds an in-memory representation.
 """
 
+import logging
 from pathlib import Path
 from typing import Optional
 
+from ..errors import YangCircularUsesError
 from ..module import YangModule
+from ..refine_expand import (
+    apply_refines_by_path,
+    apply_refines_list_cardinality,
+    copy_yang_statement,
+    uses_refine_fingerprint,
+)
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
 from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
-from ..ast import YangChoiceStmt, YangUsesStmt
+from ..ast import YangChoiceStmt, YangLeafListStmt, YangListStmt, YangUsesStmt
+
+logger = logging.getLogger(__name__)
 
 
 class YangParser:
@@ -105,6 +115,8 @@ class YangParser:
         # Refine body statements
         self.registry.register('refine:must', self.parsers.parse_must)
         self.registry.register('refine:description', self.parsers.parse_description)
+        self.registry.register('refine:min-elements', self.parsers.parse_min_elements)
+        self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
         
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types
@@ -170,45 +182,59 @@ class YangParser:
         the expanded statements from their groupings.
         """
         # Expand uses statements in module-level statements
-        module.statements = self._expand_uses_in_statements(module.statements, module)
+        module.statements = self._expand_uses_in_statements(module.statements, module, ())
         
         # Expand uses statements in groupings (for nested uses)
         for grouping_name, grouping in module.groupings.items():
-            grouping.statements = self._expand_uses_in_statements(grouping.statements, module)
+            grouping.statements = self._expand_uses_in_statements(grouping.statements, module, ())
     
-    def _expand_uses_in_statements(self, statements, module: YangModule):
-        """Recursively expand uses statements in a list of statements."""
-        from ..ast import YangStatement
-        
+    def _expand_uses_in_statements(
+        self,
+        statements,
+        module: YangModule,
+        expanding_chain: tuple[tuple[str, tuple], ...],
+    ):
+        """Recursively expand uses statements in a list of statements.
+
+        ``expanding_chain`` is the stack of ``(grouping_name, refine_fingerprint)``
+        for each ``uses`` being expanded; the same grouping may appear twice if
+        refine fingerprints differ. A true cycle repeats the same link.
+        """
         expanded = []
         for stmt in statements:
             if isinstance(stmt, YangUsesStmt):
-                # Expand this uses statement
-                grouping = module.get_grouping(stmt.grouping_name)
+                gname = stmt.grouping_name
+                grouping = module.get_grouping(gname)
                 if grouping:
-                    # Expand the grouping, which may itself contain uses statements
-                    # First expand uses in the grouping
-                    expanded_grouping_statements = self._expand_uses_in_statements(grouping.statements, module)
-                    # Then apply refines and copy statements
-                    expanded_statements = self.parsers._expand_uses_with_statements(
-                        expanded_grouping_statements, stmt.refines, module
+                    link = (gname, uses_refine_fingerprint(stmt.refines))
+                    if link in expanding_chain:
+                        raise YangCircularUsesError(expanding_chain, link)
+                    inner_chain = expanding_chain + (link,)
+                    body_copies = [copy_yang_statement(s) for s in grouping.statements]
+                    apply_refines_list_cardinality(body_copies, stmt.refines)
+                    expanded_grouping_statements = self._expand_uses_in_statements(
+                        body_copies, module, inner_chain
                     )
-                    expanded.extend(expanded_statements)
+                    apply_refines_by_path(expanded_grouping_statements, stmt.refines)
+                    expanded.extend(expanded_grouping_statements)
                 else:
-                    # Grouping not found - log warning but continue
-                    import logging
-                    logger = logging.getLogger(__name__)
-                    logger.warning(f"Grouping '{stmt.grouping_name}' not found when expanding uses statement")
+                    logger.warning(
+                        "Grouping '%s' not found when expanding uses statement", gname
+                    )
             elif isinstance(stmt, YangChoiceStmt):
-                # Case bodies are on YangCaseStmt.statements, not choice.statements (often empty).
                 for case in stmt.cases:
                     case.statements = self._expand_uses_in_statements(
-                        case.statements, module
+                        case.statements, module, expanding_chain
                     )
                 expanded.append(stmt)
-            elif hasattr(stmt, 'statements'):
-                # Recursively expand uses in child statements
-                stmt.statements = self._expand_uses_in_statements(stmt.statements, module)
+            elif isinstance(stmt, (YangListStmt, YangLeafListStmt)) and getattr(
+                stmt, "max_elements", None
+            ) == 0:
+                expanded.append(stmt)
+            elif hasattr(stmt, "statements"):
+                stmt.statements = self._expand_uses_in_statements(
+                    stmt.statements, module, expanding_chain
+                )
                 expanded.append(stmt)
             else:
                 expanded.append(stmt)

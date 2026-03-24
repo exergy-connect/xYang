@@ -26,6 +26,13 @@ from ..ast import (
     YangUsesStmt,
 )
 from ..module import YangModule
+from ..errors import YangCircularUsesError
+from ..refine_expand import (
+    apply_refines_by_path,
+    apply_refines_list_cardinality,
+    copy_yang_statement,
+    uses_refine_fingerprint,
+)
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 
@@ -170,6 +177,7 @@ def _type_to_schema(
                 XYangKey.REQUIRE_INSTANCE: require,
             },
         }
+    out: dict[str, Any]
     if name == "string":
         out = {JsonSchemaKey.TYPE: "string"}
         if type_stmt.pattern:
@@ -274,85 +282,46 @@ def _build_xyang(
 
 
 def _copy_statement(stmt: YangStatement) -> YangStatement:
-    """Shallow-copy a statement for use when expanding uses (so refines don't mutate grouping)."""
-    if isinstance(stmt, YangContainerStmt):
-        return YangContainerStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=[_copy_statement(s) for s in stmt.statements],
-            presence=getattr(stmt, "presence", None),
-            when=getattr(stmt, "when", None),
-            must_statements=list(getattr(stmt, "must_statements", None) or []),
-        )
-    if isinstance(stmt, YangListStmt):
-        return YangListStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=[_copy_statement(s) for s in stmt.statements],
-            key=stmt.key,
-            min_elements=getattr(stmt, "min_elements", None),
-            max_elements=getattr(stmt, "max_elements", None),
-            when=getattr(stmt, "when", None),
-            must_statements=list(getattr(stmt, "must_statements", None) or []),
-        )
-    if isinstance(stmt, YangLeafStmt):
-        return YangLeafStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=[],
-            type=stmt.type,
-            mandatory=stmt.mandatory,
-            default=stmt.default,
-            when=getattr(stmt, "when", None),
-            must_statements=list(getattr(stmt, "must_statements", None) or []),
-        )
-    if isinstance(stmt, YangLeafListStmt):
-        return YangLeafListStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=[],
-            type=stmt.type,
-            min_elements=getattr(stmt, "min_elements", None),
-            max_elements=getattr(stmt, "max_elements", None),
-            when=getattr(stmt, "when", None),
-            must_statements=list(getattr(stmt, "must_statements", None) or []),
-        )
-    # Fallback: same reference (refines may mutate; avoid if possible)
-    return stmt
-
-
-def _apply_refine(stmt: YangStatement, refine: YangRefineStmt) -> None:
-    """Apply refine modifications to a statement copy."""
-    if getattr(refine, "type", None) is not None and isinstance(stmt, YangLeafStmt):
-        stmt.type = refine.type
-    for refine_must in refine.must_statements:
-        must_list = getattr(stmt, "must_statements", None)
-        if must_list is None:
-            setattr(stmt, "must_statements", [])
-            must_list = getattr(stmt, "must_statements")
-        must_list.append(refine_must)
+    """Deep-copy a statement subtree for uses expansion."""
+    return copy_yang_statement(stmt)
 
 
 def _expand_uses_in_statements(
     statements: list[YangStatement],
     module: YangModule,
+    expanding_chain: tuple[tuple[str, tuple], ...] = (),
 ) -> list[YangStatement]:
     """Expand uses statements in place: resolve groupings and apply refines. Returns a flat list of statements."""
     expanded: list[YangStatement] = []
     for stmt in statements:
         if isinstance(stmt, YangUsesStmt):
-            grouping = module.get_grouping(stmt.grouping_name)
+            gname = stmt.grouping_name
+            grouping = module.get_grouping(gname)
             if grouping:
-                nested = _expand_uses_in_statements(grouping.statements, module)
-                for s in nested:
-                    s_copy = _copy_statement(s)
-                    for refine in stmt.refines:
-                        if refine.target_path == s.name:
-                            _apply_refine(s_copy, refine)
-                    expanded.append(s_copy)
+                link = (gname, uses_refine_fingerprint(stmt.refines))
+                if link in expanding_chain:
+                    raise YangCircularUsesError(expanding_chain, link)
+                inner = expanding_chain + (link,)
+                body_copies = [_copy_statement(s) for s in grouping.statements]
+                nested = _expand_uses_in_statements(body_copies, module, inner)
+                apply_refines_by_path(nested, stmt.refines)
+                expanded.extend(nested)
+        elif isinstance(stmt, YangChoiceStmt):
+            stmt_copy = _copy_statement(stmt)
+            for case in stmt_copy.cases:
+                case.statements = _expand_uses_in_statements(
+                    case.statements, module, expanding_chain
+                )
+            expanded.append(stmt_copy)
+        elif isinstance(stmt, (YangListStmt, YangLeafListStmt)) and getattr(
+            stmt, "max_elements", None
+        ) == 0:
+            expanded.append(_copy_statement(stmt))
         elif hasattr(stmt, "statements"):
             stmt_copy = _copy_statement(stmt)
-            stmt_copy.statements = _expand_uses_in_statements(stmt.statements, module)
+            stmt_copy.statements = _expand_uses_in_statements(
+                stmt.statements, module, expanding_chain
+            )
             expanded.append(stmt_copy)
         else:
             expanded.append(stmt)
