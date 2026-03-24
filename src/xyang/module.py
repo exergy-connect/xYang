@@ -27,8 +27,6 @@ class YangModule(YangStatementList):
     revisions: List[Dict[str, str]] = field(default_factory=list)
     typedefs: Dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
     groupings: Dict[str, 'YangStatement'] = field(default_factory=dict)
-    #: Number of ``uses`` statements seen while parsing the module (bounds uses expansion).
-    parsed_uses_statement_count: int = 0
 
     def get_typedef(self, name: str) -> Optional['YangTypedefStmt']:
         """Get a typedef by name."""

@@ -508,7 +508,6 @@ class StatementParsers:
                     raise tokens._make_error(f"Unknown statement in uses '{grouping_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, uses_stmt)
-        context.module.parsed_uses_statement_count += 1
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return uses_stmt
     

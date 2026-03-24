@@ -29,46 +29,6 @@ def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
     return stmt_path.endswith("/" + target_path)
 
 
-def _nested_uses_step_limit(module: YangModule) -> int:
-    """Upper bound on single-body nested-``uses`` replacements; derived from parse-time ``uses`` count."""
-    n = module.parsed_uses_statement_count
-    return max(1, n)
-
-
-def _find_first_uses_location(
-    statements: list[YangStatement],
-) -> tuple[list[YangStatement], int, YangUsesStmt] | None:
-    for i, stmt in enumerate(statements):
-        if isinstance(stmt, YangUsesStmt):
-            return (statements, i, stmt)
-        if isinstance(stmt, YangChoiceStmt):
-            for case in stmt.cases:
-                hit = _find_first_uses_location(case.statements)
-                if hit is not None:
-                    return hit
-        elif hasattr(stmt, "statements") and stmt.statements is not None:
-            hit = _find_first_uses_location(stmt.statements)
-            if hit is not None:
-                return hit
-    return None
-
-
-def _expand_nested_uses_in_body(
-    body: list[YangStatement],
-    module: YangModule,
-    inner_chain: tuple[tuple[str, tuple], ...],
-) -> None:
-    """Expand every ``uses`` under *body* (depth-first) before the parent applies its refines."""
-    limit = _nested_uses_step_limit(module)
-    for _ in range(limit):
-        loc = _find_first_uses_location(body)
-        if loc is None:
-            return
-        parent, idx, nested = loc
-        repl = _expand_one_uses_stmt(nested, module, inner_chain)
-        parent[idx : idx + 1] = repl
-
-
 def _expand_one_uses_stmt(
     stmt: YangUsesStmt,
     module: YangModule,
