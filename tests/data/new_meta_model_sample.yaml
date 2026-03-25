@@ -1,0 +1,86 @@
+# Sample data model for examples/new-meta-model.yang (generic-field + data-model root).
+# Covers every generic-field type branch and every primitive-type-name enum value.
+# Validated by tests/meta-model/test_new_meta_model_sample.py
+
+name: "New meta-model sample"
+version: "26.03.25.1"
+author: "xYang tests"
+
+# Skip per-entity non-array field count (many primitive showcase fields on one entity).
+consolidated: true
+
+entities:
+  - name: demo
+    brief: "All field type shapes"
+    primary_key: pk
+    field_definitions:
+      - name: reusable_string
+        type:
+          primitive: string
+    fields:
+      # --- generic-field type: primitive (each primitive-type-name enum) ---
+      - name: pk
+        type:
+          primitive: string
+      - name: via_definition
+        type:
+          definition: reusable_string
+      - name: prim_string
+        type:
+          primitive: string
+      - name: prim_integer
+        type:
+          primitive: integer
+      - name: prim_number
+        type:
+          primitive: number
+      - name: prim_boolean
+        type:
+          primitive: boolean
+      - name: prim_array
+        type:
+          primitive: array
+      - name: prim_datetime
+        type:
+          primitive: datetime
+      - name: prim_date
+        type:
+          primitive: date
+      - name: prim_duration_in_days
+        type:
+          primitive: duration_in_days
+      - name: prim_qualified_string
+        type:
+          primitive: qualified_string
+      - name: prim_qualified_integer
+        type:
+          primitive: qualified_integer
+      - name: prim_qualified_number
+        type:
+          primitive: qualified_number
+      # --- generic-field type: array / inner choice primitive ---
+      - name: arr_items_primitive
+        type:
+          array:
+            primitive: integer
+      # --- generic-field type: array / inner case-composite ---
+      - name: arr_items_composite
+        type:
+          array:
+            composite:
+              - name: lat
+                type:
+                  primitive: number
+              - name: lon
+                type:
+                  primitive: number
+      # --- generic-field type: top-level composite (case-composite) ---
+      - name: top_composite
+        type:
+          composite:
+            - name: part_a
+              type:
+                primitive: string
+            - name: part_b
+              type:
+                primitive: boolean
