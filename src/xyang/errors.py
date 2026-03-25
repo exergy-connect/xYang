@@ -60,13 +60,6 @@ class YangSemanticError(ValueError):
     """YANG semantic error: invalid module structure, illegal references, etc."""
 
 
-def _format_uses_expand_link(link: tuple[str, tuple]) -> str:
-    g, fp = link
-    if fp == ():
-        return g
-    return f"{g}{fp}"
-
-
 class YangRefineTargetNotFoundError(YangSemanticError):
     """Raised when a ``uses`` ``refine`` target path matches no schema node."""
 
@@ -82,15 +75,12 @@ class YangCircularUsesError(YangSemanticError):
 
     def __init__(
         self,
-        prefix_chain: tuple[tuple[str, tuple], ...],
-        repeated: tuple[str, tuple],
+        prefix_chain: tuple[str, ...],
+        repeated: str,
     ) -> None:
         self.prefix_chain = prefix_chain
-        self.repeated_link = repeated
-        self.repeated = repeated[0]
-        cycle = " -> ".join(
-            _format_uses_expand_link(x) for x in (*prefix_chain, repeated)
-        )
+        self.repeated = repeated
+        cycle = " -> ".join((*prefix_chain, repeated))
         super().__init__(
             "Circular uses chain: groupings are expanded at compile-time and this "
             f"cycle would not terminate ({cycle}). Restructure groupings to break the cycle."

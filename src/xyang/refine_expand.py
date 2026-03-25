@@ -22,27 +22,6 @@ from .ast import (
 logger = logging.getLogger(__name__)
 
 
-def uses_refine_fingerprint(refines: list[YangRefineStmt]) -> tuple:
-    """Hashable summary of ``uses`` refine blocks (order-preserving)."""
-    if not refines:
-        return ()
-    parts: list[tuple] = []
-    for r in refines:
-        t = getattr(r, "type", None)
-        type_name = t.name if t is not None else None
-        musts = tuple(m.expression for m in (getattr(r, "must_statements", None) or []))
-        parts.append(
-            (
-                r.target_path,
-                getattr(r, "min_elements", None),
-                getattr(r, "max_elements", None),
-                type_name,
-                musts,
-            )
-        )
-    return tuple(parts)
-
-
 def statement_children(stmt: YangStatement) -> list[YangStatement]:
     """Direct schema children (choice branches flatten to case bodies)."""
     if isinstance(stmt, YangChoiceStmt):

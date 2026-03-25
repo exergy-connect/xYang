@@ -7,11 +7,7 @@ import logging
 from .ast import YangChoiceStmt, YangStatement, YangUsesStmt
 from .errors import YangCircularUsesError, YangRefineTargetNotFoundError
 from .module import YangModule
-from .refine_expand import (
-    apply_refine_to_node,
-    copy_yang_statement,
-    uses_refine_fingerprint,
-)
+from .refine_expand import apply_refine_to_node, copy_yang_statement
 
 logger = logging.getLogger(__name__)
 
@@ -28,27 +24,10 @@ def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
     grouping roots are expanded (suffix match, RFC 7950 refine paths).
     """
     if not target_path or not stmt_path:
-        logger.debug(
-            "refine path match skip: empty target_path=%r stmt_path=%r",
-            target_path,
-            stmt_path,
-        )
         return False
     if stmt_path == target_path:
-        logger.debug(
-            "refine path match exact: target_path=%r stmt_path=%r",
-            target_path,
-            stmt_path,
-        )
         return True
-    matched = stmt_path.endswith("/" + target_path)
-    logger.debug(
-        "refine path match suffix: target_path=%r stmt_path=%r -> %s",
-        target_path,
-        stmt_path,
-        matched,
-    )
-    return matched
+    return stmt_path.endswith("/" + target_path)
 
 
 def _apply_refines_matching_path(
@@ -70,7 +49,7 @@ def _apply_refines_matching_path(
 def _expand_one_uses_stmt(
     stmt: YangUsesStmt,
     module: YangModule,
-    expanding_chain: tuple[tuple[str, tuple], ...],
+    expanding_chain: tuple[str, ...],
     refine_path_prefix: str,
     sibling_refines: list,
 ) -> list[YangStatement]:
@@ -81,15 +60,14 @@ def _expand_one_uses_stmt(
             "Grouping '%s' not found when expanding uses statement", gname
         )
         return []
-    link = (gname, uses_refine_fingerprint(stmt.refines))
-    if link in expanding_chain:
+    if gname in expanding_chain:
         logger.debug(
-            "circular uses detected: chain=%r repeated_link=%r",
+            "circular uses detected: chain=%r repeated=%r",
             expanding_chain,
-            link,
+            gname,
         )
-        raise YangCircularUsesError(expanding_chain, link)
-    inner_chain = expanding_chain + (link,)
+        raise YangCircularUsesError(expanding_chain, gname)
+    inner_chain = expanding_chain + (gname,)
     body = [copy_yang_statement(s) for s in grouping.statements]
     pending_refines = list(stmt.refines)
     inner_prefix = refine_path_prefix if sibling_refines else ""
@@ -126,7 +104,7 @@ def expand_all_uses_in_module(module: YangModule) -> None:
 def expand_uses_in_statements(
     statements: list[YangStatement],
     module: YangModule,
-    expanding_chain: tuple[tuple[str, tuple], ...],
+    expanding_chain: tuple[str, ...],
     refines: list,
     refine_path_prefix: str = "",
 ) -> list[YangStatement]:
