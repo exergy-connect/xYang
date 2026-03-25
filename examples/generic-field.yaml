@@ -1,0 +1,16 @@
+# Instance data for examples/generic-field.yang (container `field` uses `generic-field`).
+#
+# Array branch (`type.array` → container `array`) with one nested generic-field whose
+# type is composite: list `composite` with lat/long as primitive numbers.
+
+field:
+  name: track
+  type:
+    array:
+     composite:
+       - name: lat
+         type:
+           primitive: number
+       - name: long
+         type:
+           primitive: number

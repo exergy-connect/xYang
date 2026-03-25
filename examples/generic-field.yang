@@ -1,0 +1,113 @@
+module generic-field {
+  yang-version 1.1;
+  namespace "urn:xyang:example:generic-field";
+  prefix "gf";
+
+  organization "xYang examples";
+  description
+    "Example model: a generic field with a name and a discriminated type that is either
+     an array (elements are primitive or composite) or a composite (list of nested
+     generic-field entries).";
+
+  revision "2026-03-24" {
+    description "Recursive generic-field in composite parts; array elements primitive or composite.";
+  }
+
+  typedef primitive-type-name {
+    type enumeration {
+      enum string;
+      enum integer;
+      enum number;
+      enum boolean;
+    }
+    description "Primitive type tag.";
+  }
+
+  grouping generic-field {
+    description "Name plus container type wrapping the field-type choice.";
+    leaf name {
+      type string {
+        length "1..128";
+      }
+      mandatory true;
+      description "Field name.";
+    }
+    container type {
+      description "Field type: primitive, array or composite.";
+      choice choice-type {
+        mandatory true;
+        description "Primitive, array of elements, or composite object.";
+        case primitive {
+          leaf primitive {
+            type primitive-type-name;
+            mandatory true;
+            description "Primitive type.";
+          }
+        }
+        case case-array {
+          container array {
+            description "Array field: homogeneous elements, each primitive or composite.";
+            choice choice-type {
+              mandatory true;
+              description "Primitive, array of elements, or composite object.";
+              case primitive {
+                leaf primitive {
+                  type primitive-type-name;
+                  mandatory true;
+                  description "Primitive type.";
+                }
+              }
+              case case-composite {
+                description "Composite field: named subfields, each a full generic-field.";
+                uses composite-subfields;
+              }
+            }
+          }
+        }
+        case case-composite {
+          description "Composite field: named subfields, each a full generic-field.";
+          uses composite-subfields;
+        }
+      }
+    }
+  }
+
+  grouping composite-subfields {
+    description "Recursive generic-field entries as list items, with nesting limits.";
+    list composite {
+      key name;
+      min-elements 1;
+      description "Subfields (recursive generic field).";
+      // uses generic-field {
+      //   refine type/choice-type/case-composite/composite {
+      //     max-elements 0;
+      //     description "Exclude composite subfields at this nesting level.";
+      //   }
+      //   refine type/choice-type/case-array/array {
+      //     must "false()";
+      //     description "Exclude arrays of arrays.";
+      //   }
+      // }
+
+      leaf name {
+        type string {
+          length "1..128";
+        }
+        mandatory true;
+        description "Field name.";
+      }
+      container type {
+        leaf primitive {
+          type primitive-type-name;
+          mandatory true;
+          description "Primitive type.";
+        }
+      }
+    }
+  }
+
+  container field {
+    description "Example instance root for one generic field.";
+    uses generic-field;
+  }
+}

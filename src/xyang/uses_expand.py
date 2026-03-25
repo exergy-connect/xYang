@@ -27,12 +27,34 @@ def _extend_refine_path(prefix: str, segment: str) -> str:
 
 
 def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
-    """True if a ``refine`` *target_path* designates *stmt_path* (relative path suffix)."""
+    """True if *target_path* matches *stmt_path* (equality or relative-path suffix).
+
+    *stmt_path* uses the enclosing walk's ``refine_path_prefix`` through nested ``uses`` so
+    pending refines from an outer ``uses`` (e.g. ``list-composite``) still match after inner
+    grouping roots are expanded (suffix match, RFC 7950 refine paths).
+    """
     if not target_path or not stmt_path:
+        logger.debug(
+            "refine path match skip: empty target_path=%r stmt_path=%r",
+            target_path,
+            stmt_path,
+        )
         return False
     if stmt_path == target_path:
+        logger.debug(
+            "refine path match exact: target_path=%r stmt_path=%r",
+            target_path,
+            stmt_path,
+        )
         return True
-    return stmt_path.endswith("/" + target_path)
+    matched = stmt_path.endswith("/" + target_path)
+    logger.debug(
+        "refine path match suffix: target_path=%r stmt_path=%r -> %s",
+        target_path,
+        stmt_path,
+        matched,
+    )
+    return matched
 
 
 def _expand_one_uses_stmt(
@@ -40,6 +62,7 @@ def _expand_one_uses_stmt(
     module: YangModule,
     expanding_chain: tuple[tuple[str, tuple], ...],
     refine_path_prefix: str,
+    sibling_refines: list,
 ) -> list[YangStatement]:
     gname = stmt.grouping_name
     grouping = module.get_grouping(gname)
@@ -50,18 +73,25 @@ def _expand_one_uses_stmt(
         return []
     link = (gname, uses_refine_fingerprint(stmt.refines))
     if link in expanding_chain:
+        logger.debug(
+            "circular uses detected: chain=%r repeated_link=%r",
+            expanding_chain,
+            link,
+        )
         raise YangCircularUsesError(expanding_chain, link)
     inner_chain = expanding_chain + (link,)
     body = [copy_yang_statement(s) for s in grouping.statements]
     pending_refines = list(stmt.refines)
-    # Prefix is the schema path to the ``uses`` insertion point so refine target paths
-    # (relative to the used grouping) match stmt_path while walking nested ``uses``.
+    inner_prefix = refine_path_prefix if sibling_refines else ""
+    # Own refines are relative to the used grouping: inner prefix "" (e.g. ``composite/...``).
+    # If sibling ``refines`` still hold ancestor pending refines, keep enclosing prefix so
+    # targets like ``composite/...`` match inside nested ``uses`` (e.g. ``composite-field``).
     out = expand_uses_in_statements(
         body,
         module,
         inner_chain,
         pending_refines,
-        refine_path_prefix,
+        inner_prefix,
     )
     if pending_refines:
         raise YangRefineTargetNotFoundError(pending_refines[0].target_path)
@@ -118,7 +148,9 @@ def expand_uses_in_statements(
             continue
 
         if isinstance(stmt, YangUsesStmt):
-            repl = _expand_one_uses_stmt(stmt, module, expanding_chain, stmt_path)
+            repl = _expand_one_uses_stmt(
+                stmt, module, expanding_chain, refine_path_prefix, refines
+            )
             repl = expand_uses_in_statements(
                 repl,
                 module,
@@ -144,6 +176,12 @@ def expand_uses_in_statements(
             # children: no instances are allowed, and nested ``uses`` inside the list must
             # not be expanded (breaks apparent grouping cycles, e.g. refine on this list).
             if getattr(stmt, "max_elements", None) == 0:
+                logger.debug(
+                    "skip expanding children for %s %r at stmt_path=%r because max-elements=0",
+                    type(stmt).__name__,
+                    getattr(stmt, "name", None),
+                    stmt_path,
+                )
                 expanded.append(stmt)
             else:
                 stmt.statements = expand_uses_in_statements(

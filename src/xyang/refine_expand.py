@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import logging
 from typing import List, cast
 
 from .errors import YangRefineTargetNotFoundError
@@ -17,6 +18,8 @@ from .ast import (
     YangStatementWithMust,
     YangUsesStmt,
 )
+
+logger = logging.getLogger(__name__)
 
 
 def uses_refine_fingerprint(refines: list[YangRefineStmt]) -> tuple:
@@ -141,14 +144,33 @@ def apply_refines_by_path(
 def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
     if getattr(refine, "type", None) is not None and isinstance(stmt, YangLeafStmt):
         stmt.type = refine.type
+        logger.debug("refine applied type: stmt=%r refine=%r", stmt, refine)
     if isinstance(stmt, YangStatementWithMust):
         for refine_must in refine.must_statements:
             stmt.must_statements.append(refine_must)
+            logger.debug(
+                "refine applied must: stmt=%r added_must=%r refine=%r",
+                stmt,
+                refine_must,
+                refine,
+            )
     if isinstance(stmt, (YangListStmt, YangLeafListStmt)):
         if refine.min_elements is not None:
             stmt.min_elements = refine.min_elements
+            logger.debug(
+                "refine applied min-elements: stmt=%r min_elements=%r refine=%r",
+                stmt,
+                stmt.min_elements,
+                refine,
+            )
         if refine.max_elements is not None:
             stmt.max_elements = refine.max_elements
+            logger.debug(
+                "refine applied max-elements: stmt=%r max_elements=%r refine=%r",
+                stmt,
+                stmt.max_elements,
+                refine,
+            )
 
 
 def copy_yang_statement(stmt: YangStatement) -> YangStatement:

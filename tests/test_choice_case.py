@@ -35,7 +35,7 @@ from xyang.ast import (
     YangLeafStmt,
     YangListStmt,
 )
-from xyang.errors import YangSyntaxError
+from xyang.errors import YangSemanticError, YangSyntaxError
 
 
 def _walk_stmt(stmt: Any) -> Iterator[YangChoiceStmt]:
@@ -656,6 +656,38 @@ def test_choice_case_meta_model_missing():
     # assert len(errors) > 0
     # Current behavior: may pass (needs implementation)
     assert isinstance(is_valid, bool)
+
+
+def test_choice_duplicate_schema_node_name_across_cases_is_illegal():
+    """RFC 7950 §7.9: identifiers of nodes in the cases of a choice must be unique (shared scope).
+
+    Same name as ``leaf`` in one case and ``container`` in another is invalid YANG.
+    """
+    yang = """
+module dup-choice {
+  yang-version 1.1;
+  namespace "urn:dup";
+  prefix "d";
+
+  container c {
+    choice interface-type {
+      case a {
+        leaf ethernet {
+          type string;
+        }
+      }
+      case b {
+        container ethernet {
+          leaf x { type string; }
+        }
+      }
+    }
+  }
+}
+"""
+    with pytest.raises(YangSemanticError) as exc_info:
+        parse_yang_string(yang)
+    assert "ethernet" in str(exc_info.value)
 
 
 if __name__ == "__main__":
