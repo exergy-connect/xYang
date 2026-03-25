@@ -6,7 +6,10 @@ B uses C) and checks that xYang parses it and can validate data against it.
 """
 from __future__ import annotations
 
+import pytest
+
 from xyang import parse_yang_string, YangValidator
+from xyang.errors import YangCircularUsesError
 
 
 # Standalone YANG module with nested uses: outer uses middle, middle uses inner.
@@ -85,9 +88,9 @@ module refine_nested_list_path {
 }
 """
 
-# Same cyclic shape as ``core``/``loop_back``, but ``loop_back`` refines ``hold`` to
-# ``max-elements 0`` / ``min-elements 0`` so expansion must not descend into the list
-# body (the edge that would close the grouping cycle).
+# Same cyclic shape as ``core``/``loop_back``; ``loop_back`` refines ``hold`` to
+# ``max-elements 0`` / ``min-elements 0`` (cardinality only; does not affect compile-time
+# ``uses`` expansion).
 YANG_USES_CYCLE_BROKEN_BY_REFINE_ON_LIST = """
 module uses_cycle_broken_by_refine {
   yang-version 1.1;
@@ -155,9 +158,8 @@ def test_parse_refine_targets_list_behind_uses():
     assert root is not None
 
 
-def test_parse_uses_cycle_broken_by_refine_on_list():
-    """Grouping cycle through a list is cut by ``max-elements`` / ``min-elements`` refine on that list."""
-    module = parse_yang_string(YANG_USES_CYCLE_BROKEN_BY_REFINE_ON_LIST)
-    assert module.name == "uses_cycle_broken_by_refine"
-    root = module.find_statement("root")
-    assert root is not None
+def test_parse_uses_cycle_through_list_raises_circular_uses():
+    """Recursive ``uses`` through a list expands fully; list cardinality refine does not cut the cycle."""
+    with pytest.raises(YangCircularUsesError) as exc:
+        parse_yang_string(YANG_USES_CYCLE_BROKEN_BY_REFINE_ON_LIST)
+    assert "loop_back" in str(exc.value)

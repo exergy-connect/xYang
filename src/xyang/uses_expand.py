@@ -4,13 +4,7 @@ from __future__ import annotations
 
 import logging
 
-from .ast import (
-    YangChoiceStmt,
-    YangLeafListStmt,
-    YangListStmt,
-    YangStatement,
-    YangUsesStmt,
-)
+from .ast import YangChoiceStmt, YangStatement, YangUsesStmt
 from .errors import YangCircularUsesError, YangRefineTargetNotFoundError
 from .module import YangModule
 from .refine_expand import (
@@ -55,6 +49,22 @@ def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
         matched,
     )
     return matched
+
+
+def _apply_refines_matching_path(
+    stmt: YangStatement,
+    stmt_path: str,
+    refines: list,
+) -> None:
+    """Pop and apply refines whose target path matches *stmt_path* (mutates *refines*)."""
+    i = len(refines)
+    while i:
+        i -= 1
+        r = refines[i]
+        tp = getattr(r, "target_path", None) or ""
+        if _refine_target_matches_stmt_path(tp, stmt_path):
+            apply_refine_to_node(stmt, r)
+            del refines[i]
 
 
 def _expand_one_uses_stmt(
@@ -128,41 +138,20 @@ def expand_uses_in_statements(
             if segment
             else refine_path_prefix
         )
-
-        if refines:
-            i = len(refines)
-            while i:
-                i -= 1
-                r = refines[i]
-                tp = getattr(r, "target_path", None) or ""
-                if _refine_target_matches_stmt_path(tp, stmt_path):
-                    apply_refine_to_node(stmt, r)
-                    del refines[i]
-
-        # ``must false()`` marks a subtree as unreachable in the schema. Do not expand nested
-        # ``uses`` or recurse into children—same rationale as skipping list bodies with
-        # ``max-elements 0``: avoids infinite or cyclic grouping expansion when a refine
-        # rules out a branch (e.g. disallowing ``field_type`` array under a specific ``uses``).
-        if stmt.has_must_false():
-            expanded.append(stmt)
-            continue
+        _apply_refines_matching_path(stmt, stmt_path, refines)
 
         if isinstance(stmt, YangUsesStmt):
-            repl = _expand_one_uses_stmt(
+            body = _expand_one_uses_stmt(
                 stmt, module, expanding_chain, refine_path_prefix, refines
             )
-            repl = expand_uses_in_statements(
-                repl,
-                module,
-                expanding_chain,
-                refines,
-                stmt_path,
+            expanded.extend(
+                expand_uses_in_statements(
+                    body, module, expanding_chain, refines, stmt_path
+                )
             )
-            expanded.extend(repl)
         elif isinstance(stmt, YangChoiceStmt):
-            choice_prefix = stmt_path
             for case in stmt.cases:
-                case_prefix = _extend_refine_path(choice_prefix, case.name)
+                case_prefix = _extend_refine_path(stmt_path, case.name)
                 case.statements = expand_uses_in_statements(
                     case.statements,
                     module,
@@ -171,27 +160,6 @@ def expand_uses_in_statements(
                     case_prefix,
                 )
             expanded.append(stmt)
-        elif isinstance(stmt, (YangListStmt, YangLeafListStmt)):
-            # Refines (or the grouping) may set max-elements 0. Do not walk list/leaf-list
-            # children: no instances are allowed, and nested ``uses`` inside the list must
-            # not be expanded (breaks apparent grouping cycles, e.g. refine on this list).
-            if getattr(stmt, "max_elements", None) == 0:
-                logger.debug(
-                    "skip expanding children for %s %r at stmt_path=%r because max-elements=0",
-                    type(stmt).__name__,
-                    getattr(stmt, "name", None),
-                    stmt_path,
-                )
-                expanded.append(stmt)
-            else:
-                stmt.statements = expand_uses_in_statements(
-                    stmt.statements,
-                    module,
-                    expanding_chain,
-                    refines,
-                    stmt_path,
-                )
-                expanded.append(stmt)
         elif hasattr(stmt, "statements"):
             stmt.statements = expand_uses_in_statements(
                 stmt.statements,

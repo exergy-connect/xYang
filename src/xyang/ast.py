@@ -58,24 +58,11 @@ class YangStatement(YangStatementList):
     def child_names(self, data: dict) -> set[str]:
         return {self.name} if getattr(self, "name", None) else set()
 
-    def has_must_false(self) -> bool:
-        """True if this node has a ``must`` with expression ``false()`` (unreachable schema)."""
-        return False
-
 
 @dataclass
 class YangStatementWithMust(YangStatement):
     """Statement that can have must constraints (leaf, leaf-list, container, list)."""
     must_statements: List['YangMustStmt'] = field(default_factory=list)
-
-    def has_must_false(self) -> bool:
-        from .xpath.ast import ast_is_const_false
-
-        # TODO use XPathEvaluator for more sophisticated must expression evaluation.
-        for m in self.must_statements:
-            if ast_is_const_false(m.ast):
-                return True
-        return False
 
 
 @dataclass

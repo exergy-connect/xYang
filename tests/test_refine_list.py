@@ -1,8 +1,8 @@
 """Tests that ``refine`` can target a ``list`` and apply cardinality (and related) substatements.
 
 Also covers ``uses`` inside a ``list`` body with ``refine`` on the used grouping,
-and a ``grouping generic-field`` shape **without** the ``case-array`` branch (composite
-recursion only, with ``max-elements`` refine to keep expansion finite).
+and a ``grouping generic-field`` shape **without** the ``case-array`` branch (recursive
+``uses``; full expansion hits a grouping cycle unless expansion is disabled).
 """
 
 from __future__ import annotations
@@ -10,7 +10,10 @@ from __future__ import annotations
 import pytest
 
 from xyang import parse_yang_string
+from xyang.errors import YangCircularUsesError
 from xyang.module import YangModule
+from xyang.parser.yang_parser import YangParser
+from xyang.xpath.ast import ast_is_const_false
 from xyang.ast import (
     YangCaseStmt,
     YangChoiceStmt,
@@ -173,7 +176,9 @@ def test_uses_inside_list_with_refine_applies_to_grouping_leaf():
     assert lst is not None, "list L should exist after expansion"
     leaf = _find_leaf_named(module, "payload_leaf")
     assert leaf is not None, "grouping leaf should be inlined under list L"
-    assert leaf.has_must_false(), "refine must false() should apply to payload_leaf"
+    assert leaf.must_statements and any(
+        ast_is_const_false(m.ast) for m in leaf.must_statements
+    ), "refine must false() should apply to payload_leaf"
 
 
 YANG_GENERIC_FIELD_NO_ARRAY_CASE = """
@@ -237,19 +242,18 @@ module generic_field_no_array {
 """
 
 
-def test_grouping_generic_field_without_case_array_parses_and_refines_nested_list():
-    """``grouping generic-field`` without ``case-array``: recursive ``uses`` stays finite via list refine.
+def test_grouping_generic_field_without_case_array_raises_circular_uses_when_expanding():
+    """Recursive ``uses generic-field`` under ``list fields`` is a non-terminating expand cycle."""
+    with pytest.raises(YangCircularUsesError) as exc:
+        parse_yang_string(YANG_GENERIC_FIELD_NO_ARRAY_CASE)
+    assert "generic-field" in str(exc.value)
 
-    Full example also includes an array branch; this variant keeps the same composite
-    shape and refines only the nested ``fields`` list.
-    """
-    module = parse_yang_string(YANG_GENERIC_FIELD_NO_ARRAY_CASE)
+
+def test_grouping_generic_field_without_case_array_parses_with_expand_disabled():
+    """Same module loads when ``uses`` expansion is skipped (refines stay on AST)."""
+    parser = YangParser(expand_uses=False)
+    module = parser.parse_string(YANG_GENERIC_FIELD_NO_ARRAY_CASE)
     assert module.name == "generic_field_no_array"
-    fields_lists = _lists_named(module, "fields")
-    assert fields_lists, "expected at least one list 'fields' after expansion"
-    assert any(
-        lst.max_elements == 0 for lst in fields_lists
-    ), "nested uses generic-field should refine inner list fields to max-elements 0"
 
 
 if __name__ == "__main__":
