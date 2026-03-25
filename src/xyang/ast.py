@@ -182,8 +182,9 @@ class YangGroupingStmt(YangStatement):
 
 
 @dataclass
-class YangUsesStmt(YangStatement):
+class YangUsesStmt(YangStatementWithWhen):
     """Uses statement - incorporates a grouping."""
+
     grouping_name: str = ""
     refines: List['YangRefineStmt'] = field(default_factory=list)
 

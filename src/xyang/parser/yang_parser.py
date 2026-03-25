@@ -102,6 +102,7 @@ class YangParser:
         # Uses body statements
         self.registry.register('uses:refine', self.parsers.parse_refine)
         self.registry.register('uses:description', self.parsers.parse_description)
+        self.registry.register('uses:when', self.parsers.parse_when)
         
         # Refine body statements
         self.registry.register('refine:must', self.parsers.parse_must)

@@ -4,7 +4,13 @@ from __future__ import annotations
 
 import logging
 
-from .ast import YangChoiceStmt, YangStatement, YangUsesStmt
+from .ast import (
+    YangChoiceStmt,
+    YangStatement,
+    YangStatementWithWhen,
+    YangUsesStmt,
+    YangWhenStmt,
+)
 from .errors import YangCircularUsesError, YangRefineTargetNotFoundError
 from .module import YangModule
 from .refine_expand import apply_refine_to_node, copy_yang_statement
@@ -14,6 +20,23 @@ logger = logging.getLogger(__name__)
 
 def _extend_refine_path(prefix: str, segment: str) -> str:
     return f"{prefix}/{segment}" if prefix else segment
+
+
+def _merge_uses_when_into_grouping_roots(
+    roots: list[YangStatement],
+    uses_when: YangWhenStmt | None,
+) -> None:
+    """RFC 7950: ``when`` on ``uses`` is ANDed onto each top-level node from the grouping."""
+    if uses_when is None:
+        return
+    for node in roots:
+        if isinstance(node, YangStatementWithWhen):
+            if node.when is None:
+                node.when = uses_when
+            else:
+                node.when = YangWhenStmt(
+                    f"({uses_when.condition}) and ({node.when.condition})"
+                )
 
 
 def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
@@ -69,6 +92,7 @@ def _expand_one_uses_stmt(
         raise YangCircularUsesError(expanding_chain, gname)
     inner_chain = expanding_chain + (gname,)
     body = [copy_yang_statement(s) for s in grouping.statements]
+    _merge_uses_when_into_grouping_roots(body, stmt.when)
     pending_refines = list(stmt.refines)
     inner_prefix = refine_path_prefix if sibling_refines else ""
     # Own refines are relative to the used grouping: inner prefix "" (e.g. ``composite/...``).

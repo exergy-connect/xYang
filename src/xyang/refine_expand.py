@@ -222,5 +222,6 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
             statements=copied_statements,
             grouping_name=stmt.grouping_name,
             refines=list(stmt.refines) if stmt.refines else [],
+            when=stmt.when,
         )
     raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")

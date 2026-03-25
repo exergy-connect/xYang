@@ -7,6 +7,12 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
+  revision "2026-03-26" {
+    description
+      "grouping foreign-keys (list foreignKeys + entity leafref); uses foreign-keys { when ... }
+       under type with not(../array) so foreignKeys is invalid when the type branch is array.";
+  }
+
   revision "2026-03-24" {
     description "Recursive generic-field in composite parts; array elements primitive or composite.";
   }
@@ -26,6 +32,25 @@ module meta-model {
       enum qualified_number;
     }
     description "Primitive field data type";
+  }
+
+  grouping foreign-keys {
+    description
+      "References to another entity by name; field value type must match that entity's primary key.
+       Call sites use ``uses foreign-keys { when ... }`` so the condition applies in the parent type context.";
+    list foreignKeys {
+      key entity;
+      min-elements 1;
+      description "Each entry points at an entity whose primary key this field's type aligns with.";
+      leaf entity {
+        type leafref {
+          path "/data-model/entities/name";
+          require-instance true;
+        }
+        mandatory true;
+        description "Referenced entity name.";
+      }
+    }
   }
 
   grouping generic-field {
@@ -84,6 +109,7 @@ module meta-model {
           uses composite-subfields;
         }
       }
+      uses foreign-keys;
     }
   }
 
@@ -106,6 +132,9 @@ module meta-model {
           type primitive-type-name;
           mandatory true;
           description "Primitive type.";
+        }
+        uses foreign-keys {
+          when "not(../array)";
         }
       }
     }

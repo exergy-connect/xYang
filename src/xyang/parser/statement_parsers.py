@@ -500,12 +500,13 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.REFINE:
-                    self.parse_refine(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    self.parse_description(tokens, new_context)
+                handler = self.registry.get_handler(f"uses:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
                 else:
-                    raise tokens._make_error(f"Unknown statement in uses '{grouping_name}': {tokens.peek()}")
+                    raise tokens._make_error(
+                        f"Unknown statement in uses '{grouping_name}': {tokens.peek()}"
+                    )
             tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
