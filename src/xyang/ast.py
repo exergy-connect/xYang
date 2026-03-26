@@ -7,6 +7,8 @@ from __future__ import annotations
 from typing import TYPE_CHECKING, Any, List, Optional
 from dataclasses import dataclass, field
 
+from .errors import YangSemanticError
+
 if TYPE_CHECKING:
     from .xpath.ast import ASTNode, PathNode
 
@@ -216,6 +218,23 @@ class YangChoiceStmt(YangStatementWithWhen):
             if any(getattr(s, "name", None) in data for s in case.statements):
                 return {s.name for s in case.statements if getattr(s, "name", None)}
         return set()
+
+    def validate_case_unique_child_names(self) -> None:
+        """RFC 7950 §7.9: case branches share one namespace; schema node names must be unique."""
+        seen: dict[str, str] = {}
+        for case in self.cases:
+            for sub in case.statements:
+                seg = sub.get_schema_node()
+                if seg is None:
+                    continue
+                if seg in seen:
+                    prev_case = seen[seg]
+                    raise YangSemanticError(
+                        f"Choice {self.name!r}: schema node {seg!r} appears in case "
+                        f"{prev_case!r} and again in case {case.name!r} "
+                        "(RFC 7950: names of nodes in the cases of a choice must be unique)."
+                    )
+                seen[seg] = case.name
 
 
 @dataclass

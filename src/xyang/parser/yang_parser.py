@@ -8,7 +8,6 @@ from pathlib import Path
 from typing import Optional
 
 from ..module import YangModule
-from ..semantic_validate import validate_choice_case_unique_child_names
 from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext
@@ -164,8 +163,6 @@ class YangParser:
         
         # Parse module
         self.parsers.parse_module(tokens, context)
-
-        validate_choice_case_unique_child_names(module)
 
         # Expand uses and refine statements if enabled (default)
         if self.expand_uses:

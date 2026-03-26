@@ -372,6 +372,7 @@ def _parse_hoisted_choice_oneof(
         mandatory=mandatory,
         cases=cases,
     )
+    choice_stmt.validate_case_unique_child_names()
     return [*common_children, choice_stmt]
 
 
@@ -588,7 +589,11 @@ def _convert_choice(
             if stmt is not None:
                 case_statements.append(stmt)
         cases.append(YangCaseStmt(name=case_name, description="", statements=case_statements))
-    return YangChoiceStmt(name=name, description=description, mandatory=mandatory, cases=cases)
+    choice_stmt = YangChoiceStmt(
+        name=name, description=description, mandatory=mandatory, cases=cases
+    )
+    choice_stmt.validate_case_unique_child_names()
+    return choice_stmt
 
 
 def _convert_property(

@@ -7,6 +7,12 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
+  revision "2026-03-29" {
+    description
+      "primitive-type-and-enum extended with min, max, minDate, maxDate under the primitive branch
+       (legacy meta-model semantics; minDate/maxDate only for date or datetime primitive).";
+  }
+
   revision "2026-03-28" {
     description
       "grouping primitive-type-and-enum (mandatory primitive + optional enum) shared by generic-field
@@ -48,8 +54,9 @@ module meta-model {
 
   grouping primitive-type-and-enum {
     description
-      "Mandatory primitive discriminator plus optional allowed values (legacy meta-model).
-       enum is only applicable when primitive is string, integer, or number (when on enum).";
+      "Primitive branch: type name, optional enum, and optional min/max / minDate/maxDate (legacy meta-model).
+       enum applies only when primitive is string, integer, or number (when on enum).
+       minDate and maxDate only when primitive is date or datetime.";
     leaf primitive {
       type primitive-type-name;
       mandatory true;
@@ -66,6 +73,42 @@ module meta-model {
       }
       description
         "List of allowed values; only valid when primitive is string, integer, or number.";
+    }
+    leaf min {
+      type int32;
+      description
+        "Minimum string length, or minimum value for integer/number primitives.";
+    }
+    leaf max {
+      type int32;
+      description
+        "Maximum string length, or maximum value for integer/number primitives.";
+    }
+    leaf minDate {
+      type date;
+      description
+        "Minimum date (YYYY-MM-DD) for date or datetime primitive fields.";
+      must "../primitive = ('date','datetime')" {
+        error-message "minDate can only be used with primitive type date or datetime";
+        description "minDate applies only to date and datetime primitives.";
+      }
+      must "not(../maxDate) or . <= ../maxDate" {
+        error-message "minDate must be less than or equal to maxDate when both are specified";
+        description "Ordering between minDate and maxDate.";
+      }
+    }
+    leaf maxDate {
+      type date;
+      description
+        "Maximum date (YYYY-MM-DD) for date or datetime primitive fields.";
+      must "../primitive = ('date','datetime')" {
+        error-message "maxDate can only be used with primitive type date or datetime";
+        description "maxDate applies only to date and datetime primitives.";
+      }
+      must "not(../minDate) or . >= ../minDate" {
+        error-message "maxDate must be greater than or equal to minDate when both are specified";
+        description "Ordering between minDate and maxDate.";
+      }
     }
   }
 
@@ -315,7 +358,7 @@ module meta-model {
         key name;
         min-elements 1;
         description "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.";
-        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)" {
+        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)" {
           error-message "When type references a field_definition, min, max, minDate, maxDate, enum, default, item_type, and composite must not be specified (description and brief may be used at the reference site).";
           description "Inline constraints only when type is a primitive; when type is a field_definition name they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site.";
         }

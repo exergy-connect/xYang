@@ -113,6 +113,47 @@ def test_primitive_enum_invalid_for_boolean(new_meta_model_module):
     assert any("enum" in e.lower() for e in errors)
 
 
+def test_min_max_and_minDate_on_field_valid(new_meta_model_module):
+    """min/max/minDate/maxDate live under type with primitive (primitive-type-and-enum)."""
+    dm = _base_data_model()["data-model"]
+    ent = dm["entities"][0]
+    ent["fields"].append(
+        {
+            "name": "qty",
+            "type": {"primitive": "integer", "min": 0, "max": 100},
+        }
+    )
+    ent["fields"].append(
+        {
+            "name": "dob",
+            "type": {
+                "primitive": "date",
+                "minDate": "2020-01-01",
+                "maxDate": "2030-12-31",
+            },
+        }
+    )
+    validator = YangValidator(new_meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert ok, errors
+
+
+def test_minDate_rejected_for_string_primitive(new_meta_model_module):
+    """minDate must only apply when primitive is date or datetime."""
+    dm = _base_data_model()["data-model"]
+    ent = dm["entities"][0]
+    ent["fields"].append(
+        {
+            "name": "bad_dates",
+            "type": {"primitive": "string", "minDate": "2020-01-01"},
+        }
+    )
+    validator = YangValidator(new_meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert not ok
+    assert any("mindate" in e.lower() for e in errors)
+
+
 def test_default_on_composite_subfield_valid(new_meta_model_module):
     """default is allowed on composite subcomponents (no required leaf there)."""
     dm = _base_data_model()["data-model"]

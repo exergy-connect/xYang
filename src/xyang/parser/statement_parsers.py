@@ -556,6 +556,7 @@ class StatementParsers:
                 else:
                     raise tokens._make_error(f"Unknown statement in choice '{choice_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
+            choice_stmt.validate_case_unique_child_names()
         self._add_to_parent_or_module(context, choice_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return choice_stmt
