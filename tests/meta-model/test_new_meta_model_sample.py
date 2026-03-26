@@ -241,3 +241,50 @@ def test_field_definition_definition_ref_rejected(new_meta_model_module):
     is_valid, errors, _warnings = validator.validate(data)
     assert not is_valid
     assert any("field_definition cannot reference another" in str(e) for e in errors)
+
+
+def test_new_meta_model_parent_array_must_rejects_non_array_target(new_meta_model_module):
+    """parent_array must requires a direct type/array on the referenced field (consolidated=true)."""
+    data = {
+        "data-model": {
+            "name": "t",
+            "version": "1",
+            "author": "t",
+            "consolidated": True,
+            "entities": [
+                {
+                    "name": "company",
+                    "brief": "c",
+                    "primary_key": "id",
+                    "fields": [
+                        {"name": "id", "type": {"primitive": "string"}},
+                        {
+                            "name": "departments",
+                            "type": {"array": {"primitive": "string"}},
+                        },
+                    ],
+                },
+                {
+                    "name": "department",
+                    "brief": "d",
+                    "primary_key": "did",
+                    "fields": [
+                        {"name": "did", "type": {"primitive": "string"}},
+                        {
+                            "name": "company_id",
+                            "type": {
+                                "primitive": "string",
+                                "foreignKeys": [
+                                    {"entity": "company", "parent_array": "id"}
+                                ],
+                            },
+                        },
+                    ],
+                },
+            ],
+        }
+    }
+    validator = YangValidator(new_meta_model_module)
+    is_valid, errors, _warnings = validator.validate(data)
+    assert not is_valid
+    assert any("parent_array must name" in str(e) for e in errors)

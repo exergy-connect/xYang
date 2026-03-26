@@ -145,6 +145,21 @@ module meta-model {
         mandatory true;
         description "Referenced entity name.";
       }
+      leaf parent_array {
+        type leafref {
+          path "/data-model/entities/fields/name";
+          require-instance true;
+        }
+        description
+          "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).";
+        must "/data-model/consolidated = false() or " +
+           "count(/data-model/entities[name = string(deref(../entity))]/fields[name = current()]/type/array) = 1" {
+          error-message
+            "parent_array must name a field on the referenced entity whose type uses the array branch directly (not via field_definitions); skipped when consolidated is false.";
+          description
+            "Requires a direct type/array container on the referenced field. Fields that only reference field_definitions are not checked here. Skipped when consolidated is false.";
+        }
+      }
     }
   }
 
