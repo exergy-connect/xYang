@@ -7,6 +7,18 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
+  revision "2026-03-28" {
+    description
+      "grouping primitive-type-and-enum (mandatory primitive + optional enum) shared by generic-field
+       primitive cases and composite-subfields; enum only when primitive is string, integer, or number.";
+  }
+
+  revision "2026-03-27" {
+    description
+      "grouping field-default (leaf default) for entity fields and composite subcomponents;
+       leaf required only on generic-field (not on composite subfields — inherited from parent).";
+  }
+
   revision "2026-03-26" {
     description
       "grouping foreign-keys (list foreignKeys + entity leafref); uses foreign-keys { when ... }
@@ -34,6 +46,46 @@ module meta-model {
     description "Primitive field data type";
   }
 
+  grouping primitive-type-and-enum {
+    description
+      "Mandatory primitive discriminator plus optional allowed values (legacy meta-model).
+       enum is only applicable when primitive is string, integer, or number (when on enum).";
+    leaf primitive {
+      type primitive-type-name;
+      mandatory true;
+      description "Primitive type.";
+    }
+    leaf-list enum {
+      when "../primitive = ('string', 'integer', 'number')";
+      type union {
+        type string;
+        type int32;
+        type decimal64 {
+          fraction-digits 2;
+        }
+      }
+      description
+        "List of allowed values; only valid when primitive is string, integer, or number.";
+    }
+  }
+
+  grouping field-default {
+    description
+      "Optional default value for instance data. Allowed on entity fields, field_definitions,
+       and composite subcomponents; not combinable with required=true on the same node (see generic-field).";
+    leaf default {
+      type union {
+        type string;
+        type int32;
+        type decimal64 {
+          fraction-digits 2;
+        }
+        type boolean;
+      }
+      description "Default value when the field is omitted in instance data.";
+    }
+  }
+
   grouping foreign-keys {
     description
       "References to another entity by name; field value type must match that entity's primary key.
@@ -54,13 +106,27 @@ module meta-model {
   }
 
   grouping generic-field {
-    description "Name plus container type wrapping the field-type choice.";
+    description
+      "Name, optional required (top-level only), container type, then optional default.
+       Composite subcomponents use field-default only after type; required is inherited from the parent field.";
     leaf name {
       type string {
         length "1..128";
       }
       mandatory true;
       description "Field name.";
+    }
+    leaf required {
+      type boolean;
+      default false;
+      description
+        "Whether this field is required in instance data. Only for entity fields and field_definitions;
+         must not appear on composite subcomponents (requiredness is inherited from the enclosing field).";
+      must "not(../default) or . = false()" {
+        error-message
+          "A required field cannot have a default value. If required is true, default must not be specified.";
+        description "A required field cannot have a default value.";
+      }
     }
     container type {
       description "Field type: primitive, array or composite.";
@@ -78,11 +144,7 @@ module meta-model {
           }
         }
         case primitive {
-          leaf primitive {
-            type primitive-type-name;
-            mandatory true;
-            description "Primitive type.";
-          }
+          uses primitive-type-and-enum;
         }
         case case-array {
           container array {
@@ -91,11 +153,7 @@ module meta-model {
               mandatory true;
               description "Primitive, array of elements, or composite object.";
               case primitive {
-                leaf primitive {
-                  type primitive-type-name;
-                  mandatory true;
-                  description "Primitive type.";
-                }
+                uses primitive-type-and-enum;
               }
               case case-composite {
                 description "Composite field: named subfields, each a full generic-field.";
@@ -111,6 +169,7 @@ module meta-model {
       }
       uses foreign-keys;
     }
+    uses field-default;
   }
 
   grouping composite-subfields {
@@ -128,15 +187,12 @@ module meta-model {
         description "Field name.";
       }
       container type {
-        leaf primitive {
-          type primitive-type-name;
-          mandatory true;
-          description "Primitive type.";
-        }
+        uses primitive-type-and-enum;
         uses foreign-keys {
           when "not(../array)";
         }
       }
+      uses field-default;
     }
   }
 
@@ -259,7 +315,7 @@ module meta-model {
         key name;
         min-elements 1;
         description "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.";
-        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)" {
+        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)" {
           error-message "When type references a field_definition, min, max, minDate, maxDate, enum, default, item_type, and composite must not be specified (description and brief may be used at the reference site).";
           description "Inline constraints only when type is a primitive; when type is a field_definition name they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site.";
         }

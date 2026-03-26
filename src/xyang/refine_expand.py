@@ -208,12 +208,14 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
             statements=copied_statements,
             mandatory=stmt.mandatory,
             cases=copied_cases,
+            when=stmt.when,
         )
     if isinstance(stmt, YangCaseStmt):
         return YangCaseStmt(
             name=stmt.name,
             description=stmt.description,
             statements=copied_statements,
+            when=stmt.when,
         )
     if isinstance(stmt, YangUsesStmt):
         return YangUsesStmt(

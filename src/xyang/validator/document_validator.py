@@ -432,6 +432,17 @@ class DocumentValidator:
                 )
                 path.pop()
 
+    def _choice_has_branch_data(
+        self, choice: YangChoiceStmt, data: Dict[str, Any]
+    ) -> bool:
+        """True if any schema child under any case has a key in ``data``."""
+        for case in choice.cases:
+            for s in case.statements:
+                n = getattr(s, "name", None)
+                if n and n in data:
+                    return True
+        return False
+
     def _visit_choice(
         self,
         choice: YangChoiceStmt,
@@ -440,12 +451,50 @@ class DocumentValidator:
         path: PathBuilder,
         enforce_mandatory_choice: bool,
     ) -> None:
+        parent_ctx_obj, parent_node = parent_ctx
+
+        if choice.when is not None:
+            when_ok = self._eval_expr(choice.when.ast, parent_ctx_obj, parent_node)
+            if when_ok is None:
+                when_ok = True
+            if not when_ok:
+                if self._choice_has_branch_data(choice, data):
+                    self._errors.append(
+                        ValidationError(
+                            path=path.current(),
+                            message=(
+                                f"Choice '{choice.name}' has data but its 'when' "
+                                "evaluates to false — this branch must not exist"
+                            ),
+                            expression=choice.when.condition,
+                        )
+                    )
+                return
+
         active_cases: list[YangCaseStmt] = []
         for case in choice.cases:
-            if any(
+            if not any(
                 getattr(s, "name", None) in data for s in case.statements
             ):
-                active_cases.append(case)
+                continue
+            if case.when is not None:
+                c_ok = self._eval_expr(case.when.ast, parent_ctx_obj, parent_node)
+                if c_ok is None:
+                    c_ok = True
+                if not c_ok:
+                    self._errors.append(
+                        ValidationError(
+                            path=path.current(),
+                            message=(
+                                f"Case '{case.name}' of choice '{choice.name}' has "
+                                "data but its 'when' evaluates to false — this branch "
+                                "must not exist"
+                            ),
+                            expression=case.when.condition,
+                        )
+                    )
+                    return
+            active_cases.append(case)
 
         if len(active_cases) > 1:
             names = ", ".join(c.name for c in active_cases)

@@ -202,8 +202,9 @@ class YangRefineStmt(YangStatementWithMust):
 
 
 @dataclass
-class YangChoiceStmt(YangStatement):
+class YangChoiceStmt(YangStatementWithWhen):
     """Choice statement - defines mutually exclusive alternatives."""
+
     mandatory: bool = False
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
@@ -218,7 +219,7 @@ class YangChoiceStmt(YangStatement):
 
 
 @dataclass
-class YangCaseStmt(YangStatement):
+class YangCaseStmt(YangStatementWithWhen):
     """Case statement - defines one alternative in a choice."""
 
     def get_schema_node(self) -> Optional[str]:

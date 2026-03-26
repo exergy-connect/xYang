@@ -48,7 +48,7 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
   - Supports must constraints on containers, lists, leaves, and leaf-lists
   - Supports must constraints on lists containing leafref types
   - `current()` correctly refers to list item context in list must constraints
-- ✅ `when` - When conditions (1 occurrence) - **Parsed and evaluated**
+- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses` (not on `refine`; `augment` / `anydata` are unsupported)
 - ✅ `mandatory` - Mandatory fields (15 occurrences)
   - Supports mandatory on choice statements (exactly one case must be present)
 - ✅ `default` - Default values (29 occurrences)
@@ -97,7 +97,7 @@ The following YANG features are not used in `meta-model.yang` and are not implem
 
 ## When Conditions
 
-xYang supports `when` statements for conditional validation. When a `when` condition evaluates to `false`, the associated statement (container, leaf, list, etc.) is skipped during validation. This allows conditional inclusion of schema elements based on data values.
+xYang supports `when` statements for conditional validation. When a `when` condition evaluates to `false`, the associated statement is skipped; if instance data is present for that branch, validation reports an error (see RFC 7950 §7.21.5). Supported parents match the implemented subset of the data model: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses`. For `choice` and `case`, the XPath context is the same as for other children of the enclosing container or list entry (the choice/case nodes do not appear as data keys).
 
 Example from `meta-model.yang`:
 ```yang

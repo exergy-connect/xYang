@@ -89,6 +89,7 @@ class YangParser:
         self.registry.register('leaf-list:min-elements', self.parsers.parse_min_elements)
         self.registry.register('leaf-list:max-elements', self.parsers.parse_max_elements)
         self.registry.register('leaf-list:description', self.parsers.parse_description)
+        self.registry.register('leaf-list:when', self.parsers.parse_when)
         self.registry.register('leaf-list:must', self.parsers.parse_must)
         
         # Typedef body statements
@@ -123,10 +124,12 @@ class YangParser:
         # Choice body statements
         self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
         self.registry.register('choice:description', self.parsers.parse_description)
+        self.registry.register('choice:when', self.parsers.parse_when)
         self.registry.register('choice:case', self.parsers.parse_case)
         
         # Case body statements
         self.registry.register('case:description', self.parsers.parse_description)
+        self.registry.register('case:when', self.parsers.parse_when)
         self.registry.register('case:uses', self.parsers.parse_uses)
     
     def parse_file(self, file_path: Path) -> YangModule:
