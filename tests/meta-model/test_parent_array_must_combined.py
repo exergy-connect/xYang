@@ -2,17 +2,15 @@
 Test for parent_array must constraint on combined (consolidated) data model.
 
 Reproduces the xFrame basecase scenario: when validating a combined model
-(consolidated=True), the must constraint
-
-  /data-model/entities[name = ../entity]/fields[name = current()]/type = 'array'
-
-must correctly resolve the referenced entity's field (e.g. company.departments,
-department.employees, employee.reports) and see type 'array'. With path caching
-enabled, this can incorrectly fail (cached path result from different context).
+(consolidated=True), the parent_array leafref must see the referenced field's
+type/array branch. With path caching enabled, this can incorrectly fail.
 """
 
-import pytest
+from __future__ import annotations
+
 from pathlib import Path
+
+import pytest
 
 from xyang import YangValidator, parse_yang_file
 from xyang.validator.document_validator import DocumentValidator
@@ -25,77 +23,84 @@ def meta_model():
     return parse_yang_file(str(yang_path))
 
 
-def _combined_basecase_data():
-    """Combined data model equivalent to xFrame basecase (company, department, employee).
+def _str_field(name: str, description: str) -> dict:
+    return {"name": name, "description": description, "type": {"primitive": "string"}}
 
-    Each parent_array references a field that exists on the referenced entity
-    and has type 'array'.
-    """
+
+def _combined_basecase_data():
+    """Combined data model equivalent to xFrame basecase (company, department, employee)."""
     return {
         "data-model": {
             "name": "Base Case Test Model",
             "version": "25.11.29.1",
             "author": "Test",
+            "description": "Hierarchical org sample.",
             "consolidated": True,
             "entities": [
                 {
                     "name": "company",
+                    "description": "Company root.",
                     "primary_key": "company_id",
                     "fields": [
-                        {"name": "company_id", "type": "string"},
-                        {"name": "company_name", "type": "string"},
+                        _str_field("company_id", "Company PK."),
+                        _str_field("company_name", "Name."),
                         {
                             "name": "departments",
-                            "type": "array",
-                            "item_type": {"entity": "department"},
+                            "description": "Nested departments.",
+                            "type": {"array": {"entity": "department"}},
                         },
                     ],
                 },
                 {
                     "name": "department",
+                    "description": "Department under company.",
                     "primary_key": "department_id",
                     "fields": [
-                        {"name": "department_id", "type": "string"},
-                        {"name": "department_name", "type": "string"},
+                        _str_field("department_id", "Dept PK."),
+                        _str_field("department_name", "Dept name."),
                         {
                             "name": "company_id",
-                            "type": "string",
-                            "foreignKeys": [
-                                {"entity": "company", "parent_array": "departments"}
-                            ],
+                            "description": "FK to company via departments array.",
+                            "type": {
+                                "primitive": "string",
+                                "foreignKeys": [{"entity": "company", "parent_array": "departments"}],
+                            },
                         },
                         {
                             "name": "employees",
-                            "type": "array",
-                            "item_type": {"entity": "employee"},
+                            "description": "Nested employees.",
+                            "type": {"array": {"entity": "employee"}},
                         },
                     ],
                 },
                 {
                     "name": "employee",
+                    "description": "Employee under department.",
                     "primary_key": "employee_id",
                     "fields": [
-                        {"name": "employee_id", "type": "string"},
-                        {"name": "employee_name", "type": "string"},
+                        _str_field("employee_id", "Employee PK."),
+                        _str_field("employee_name", "Employee name."),
                         {
                             "name": "manager_id",
-                            "type": "string",
-                            "foreignKeys": [
-                                {"entity": "employee", "parent_array": "reports"}
-                            ],
+                            "description": "Self-FK via reports array.",
+                            "type": {
+                                "primitive": "string",
+                                "foreignKeys": [{"entity": "employee", "parent_array": "reports"}],
+                            },
                         },
                         {
                             "name": "department_id",
-                            "type": "string",
-                            "foreignKeys": [
-                                {"entity": "department", "parent_array": "employees"}
-                            ],
+                            "description": "FK to department via employees array.",
+                            "type": {
+                                "primitive": "string",
+                                "foreignKeys": [{"entity": "department", "parent_array": "employees"}],
+                            },
                         },
-                        {"name": "email", "type": "string"},
+                        _str_field("email", "Email."),
                         {
                             "name": "reports",
-                            "type": "array",
-                            "item_type": {"entity": "employee"},
+                            "description": "Nested reports (employees).",
+                            "type": {"array": {"entity": "employee"}},
                         },
                     ],
                 },
@@ -105,14 +110,7 @@ def _combined_basecase_data():
 
 
 def test_parent_array_must_combined_with_cache(meta_model):
-    """Combined model with parent_array refs must validate when cache is enabled.
-
-    Reproduces the xFrame failure: validation fails with
-    'Parent array field must be of type array' when path cache is used, because
-    the must path /data-model/entities[name=../entity]/fields[name=current()]/type
-    is context-dependent (current(), ../entity) but cached by path string only.
-    This test asserts that validation passes with cache=True once the bug is fixed.
-    """
+    """Combined model with parent_array refs must validate when cache is enabled."""
     data = _combined_basecase_data()
     validator = YangValidator(meta_model)
     is_valid, errors, warnings = validator.validate(data)
@@ -124,15 +122,10 @@ def test_parent_array_must_combined_with_cache(meta_model):
 
 
 def test_parent_array_must_combined_without_cache(meta_model):
-    """Same combined model with cache disabled must validate.
-
-    Documents that the data is valid: with cache=False the parent_array must
-    constraint evaluates correctly.
-    """
+    """Same combined model with cache disabled must validate."""
     data = _combined_basecase_data()
     doc_validator = DocumentValidator(meta_model)
     errors = doc_validator.validate(data, cache=False)
     assert not errors, (
-        "With cache=False, combined model should pass parent_array must. "
-        f"Errors: {errors}"
+        f"With cache=False, combined model should pass parent_array must. Errors: {errors}"
     )

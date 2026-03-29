@@ -7,49 +7,68 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
-  revision "2026-03-08" {
+  revision "2026-04-01" {
     description
-      "Optional source for model and fields:
-       - Added optional leaf source under data-model to document where the model data comes from (e.g. URL, Excel sheet)
-       - Added optional leaf source to composite-field and field-constraints to document where each entity field's data comes from (e.g. column name, API path)";
+      "Restored shared typedefs (date, entity-name, version-string, change-history-policy, rate-of-change, validation-mode, storage-type) for JSON Schema $defs;
+       array choice array-element-entity; must expressions use type/array and type/definition paths.";
   }
 
-  revision "2026-03-06" {
+  revision "2026-03-31" {
     description
-      "Optional field_definitions per entity and type as definition reference:
-       - Added optional list field_definitions under each entity (name + type, min, max, etc.); names unique per entity only
-       - Entity field 'type' may be a primitive or a field_definition name (same entity or, after consolidation, another entity)
-       - When type references a field_definition, min/max/minDate/maxDate/enum/default/item_type/composite must not be set
-       - Cross-entity field_definition reference is only allowed when consolidated is true";
+      "Optional entity leaf index (type empty) for per-PK file sharding; forbidden when any field uses foreignKeys/parent_array.";
   }
 
-  revision "2026-02-23" {
+  revision "2026-03-30" {
     description
-      "Removed field leaf from foreignKeys list and primaryKey field from field-definition:
-       - Foreign keys now always reference the primary key of the referenced entity
-       - Removed optional field specification from foreignKeys (field leaf removed)
-       - Removed primaryKey boolean field from field-definition grouping
-       - Updated all related constraints and test data";
+      "Grouping field-common-atts (name, brief, mandatory description, source) reused by generic-field and composite-subfields;
+       data-model and entity description leaves aligned with legacy meta-model (mandatory description on model and entity).";
   }
 
-  revision "2026-02-22" {
+  revision "2026-03-29" {
     description
-      "Major refactoring and composite field support:
-       - Implemented composite fields using grouping and uses statements
-       - Added 'composite' to primitive-type enumeration
-       - Created composite-field grouping for subcomponent definitions
-       - Refactored field-definition to extend composite-field grouping
-       - Changed foreignKey to foreignKeys as a direct list (replacing single entity/field and references wrapper)
-       - Changed primary_key from leaf-list to single leaf supporting composite fields
-       - Composite subcomponents inherit required from parent
-       - Only one level of composition allowed (no nested composites)";
+      "primitive-type-and-enum extended with min, max, minDate, maxDate under the primitive branch
+       (legacy meta-model semantics; minDate/maxDate only for date or datetime primitive).";
   }
 
-  revision "2026-01-15" {
-    description "Initial version";
+  revision "2026-03-28" {
+    description
+      "grouping primitive-type-and-enum (mandatory primitive + optional enum) shared by generic-field
+       primitive cases and composite-subfields; enum only when primitive is string, integer, or number.";
   }
 
-  // Type definitions
+  revision "2026-03-27" {
+    description
+      "grouping field-default (leaf default) for entity fields and composite subcomponents;
+       leaf required only on generic-field (not on composite subfields — inherited from parent).";
+  }
+
+  revision "2026-03-26" {
+    description
+      "grouping foreign-keys (list foreignKeys + entity leafref); uses foreign-keys { when ... }
+       under type with not(../array) so foreignKeys is invalid when the type branch is array.";
+  }
+
+  revision "2026-03-24" {
+    description "Recursive generic-field in composite parts; array elements primitive or composite.";
+  }
+
+  typedef primitive-type-name {
+    type enumeration {
+      enum string;
+      enum integer;
+      enum number;
+      enum boolean;
+      enum array;
+      enum datetime;
+      enum date;
+      enum duration_in_days;
+      enum qualified_string;
+      enum qualified_integer;
+      enum qualified_number;
+    }
+    description "Primitive field data type";
+  }
+
   typedef date {
     type string {
       pattern '\d{4}-\d{2}-\d{2}';
@@ -76,38 +95,6 @@ module meta-model {
     description "Entity name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2).";
   }
 
-  typedef field-name {
-    type string {
-      length "1..64";
-      pattern '[a-z_][a-z0-9_]*' {
-        description
-          "Field names must start with a letter or underscore, and are normalized to lower case.";
-      }
-    }
-    description "Field name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2).";
-  }
-
-  typedef child-fk-reference {
-    type union {
-      type leafref {
-        path "../../fields/name";
-        require-instance true;
-      }
-      type leafref {
-        path "../../fields[type = 'composite']/composite/name";
-        require-instance true;
-      }
-    }
-    description "Child foreign key reference - either a top-level field name or a composite field subcomponent name. Composite subcomponent names must be unique within the entity, allowing direct reference by name without the field prefix.";
-  }
-
-  typedef identifier {
-    type string {
-      pattern '^[a-zA-Z_][a-zA-Z0-9_]*$';
-    }
-    description "Valid Python identifier";
-  }
-
   typedef version-string {
     type string {
       pattern '\d{2}\.\d{2}\.\d{2}\.\d+' {
@@ -115,35 +102,6 @@ module meta-model {
       }
     }
     description "Version string in format YY.MM.DD.N, auto-incremented during consolidation when changes are detected";
-  }
-
-  typedef primitive-type {
-    type enumeration {
-      enum string;
-      enum integer;
-      enum number;
-      enum boolean;
-      enum array;
-      enum datetime;
-      enum date;
-      enum duration_in_days;
-      enum qualified_string;
-      enum qualified_integer;
-      enum qualified_number;
-      enum composite;
-    }
-    description "Primitive field data type";
-  }
-
-  typedef type-or-definition-ref {
-    type union {
-      type primitive-type;
-      type leafref {
-        path "/data-model/entities/field_definitions/name";
-        require-instance true;
-      }
-    }
-    description "Field type: primitive, or a reference to a field_definition. When a reference, constraints (min, max, etc.) are inherited from that definition.";
   }
 
   typedef rate-of-change {
@@ -181,27 +139,6 @@ module meta-model {
     description "Storage type for entity data";
   }
 
-  typedef field-validation-mode {
-    type enumeration {
-      enum enforce;
-      enum filter;
-    }
-    description "Field validation mode. 'enforce' (default) - field constraints are enforced during validation, 'filter' - field value is filtered out (not included in data output)";
-  }
-
-  typedef qualified-source {
-    type enumeration {
-      enum ai;
-      enum enum;
-      enum schema;
-      enum user;
-      enum inferred;
-      enum default;
-      enum model;
-    }
-    description "Source of qualified value determination";
-  }
-
   typedef change-history-policy {
     type union {
       type int32 {
@@ -218,59 +155,39 @@ module meta-model {
        - 0: Disabled (no modification history tracked)";
   }
 
-  // Grouping for field constraint definitions (type, min/max, etc.) - used only in list field_definitions
-  grouping field-constraints {
-    description "Reusable type and constraint definition: type, min, max, minDate, maxDate, enum, default, item_type, validation, and composite subcomponents when type is composite.";
-    leaf type {
-      type primitive-type;
+  typedef field-name {
+    type string {
+      length "1..128";
+      pattern '[a-z_][a-z0-9_]*' {
+        description
+          "Field names must start with a letter or underscore, and are normalized to lower case.";
+      }
+    }
+    description "Field name for computed references and leafrefs (same rules as entity fields).";
+  }
+
+  typedef field-validation-mode {
+    type enumeration {
+      enum enforce;
+      enum filter;
+    }
+    description
+      "Field validation mode. 'enforce' (default) — constraints are enforced during validation;
+       'filter' — invalid field value is omitted from consolidated output.";
+  }
+
+  grouping primitive-type-and-enum {
+    description
+      "Primitive branch: type name, optional enum, and optional min/max / minDate/maxDate (legacy meta-model).
+       enum applies only when primitive is string, integer, or number (when on enum).
+       minDate and maxDate only when primitive is date or datetime.";
+    leaf primitive {
+      type primitive-type-name;
       mandatory true;
-      description "Field data type";
-    }
-    leaf description {
-      type string;
-      description "AI-friendly field description. When type references a field_definition, may be specified at the reference site to override or supplement the definition's description.";
-    }
-    leaf source {
-      type string;
-      description "Optional documentation of where this field's data comes from (e.g. URL, Excel column name, API path).";
-    }
-    leaf brief {
-      type string;
-      description "Brief one-line summary of the field. When type references a field_definition, may be specified at the reference site to override or supplement the definition's brief.";
-    }
-    leaf min {
-      type int32;
-      description "Minimum length for string fields, or minimum value for numeric fields";
-    }
-    leaf max {
-      type int32;
-      description "Maximum length for string fields, or maximum value for numeric fields";
-    }
-    leaf minDate {
-      type date;
-      description "Minimum date value for date or datetime fields (YYYY-MM-DD format).";
-      must "../type = ('date','datetime')" {
-        error-message "minDate can only be used with fields of type 'date' or 'datetime'";
-        description "Validates that minDate is only specified for date or datetime fields";
-      }
-      must "not(../maxDate) or . <= ../maxDate" {
-        error-message "minDate must be less than or equal to maxDate when both are specified";
-        description "Validates that minDate is not greater than maxDate when both date constraints are present";
-      }
-    }
-    leaf maxDate {
-      type date;
-      description "Maximum date value for date or datetime fields (YYYY-MM-DD format).";
-      must "../type = ('date','datetime')" {
-        error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
-        description "Validates that maxDate is only specified for date or datetime fields";
-      }
-      must "not(../minDate) or . >= ../minDate" {
-        error-message "maxDate must be greater than or equal to minDate when both are specified";
-        description "Validates that maxDate is not less than minDate when both date constraints are present";
-      }
+      description "Primitive type.";
     }
     leaf-list enum {
+      when "../primitive = ('string', 'integer', 'number')";
       type union {
         type string;
         type int32;
@@ -278,14 +195,61 @@ module meta-model {
           fraction-digits 2;
         }
       }
-      description "List of allowed enum values";
-      must "../type = ('string', 'integer', 'number') or " +
-           "(../type = 'array' and ../item_type/primitive = ('string', 'integer', 'number')) or " +
-           "(../type = 'composite' and count(../composite[type = ('string', 'integer', 'number')]) > 0)" {
-        error-message "enum can only be used with fields of type 'string', 'integer', 'number', 'array' with item_type primitive 'string', 'integer', or 'number', or 'composite' with at least one subcomponent of type 'string', 'integer', or 'number'";
-        description "Validates that enum is only specified for field types that support enum values.";
+      description
+        "List of allowed values; only valid when primitive is string, integer, or number.";
+    }
+    leaf min {
+      type int32;
+      description
+        "Minimum string length, or minimum value for integer/number primitives.";
+    }
+    leaf max {
+      type int32;
+      description
+        "Maximum string length, or maximum value for integer/number primitives.";
+    }
+    leaf minDate {
+      type date;
+      description
+        "Minimum date (YYYY-MM-DD) for date or datetime primitive fields.";
+      must "../primitive = ('date','datetime')" {
+        error-message "minDate can only be used with primitive type date or datetime";
+        description "minDate applies only to date and datetime primitives.";
+      }
+      must "not(../maxDate) or . <= ../maxDate" {
+        error-message "minDate must be less than or equal to maxDate when both are specified";
+        description "Ordering between minDate and maxDate.";
       }
     }
+    leaf maxDate {
+      type date;
+      description
+        "Maximum date (YYYY-MM-DD) for date or datetime primitive fields.";
+      must "../primitive = ('date','datetime')" {
+        error-message "maxDate can only be used with primitive type date or datetime";
+        description "maxDate applies only to date and datetime primitives.";
+      }
+      must "not(../minDate) or . >= ../minDate" {
+        error-message "maxDate must be greater than or equal to minDate when both are specified";
+        description "Ordering between minDate and maxDate.";
+      }
+    }
+    leaf outlier {
+      when "not(../primitive = ('string', 'boolean', 'qualified_string'))";
+      type decimal64 {
+        fraction-digits 1;
+        range "0.1..4.0";
+      }
+      description
+        "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.
+         Omit to disable sigma-based outlier detection.";
+    }
+  }
+
+  grouping field-default {
+    description
+      "Optional default value for instance data. Allowed on entity fields, field_definitions,
+       and composite subcomponents; not combinable with required=true on the same node (see generic-field).";
     leaf default {
       type union {
         type string;
@@ -295,288 +259,190 @@ module meta-model {
         }
         type boolean;
       }
-      description "Default value for this field";
-    }
-    container item_type {
-      when "../type = 'array'";
-      description "Required for array fields - specifies the type of each item";
-      choice item-type-choice {
-        mandatory true;
-        description "Type of array items - must be one of: primitive or entity";
-        case primitive-case {
-          leaf primitive {
-            type primitive-type;
-            description "Primitive type (string, integer, etc.)";
-          }
-        }
-        case entity-case {
-          leaf entity {
-            type entity-name;
-            description "Entity (array items may be full object or primary key value)";
-          }
-        }
-      }
-    }
-    leaf validation {
-      type field-validation-mode;
-      default enforce;
-      description "Field validation mode.";
-    }
-    list composite {
-      when "../type = 'composite'";
-      key name;
-      min-elements 1;
-      must "count(../composite) <= 7 or /data-model/allow_unlimited_fields" {
-        error-message "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).";
-        description "Maximum 7 subcomponents unless allow_unlimited_fields is set.";
-      }
-      description "Subcomponent fields when type is composite. Maximum 7 subcomponents unless allow_unlimited_fields is set (same as entity non-array field limit). No nested composites.";
-      uses composite-field {
-        refine type {
-          must ". != 'composite'" {
-            error-message "Subcomponents of a composite field cannot themselves be composite (no nested composites)";
-            description "Prevents nested composite fields";
-          }
-        }
-      }
+      description "Default value when the field is omitted in instance data.";
     }
   }
 
-  // Grouping for field definition: uses composite-field; type may be primitive or field_definition name (refined in list fields)
-  grouping field-definition {
-    description "Reusable field definition structure for top-level fields. Type may be primitive or a field_definition name; when a reference, min/max/etc. must not be set.";
-    uses composite-field;
-    leaf required {
-      type boolean;
-      default false;
-      description "Whether this field is required.";
-      must "not(../default) or . = false()" {
-        error-message "A required field cannot have a default value. If required is true, default must not be specified.";
-        description "A required field cannot have a default value.";
-      }
-    }
-    list composite {
-      when "../type = 'composite'";
-      key name;
-      min-elements 1;
-      must "count(../composite) <= 7 or /data-model/allow_unlimited_fields" {
-        error-message "Composite field has more than 7 subcomponents. Set allow_unlimited_fields on the data model to bypass this limit (same as entity non-array field limit).";
-        description "Maximum 7 subcomponents unless allow_unlimited_fields is set.";
-      }
-      description "Subcomponent fields when type is composite. Maximum 7 subcomponents unless allow_unlimited_fields is set (same as entity non-array field limit). No nested composites.";
-      uses composite-field {
-        refine type {
-          must ". != 'composite'" {
-            error-message "Subcomponents of a composite field cannot themselves be composite (no nested composites)";
-            description "Prevents nested composite fields";
-          }
-        }
-      }
-    }
-  }
-
-  // Grouping for composite subcomponent definition (excludes required)
-  grouping composite-field {
-    description "Field definition for composite subcomponents, excluding required which is inherited from the parent";
-    leaf name {
-      type field-name;
-      mandatory true;
-      description "Field name";
-      must "string-length(.) - string-length(translate(., '_', '')) <= number(/data-model/max_name_underscores)" {
-        error-message "Field name exceeds the maximum underscore limit configured in max_name_underscores (default: 2). Deep names suggest missing entity boundaries - create proper entities instead.";
-        description "Validates that field name has at most max_name_underscores underscores (default: 2) to constrain hierarchical depth and reduce parsing complexity.";
-      }
-    }
-    leaf type {
-      type primitive-type;
-      mandatory true;
-      description "Field data type";
-    }
-    leaf description {
-      type string;
-      description "AI-friendly field description";
-    }
-    leaf source {
-      type string;
-      description "Optional documentation of where this field's data comes from (e.g. URL, Excel column name, API path).";
-    }
-    leaf brief {
-      type string;
-      description "Brief one-line summary of the field";
-    }
+  grouping foreign-keys {
+    description
+      "References to another entity by name; field value type must match that entity's primary key.
+       Call sites use ``uses foreign-keys { when ... }`` so the condition applies in the parent type context.";
     list foreignKeys {
       key entity;
       min-elements 1;
-      description "List of foreign key relationships. Each entry references an entity, and the foreign key field must match that entity's primary key.";
-      must "/data-model/consolidated = false() or " +
-           "count(/data-model/entities[name = string(current()/entity)]/fields[name = /data-model/entities[name = string(current()/entity)]/primary_key]/type) != 1 or " +
-           "../type = /data-model/entities[name = string(current()/entity)]/fields[name = /data-model/entities[name = string(current()/entity)]/primary_key]/type" {
-        error-message "Foreign key field type must match the referenced entity's primary key (entity: {../../name}, field: {../name}). When the primary key uses a field_definition, the foreign key must reference that same definition.";
-        description "Validates type match: same primitive or same field_definition name. When the primary key is defined by a field_definition, foreignKeys must reference that very same definition.";
-      }
+      description "Each entry points at an entity whose primary key this field's type aligns with.";
       leaf entity {
         type leafref {
           path "/data-model/entities/name";
           require-instance true;
         }
         mandatory true;
-        description "Name of the referenced entity. Must reference an entity that exists in the data model. The foreign key field must match this entity's primary key.";
+        description "Referenced entity name.";
       }
       leaf parent_array {
         type leafref {
           path "/data-model/entities/fields/name";
           require-instance true;
         }
-        description "Optional: Parent's array field name where children are nested. When specified, defines a nesting relationship. References a field name that must exist in the referenced entity's fields list and be of type 'array'.";
-        must "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or " +
-           "count(/data-model/entities[name = ../entity]/fields[name = current()]/type) != 1 or " +
-           "/data-model/entities[name = ../entity]/fields[name = current()]/type = 'array'" {
-          error-message "Parent array field must be of type 'array' (entity: {../../name}, field: {../name})";
-          description "Validates that the referenced field is array. Skipped when type references a field_definition.";
+        description
+          "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).";
+        must "/data-model/consolidated = false() or " +
+           "count(/data-model/entities[name = string(deref(../entity))]/fields[name = current()]/type/array) = 1" {
+          error-message
+            "parent_array must name a field on the referenced entity whose type uses the array branch directly (not via field_definitions); skipped when consolidated is false.";
+          description
+            "Requires a direct type/array container on the referenced field. Fields that only reference field_definitions are not checked here. Skipped when consolidated is false.";
         }
       }
-      must "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or " +
-           "../../type != 'composite' or " +
-           "(count(../../composite) = count(/data-model/entities[name = current()/entity]/fields[name = /data-model/entities[name = current()/entity]/primary_key]/composite))" {
-        error-message "Composite foreign key field must have the same number of subcomponents as the referenced entity's primary key.";
-        description "Validates composite FK subcomponent count. Skipped when type references a field_definition.";
+    }
+  }
+
+  grouping field-common-atts {
+    description
+      "Shared name and documentation attributes for entity fields, field_definitions, and composite subcomponents.
+       When type references a field_definition, brief and description may be specified at the reference site to override or supplement the definition.";
+    leaf name {
+      type string {
+        length "1..128";
       }
-      must "count(../../../../field_definitions[name = ../../type]) = 1 or /data-model/consolidated = false() or " +
-           "../../type != 'composite' or " +
-           "(count(../../composite[name = /data-model/entities[name = current()/entity]/fields[name = /data-model/entities[name = current()/entity]/primary_key]/composite/name and " +
-           "type = /data-model/entities[name = current()/entity]/fields[name = /data-model/entities[name = current()/entity]/primary_key]/composite[name = ../../composite[name = /data-model/entities[name = current()/entity]/fields[name = /data-model/entities[name = current()/entity]/primary_key]/composite/name]/name]/type]) = " +
-           "count(/data-model/entities[name = current()/entity]/fields[name = /data-model/entities[name = current()/entity]/primary_key]/composite))" {
-        error-message "Composite foreign key field subcomponents must match the referenced entity's primary key in name, type, and order.";
-        description "Validates composite FK subcomponent match. Skipped when type references a field_definition.";
+      mandatory true;
+      description "Field name.";
+    }
+    leaf brief {
+      type string;
+      description
+        "Brief one-line summary of the field. When type references a field_definition, may be specified at the reference site to override or supplement the definition's brief.";
+    }
+    leaf description {
+      type string;
+      mandatory true;
+      description
+        "AI-friendly field description. When type references a field_definition, may be specified at the reference site to override or supplement the definition's description.";
+    }
+    leaf source {
+      type string;
+      description
+        "Optional documentation of where this field's data comes from (e.g. URL, Excel column name, API path).";
+    }
+  }
+
+  grouping generic-field {
+    description
+      "uses field-common-atts (name, brief, description, source); optional required (top-level only); container type; optional default.
+       Composite subcomponents use field-default only after type; required is inherited from the parent field.";
+    uses field-common-atts;
+    leaf required {
+      type boolean;
+      default false;
+      description
+        "Whether this field is required in instance data. Only for entity fields and field_definitions;
+         must not appear on composite subcomponents (requiredness is inherited from the enclosing field).";
+      must "not(../default) or . = false()" {
+        error-message
+          "A required field cannot have a default value. If required is true, default must not be specified.";
+        description "A required field cannot have a default value.";
       }
     }
-    leaf min {
-      type int32;
-      description "Minimum length for string fields, or minimum value for numeric fields";
-    }
-    leaf max {
-      type int32;
-      description "Maximum length for string fields, or maximum value for numeric fields";
-    }
-    leaf minDate {
-      type date;
-      description "Minimum date value for date or datetime fields (YYYY-MM-DD format). Values must be on or after this date. Only applicable to fields with type 'date' or 'datetime'.";
-      must "../type = ('date','datetime')" {
-        error-message "minDate can only be used with fields of type 'date' or 'datetime'";
-        description "Validates that minDate is only specified for date or datetime fields";
-      }
-      must "not(../maxDate) or . <= ../maxDate" {
-        error-message "minDate must be less than or equal to maxDate when both are specified";
-        description "Validates that minDate is not greater than maxDate when both date constraints are present";
-      }
-    }
-    leaf maxDate {
-      type date;
-      description "Maximum date value for date or datetime fields (YYYY-MM-DD format). Values must be on or before this date. Only applicable to fields with type 'date' or 'datetime'.";
-      must "../type = ('date','datetime')" {
-        error-message "maxDate can only be used with fields of type 'date' or 'datetime'";
-        description "Validates that maxDate is only specified for date or datetime fields";
-      }
-      must "not(../minDate) or . >= ../minDate" {
-        error-message "maxDate must be greater than or equal to minDate when both are specified";
-        description "Validates that maxDate is not less than minDate when both date constraints are present";
-      }
-    }
-    leaf-list enum {
-      type union {
-        type string;
-        type int32;
-        type decimal64 {
-          fraction-digits 2;
-        }
-      }
-      description "List of allowed enum values";
-      must "../type = ('string', 'integer', 'number') or " +
-           "(../type = 'array' and ../item_type/primitive = ('string', 'integer', 'number')) or " +
-           "(../type = 'composite' and count(../composite[type = ('string', 'integer', 'number')]) > 0)" {
-        error-message "enum can only be used with fields of type 'string', 'integer', 'number', 'array' with item_type primitive 'string', 'integer', or 'number', or 'composite' with at least one subcomponent of type 'string', 'integer', or 'number'";
-        description "Validates that enum is only specified for field types that support enum values: string, integer, number, array with primitive item types string, integer, or number, or composite fields with at least one subcomponent of type string, integer, or number";
-      }
-    }
-    leaf default {
-      type union {
-        type string;
-        type int32;
-        type decimal64 {
-          fraction-digits 2;
-        }
-        type boolean;
-      }
-      description "Default value for this field";
-    }
-    container item_type {
-      when "../type = 'array'";
-      description "Required for array fields - specifies the type of each item";
-      choice item-type-choice {
+    container type {
+      description "Field type: primitive, array or composite.";
+      choice choice-type {
         mandatory true;
-        description "Type of array items - must be one of: primitive or entity";
-        case primitive-case {
-          leaf primitive {
-            type primitive-type;
-            description "Primitive type (string, integer, etc.)";
+        description "Primitive, array of elements, or composite object.";
+        case definition {
+          leaf definition {
+            type leafref {
+              path "/data-model/entities/field_definitions/name";
+              require-instance true;
+            }
+            mandatory true;
+            description "Reference to a reusable field_definition name on this entity.";
           }
         }
-        case entity-case {
-          leaf entity {
-            type entity-name;
-            description "Entity (array items may be full object or primary key value)";
+        case primitive {
+          uses primitive-type-and-enum;
+        }
+        case case-array {
+          container array {
+            description "Array field: homogeneous elements, each primitive or composite.";
+            choice choice-type {
+              mandatory true;
+              description "Primitive, array of elements, or composite object.";
+              case primitive {
+                uses primitive-type-and-enum;
+              }
+              case array-element-entity {
+                leaf entity {
+                  type leafref {
+                    path "/data-model/entities/name";
+                    require-instance true;
+                  }
+                  mandatory true;
+                  description
+                    "Entity type for each array element (embedded object or primary key value).";
+                }
+              }
+              case case-composite {
+                description "Composite field: named subfields, each a full generic-field.";
+                uses composite-subfields;
+              }
+            }
           }
+        }
+        case case-composite {
+          description "Composite field: named subfields, each a full generic-field.";
+          uses composite-subfields;
         }
       }
+      uses foreign-keys;
     }
-    leaf-list aliases {
-      type field-name;
-      description "Alternative names for this field";
-    }
+    uses field-default;
     leaf validation {
       type field-validation-mode;
       default enforce;
-      description "Field validation mode. 'enforce' (default) - field constraints (min, max, minDate, maxDate, enum) are enforced during validation, 'filter' - the field value is filtered out (not included in the data output). Use 'filter' to exclude field values from consolidated data while keeping the field definition in the schema.";
+      description
+        "Per-field validation: enforce constraints or filter invalid values from consolidated output.";
     }
     container computed {
       presence "Computed field is defined";
-      description "Computed field definition. When present, this field's value is calculated from other fields using the specified operation. Computed fields are marked as readOnly in JSON Schema and are excluded from required_fields.";
+      description
+        "When present, the field value is derived from referenced fields using the given operation.
+         Computed fields are read-only in JSON Schema and excluded from required_fields.";
       leaf operation {
         type enumeration {
           enum add {
-            description "Add operation: fields[0] + fields[1]. Valid for integer/number. Returns same type as operands. Requires exactly 2 fields.";
+            description "Add: fields[0] + fields[1]. Integer/number; exactly 2 fields.";
           }
           enum subtraction {
-            description "Subtraction operation: fields[0] - fields[1]. Valid for date/datetime (returns duration_in_days) and integer/number (returns same type). Requires exactly 2 fields.";
+            description "Subtract: fields[0] - fields[1]. date/datetime or integer/number; 2 fields.";
           }
           enum multiplication {
-            description "Multiplication operation: fields[0] * fields[1]. Valid for integer/number. Returns same type as operands. Requires exactly 2 fields.";
+            description "Multiply: fields[0] * fields[1]. Integer/number; exactly 2 fields.";
           }
           enum division {
-            description "Division operation: fields[0] / fields[1]. Valid for integer/number. Returns same type as operands. Requires exactly 2 fields.";
+            description "Divide: fields[0] / fields[1]. Integer/number; exactly 2 fields.";
           }
           enum min {
-            description "Minimum operation: minimum of all fields. Valid for date, datetime, integer, number. Returns same type as input fields. Requires 2 or more fields.";
+            description "Minimum of all referenced fields. date, datetime, integer, number; 2+ fields.";
           }
           enum max {
-            description "Maximum operation: maximum of all fields. Valid for date, datetime, integer, number. Returns same type as input fields. Requires 2 or more fields.";
+            description "Maximum of all referenced fields. date, datetime, integer, number; 2+ fields.";
           }
           enum average {
-            description "Average (mean) operation: sum of all fields divided by count. Valid for integer, number. Returns number. Requires 2 or more fields.";
+            description "Mean of numeric fields. integer/number only; 2+ fields.";
           }
         }
         mandatory true;
-        description "Operation to perform on the referenced fields";
+        description "Operation applied to referenced fields.";
       }
       list fields {
         key field;
         min-elements 2;
         max-elements 100;
-        description "List of field references for the computed operation. For binary operations (add, subtraction), exactly 2 fields required. For aggregations (min, max, average), 2 or more fields required (up to 100 fields).";
+        description "Field references for the computation (same entity or cross-entity with entity leaf).";
         leaf field {
           type field-name;
           mandatory true;
-          description "Field name to reference.";
+          description "Referenced field name.";
           must "/data-model/consolidated = false() or ((not(../entity) and count(../../../../fields[name = current()]) = 1) or (../entity and count(deref(../entity)/../fields[name = current()]) = 1))" {
             error-message "Computed field reference must exist in the specified entity (or current entity if not specified)";
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
@@ -588,24 +454,46 @@ module meta-model {
             require-instance true;
           }
           description "Entity name for cross-entity field reference (optional).";
-          must "/data-model/consolidated = false() or count(../../../../fields[foreignKeys/entity = current()]) = 1" {
+          must "/data-model/consolidated = false() or count(../../../../fields[type/foreignKeys/entity = current()]) = 1" {
             error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
             description "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
           }
         }
-        must "../../operation != 'average' or (not(current()/entity) and ../../../fields[name = current()/field]/type = ('integer', 'number')) or (current()/entity and /data-model/entities[name = current()/entity]/fields[name = current()/field]/type = ('integer', 'number'))" {
+        must "../../operation != 'average' or (not(current()/entity) and ../../../fields[name = current()/field]/type/primitive = ('integer', 'number')) or (current()/entity and /data-model/entities[name = current()/entity]/fields[name = current()/field]/type/primitive = ('integer', 'number'))" {
           error-message "Average operation requires all referenced fields to have type integer or number";
           description "When operation is average, each referenced field (same-entity or cross-entity) must be numeric (integer or number). Only enforced during consolidated validation (Phase 2).";
         }
       }
-      must "count(fields) >= 2" {
-        error-message "Computed operation requires at least 2 field references";
-        description "Ensures the fields list has at least two entries (aligned with min-elements 2).";
+      must "(operation != 'add' and operation != 'subtraction') or count(fields) = 2" {
+        error-message "Binary operations (add, subtraction) require exactly 2 fields";
+        description "Validates that binary operations have exactly 2 field references";
+      }
+      must "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2" {
+        error-message "Aggregation operations (min, max, average) require at least 2 fields";
+        description "Validates that aggregation operations have at least 2 field references";
       }
     }
   }
 
-  // Root container for data model
+  grouping composite-subfields {
+    description "Recursive generic-field entries as list items, with nesting limits.";
+    list composite {
+      key name;
+      min-elements 1;
+      description "Subfields (recursive generic field).";
+
+      uses field-common-atts;
+      container type {
+        uses primitive-type-and-enum;
+        uses foreign-keys {
+          when "not(../array)";
+        }
+      }
+      uses field-default;
+    }
+  }
+
+// Root container for data model
   container data-model {
     description "Root container for data model definition";
     leaf consolidated {
@@ -624,6 +512,11 @@ module meta-model {
     leaf author {
       type string;
       description "Author of the data model";
+    }
+    leaf description {
+      type string;
+      mandatory true;
+      description "AI-friendly description of the overall data model, its purpose, and main entities.";
     }
     leaf source {
       type string;
@@ -648,7 +541,7 @@ module meta-model {
     leaf allow_unlimited_fields {
       type empty;
       description "When present, allow entities to exceed the 7 non-array field limit. Omit when all entities have 7 or fewer non-array fields.";
-      must "count(../entities[count(fields[type != 'array']) > 7]) > 0" {
+      must "count(../entities[count(fields[not(type/array)]) > 7]) > 0" {
         error-message "allow_unlimited_fields can only be set when at least one entity has more than 7 non-array fields. If all entities have 7 or fewer fields, omit this field.";
         description "When this flag is present, at least one entity must exceed the 7-field limit.";
       }
@@ -666,6 +559,20 @@ module meta-model {
       key name;
       min-elements 1;
       description "List of entity definitions";
+      leaf index {
+        type empty;
+        must "count(../fields[type/foreignKeys[parent_array]]) = 0" {
+          error-message "index can only be set on top-level entities. Remove index or remove parent_array from this entity's foreignKeys.";
+          description "Disallow index on entities that define parent relationships via foreignKeys/parent_array (nested child entities).";
+        }
+        description
+          "When present, consolidation writes one JSON file per primary-key instance under
+           output/<entity-name>/ (readable, filesystem-safe form of the entity-store PK string,
+           .json).
+           Shards duplicate top-level nested instances after hierarchical nesting; the same
+           records remain in consolidated_data.json data. sharded_entities lists those type
+           names.";
+      }
       leaf name {
         type entity-name;
         mandatory true;
@@ -681,7 +588,8 @@ module meta-model {
       }
       leaf description {
         type string;
-        description "AI-friendly description of the entity type, not mandatory but STRONGLY recommended";
+        mandatory true;
+        description "AI-friendly description of the entity type.";
       }
       leaf source {
         type string;
@@ -702,33 +610,33 @@ module meta-model {
         }
         description "List of required field names (auto-generated)";
       }
-      must "/data-model/consolidated = true() or ../allow_unlimited_fields or count(fields[type != 'array']) <= 7" {
+      must "/data-model/consolidated = true() or ../allow_unlimited_fields or count(fields[not(type/array)]) <= 7" {
         error-message "Entity has more than 7 non-array fields. Array fields are excluded from this count as they represent relationships to child entities. Consider splitting into multiple entities with foreign key relationships, or set allow_unlimited_fields (present) to bypass this limit.";
         description "Validates that entity has at most 7 non-array fields, unless allow_unlimited_fields is present. Field limits are enforced in Phase 1 (individual file validation, consolidated=false) using the file's allow_unlimited_fields flag. In Phase 2 (combined validation, consolidated=true), this constraint is skipped as field limits are already validated per-file.";
       }
       list field_definitions {
         key name;
         description "Optional reusable field type and constraint definitions for this entity. Entity fields may reference these by setting type to this name; when type is a definition name, min, max, etc. must not be set inline. Names are unique within this entity only.";
-        leaf name {
-          type field-name;
-          mandatory true;
-          description "Name for this field definition. Referenced by this entity's fields by setting their type to this name.";
+        uses generic-field {
+          refine type {
+            must "not(./definition)" {
+              error-message
+                "A reusable field_definition cannot reference another field_definition; define the type with primitive, array, or composite only.";
+              description
+                "Disallows the definition leafref case under type so field_definitions do not chain or recurse via name references.";
+            }
+          }
         }
-        uses field-constraints;
       }
       list fields {
         key name;
         min-elements 1;
         description "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.";
-        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type]) = 0 or (not(current()/min) and not(current()/max) and not(current()/minDate) and not(current()/maxDate) and count(current()/enum) = 0 and not(current()/default) and not(current()/item_type) and count(current()/composite) = 0)" {
-          error-message "When type references a field_definition, min, max, minDate, maxDate, enum, default, item_type, and composite must not be specified (description and brief may be used at the reference site).";
-          description "Inline constraints only when type is a primitive; when type is a field_definition name they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site.";
+        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type/definition]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and count(current()/type/array) = 0 and count(current()/type/composite) = 0)" {
+          error-message "When type references a field_definition, min, max, minDate, maxDate, enum, default, array, composite, and other inline type branches must not be specified (description and brief may be used at the reference site).";
+          description "Inline constraints only when type is a primitive; when type uses the definition leafref they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site.";
         }
-        uses field-definition {
-          refine type {
-            type type-or-definition-ref;
-          }
-        }
+        uses generic-field;
       }
       leaf change_history {
         type change-history-policy;

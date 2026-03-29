@@ -9,14 +9,14 @@ import pytest
 from xyang import YangValidator, parse_yang_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-NEW_META_MODEL_YANG = REPO_ROOT / "examples" / "new-meta-model.yang"
+META_MODEL_YANG = REPO_ROOT / "examples" / "meta-model.yang"
 SAMPLE_YAML = REPO_ROOT / "tests" / "data" / "composite_primary_key_sample.yaml"
 
 
 @pytest.fixture
-def new_meta_model_module():
-    assert NEW_META_MODEL_YANG.is_file(), f"Missing {NEW_META_MODEL_YANG}"
-    return parse_yang_file(str(NEW_META_MODEL_YANG))
+def meta_model_module():
+    assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
+    return parse_yang_file(str(META_MODEL_YANG))
 
 
 def _load_sample() -> dict:
@@ -27,18 +27,18 @@ def _load_sample() -> dict:
     return {"data-model": tree}
 
 
-def test_composite_primary_key_sample_validates(new_meta_model_module):
-    """Full YAML validates against new-meta-model.yang."""
+def test_composite_primary_key_sample_validates(meta_model_module):
+    """Full YAML validates against examples/meta-model.yang."""
     data = _load_sample()
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"errors={errors} warnings={warnings}"
 
 
-def test_composite_primary_key_points_at_composite_field(new_meta_model_module):
+def test_composite_primary_key_points_at_composite_field(meta_model_module):
     """primary_key references a field whose type resolves to composite (xFrame-style)."""
     data = _load_sample()
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, _warnings = validator.validate(data)
     assert is_valid, errors
 

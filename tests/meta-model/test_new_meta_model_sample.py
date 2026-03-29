@@ -1,4 +1,4 @@
-"""Validate tests/data/new_meta_model_sample.yaml against examples/new-meta-model.yang."""
+"""Validate tests/data/new_meta_model_sample.yaml against examples/meta-model.yang."""
 
 from __future__ import annotations
 
@@ -9,10 +9,10 @@ import pytest
 from xyang import YangValidator, parse_yang_file
 
 REPO_ROOT = Path(__file__).resolve().parent.parent.parent
-NEW_META_MODEL_YANG = REPO_ROOT / "examples" / "new-meta-model.yang"
+META_MODEL_YANG = REPO_ROOT / "examples" / "meta-model.yang"
 SAMPLE_YAML = REPO_ROOT / "tests" / "data" / "new_meta_model_sample.yaml"
 
-# Every enum in typedef primitive-type-name (examples/new-meta-model.yang), as used under type.primitive.
+# Every enum in typedef primitive-type-name (examples/meta-model.yang), as used under type.primitive.
 _PRIMITIVE_TYPE_NAME_ENUMS = frozenset(
     {
         "string",
@@ -42,9 +42,9 @@ _TYPE_SHAPE_FIELD_NAMES = frozenset(
 
 
 @pytest.fixture
-def new_meta_model_module():
-    assert NEW_META_MODEL_YANG.is_file(), f"Missing {NEW_META_MODEL_YANG}"
-    return parse_yang_file(str(NEW_META_MODEL_YANG))
+def meta_model_module():
+    assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
+    return parse_yang_file(str(META_MODEL_YANG))
 
 
 def _load_sample_data_model() -> dict:
@@ -56,18 +56,18 @@ def _load_sample_data_model() -> dict:
     return {"data-model": tree}
 
 
-def test_new_meta_model_sample_yaml_validates(new_meta_model_module):
-    """Full sample YAML conforms to new-meta-model.yang."""
+def test_new_meta_model_sample_yaml_validates(meta_model_module):
+    """Full sample YAML conforms to examples/meta-model.yang."""
     data = _load_sample_data_model()
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Validation errors: {errors}; warnings: {warnings}"
 
 
-def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_meta_model_module):
+def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(meta_model_module):
     """Each primitive-type-name value and each generic-field type branch appears and validates."""
     data = _load_sample_data_model()
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Validation errors: {errors}; warnings: {warnings}"
 
@@ -98,14 +98,18 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         pytest.param(
             {
                 "name": "p",
-                "version": "1.0.0.1",
+                "version": "26.03.29.1",
                 "author": "t",
+                "description": "Minimal primitive branch.",
                 "consolidated": True,
                 "entities": [
                     {
                         "name": "e",
+                        "description": "Entity e.",
                         "primary_key": "id",
-                        "fields": [{"name": "id", "type": {"primitive": "string"}}],
+                        "fields": [
+                            {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
+                        ],
                     }
                 ],
             },
@@ -114,17 +118,21 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         pytest.param(
             {
                 "name": "p",
-                "version": "1.0.0.1",
+                "version": "26.03.29.1",
                 "author": "t",
+                "description": "Definition ref branch.",
                 "consolidated": True,
                 "entities": [
                     {
                         "name": "e",
+                        "description": "Entity e.",
                         "primary_key": "id",
-                        "field_definitions": [{"name": "d", "type": {"primitive": "integer"}}],
+                        "field_definitions": [
+                            {"name": "d", "description": "Reusable int.", "type": {"primitive": "integer"}},
+                        ],
                         "fields": [
-                            {"name": "id", "type": {"primitive": "string"}},
-                            {"name": "r", "type": {"definition": "d"}},
+                            {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
+                            {"name": "r", "description": "Via definition.", "type": {"definition": "d"}},
                         ],
                     }
                 ],
@@ -134,16 +142,22 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         pytest.param(
             {
                 "name": "p",
-                "version": "1.0.0.1",
+                "version": "26.03.29.1",
                 "author": "t",
+                "description": "Array of primitives.",
                 "consolidated": True,
                 "entities": [
                     {
                         "name": "e",
+                        "description": "Entity e.",
                         "primary_key": "id",
                         "fields": [
-                            {"name": "id", "type": {"primitive": "string"}},
-                            {"name": "a", "type": {"array": {"primitive": "number"}}},
+                            {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
+                            {
+                                "name": "a",
+                                "description": "Number array.",
+                                "type": {"array": {"primitive": "number"}},
+                            },
                         ],
                     }
                 ],
@@ -153,21 +167,28 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         pytest.param(
             {
                 "name": "p",
-                "version": "1.0.0.1",
+                "version": "26.03.29.1",
                 "author": "t",
+                "description": "Array of composite.",
                 "consolidated": True,
                 "entities": [
                     {
                         "name": "e",
+                        "description": "Entity e.",
                         "primary_key": "id",
                         "fields": [
-                            {"name": "id", "type": {"primitive": "string"}},
+                            {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
                             {
                                 "name": "a",
+                                "description": "Composite array.",
                                 "type": {
                                     "array": {
                                         "composite": [
-                                            {"name": "x", "type": {"primitive": "boolean"}},
+                                            {
+                                                "name": "x",
+                                                "description": "Sub x.",
+                                                "type": {"primitive": "boolean"},
+                                            },
                                         ]
                                     }
                                 },
@@ -181,21 +202,24 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         pytest.param(
             {
                 "name": "p",
-                "version": "1.0.0.1",
+                "version": "26.03.29.1",
                 "author": "t",
+                "description": "Top composite.",
                 "consolidated": True,
                 "entities": [
                     {
                         "name": "e",
+                        "description": "Entity e.",
                         "primary_key": "id",
                         "fields": [
-                            {"name": "id", "type": {"primitive": "string"}},
+                            {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
                             {
                                 "name": "c",
+                                "description": "Composite field.",
                                 "type": {
                                     "composite": [
-                                        {"name": "u", "type": {"primitive": "date"}},
-                                        {"name": "v", "type": {"primitive": "datetime"}},
+                                        {"name": "u", "description": "U.", "type": {"primitive": "date"}},
+                                        {"name": "v", "description": "V.", "type": {"primitive": "datetime"}},
                                     ]
                                 },
                             },
@@ -207,59 +231,67 @@ def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(new_me
         ),
     ],
 )
-def test_generic_field_type_branch_minimal_valid(new_meta_model_module, fragment: dict):
+def test_generic_field_type_branch_minimal_valid(meta_model_module, fragment: dict):
     """Each top-level generic-field type choice branch validates in isolation."""
     data = {"data-model": fragment}
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, _warnings = validator.validate(data)
     assert is_valid, errors
 
 
-def test_field_definition_definition_ref_rejected(new_meta_model_module):
+def test_field_definition_definition_ref_rejected(meta_model_module):
     """field_definitions list must not use type.definition (refine must on generic-field)."""
     data = {
         "data-model": {
             "name": "Bad",
-            "version": "1.0.0.1",
+            "version": "26.03.29.1",
             "author": "t",
+            "description": "Nested definition ref (invalid).",
             "consolidated": False,
             "entities": [
                 {
                     "name": "e",
-                    "description": "d",
+                    "description": "Entity e.",
                     "primary_key": "id",
                     "field_definitions": [
-                        {"name": "base", "type": {"primitive": "string"}},
-                        {"name": "nested_ref", "type": {"definition": "base"}},
+                        {"name": "base", "description": "Base.", "type": {"primitive": "string"}},
+                        {
+                            "name": "nested_ref",
+                            "description": "Invalid chained def.",
+                            "type": {"definition": "base"},
+                        },
                     ],
-                    "fields": [{"name": "id", "type": {"primitive": "string"}}],
+                    "fields": [{"name": "id", "description": "PK.", "type": {"primitive": "string"}}],
                 }
             ],
         }
     }
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, _warnings = validator.validate(data)
     assert not is_valid
     assert any("field_definition cannot reference another" in str(e) for e in errors)
 
 
-def test_new_meta_model_parent_array_must_rejects_non_array_target(new_meta_model_module):
+def test_new_meta_model_parent_array_must_rejects_non_array_target(meta_model_module):
     """parent_array must requires a direct type/array on the referenced field (consolidated=true)."""
     data = {
         "data-model": {
             "name": "t",
-            "version": "1",
+            "version": "26.03.29.1",
             "author": "t",
+            "description": "parent_array negative test.",
             "consolidated": True,
             "entities": [
                 {
                     "name": "company",
                     "brief": "c",
+                    "description": "Company.",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": {"primitive": "string"}},
+                        {"name": "id", "description": "PK.", "type": {"primitive": "string"}},
                         {
                             "name": "departments",
+                            "description": "Not an entity array.",
                             "type": {"array": {"primitive": "string"}},
                         },
                     ],
@@ -267,16 +299,16 @@ def test_new_meta_model_parent_array_must_rejects_non_array_target(new_meta_mode
                 {
                     "name": "department",
                     "brief": "d",
+                    "description": "Department.",
                     "primary_key": "did",
                     "fields": [
-                        {"name": "did", "type": {"primitive": "string"}},
+                        {"name": "did", "description": "PK.", "type": {"primitive": "string"}},
                         {
                             "name": "company_id",
+                            "description": "Broken parent_array target.",
                             "type": {
                                 "primitive": "string",
-                                "foreignKeys": [
-                                    {"entity": "company", "parent_array": "id"}
-                                ],
+                                "foreignKeys": [{"entity": "company", "parent_array": "id"}],
                             },
                         },
                     ],
@@ -284,7 +316,7 @@ def test_new_meta_model_parent_array_must_rejects_non_array_target(new_meta_mode
             ],
         }
     }
-    validator = YangValidator(new_meta_model_module)
+    validator = YangValidator(meta_model_module)
     is_valid, errors, _warnings = validator.validate(data)
     assert not is_valid
     assert any("parent_array must name" in str(e) for e in errors)

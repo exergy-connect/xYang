@@ -1,50 +1,61 @@
 # Sample data model: composite primary key on one entity, foreign key to that key on another.
-# Schema: examples/new-meta-model.yang (validated elsewhere).
-#
+# Schema: examples/meta-model.yang.
 # Validated by tests/meta-model/test_composite_primary_key_sample.py
 
 name: "Composite primary key sample"
 version: "26.03.26.1"
 author: "xYang tests"
+description: "Warehouse references location composite primary key."
 
 consolidated: true
 
 entities:
   - name: location
     brief: "Location with composite primary key"
+    description: "Geographic location entity."
     primary_key: location_key
     field_definitions:
       - name: location_key_ref
+        description: "Reusable composite location key type."
         type:
           composite:
             - name: region_code
+              description: "Region code subfield."
               type:
                 primitive: string
             - name: location_id
+              description: "Location id subfield."
               type:
                 primitive: integer
     fields:
       - name: location_key
+        description: "Composite primary key field."
         type:
           definition: location_key_ref
       - name: location_name
+        description: "Human-readable location name."
         type:
           primitive: string
       - name: address
+        description: "Street address."
         type:
           primitive: string
 
   - name: warehouse
     brief: "Warehouse with FK to location primary key"
+    description: "Warehouse entity."
     primary_key: warehouse_id
     fields:
       - name: warehouse_id
+        description: "Warehouse identifier."
         type:
           primitive: string
       - name: warehouse_name
+        description: "Warehouse name."
         type:
           primitive: string
       - name: at_location
+        description: "Foreign key to location composite key."
         type:
           definition: location_key_ref
           foreignKeys:

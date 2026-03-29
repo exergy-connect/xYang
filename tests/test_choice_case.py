@@ -27,6 +27,7 @@ from typing import Any
 
 import pytest
 
+from tests.meta_model_data import dm, ent, f_array_entity, fp
 from xyang import parse_yang_file, parse_yang_string, YangValidator
 from xyang.ast import (
     YangChoiceStmt,
@@ -544,75 +545,51 @@ module test {
 
 
 def test_choice_case_meta_model_primitive():
-    """Test choice/case in meta-model with primitive case."""
+    """Test choice/case in meta-model with array-of-primitive case."""
     yang_path = Path(__file__).parent.parent / "examples" / "meta-model.yang"
     module = parse_yang_file(str(yang_path))
     validator = YangValidator(module)
-    
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "tags",
-                            "type": "array",
-                            "item_type": {
-                                "primitive": "string"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
+
+    data = dm(
+        entities=[
+            ent(
+                "test_entity",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    {
+                        "name": "tags",
+                        "description": "String tags.",
+                        "type": {"array": {"primitive": "string"}},
+                    },
+                ],
+            ),
+        ],
+    )
 
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Expected valid meta-model data with primitive case. Errors: {errors}"
 
 
 def test_choice_case_meta_model_entity():
-    """Test choice/case in meta-model with entity case."""
+    """Test choice/case in meta-model with array-of-entity case."""
     yang_path = Path(__file__).parent.parent / "examples" / "meta-model.yang"
     module = parse_yang_file(str(yang_path))
     validator = YangValidator(module)
-    
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "parent",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"}
-                    ]
-                },
-                {
-                    "name": "child",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "parents",
-                            "type": "array",
-                            "item_type": {
-                                "entity": "parent"
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
+
+    data = dm(
+        entities=[
+            ent("parent", "id", [fp("id", "integer", description="PK.")]),
+            ent(
+                "child",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    f_array_entity("parents", "parent", description="Parent entities."),
+                ],
+            ),
+        ],
+    )
 
     is_valid, errors, warnings = validator.validate(data)
     assert is_valid, f"Expected valid meta-model data with entity case. Errors: {errors}"
@@ -628,27 +605,18 @@ def test_choice_case_meta_model_missing():
     module = parse_yang_file(str(yang_path))
     validator = YangValidator(module)
     
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "tags",
-                            "type": "array",
-                            "item_type": {}
-                        }
-                    ]
-                }
-            ]
-        }
-    }
+    data = dm(
+        entities=[
+            ent(
+                "test_entity",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    {"name": "tags", "description": "Empty array inner choice.", "type": {"array": {}}},
+                ],
+            ),
+        ],
+    )
     
     is_valid, errors, warnings = validator.validate(data)
     # TODO: When choice/case mandatory validation is implemented, this should fail

@@ -227,6 +227,20 @@ def _type_to_schema(
             fd = int(type_stmt.fraction_digits)
             if fd > 0:
                 out[JsonSchemaKey.MULTIPLE_OF] = 10**-fd
+        if type_stmt.range:
+            parts = [p.strip() for p in type_stmt.range.split("..", 1)]
+            if len(parts) == 2:
+                lo, hi = parts[0], parts[1]
+                if lo.lower() != "min":
+                    try:
+                        out[JsonSchemaKey.MINIMUM] = float(lo)
+                    except ValueError:
+                        pass
+                if hi.lower() != "max":
+                    try:
+                        out[JsonSchemaKey.MAXIMUM] = float(hi)
+                    except ValueError:
+                        pass
         return out
     if name == "empty":
         return {JsonSchemaKey.TYPE: "object", JsonSchemaKey.MAX_PROPERTIES: 0}
@@ -261,6 +275,8 @@ def _build_xyang(
     must_list: list[YangMustStmt] | None = None,
     when_condition: str | None = None,
     presence: str | None = None,
+    *,
+    mandatory: bool | None = None,
 ) -> dict[str, Any]:
     """Build x-yang object for a node."""
     xyang: dict[str, Any] = {XYangKey.TYPE: node_type}
@@ -272,6 +288,8 @@ def _build_xyang(
         xyang[XYangKey.WHEN] = when_condition
     if presence:
         xyang[XYangKey.PRESENCE] = presence
+    if mandatory is True:
+        xyang[XYangKey.MANDATORY] = True
     return xyang
 
 
@@ -330,14 +348,19 @@ def _merge_oneof_branches_with_base(
             continue
         bp = dict(branch.get(JsonSchemaKey.PROPERTIES) or {})
         br = list(branch.get(JsonSchemaKey.REQUIRED) or [])
-        merged.append(
-            {
-                JsonSchemaKey.TYPE: "object",
-                JsonSchemaKey.PROPERTIES: {**base_props, **bp},
-                JsonSchemaKey.REQUIRED: sorted(set(base_required) | set(br)),
-                JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
-            }
-        )
+        merged_branch: dict[str, Any] = {
+            JsonSchemaKey.TYPE: "object",
+            JsonSchemaKey.PROPERTIES: {**base_props, **bp},
+            JsonSchemaKey.REQUIRED: sorted(set(base_required) | set(br)),
+            JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
+        }
+        b_desc = branch.get(JsonSchemaKey.DESCRIPTION)
+        if isinstance(b_desc, str) and b_desc:
+            merged_branch[JsonSchemaKey.DESCRIPTION] = b_desc
+        b_xy = branch.get(JsonSchemaKey.X_YANG)
+        if isinstance(b_xy, dict) and b_xy:
+            merged_branch[JsonSchemaKey.X_YANG] = dict(b_xy)
+        merged.append(merged_branch)
     return merged
 
 
@@ -362,8 +385,7 @@ def _choice_to_object_body(
     parent ``properties`` listing all case leaves. Case leaves use leafref_parent
     as XPath current() parent (choice/case are not data nodes).
     """
-    case_keys_list: list[list[str]] = []
-    case_props_list: list[dict[str, Any]] = []
+    case_entries: list[tuple[YangCaseStmt, dict[str, Any], list[str]]] = []
     for case in getattr(choice_stmt, "cases", []) or []:
         if not isinstance(case, YangCaseStmt):
             continue
@@ -377,22 +399,23 @@ def _choice_to_object_body(
                 case_props[s.name] = child_prop
                 case_keys.append(s.name)
         if case_keys:
-            case_keys_list.append(case_keys)
-            case_props_list.append(case_props)
+            case_entries.append((case, case_props, case_keys))
     out: dict[str, Any] = {JsonSchemaKey.DESCRIPTION: choice_stmt.description or ""}
     mandatory = getattr(choice_stmt, "mandatory", False)
     case_branch = [
         {
             JsonSchemaKey.TYPE: "object",
+            JsonSchemaKey.DESCRIPTION: (case_st.description or ""),
             JsonSchemaKey.PROPERTIES: cp,
             JsonSchemaKey.REQUIRED: list(keys),
             JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
+            JsonSchemaKey.X_YANG: {JsonSchemaKey.NAME: case_st.name},
         }
-        for cp, keys in zip(case_props_list, case_keys_list)
+        for case_st, cp, keys in case_entries
     ]
-    if mandatory and case_props_list:
+    if mandatory and case_entries:
         out[JsonSchemaKey.ONE_OF] = case_branch
-    elif not mandatory and len(case_props_list) > 1:
+    elif not mandatory and len(case_entries) > 1:
         out[JsonSchemaKey.ONE_OF] = [
             {JsonSchemaKey.TYPE: "object", JsonSchemaKey.MAX_PROPERTIES: 0},
             *case_branch,
@@ -604,6 +627,7 @@ def _statement_to_property(
                     "leaf",
                     must_list=getattr(stmt, "must_statements", None) or [],
                     when_condition=when_cond,
+                    mandatory=stmt.mandatory or None,
                 ),
             }
         else:
@@ -618,6 +642,7 @@ def _statement_to_property(
                 "leaf",
                 must_list=getattr(stmt, "must_statements", None) or [],
                 when_condition=when_cond,
+                mandatory=stmt.mandatory or None,
             )
             # Preserve leafref (type, path, require-instance) from type_schema x-yang
             if type_schema.get(JsonSchemaKey.X_YANG):

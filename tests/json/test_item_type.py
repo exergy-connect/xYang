@@ -14,7 +14,6 @@ import pytest
 
 from xyang import YangValidator, parse_yang_file
 from xyang.json import parse_json_schema
-from xyang.ast import YangStatementList
 
 
 _EXAMPLES_DIR = Path(__file__).resolve().parent.parent.parent / "examples"
@@ -29,6 +28,7 @@ def _minimal_data_model(entities: list) -> dict:
             "name": "M",
             "version": "25.03.11.1",  # version-string pattern YY.MM.DD.N
             "author": "A",
+            "description": "Minimal model for item_type encoding tests.",
             "consolidated": False,
             "max_name_underscores": 2,
             "entities": entities,
@@ -40,22 +40,43 @@ def _minimal_data_model(entities: list) -> dict:
 DATA_ITEM_TYPE_PRIMITIVE_VALID = _minimal_data_model([
     {
         "name": "e",
+        "description": "Entity with string array field.",
         "primary_key": "id",
         "fields": [
-            {"name": "id", "type": "integer"},
-            {"name": "tags", "type": "array", "item_type": {"primitive": "string"}},
+            {
+                "name": "id",
+                "description": "Primary key.",
+                "type": {"primitive": "integer"},
+            },
+            {
+                "name": "tags",
+                "description": "Tag strings.",
+                "type": {"array": {"primitive": "string"}},
+            },
         ],
     },
 ])
 
 DATA_ITEM_TYPE_ENTITY_VALID = _minimal_data_model([
-    {"name": "server", "primary_key": "id", "fields": [{"name": "id", "type": "integer"}]},
     {
-        "name": "client",
+        "name": "server",
+        "description": "Server entity.",
         "primary_key": "id",
         "fields": [
-            {"name": "id", "type": "integer"},
-            {"name": "servers", "type": "array", "item_type": {"entity": "server"}},
+            {"name": "id", "description": "Server id.", "type": {"primitive": "integer"}},
+        ],
+    },
+    {
+        "name": "client",
+        "description": "Client with FK array to servers.",
+        "primary_key": "id",
+        "fields": [
+            {"name": "id", "description": "Client id.", "type": {"primitive": "integer"}},
+            {
+                "name": "servers",
+                "description": "Attached servers.",
+                "type": {"array": {"entity": "server"}},
+            },
         ],
     },
 ])
@@ -63,10 +84,11 @@ DATA_ITEM_TYPE_ENTITY_VALID = _minimal_data_model([
 DATA_ITEM_TYPE_EMPTY_INVALID = _minimal_data_model([
     {
         "name": "e",
+        "description": "Entity with empty array type branch.",
         "primary_key": "id",
         "fields": [
-            {"name": "id", "type": "integer"},
-            {"name": "tags", "type": "array", "item_type": {}},
+            {"name": "id", "description": "Primary key.", "type": {"primitive": "integer"}},
+            {"name": "tags", "description": "Tags.", "type": {"array": {}}},
         ],
     },
 ])
@@ -74,10 +96,16 @@ DATA_ITEM_TYPE_EMPTY_INVALID = _minimal_data_model([
 DATA_ITEM_TYPE_WHEN_FALSE_INVALID = _minimal_data_model([
     {
         "name": "e",
+        "description": "Entity with invalid item_type on primitive field.",
         "primary_key": "id",
         "fields": [
-            {"name": "id", "type": "integer"},
-            {"name": "title", "type": "string", "item_type": {"primitive": "string"}},
+            {"name": "id", "description": "Primary key.", "type": {"primitive": "integer"}},
+            {
+                "name": "title",
+                "description": "Title string.",
+                "type": {"primitive": "string"},
+                "item_type": {"primitive": "string"},
+            },
         ],
     },
 ])
@@ -103,24 +131,9 @@ def _validate(module, data: dict) -> tuple[bool, list]:
     return is_valid, list(errors)
 
 
-def _debug_print_must_asts(module, label: str) -> None:
-    """Debug helper: print all must expressions and their parsed AST objects."""
-    def _walk(stmt_list: YangStatementList) -> None:
-        for stmt in stmt_list.statements:
-            musts = getattr(stmt, "must_statements", [])
-            for m in musts:
-                print(f"[{label}] must on {getattr(stmt, 'name', '<noname>')}: expr={m.expression!r} ast={m.ast!r}")
-            if isinstance(stmt, YangStatementList):
-                _walk(stmt)
-
-    _walk(module)
-
-
 # ---- Positive: type=array with item_type.primitive ----
 def test_item_type_primitive_valid(module_from_yang, module_from_yang_json):
     """Both encodings: array field with item_type.primitive is valid."""
-    _debug_print_must_asts(module_from_yang, "YANG-primitive")
-    _debug_print_must_asts(module_from_yang_json, "JSON-primitive")
     valid_yang, errors_yang = _validate(module_from_yang, DATA_ITEM_TYPE_PRIMITIVE_VALID)
     valid_json, errors_json = _validate(module_from_yang_json, DATA_ITEM_TYPE_PRIMITIVE_VALID)
     assert valid_yang == valid_json, "YANG and YANG.json encodings must agree"

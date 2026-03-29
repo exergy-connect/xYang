@@ -167,35 +167,37 @@ def test_must_on_foreignkeys_list_valid():
     data = {
         "data-model": {
             "name": "Test Model",
-            "version": "25.01.27.1",
+            "version": "26.03.29.1",
             "author": "Test",
+            "description": "FK list must test.",
             "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
+                    "description": "Parent entity.",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "name", "type": "string"}
-                    ]
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
+                        {"name": "name", "description": "Name.", "type": {"primitive": "string"}},
+                    ],
                 },
                 {
                     "name": "child",
+                    "description": "Child entity.",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
                         {
                             "name": "parent_id",
-                            "type": "integer",
-                            "foreignKeys": [
-                                {
-                                    "entity": "parent"  # field omitted, defaults to primary key
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
+                            "description": "FK to parent PK.",
+                            "type": {
+                                "primitive": "integer",
+                                "foreignKeys": [{"entity": "parent"}],
+                            },
+                        },
+                    ],
+                },
+            ],
         }
     }
     
@@ -219,35 +221,37 @@ def test_must_on_foreignkeys_list_invalid():
     data = {
         "data-model": {
             "name": "Test Model",
-            "version": "25.01.27.1",
+            "version": "26.03.29.1",
             "author": "Test",
+            "description": "FK mismatch test.",
             "consolidated": True,
             "entities": [
                 {
                     "name": "parent",
+                    "description": "Parent entity.",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "name", "type": "string"}
-                    ]
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
+                        {"name": "name", "description": "Name.", "type": {"primitive": "string"}},
+                    ],
                 },
                 {
                     "name": "child",
+                    "description": "Child entity.",
                     "primary_key": "id",
                     "fields": [
-                        {"name": "id", "type": "integer"},
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
                         {
                             "name": "parent_name",
-                            "type": "string",
-                            "foreignKeys": [
-                                {
-                                    "entity": "parent"  # Invalid: field name 'parent_name' doesn't match primary key 'id', and type 'string' doesn't match type 'integer'
-                                }
-                            ]
-                        }
-                    ]
-                }
-            ]
+                            "description": "String FK to parent (type mismatch vs int PK).",
+                            "type": {
+                                "primitive": "string",
+                                "foreignKeys": [{"entity": "parent"}],
+                            },
+                        },
+                    ],
+                },
+            ],
         }
     }
     

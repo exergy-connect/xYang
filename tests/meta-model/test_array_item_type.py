@@ -1,13 +1,16 @@
 """
-Test for array item_type foreignKey constraints.
+Test for array type with entity element (type.array.entity).
 
-Note: The YANG model's item_type/foreignKeys only has an 'entity' leaf, not a 'field' leaf.
-The constraints for field existence and primary key matching are not currently enforced
-for item_type foreignKeys. These tests verify the current behavior.
+foreignKeys belong under type on scalar fields, not inside the array branch.
 """
-import pytest
-from xyang import YangValidator, parse_yang_file
+from __future__ import annotations
+
 from pathlib import Path
+
+import pytest
+
+from tests.meta_model_data import dm, ent, f_array_entity, fp
+from xyang import YangValidator, parse_yang_file
 
 
 @pytest.fixture
@@ -18,84 +21,52 @@ def meta_model():
 
 
 def test_array_item_type_foreign_key_valid(meta_model):
-    """Test that array item_type with entity case passes (foreignKeys not allowed in item_type)."""
+    """Array field with type.array.entity passes."""
     validator = YangValidator(meta_model)
-    
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "26.02.24.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "parent",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"}
-                    ]
-                },
-                {
-                    "name": "child",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "parents",
-                            "type": "array",
-                            "item_type": {
-                                "entity": "parent"
-                                # Note: foreignKeys is not allowed in item_type according to the schema
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    
-    is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Array item_type with entity case should pass. Errors: {errors}"
+    data = dm(
+        entities=[
+            ent("parent", "id", [fp("id", "integer", description="PK.")]),
+            ent(
+                "child",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    f_array_entity("parents", "parent", description="Parent refs."),
+                ],
+            ),
+        ],
+    )
+    is_valid, errors, _warnings = validator.validate(data)
+    assert is_valid, f"Array with entity element type should pass. Errors: {errors}"
 
 
 def test_array_item_type_foreign_key_invalid(meta_model):
-    """Test that foreignKeys in item_type is rejected as unknown field."""
+    """foreignKeys inside type.array is an unknown field (not part of array inner choice)."""
     validator = YangValidator(meta_model)
-    
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "26.02.24.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "parent",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"}
-                    ]
-                },
-                {
-                    "name": "child",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {
-                            "name": "parents",
-                            "type": "array",
-                            "item_type": {
+    data = dm(
+        entities=[
+            ent("parent", "id", [fp("id", "integer", description="PK.")]),
+            ent(
+                "child",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    {
+                        "name": "parents",
+                        "description": "Invalid nested FK.",
+                        "type": {
+                            "array": {
                                 "entity": "parent",
-                                "foreignKeys": [{"entity": "parent"}]  # Not allowed in schema
+                                "foreignKeys": [{"entity": "parent"}],
                             }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
-    
-    is_valid, errors, warnings = validator.validate(data)
-    assert not is_valid, "foreignKeys in item_type should be rejected as unknown field"
-    assert any("Unknown field 'foreignKeys'" in error for error in errors), \
-        f"Expected error about unknown field 'foreignKeys'. Errors: {errors}"
-
-
+                        },
+                    },
+                ],
+            ),
+        ],
+    )
+    is_valid, errors, _warnings = validator.validate(data)
+    assert not is_valid, "foreignKeys inside array container should be rejected"
+    assert any("foreignKeys" in error or "Unknown field" in error for error in errors), (
+        f"Expected unknown foreignKeys under array. Errors: {errors}"
+    )

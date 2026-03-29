@@ -24,29 +24,31 @@ def test_invalid_enum_value():
     data = {
         "data-model": {
             "name": "Test",
-            "version": "25.01.27.1",
+            "version": "26.03.29.1",
             "author": "Test",
+            "description": "Enum invalid test.",
             "consolidated": False,
-            "entities": [{
-                "name": "test",
-                "primary_key": "id",  # New format: string instead of list
-                "fields": [
-                    {"name": "id", "type": "integer"},
-                    {"name": "field1", "type": "integer"},
-                    {"name": "field2", "type": "integer"},
-                    {
-                        "name": "computed",
-                        "type": "integer",
-                        "computed": {
-                            "operation": "invalid_operation",  # Invalid enum value
-                            "fields": [
-                                {"field": "field1"},
-                                {"field": "field2"}
-                            ]
-                        }
-                    }
-                ]
-            }]
+            "entities": [
+                {
+                    "name": "test",
+                    "description": "Test entity.",
+                    "primary_key": "id",
+                    "fields": [
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
+                        {"name": "field1", "description": "F1.", "type": {"primitive": "integer"}},
+                        {"name": "field2", "description": "F2.", "type": {"primitive": "integer"}},
+                        {
+                            "name": "computed",
+                            "description": "Computed.",
+                            "type": {"primitive": "integer"},
+                            "computed": {
+                                "operation": "invalid_operation",
+                                "fields": [{"field": "field1"}, {"field": "field2"}],
+                            },
+                        },
+                    ],
+                }
+            ],
         }
     }
     
@@ -81,29 +83,31 @@ def test_valid_enum_value():
     data = {
         "data-model": {
             "name": "Test",
-            "version": "25.01.27.1",
+            "version": "26.03.29.1",
             "author": "Test",
+            "description": "Enum valid test.",
             "consolidated": False,
-            "entities": [{
-                "name": "test",
-                "primary_key": "id",  # New format: string instead of list
-                "fields": [
-                    {"name": "id", "type": "integer"},
-                    {"name": "field1", "type": "integer"},
-                    {"name": "field2", "type": "integer"},
-                    {
-                        "name": "computed",
-                        "type": "integer",
-                        "computed": {
-                            "operation": "subtraction",  # Valid enum value
-                            "fields": [
-                                {"field": "field1"},
-                                {"field": "field2"}
-                            ]
-                        }
-                    }
-                ]
-            }]
+            "entities": [
+                {
+                    "name": "test",
+                    "description": "Test entity.",
+                    "primary_key": "id",
+                    "fields": [
+                        {"name": "id", "description": "PK.", "type": {"primitive": "integer"}},
+                        {"name": "field1", "description": "F1.", "type": {"primitive": "integer"}},
+                        {"name": "field2", "description": "F2.", "type": {"primitive": "integer"}},
+                        {
+                            "name": "computed",
+                            "description": "Computed.",
+                            "type": {"primitive": "integer"},
+                            "computed": {
+                                "operation": "subtraction",
+                                "fields": [{"field": "field1"}, {"field": "field2"}],
+                            },
+                        },
+                    ],
+                }
+            ],
         }
     }
     

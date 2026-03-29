@@ -172,6 +172,12 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             fd = _fraction_digits_from_multiple_of(mo)
             if fd is not None:
                 type_stmt.fraction_digits = fd
+        min_val = schema.get(JsonSchemaKey.MINIMUM)
+        max_val = schema.get(JsonSchemaKey.MAXIMUM)
+        if min_val is not None or max_val is not None:
+            lo = "min" if min_val is None else str(min_val)
+            hi = "max" if max_val is None else str(max_val)
+            type_stmt.range = f"{lo}..{hi}"
         return type_stmt
     if t == "boolean":
         return YangTypeStmt(name="boolean")
@@ -363,8 +369,19 @@ def _parse_hoisted_choice_oneof(
             if stmt is not None:
                 case_statements.append(stmt)
         if case_statements:
-            label = disc_keys[0] if disc_keys else "case"
-            cases.append(YangCaseStmt(name=f"{label}-case", description="", statements=case_statements))
+            b_xyang = branch.get(JsonSchemaKey.X_YANG) or {}
+            case_name = ""
+            if isinstance(b_xyang, dict):
+                case_name = str(b_xyang.get(JsonSchemaKey.NAME) or "").strip()
+            if not case_name:
+                label = disc_keys[0] if disc_keys else "case"
+                case_name = f"{label}-case"
+            case_desc = branch.get(JsonSchemaKey.DESCRIPTION)
+            if not isinstance(case_desc, str):
+                case_desc = ""
+            cases.append(
+                YangCaseStmt(name=case_name, description=case_desc, statements=case_statements)
+            )
 
     choice_stmt = YangChoiceStmt(
         name=choice_name,
@@ -498,9 +515,12 @@ def _convert_leaf(
     type_stmt = _type_from_schema(defs, type_schema, xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt(name="string")
-    mandatory = mandatory_override if mandatory_override is not None else (
-        name in (schema.get(JsonSchemaKey.REQUIRED) or [])
-    )
+    if mandatory_override is not None:
+        mandatory = mandatory_override
+    elif xyang.get(XYangKey.MANDATORY) is True:
+        mandatory = True
+    else:
+        mandatory = name in (schema.get(JsonSchemaKey.REQUIRED) or [])
     default = schema.get(JsonSchemaKey.DEFAULT)
     if default is not None and schema.get(JsonSchemaKey.TYPE) != "boolean":
         default = str(default).lower() if isinstance(default, bool) else str(default)
@@ -588,7 +608,10 @@ def _convert_choice(
             )
             if stmt is not None:
                 case_statements.append(stmt)
-        cases.append(YangCaseStmt(name=case_name, description="", statements=case_statements))
+        case_desc = case_schema.get(JsonSchemaKey.DESCRIPTION)
+        if not isinstance(case_desc, str):
+            case_desc = ""
+        cases.append(YangCaseStmt(name=case_name, description=case_desc, statements=case_statements))
     choice_stmt = YangChoiceStmt(
         name=name, description=description, mandatory=mandatory, cases=cases
     )

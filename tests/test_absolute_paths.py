@@ -5,9 +5,11 @@ This test validates that xYang's XPath evaluator correctly handles absolute path
 starting with '/' in must constraints.
 """
 
-import pytest
 from pathlib import Path
 
+import pytest
+
+from tests.meta_model_data import dm, ent, f_computed, fp
 from xyang import parse_yang_file, YangValidator
 
 
@@ -28,31 +30,9 @@ def test_absolute_path_entities_list():
     
     # This test uses a constraint that already exists in meta-model.yang
     # The entities list has a must constraint using absolute path
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "allow_unlimited_fields": False,
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"},
-                        {"name": "field2", "type": "integer"},
-                        {"name": "field3", "type": "integer"},
-                        {"name": "field4", "type": "integer"},
-                        {"name": "field5", "type": "integer"},
-                        {"name": "field6", "type": "integer"},
-                        {"name": "field7", "type": "integer"},
-                        {"name": "field8", "type": "integer"},  # 8 fields > 7 limit
-                    ]
-                }
-            ]
-        }
-    }
+    fields = [fp("id", "integer", description="PK.")]
+    fields += [fp(f"field{i}", "integer", description=f"Field {i}.") for i in range(1, 9)]
+    data = dm(entities=[ent("test_entity", "id", fields)])
     
     # This should fail because entity has more than 7 non-array fields
     # and the constraint uses absolute path: /data-model/entities[...]
@@ -71,7 +51,7 @@ def test_absolute_path_entities_list():
     # The constraint expression uses: /data-model/entities[...] which is an absolute path
     # 
     # BUG: Currently validation passes (is_valid=True) when it should fail because
-    # the constraint 'bool(../allow_unlimited_fields) = true() or count(fields[type != 'array']) <= 7'
+    # the entity field-count must (not(type/array)) does not evaluate correctly in some contexts
     # doesn't work correctly when evaluator.data is set to the entity item.
     # See tests/test_path_resolution_list_items.py for unit tests demonstrating this bug.
     if is_valid:
@@ -158,22 +138,7 @@ def test_absolute_path_simple():
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
     
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"}
-                    ]
-                }
-            ]
-        }
-    }
+    data = dm(entities=[ent("test_entity", "id", [fp("id", "integer", description="PK.")])])
     
     # Basic validation to ensure absolute paths don't cause syntax errors
     is_valid, errors, warnings = validator.validate(data)
@@ -191,36 +156,26 @@ def test_absolute_path_in_computed_field_validation():
     module = parse_yang_file(str(meta_model_path))
     validator = YangValidator(module)
     
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "consolidated": False,
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "id",
-                    "fields": [
-                        {"name": "id", "type": "integer"},
-                        {"name": "field1", "type": "integer"},
-                        {"name": "field2", "type": "integer"},
-                        {
-                            "name": "computed_field",
-                            "type": "integer",
-                            "computed": {
-                                "operation": "subtraction",
-                                "fields": [
-                                    {"field": "field1"},
-                                    {"field": "field2"}
-                                ]
-                            }
-                        }
-                    ]
-                }
-            ]
-        }
-    }
+    data = dm(
+        consolidated=False,
+        entities=[
+            ent(
+                "test_entity",
+                "id",
+                [
+                    fp("id", "integer", description="PK."),
+                    fp("field1", "integer", description="F1."),
+                    fp("field2", "integer", description="F2."),
+                    f_computed(
+                        "computed_field",
+                        "integer",
+                        "subtraction",
+                        [{"field": "field1"}, {"field": "field2"}],
+                    ),
+                ],
+            ),
+        ],
+    )
 
     # This tests the constraint: ../../../../fields[name = current()]
     # Note: The constraint now uses relative paths, not absolute paths
@@ -234,13 +189,7 @@ def test_absolute_path_in_computed_field_validation():
     assert len(xpath_errors) == 0, \
         f"Computed field validation should not have XPath syntax errors: {xpath_errors}"
     
-    # Check that there are no computed field validation errors
-    computed_errors = [e for e in errors if "computed" in e.lower() or ("field reference" in e.lower() and "exist" in e.lower())]
-    assert len(computed_errors) == 0, \
-        f"Computed field validation should pass for valid fields, got errors: {computed_errors}"
-    
-    # Note: is_valid may be False due to other unrelated validation errors (foreign keys, etc.)
-    # but the important thing is that computed field validation works correctly
+    assert is_valid, f"Valid same-entity computed field should pass meta-model validation. Errors: {errors}"
 
 
 def test_absolute_path_vs_relative_path():
@@ -251,22 +200,9 @@ def test_absolute_path_vs_relative_path():
     
     # Test with a constraint that should work with relative paths
     # (primary_key is a leaf; constraint uses ../fields[name = current()])
-    data = {
-        "data-model": {
-            "name": "Test Model",
-            "version": "25.01.27.1",
-            "author": "Test",
-            "entities": [
-                {
-                    "name": "test_entity",
-                    "primary_key": "nonexistent",  # Should fail - field doesn't exist
-                    "fields": [
-                        {"name": "id", "type": "integer"}
-                    ]
-                }
-            ]
-        }
-    }
+    data = dm(
+        entities=[ent("test_entity", "nonexistent", [fp("id", "integer", description="PK.")])],
+    )
     
     # This uses relative path: ../fields[name = current()]
     is_valid, errors, warnings = validator.validate(data)
