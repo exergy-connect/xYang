@@ -57,6 +57,10 @@ entities:
         description: "Primitive date."
         type:
           primitive: date
+      - name: prim_year
+        description: "Primitive year."
+        type:
+          primitive: year
       - name: prim_duration_in_days
         description: "Primitive duration in days."
         type:

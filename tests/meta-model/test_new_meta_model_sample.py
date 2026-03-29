@@ -22,6 +22,7 @@ _PRIMITIVE_TYPE_NAME_ENUMS = frozenset(
         "array",
         "datetime",
         "date",
+        "year",
         "duration_in_days",
         "qualified_string",
         "qualified_integer",

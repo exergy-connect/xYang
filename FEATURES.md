@@ -12,7 +12,7 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `organization` - Organization (1 occurrence)
 - ✅ `contact` - Contact info (1 occurrence)
 - ✅ `description` - Description text
-- ✅ `revision` - Revision history (1 occurrence)
+- ✅ `revision` - Revision history (9 revisions in the current `examples/meta-model.yang`)
 
 ### Type Definitions
 - ✅ `typedef` - Type definitions (heavily used)
@@ -24,12 +24,12 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 Validation / JSON Schema coverage varies by type; commonly used in `meta-model.yang`:
 - ✅ `string` - String type
 - ✅ `int32` - 32-bit integer
-- ✅ `uint8` - 8-bit unsigned integer
+- ✅ `uint8` - 8-bit unsigned integer (1 occurrence)
 - ✅ `boolean` - Boolean type
-- ✅ `decimal64` - Decimal64 type (2 occurrences)
+- ✅ `decimal64` - Decimal64 type (3 occurrences)
 
 ### Derived Types
-- ✅ `enumeration` - Enumeration type (6 occurrences) (built-in keyword; `enum` is the substatement keyword inside the block)
+- ✅ `enumeration` - Enumeration type (6 `type enumeration` typedef bodies) (built-in keyword; `enum` is the substatement keyword inside the block). The meta-model’s `primitive-type-name` enumeration includes **year** (calendar year) alongside string, integer, number, boolean, array, datetime, date, duration_in_days, and qualified types.
 - ✅ `union` - Union type (3 occurrences) - **Full support in typedefs with validation, including union types with leafref members**
 
 ### Data Structures
@@ -44,31 +44,31 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
 
 ### Constraints
-- ✅ `must` - Must constraints (57+ occurrences) - **Parsed and evaluated**
+- ✅ `must` - Must constraints (19 `must "` substatements) - **Parsed and evaluated**
   - Supports must constraints on containers, lists, leaves, and leaf-lists
   - Supports must constraints on lists containing leafref types
   - `current()` correctly refers to list item context in list must constraints
 - ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses` (not on `refine`; `augment` / `anydata` are unsupported)
-- ✅ `mandatory` - Mandatory fields (15 occurrences)
+- ✅ `mandatory` - Mandatory fields (16 occurrences)
   - Supports mandatory on choice statements (exactly one case must be present)
-- ✅ `default` - Default values (29 occurrences)
+- ✅ `default` - Default values (7 occurrences)
 - ✅ `min-elements` - Minimum elements (5 occurrences)
-- ✅ `max-elements` - Maximum elements (2 occurrences)
+- ✅ `max-elements` - Maximum elements (1 occurrence)
 - ✅ `key` - List keys (heavily used)
 
 ### Type Constraints
-- ✅ `pattern` - Pattern matching (7 occurrences)
-- ✅ `length` - Length constraints (8 occurrences)
-- ✅ `range` - Range constraints (1 occurrence)
-- ✅ `fraction-digits` - Decimal fraction digits (2 occurrences)
+- ✅ `pattern` - Pattern matching (6 occurrences)
+- ✅ `length` - Length constraints (3 occurrences)
+- ✅ `range` - Range constraints (2 occurrences)
+- ✅ `fraction-digits` - Decimal fraction digits (3 occurrences)
 
 ### Type References
-- ✅ `leafref` - Leaf references (11 occurrences) - **Parsed and resolved via deref()**
+- ✅ `leafref` - Leaf references (7 `type leafref` uses) - **Parsed and resolved via deref()**
 - ✅ `path` - Leafref paths
 - ✅ `require-instance` - Leafref require-instance
 
 ### Container Features
-- ✅ `presence` - Container presence (4 occurrences)
+- ✅ `presence` - Container presence (1 occurrence)
 
 ### CLI and JSON Schema Export
 - ✅ **CLI** (`xyang` or `python -m xyang`): `parse`, `validate`, `convert`
@@ -99,16 +99,19 @@ The following YANG features are not used in `meta-model.yang` and are not implem
 
 xYang supports `when` statements for conditional validation. When a `when` condition evaluates to `false`, the associated statement is skipped; if instance data is present for that branch, validation reports an error (see RFC 7950 §7.21.5). Supported parents match the implemented subset of the data model: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses`. For `choice` and `case`, the XPath context is the same as for other children of the enclosing container or list entry (the choice/case nodes do not appear as data keys).
 
-Example from `meta-model.yang`:
+Example from `meta-model.yang` (leaf-list `enum` only when primitive allows enumerated values):
 ```yang
-container item_type {
-  when "../type = 'array'";
-  description "Required for array fields";
-  ...
+leaf-list enum {
+  when "../primitive = ('string', 'integer', 'number', 'year')";
+  type union {
+    type string;
+    type int32;
+    ...
+  }
 }
 ```
 
-If `../type = 'array'` evaluates to false, the `item_type` container is not validated and is treated as optional.
+If the `when` expression evaluates to false, the node is not part of the effective schema for that instance; data under that branch is then invalid if present.
 
 ## Grouping and Uses Implementation
 
@@ -397,29 +400,29 @@ The modular architecture separates concerns:
 
 ## Usage Statistics from meta-model.yang
 
-Counts below are from `examples/meta-model.yang` (statement or keyword occurrences):
+Counts below are from `examples/meta-model.yang`, using **line-initial** YANG keywords (or `type <keyword>`) so prose inside multi-line `description` strings is excluded. **`must`** is counted as lines matching `must "` (opening quoted expression).
 
-- `must`: 30
-- `default`: 28
-- `mandatory`: 14
-- `pattern`: 7
-- `length`: 8
-- `enumeration`: 8
-- `leafref`: 6 (in `type` / path)
-- `union`: 7 (fully supported in typedefs)
-- `min-elements`: 6
-- `case`: 6
+- `must`: 19
+- `default`: 7
+- `mandatory`: 16
+- `pattern`: 6
+- `length`: 3
+- `type enumeration` (typedef bodies): 6
+- `type leafref`: 7
+- `type union`: 3 (fully supported in typedefs)
+- `min-elements`: 5
+- `case`: 7
 - `choice`: 2
-- `decimal64`: 4
-- `fraction-digits`: 4
-- `when`: 4
+- `type decimal64`: 3
+- `fraction-digits`: 3
+- `when`: 3
 - `presence`: 1
 - `max-elements`: 1
-- `range`: 1
+- `range`: 2
 
 ## Test Coverage
 
-xYang has comprehensive test coverage with **195+ passing tests** covering:
+xYang has comprehensive test coverage with **250+ passing tests** covering:
 - Basic YANG parsing and validation
 - Type validation (including enumeration)
 - Constraint validation (must, when, mandatory, default)
@@ -438,6 +441,10 @@ xYang has comprehensive test coverage with **195+ passing tests** covering:
 - JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
 
 ## Recent Improvements
+
+### Meta-model example and documentation (2026-04)
+- ✅ **`examples/meta-model.yang`** stays aligned with the xFrame canonical module (including `year` in `primitive-type-name`, multiple `revision` statements, and current `when` / `must` paths under the `type` container).
+- ✅ **`FEATURES.md` usage statistics** were recomputed with stricter patterns (e.g. `must "` only) so counts are not inflated by the word “must” inside description text.
 
 ### CLI, Convert, and JSON Schema (2026-03)
 - ✅ **CLI**: `xyang` (or `python -m xyang`) with subcommands
@@ -494,7 +501,7 @@ xYang has comprehensive test coverage with **195+ passing tests** covering:
   - Groupings are now expanded once during parsing, not in each validator
   - Eliminates redundancy and ensures consistency across validators
   - Removed unused grouping expansion code from validators
-- ✅ **Test coverage**: All 178 tests now passing, including fixes for:
+- ✅ **Test coverage**: The suite has since grown (250+ tests); historical note: 178 tests at the time of this entry, including fixes for:
   - Foreign key validation tests
   - Parents validation tests
   - Deref() function tests

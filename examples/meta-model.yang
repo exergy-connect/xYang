@@ -7,6 +7,11 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
+  revision "2026-04-02" {
+    description
+      "primitive-type-name: add year; enum and min/max apply to year like integer.";
+  }
+
   revision "2026-04-01" {
     description
       "Restored shared typedefs (date, entity-name, version-string, change-history-policy, rate-of-change, validation-mode, storage-type) for JSON Schema $defs;
@@ -61,6 +66,7 @@ module meta-model {
       enum array;
       enum datetime;
       enum date;
+      enum year;
       enum duration_in_days;
       enum qualified_string;
       enum qualified_integer;
@@ -179,7 +185,7 @@ module meta-model {
   grouping primitive-type-and-enum {
     description
       "Primitive branch: type name, optional enum, and optional min/max / minDate/maxDate (legacy meta-model).
-       enum applies only when primitive is string, integer, or number (when on enum).
+       enum applies only when primitive is string, integer, number, or year (when on enum).
        minDate and maxDate only when primitive is date or datetime.";
     leaf primitive {
       type primitive-type-name;
@@ -187,7 +193,7 @@ module meta-model {
       description "Primitive type.";
     }
     leaf-list enum {
-      when "../primitive = ('string', 'integer', 'number')";
+      when "../primitive = ('string', 'integer', 'number', 'year')";
       type union {
         type string;
         type int32;
@@ -196,17 +202,17 @@ module meta-model {
         }
       }
       description
-        "List of allowed values; only valid when primitive is string, integer, or number.";
+        "List of allowed values; only valid when primitive is string, integer, number, or year.";
     }
     leaf min {
       type int32;
       description
-        "Minimum string length, or minimum value for integer/number primitives.";
+        "Minimum string length, or minimum value for integer, number, or year primitives.";
     }
     leaf max {
       type int32;
       description
-        "Maximum string length, or maximum value for integer/number primitives.";
+        "Maximum string length, or maximum value for integer, number, or year primitives.";
     }
     leaf minDate {
       type date;

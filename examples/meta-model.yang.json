@@ -404,22 +404,22 @@
                                   }
                                 ]
                               },
-                              "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                              "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                               "x-yang": {
                                 "type": "leaf-list",
-                                "when": "../primitive = ('string', 'integer', 'number')"
+                                "when": "../primitive = ('string', 'integer', 'number', 'year')"
                               }
                             },
                             "min": {
                               "type": "integer",
-                              "description": "Minimum string length, or minimum value for integer/number primitives.",
+                              "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                               "x-yang": {
                                 "type": "leaf"
                               }
                             },
                             "max": {
                               "type": "integer",
-                              "description": "Maximum string length, or maximum value for integer/number primitives.",
+                              "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                               "x-yang": {
                                 "type": "leaf"
                               }
@@ -575,22 +575,22 @@
                                           }
                                         ]
                                       },
-                                      "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                      "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                       "x-yang": {
                                         "type": "leaf-list",
-                                        "when": "../primitive = ('string', 'integer', 'number')"
+                                        "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                       }
                                     },
                                     "min": {
                                       "type": "integer",
-                                      "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                      "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
                                       }
                                     },
                                     "max": {
                                       "type": "integer",
-                                      "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                      "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
                                       }
@@ -754,22 +754,22 @@
                                                     }
                                                   ]
                                                 },
-                                                "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                                "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                                 "x-yang": {
                                                   "type": "leaf-list",
-                                                  "when": "../primitive = ('string', 'integer', 'number')"
+                                                  "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                                 }
                                               },
                                               "min": {
                                                 "type": "integer",
-                                                "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                                "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                 "x-yang": {
                                                   "type": "leaf"
                                                 }
                                               },
                                               "max": {
                                                 "type": "integer",
-                                                "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                                "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                 "x-yang": {
                                                   "type": "leaf"
                                                 }
@@ -1044,22 +1044,22 @@
                                             }
                                           ]
                                         },
-                                        "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                        "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                         "x-yang": {
                                           "type": "leaf-list",
-                                          "when": "../primitive = ('string', 'integer', 'number')"
+                                          "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                         }
                                       },
                                       "min": {
                                         "type": "integer",
-                                        "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                        "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                         "x-yang": {
                                           "type": "leaf"
                                         }
                                       },
                                       "max": {
                                         "type": "integer",
-                                        "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                        "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                         "x-yang": {
                                           "type": "leaf"
                                         }
@@ -1554,22 +1554,22 @@
                                   }
                                 ]
                               },
-                              "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                              "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                               "x-yang": {
                                 "type": "leaf-list",
-                                "when": "../primitive = ('string', 'integer', 'number')"
+                                "when": "../primitive = ('string', 'integer', 'number', 'year')"
                               }
                             },
                             "min": {
                               "type": "integer",
-                              "description": "Minimum string length, or minimum value for integer/number primitives.",
+                              "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                               "x-yang": {
                                 "type": "leaf"
                               }
                             },
                             "max": {
                               "type": "integer",
-                              "description": "Maximum string length, or maximum value for integer/number primitives.",
+                              "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                               "x-yang": {
                                 "type": "leaf"
                               }
@@ -1725,22 +1725,22 @@
                                           }
                                         ]
                                       },
-                                      "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                      "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                       "x-yang": {
                                         "type": "leaf-list",
-                                        "when": "../primitive = ('string', 'integer', 'number')"
+                                        "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                       }
                                     },
                                     "min": {
                                       "type": "integer",
-                                      "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                      "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
                                       }
                                     },
                                     "max": {
                                       "type": "integer",
-                                      "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                      "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
                                       }
@@ -1904,22 +1904,22 @@
                                                     }
                                                   ]
                                                 },
-                                                "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                                "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                                 "x-yang": {
                                                   "type": "leaf-list",
-                                                  "when": "../primitive = ('string', 'integer', 'number')"
+                                                  "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                                 }
                                               },
                                               "min": {
                                                 "type": "integer",
-                                                "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                                "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                 "x-yang": {
                                                   "type": "leaf"
                                                 }
                                               },
                                               "max": {
                                                 "type": "integer",
-                                                "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                                "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                 "x-yang": {
                                                   "type": "leaf"
                                                 }
@@ -2194,22 +2194,22 @@
                                             }
                                           ]
                                         },
-                                        "description": "List of allowed values; only valid when primitive is string, integer, or number.",
+                                        "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
                                         "x-yang": {
                                           "type": "leaf-list",
-                                          "when": "../primitive = ('string', 'integer', 'number')"
+                                          "when": "../primitive = ('string', 'integer', 'number', 'year')"
                                         }
                                       },
                                       "min": {
                                         "type": "integer",
-                                        "description": "Minimum string length, or minimum value for integer/number primitives.",
+                                        "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                         "x-yang": {
                                           "type": "leaf"
                                         }
                                       },
                                       "max": {
                                         "type": "integer",
-                                        "description": "Maximum string length, or maximum value for integer/number primitives.",
+                                        "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                         "x-yang": {
                                           "type": "leaf"
                                         }
@@ -2684,6 +2684,7 @@
         "array",
         "datetime",
         "date",
+        "year",
         "duration_in_days",
         "qualified_string",
         "qualified_integer",
