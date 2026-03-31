@@ -158,7 +158,7 @@ Leafref path is stored as a string (`PathNode.to_string()` when parsed from YANG
 
 The convert path uses `YangParser(expand_uses=False)` so **grouping / uses** are expanded when emitting JSON, matching the flattened AST the generator walks.
 
-**Parser scope today:** `parse_json_schema` only reconstructs module **data** statements from a root **`properties.data-model`** object (the `meta-model` / xFrame profile). Other top-level property names are ignored until the parser is generalized. Hand-authored or converted schemas meant for round-trip through `parse_json_schema` should use that root container name.
+**Parser scope today:** `parse_json_schema` walks **every** key under root **`properties`**, runs `_convert_property` for each, and appends a module-level statement when the value has a recognized **`x-yang`** shape (`container`, `list`, `leaf`, `leaf-list`, `choice`). There is no special case for the name `data-model`; the xFrame meta-model uses that name by convention. Top-level entries that do not map to a supported node type are skipped. **`$defs`** is used for typedefs and identities regardless of root property names.
 
 ---
 
