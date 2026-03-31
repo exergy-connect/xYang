@@ -13,6 +13,7 @@ from .ast import FunctionCallNode
 from .node import Context, Node
 
 if TYPE_CHECKING:
+    from ..module import YangModule
     from .evaluator import XPathEvaluator
 from .utils import first_value, is_nodeset, yang_bool
 
@@ -132,6 +133,76 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
     return results
 
 
+def f_derived_from(
+    ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node
+) -> Any:
+    """derived-from(identityref, identity) — value is strict descendant of target (RFC 7950)."""
+    if len(ast.args) != 2:
+        return False
+    from ..identity_graph import is_derived_from_strict, resolve_identity_qname
+    from ..module import YangModule
+
+    root_schema = ctx.root.schema if ctx.root is not None else None
+    if not isinstance(root_schema, YangModule):
+        return False
+    mod = root_schema
+    start = ctx.current if ctx.current is not None else node
+    v1 = ev.eval(ast.args[0], ctx, start)
+    if is_nodeset(v1):
+        if not v1:
+            return False
+        v1 = v1[0].data
+    elif isinstance(v1, Node):
+        v1 = v1.data
+    else:
+        v1 = first_value(v1)
+    if not isinstance(v1, str):
+        return False
+    v2 = first_value(ev.eval(ast.args[1], ctx, start))
+    if not isinstance(v2, str):
+        return False
+    local_val = resolve_identity_qname(mod, v1)
+    local_tgt = resolve_identity_qname(mod, v2)
+    if local_val is None or local_tgt is None:
+        return False
+    return is_derived_from_strict(mod, local_val, local_tgt)
+
+
+def f_derived_from_or_self(
+    ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node
+) -> Any:
+    """derived-from-or-self(identityref, identity) — equal or strict descendant."""
+    if len(ast.args) != 2:
+        return False
+    from ..identity_graph import is_derived_from_or_self, resolve_identity_qname
+    from ..module import YangModule
+
+    root_schema = ctx.root.schema if ctx.root is not None else None
+    if not isinstance(root_schema, YangModule):
+        return False
+    mod = root_schema
+    start = ctx.current if ctx.current is not None else node
+    v1 = ev.eval(ast.args[0], ctx, start)
+    if is_nodeset(v1):
+        if not v1:
+            return False
+        v1 = v1[0].data
+    elif isinstance(v1, Node):
+        v1 = v1.data
+    else:
+        v1 = first_value(v1)
+    if not isinstance(v1, str):
+        return False
+    v2 = first_value(ev.eval(ast.args[1], ctx, start))
+    if not isinstance(v2, str):
+        return False
+    local_val = resolve_identity_qname(mod, v1)
+    local_tgt = resolve_identity_qname(mod, v2)
+    if local_val is None or local_tgt is None:
+        return False
+    return is_derived_from_or_self(mod, local_val, local_tgt)
+
+
 FUNCTIONS = {
     "current": f_current,
     "not": f_not,
@@ -145,4 +216,6 @@ FUNCTIONS = {
     "concat": f_concat,
     "translate": f_translate,
     "deref": f_deref,
+    "derived-from": f_derived_from,
+    "derived-from-or-self": f_derived_from_or_self,
 }

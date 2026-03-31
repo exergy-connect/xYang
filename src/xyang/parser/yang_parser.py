@@ -43,6 +43,7 @@ class YangParser:
         self.registry.register('module:description', self.parsers.parse_description)
         self.registry.register('module:revision', self.parsers.parse_revision)
         self.registry.register('module:typedef', self.parsers.parse_typedef)
+        self.registry.register('module:identity', self.parsers.parse_identity)
         self.registry.register('module:grouping', self.parsers.parse_grouping)
         self.registry.register('module:container', self.parsers.parse_container)
         self.registry.register('module:list', self.parsers.parse_list)
@@ -119,6 +120,8 @@ class YangParser:
         self.registry.register('type:enum', self.parsers.parse_type_enum)
         self.registry.register('type:path', self.parsers.parse_type_path)
         self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
+        self.registry.register('type:base', self.parsers.parse_type_base)
+        self.registry.register('identity:base', self.parsers.parse_identity_base)
         
         # Choice body statements
         self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)

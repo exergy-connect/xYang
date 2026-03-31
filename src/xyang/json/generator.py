@@ -15,6 +15,7 @@ from ..ast import (
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
+    YangIdentityStmt,
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
@@ -24,13 +25,14 @@ from ..ast import (
     YangTypeStmt,
     YangTypedefStmt,
 )
+from ..identity_graph import descendant_closure, qualified_identity_name
 from ..module import YangModule
 from ..refine_expand import copy_yang_statement
 from ..uses_expand import expand_uses_in_statements
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 
-from .schema_keys import JsonSchemaKey, XYangKey, XYangMustEntryKey, json_schema_defs_uri
+from .schema_keys import JsonSchemaKey, XYangKey, XYangMustEntryKey, XYangTypeValue, json_schema_defs_uri
 
 
 def _leafref_path_string(path: Any) -> str:
@@ -147,6 +149,24 @@ def _type_to_schema(
     name = type_stmt.name
     if name in typedef_names:
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
+
+    if name == "identityref":
+        bases = list(type_stmt.identityref_bases or [])
+        if not bases:
+            return {JsonSchemaKey.TYPE: "string"}
+        xy = {
+            XYangKey.TYPE: XYangTypeValue.IDENTITYREF,
+            XYangKey.BASES: bases,
+        }
+        if len(bases) == 1:
+            return {
+                JsonSchemaKey.REF: json_schema_defs_uri(bases[0]),
+                JsonSchemaKey.X_YANG: xy,
+            }
+        return {
+            JsonSchemaKey.ALL_OF: [{JsonSchemaKey.REF: json_schema_defs_uri(b)} for b in bases],
+            JsonSchemaKey.X_YANG: xy,
+        }
 
     if name == "leafref":
         path_str = _leafref_path_string(type_stmt.path)
@@ -704,6 +724,21 @@ def _statement_to_property(
     return None
 
 
+def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) -> dict[str, Any]:
+    """Convert YangIdentityStmt to a $defs entry (enum of qualified names + x-yang)."""
+    closure = sorted(descendant_closure(module, name))
+    enum_vals = [qualified_identity_name(module, n) for n in closure]
+    return {
+        JsonSchemaKey.TYPE: "string",
+        JsonSchemaKey.ENUM: enum_vals,
+        JsonSchemaKey.DESCRIPTION: identity.description or "",
+        JsonSchemaKey.X_YANG: {
+            XYangKey.TYPE: XYangTypeValue.IDENTITY,
+            XYangKey.BASES: list(identity.bases),
+        },
+    }
+
+
 def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> dict[str, Any]:
     """Convert YangTypedefStmt to a $defs entry."""
     type_stmt = typedef.type
@@ -745,6 +780,9 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     for name, typedef in module.typedefs.items():
         if isinstance(typedef, YangTypedefStmt):
             defs[name] = _typedef_to_def(name, typedef, module)
+    for name, identity in module.identities.items():
+        if isinstance(identity, YangIdentityStmt):
+            defs[name] = _identity_to_def(name, identity, module)
 
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",

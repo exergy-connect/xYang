@@ -18,6 +18,7 @@ from ..ast import (
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
+    YangIdentityStmt,
     YangListStmt,
     YangLeafStmt,
     YangLeafListStmt,
@@ -102,6 +103,15 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
 
 def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     """Build YangTypeStmt from JSON schema (+ $ref) and x-yang (e.g. leafref)."""
+    if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
+        bases = xyang.get(XYangKey.BASES)
+        if not isinstance(bases, list):
+            bases = []
+        if not bases:
+            b = xyang.get(XYangKey.BASE)
+            if isinstance(b, str):
+                bases = [b]
+        return YangTypeStmt(name="identityref", identityref_bases=list(bases))
     # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
     if xyang.get(XYangKey.TYPE) == "leafref":
         path_val = xyang.get(XYangKey.PATH)
@@ -196,9 +206,15 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
     return None
 
 
+def _is_identity_def_schema(def_schema: dict[str, Any]) -> bool:
+    return _get_xyang(def_schema).get(XYangKey.TYPE) == XYangTypeValue.IDENTITY
+
+
 def _is_typedef_def_schema(def_schema: dict[str, Any]) -> bool:
     """$defs entries are typedefs; x-yang.type is optional (omitted = typedef)."""
     t = _get_xyang(def_schema).get(XYangKey.TYPE)
+    if t == XYangTypeValue.IDENTITY:
+        return False
     return t is None or t == "typedef"
 
 
@@ -213,6 +229,18 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
         type_stmt = YangTypeStmt(name="string")
     stmt = YangTypedefStmt(name=def_name, description=desc, type=type_stmt)
     return stmt
+
+
+def _build_identity(def_name: str, def_schema: dict[str, Any]) -> YangIdentityStmt | None:
+    """Build YangIdentityStmt from a $defs entry with x-yang type identity."""
+    if not _is_identity_def_schema(def_schema):
+        return None
+    xyang = _get_xyang(def_schema)
+    bases = xyang.get(XYangKey.BASES) or []
+    if not isinstance(bases, list):
+        bases = []
+    desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
+    return YangIdentityStmt(name=def_name, description=desc, bases=list(bases))
 
 
 def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
@@ -256,7 +284,9 @@ def _property_schema_and_xyang(prop_value: dict[str, Any], defs: dict[str, Any])
                 else:
                     merged.update(part)
                 xyang.update(part.get(JsonSchemaKey.X_YANG) or {})
-        return merged, xyang
+        top_xy = prop_value.get(JsonSchemaKey.X_YANG) or {}
+        merged_xyang = {**xyang, **top_xy}
+        return merged, merged_xyang
     return prop_value, _get_xyang(prop_value)
 
 
@@ -516,8 +546,10 @@ def _convert_leaf(
     type_schema = schema
     if JsonSchemaKey.REF in prop_value:
         ref_name = _ref_to_typedef_name(prop_value[JsonSchemaKey.REF])
-        if ref_name and ref_name in defs and _is_typedef_def_schema(defs[ref_name]):
-            type_schema = prop_value
+        if ref_name and ref_name in defs:
+            d = defs[ref_name]
+            if _is_typedef_def_schema(d) or _is_identity_def_schema(d):
+                type_schema = prop_value
     type_stmt = _type_from_schema(defs, type_schema, xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt(name="string")
@@ -637,6 +669,8 @@ def _convert_property(
     node_type = xyang.get(XYangKey.TYPE)
     if node_type == XYangTypeValue.LEAFREF:
         node_type = "leaf"
+    if node_type == XYangTypeValue.IDENTITYREF:
+        node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in ("leaf", "leaf-list", "container", "list") else []
 
     if node_type == "container":
@@ -693,6 +727,10 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
 
     for def_name, def_schema in defs.items():
         if not isinstance(def_schema, dict):
+            continue
+        ident = _build_identity(def_name, def_schema)
+        if ident is not None:
+            module.identities[def_name] = ident
             continue
         td = _build_typedef(def_name, def_schema, defs)
         if td is not None:

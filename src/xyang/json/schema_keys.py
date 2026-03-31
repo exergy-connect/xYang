@@ -52,6 +52,8 @@ class XYangKey:
     """Keys inside the ``x-yang`` extension object (and root module metadata)."""
 
     TYPE = "type"
+    BASE = "base"
+    BASES = "bases"
     PATH = "path"
     REQUIRE_INSTANCE = "require-instance"
     WHEN = "when"
@@ -72,6 +74,8 @@ class XYangTypeValue:
     """Values for ``x-yang.type`` (e.g. merged leaf type for leafref)."""
 
     LEAFREF = "leafref"
+    IDENTITY = "identity"
+    IDENTITYREF = "identityref"
 
 
 class XYangMustEntryKey:

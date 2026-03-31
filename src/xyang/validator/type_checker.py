@@ -9,6 +9,8 @@ import re
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
+from ..identity_graph import identityref_value_valid, resolve_identity_qname
+from ..module import YangModule
 from ..xpath.node import Context, Node
 
 logger = logging.getLogger("xyang.validator")
@@ -39,6 +41,8 @@ class TypeChecker:
 
         if name == "union":
             return self._check_union(value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current)
+        if name == "identityref":
+            return self._check_identityref(value, type_stmt, root_schema)
         if name == "leafref":
             return self._check_leafref(value, type_stmt, path, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current)
         if name in (
@@ -86,6 +90,27 @@ class TypeChecker:
                     evaluator=evaluator,
                     leafref_current=leafref_current,
                 )
+        return []
+
+    def _check_identityref(
+        self, value: Any, type_stmt: YangTypeStmt, root_schema: Any
+    ) -> List[str]:
+        if not isinstance(value, str):
+            return [f"identityref value must be a string, got {type(value).__name__}"]
+        if not isinstance(root_schema, YangModule):
+            return ["identityref validation requires module schema"]
+        bases = getattr(type_stmt, "identityref_bases", None) or []
+        if not bases:
+            return ["identityref type has no base identities"]
+        local = resolve_identity_qname(root_schema, value)
+        if local is None:
+            return [
+                f"identityref value {value!r} is not a valid identity for this module prefix"
+            ]
+        if not identityref_value_valid(root_schema, local, bases):
+            return [
+                f"identityref value {value!r} is not derived from all bases {bases!r}"
+            ]
         return []
 
     def _check_union(

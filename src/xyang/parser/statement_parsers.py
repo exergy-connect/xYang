@@ -7,6 +7,7 @@ from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
+    YangIdentityStmt,
     YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
@@ -165,7 +166,43 @@ class StatementParsers:
         context.module.typedefs[typedef_name] = typedef_stmt
         tokens.consume_if(';')
         return None  # Typedefs are stored in module, not returned as statements
-    
+
+    def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse identity statement."""
+        tokens.consume_type(YangTokenType.IDENTITY)
+        identity_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        identity_stmt = YangIdentityStmt(name=identity_name)
+        if tokens.peek_type() == YangTokenType.LBRACE:
+            tokens.consume_type(YangTokenType.LBRACE)
+            new_context = context.push_parent(identity_stmt)
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                handler = self.registry.get_handler(f"identity:{tokens.peek()}")
+                if handler:
+                    handler(tokens, new_context)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in identity '{identity_name}': {tokens.peek()}"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+        context.module.identities[identity_name] = identity_stmt
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse base substatement inside identity."""
+        tokens.consume_type(YangTokenType.BASE)
+        base_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        parent = context.current_parent
+        if isinstance(parent, YangIdentityStmt):
+            parent.bases.append(base_name)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_type_base(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
+        """Parse base substatement inside identityref type."""
+        tokens.consume_type(YangTokenType.BASE)
+        base_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        type_stmt.identityref_bases.append(base_name)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
         """Parse container statement."""
         tokens.consume_type(YangTokenType.CONTAINER)
@@ -271,6 +308,10 @@ class StatementParsers:
         if type_stmt.name == "enumeration" and not type_stmt.enums:
             raise tokens._make_error(
                 'enumeration type requires at least one "enum" statement (RFC 7950)'
+            )
+        if type_stmt.name == "identityref" and not type_stmt.identityref_bases:
+            raise tokens._make_error(
+                'identityref type requires at least one "base" statement (RFC 7950)'
             )
         # Assign to parent (use setattr: current_parent is typed as YangStatementList which has no type/types)
         parent = context.current_parent

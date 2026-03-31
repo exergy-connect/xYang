@@ -90,7 +90,7 @@ The following YANG features are not used in `meta-model.yang` and are not implem
 - ❌ `deviation` - Deviation
 - ❌ `import` - Module imports (modules are self-contained)
 - ❌ `extension` - Extension statements
-- ❌ `identity` / `identityref` - Identity statements
+- ✅ `identity` / `identityref` - Identity statements (single module; JSON Schema `$defs` per identity with `enum` of qualified names)
 - ❌ `bits` - Bits type
 - ❌ `empty` - Empty type
 - ❌ `instance-identifier` - Instance identifier

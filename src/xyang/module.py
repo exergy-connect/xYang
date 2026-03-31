@@ -10,7 +10,7 @@ from dataclasses import dataclass, field
 from .ast import YangStatementList
 
 if TYPE_CHECKING:
-    from .ast import YangStatement, YangTypedefStmt
+    from .ast import YangIdentityStmt, YangStatement, YangTypedefStmt
 
 
 @dataclass
@@ -26,6 +26,7 @@ class YangModule(YangStatementList):
     description: str = ""
     revisions: List[Dict[str, str]] = field(default_factory=list)
     typedefs: Dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
+    identities: Dict[str, 'YangIdentityStmt'] = field(default_factory=dict)
     groupings: Dict[str, 'YangStatement'] = field(default_factory=dict)
 
     def get_typedef(self, name: str) -> Optional['YangTypedefStmt']:
@@ -35,3 +36,7 @@ class YangModule(YangStatementList):
     def get_grouping(self, name: str) -> Optional['YangStatement']:
         """Get a grouping by name."""
         return self.groupings.get(name)
+
+    def get_identity(self, name: str) -> Optional['YangIdentityStmt']:
+        """Get an identity by name."""
+        return self.identities.get(name)

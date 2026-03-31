@@ -83,6 +83,16 @@ class YangTypedefStmt(YangStatement):
 
 
 @dataclass
+class YangIdentityStmt(YangStatement):
+    """Identity statement (RFC 7950); may have multiple ``base`` substatements (YANG 1.1)."""
+
+    bases: List[str] = field(default_factory=list)
+
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
+
+@dataclass
 class YangTypeStmt:
     """Type statement."""
     name: str
@@ -94,6 +104,7 @@ class YangTypeStmt:
     types: List['YangTypeStmt'] = field(default_factory=list)  # For union types
     path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
     require_instance: bool = True  # For leafref
+    identityref_bases: List[str] = field(default_factory=list)  # For identityref: one per ``base`` substatement
 
 
 @dataclass

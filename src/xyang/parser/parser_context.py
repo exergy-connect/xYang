@@ -51,6 +51,8 @@ class YangTokenType(Enum):
     DESCRIPTION = "description"
     REVISION = "revision"
     TYPEDEF = "typedef"
+    IDENTITY = "identity"
+    BASE = "base"
     TYPE = "type"
     # RFC 7950 built-in types (Section 4.2.4) — lexer keywords, same spelling as YANG source.
     BINARY = "binary"

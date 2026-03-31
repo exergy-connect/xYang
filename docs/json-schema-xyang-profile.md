@@ -30,7 +30,7 @@ Generated schemas include:
 - **`type`**: `"object"` at the root
 - **`properties`**: top-level data nodes — one JSON property per module-level `container` / `list` / leaf / … (any identifier; `parse_json_schema` imports **all** x-yang–mapped root properties, not only `data-model`)
 - **`additionalProperties`**: `false` at root (and on emitted object shapes where applicable)
-- **`$defs`**: optional map of **typedef** names → schema fragments
+- **`$defs`**: optional map of **typedef** and **identity** names → schema fragments (see **Typedefs** and **Identities** below)
 
 ---
 
@@ -58,6 +58,7 @@ For **container**, **list**, **leaf**, **leaf-list**, and leaves whose YANG type
 | `type` | container / list / leaf-list | `"container"` \| `"list"` \| `"leaf-list"` |
 | `type` | Ordinary leaf | `"leaf"` |
 | `type` | Leaf with `type leafref` | `"leafref"` (merged from the leafref type schema; overrides the initial `"leaf"`) |
+| `type` | Leaf with `type identityref` | `"identityref"` (merged; includes `bases`); parser maps back to `identityref` |
 | `key` | `list` | List key string (YANG `key`) |
 | `must` | When present | Array of `{ "must", "error-message", "description" }` (XPath strings) |
 | `when` | When present | XPath condition string |
@@ -109,10 +110,23 @@ See `tests/json/test_choice_cases.py` and `tests/json/test_issue_choice_flat_ins
 Each typedef becomes a **`$defs/<name>`** entry:
 
 - JSON Schema fragment from the resolved base type (`pattern`, `enum`, `minimum` / `maximum`, etc.)
-- `"x-yang": { "type": "typedef" }`
-- `description` from the typedef when present
+- `description` from the typedef when present (typedef is implied for `$defs` entries that are not identities; no required `x-yang.type` marker)
 
 Leaves that use a typedef reference it with `"$ref": "#/$defs/<typedef-name>"` while keeping **`x-yang.type": "leaf"`** on the leaf node (unless the leaf is a leafref; then **`x-yang.type`** is **`"leafref"`** as above).
+
+---
+
+## Identities (`$defs`) and `identityref`
+
+Each YANG **`identity`** becomes **`$defs/<identity-name>`**:
+
+- `type: "string"`, `enum`: sorted qualified names (`prefix:local`) for that identity and every identity **derived from** it in the module (closed-world snapshot).
+- **`x-yang`**: `{ "type": "identity", "bases": [ "<local-base>", ... ] }` mirroring YANG `base` statements (multi-base supported).
+
+A leaf of type **`identityref`** is emitted as:
+
+- **One base:** `{ "$ref": "#/$defs/<base>", "x-yang": { "type": "identityref", "bases": ["<base>"] } }` merged with the leaf’s `x-yang` (effective `type` on the leaf becomes `identityref` after merge; the JSON parser treats it as a leaf).
+- **Multiple bases:** `{ "allOf": [ {"$ref": "#/$defs/<b1>"}, ... ], "x-yang": { "type": "identityref", "bases": ["...", "..."] } }` so instance values must satisfy every base (intersection), per RFC 7950.
 
 Inside a typedef definition, nested `$ref` to other typedefs is avoided in the generator (`typedef_names` empty in `_typedef_to_def`).
 
@@ -130,6 +144,7 @@ Inside a typedef definition, nested `$ref` to other typedefs is avoided in the g
 | `empty` | `type: "object"`, `maxProperties: 0` | |
 | `union` | `oneOf: [ ... ]` | One schema per member type |
 | `leafref` | `type: "string"` | **`x-yang`** on the **leaf** merges `type: "leafref"`, `path`, `require-instance` |
+| `identityref` | `$ref` to `$defs/<base>` (or `allOf` of several `$ref`s) | **`x-yang`**: `type: "identityref"`, `bases`: local base identity names |
 
 Leafref path is stored as a string (`PathNode.to_string()` when parsed from YANG). Resolving references is **not** a JSON Schema concern; xYang’s validator uses this metadata.
 

@@ -1,0 +1,23 @@
+module identity-roundtrip {
+  yang-version 1.1;
+  namespace "urn:identity-roundtrip";
+  prefix "ir";
+
+  identity animal;
+
+  identity mammal {
+    base animal;
+  }
+
+  identity dog {
+    base mammal;
+  }
+
+  container data {
+    leaf kind {
+      type identityref {
+        base animal;
+      }
+    }
+  }
+}
