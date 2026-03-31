@@ -2690,44 +2690,29 @@
         "qualified_integer",
         "qualified_number"
       ],
-      "description": "Primitive field data type",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Primitive field data type"
     },
     "date": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
-      "description": "Date in YYYY-MM-DD format",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Date in YYYY-MM-DD format"
     },
     "date-and-time": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})?$",
-      "description": "ISO 8601 date and time in format YYYY-MM-DDTHH:mm:ss[.sss][Z|±HH:mm]",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "ISO 8601 date and time in format YYYY-MM-DDTHH:mm:ss[.sss][Z|±HH:mm]"
     },
     "entity-name": {
       "type": "string",
       "pattern": "^[a-z_][a-z0-9_]*$",
       "minLength": 1,
       "maxLength": 64,
-      "description": "Entity name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2).",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Entity name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2)."
     },
     "version-string": {
       "type": "string",
       "pattern": "^\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+$",
-      "description": "Version string in format YY.MM.DD.N, auto-incremented during consolidation when changes are detected",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Version string in format YY.MM.DD.N, auto-incremented during consolidation when changes are detected"
     },
     "rate-of-change": {
       "type": "string",
@@ -2741,10 +2726,7 @@
         "rarely",
         "never"
       ],
-      "description": "Expected rate of change for an entity, indicating what is considered 'normal' change frequency",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Expected rate of change for an entity, indicating what is considered 'normal' change frequency"
     },
     "validation-mode": {
       "type": "string",
@@ -2753,10 +2735,7 @@
         "warn",
         "skip"
       ],
-      "description": "Data validation mode for entity",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Data validation mode for entity"
     },
     "storage-type": {
       "type": "string",
@@ -2764,10 +2743,7 @@
         "INDEXED_KV",
         "GITHUB_PR"
       ],
-      "description": "Storage type for entity data",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Storage type for entity data"
     },
     "change-history-policy": {
       "oneOf": [
@@ -2780,20 +2756,14 @@
           "pattern": "^\\*$"
         }
       ],
-      "description": "Change history retention policy. Can be:\n       - An integer N: Keep last N modification change IDs (default: 3)\n       - '*': Keep infinite history\n       - 0: Disabled (no modification history tracked)",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Change history retention policy. Can be:\n       - An integer N: Keep last N modification change IDs (default: 3)\n       - '*': Keep infinite history\n       - 0: Disabled (no modification history tracked)"
     },
     "field-name": {
       "type": "string",
       "pattern": "^[a-z_][a-z0-9_]*$",
       "minLength": 1,
       "maxLength": 128,
-      "description": "Field name for computed references and leafrefs (same rules as entity fields).",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Field name for computed references and leafrefs (same rules as entity fields)."
     },
     "field-validation-mode": {
       "type": "string",
@@ -2801,10 +2771,7 @@
         "enforce",
         "filter"
       ],
-      "description": "Field validation mode. 'enforce' (default) — constraints are enforced during validation;\n       'filter' — invalid field value is omitted from consolidated output.",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Field validation mode. 'enforce' (default) — constraints are enforced during validation;\n       'filter' — invalid field value is omitted from consolidated output."
     }
   }
 }

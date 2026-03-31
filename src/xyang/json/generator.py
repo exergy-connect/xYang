@@ -714,7 +714,6 @@ def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> 
         leafref_anchor=None,
     )  # no $ref inside typedef def
     schema[JsonSchemaKey.DESCRIPTION] = typedef.description or ""
-    schema[JsonSchemaKey.X_YANG] = {XYangKey.TYPE: "typedef"}
     return schema
 
 

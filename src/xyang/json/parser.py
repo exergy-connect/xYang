@@ -196,10 +196,16 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
     return None
 
 
+def _is_typedef_def_schema(def_schema: dict[str, Any]) -> bool:
+    """$defs entries are typedefs; x-yang.type is optional (omitted = typedef)."""
+    t = _get_xyang(def_schema).get(XYangKey.TYPE)
+    return t is None or t == "typedef"
+
+
 def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, Any]) -> YangTypedefStmt | None:
-    """Build YangTypedefStmt from a $defs entry with x-yang type typedef."""
+    """Build YangTypedefStmt from a $defs entry."""
     xyang = _get_xyang(def_schema)
-    if xyang.get(XYangKey.TYPE) != "typedef":
+    if not _is_typedef_def_schema(def_schema):
         return None
     desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
     type_stmt = _type_from_schema(defs, def_schema, xyang)
@@ -510,7 +516,7 @@ def _convert_leaf(
     type_schema = schema
     if JsonSchemaKey.REF in prop_value:
         ref_name = _ref_to_typedef_name(prop_value[JsonSchemaKey.REF])
-        if ref_name and ref_name in defs and _get_xyang(defs[ref_name]).get(XYangKey.TYPE) == "typedef":
+        if ref_name and ref_name in defs and _is_typedef_def_schema(defs[ref_name]):
             type_schema = prop_value
     type_stmt = _type_from_schema(defs, type_schema, xyang)
     if type_stmt is None:
