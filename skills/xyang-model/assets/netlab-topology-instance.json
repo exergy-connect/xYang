@@ -1,0 +1,17 @@
+{
+  "topology": {
+    "nodes": [
+      { "name": "r1", "role": "router" },
+      { "name": "r2", "role": "router" }
+    ],
+    "links": [
+      { "name": "eth12", "source": "r1", "target": "r2" }
+    ],
+    "services": [
+      {
+        "name": "ntp",
+        "runs-on": "/topology/nodes[name='r1']"
+      }
+    ]
+  }
+}

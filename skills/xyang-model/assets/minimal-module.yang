@@ -1,0 +1,21 @@
+// Minimal self-contained YANG 1.1 module valid for xYang (parse + convert + validate).
+// Copy into your project and rename module / namespace / prefix.
+
+module example-minimal {
+  yang-version 1.1;
+  namespace "urn:example:minimal";
+  prefix "ex";
+
+  organization "Example";
+  contact "example@example.com";
+  description "Minimal data tree for xyang-model skill.";
+
+  container data-model {
+    description "Root container for instance JSON (conventional name; any valid identifier works).";
+
+    leaf title {
+      type string;
+      description "Sample leaf.";
+    }
+  }
+}

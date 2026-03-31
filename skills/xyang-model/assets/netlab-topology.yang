@@ -1,0 +1,68 @@
+// Netlab-style lab topology: nodes and links with referential integrity.
+// Demonstrates leafref endpoints, must (no self-loops), and instance-identifier for node refs.
+
+module netlab-topology {
+  yang-version 1.1;
+  namespace "urn:netlab:topology";
+  prefix "nt";
+
+  organization "xYang skill example";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Example topology model inspired by network lab tools: nodes, links, and services that reference node names.";
+
+  container topology {
+    description "Single-lab topology (devices and cables).";
+
+    list nodes {
+      key name;
+      description "Router, switch, or end host in the lab.";
+      leaf name {
+        type string;
+      }
+      leaf role {
+        type string;
+        description "e.g. router, switch, host.";
+      }
+    }
+
+    list links {
+      key name;
+      description "Layer-3 or layer-2 edge between two nodes.";
+      leaf name {
+        type string;
+      }
+      leaf source {
+        type leafref {
+          path "/topology/nodes/name";
+          require-instance true;
+        }
+      }
+      leaf target {
+        type leafref {
+          path "/topology/nodes/name";
+          require-instance true;
+        }
+      }
+      must "source != target" {
+        error-message "A link cannot connect a node to itself.";
+        description "Referential integrity: distinct endpoints.";
+      }
+    }
+
+    list services {
+      key name;
+      description "Service or workload pinned to a node via instance-identifier (absolute path).";
+      leaf name {
+        type string;
+      }
+      leaf runs-on {
+        type instance-identifier {
+          require-instance true;
+        }
+        description
+          "Absolute path to a node in this topology (e.g. /topology/nodes[name='r1']).";
+      }
+    }
+  }
+}
