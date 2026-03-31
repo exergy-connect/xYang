@@ -112,6 +112,12 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             if isinstance(b, str):
                 bases = [b]
         return YangTypeStmt(name="identityref", identityref_bases=list(bases))
+    if xyang.get(XYangKey.TYPE) == XYangTypeValue.INSTANCE_IDENTIFIER:
+        require = xyang.get(XYangKey.REQUIRE_INSTANCE, True)
+        return YangTypeStmt(
+            name="instance-identifier",
+            require_instance=bool(require),
+        )
     # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
     if xyang.get(XYangKey.TYPE) == "leafref":
         path_val = xyang.get(XYangKey.PATH)
@@ -670,6 +676,8 @@ def _convert_property(
     if node_type == XYangTypeValue.LEAFREF:
         node_type = "leaf"
     if node_type == XYangTypeValue.IDENTITYREF:
+        node_type = "leaf"
+    if node_type == XYangTypeValue.INSTANCE_IDENTIFIER:
         node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in ("leaf", "leaf-list", "container", "list") else []
 

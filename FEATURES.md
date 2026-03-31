@@ -27,6 +27,7 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `uint8` - 8-bit unsigned integer (1 occurrence)
 - ✅ `boolean` - Boolean type
 - ✅ `decimal64` - Decimal64 type (3 occurrences)
+- ✅ `empty` - Empty type (presence-only leaf; validated)
 
 ### Derived Types
 - ✅ `enumeration` - Enumeration type (6 `type enumeration` typedef bodies) (built-in keyword; `enum` is the substatement keyword inside the block). The meta-model’s `primitive-type-name` enumeration includes **year** (calendar year) alongside string, integer, number, boolean, array, datetime, date, duration_in_days, and qualified types.
@@ -66,6 +67,13 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `leafref` - Leaf references (7 `type leafref` uses) - **Parsed and resolved via deref()**
 - ✅ `path` - Leafref paths
 - ✅ `require-instance` - Leafref require-instance
+- ✅ `instance-identifier` - **Parsed** with `require-instance`; validation resolves absolute paths when `require-instance` is true; JSON Schema `x-yang.type` + `require-instance`
+
+### Identity (single module)
+- ✅ `identity` / `base` - Identity statements (multi-base supported)
+- ✅ `identityref` / `base` - Identityref type; instance values as qualified names; validation against the derivation graph
+- ✅ XPath `derived-from()` / `derived-from-or-self()` in `must` expressions
+- ✅ JSON Schema: `$defs` per identity (`enum` of qualified names) and `$ref` / `allOf` on `identityref` leaves; `parse_json_schema` round-trip
 
 ### Container Features
 - ✅ `presence` - Container presence (1 occurrence)
@@ -84,16 +92,15 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 
 All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built-in Types** above), even when validation or JSON Schema support is incomplete.
 
-The following YANG features are not used in `meta-model.yang` and are not implemented:
+The following YANG features are not used in `meta-model.yang` and are **not** implemented:
 
 - ❌ `augment` - Augmentation
 - ❌ `deviation` - Deviation
 - ❌ `import` - Module imports (modules are self-contained)
 - ❌ `extension` - Extension statements
-- ✅ `identity` / `identityref` - Identity statements (single module; JSON Schema `$defs` per identity with `enum` of qualified names)
 - ❌ `bits` - Bits type
-- ❌ `empty` - Empty type
-- ❌ `instance-identifier` - Instance identifier
+
+Other reserved built-in type names may parse but lack full validation or JSON Schema parity; see **Built-in Types** and sections above.
 
 ## When Conditions
 

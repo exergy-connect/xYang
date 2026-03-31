@@ -11,6 +11,8 @@ from typing import Any, List, Optional
 from ..ast import YangTypeStmt
 from ..identity_graph import identityref_value_valid, resolve_identity_qname
 from ..module import YangModule
+from ..xpath import XPathParser
+from ..xpath.ast import PathNode
 from ..xpath.node import Context, Node
 
 logger = logging.getLogger("xyang.validator")
@@ -43,6 +45,10 @@ class TypeChecker:
             return self._check_union(value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current)
         if name == "identityref":
             return self._check_identityref(value, type_stmt, root_schema)
+        if name == "instance-identifier":
+            return self._check_instance_identifier(
+                value, type_stmt, ctx, evaluator
+            )
         if name == "leafref":
             return self._check_leafref(value, type_stmt, path, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current)
         if name in (
@@ -110,6 +116,42 @@ class TypeChecker:
         if not identityref_value_valid(root_schema, local, bases):
             return [
                 f"identityref value {value!r} is not derived from all bases {bases!r}"
+            ]
+        return []
+
+    def _check_instance_identifier(
+        self,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        ctx: Context,
+        evaluator: Any,
+    ) -> List[str]:
+        """RFC 7950 instance-identifier: string path; optional require-instance existence check."""
+        if not isinstance(value, str):
+            return [
+                f"instance-identifier value must be a string, got {type(value).__name__}"
+            ]
+        if not getattr(type_stmt, "require_instance", True):
+            return []
+        s = value.strip()
+        if not s:
+            return ["instance-identifier path must not be empty when require-instance is true"]
+        try:
+            ast = XPathParser(s).parse()
+        except Exception as e:
+            return [f"instance-identifier: invalid path expression ({e})"]
+        if not isinstance(ast, PathNode):
+            return [
+                "instance-identifier: value must be a path expression (e.g. /top/leaf)"
+            ]
+        if not ast.is_absolute:
+            return [
+                "instance-identifier: only absolute paths are supported (path must start with '/')"
+            ]
+        nodes = evaluator.eval(ast, ctx, ctx.root)
+        if not nodes:
+            return [
+                f"instance-identifier: no instance at path {value!r} (require-instance is true)"
             ]
         return []
 

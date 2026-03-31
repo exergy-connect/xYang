@@ -76,6 +76,7 @@ class XYangTypeValue:
     LEAFREF = "leafref"
     IDENTITY = "identity"
     IDENTITYREF = "identityref"
+    INSTANCE_IDENTIFIER = "instance-identifier"
 
 
 class XYangMustEntryKey:

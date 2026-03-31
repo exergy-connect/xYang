@@ -191,6 +191,16 @@ def _type_to_schema(
                 XYangKey.REQUIRE_INSTANCE: require,
             },
         }
+
+    if name == "instance-identifier":
+        require = getattr(type_stmt, "require_instance", True)
+        return {
+            JsonSchemaKey.TYPE: "string",
+            JsonSchemaKey.X_YANG: {
+                XYangKey.TYPE: XYangTypeValue.INSTANCE_IDENTIFIER,
+                XYangKey.REQUIRE_INSTANCE: require,
+            },
+        }
     out: dict[str, Any]
     if name == "string":
         out = {JsonSchemaKey.TYPE: "string"}
