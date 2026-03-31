@@ -5,6 +5,7 @@ from __future__ import annotations
 from typing import Any
 
 from xyang import YangValidator, parse_yang_string
+from xyang.ast import YangLeafStmt
 from xyang.json import generate_json_schema, parse_json_schema
 
 
@@ -91,11 +92,11 @@ def test_instance_identifier_json_schema_round_trip():
     dm = module2.find_statement("data-model")
     assert dm is not None
     ptr = dm.find_statement("ptr")
-    assert ptr is not None and ptr.type is not None
+    assert isinstance(ptr, YangLeafStmt) and ptr.type is not None
     assert ptr.type.name == "instance-identifier"
     assert ptr.type.require_instance is True
     loose = dm.find_statement("ptr_loose")
-    assert loose is not None and loose.type is not None
+    assert isinstance(loose, YangLeafStmt) and loose.type is not None
     assert loose.type.name == "instance-identifier"
     assert loose.type.require_instance is False
 
