@@ -95,12 +95,16 @@ def _union_member_names_compatible(jt: dict[str, Any], yt: dict[str, Any]) -> bo
     return True
 
 
-def _normalize_when(stmt: Any) -> str | None:
-    """Extract when condition string from a statement that may have .when."""
+def _normalize_when(stmt: Any) -> dict[str, Any] | None:
+    """Extract when condition and optional description (RFC 7950 substatement)."""
     w = getattr(stmt, "when", None)
     if w is None:
         return None
-    return getattr(w, "condition", None) or None
+    cond = getattr(w, "condition", None) or getattr(w, "expression", None)
+    if not cond:
+        return None
+    desc = getattr(w, "description", None) or ""
+    return {"condition": cond, "description": desc}
 
 
 def _normalize_statement(stmt: Any) -> dict[str, Any] | None:

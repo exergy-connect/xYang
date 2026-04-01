@@ -36,6 +36,7 @@ from .schema_keys import (
     XYangKey,
     XYangMustEntryKey,
     XYangTypeValue,
+    XYangWhenEntryKey,
 )
 
 
@@ -45,11 +46,19 @@ def _get_xyang(schema: dict[str, Any]) -> dict[str, Any]:
 
 
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
-    """Build YangWhenStmt from x-yang 'when' condition string, or None if absent."""
-    when_str = xyang.get(XYangKey.WHEN)
-    if not when_str or not isinstance(when_str, str):
+    """Build YangWhenStmt from x-yang ``when``: object with ``condition`` and optional ``description``."""
+    raw = xyang.get(XYangKey.WHEN)
+    if raw is None:
         return None
-    return YangWhenStmt(condition=when_str)
+    if not isinstance(raw, dict):
+        return None
+    cond = raw.get(XYangWhenEntryKey.CONDITION)
+    if not cond or not isinstance(cond, str):
+        return None
+    desc = raw.get(JsonSchemaKey.DESCRIPTION) or ""
+    if not isinstance(desc, str):
+        desc = str(desc)
+    return YangWhenStmt(expression=cond, description=desc)
 
 
 def _ref_to_typedef_name(ref: str) -> str | None:

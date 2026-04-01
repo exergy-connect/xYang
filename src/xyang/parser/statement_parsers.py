@@ -491,12 +491,28 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse when statement. Argument is string (with optional + concatenation). Uses xpath."""
+        """Parse when statement. Argument is string (with optional + concatenation). Uses xpath.
+
+        RFC 7950 allows optional substatements ``description`` and ``reference`` in the braced form;
+        xYang currently supports ``description`` only.
+        """
         tokens.consume_type(YangTokenType.WHEN)
         condition = self._parse_string_concatenation(tokens)
-        when_stmt = YangWhenStmt(condition=condition)
-        if context.current_parent and isinstance(context.current_parent, YangStatementWithWhen):
-            context.current_parent.when = when_stmt
+        when_stmt = YangWhenStmt(expression=condition)
+        parent_for_when = context.current_parent
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            new_context = context.push_parent(when_stmt)
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self.parse_description(tokens, new_context)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in when: {tokens.peek()!r} "
+                        f"(only description allowed)"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+        if parent_for_when and isinstance(parent_for_when, YangStatementWithWhen):
+            parent_for_when.when = when_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:

@@ -90,14 +90,14 @@ def test_required_true_with_default_fails_must(meta_model_module):
 
 
 def test_primitive_enum_valid_for_string(meta_model_module):
-    """Optional type.enum allowed when primitive is string (grouping primitive-type-and-enum)."""
+    """Closed enumeration: enum-only (no primitive leaf) is valid (primitive-type-and-enum grouping)."""
     dm = _base_data_model()["data-model"]
     ent = dm["entities"][0]
     ent["fields"].append(
         {
             "name": "status",
             "description": "Status enum.",
-            "type": {"primitive": "string", "enum": ["a", "b"]},
+            "type": {"enum": ["a", "b"]},
         }
     )
     validator = YangValidator(meta_model_module)

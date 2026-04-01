@@ -24,6 +24,7 @@ from ..ast import (
     YangStatement,
     YangTypeStmt,
     YangTypedefStmt,
+    YangWhenStmt,
 )
 from ..identity_graph import descendant_closure, qualified_identity_name
 from ..module import YangModule
@@ -32,7 +33,14 @@ from ..uses_expand import expand_uses_in_statements
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 
-from .schema_keys import JsonSchemaKey, XYangKey, XYangMustEntryKey, XYangTypeValue, json_schema_defs_uri
+from .schema_keys import (
+    JsonSchemaKey,
+    XYangKey,
+    XYangMustEntryKey,
+    XYangTypeValue,
+    XYangWhenEntryKey,
+    json_schema_defs_uri,
+)
 
 
 def _leafref_path_string(path: Any) -> str:
@@ -299,11 +307,19 @@ def _must_to_json(must: YangMustStmt) -> dict[str, Any]:
     }
 
 
+def _when_to_xyang_json(when: YangWhenStmt) -> dict[str, Any]:
+    """Serialize ``when`` as object: ``condition`` (required) and optional ``description``."""
+    out: dict[str, Any] = {XYangWhenEntryKey.CONDITION: when.expression}
+    if when.description and when.description.strip():
+        out[JsonSchemaKey.DESCRIPTION] = when.description
+    return out
+
+
 def _build_xyang(
     node_type: str,
     key: str | None = None,
     must_list: list[YangMustStmt] | None = None,
-    when_condition: str | None = None,
+    when_stmt: YangWhenStmt | None = None,
     presence: str | None = None,
     *,
     mandatory: bool | None = None,
@@ -314,8 +330,8 @@ def _build_xyang(
         xyang[XYangKey.KEY] = key
     if must_list:
         xyang[XYangKey.MUST] = [_must_to_json(m) for m in must_list]
-    if when_condition:
-        xyang[XYangKey.WHEN] = when_condition
+    if when_stmt is not None and when_stmt.expression:
+        xyang[XYangKey.WHEN] = _when_to_xyang_json(when_stmt)
     if presence:
         xyang[XYangKey.PRESENCE] = presence
     if mandatory is True:
@@ -464,9 +480,7 @@ def _statement_to_property(
 
     if isinstance(stmt, YangContainerStmt):
         children = _expand_uses_for_json(stmt.statements, module)
-        when_cond = None
-        if getattr(stmt, "when", None) is not None:
-            when_cond = getattr(stmt.when, "condition", None)
+        when_stmt = getattr(stmt, "when", None)
         others, hoisted_ch = _partition_choice_sibling_statements(children)
         if hoisted_ch is not None and others:
             base_props: dict[str, Any] = {}
@@ -484,7 +498,7 @@ def _statement_to_property(
                 **_build_xyang(
                     "container",
                     must_list=getattr(stmt, "must_statements", None) or [],
-                    when_condition=when_cond,
+                    when_stmt=when_stmt,
                     presence=getattr(stmt, "presence", None),
                 ),
                 XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
@@ -518,7 +532,7 @@ def _statement_to_property(
                 **_build_xyang(
                     "container",
                     must_list=getattr(stmt, "must_statements", None) or [],
-                    when_condition=when_cond,
+                    when_stmt=when_stmt,
                     presence=getattr(stmt, "presence", None),
                 ),
                 XYangKey.CHOICE: _choice_meta_xyang(ch0),
@@ -550,7 +564,7 @@ def _statement_to_property(
             JsonSchemaKey.X_YANG: _build_xyang(
                 "container",
                 must_list=getattr(stmt, "must_statements", None) or [],
-                when_condition=when_cond,
+                when_stmt=when_stmt,
                 presence=getattr(stmt, "presence", None),
             ),
         }
@@ -568,14 +582,12 @@ def _statement_to_property(
             list_children = [_copy_statement(s) for s in stmt.statements]
         else:
             list_children = _expand_uses_for_json(stmt.statements, module)
-        when_cond = None
-        if getattr(stmt, "when", None) is not None:
-            when_cond = getattr(stmt.when, "condition", None)
+        when_stmt = getattr(stmt, "when", None)
         list_xy = _build_xyang(
             "list",
             key=stmt.key,
             must_list=getattr(stmt, "must_statements", None) or [],
-            when_condition=when_cond,
+            when_stmt=when_stmt,
         )
         items: dict[str, Any]
         others_lc, hoisted_list_ch = _partition_choice_sibling_statements(list_children)
@@ -646,9 +658,7 @@ def _statement_to_property(
 
     if isinstance(stmt, YangLeafStmt):
         type_stmt = stmt.type
-        when_cond = None
-        if getattr(stmt, "when", None) is not None:
-            when_cond = getattr(stmt.when, "condition", None)
+        when_stmt = getattr(stmt, "when", None)
         if type_stmt and type_stmt.name in typedef_names:
             out = {
                 JsonSchemaKey.REF: json_schema_defs_uri(type_stmt.name),
@@ -656,7 +666,7 @@ def _statement_to_property(
                 JsonSchemaKey.X_YANG: _build_xyang(
                     "leaf",
                     must_list=getattr(stmt, "must_statements", None) or [],
-                    when_condition=when_cond,
+                    when_stmt=when_stmt,
                     mandatory=stmt.mandatory or None,
                 ),
             }
@@ -671,7 +681,7 @@ def _statement_to_property(
             leaf_xyang = _build_xyang(
                 "leaf",
                 must_list=getattr(stmt, "must_statements", None) or [],
-                when_condition=when_cond,
+                when_stmt=when_stmt,
                 mandatory=stmt.mandatory or None,
             )
             # Preserve leafref (type, path, require-instance) from type_schema x-yang
@@ -695,9 +705,7 @@ def _statement_to_property(
             module=module,
             leafref_anchor=lr_anchor,
         )
-        when_cond = None
-        if getattr(stmt, "when", None) is not None:
-            when_cond = getattr(stmt.when, "condition", None)
+        when_stmt = getattr(stmt, "when", None)
         out = {
             JsonSchemaKey.TYPE: "array",
             JsonSchemaKey.ITEMS: items_schema,
@@ -705,7 +713,7 @@ def _statement_to_property(
             JsonSchemaKey.X_YANG: _build_xyang(
                 "leaf-list",
                 must_list=getattr(stmt, "must_statements", None) or [],
-                when_condition=when_cond,
+                when_stmt=when_stmt,
             ),
         }
         if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:

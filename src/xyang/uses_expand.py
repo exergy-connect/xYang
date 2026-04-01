@@ -34,8 +34,13 @@ def _merge_uses_when_into_grouping_roots(
             if node.when is None:
                 node.when = uses_when
             else:
+                old = node.when
+                merged_expr = f"({uses_when.condition}) and ({old.condition})"
+                merged_desc = (old.description or "").strip() or (
+                    uses_when.description or ""
+                ).strip()
                 node.when = YangWhenStmt(
-                    f"({uses_when.condition}) and ({node.when.condition})"
+                    expression=merged_expr, description=merged_desc
                 )
 
 

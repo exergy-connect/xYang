@@ -171,10 +171,7 @@ class YangMustStmt(YangParsedXPathBase):
 
 @dataclass
 class YangWhenStmt(YangParsedXPathBase):
-    """When statement (conditional)."""
-    def __init__(self, condition: str, description: str = ""):
-        super().__init__(expression=condition)
-        self.description = description
+    """When statement (conditional). XPath lives in ``expression`` (see ``condition``)."""
 
     @property
     def condition(self) -> str:

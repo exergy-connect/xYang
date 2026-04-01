@@ -111,6 +111,36 @@ module test {
     assert is_valid or len(errors) == 0
 
 
+def test_when_braced_form_with_description():
+    """RFC 7950: when may include a description substatement in the braced form."""
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+
+  container data {
+    leaf mode {
+      type string;
+    }
+    leaf extra {
+      when "../mode = 'on'" {
+        description "Only when mode is on.";
+      }
+      type string;
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    data_model = module.find_statement("data")
+    assert data_model is not None
+    extra = next(s for s in data_model.statements if getattr(s, "name", None) == "extra")
+    assert extra.when is not None
+    assert extra.when.condition == "../mode = 'on'"
+    assert "Only when mode is on" in extra.when.description
+
+
 def test_when_condition_false():
     """Test when condition that evaluates to false - container should be skipped."""
     yang_content = """

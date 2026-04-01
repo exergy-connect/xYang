@@ -195,6 +195,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | List key | — | ✅ `key` |
 | Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |
 | Must constraints | — | ✅ `must`: array of expression + error-message + description |
+| When conditions | — | ✅ `when`: object `{ "condition": "<xpath>" }` with optional `"description"` (RFC-style substatement text) |
 | Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
 
 ### Leafref in hybrid form
@@ -232,6 +233,20 @@ Must constraints are not expressible in JSON Schema, so they appear only under *
 ```
 
 The XPath expression is preserved as a string; the YANG validator evaluates it during validation.
+
+### When conditions in hybrid form
+
+`when` is always an object (not a bare string): required **`condition`** (XPath) and optional **`description`** when the YANG source had a `when { description "..."; }` substatement.
+
+```json
+"x-yang": {
+  "type": "leaf",
+  "when": {
+    "condition": "../primitive = ('date','datetime')",
+    "description": "minDate applies only to date and datetime primitives."
+  }
+}
+```
 
 ### Round-trip and tooling
 

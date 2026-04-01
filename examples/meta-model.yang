@@ -219,26 +219,26 @@ module meta-model {
         "Maximum string length, or maximum value for integer, number, or year primitives.";
     }
     leaf minDate {
+      when "../primitive = ('date','datetime')" {
+        description
+          "minDate applies only to date and datetime primitives.";
+      }
       type date;
       description
         "Minimum date (YYYY-MM-DD) for date or datetime primitive fields.";
-      must "../primitive = ('date','datetime')" {
-        error-message "minDate can only be used with primitive type date or datetime";
-        description "minDate applies only to date and datetime primitives.";
-      }
       must "not(../maxDate) or . <= ../maxDate" {
         error-message "minDate must be less than or equal to maxDate when both are specified";
         description "Ordering between minDate and maxDate.";
       }
     }
     leaf maxDate {
+      when "../primitive = ('date','datetime')" {
+        description
+          "maxDate applies only to date and datetime primitives.";
+      }
       type date;
       description
         "Maximum date (YYYY-MM-DD) for date or datetime primitive fields.";
-      must "../primitive = ('date','datetime')" {
-        error-message "maxDate can only be used with primitive type date or datetime";
-        description "maxDate applies only to date and datetime primitives.";
-      }
       must "not(../minDate) or . >= ../minDate" {
         error-message "maxDate must be greater than or equal to minDate when both are specified";
         description "Ordering between minDate and maxDate.";

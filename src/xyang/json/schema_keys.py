@@ -86,11 +86,18 @@ class XYangMustEntryKey:
     ERROR_MESSAGE = "error-message"
 
 
+class XYangWhenEntryKey:
+    """Keys inside ``x-yang.when`` when encoded as an object (condition + optional description)."""
+
+    CONDITION = "condition"
+
+
 __all__ = [
     "JSON_SCHEMA_DEFS_URI_PREFIX",
     "JsonSchemaKey",
     "XYangKey",
     "XYangMustEntryKey",
+    "XYangWhenEntryKey",
     "XYangTypeValue",
     "json_schema_defs_uri",
 ]

@@ -61,7 +61,7 @@ For **container**, **list**, **leaf**, **leaf-list**, and leaves whose YANG type
 | `type` | Leaf with `type identityref` | `"identityref"` (merged; includes `bases`); parser maps back to `identityref` |
 | `key` | `list` | List key string (YANG `key`) |
 | `must` | When present | Array of `{ "must", "error-message", "description" }` (XPath strings) |
-| `when` | When present | XPath condition string |
+| `when` | When present | Object `{ "condition": "<xpath>" }` with optional `"description"` (no bare string) |
 | `presence` | `container` | Presence string when the container is presence container |
 | `choice` | `container` / `list` | When the choice is **hoisted**: `{ "name", "description" }` of the YANG `choice` (round-trip metadata) |
 | `path`, `require-instance` | Leafref leaf | Leafref target path (string) and `require-instance` flag |
