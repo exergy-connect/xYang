@@ -80,7 +80,7 @@ Per RFC 7950 Section 8.1, applicability is determined first: mandatory and min/m
 4. **Type** — pattern, range, length, enum, leafref (with schema-aware resolution).
 5. **Descend** — recurse into children.
 
-*Note:* The current implementation in `document_validator.py` runs structural checks before `when` (so that effective value and Context/Node exist for the when expression). That can yield a different error order than the spec (e.g. min-elements before when-false). Aligning with the spec would require evaluating `when` first and only then applying structural checks for applicable nodes.
+`DocumentValidator._visit_stmt` follows this order: it builds the child’s effective value and a `Node`/`Context` for XPath (via `_effective_value` and `parent_node.step`), evaluates **`when` first**, then calls **`_check_structural`** (mandatory, min/max-elements, presence), then `must`, type, and descent. So error ordering for a single statement matches the spec intent (e.g. when-false before min-elements on the same node). Choice/case handling in `_visit_choice` similarly evaluates choice- and case-level `when` before mandatory-choice and branch validation.
 
 ## Related code
 
