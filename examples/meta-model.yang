@@ -7,6 +7,11 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
 
+  revision "2026-04-03" {
+    description
+      "primitive-type-and-enum: mutually exclusive primitive (open + min/max/minDate/maxDate/outlier) vs enum (closed list, implied type); flat leaves for JSON/YANG instance mapping.";
+  }
+
   revision "2026-04-02" {
     description
       "primitive-type-name: add year; enum and min/max apply to year like integer.";
@@ -184,16 +189,15 @@ module meta-model {
 
   grouping primitive-type-and-enum {
     description
-      "Primitive branch: type name, optional enum, and optional min/max / minDate/maxDate (legacy meta-model).
-       enum applies only when primitive is string, integer, number, or year (when on enum).
-       minDate and maxDate only when primitive is date or datetime.";
+      "Either an open primitive (leaf primitive plus optional min, max, minDate, maxDate, outlier)
+       or a closed enumeration (leaf-list enum only). Same logical choice as two YANG cases, expressed
+       as flat siblings so instance data uses primitive *or* enum, not both (must constraints).";
     leaf primitive {
       type primitive-type-name;
-      mandatory true;
-      description "Primitive type.";
+      description
+        "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).";
     }
     leaf-list enum {
-      when "../primitive = ('string', 'integer', 'number', 'year')";
       type union {
         type string;
         type int32;
@@ -202,7 +206,7 @@ module meta-model {
         }
       }
       description
-        "List of allowed values; only valid when primitive is string, integer, number, or year.";
+        "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.";
     }
     leaf min {
       type int32;
@@ -364,8 +368,23 @@ module meta-model {
             description "Reference to a reusable field_definition name on this entity.";
           }
         }
-        case primitive {
-          uses primitive-type-and-enum;
+        case open-type {
+          description
+            "Primitive or closed enum (leaf primitive or leaf-list enum). Case name avoids clashing with leaf primitive in JSON.";
+          uses primitive-type-and-enum {
+            refine primitive {
+              must "count(../enum) = 0" {
+                error-message "Open primitive cannot be combined with enum; use enum-only for closed enumeration.";
+                description "primitive leaf excludes enum leaf-list.";
+              }
+            }
+            refine enum {
+              must "not(boolean(../primitive))" {
+                error-message "Closed enum cannot be combined with primitive leaf.";
+                description "enum leaf-list excludes primitive leaf.";
+              }
+            }
+          }
         }
         case case-array {
           container array {
@@ -373,8 +392,22 @@ module meta-model {
             choice choice-type {
               mandatory true;
               description "Primitive, array of elements, or composite object.";
-              case primitive {
-                uses primitive-type-and-enum;
+              case open-type {
+                description "Array element: primitive or closed enum; case name avoids clashing with leaf primitive.";
+                uses primitive-type-and-enum {
+                  refine primitive {
+                    must "count(../enum) = 0" {
+                      error-message "Open primitive cannot be combined with enum.";
+                      description "primitive leaf excludes enum leaf-list.";
+                    }
+                  }
+                  refine enum {
+                    must "not(boolean(../primitive))" {
+                      error-message "Closed enum cannot be combined with primitive leaf.";
+                      description "enum leaf-list excludes primitive leaf.";
+                    }
+                  }
+                }
               }
               case array-element-entity {
                 leaf entity {
@@ -490,7 +523,20 @@ module meta-model {
 
       uses field-common-atts;
       container type {
-        uses primitive-type-and-enum;
+        uses primitive-type-and-enum {
+          refine primitive {
+            must "count(../enum) = 0" {
+              error-message "Open primitive cannot be combined with enum.";
+              description "primitive leaf excludes enum leaf-list.";
+            }
+          }
+          refine enum {
+            must "not(boolean(../primitive))" {
+              error-message "Closed enum cannot be combined with primitive leaf.";
+              description "enum leaf-list excludes primitive leaf.";
+            }
+          }
+        }
         uses foreign-keys {
           when "not(../array)";
         }

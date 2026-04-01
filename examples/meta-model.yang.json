@@ -382,10 +382,16 @@
                             },
                             "primitive": {
                               "$ref": "#/$defs/primitive-type-name",
-                              "description": "Primitive type.",
+                              "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                               "x-yang": {
                                 "type": "leaf",
-                                "mandatory": true
+                                "must": [
+                                  {
+                                    "must": "count(../enum) = 0",
+                                    "error-message": "Open primitive cannot be combined with enum; use enum-only for closed enumeration.",
+                                    "description": "primitive leaf excludes enum leaf-list."
+                                  }
+                                ]
                               }
                             },
                             "enum": {
@@ -404,10 +410,16 @@
                                   }
                                 ]
                               },
-                              "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                              "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                               "x-yang": {
                                 "type": "leaf-list",
-                                "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                "must": [
+                                  {
+                                    "must": "not(boolean(../primitive))",
+                                    "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                    "description": "enum leaf-list excludes primitive leaf."
+                                  }
+                                ]
                               }
                             },
                             "min": {
@@ -484,8 +496,9 @@
                             "primitive"
                           ],
                           "additionalProperties": false,
+                          "description": "Primitive or closed enum (leaf primitive or leaf-list enum). Case name avoids clashing with leaf primitive in JSON.",
                           "x-yang": {
-                            "name": "primitive"
+                            "name": "open-type"
                           }
                         },
                         {
@@ -549,14 +562,20 @@
                               "oneOf": [
                                 {
                                   "type": "object",
-                                  "description": "",
+                                  "description": "Array element: primitive or closed enum; case name avoids clashing with leaf primitive.",
                                   "properties": {
                                     "primitive": {
                                       "$ref": "#/$defs/primitive-type-name",
-                                      "description": "Primitive type.",
+                                      "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                       "x-yang": {
                                         "type": "leaf",
-                                        "mandatory": true
+                                        "must": [
+                                          {
+                                            "must": "count(../enum) = 0",
+                                            "error-message": "Open primitive cannot be combined with enum.",
+                                            "description": "primitive leaf excludes enum leaf-list."
+                                          }
+                                        ]
                                       }
                                     },
                                     "enum": {
@@ -575,10 +594,16 @@
                                           }
                                         ]
                                       },
-                                      "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                      "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                       "x-yang": {
                                         "type": "leaf-list",
-                                        "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                        "must": [
+                                          {
+                                            "must": "not(boolean(../primitive))",
+                                            "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                            "description": "enum leaf-list excludes primitive leaf."
+                                          }
+                                        ]
                                       }
                                     },
                                     "min": {
@@ -656,7 +681,7 @@
                                   ],
                                   "additionalProperties": false,
                                   "x-yang": {
-                                    "name": "primitive"
+                                    "name": "open-type"
                                   }
                                 },
                                 {
@@ -732,10 +757,16 @@
                                             "properties": {
                                               "primitive": {
                                                 "$ref": "#/$defs/primitive-type-name",
-                                                "description": "Primitive type.",
+                                                "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                                 "x-yang": {
                                                   "type": "leaf",
-                                                  "mandatory": true
+                                                  "must": [
+                                                    {
+                                                      "must": "count(../enum) = 0",
+                                                      "error-message": "Open primitive cannot be combined with enum.",
+                                                      "description": "primitive leaf excludes enum leaf-list."
+                                                    }
+                                                  ]
                                                 }
                                               },
                                               "enum": {
@@ -754,10 +785,16 @@
                                                     }
                                                   ]
                                                 },
-                                                "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                                "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                                 "x-yang": {
                                                   "type": "leaf-list",
-                                                  "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                                  "must": [
+                                                    {
+                                                      "must": "not(boolean(../primitive))",
+                                                      "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                                      "description": "enum leaf-list excludes primitive leaf."
+                                                    }
+                                                  ]
                                                 }
                                               },
                                               "min": {
@@ -869,9 +906,6 @@
                                                 "minItems": 1
                                               }
                                             },
-                                            "required": [
-                                              "primitive"
-                                            ],
                                             "additionalProperties": false
                                           },
                                           "default": {
@@ -1022,10 +1056,16 @@
                                     "properties": {
                                       "primitive": {
                                         "$ref": "#/$defs/primitive-type-name",
-                                        "description": "Primitive type.",
+                                        "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                         "x-yang": {
                                           "type": "leaf",
-                                          "mandatory": true
+                                          "must": [
+                                            {
+                                              "must": "count(../enum) = 0",
+                                              "error-message": "Open primitive cannot be combined with enum.",
+                                              "description": "primitive leaf excludes enum leaf-list."
+                                            }
+                                          ]
                                         }
                                       },
                                       "enum": {
@@ -1044,10 +1084,16 @@
                                             }
                                           ]
                                         },
-                                        "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                        "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                         "x-yang": {
                                           "type": "leaf-list",
-                                          "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                          "must": [
+                                            {
+                                              "must": "not(boolean(../primitive))",
+                                              "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                              "description": "enum leaf-list excludes primitive leaf."
+                                            }
+                                          ]
                                         }
                                       },
                                       "min": {
@@ -1159,9 +1205,6 @@
                                         "minItems": 1
                                       }
                                     },
-                                    "required": [
-                                      "primitive"
-                                    ],
                                     "additionalProperties": false
                                   },
                                   "default": {
@@ -1532,10 +1575,16 @@
                             },
                             "primitive": {
                               "$ref": "#/$defs/primitive-type-name",
-                              "description": "Primitive type.",
+                              "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                               "x-yang": {
                                 "type": "leaf",
-                                "mandatory": true
+                                "must": [
+                                  {
+                                    "must": "count(../enum) = 0",
+                                    "error-message": "Open primitive cannot be combined with enum; use enum-only for closed enumeration.",
+                                    "description": "primitive leaf excludes enum leaf-list."
+                                  }
+                                ]
                               }
                             },
                             "enum": {
@@ -1554,10 +1603,16 @@
                                   }
                                 ]
                               },
-                              "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                              "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                               "x-yang": {
                                 "type": "leaf-list",
-                                "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                "must": [
+                                  {
+                                    "must": "not(boolean(../primitive))",
+                                    "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                    "description": "enum leaf-list excludes primitive leaf."
+                                  }
+                                ]
                               }
                             },
                             "min": {
@@ -1634,8 +1689,9 @@
                             "primitive"
                           ],
                           "additionalProperties": false,
+                          "description": "Primitive or closed enum (leaf primitive or leaf-list enum). Case name avoids clashing with leaf primitive in JSON.",
                           "x-yang": {
-                            "name": "primitive"
+                            "name": "open-type"
                           }
                         },
                         {
@@ -1699,14 +1755,20 @@
                               "oneOf": [
                                 {
                                   "type": "object",
-                                  "description": "",
+                                  "description": "Array element: primitive or closed enum; case name avoids clashing with leaf primitive.",
                                   "properties": {
                                     "primitive": {
                                       "$ref": "#/$defs/primitive-type-name",
-                                      "description": "Primitive type.",
+                                      "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                       "x-yang": {
                                         "type": "leaf",
-                                        "mandatory": true
+                                        "must": [
+                                          {
+                                            "must": "count(../enum) = 0",
+                                            "error-message": "Open primitive cannot be combined with enum.",
+                                            "description": "primitive leaf excludes enum leaf-list."
+                                          }
+                                        ]
                                       }
                                     },
                                     "enum": {
@@ -1725,10 +1787,16 @@
                                           }
                                         ]
                                       },
-                                      "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                      "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                       "x-yang": {
                                         "type": "leaf-list",
-                                        "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                        "must": [
+                                          {
+                                            "must": "not(boolean(../primitive))",
+                                            "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                            "description": "enum leaf-list excludes primitive leaf."
+                                          }
+                                        ]
                                       }
                                     },
                                     "min": {
@@ -1806,7 +1874,7 @@
                                   ],
                                   "additionalProperties": false,
                                   "x-yang": {
-                                    "name": "primitive"
+                                    "name": "open-type"
                                   }
                                 },
                                 {
@@ -1882,10 +1950,16 @@
                                             "properties": {
                                               "primitive": {
                                                 "$ref": "#/$defs/primitive-type-name",
-                                                "description": "Primitive type.",
+                                                "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                                 "x-yang": {
                                                   "type": "leaf",
-                                                  "mandatory": true
+                                                  "must": [
+                                                    {
+                                                      "must": "count(../enum) = 0",
+                                                      "error-message": "Open primitive cannot be combined with enum.",
+                                                      "description": "primitive leaf excludes enum leaf-list."
+                                                    }
+                                                  ]
                                                 }
                                               },
                                               "enum": {
@@ -1904,10 +1978,16 @@
                                                     }
                                                   ]
                                                 },
-                                                "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                                "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                                 "x-yang": {
                                                   "type": "leaf-list",
-                                                  "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                                  "must": [
+                                                    {
+                                                      "must": "not(boolean(../primitive))",
+                                                      "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                                      "description": "enum leaf-list excludes primitive leaf."
+                                                    }
+                                                  ]
                                                 }
                                               },
                                               "min": {
@@ -2019,9 +2099,6 @@
                                                 "minItems": 1
                                               }
                                             },
-                                            "required": [
-                                              "primitive"
-                                            ],
                                             "additionalProperties": false
                                           },
                                           "default": {
@@ -2172,10 +2249,16 @@
                                     "properties": {
                                       "primitive": {
                                         "$ref": "#/$defs/primitive-type-name",
-                                        "description": "Primitive type.",
+                                        "description": "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).",
                                         "x-yang": {
                                           "type": "leaf",
-                                          "mandatory": true
+                                          "must": [
+                                            {
+                                              "must": "count(../enum) = 0",
+                                              "error-message": "Open primitive cannot be combined with enum.",
+                                              "description": "primitive leaf excludes enum leaf-list."
+                                            }
+                                          ]
                                         }
                                       },
                                       "enum": {
@@ -2194,10 +2277,16 @@
                                             }
                                           ]
                                         },
-                                        "description": "List of allowed values; only valid when primitive is string, integer, number, or year.",
+                                        "description": "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.",
                                         "x-yang": {
                                           "type": "leaf-list",
-                                          "when": "../primitive = ('string', 'integer', 'number', 'year')"
+                                          "must": [
+                                            {
+                                              "must": "not(boolean(../primitive))",
+                                              "error-message": "Closed enum cannot be combined with primitive leaf.",
+                                              "description": "enum leaf-list excludes primitive leaf."
+                                            }
+                                          ]
                                         }
                                       },
                                       "min": {
@@ -2309,9 +2398,6 @@
                                         "minItems": 1
                                       }
                                     },
-                                    "required": [
-                                      "primitive"
-                                    ],
                                     "additionalProperties": false
                                   },
                                   "default": {
