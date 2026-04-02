@@ -90,8 +90,8 @@ module test {
     assert any("primary_key" in str(e).lower() for e in errors)
 
 
-def test_must_bool_current_equals_true():
-    """Must bool(current()) = true(): bool() and current() on leaf."""
+def test_must_boolean_current_equals_true():
+    """Must boolean(current()) = true(): boolean() and current() on leaf."""
     yang = """
 module test {
   yang-version 1.1;
@@ -100,7 +100,7 @@ module test {
   container data {
     leaf enabled {
       type boolean;
-      must "bool(current()) = true()";
+      must "boolean(current()) = true()";
     }
   }
 }

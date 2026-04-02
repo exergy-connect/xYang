@@ -278,7 +278,7 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 - ✅ `current()` - Get current node value (preserved in predicate contexts)
 - ✅ `not(...)` - Logical negation
 - ✅ `true()`, `false()` - Boolean literals
-- ✅ `bool(...)` - Convert value to boolean following YANG rules
+- ✅ `boolean(...)` - Convert value to boolean following YANG / XPath 1.0 rules
 - ✅ `number(...)` - Convert value to number following XPath rules
 
 ### Comparisons

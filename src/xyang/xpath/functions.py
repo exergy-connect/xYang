@@ -211,7 +211,7 @@ FUNCTIONS = {
     "count": f_count,
     "string": f_string,
     "number": f_number,
-    "bool": f_bool,
+    "boolean": f_bool,  # XPath 1.0 (RFC 7950 when/must)
     "string-length": f_string_length,
     "concat": f_concat,
     "translate": f_translate,

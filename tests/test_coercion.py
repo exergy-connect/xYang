@@ -3,7 +3,7 @@ Tests for type-aware coercion in XPath comparisons.
 
 - Numeric: string digits are coerced in comparisons (e.g. current() > 0).
 - Boolean: current() returns raw data; string 'true'/'false' are not coerced
-  to boolean in must, and bool(non-empty string) is true. Data is not modified.
+  to boolean in must, and boolean(non-empty string) is true. Data is not modified.
 """
 
 import pytest
@@ -68,8 +68,8 @@ module test {
     assert is_valid
 
 
-def test_boolean_coercion_with_bool_function():
-    """Test bool(current()) in must: non-empty string is truthy, so both 'true' and 'false' pass."""
+def test_boolean_coercion_with_boolean_function():
+    """Test boolean(current()) in must: non-empty string is truthy, so both 'true' and 'false' pass."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -79,7 +79,7 @@ module test {
   container data {
     leaf enabled {
       type boolean;
-      must "bool(current()) = true()";
+      must "boolean(current()) = true()";
     }
   }
 }
@@ -87,12 +87,12 @@ module test {
     module = parse_yang_string(yang_content)
     validator = YangValidator(module)
     
-    # String "true": bool("true") is truthy, must passes
+    # String "true": boolean("true") is truthy, must passes
     data1 = {"data": {"enabled": "true"}}
     is_valid1, errors1, warnings1 = validator.validate(data1)
     assert is_valid1, f"Expected valid, got errors: {errors1}"
     
-    # String "false": bool("false") is truthy (non-empty string), must passes
+    # String "false": boolean("false") is truthy (non-empty string), must passes
     data2 = {"data": {"enabled": "false"}}
     is_valid2, errors2, warnings2 = validator.validate(data2)
     assert is_valid2, f"Expected valid (non-empty string is truthy), got errors: {errors2}"

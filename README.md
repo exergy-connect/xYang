@@ -173,7 +173,7 @@ xYang/
 xYang implements exactly the XPath features required to correctly validate `meta-model.yang`:
 
 - **Path navigation**: `../field`, `../../field`, absolute paths `/data-model/entities`
-- **Functions**: `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `bool()`
+- **Functions**: `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `boolean()`
 - **Comparisons**: `=`, `!=`, `<=`, `>=`, `<`, `>`
 - **XPath 2.0-style**: literal sequence on RHS of `=`, e.g. `path = ('integer', 'number')` (true when left equals any item in the sequence)
 - **Logical operators**: `or`, `and`
@@ -216,7 +216,7 @@ If a `must` constraint fails, validation returns an error with the specified err
 ## Limitations
 
 - **Input contract**: The validator receives a consolidated JSON document. All data must be provided in a single, complete structure — there is no support for validating against source documents or handling partial/incremental data.
-- **Type-aware coercion**: The XPath evaluator's comparison operators receive schema-type context and perform coercion inline. This ensures `bool()` in XPath sees actual booleans, not strings (e.g., string `"true"` is coerced to `True` during boolean comparisons). For union types, coercion is attempted in declared order, using the first success. The validator accepts raw consolidated JSON - type awareness is pushed to exactly where it's needed (the evaluator).
+- **Type-aware coercion**: The XPath evaluator's comparison operators receive schema-type context and perform coercion inline. This ensures `boolean()` in XPath sees actual booleans, not strings (e.g., string `"true"` is coerced to `True` during boolean comparisons). For union types, coercion is attempted in declared order, using the first success. The validator accepts raw consolidated JSON - type awareness is pushed to exactly where it's needed (the evaluator).
 - **XPath scope**: Only the XPath features used in `meta-model.yang` are supported. Unsupported expressions will raise `UnsupportedXPathError` at parse time.
 - **deref() implementation**: `deref()` is fully implemented for the patterns used in `meta-model.yang`, including:
   - **Schema-coupled resolution**: When `deref()` is called on a leafref node, it MUST resolve using the path from the leafref's schema definition, not just return the value. This reinforces that `deref()` is inherently schema-coupled and cannot be implemented without schema context.
