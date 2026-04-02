@@ -242,7 +242,10 @@ class DocumentValidator:
         )
         visited_names: set[str] = set()
         for stmt in schema.statements:
-            visited_names.update(stmt.child_names(data))
+            if isinstance(stmt, YangChoiceStmt):
+                visited_names.update(self._choice_instance_keys(stmt, data))
+            else:
+                visited_names.update(stmt.child_names(data))
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
         for key in data:
             if key not in visited_names:
@@ -435,13 +438,41 @@ class DocumentValidator:
     def _choice_has_branch_data(
         self, choice: YangChoiceStmt, data: Dict[str, Any]
     ) -> bool:
-        """True if any schema child under any case has a key in ``data``."""
-        for case in choice.cases:
-            for s in case.statements:
-                n = getattr(s, "name", None)
-                if n and n in data:
-                    return True
-        return False
+        """True if any schema child under any case has matching data in ``data``."""
+        return any(self._case_has_any_stmt_data(c, data) for c in choice.cases)
+
+    def _stmt_instance_keys_from_data(
+        self, stmt: YangStatement, data: dict[str, Any]
+    ) -> set[str]:
+        """Instance keys under ``data`` claimed by this statement (same nesting level)."""
+        if isinstance(stmt, YangLeafStmt):
+            return {stmt.name} if stmt.name in data else set()
+        if isinstance(stmt, YangLeafListStmt):
+            return {stmt.name} if stmt.name in data else set()
+        if isinstance(stmt, YangContainerStmt):
+            return {stmt.name} if stmt.name in data else set()
+        if isinstance(stmt, YangListStmt):
+            return {stmt.name} if stmt.name in data else set()
+        if isinstance(stmt, YangChoiceStmt):
+            return self._choice_instance_keys(stmt, data)
+        return set()
+
+    def _choice_instance_keys(
+        self, choice: YangChoiceStmt, data: dict[str, Any]
+    ) -> set[str]:
+        """Keys in ``data`` consumed by this choice (nested choices: leaves stay at this level)."""
+        active_cases = [c for c in choice.cases if self._case_has_any_stmt_data(c, data)]
+        if not active_cases:
+            return set()
+        keys: set[str] = set()
+        if len(active_cases) > 1:
+            for case in active_cases:
+                for s in case.statements:
+                    keys.update(self._stmt_instance_keys_from_data(s, data))
+            return keys
+        for s in active_cases[0].statements:
+            keys.update(self._stmt_instance_keys_from_data(s, data))
+        return keys
 
     def _visit_choice(
         self,
@@ -473,9 +504,7 @@ class DocumentValidator:
 
         active_cases: list[YangCaseStmt] = []
         for case in choice.cases:
-            if not any(
-                getattr(s, "name", None) in data for s in case.statements
-            ):
+            if not self._case_has_any_stmt_data(case, data):
                 continue
             if case.when is not None:
                 c_ok = self._eval_expr(case.when.ast, parent_ctx_obj, parent_node)
