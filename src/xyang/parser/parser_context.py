@@ -97,6 +97,7 @@ class YangTokenType(Enum):
     KEY = "key"
     MIN_ELEMENTS = "min-elements"
     MAX_ELEMENTS = "max-elements"
+    ORDERED_BY = "ordered-by"
     MANDATORY = "mandatory"
     DEFAULT = "default"
     ERROR_MESSAGE = "error-message"

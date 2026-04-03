@@ -408,6 +408,18 @@ class StatementParsers:
             setattr(parent, "max_elements", value)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
+    def parse_ordered_by(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ordered-by under list or leaf-list (RFC 7950 §7.7.1).
+
+        xYang does not track user vs system ordering in validation; the statement is accepted
+        and discarded after syntax check.
+        """
+        tokens.consume_type(YangTokenType.ORDERED_BY)
+        arg = tokens.consume()
+        if arg not in ("user", "system"):
+            raise tokens._make_error(f"ordered-by must be 'user' or 'system', got {arg!r}")
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in leaf statement."""
         tokens.consume_type(YangTokenType.MANDATORY)

@@ -66,6 +66,7 @@ class YangParser:
         self.registry.register('list:key', self.parsers.parse_list_key)
         self.registry.register('list:min-elements', self.parsers.parse_min_elements)
         self.registry.register('list:max-elements', self.parsers.parse_max_elements)
+        self.registry.register('list:ordered-by', self.parsers.parse_ordered_by)
         self.registry.register('list:description', self.parsers.parse_description)
         self.registry.register('list:when', self.parsers.parse_when)
         self.registry.register('list:leaf', self.parsers.parse_leaf)
@@ -88,6 +89,7 @@ class YangParser:
         self.registry.register('leaf-list:type', self.parsers.parse_type)
         self.registry.register('leaf-list:min-elements', self.parsers.parse_min_elements)
         self.registry.register('leaf-list:max-elements', self.parsers.parse_max_elements)
+        self.registry.register('leaf-list:ordered-by', self.parsers.parse_ordered_by)
         self.registry.register('leaf-list:description', self.parsers.parse_description)
         self.registry.register('leaf-list:when', self.parsers.parse_when)
         self.registry.register('leaf-list:must', self.parsers.parse_must)
@@ -110,6 +112,7 @@ class YangParser:
         self.registry.register('refine:description', self.parsers.parse_description)
         self.registry.register('refine:min-elements', self.parsers.parse_min_elements)
         self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
+        self.registry.register('refine:ordered-by', self.parsers.parse_ordered_by)
         
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types
