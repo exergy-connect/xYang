@@ -1,24 +1,27 @@
 """CLI entry point for xyang (python -m xyang / xyang command)."""
 
+from __future__ import annotations
+
 import argparse
 import json
 import sys
 from pathlib import Path
+from typing import Any
 
 
-def _parse_cmd(parser: argparse.ArgumentParser, args: list[str]) -> int:
-    sub = parser.add_parser("parse", help="Parse a YANG file and print module info")
-    sub.add_argument("yang_file", type=Path, help="Path to .yang file")
-    sub.set_defaults(cmd="parse")
-    return 0
-
-
-def _validate_cmd(parser: argparse.ArgumentParser, args: list[str]) -> int:
-    sub = parser.add_parser("validate", help="Validate JSON data against a YANG module")
-    sub.add_argument("yang_file", type=Path, help="Path to .yang file")
-    sub.add_argument("data_file", type=Path, nargs="?", default=None, help="Path to JSON data (stdin if omitted)")
-    sub.set_defaults(cmd="validate")
-    return 0
+def _load_instance_data(data_path: Path) -> Any:
+    """Load JSON or YAML instance data from a file path."""
+    text = data_path.read_text(encoding="utf-8")
+    suffix = data_path.suffix.lower()
+    if suffix in (".yaml", ".yml"):
+        try:
+            import yaml  # type: ignore[import-not-found]
+        except ImportError as exc:
+            raise ImportError(
+                "Reading .yaml or .yml requires PyYAML. Install it with: pip install PyYAML"
+            ) from exc
+        return yaml.safe_load(text)
+    return json.loads(text)
 
 
 def main() -> int:
@@ -40,7 +43,7 @@ def main() -> int:
     validate_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
     validate_parser.add_argument(
         "data_file", type=Path, nargs="?", default=None,
-        help="Path to JSON data file (read from stdin if omitted)",
+        help="Path to JSON or YAML data file (.yaml/.yml need PyYAML; read from stdin if omitted)",
     )
 
     convert_parser = subparsers.add_parser("convert", help="Convert .yang to .yang.json (JSON Schema with x-yang)")
@@ -93,7 +96,7 @@ def main() -> int:
                 if not data_path.exists():
                     print(f"Error: file not found: {data_path}", file=sys.stderr)
                     return 1
-                data = json.loads(data_path.read_text(encoding="utf-8"))
+                data = _load_instance_data(data_path)
             else:
                 data = json.load(sys.stdin)
             is_valid, errors, warnings = validator.validate(data)
