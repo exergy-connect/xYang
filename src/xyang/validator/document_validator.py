@@ -8,7 +8,7 @@ building Context and Node at the root and using Node.step / Context.child
 as it descends.  At each evaluation point it calls evaluator.eval(ctx, node).
 
 At each node the order is (RFC 7950: when before structural):
-    1. when   -- evaluated in current node context; false + present = error; false + absent = skip node
+    1. when   -- usually current node context; ``when`` merged from ``uses`` uses parent of ``uses`` (§7.21.5)
     2. structural -- mandatory, min/max-elements, presence
     3. must   -- evaluated in current node context, per entry for lists
     4. type   -- pattern, range, length, enum, leafref require-instance
@@ -295,7 +295,11 @@ class DocumentValidator:
         # -- 1. when (RFC 7950: applicability first; report when-false before structural) --
         logger.debug("phase 1 when path=%s", child_path)
         if isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
-            when_ok = self._eval_expr(stmt.when.ast, curr_ctx, curr_node)
+            if getattr(stmt.when, "evaluate_with_parent_context", False):
+                when_ctx, when_node = parent_ctx_obj, parent_node
+            else:
+                when_ctx, when_node = curr_ctx, curr_node
+            when_ok = self._eval_expr(stmt.when.ast, when_ctx, when_node)
             if when_ok is None:
                 when_ok = True
             if not when_ok and present:

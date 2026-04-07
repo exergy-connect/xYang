@@ -124,6 +124,14 @@ def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
     if getattr(refine, "type", None) is not None and isinstance(stmt, YangLeafStmt):
         stmt.type = refine.type
         logger.debug("refine applied type: stmt=%r refine=%r", stmt, refine)
+    rm = getattr(refine, "refined_mandatory", None)
+    if rm is not None:
+        if isinstance(stmt, YangLeafStmt):
+            stmt.mandatory = rm
+            logger.debug("refine applied mandatory: stmt=%r mandatory=%r", stmt, rm)
+        elif isinstance(stmt, YangChoiceStmt):
+            stmt.mandatory = rm
+            logger.debug("refine applied mandatory: choice=%r mandatory=%r", stmt, rm)
     if isinstance(stmt, YangStatementWithMust):
         for refine_must in refine.must_statements:
             stmt.must_statements.append(refine_must)

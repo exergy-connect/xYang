@@ -173,6 +173,10 @@ class YangMustStmt(YangParsedXPathBase):
 class YangWhenStmt(YangParsedXPathBase):
     """When statement (conditional). XPath lives in ``expression`` (see ``condition``)."""
 
+    # RFC 7950 §7.21.5: ``when`` under ``uses`` uses the parent of ``uses`` as context node.
+    # Set when this ``when`` is merged from a ``uses`` (or AND-merged with such a ``when``).
+    evaluate_with_parent_context: bool = False
+
     @property
     def condition(self) -> str:
         return self.expression
@@ -209,6 +213,8 @@ class YangRefineStmt(YangStatementWithMust):
     type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
     min_elements: Optional[int] = None  # Refined min-elements (list / leaf-list)
     max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)
+    # RFC 7950 §7.13.2: leaf / choice may get a different mandatory; None = omit from refine
+    refined_mandatory: Optional[bool] = None
 
 
 @dataclass

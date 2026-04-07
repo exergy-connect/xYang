@@ -670,6 +670,15 @@ class StatementParsers:
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse mandatory in refine (RFC 7950 §7.13.2: leaf / choice target)."""
+        tokens.consume_type(YangTokenType.MANDATORY)
+        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.refined_mandatory = tt == YangTokenType.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def _expand_uses(
         self,

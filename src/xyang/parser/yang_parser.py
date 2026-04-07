@@ -113,6 +113,7 @@ class YangParser:
         self.registry.register('refine:min-elements', self.parsers.parse_min_elements)
         self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
         self.registry.register('refine:ordered-by', self.parsers.parse_ordered_by)
+        self.registry.register('refine:mandatory', self.parsers.parse_refine_mandatory)
         
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types

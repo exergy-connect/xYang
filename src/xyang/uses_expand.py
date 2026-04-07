@@ -26,9 +26,14 @@ def _merge_uses_when_into_grouping_roots(
     roots: list[YangStatement],
     uses_when: YangWhenStmt | None,
 ) -> None:
-    """RFC 7950: ``when`` on ``uses`` is ANDed onto each top-level node from the grouping."""
+    """RFC 7950: ``when`` on ``uses`` is ANDed onto each top-level node from the grouping.
+
+    §7.21.5: that ``when`` is evaluated with the **parent of ``uses``** as the context node.
+    ``evaluate_with_parent_context`` is set so the validator uses the parent data node.
+    """
     if uses_when is None:
         return
+    uses_when.evaluate_with_parent_context = True
     for node in roots:
         if isinstance(node, YangStatementWithWhen):
             if node.when is None:
@@ -40,7 +45,9 @@ def _merge_uses_when_into_grouping_roots(
                     uses_when.description or ""
                 ).strip()
                 node.when = YangWhenStmt(
-                    expression=merged_expr, description=merged_desc
+                    expression=merged_expr,
+                    description=merged_desc,
+                    evaluate_with_parent_context=True,
                 )
 
 
