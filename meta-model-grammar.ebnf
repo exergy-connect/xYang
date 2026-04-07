@@ -1,8 +1,16 @@
-(* Minimal EBNF for YANG as used by xFrame meta-model.yang (YANG 1.1 subset).
-   Covers: module, typedef, grouping, uses, refine, container, list, leaf, leaf-list,
-   choice/case, must, when, type (union, leafref, enumeration, string, int32, uint8,
-   decimal64, boolean, empty). Must expressions are XPath strings (possibly + concatenated).
-   Not covered: submodule, import, include, extension, augment, deviation, identity, bits. *)
+(* Approximate EBNF for the YANG subset used in xYang `examples/meta-model.yang` (YANG 1.1).
+   Statement order within braces follows RFC 7950 loosely; this sketch is not a complete parser spec.
+
+   Covered: module, typedef, grouping, uses (with refine and/or when), container, list, leaf, leaf-list,
+   choice/case (including nested choice under container type), must, when, presence, key, min/max-elements,
+   type union (members: typedef ref, string, int32, uint8, boolean, leafref, decimal64, enumeration),
+   leafref path + require-instance, default, mandatory, error-message, description (incl. block + nested).
+
+   Must/when operands are XPath strings; `must` may use `+` to concatenate quoted string fragments.
+
+   Out of scope for this module (and omitted here): submodule, import, include, extension, augment,
+   deviation, feature, bits, anydata, RPC/notification. identity / identityref / instance-identifier
+   appear in other xYang examples, not in meta-model.yang. *)
 
 (* === Module === *)
 module                = "module" identifier "{" module_body "}" ;
@@ -10,80 +18,90 @@ module_body           = { meta_statement | typedef | grouping | data_def_stateme
 meta_statement        = yang_version | namespace | prefix | organization | contact
                       | description_stmt | revision_block ;
 
-yang_version         = "yang-version" "1.1" ";" ;
-namespace            = "namespace" string ";" ;
-prefix               = "prefix" string ";" ;
-organization         = "organization" string ";" ;
-contact              = "contact" string ";" ;
-revision_block       = "revision" string "{" { description_stmt } "}" ;
+yang_version          = "yang-version" "1.1" ";" ;
+namespace             = "namespace" string ";" ;
+prefix                = "prefix" string ";" ;
+organization          = "organization" string ";" ;
+contact               = "contact" string ";" ;
+revision_block        = "revision" string "{" { description_stmt } "}" ;
 
 (* === Description (string or block with nested description) === *)
-description_stmt     = "description" ( string ";" | string "{" { description_stmt } "}" ) ;
-error_message        = "error-message" string ";" ;
+description_stmt      = "description" ( string ";" | string "{" { description_stmt } "}" ) ;
+error_message         = "error-message" string ";" ;
 
 (* === Typedef === *)
-typedef              = "typedef" identifier "{" type_body "}" ;
-type_body            = type_stmt { type_restriction | description_stmt } ;
-type_stmt            = "type" ( type_name_ref | union_type | leafref_type | enum_type
-                      | string_type | numeric_type | "boolean" | "empty" ) ";" ;
+typedef               = "typedef" identifier "{" type_body "}" ;
+type_body             = type_stmt { description_stmt } ;
 
-type_name_ref        = identifier ;
-union_type           = "union" "{" { "type" ( type_name_ref | string_type | numeric_type | "boolean" ) ";" } "}" ;
-leafref_type         = "leafref" "{" "path" string ";" [ "require-instance" "true" ";" ] "}" ;
-enum_type            = "enumeration" "{" enum_specification "}" ;
+(* trailing ";" ends the type statement; union / leafref / enum / string / numeric use inner { } *)
+type_stmt             = "type" type_spec ";" ;
+
+type_spec             = union_type | leafref_type | enum_type | string_type | numeric_type
+                      | "boolean" | "empty" | type_name_ref ;
+
+type_name_ref         = identifier ;
+
+union_type            = "union" "{" { union_member } "}" ;
+union_member          = "type" union_member_spec ";" ;
+union_member_spec     = leafref_type | string_type | numeric_type | enum_type
+                      | "boolean" | "empty" | type_name_ref ;
+
+leafref_type          = "leafref" "{" "path" string ";"
+                        [ "require-instance" ( "true" | "false" ) ";" ] "}" ;
+enum_type             = "enumeration" "{" enum_specification "}" ;
 (* RFC 7950: enum-specification = 1*enum-stmt *)
-enum_specification   = enum_stmt { enum_stmt } ;
-enum_stmt            = "enum" identifier [ "{" [ description_stmt ] "}" ] ";" ;
-string_type          = "string" [ "{" [ length_stmt ] [ pattern_stmt ] "}" ] ;
-pattern_stmt         = "pattern" string [ "{" [ description_stmt ] "}" ] ";" ;
-length_stmt          = "length" string ";" ;
-numeric_type         = ( "int32" | "uint8" ) [ "{" [ range_stmt ] "}" ]
-                    | "decimal64" "{" "fraction-digits" integer ";" "}" ;
-range_stmt           = "range" string ";" ;
+enum_specification    = enum_stmt { enum_stmt } ;
+enum_stmt             = "enum" identifier [ "{" [ description_stmt ] "}" ] ";" ;
+string_type           = "string" [ "{" [ length_stmt ] [ pattern_stmt ] "}" ] ;
+pattern_stmt          = "pattern" string [ "{" [ description_stmt ] "}" ] ";" ;
+length_stmt           = "length" string ";" ;
+numeric_type          = ( "int32" | "uint8" ) [ "{" [ range_stmt ] "}" ]
+                      | "decimal64" "{" "fraction-digits" integer ";" [ range_stmt ] "}" ;
+range_stmt            = "range" string ";" ;
 
 (* === Grouping and uses === *)
-grouping             = "grouping" identifier "{" [ description_stmt ] data_def_body "}" ;
-uses                = "uses" identifier [ "{" refine_block "}" ] ";" ;
-refine_block        = { "refine" refine_target "{" refine_body "}" } ;
-refine_target       = identifier | ( identifier "/" identifier ) ;
-refine_body         = { "type" type_stmt ";" | "must" must_expr ";" | must_block | description_stmt } ;
+grouping              = "grouping" identifier "{" [ description_stmt ] data_def_body "}" ;
+uses                  = "uses" identifier [ "{" uses_body "}" ] ";" ;
+uses_body             = { "refine" refine_target "{" refine_body "}" | when_block } ;
+refine_target         = identifier | ( identifier "/" identifier ) ;
+refine_body           = { type_stmt | must_block | description_stmt } ;
 
 (* === Data definition statements === *)
-data_def_statement   = container | list | leaf | leaf_list | choice ;
-data_def_body        = { data_def_statement | uses | description_stmt } ;
+data_def_statement    = container | list | leaf | leaf_list | choice ;
+data_def_body         = { data_def_statement | uses | description_stmt } ;
 
-container           = "container" identifier "{" container_body "}" ;
-container_body       = [ "presence" string ";" ] [ when_block ] [ description_stmt ]
+container             = "container" identifier "{" container_body "}" ;
+container_body        = [ "presence" string ";" ] [ when_block ] [ description_stmt ]
                       { must_block | data_def_statement | uses } ;
-list                = "list" identifier "{" list_body "}" ;
-list_body           = [ "key" string ";" ] [ "min-elements" integer ";" ] [ "max-elements" integer ";" ]
+list                  = "list" identifier "{" list_body "}" ;
+list_body             = [ "key" string ";" ] [ "min-elements" integer ";" ] [ "max-elements" integer ";" ]
                       [ when_block ] [ description_stmt ]
                       { must_block | data_def_statement | uses } ;
-leaf                = "leaf" identifier "{" leaf_body "}" ;
-leaf_body           = type_stmt [ "mandatory" "true" ";" ] [ "default" ( string | integer | "true" | "false" ) ";" ]
+leaf                  = "leaf" identifier "{" leaf_body "}" ;
+leaf_body             = type_stmt [ "mandatory" "true" ";" ] [ "default" ( string | integer | "true" | "false" ) ";" ]
                       [ when_block ] [ description_stmt ] { must_block } ;
-leaf_list           = "leaf-list" identifier "{" leaf_list_body "}" ;
-leaf_list_body      = type_stmt [ "min-elements" integer ";" ] [ "max-elements" integer ";" ]
-                      [ description_stmt ] { must_block } ;
+leaf_list             = "leaf-list" identifier "{" leaf_list_body "}" ;
+leaf_list_body        = type_stmt [ "min-elements" integer ";" ] [ "max-elements" integer ";" ]
+                      [ when_block ] [ description_stmt ] { must_block } ;
 
-choice              = "choice" identifier "{" [ "mandatory" "true" ";" ] [ description_stmt ] { case } "}" ;
-case                = "case" identifier "{" data_def_body "}" ;
+choice                = "choice" identifier "{" [ "mandatory" "true" ";" ] [ description_stmt ] { case } "}" ;
+case                  = "case" identifier "{" data_def_body "}" ;
 
 (* === Must and when === *)
-must_block          = "must" string ( ";" | "{" [ error_message ] [ description_stmt ] "}" ) ;
-must_expr           = string ;
-when_block          = "when" string [ "{" [ description_stmt ] "}" ] ";" ;
+must_block            = "must" string ( ";" | "{" [ error_message ] [ description_stmt ] "}" ) ;
+must_expr             = string ;
+when_block            = "when" string [ "{" [ description_stmt ] "}" ] ";" ;
 
 (* === Lexical === *)
-identifier          = ( letter | "_" ) { letter | digit | "_" | "-" | "." } ;
-letter              = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
-                    | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
-                    | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
-                    | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
-digit               = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
-integer             = [ "-" ] digit { digit } ;
+identifier            = ( letter | "_" ) { letter | digit | "_" | "-" | "." } ;
+letter                = "A" | "B" | "C" | "D" | "E" | "F" | "G" | "H" | "I" | "J" | "K" | "L" | "M"
+                      | "N" | "O" | "P" | "Q" | "R" | "S" | "T" | "U" | "V" | "W" | "X" | "Y" | "Z"
+                      | "a" | "b" | "c" | "d" | "e" | "f" | "g" | "h" | "i" | "j" | "k" | "l" | "m"
+                      | "n" | "o" | "p" | "q" | "r" | "s" | "t" | "u" | "v" | "w" | "x" | "y" | "z" ;
+digit                 = "0" | "1" | "2" | "3" | "4" | "5" | "6" | "7" | "8" | "9" ;
+integer               = [ "-" ] digit { digit } ;
 
-(* String: double- or single-quoted; may contain escaped quote; content excluded from grammar *)
-string              = ? double-quoted or single-quoted string; " and \ escaped; + for concatenation in must ? ;
+(* String: double- or single-quoted; escape rules per YANG; in `must`, adjacent strings may use `+`. *)
+string                = ? double-quoted or single-quoted string; " and \ escaped; + between strings in must ? ;
 
 (* Comments: // to end of line or /* ... */ *)

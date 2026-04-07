@@ -4,28 +4,31 @@ xYang implements exactly the YANG and XPath features required to correctly valid
 
 ## Features
 
-xYang implements only the YANG features actually used in `meta-model.yang`:
+xYang implements the YANG and XPath subset needed to validate `examples/meta-model.yang`. The list below is a short overview; [FEATURES.md](FEATURES.md) matches the module line by line.
 
 - **Module Structure**: Module definition with yang-version, namespace, prefix, organization, contact, description, revision
 - **Type Definitions**: Typedef statements with type constraints
-- **Built-in Types**: string, int32, uint8, boolean, decimal64
-- **Derived Types**: enumeration, union
-- **Data Structures**: Container, list, leaf, and leaf-list statements
+- **Built-in Types**: e.g. `string`, `int32`, `uint8`, `boolean`, `decimal64`, `empty`, `identityref`, `instance-identifier`, `leafref` as in meta-model; the lexer recognizes the full RFC 7950 built-in set—validation depth varies by type ([FEATURES.md](FEATURES.md))
+- **Derived Types**: enumeration, union (including union members that are leafrefs)
+- **Data Structures**: Container, list (with `key`), leaf, leaf-list; `choice` / `case`; `grouping` / `uses` / `refine`
 - **Constraints**: 
   - `must` statements (evaluated using XPath)
   - `when` conditions (evaluated using XPath)
   - `mandatory`, `default`, `min-elements`, `max-elements`
   - Type constraints: `pattern`, `length`, `range`, `fraction-digits`
 - **Type References**: Leafref with path and require-instance
+- **Identity** (single module): `identity` / `base`, `identityref`, XPath `derived-from()` / `derived-from-or-self()`
 - **Container Presence**: Presence statements
 - **CLI**: `xyang` with `parse`, `validate`, `convert` (YANG → `.yang.json`)
-- **JSON Schema export**: YANG → JSON Schema (draft 2020-12) with `x-yang` annotations; see [FEATURES.md](FEATURES.md) for the full feature list and the YANG.json hybrid format.
+- **JSON Schema export**: YANG → JSON Schema (draft 2020-12) with `x-yang` annotations; see [FEATURES.md](FEATURES.md#yangjson-hybrid-format) for the hybrid format
 
 ## Installation
 
 ```bash
 pip install -e .
 ```
+
+The library has **no required runtime dependencies** (`pyproject.toml`). For `xyang validate` with a **`.yaml` / `.yml` instance file**, install **PyYAML** (`pip install PyYAML` or `pip install -e ".[dev]"`).
 
 ## Usage
 
@@ -34,7 +37,7 @@ pip install -e .
 ```bash
 xyang -h                    # help
 xyang parse <file.yang>     # print module info
-xyang validate <file.yang> [data.json]   # validate JSON (stdin if no file)
+xyang validate <file.yang> [data.json]  # or .yaml/.yml (needs PyYAML); omit file → JSON from stdin
 xyang convert <file.yang> [-o path]     # convert .yang to .yang.json (output path always ends with .yang.json)
 ```
 
@@ -43,7 +46,7 @@ Without installing, run from the repo root: `PYTHONPATH=src python3 -m xyang -h`
 ### Parsing a YANG Module
 
 ```python
-from xYang import parse_yang_file, parse_yang_string
+from xyang import parse_yang_file, parse_yang_string
 
 # Parse from file
 module = parse_yang_file("examples/meta-model.yang")
@@ -73,7 +76,7 @@ print(f"Prefix: {module.prefix}")
 ### Validating Data
 
 ```python
-from xYang import parse_yang_file, YangValidator
+from xyang import parse_yang_file, YangValidator
 
 # Parse module
 module = parse_yang_file("examples/meta-model.yang")
@@ -109,8 +112,7 @@ if not is_valid:
 ### Working with Types
 
 ```python
-from xYang import TypeSystem
-from xYang.types import TypeConstraint
+from xyang import TypeConstraint, TypeSystem
 
 # Create type system
 type_system = TypeSystem()
@@ -150,7 +152,7 @@ xYang/
 │   ├── __init__.py      # Package exports
 │   ├── __main__.py      # CLI (parse, validate, convert)
 │   ├── parser/          # YANG parser
-│   ├── json/             # JSON Schema export (generator, parser)
+│   ├── json/            # JSON Schema export (generator, parser)
 │   ├── validator/        # Validation engine
 │   ├── xpath/            # XPath implementation
 │   ├── ast.py            # YANG AST nodes
@@ -158,9 +160,12 @@ xYang/
 │   ├── module.py         # Module representation
 │   └── errors.py         # Error classes
 ├── examples/
-│   ├── basic_usage.py   # Usage examples
-│   ├── meta-model.yang   # Example YANG module
-│   └── meta-model.yang.json  # Generated JSON Schema
+│   ├── basic_usage.py          # Usage examples
+│   ├── meta-model.yang         # Primary example module
+│   ├── meta-model.yang.json    # Generated JSON Schema
+│   ├── generic-field.yang      # Smaller schema samples
+│   ├── generic-field.yaml
+│   └── identity_roundtrip.yang
 ├── tests/               # Test suite
 ├── benchmarks/           # Performance benchmarks
 ├── pyproject.toml
@@ -173,7 +178,7 @@ xYang/
 xYang implements exactly the XPath features required to correctly validate `meta-model.yang`:
 
 - **Path navigation**: `../field`, `../../field`, absolute paths `/data-model/entities`
-- **Functions**: `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `boolean()`
+- **Functions**: `string()`, `number()`, `concat()`, `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `boolean()`, `derived-from()`, `derived-from-or-self()`
 - **Comparisons**: `=`, `!=`, `<=`, `>=`, `<`, `>`
 - **XPath 2.0-style**: literal sequence on RHS of `=`, e.g. `path = ('integer', 'number')` (true when left equals any item in the sequence)
 - **Logical operators**: `or`, `and`
@@ -229,7 +234,7 @@ If a `must` constraint fails, validation returns an error with the specified err
 
 ## Design Rationale
 
-**Zero dependencies**: xYang is implemented in pure Python with no external libraries. Full XPath 1.0 coverage was available via `elementpath` but was excluded to keep the dependency footprint zero. Users who need expressions outside the supported subset will need to extend the evaluator.
+**No required third-party libraries**: The `xyang` package is pure Python with an empty `dependencies` list in `pyproject.toml`. Optional **PyYAML** is only needed for YAML instance paths on the `validate` CLI. Full XPath 1.0 coverage was available via `elementpath` but was excluded to keep the core footprint minimal. Expressions outside the supported subset require extending the evaluator.
 
 ## Development
 
