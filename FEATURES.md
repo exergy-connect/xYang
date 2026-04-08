@@ -1,6 +1,6 @@
 # xYang Feature Set
 
-This document lists the YANG features implemented in xYang, based on actual usage in `meta-model.yang`.
+This document lists the YANG features implemented in xYang. Primary usage is reflected in `examples/meta-model.yang`; multi-module parsing and `if-feature` are also covered by dedicated tests (e.g. `tests/test_yangson_ex3_import.py`, `tests/test_if_feature.py`).
 
 ## Features Implemented
 
@@ -13,6 +13,10 @@ This document lists the YANG features implemented in xYang, based on actual usag
 - ✅ `contact` - Contact info (1 occurrence)
 - ✅ `description` - Description text
 - ✅ `revision` - Revision history (9 revisions in the current `examples/meta-model.yang`)
+- ✅ `import` - Import other modules (loads `.yang` from the directory of the file being parsed, optional `YangParser(include_path=...)` for extra search paths); `import` prefix map on `YangModule.import_prefixes`
+- ✅ `include` - Include submodules into the parent module (merged typedefs, identities, groupings, features, top-level statements)
+- ✅ `submodule` / `belongs-to` - Submodule files parsed and merged via `include`
+- ✅ `feature` - Feature declarations; optional braced body with `description`, `reference`, and `if-feature` (per-feature conditions stored on the module)
 
 ### Type Definitions
 - ✅ `typedef` - Type definitions (heavily used)
@@ -50,7 +54,8 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
   - Supports must constraints on containers, lists, leaves, and leaf-lists
   - Supports must constraints on lists containing leafref types
   - `current()` correctly refers to list item context in list must constraints
-- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses` (not on `refine`; `augment` / `anydata` are unsupported)
+- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports for **data nodes**: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses` (not on `refine`). `augment` accepts `when` in the parse tree, but augment targets are **not** merged into the instance-validation schema (see **Features NOT Implemented**).
+- ✅ `if-feature` - **Parsed** on `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses`, `refine`, `augment`, `identity`, and braced `feature`; **boolean expressions** (`and` / `or` / `not`, parentheses, `prefix:feature`) evaluated for **document validation** via `DocumentValidator(..., enabled_features_by_module=...)`. `uses` / `refine` `if-feature` values are ANDed onto expanded grouping nodes; `copy_yang_statement` preserves `if_features` through `uses` expansion. Feature-level `if-feature` substatements prune `build_enabled_features_map()` (RFC 7950 §7.20.1). **Not** emitted in JSON Schema `x-yang` yet.
 - ✅ `mandatory` - Mandatory fields (16 occurrences)
   - Supports mandatory on choice statements (exactly one case must be present)
 - ✅ `default` - Default values (7 occurrences)
@@ -70,8 +75,8 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `require-instance` - Leafref require-instance
 - ✅ `instance-identifier` - **Parsed** with `require-instance`; validation resolves absolute paths when `require-instance` is true; JSON Schema `x-yang.type` + `require-instance`
 
-### Identity (single module)
-- ✅ `identity` / `base` - Identity statements (multi-base supported)
+### Identity
+- ✅ `identity` / `base` - Identity statements (multi-base supported); `if-feature` on `identity` is parsed
 - ✅ `identityref` / `base` - Identityref type; instance values as qualified names; validation against the derivation graph
 - ✅ XPath `derived-from()` / `derived-from-or-self()` in `must` expressions
 - ✅ JSON Schema: `$defs` per identity (`enum` of qualified names) and `$ref` / `allOf` on `identityref` leaves; `parse_json_schema` round-trip
@@ -86,19 +91,22 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
   - `xyang convert <file.yang> [-o path]` — convert .yang to JSON Schema (output path always ends with `.yang.json`)
 - ✅ **JSON Schema generator**: YANG AST → JSON Schema (draft 2020-12) with `x-yang` annotations
   - `generate_json_schema(module)`, `schema_to_yang_json(module, output_path=...)`
-  - Uses expansion during emission when parsing with `expand_uses=False`
+  - Parse with `YangParser(expand_uses=False)` so the AST keeps original `uses` and `augment` structure; the generator expands `uses` when emitting. That split keeps **YANG ↔ JSON Schema** conversion reversible where `x-yang` carries the source shape.
   - Round-trip: parse YANG → generate JSON → parse JSON schema → equivalent AST where supported
 
 ## Features NOT Implemented
 
 All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built-in Types** above), even when validation or JSON Schema support is incomplete.
 
-The following YANG features are not used in `meta-model.yang` and are **not** implemented:
+### Partial / syntax only
+- ⚠️ **`augment`** — Parsed into `YangAugmentStmt` (including `if-feature`, `when`, `must`, nested data definitions). With `YangParser(expand_uses=True)`, augments are resolved and merged into the target module (same gate as `uses` expansion). With `expand_uses=False`, augments stay as statements for reversible convert. **JSON Schema** emission today still does not walk merged augment semantics end-to-end for every case; validate with an expanded module when you need full augmented-tree checks.
 
-- ❌ `augment` - Augmentation
-- ❌ `deviation` - Deviation
-- ❌ `import` - Module imports (modules are self-contained)
-- ❌ `extension` - Extension statements
+### Not implemented
+- ❌ `deviation` — Deviations
+- ❌ `extension` — Extension statements (and extension-defined syntax)
+- ⚠️ **`bits`** — Parsed and instance-validated (space-separated bit names). JSON Schema emission for `bits` is not fully modeled yet.
+- ❌ `rpc`, `action`, `notification`, `input`, `output` — RPC/action/notification modeling
+- ❌ `anydata`, `anyxml`
 
 Other reserved built-in type names may parse but lack full validation or JSON Schema parity; see **Built-in Types** and sections above.
 
@@ -119,6 +127,16 @@ leaf-list enum {
 ```
 
 If the `when` expression evaluates to false, the node is not part of the effective schema for that instance; data under that branch is then invalid if present.
+
+## If-feature (RFC 7950 §7.20)
+
+The validator evaluates `if-feature` **before** `when` and structural rules (RFC 7950 ordering): if the expression is false, the node is inactive; instance data for that node is an error.
+
+- **Expressions**: `and`, `or`, `not`, parentheses; feature names or `prefix:feature` (imports and own module prefix).
+- **API**: `DocumentValidator(module, enabled_features_by_module={ "module-name": frozenset({"feat", ...}), ... })`. Modules omitted from the map use all **pruned** declared features (after applying each feature’s own `if-feature` substatements).
+- **Parents** (parsed, with validation where the node participates in the data tree): `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses` (merged into expanded nodes), `refine` (merged into refine targets). `augment` and `identity` store expressions in the AST for tooling; instance validation does not yet walk augment-applied schema.
+
+See `src/xyang/validator/if_feature_eval.py` and `tests/test_if_feature.py`.
 
 ## Grouping and Uses Implementation
 
@@ -141,7 +159,7 @@ grouping common-fields {
 ```
 
 ### Uses Statement
-The `uses` statement incorporates a grouping into the current schema node. When a `uses` statement is encountered, the statements from the grouping are copied and expanded into the current location.
+The `uses` statement incorporates a grouping into the current schema node. When a `uses` statement is encountered, the statements from the grouping are copied and expanded into the current location. A `when` substatement on `uses` is AND-merged onto each top-level node from the grouping (parent context for evaluation). An `if-feature` substatement on `uses` is likewise AND-prepended to each expanded root node’s `if_features` list.
 
 Example:
 ```yang
@@ -154,7 +172,7 @@ container data {
 ```
 
 ### Refine Statement
-The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties.
+The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties. Refine may add **`if-feature`** expressions, which are appended to the target node’s `if_features` (AND with any existing conditions).
 
 Example:
 ```yang
@@ -196,6 +214,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |
 | Must constraints | — | ✅ `must`: array of expression + error-message + description |
 | When conditions | — | ✅ `when`: object `{ "condition": "<xpath>" }` with optional `"description"` (RFC-style substatement text) |
+| If-feature | — | Not emitted in `x-yang` yet (validation uses the YANG AST / `DocumentValidator` only) |
 | Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
 
 ### Leafref in hybrid form
@@ -250,7 +269,7 @@ The XPath expression is preserved as a string; the YANG validator evaluates it d
 
 ### Round-trip and tooling
 
-- **Generate**: Parse `.yang` with `YangParser(expand_uses=False)` → `generate_json_schema(module)` or `schema_to_yang_json(module, output_path=...)` → `.yang.json`.
+- **Generate**: Parse `.yang` with `YangParser(expand_uses=False)` (reversible AST: `uses`/`augment` not flattened at parse) → `generate_json_schema(module)` or `schema_to_yang_json(module, output_path=...)` → `.yang.json`.
 - **Parse back**: `parse_json_schema(data)` reads the same file and reconstructs a `YangModule` (equivalent where supported); the json parser understands `x-yang` and `$defs`.
 - **Generic JSON Schema tools**: Can use the file for structure and type checking; they ignore `x-yang`. Full YANG semantics (must, when, leafref resolution) require xYang’s validator.
 
@@ -390,15 +409,19 @@ src/xyang/
 │   ├── generator.py             # YANG AST → JSON Schema (with x-yang annotations)
 │   └── parser.py                # JSON Schema → YANG AST (round-trip)
 ├── validator/                   # Validation engine
-│   ├── yang_validator.py       # Top-level YANG validator
-│   ├── document_validator.py   # Document/node validation (must, leafref, etc.)
-│   ├── type_checker.py         # Type checking
-│   ├── path_builder.py         # Path building utilities
+│   ├── yang_validator.py        # Top-level YANG validator
+│   ├── document_validator.py    # Document/node validation (must, when, if-feature, leafref, …)
+│   ├── if_feature_eval.py       # RFC 7950 if-feature boolean expressions + enabled-feature maps
+│   ├── type_checker.py          # Type checking
+│   ├── path_builder.py          # Path building utilities
 │   └── validation_error.py      # Validation error types
+├── uses_expand.py               # Expand `uses`, merge `when` / `if-feature` from uses into grouping roots
+├── refine_expand.py             # Apply `refine`, copy schema subtrees (`copy_yang_statement` + `dataclasses.replace`)
+├── identity_graph.py            # Identity derivation for `identityref` / `derived-from*()`
 ├── errors.py                    # Custom exception classes
 ├── ast.py                       # YANG AST node definitions
 ├── types.py                     # Type utilities
-└── module.py                    # Module handling
+└── module.py                    # Module representation (`import_prefixes`, `feature_if_features`, …)
 ```
 
 The modular architecture separates concerns:
@@ -410,6 +433,8 @@ The modular architecture separates concerns:
 
 ## Limitations
 
+- **Augment**: Augment statements are parsed but **not** merged into the schema used for instance validation or JSON Schema generation for remote targets.
+- **If-feature in JSON Schema**: Hybrid `.yang.json` does not yet carry `if-feature` under `x-yang`; use `DocumentValidator` with `enabled_features_by_module` for conditional validation.
 - **XPath scope**: Only the XPath features used in `meta-model.yang` are implemented. Unsupported: axes (e.g. `child::`, `following-sibling::`), namespaces, and more complex location paths.
 - **Error reporting**: In constraint validation the evaluator catches exceptions and returns `False` or `None`, so detailed error information is not surfaced to the caller.
 - **Expression caching**: Caching is per-expression (local cache per `eval()`); path results that depend on `current()` or similar in predicates are not retained (purged after the expression).
@@ -444,14 +469,14 @@ Counts below are from `examples/meta-model.yang`, using **line-initial** YANG ke
 
 ## Test Coverage
 
-xYang has comprehensive test coverage with **250+ passing tests** covering:
+The suite currently has **310 passing tests** (`python3 -m pytest tests/`), including:
 - Basic YANG parsing and validation
 - Type validation (including enumeration)
-- Constraint validation (must, when, mandatory, default)
+- Constraint validation (must, when, if-feature, mandatory, default)
 - Leafref resolution and validation
 - Deref() function with nested calls
-- Grouping and uses statements
-- Choice/case statements
+- Grouping and uses statements (including nested groupings, refine, `when` / `if-feature` on `uses` and `refine`)
+- Choice/case statements (including `if-feature` on choice/case)
 - Union types in typedefs
 - Unknown field detection
 - XPath expression evaluation
@@ -460,9 +485,16 @@ xYang has comprehensive test coverage with **250+ passing tests** covering:
 - Must constraints on leafref lists
 - Current context preservation in predicates
 - Relative and absolute path resolution
+- **Import / include / submodule** patterns (`tests/test_yangson_ex3_import.py` and related fixtures under `tests/data/yangson-ex3/`)
+- **If-feature** parsing, evaluation, and validation (`tests/test_if_feature.py`)
 - JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
 
 ## Recent Improvements
+
+### Import, submodule, if-feature, and docs (2026-04)
+- ✅ **`import` / `include` / `submodule`**: Resolve and parse dependent `.yang` files; merge included submodules; `import` prefix map for prefixed types and `if-feature` expressions.
+- ✅ **`if-feature`**: Parsing on data-definition parents supported by the grammar; boolean evaluation; `DocumentValidator` integration; `uses` / `refine` propagation; per-feature conditions on `feature` statements; `copy_yang_statement` refactored with `dataclasses.replace`.
+- ✅ **`FEATURES.md`**: Brought in line with the codebase (this update).
 
 ### Meta-model example and documentation (2026-04)
 - ✅ **`examples/meta-model.yang`** stays aligned with the xFrame canonical module (including `year` in `primitive-type-name`, multiple `revision` statements, and current `when` / `must` paths under the `type` container).
@@ -473,7 +505,7 @@ xYang has comprehensive test coverage with **250+ passing tests** covering:
   - `parse <file.yang>` — print module name, namespace, prefix, typedef count, etc.
   - `validate <file.yang> [data.json]` — validate JSON against the YANG module (stdin if no file)
   - `convert <file.yang> [-o path]` — convert .yang to JSON Schema; output path always ends with `.yang.json` (default: `<stem>.yang.json` alongside input)
-- ✅ **Convert**: Uses `YangParser(expand_uses=False)` so the JSON generator expands uses when emitting; produces draft 2020-12 JSON Schema with `x-yang` annotations.
+- ✅ **Convert**: Uses `YangParser(expand_uses=False)` for a reversible AST (`uses`/`augment` not flattened at parse); the JSON generator expands `uses` when emitting; produces draft 2020-12 JSON Schema with `x-yang` annotations.
 - ✅ **JSON Schema pattern fix**: Pattern strings are written as-is; `json.dumps()` performs the single escape needed for JSON. Previously patterns were double-escaped, producing invalid regex in the output (e.g. `\\\\d` instead of `\\d`).
 
 ### Union Types with Leafref and XPath String Functions (2026-02-26)
@@ -523,7 +555,7 @@ xYang has comprehensive test coverage with **250+ passing tests** covering:
   - Groupings are now expanded once during parsing, not in each validator
   - Eliminates redundancy and ensures consistency across validators
   - Removed unused grouping expansion code from validators
-- ✅ **Test coverage**: The suite has since grown (250+ tests); historical note: 178 tests at the time of this entry, including fixes for:
+- ✅ **Test coverage**: The suite has since grown (see **Test Coverage**); historical note: 178 tests at the time of this entry, including fixes for:
   - Foreign key validation tests
   - Parents validation tests
   - Deref() function tests
