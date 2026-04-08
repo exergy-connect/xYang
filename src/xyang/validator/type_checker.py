@@ -4,8 +4,11 @@ Type checker for YANG document validation.
 
 from __future__ import annotations
 
+import base64
+import binascii
 import logging
 import re
+import sys
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
@@ -108,6 +111,8 @@ class TypeChecker:
             return self._check_bits(value, type_stmt)
         if name == "empty":
             return self._check_empty(value)
+        if name == "binary":
+            return self._check_binary(value, type_stmt)
         # Resolve typedef and check against the underlying type
         if getattr(root_schema, "get_typedef", None) is not None:
             typedef = root_schema.get_typedef(name)
@@ -299,6 +304,15 @@ class TypeChecker:
                 return [f"Value {n} is less than minimum {lo}"]
             if hi is not None and n > hi:
                 return [f"Value {n} exceeds maximum {hi}"]
+        fd = getattr(type_stmt, "fraction_digits", None)
+        if fd is not None and fd >= 0:
+            s = str(value).strip()
+            if "." in s:
+                frac = s.split(".", 1)[1]
+                if len(frac) > int(fd):
+                    return [
+                        f"Value has more than {fd} fraction digits (decimal64 fraction-digits)"
+                    ]
         return []
 
     def _check_boolean(self, value: Any) -> List[str]:
@@ -343,6 +357,39 @@ class TypeChecker:
     def _check_empty(self, value: Any) -> List[str]:
         if value not in (None, True, "", {}):
             return [f"Empty type leaf should have no value, got {value!r}"]
+        return []
+
+    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[str]:
+        """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
+        if not isinstance(value, str):
+            return [
+                f"binary value must be a base64-encoded string, got {type(value).__name__}"
+            ]
+        s = value.strip()
+        try:
+            if not s:
+                decoded = b""
+            elif sys.version_info >= (3, 11):
+                decoded = base64.b64decode(s, validate=True)
+            else:
+                decoded = base64.b64decode(s)
+        except binascii.Error:
+            return ["binary value is not valid base64"]
+        if type_stmt.length:
+            lo, hi = self._parse_range(type_stmt.length)
+            n = len(decoded)
+            if lo is not None and n < lo:
+                return [
+                    f"binary decoded length {n} octets is less than minimum {int(lo)}"
+                ]
+            if hi is not None and n > hi:
+                return [
+                    f"binary decoded length {n} octets exceeds maximum {int(hi)}"
+                ]
+        if type_stmt.pattern and not re.fullmatch(type_stmt.pattern, s):
+            return [
+                f"binary value {s!r} does not match pattern {type_stmt.pattern!r}"
+            ]
         return []
 
     def _parse_range(

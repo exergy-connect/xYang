@@ -25,8 +25,9 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 ### Built-in Types
 The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserved keywords: `binary`, `bits`, `boolean`, `decimal64`, `empty`, `enumeration`, `identityref`, `instance-identifier`, `int8`, `int16`, `int32`, `int64`, `leafref`, `string`, `uint8`, `uint16`, `uint32`, `uint64`, `union`.
 
-Validation / JSON Schema coverage varies by type; commonly used in `meta-model.yang`:
+**All** of these built-in types are **validated** during document validation (`DocumentValidator` / `xyang validate`): values are checked against the rules for that type (numeric `range`, `string` / `binary` `length` and `pattern`, `decimal64`, `enumeration`, `bits`, ordered **`union`** members, **`leafref`** / **`identityref`** / **`instance-identifier`** with `require-instance` semantics, and so on). **JSON Schema** representation and `x-yang` round-trip detail still vary by type (see **YANG.json hybrid format**). Types heavily used in `meta-model.yang`:
 - ✅ `string` - String type
+- ✅ `binary` - Base64 instance string; `length` on decoded octets; `pattern` on lexical form
 - ✅ `int32` - 32-bit integer
 - ✅ `uint8` - 8-bit unsigned integer (1 occurrence)
 - ✅ `boolean` - Boolean type
