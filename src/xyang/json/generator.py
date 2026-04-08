@@ -8,6 +8,7 @@ so that parse_json_schema(generate_json_schema(module)) round-trips where suppor
 from __future__ import annotations
 
 import json
+import re
 from pathlib import Path
 from typing import Any
 
@@ -41,6 +42,19 @@ from .schema_keys import (
     XYangWhenEntryKey,
     json_schema_defs_uri,
 )
+
+
+def _bits_space_separated_pattern(bit_names: list[str]) -> str:
+    """JSON Schema ``pattern`` for a YANG ``bits`` value: space-separated bit names (any order).
+
+    Matches the token alphabet only; duplicate tokens are not excluded (YANG validation
+    still rejects duplicates). Names are longest-first in the alternation.
+    """
+    if not bit_names:
+        return "^$"
+    escaped = sorted((re.escape(n) for n in bit_names), key=len, reverse=True)
+    alt = "|".join(escaped)
+    return rf"^$|^(?:{alt})(?:\s+(?:{alt}))*$"
 
 
 def _leafref_path_string(path: Any) -> str:
@@ -253,8 +267,20 @@ def _type_to_schema(
         bits_obj: dict[str, int] = {}
         for b in ordered:
             bits_obj[b.name] = int(b.position) if b.position is not None else 0
+        bit_names = [b.name for b in ordered]
+        desc = (
+            "YANG bits (RFC 7950): space-separated subset of these names (order irrelevant; "
+            "no duplicate names in instance data). Positions: see x-yang.bits. "
+            f"Names: {', '.join(bit_names)}."
+        )
+        examples: list[str] = ["", bit_names[0]]
+        if len(bit_names) > 1:
+            examples.append(" ".join(bit_names))
         return {
             JsonSchemaKey.TYPE: "string",
+            JsonSchemaKey.DESCRIPTION: desc,
+            JsonSchemaKey.PATTERN: _bits_space_separated_pattern(bit_names),
+            JsonSchemaKey.EXAMPLES: examples,
             JsonSchemaKey.X_YANG: {
                 XYangKey.TYPE: XYangTypeValue.BITS,
                 XYangKey.BITS: bits_obj,

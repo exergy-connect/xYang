@@ -22,6 +22,7 @@ class JsonSchemaKey:
     TYPE = "type"
     ITEMS = "items"
     DEFAULT = "default"
+    EXAMPLES = "examples"
     ENUM = "enum"
     PATTERN = "pattern"
     MIN_LENGTH = "minLength"

@@ -148,7 +148,13 @@ def test_bits_json_schema_roundtrip():
     module = p.parse_string(BITS_TYPEDEF_MODULE)
     text = schema_to_yang_json(module)
     data = json.loads(text)
-    bits_xyang = (data.get("$defs") or {}).get("flags", {}).get("x-yang") or {}
+    flags_def = (data.get("$defs") or {}).get("flags", {})
+    assert flags_def.get("type") == "string"
+    assert "pattern" in flags_def
+    assert "examples" in flags_def
+    assert isinstance(flags_def["examples"], list)
+    assert "" in flags_def["examples"]
+    bits_xyang = flags_def.get("x-yang") or {}
     assert bits_xyang.get("type") == "bits"
     assert isinstance(bits_xyang.get("bits"), dict)
     assert bits_xyang["bits"] == {"execute": 0, "read": 2, "write": 3}
