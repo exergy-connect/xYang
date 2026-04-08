@@ -26,6 +26,8 @@ import logging
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
 from ..ast import (
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -171,6 +173,8 @@ class DocumentValidator:
         """True if this statement (or a nested choice branch) has a key in ``data``."""
         if isinstance(stmt, YangLeafStmt):
             return stmt.name in data
+        if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
+            return stmt.name in data
         if isinstance(stmt, YangLeafListStmt):
             return stmt.name in data
         if isinstance(stmt, YangContainerStmt):
@@ -230,7 +234,7 @@ class DocumentValidator:
 
     def _leaf_mandatory_must_exist(
         self,
-        leaf: YangLeafStmt,
+        leaf: YangLeafStmt | YangAnydataStmt | YangAnyxmlStmt,
         data: dict[str, Any],
         enforce_mandatory_choice: bool,
     ) -> bool:
@@ -487,6 +491,8 @@ class DocumentValidator:
         """Instance keys under ``data`` claimed by this statement (same nesting level)."""
         if isinstance(stmt, YangLeafStmt):
             return {stmt.name} if stmt.name in data else set()
+        if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
+            return {stmt.name} if stmt.name in data else set()
         if isinstance(stmt, YangLeafListStmt):
             return {stmt.name} if stmt.name in data else set()
         if isinstance(stmt, YangContainerStmt):
@@ -670,6 +676,20 @@ class DocumentValidator:
                         ValidationError(
                             path=path,
                             message=f"Mandatory leaf '{name}' is missing",
+                        )
+                    )
+            return effective is not None
+
+        if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
+            if effective is None and stmt.mandatory:
+                if self._leaf_mandatory_must_exist(
+                    stmt, data, enforce_mandatory_choice
+                ):
+                    kind = "anydata" if isinstance(stmt, YangAnydataStmt) else "anyxml"
+                    self._errors.append(
+                        ValidationError(
+                            path=path,
+                            message=f"Mandatory {kind} '{name}' is missing",
                         )
                     )
             return effective is not None

@@ -13,6 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from ..ast import (
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -42,6 +44,26 @@ from .schema_keys import (
     XYangWhenEntryKey,
     json_schema_defs_uri,
 )
+
+# Open JSON value: anydata / anyxml carry no fixed type in YANG (RFC 7950 §7.11–7.12).
+_ANY_JSON_INSTANCE_SCHEMA: dict[str, Any] = {
+    JsonSchemaKey.TYPE: [
+        "array",
+        "boolean",
+        "integer",
+        "null",
+        "number",
+        "object",
+        "string",
+    ],
+}
+
+
+def _mandatory_schema_child(stmt: YangStatement) -> bool:
+    """Leaf / anydata / anyxml may appear in container ``required``."""
+    return isinstance(stmt, (YangLeafStmt, YangAnydataStmt, YangAnyxmlStmt)) and bool(
+        getattr(stmt, "mandatory", False)
+    )
 
 
 def _bits_space_separated_pattern(bit_names: list[str]) -> str:
@@ -83,7 +105,7 @@ def _locate_stmt_with_parent(
                 if found is not None:
                     return found
         elif hasattr(s, "statements") and not isinstance(
-            s, (YangLeafStmt, YangLeafListStmt)
+            s, (YangLeafStmt, YangLeafListStmt, YangAnydataStmt, YangAnyxmlStmt)
         ):
             found = _locate_stmt_with_parent(s.statements, s, target)
             if found is not None:
@@ -516,6 +538,333 @@ def _choice_to_object_body(
     return out
 
 
+def _child_property_map(
+    children: list[YangStatement],
+    typedef_names: set[str],
+    module: YangModule,
+    parent: YangStatement | YangModule,
+) -> tuple[dict[str, Any], list[str]]:
+    """JSON Schema ``properties`` and parallel ``required`` names for mandatory leaves."""
+    props: dict[str, Any] = {}
+    required: list[str] = []
+    for child in children:
+        child_prop = _statement_to_property(child, typedef_names, module, parent=parent)
+        if child_prop is not None:
+            props[child.name] = child_prop
+            if _mandatory_schema_child(child):
+                required.append(child.name)
+    return props, required
+
+
+def _container_stmt_to_property(
+    stmt: YangContainerStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
+    children = _expand_uses_for_json(stmt.statements, module)
+    when_stmt = getattr(stmt, "when", None)
+    others, hoisted_ch = _partition_choice_sibling_statements(children)
+
+    if hoisted_ch is not None and others:
+        base_props, base_required = _child_property_map(others, typedef_names, module, stmt)
+        ch_body = _choice_to_object_body(
+            hoisted_ch, typedef_names, module, leafref_parent=stmt
+        )
+        xy_container = {
+            **_build_xyang(
+                "container",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_stmt=when_stmt,
+                presence=getattr(stmt, "presence", None),
+            ),
+            XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
+        }
+        out: dict[str, Any] = {
+            JsonSchemaKey.TYPE: "object",
+            JsonSchemaKey.DESCRIPTION: stmt.description or "",
+            JsonSchemaKey.X_YANG: xy_container,
+        }
+        if JsonSchemaKey.ONE_OF in ch_body:
+            out[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
+                ch_body[JsonSchemaKey.ONE_OF], base_props, base_required
+            )
+        elif ch_body.get(JsonSchemaKey.PROPERTIES):
+            out[JsonSchemaKey.PROPERTIES] = {
+                **base_props,
+                **ch_body[JsonSchemaKey.PROPERTIES],
+            }
+            out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+            req = list(base_required)
+            if ch_body.get(JsonSchemaKey.REQUIRED):
+                req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
+            if req:
+                out[JsonSchemaKey.REQUIRED] = req
+        return out
+
+    if len(children) == 1 and isinstance(children[0], YangChoiceStmt):
+        # Choice (and case) are not data nodes; instance keys are case leaves on this container.
+        ch0 = children[0]
+        ch_body = _choice_to_object_body(
+            ch0, typedef_names, module, leafref_parent=stmt
+        )
+        xy_container = {
+            **_build_xyang(
+                "container",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_stmt=when_stmt,
+                presence=getattr(stmt, "presence", None),
+            ),
+            XYangKey.CHOICE: _choice_meta_xyang(ch0),
+        }
+        out = {
+            JsonSchemaKey.TYPE: "object",
+            # Choice text lives in x-yang.choice.description; do not merge onto the container.
+            JsonSchemaKey.DESCRIPTION: stmt.description or "",
+            JsonSchemaKey.X_YANG: xy_container,
+        }
+        if JsonSchemaKey.ONE_OF in ch_body:
+            out[JsonSchemaKey.ONE_OF] = ch_body[JsonSchemaKey.ONE_OF]
+        elif ch_body.get(JsonSchemaKey.PROPERTIES):
+            out[JsonSchemaKey.PROPERTIES] = ch_body[JsonSchemaKey.PROPERTIES]
+            out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+        return out
+
+    props, required = _child_property_map(children, typedef_names, module, stmt)
+    out = {
+        JsonSchemaKey.TYPE: "object",
+        JsonSchemaKey.DESCRIPTION: stmt.description or "",
+        JsonSchemaKey.X_YANG: _build_xyang(
+            "container",
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=when_stmt,
+            presence=getattr(stmt, "presence", None),
+        ),
+    }
+    if props:
+        out[JsonSchemaKey.PROPERTIES] = props
+    if required:
+        out[JsonSchemaKey.REQUIRED] = required
+    out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+    return out
+
+
+def _list_items_object_schema(
+    list_children: list[YangStatement],
+    stmt: YangListStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> tuple[dict[str, Any], dict[str, Any] | None]:
+    """Shape of one list entry (object) and optional x-yang keys to merge (e.g. hoisted ``choice``)."""
+    others_lc, hoisted_list_ch = _partition_choice_sibling_statements(list_children)
+    if hoisted_list_ch is not None and others_lc:
+        list_base_props, list_base_required = _child_property_map(
+            others_lc, typedef_names, module, stmt
+        )
+        ch_body = _choice_to_object_body(
+            hoisted_list_ch, typedef_names, module, leafref_parent=stmt
+        )
+        items: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
+        if JsonSchemaKey.ONE_OF in ch_body:
+            items[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
+                ch_body[JsonSchemaKey.ONE_OF], list_base_props, list_base_required
+            )
+        else:
+            items[JsonSchemaKey.PROPERTIES] = {
+                **list_base_props,
+                **(ch_body.get(JsonSchemaKey.PROPERTIES) or {}),
+            }
+            items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+            req = list(list_base_required)
+            if ch_body.get(JsonSchemaKey.REQUIRED):
+                req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
+            if req:
+                items[JsonSchemaKey.REQUIRED] = req
+        overlay = {XYangKey.CHOICE: _choice_meta_xyang(hoisted_list_ch)}
+        return items, overlay
+    if len(list_children) == 1 and isinstance(list_children[0], YangChoiceStmt):
+        ch0 = list_children[0]
+        ch_body = _choice_to_object_body(
+            ch0, typedef_names, module, leafref_parent=stmt
+        )
+        items = {JsonSchemaKey.TYPE: "object"}
+        if JsonSchemaKey.ONE_OF in ch_body:
+            items[JsonSchemaKey.ONE_OF] = ch_body[JsonSchemaKey.ONE_OF]
+        else:
+            items[JsonSchemaKey.PROPERTIES] = ch_body.get(JsonSchemaKey.PROPERTIES) or {}
+            items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+        overlay = {XYangKey.CHOICE: _choice_meta_xyang(ch0)}
+        return items, overlay
+    props, item_required = _child_property_map(
+        list_children, typedef_names, module, stmt
+    )
+    items = {
+        JsonSchemaKey.TYPE: "object",
+        JsonSchemaKey.PROPERTIES: props,
+    }
+    if item_required:
+        items[JsonSchemaKey.REQUIRED] = item_required
+    items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+    return items, None
+
+
+def _list_stmt_to_property(
+    stmt: YangListStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
+    # Match parser/yang_parser: do not expand uses under lists refined to max-elements 0
+    # (xFrame meta-model breaks composite recursion that way).
+    if getattr(stmt, "max_elements", None) == 0:
+        list_children = [_copy_statement(s) for s in stmt.statements]
+    else:
+        list_children = _expand_uses_for_json(stmt.statements, module)
+    when_stmt = getattr(stmt, "when", None)
+    list_xy = _build_xyang(
+        "list",
+        key=stmt.key,
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=when_stmt,
+    )
+    items, choice_overlay = _list_items_object_schema(
+        list_children, stmt, typedef_names, module
+    )
+    if choice_overlay:
+        list_xy = {**list_xy, **choice_overlay}
+    out = {
+        JsonSchemaKey.TYPE: "array",
+        JsonSchemaKey.ITEMS: items,
+        JsonSchemaKey.DESCRIPTION: stmt.description or "",
+        JsonSchemaKey.X_YANG: list_xy,
+    }
+    if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
+        out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
+    if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
+        out[JsonSchemaKey.MAX_ITEMS] = stmt.max_elements
+    return out
+
+
+def _leaf_stmt_to_property(
+    stmt: YangLeafStmt,
+    typedef_names: set[str],
+    module: YangModule,
+    parent: YangStatement | YangModule | None,
+) -> dict[str, Any]:
+    type_stmt = stmt.type
+    when_stmt = getattr(stmt, "when", None)
+    if type_stmt and type_stmt.name in typedef_names:
+        out: dict[str, Any] = {
+            JsonSchemaKey.REF: json_schema_defs_uri(type_stmt.name),
+            JsonSchemaKey.DESCRIPTION: stmt.description or "",
+            JsonSchemaKey.X_YANG: _build_xyang(
+                "leaf",
+                must_list=getattr(stmt, "must_statements", None) or [],
+                when_stmt=when_stmt,
+                mandatory=stmt.mandatory or None,
+            ),
+        }
+    else:
+        lr_anchor = _leafref_context_parent(module, parent)
+        type_schema = _type_to_schema(
+            type_stmt,
+            typedef_names,
+            module=module,
+            leafref_anchor=lr_anchor,
+        )
+        leaf_xyang = _build_xyang(
+            "leaf",
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=when_stmt,
+            mandatory=stmt.mandatory or None,
+        )
+        # Preserve leafref (type, path, require-instance) from type_schema x-yang
+        if type_schema.get(JsonSchemaKey.X_YANG):
+            leaf_xyang = {**leaf_xyang, **type_schema.get(JsonSchemaKey.X_YANG, {})}
+        out = {
+            **{k: v for k, v in type_schema.items() if k != JsonSchemaKey.X_YANG},
+            JsonSchemaKey.DESCRIPTION: stmt.description or "",
+            JsonSchemaKey.X_YANG: leaf_xyang,
+        }
+    if stmt.default is not None:
+        out[JsonSchemaKey.DEFAULT] = stmt.default
+    return out
+
+
+def _anydata_anyxml_stmt_to_property(
+    stmt: YangAnydataStmt | YangAnyxmlStmt,
+) -> dict[str, Any]:
+    when_stmt = getattr(stmt, "when", None)
+    xy_type = (
+        XYangTypeValue.ANYDATA
+        if isinstance(stmt, YangAnydataStmt)
+        else XYangTypeValue.ANYXML
+    )
+    return {
+        **_ANY_JSON_INSTANCE_SCHEMA,
+        JsonSchemaKey.DESCRIPTION: stmt.description or "",
+        JsonSchemaKey.X_YANG: _build_xyang(
+            xy_type,
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=when_stmt,
+            mandatory=stmt.mandatory or None,
+        ),
+    }
+
+
+def _leaf_list_stmt_to_property(
+    stmt: YangLeafListStmt,
+    typedef_names: set[str],
+    module: YangModule,
+    parent: YangStatement | YangModule | None,
+) -> dict[str, Any]:
+    type_stmt = stmt.type
+    lr_anchor = _leafref_context_parent(module, parent)
+    items_schema = _type_to_schema(
+        type_stmt,
+        typedef_names,
+        module=module,
+        leafref_anchor=lr_anchor,
+    )
+    when_stmt = getattr(stmt, "when", None)
+    out = {
+        JsonSchemaKey.TYPE: "array",
+        JsonSchemaKey.ITEMS: items_schema,
+        JsonSchemaKey.DESCRIPTION: stmt.description or "",
+        JsonSchemaKey.X_YANG: _build_xyang(
+            "leaf-list",
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=when_stmt,
+        ),
+    }
+    if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
+        out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
+    if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
+        out[JsonSchemaKey.MAX_ITEMS] = stmt.max_elements
+    return out
+
+
+def _choice_stmt_to_property(
+    stmt: YangChoiceStmt,
+    typedef_names: set[str],
+    module: YangModule,
+    parent: YangStatement | YangModule | None,
+) -> dict[str, Any]:
+    anchor = parent if parent is not None else module
+    body = _choice_to_object_body(stmt, typedef_names, module, leafref_parent=anchor)
+    out = {
+        JsonSchemaKey.TYPE: "object",
+        JsonSchemaKey.DESCRIPTION: body.get(JsonSchemaKey.DESCRIPTION, ""),
+        JsonSchemaKey.X_YANG: {
+            XYangKey.TYPE: "choice",
+            XYangKey.MANDATORY: bool(getattr(stmt, "mandatory", False)),
+        },
+    }
+    if body.get(JsonSchemaKey.PROPERTIES):
+        out[JsonSchemaKey.PROPERTIES] = body[JsonSchemaKey.PROPERTIES]
+    if JsonSchemaKey.ONE_OF in body:
+        out[JsonSchemaKey.ONE_OF] = body[JsonSchemaKey.ONE_OF]
+    return out
+
+
 def _statement_to_property(
     stmt: YangStatement,
     typedef_names: set[str],
@@ -523,269 +872,18 @@ def _statement_to_property(
     parent: YangStatement | YangModule | None = None,
 ) -> dict[str, Any] | None:
     """Convert an AST statement to a JSON Schema property. Returns None for unsupported nodes. Expands uses when present."""
-    from ..ast import YangContainerStmt, YangLeafListStmt, YangLeafStmt, YangListStmt
-
     if isinstance(stmt, YangContainerStmt):
-        children = _expand_uses_for_json(stmt.statements, module)
-        when_stmt = getattr(stmt, "when", None)
-        others, hoisted_ch = _partition_choice_sibling_statements(children)
-        if hoisted_ch is not None and others:
-            base_props: dict[str, Any] = {}
-            base_required: list[str] = []
-            for child in others:
-                child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
-                if child_prop is not None:
-                    base_props[child.name] = child_prop
-                    if isinstance(child, YangLeafStmt) and child.mandatory:
-                        base_required.append(child.name)
-            ch_body = _choice_to_object_body(
-                hoisted_ch, typedef_names, module, leafref_parent=stmt
-            )
-            xy_container = {
-                **_build_xyang(
-                    "container",
-                    must_list=getattr(stmt, "must_statements", None) or [],
-                    when_stmt=when_stmt,
-                    presence=getattr(stmt, "presence", None),
-                ),
-                XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
-            }
-            out = {
-                JsonSchemaKey.TYPE: "object",
-                JsonSchemaKey.DESCRIPTION: stmt.description or "",
-                JsonSchemaKey.X_YANG: xy_container,
-            }
-            if JsonSchemaKey.ONE_OF in ch_body:
-                out[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
-                    ch_body[JsonSchemaKey.ONE_OF], base_props, base_required
-                )
-            elif ch_body.get(JsonSchemaKey.PROPERTIES):
-                out[JsonSchemaKey.PROPERTIES] = {**base_props, **ch_body[JsonSchemaKey.PROPERTIES]}
-                out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-                req = list(base_required)
-                if ch_body.get(JsonSchemaKey.REQUIRED):
-                    req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
-                if req:
-                    out[JsonSchemaKey.REQUIRED] = req
-            return out
-
-        if len(children) == 1 and isinstance(children[0], YangChoiceStmt):
-            # Choice (and case) are not data nodes; instance keys are case leaves on this container.
-            ch_body = _choice_to_object_body(
-                children[0], typedef_names, module, leafref_parent=stmt
-            )
-            ch0 = children[0]
-            xy_container = {
-                **_build_xyang(
-                    "container",
-                    must_list=getattr(stmt, "must_statements", None) or [],
-                    when_stmt=when_stmt,
-                    presence=getattr(stmt, "presence", None),
-                ),
-                XYangKey.CHOICE: _choice_meta_xyang(ch0),
-            }
-            out = {
-                JsonSchemaKey.TYPE: "object",
-                # Choice text lives in x-yang.choice.description; do not merge onto the container.
-                JsonSchemaKey.DESCRIPTION: stmt.description or "",
-                JsonSchemaKey.X_YANG: xy_container,
-            }
-            if JsonSchemaKey.ONE_OF in ch_body:
-                out[JsonSchemaKey.ONE_OF] = ch_body[JsonSchemaKey.ONE_OF]
-            elif ch_body.get(JsonSchemaKey.PROPERTIES):
-                out[JsonSchemaKey.PROPERTIES] = ch_body[JsonSchemaKey.PROPERTIES]
-                out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-            return out
-
-        props: dict[str, Any] = {}
-        required: list[str] = []
-        for child in children:
-            child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
-            if child_prop is not None:
-                props[child.name] = child_prop
-                if isinstance(child, YangLeafStmt) and child.mandatory:
-                    required.append(child.name)
-        out = {
-            JsonSchemaKey.TYPE: "object",
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: _build_xyang(
-                "container",
-                must_list=getattr(stmt, "must_statements", None) or [],
-                when_stmt=when_stmt,
-                presence=getattr(stmt, "presence", None),
-            ),
-        }
-        if props:
-            out[JsonSchemaKey.PROPERTIES] = props
-        if required:
-            out[JsonSchemaKey.REQUIRED] = required
-        out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-        return out
-
+        return _container_stmt_to_property(stmt, typedef_names, module)
     if isinstance(stmt, YangListStmt):
-        # Match parser/yang_parser: do not expand uses under lists refined to max-elements 0
-        # (xFrame meta-model breaks composite recursion that way).
-        if getattr(stmt, "max_elements", None) == 0:
-            list_children = [_copy_statement(s) for s in stmt.statements]
-        else:
-            list_children = _expand_uses_for_json(stmt.statements, module)
-        when_stmt = getattr(stmt, "when", None)
-        list_xy = _build_xyang(
-            "list",
-            key=stmt.key,
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=when_stmt,
-        )
-        items: dict[str, Any]
-        others_lc, hoisted_list_ch = _partition_choice_sibling_statements(list_children)
-        if hoisted_list_ch is not None and others_lc:
-            list_base_props: dict[str, Any] = {}
-            list_base_required: list[str] = []
-            for child in others_lc:
-                child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
-                if child_prop is not None:
-                    list_base_props[child.name] = child_prop
-                    if isinstance(child, YangLeafStmt) and child.mandatory:
-                        list_base_required.append(child.name)
-            ch_body = _choice_to_object_body(
-                hoisted_list_ch, typedef_names, module, leafref_parent=stmt
-            )
-            list_xy = {**list_xy, XYangKey.CHOICE: _choice_meta_xyang(hoisted_list_ch)}
-            items = {JsonSchemaKey.TYPE: "object"}
-            if JsonSchemaKey.ONE_OF in ch_body:
-                items[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
-                    ch_body[JsonSchemaKey.ONE_OF], list_base_props, list_base_required
-                )
-            else:
-                items[JsonSchemaKey.PROPERTIES] = {
-                    **list_base_props,
-                    **(ch_body.get(JsonSchemaKey.PROPERTIES) or {}),
-                }
-                items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-                req = list(list_base_required)
-                if ch_body.get(JsonSchemaKey.REQUIRED):
-                    req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
-                if req:
-                    items[JsonSchemaKey.REQUIRED] = req
-        elif len(list_children) == 1 and isinstance(list_children[0], YangChoiceStmt):
-            ch0 = list_children[0]
-            ch_body = _choice_to_object_body(
-                ch0, typedef_names, module, leafref_parent=stmt
-            )
-            list_xy = {**list_xy, XYangKey.CHOICE: _choice_meta_xyang(ch0)}
-            items = {JsonSchemaKey.TYPE: "object"}
-            if JsonSchemaKey.ONE_OF in ch_body:
-                items[JsonSchemaKey.ONE_OF] = ch_body[JsonSchemaKey.ONE_OF]
-            else:
-                items[JsonSchemaKey.PROPERTIES] = ch_body.get(JsonSchemaKey.PROPERTIES) or {}
-                items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-        else:
-            items = {JsonSchemaKey.TYPE: "object", JsonSchemaKey.PROPERTIES: {}}
-            item_required: list[str] = []
-            for child in list_children:
-                child_prop = _statement_to_property(child, typedef_names, module, parent=stmt)
-                if child_prop is not None:
-                    items[JsonSchemaKey.PROPERTIES][child.name] = child_prop
-                    if isinstance(child, YangLeafStmt) and child.mandatory:
-                        item_required.append(child.name)
-            if item_required:
-                items[JsonSchemaKey.REQUIRED] = item_required
-            items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-        out = {
-            JsonSchemaKey.TYPE: "array",
-            JsonSchemaKey.ITEMS: items,
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: list_xy,
-        }
-        if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
-            out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
-        if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
-            out[JsonSchemaKey.MAX_ITEMS] = stmt.max_elements
-        return out
-
+        return _list_stmt_to_property(stmt, typedef_names, module)
     if isinstance(stmt, YangLeafStmt):
-        type_stmt = stmt.type
-        when_stmt = getattr(stmt, "when", None)
-        if type_stmt and type_stmt.name in typedef_names:
-            out = {
-                JsonSchemaKey.REF: json_schema_defs_uri(type_stmt.name),
-                JsonSchemaKey.DESCRIPTION: stmt.description or "",
-                JsonSchemaKey.X_YANG: _build_xyang(
-                    "leaf",
-                    must_list=getattr(stmt, "must_statements", None) or [],
-                    when_stmt=when_stmt,
-                    mandatory=stmt.mandatory or None,
-                ),
-            }
-        else:
-            lr_anchor = _leafref_context_parent(module, parent)
-            type_schema = _type_to_schema(
-                type_stmt,
-                typedef_names,
-                module=module,
-                leafref_anchor=lr_anchor,
-            )
-            leaf_xyang = _build_xyang(
-                "leaf",
-                must_list=getattr(stmt, "must_statements", None) or [],
-                when_stmt=when_stmt,
-                mandatory=stmt.mandatory or None,
-            )
-            # Preserve leafref (type, path, require-instance) from type_schema x-yang
-            if type_schema.get(JsonSchemaKey.X_YANG):
-                leaf_xyang = {**leaf_xyang, **type_schema.get(JsonSchemaKey.X_YANG, {})}
-            out = {
-                **{k: v for k, v in type_schema.items() if k != JsonSchemaKey.X_YANG},
-                JsonSchemaKey.DESCRIPTION: stmt.description or "",
-                JsonSchemaKey.X_YANG: leaf_xyang,
-            }
-        if stmt.default is not None:
-            out[JsonSchemaKey.DEFAULT] = stmt.default
-        return out
-
+        return _leaf_stmt_to_property(stmt, typedef_names, module, parent)
+    if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
+        return _anydata_anyxml_stmt_to_property(stmt)
     if isinstance(stmt, YangLeafListStmt):
-        type_stmt = stmt.type
-        lr_anchor = _leafref_context_parent(module, parent)
-        items_schema = _type_to_schema(
-            type_stmt,
-            typedef_names,
-            module=module,
-            leafref_anchor=lr_anchor,
-        )
-        when_stmt = getattr(stmt, "when", None)
-        out = {
-            JsonSchemaKey.TYPE: "array",
-            JsonSchemaKey.ITEMS: items_schema,
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: _build_xyang(
-                "leaf-list",
-                must_list=getattr(stmt, "must_statements", None) or [],
-                when_stmt=when_stmt,
-            ),
-        }
-        if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
-            out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
-        if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
-            out[JsonSchemaKey.MAX_ITEMS] = stmt.max_elements
-        return out
-
+        return _leaf_list_stmt_to_property(stmt, typedef_names, module, parent)
     if isinstance(stmt, YangChoiceStmt):
-        anchor = parent if parent is not None else module
-        body = _choice_to_object_body(stmt, typedef_names, module, leafref_parent=anchor)
-        out = {
-            JsonSchemaKey.TYPE: "object",
-            JsonSchemaKey.DESCRIPTION: body.get(JsonSchemaKey.DESCRIPTION, ""),
-            JsonSchemaKey.X_YANG: {
-                XYangKey.TYPE: "choice",
-                XYangKey.MANDATORY: bool(getattr(stmt, "mandatory", False)),
-            },
-        }
-        if body.get(JsonSchemaKey.PROPERTIES):
-            out[JsonSchemaKey.PROPERTIES] = body[JsonSchemaKey.PROPERTIES]
-        if JsonSchemaKey.ONE_OF in body:
-            out[JsonSchemaKey.ONE_OF] = body[JsonSchemaKey.ONE_OF]
-        return out
-
+        return _choice_stmt_to_property(stmt, typedef_names, module, parent)
     return None
 
 
