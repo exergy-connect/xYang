@@ -21,6 +21,7 @@ from ..ast import (
 from ..xpath import XPathParser
 
 from ..refine_expand import apply_refines_by_path, copy_yang_statement
+from .unsupported_skip import is_unsupported_construct_start, skip_unsupported_construct
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
@@ -65,6 +66,13 @@ class StatementParsers:
             setattr(obj, attr, current)
         current.append(value)
 
+    def _skip_unsupported_if_present(self, tokens: TokenStream, context: str) -> bool:
+        """If the next token starts deviation/extension/rpc/..., skip it and warn. Returns True if skipped."""
+        if not is_unsupported_construct_start(tokens):
+            return False
+        skip_unsupported_construct(tokens, context=context)
+        return True
+
     def _consume_qname_from_identifier(self, tokens: TokenStream) -> str:
         """Consume ``name`` or ``prefix:name`` (``prefix:...`` chain). Current token must be IDENTIFIER."""
         parts = [tokens.consume_type(YangTokenType.IDENTIFIER)]
@@ -107,8 +115,9 @@ class StatementParsers:
         handler = self.registry.get_handler(f"module:{stmt_type}")
         if handler:
             handler(tokens, context)
+        elif self._skip_unsupported_if_present(tokens, "module body"):
+            return
         else:
-            # Unknown statement - raise error instead of silently skipping
             raise tokens._make_error(f"Unknown statement in module: {stmt_type}")
 
     def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -126,6 +135,8 @@ class StatementParsers:
         handler = self.registry.get_handler(f"submodule:{stmt_type}")
         if handler:
             handler(tokens, context)
+        elif self._skip_unsupported_if_present(tokens, "submodule body"):
+            return
         else:
             raise tokens._make_error(f"Unknown statement in submodule: {stmt_type}")
 
@@ -264,6 +275,8 @@ class StatementParsers:
                     self.parse_description_string_only(tokens, feat_ctx)
                 elif st == "reference":
                     self.parse_reference_string_only(tokens, feat_ctx)
+                elif self._skip_unsupported_if_present(tokens, f"feature '{name}'"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in feature '{name}': {st!r}"
@@ -291,6 +304,8 @@ class StatementParsers:
                     self.parse_description_string_only(tokens, context)
                 elif st == "reference":
                     self.parse_reference_string_only(tokens, context)
+                elif self._skip_unsupported_if_present(tokens, "if-feature substatement"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in if-feature: {st!r}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -306,6 +321,8 @@ class StatementParsers:
             handler = self.registry.get_handler(f"belongs-to:{st}")
             if handler:
                 handler(tokens, context)
+            elif self._skip_unsupported_if_present(tokens, "belongs-to"):
+                pass
             else:
                 raise tokens._make_error(f"Unknown statement in belongs-to: {st!r}")
         tokens.consume_type(YangTokenType.RBRACE)
@@ -322,6 +339,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"augment:{st}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, "augment"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in augment: {st!r}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -431,6 +450,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"typedef:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"typedef '{typedef_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in typedef '{typedef_name}': {tokens.peek()}")
             tokens.consume('}')
@@ -451,6 +472,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"identity:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"identity '{identity_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in identity '{identity_name}': {tokens.peek()}"
@@ -492,6 +515,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"container:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"container '{container_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in container '{container_name}': {tokens.peek()}")
             if tokens.has_more() and tokens.peek_type() == YangTokenType.RBRACE:
@@ -519,6 +544,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"{block_type}:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"{block_type} '{name}'"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in {block_type} '{name}': {tokens.peek()}"
@@ -588,6 +615,8 @@ class StatementParsers:
                             handler(tokens, type_context)
                         else:
                             handler(tokens, type_context, type_stmt)
+                    elif self._skip_unsupported_if_present(tokens, f"type '{type_name}'"):
+                        pass
                     else:
                         raise tokens._make_error(f"Unknown statement in type '{type_name}': {tokens.peek()}")
                 else:
@@ -688,6 +717,8 @@ class StatementParsers:
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == YangTokenType.DESCRIPTION:
                     self._consume_bit_block_description(tokens)
+                elif self._skip_unsupported_if_present(tokens, "bit"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in bit: {tokens.peek()!r} "
@@ -840,6 +871,8 @@ class StatementParsers:
                     self.parse_must_error_message(tokens, new_context)
                 elif tokens.peek_type() == YangTokenType.DESCRIPTION:
                     self.parse_description(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, "must"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in must: {tokens.peek()!r} "
@@ -877,6 +910,8 @@ class StatementParsers:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.peek_type() == YangTokenType.DESCRIPTION:
                     self.parse_description(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, "when"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in when: {tokens.peek()!r} "
@@ -916,6 +951,8 @@ class StatementParsers:
                         self.parse_anydata(tokens, new_context)
                     elif pt == YangTokenType.ANYXML:
                         self.parse_anyxml(tokens, new_context)
+                    elif self._skip_unsupported_if_present(tokens, f"grouping '{grouping_name}'"):
+                        pass
                     else:
                         raise tokens._make_error(f"Unknown statement in grouping '{grouping_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -939,6 +976,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"uses:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"uses '{grouping_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(
                         f"Unknown statement in uses '{grouping_name}': {tokens.peek()}"
@@ -971,6 +1010,8 @@ class StatementParsers:
                     self.parse_type(tokens, new_context)
                 elif tokens.peek_type() == YangTokenType.DEFAULT:
                     tokens.consume()  # Skip for now
+                elif self._skip_unsupported_if_present(tokens, f"refine '{target_path}'"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in refine '{target_path}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -989,6 +1030,8 @@ class StatementParsers:
                 handler = self.registry.get_handler(f"choice:{tokens.peek()}")
                 if handler:
                     handler(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"choice '{choice_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in choice '{choice_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -1024,6 +1067,8 @@ class StatementParsers:
                     self.parse_anydata(tokens, new_context)
                 elif tokens.peek_type() == YangTokenType.ANYXML:
                     self.parse_anyxml(tokens, new_context)
+                elif self._skip_unsupported_if_present(tokens, f"case '{case_name}'"):
+                    pass
                 else:
                     raise tokens._make_error(f"Unknown statement in case '{case_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)

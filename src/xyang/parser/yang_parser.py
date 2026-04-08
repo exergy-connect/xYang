@@ -109,10 +109,9 @@ class YangParser:
 
         # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
         # parser implements — container, leaf, leaf-list, list, choice, case, uses, refine,
-        # augment, identity — plus ``feature`` (§7.20.1.1).  Not wired for statements we
-        # do not parse (e.g. ``rpc``, ``action``, ``notification``, ``input``, ``output``,
-        # ``deviation``) or for finer-grained typedef leaves
-        # (``enum``, ``bit``) per RFC 7950 §9.
+        # augment, identity — plus ``feature`` (§7.20.1.1).  Not on ``enum`` / ``bit`` per
+        # RFC 7950 §9.  ``deviation``, ``extension``, ``rpc``, ``action``, ``notification``,
+        # ``input``, ``output`` are skipped with a warning (see ``unsupported_skip``).
 
         # Augment body
         self.registry.register('augment:if-feature', self.parsers.parse_if_feature_stmt)

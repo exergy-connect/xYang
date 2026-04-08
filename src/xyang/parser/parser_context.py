@@ -128,6 +128,14 @@ class YangTokenType(Enum):
     SUBMODULE = "submodule"
     BELONGS_TO = "belongs-to"
     REFERENCE = "reference"
+    # Parsed only to skip (see unsupported_skip); not represented in the AST.
+    DEVIATION = "deviation"
+    EXTENSION = "extension"
+    RPC = "rpc"
+    ACTION = "action"
+    NOTIFICATION = "notification"
+    INPUT = "input"
+    OUTPUT = "output"
 
 
 def diagnostic_source_lines(content: str) -> List[str]:

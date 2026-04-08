@@ -102,10 +102,8 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 ### Partial / syntax only
 - ⚠️ **`augment`** — Parsed into `YangAugmentStmt` (including `if-feature`, `when`, `must`, nested data definitions). With `YangParser(expand_uses=True)`, augments are resolved and merged into the target module (same gate as `uses` expansion). With `expand_uses=False`, augments stay as statements for reversible convert. **JSON Schema** emission today still does not walk merged augment semantics end-to-end for every case; validate with an expanded module when you need full augmented-tree checks.
 
-### Not implemented
-- ❌ `deviation` — Deviations
-- ❌ `extension` — Extension statements (and extension-defined syntax)
-- ❌ `rpc`, `action`, `notification`, `input`, `output` — RPC/action/notification modeling
+### Not implemented (skipped when parsing)
+- ⚠️ `deviation`, `extension`, `rpc`, `action`, `notification`, `input`, `output` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
 
 Other reserved built-in type names may parse but lack full validation or JSON Schema parity; see **Built-in Types** and sections above.
 
