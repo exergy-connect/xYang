@@ -15,11 +15,11 @@ setup(
     long_description=long_description,
     long_description_content_type="text/markdown",
     url="https://github.com/exergy-connect/xYang",
-    packages=find_packages(),
+    packages=find_packages(where="src"),
+    package_dir={"": "src"},
     classifiers=[
         "Development Status :: 3 - Alpha",
         "Intended Audience :: Developers",
-        "License :: OSI Approved :: MIT License",
         "Operating System :: OS Independent",
         "Programming Language :: Python :: 3",
         "Programming Language :: Python :: 3.8",
@@ -32,12 +32,5 @@ setup(
         "Topic :: System :: Networking",
     ],
     python_requires=">=3.8",
-    install_requires=[],  # No dependencies - pure Python
-    extras_require={
-        "dev": [
-            "pytest>=9.0.3",
-            "black>=26.3.1",
-            "PyYAML>=6.0.3",
-        ],
-    },
+    install_requires=[],  # No dependencies - pure Python; dev deps live in pyproject.toml
 )
