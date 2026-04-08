@@ -48,6 +48,24 @@ def _get_xyang(schema: dict[str, Any]) -> dict[str, Any]:
     return schema.get(JsonSchemaKey.X_YANG) or {}
 
 
+def _if_features_from_xyang(xyang: dict[str, Any]) -> list[str]:
+    """Parse ``x-yang`` ``if-features``: AND of RFC ``if-feature`` substatements (string or string list)."""
+    raw = xyang.get(XYangKey.IF_FEATURES)
+    if raw is None:
+        return []
+    if isinstance(raw, str):
+        return [raw] if raw.strip() else []
+    if isinstance(raw, list):
+        return [str(x) for x in raw if isinstance(x, str) and x.strip()]
+    return []
+
+
+def _set_if_features_from_xyang(stmt: Any, xyang: dict[str, Any]) -> None:
+    feats = _if_features_from_xyang(xyang)
+    if feats:
+        stmt.if_features = feats
+
+
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     """Build YangWhenStmt from x-yang ``when``: object with ``condition`` and optional ``description``."""
     raw = xyang.get(XYangKey.WHEN)
@@ -292,7 +310,9 @@ def _build_identity(def_name: str, def_schema: dict[str, Any]) -> YangIdentitySt
     if not isinstance(bases, list):
         bases = []
     desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
-    return YangIdentityStmt(name=def_name, description=desc, bases=list(bases))
+    ident = YangIdentityStmt(name=def_name, description=desc, bases=list(bases))
+    _set_if_features_from_xyang(ident, xyang)
+    return ident
 
 
 def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
@@ -384,6 +404,7 @@ def _parse_hoisted_choice_oneof(
     mandatory: bool | None,
     choice_name: str = "hoisted-choice",
     choice_description: str = "",
+    choice_xyang_meta: dict[str, Any] | None = None,
 ) -> list[YangStatement]:
     """
     Rebuild hoisted YANG choice from ``oneOf`` on the parent object.
@@ -392,6 +413,9 @@ def _parse_hoisted_choice_oneof(
     branches), then a single ``YangChoiceStmt``. YANG choices are not instance
     nodes; case keys sit beside sibling leaves in instance data.
     """
+    meta: dict[str, Any] = (
+        choice_xyang_meta if isinstance(choice_xyang_meta, dict) else {}
+    )
     branches = [b for b in one_of if isinstance(b, dict)]
     branches_with_props = [b for b in branches if not _empty_optional_choice_branch(b)]
     if not branches_with_props:
@@ -467,9 +491,11 @@ def _parse_hoisted_choice_oneof(
             case_desc = branch.get(JsonSchemaKey.DESCRIPTION)
             if not isinstance(case_desc, str):
                 case_desc = ""
-            cases.append(
-                YangCaseStmt(name=case_name, description=case_desc, statements=case_statements)
+            case_stmt = YangCaseStmt(
+                name=case_name, description=case_desc, statements=case_statements
             )
+            _set_if_features_from_xyang(case_stmt, b_xyang)
+            cases.append(case_stmt)
 
     choice_stmt = YangChoiceStmt(
         name=choice_name,
@@ -477,6 +503,7 @@ def _parse_hoisted_choice_oneof(
         mandatory=mandatory,
         cases=cases,
     )
+    _set_if_features_from_xyang(choice_stmt, meta)
     choice_stmt.validate_case_unique_child_names()
     return [*common_children, choice_stmt]
 
@@ -506,6 +533,7 @@ def _convert_container(
             mandatory=man,
             choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
             choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+            choice_xyang_meta=meta,
         )
     else:
         child_statements = []
@@ -527,6 +555,7 @@ def _convert_container(
         c.when = when_stmt
     if xyang.get(XYangKey.PRESENCE) is not None:
         c.presence = xyang.get(XYangKey.PRESENCE)
+    _set_if_features_from_xyang(c, xyang)
     return c
 
 
@@ -558,6 +587,7 @@ def _convert_list(
             mandatory=man,
             choice_name=str(meta.get(JsonSchemaKey.NAME) or "hoisted-choice"),
             choice_description=str(meta.get(JsonSchemaKey.DESCRIPTION) or ""),
+            choice_xyang_meta=meta,
         )
     else:
         child_statements = []
@@ -581,6 +611,7 @@ def _convert_list(
         lst.min_elements = int(schema[JsonSchemaKey.MIN_ITEMS])
     if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
         lst.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
+    _set_if_features_from_xyang(lst, xyang)
     return lst
 
 
@@ -625,6 +656,7 @@ def _convert_leaf(
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         leaf.when = when_stmt
+    _set_if_features_from_xyang(leaf, xyang)
     return leaf
 
 
@@ -651,6 +683,7 @@ def _convert_anydata_anyxml(
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         node.when = when_stmt
+    _set_if_features_from_xyang(node, xyang)
     return node
 
 
@@ -683,6 +716,7 @@ def _convert_leaf_list(
         ll.min_elements = int(schema[JsonSchemaKey.MIN_ITEMS])
     if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
         ll.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
+    _set_if_features_from_xyang(ll, xyang)
     return ll
 
 
@@ -727,10 +761,15 @@ def _convert_choice(
         case_desc = case_schema.get(JsonSchemaKey.DESCRIPTION)
         if not isinstance(case_desc, str):
             case_desc = ""
-        cases.append(YangCaseStmt(name=case_name, description=case_desc, statements=case_statements))
+        case_stmt = YangCaseStmt(
+            name=case_name, description=case_desc, statements=case_statements
+        )
+        _set_if_features_from_xyang(case_stmt, case_xyang)
+        cases.append(case_stmt)
     choice_stmt = YangChoiceStmt(
         name=name, description=description, mandatory=mandatory, cases=cases
     )
+    _set_if_features_from_xyang(choice_stmt, xyang)
     choice_stmt.validate_case_unique_child_names()
     return choice_stmt
 

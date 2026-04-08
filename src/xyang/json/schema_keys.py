@@ -64,6 +64,7 @@ class XYangKey:
     PRESENCE = "presence"
     MANDATORY = "mandatory"
     CHOICE = "choice"
+    IF_FEATURES = "if-features"
     MODULE = "module"
     YANG_VERSION = "yang-version"
     NAMESPACE = "namespace"

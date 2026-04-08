@@ -213,7 +213,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |
 | Must constraints | — | ✅ `must`: array of expression + error-message + description |
 | When conditions | — | ✅ `when`: object `{ "condition": "<xpath>" }` with optional `"description"` (RFC-style substatement text) |
-| If-feature | — | Not emitted in `x-yang` yet (validation uses the YANG AST / `DocumentValidator` only) |
+| If-feature | — | `if-features`: array of strings (one per `if-feature` substatement, AND in YANG order) on data nodes, hoisted `choice` metadata, choice `oneOf` case branches, and identity `$defs` |
 | Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
 
 ### Leafref in hybrid form

@@ -66,6 +66,14 @@ def _mandatory_schema_child(stmt: YangStatement) -> bool:
     )
 
 
+def _if_features_for_xyang(obj: Any) -> list[str] | None:
+    """Return ``if-features`` array for x-yang, or None when empty."""
+    raw = getattr(obj, "if_features", None) or []
+    if not raw:
+        return None
+    return list(raw)
+
+
 def _bits_space_separated_pattern(bit_names: list[str]) -> str:
     """JSON Schema ``pattern`` for a YANG ``bits`` value: space-separated bit names (any order).
 
@@ -392,6 +400,7 @@ def _build_xyang(
     presence: str | None = None,
     *,
     mandatory: bool | None = None,
+    if_features: list[str] | None = None,
 ) -> dict[str, Any]:
     """Build x-yang object for a node."""
     xyang: dict[str, Any] = {XYangKey.TYPE: node_type}
@@ -405,6 +414,8 @@ def _build_xyang(
         xyang[XYangKey.PRESENCE] = presence
     if mandatory is True:
         xyang[XYangKey.MANDATORY] = True
+    if if_features:
+        xyang[XYangKey.IF_FEATURES] = list(if_features)
     return xyang
 
 
@@ -481,11 +492,15 @@ def _merge_oneof_branches_with_base(
 
 def _choice_meta_xyang(choice_stmt: YangChoiceStmt) -> dict[str, Any]:
     """x-yang.choice metadata for hoisted (sibling-less or merged) choices."""
-    return {
+    meta: dict[str, Any] = {
         JsonSchemaKey.NAME: choice_stmt.name,
         JsonSchemaKey.DESCRIPTION: choice_stmt.description or "",
         XYangKey.MANDATORY: bool(getattr(choice_stmt, "mandatory", False)),
     }
+    ff = _if_features_for_xyang(choice_stmt)
+    if ff:
+        meta[XYangKey.IF_FEATURES] = ff
+    return meta
 
 
 def _choice_to_object_body(
@@ -517,17 +532,22 @@ def _choice_to_object_body(
             case_entries.append((case, case_props, case_keys))
     out: dict[str, Any] = {JsonSchemaKey.DESCRIPTION: choice_stmt.description or ""}
     mandatory = getattr(choice_stmt, "mandatory", False)
-    case_branch = [
-        {
-            JsonSchemaKey.TYPE: "object",
-            JsonSchemaKey.DESCRIPTION: (case_st.description or ""),
-            JsonSchemaKey.PROPERTIES: cp,
-            JsonSchemaKey.REQUIRED: list(keys),
-            JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
-            JsonSchemaKey.X_YANG: {JsonSchemaKey.NAME: case_st.name},
-        }
-        for case_st, cp, keys in case_entries
-    ]
+    case_branch = []
+    for case_st, cp, keys in case_entries:
+        case_xy: dict[str, Any] = {JsonSchemaKey.NAME: case_st.name}
+        ff = _if_features_for_xyang(case_st)
+        if ff:
+            case_xy[XYangKey.IF_FEATURES] = ff
+        case_branch.append(
+            {
+                JsonSchemaKey.TYPE: "object",
+                JsonSchemaKey.DESCRIPTION: (case_st.description or ""),
+                JsonSchemaKey.PROPERTIES: cp,
+                JsonSchemaKey.REQUIRED: list(keys),
+                JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
+                JsonSchemaKey.X_YANG: case_xy,
+            }
+        )
     if mandatory and case_entries:
         out[JsonSchemaKey.ONE_OF] = case_branch
     elif not mandatory and len(case_entries) > 1:
@@ -576,6 +596,7 @@ def _container_stmt_to_property(
                 must_list=getattr(stmt, "must_statements", None) or [],
                 when_stmt=when_stmt,
                 presence=getattr(stmt, "presence", None),
+                if_features=_if_features_for_xyang(stmt),
             ),
             XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
         }
@@ -613,6 +634,7 @@ def _container_stmt_to_property(
                 must_list=getattr(stmt, "must_statements", None) or [],
                 when_stmt=when_stmt,
                 presence=getattr(stmt, "presence", None),
+                if_features=_if_features_for_xyang(stmt),
             ),
             XYangKey.CHOICE: _choice_meta_xyang(ch0),
         }
@@ -638,6 +660,7 @@ def _container_stmt_to_property(
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=when_stmt,
             presence=getattr(stmt, "presence", None),
+            if_features=_if_features_for_xyang(stmt),
         ),
     }
     if props:
@@ -724,6 +747,7 @@ def _list_stmt_to_property(
         key=stmt.key,
         must_list=getattr(stmt, "must_statements", None) or [],
         when_stmt=when_stmt,
+        if_features=_if_features_for_xyang(stmt),
     )
     items, choice_overlay = _list_items_object_schema(
         list_children, stmt, typedef_names, module
@@ -760,6 +784,7 @@ def _leaf_stmt_to_property(
                 must_list=getattr(stmt, "must_statements", None) or [],
                 when_stmt=when_stmt,
                 mandatory=stmt.mandatory or None,
+                if_features=_if_features_for_xyang(stmt),
             ),
         }
     else:
@@ -775,6 +800,7 @@ def _leaf_stmt_to_property(
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=when_stmt,
             mandatory=stmt.mandatory or None,
+            if_features=_if_features_for_xyang(stmt),
         )
         # Preserve leafref (type, path, require-instance) from type_schema x-yang
         if type_schema.get(JsonSchemaKey.X_YANG):
@@ -806,6 +832,7 @@ def _anydata_anyxml_stmt_to_property(
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=when_stmt,
             mandatory=stmt.mandatory or None,
+            if_features=_if_features_for_xyang(stmt),
         ),
     }
 
@@ -833,6 +860,7 @@ def _leaf_list_stmt_to_property(
             "leaf-list",
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=when_stmt,
+            if_features=_if_features_for_xyang(stmt),
         ),
     }
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
@@ -850,13 +878,17 @@ def _choice_stmt_to_property(
 ) -> dict[str, Any]:
     anchor = parent if parent is not None else module
     body = _choice_to_object_body(stmt, typedef_names, module, leafref_parent=anchor)
+    xy_choice: dict[str, Any] = {
+        XYangKey.TYPE: "choice",
+        XYangKey.MANDATORY: bool(getattr(stmt, "mandatory", False)),
+    }
+    ff = _if_features_for_xyang(stmt)
+    if ff:
+        xy_choice[XYangKey.IF_FEATURES] = ff
     out = {
         JsonSchemaKey.TYPE: "object",
         JsonSchemaKey.DESCRIPTION: body.get(JsonSchemaKey.DESCRIPTION, ""),
-        JsonSchemaKey.X_YANG: {
-            XYangKey.TYPE: "choice",
-            XYangKey.MANDATORY: bool(getattr(stmt, "mandatory", False)),
-        },
+        JsonSchemaKey.X_YANG: xy_choice,
     }
     if body.get(JsonSchemaKey.PROPERTIES):
         out[JsonSchemaKey.PROPERTIES] = body[JsonSchemaKey.PROPERTIES]
@@ -898,6 +930,11 @@ def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) 
         JsonSchemaKey.X_YANG: {
             XYangKey.TYPE: XYangTypeValue.IDENTITY,
             XYangKey.BASES: list(identity.bases),
+            **(
+                {XYangKey.IF_FEATURES: list(identity.if_features)}
+                if identity.if_features
+                else {}
+            ),
         },
     }
 
