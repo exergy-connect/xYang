@@ -41,7 +41,7 @@ pip install -e .
 
 There are **no required runtime dependencies**. For **`xyang validate`** with **`.yaml` / `.yml`** instance files, install **PyYAML** (`pip install PyYAML` or `pip install -e ".[dev]"`).
 
-**Requirements:** Python **≥ 3.8** (see `pyproject.toml`).
+**Requirements:** Python **≥ 3.9** (see `pyproject.toml`).
 
 ---
 
