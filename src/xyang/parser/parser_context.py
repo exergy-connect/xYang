@@ -101,6 +101,8 @@ class YangTokenType(Enum):
     LIST = "list"
     LEAF = "leaf"
     LEAF_LIST = "leaf-list"
+    ANYDATA = "anydata"
+    ANYXML = "anyxml"
     CHOICE = "choice"
     CASE = "case"
     MUST = "must"

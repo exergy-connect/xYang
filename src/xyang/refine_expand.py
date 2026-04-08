@@ -8,6 +8,8 @@ from typing import List, cast
 
 from .errors import YangRefineTargetNotFoundError
 from .ast import (
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -196,7 +198,14 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
         )
     if isinstance(
         stmt,
-        (YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt),
+        (
+            YangContainerStmt,
+            YangListStmt,
+            YangLeafStmt,
+            YangLeafListStmt,
+            YangAnydataStmt,
+            YangAnyxmlStmt,
+        ),
     ):
         must = list(stmt.must_statements) if stmt.must_statements else []
         return replace(

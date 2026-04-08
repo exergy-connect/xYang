@@ -15,6 +15,8 @@ from typing import Any
 
 from ..module import YangModule
 from ..ast import (
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangBitStmt,
     YangCaseStmt,
     YangChoiceStmt,
@@ -626,6 +628,32 @@ def _convert_leaf(
     return leaf
 
 
+def _convert_anydata_anyxml(
+    name: str,
+    schema: dict[str, Any],
+    xyang: dict[str, Any],
+    mandatory_override: bool | None,
+    must_list: list[YangMustStmt],
+    *,
+    as_anyxml: bool,
+) -> YangAnydataStmt | YangAnyxmlStmt:
+    """Convert a property with x-yang type anydata or anyxml."""
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    if mandatory_override is not None:
+        mandatory = mandatory_override
+    elif xyang.get(XYangKey.MANDATORY) is True:
+        mandatory = True
+    else:
+        mandatory = name in (schema.get(JsonSchemaKey.REQUIRED) or [])
+    cls = YangAnyxmlStmt if as_anyxml else YangAnydataStmt
+    node = cls(name=name, description=description, mandatory=mandatory)
+    node.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        node.when = when_stmt
+    return node
+
+
 def _convert_leaf_list(
     name: str,
     schema: dict[str, Any],
@@ -713,7 +741,16 @@ def _convert_property(
     defs: dict[str, Any],
     parent_path: str,
     mandatory_override: bool | None = None,
-) -> YangContainerStmt | YangListStmt | YangLeafStmt | YangLeafListStmt | YangChoiceStmt | None:
+) -> (
+    YangContainerStmt
+    | YangListStmt
+    | YangLeafStmt
+    | YangLeafListStmt
+    | YangChoiceStmt
+    | YangAnydataStmt
+    | YangAnyxmlStmt
+    | None
+):
     """Convert one JSON schema property to a YANG AST statement. Returns None if not x-yang mapped."""
     schema, xyang = _property_schema_and_xyang(prop_value, defs)
     node_type = xyang.get(XYangKey.TYPE)
@@ -723,7 +760,14 @@ def _convert_property(
         node_type = "leaf"
     if node_type == XYangTypeValue.INSTANCE_IDENTIFIER:
         node_type = "leaf"
-    must_list = _build_must_list(xyang) if node_type in ("leaf", "leaf-list", "container", "list") else []
+    must_list = _build_must_list(xyang) if node_type in (
+        "leaf",
+        "leaf-list",
+        "container",
+        "list",
+        XYangTypeValue.ANYDATA,
+        XYangTypeValue.ANYXML,
+    ) else []
 
     if node_type == "container":
         return _convert_container(name, schema, xyang, defs, parent_path, must_list)
@@ -735,6 +779,14 @@ def _convert_property(
         return _convert_leaf_list(name, schema, xyang, defs, must_list)
     if node_type == "choice":
         return _convert_choice(name, schema, xyang, defs, parent_path)
+    if node_type == XYangTypeValue.ANYDATA:
+        return _convert_anydata_anyxml(
+            name, schema, xyang, mandatory_override, must_list, as_anyxml=False
+        )
+    if node_type == XYangTypeValue.ANYXML:
+        return _convert_anydata_anyxml(
+            name, schema, xyang, mandatory_override, must_list, as_anyxml=True
+        )
     return None
 
 

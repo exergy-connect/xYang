@@ -80,6 +80,8 @@ class XYangTypeValue:
     IDENTITYREF = "identityref"
     INSTANCE_IDENTIFIER = "instance-identifier"
     BITS = "bits"
+    ANYDATA = "anydata"
+    ANYXML = "anyxml"
 
 
 class XYangMustEntryKey:

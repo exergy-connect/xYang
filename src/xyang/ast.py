@@ -75,6 +75,10 @@ class YangStatementWithWhen(YangStatement):
     # RFC 7950 / 7952: one or more ``if-feature`` substatements (AND of expressions).
     if_features: List[str] = field(default_factory=list)
 
+    def get_schema_node(self) -> Optional[str]:
+        """Default for data-shaped nodes: instance key is ``name``. Override when not a data node."""
+        return self.name or None
+
 
 @dataclass
 class YangTypedefStmt(YangStatement):
@@ -129,9 +133,6 @@ class YangContainerStmt(YangStatementWithMust, YangStatementWithWhen):
     """Container statement."""
     presence: Optional[str] = None
 
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
-
 
 @dataclass
 class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
@@ -139,9 +140,6 @@ class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
-
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
 
 
 @dataclass
@@ -151,9 +149,6 @@ class YangLeafStmt(YangStatementWithMust, YangStatementWithWhen):
     mandatory: bool = False
     default: Optional[Any] = None
 
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
-
 
 @dataclass
 class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
@@ -162,8 +157,19 @@ class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
 
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
+
+@dataclass
+class YangAnydataStmt(YangStatementWithMust, YangStatementWithWhen):
+    """Anydata statement (RFC 7950 §7.12); instance is an arbitrary JSON-compatible value."""
+
+    mandatory: bool = False
+
+
+@dataclass
+class YangAnyxmlStmt(YangStatementWithMust, YangStatementWithWhen):
+    """Anyxml statement (RFC 7950 §7.11, deprecated in YANG 1.1); treated like anydata for JSON."""
+
+    mandatory: bool = False
 
 
 @dataclass
@@ -253,9 +259,6 @@ class YangChoiceStmt(YangStatementWithWhen):
     mandatory: bool = False
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
-
     def child_names(self, data: dict) -> set[str]:
         for case in self.cases:
             if any(getattr(s, "name", None) in data for s in case.statements):
@@ -283,9 +286,6 @@ class YangChoiceStmt(YangStatementWithWhen):
 @dataclass
 class YangCaseStmt(YangStatementWithWhen):
     """Case statement - defines one alternative in a choice."""
-
-    def get_schema_node(self) -> Optional[str]:
-        return self.name or None
 
     def child_names(self, data: dict) -> set[str]:
         return {s.name for s in self.statements if getattr(s, "name", None)}

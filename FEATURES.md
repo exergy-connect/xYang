@@ -43,6 +43,7 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `list` - List statements (with key)
 - ✅ `leaf` - Leaf statements
 - ✅ `leaf-list` - Leaf-list statements
+- ✅ `anydata` / `anyxml` — Parsed; instance values are any JSON-compatible shape (no inner schema). `DocumentValidator` enforces presence, `when`, `must`, `if-feature`, and `mandatory` only. JSON Schema uses an open multi-type union plus `x-yang.type` `anydata` / `anyxml` for round-trip.
 - ✅ `choice` - Choice statements (mutually exclusive alternatives)
 - ✅ `case` - Case statements (choice alternatives)
 - ✅ `grouping` - Grouping statements (defines reusable schema components)
@@ -51,10 +52,10 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 
 ### Constraints
 - ✅ `must` - Must constraints (19 `must "` substatements) - **Parsed and evaluated**
-  - Supports must constraints on containers, lists, leaves, and leaf-lists
+  - Supports must constraints on containers, lists, leaves, leaf-lists, `anydata`, and `anyxml`
   - Supports must constraints on lists containing leafref types
   - `current()` correctly refers to list item context in list must constraints
-- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports for **data nodes**: `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, and `uses` (not on `refine`). `augment` accepts `when` in the parse tree, but augment targets are **not** merged into the instance-validation schema (see **Features NOT Implemented**).
+- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports for **data nodes**: `container`, `leaf`, `leaf-list`, `list`, `anydata`, `anyxml`, `choice`, `case`, and `uses` (not on `refine`). `augment` accepts `when` in the parse tree, but augment targets are **not** merged into the instance-validation schema (see **Features NOT Implemented**).
 - ✅ `if-feature` - **Parsed** on `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses`, `refine`, `augment`, `identity`, and braced `feature`; **boolean expressions** (`and` / `or` / `not`, parentheses, `prefix:feature`) evaluated for **document validation** via `DocumentValidator(..., enabled_features_by_module=...)`. `uses` / `refine` `if-feature` values are ANDed onto expanded grouping nodes; `copy_yang_statement` preserves `if_features` through `uses` expansion. Feature-level `if-feature` substatements prune `build_enabled_features_map()` (RFC 7950 §7.20.1). **Not** emitted in JSON Schema `x-yang` yet.
 - ✅ `mandatory` - Mandatory fields (16 occurrences)
   - Supports mandatory on choice statements (exactly one case must be present)
@@ -105,7 +106,6 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 - ❌ `deviation` — Deviations
 - ❌ `extension` — Extension statements (and extension-defined syntax)
 - ❌ `rpc`, `action`, `notification`, `input`, `output` — RPC/action/notification modeling
-- ❌ `anydata`, `anyxml`
 
 Other reserved built-in type names may parse but lack full validation or JSON Schema parity; see **Built-in Types** and sections above.
 

@@ -9,6 +9,8 @@ from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
     YangBitStmt,
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangIdentityStmt,
@@ -546,6 +548,18 @@ class StatementParsers:
             tokens, context, "leaf-list", YangLeafListStmt(name=leaf_list_name), leaf_list_name
         )
 
+    def parse_anydata(self, tokens: TokenStream, context: ParserContext) -> YangAnydataStmt:
+        """Parse anydata statement (RFC 7950 §7.12)."""
+        tokens.consume_type(YangTokenType.ANYDATA)
+        n = tokens.consume()
+        return self._parse_block(tokens, context, "anydata", YangAnydataStmt(name=n), n)
+
+    def parse_anyxml(self, tokens: TokenStream, context: ParserContext) -> YangAnyxmlStmt:
+        """Parse anyxml statement (RFC 7950 §7.11)."""
+        tokens.consume_type(YangTokenType.ANYXML)
+        n = tokens.consume()
+        return self._parse_block(tokens, context, "anyxml", YangAnyxmlStmt(name=n), n)
+
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
         tokens.consume_type(YangTokenType.TYPE)
@@ -766,11 +780,12 @@ class StatementParsers:
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse mandatory in leaf statement."""
+        """Parse mandatory in leaf / anydata / anyxml."""
         tokens.consume_type(YangTokenType.MANDATORY)
-        if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
+        parent = context.current_parent
+        if isinstance(parent, (YangLeafStmt, YangAnydataStmt, YangAnyxmlStmt)):
             _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
-            context.current_parent.mandatory = tt == YangTokenType.TRUE
+            parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_leaf_default(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -897,6 +912,10 @@ class StatementParsers:
                         self.parse_uses(tokens, new_context)
                     elif pt == YangTokenType.DESCRIPTION:
                         self.parse_description(tokens, new_context)
+                    elif pt == YangTokenType.ANYDATA:
+                        self.parse_anydata(tokens, new_context)
+                    elif pt == YangTokenType.ANYXML:
+                        self.parse_anyxml(tokens, new_context)
                     else:
                         raise tokens._make_error(f"Unknown statement in grouping '{grouping_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
@@ -1001,6 +1020,10 @@ class StatementParsers:
                     self.parse_choice(tokens, new_context)
                 elif tokens.peek_type() == YangTokenType.DESCRIPTION:
                     self.parse_description(tokens, new_context)
+                elif tokens.peek_type() == YangTokenType.ANYDATA:
+                    self.parse_anydata(tokens, new_context)
+                elif tokens.peek_type() == YangTokenType.ANYXML:
+                    self.parse_anyxml(tokens, new_context)
                 else:
                     raise tokens._make_error(f"Unknown statement in case '{case_name}': {tokens.peek()}")
             tokens.consume_type(YangTokenType.RBRACE)
