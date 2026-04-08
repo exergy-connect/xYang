@@ -155,7 +155,7 @@ bit_substmt   = "position" INTEGER [ ";" ]
 
 **Enumeration:** `type enumeration {` **enum-specification** `}` where **enum-specification** is **one or more** **enum-stmt** (each `enum` *enum-name* `;`, or a braced variant if supported). The parser currently takes a single token per `enum` name then `;` (optional nested description blocks are limited; see `parse_type_enum`).
 
-**Bits:** `type bits {` one or more `bit` *name* `;` or `bit` *name* `{` `position` *integer* `;` [ `description` … ] `}` `}`. Implicit `position` values follow RFC 7950 (see `StatementParsers._finalize_bits_type`). Instance JSON: a single string, space-separated bit names.
+**Bits:** `type bits {` one or more `bit` *name* `;` or `bit` *name* `{` `position` *integer* `;` [ `description` … ] `}` `}`. Implicit `position` values follow RFC 7950 (see `StatementParsers._finalize_bits_type`). Instance JSON: a single string, space-separated bit names. In generated JSON Schema, `x-yang.bits` is an object mapping each bit name to its integer position (legacy array-of-objects input is still parsed).
 
 **String:** optional `{ length … ; pattern … ; description … }`.
 

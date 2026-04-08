@@ -129,9 +129,20 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             require_instance=bool(require),
         )
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.BITS:
-        raw = xyang.get(XYangKey.BITS) or []
+        raw = xyang.get(XYangKey.BITS)
         bits: list[YangBitStmt] = []
-        if isinstance(raw, list):
+        if isinstance(raw, dict):
+            for name, pos in raw.items():
+                if not isinstance(name, str) or not name:
+                    continue
+                try:
+                    p = int(pos)
+                except (TypeError, ValueError):
+                    continue
+                bits.append(YangBitStmt(name=name, position=p))
+            bits.sort(key=lambda b: (b.position if b.position is not None else 0, b.name))
+        elif isinstance(raw, list):
+            # Legacy: [{ "name", "position" }, …] or bare names with index as position
             for i, item in enumerate(raw):
                 if isinstance(item, dict):
                     nm = item.get("name")

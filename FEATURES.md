@@ -28,7 +28,7 @@ Validation / JSON Schema coverage varies by type; commonly used in `meta-model.y
 - ✅ `boolean` - Boolean type
 - ✅ `decimal64` - Decimal64 type (3 occurrences)
 - ✅ `empty` - Empty type (presence-only leaf; validated)
-- ✅ `bits` - Bits type (RFC 7950 §9.3.4): `bit` / optional `position`; implicit positions per RFC; instance value is a **string** of space-separated bit names (empty string = no bits set); JSON Schema uses `type: "string"` plus `x-yang.type: "bits"` and `x-yang.bits` as `[{ "name", "position" }, …]` for generator/parser round-trip
+- ✅ `bits` - Bits type (RFC 7950 §9.3.4): `bit` / optional `position`; implicit positions per RFC; instance value is a **string** of space-separated bit names (empty string = no bits set); JSON Schema uses `type: "string"` plus `x-yang.type: "bits"` and `x-yang.bits` as an object **bit name → position** (integer) for generator/parser round-trip (legacy list form is still accepted on parse)
 
 ### Derived Types
 - ✅ `enumeration` - Enumeration type (6 `type enumeration` typedef bodies) (built-in keyword; `enum` is the substatement keyword inside the block). The meta-model’s `primitive-type-name` enumeration includes **year** (calendar year) alongside string, integer, number, boolean, array, datetime, date, duration_in_days, and qualified types.

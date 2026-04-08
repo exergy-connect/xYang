@@ -77,7 +77,9 @@ module x {
 }
 """
     module = parse_yang_string(yang)
-    by_name = {b.name: b.position for b in module.typedefs["t"].type.bits}
+    td = module.typedefs["t"]
+    assert td.type is not None
+    by_name = {b.name: b.position for b in td.type.bits}
     assert by_name == {"early": 0, "late": 5}
 
 
@@ -146,6 +148,10 @@ def test_bits_json_schema_roundtrip():
     module = p.parse_string(BITS_TYPEDEF_MODULE)
     text = schema_to_yang_json(module)
     data = json.loads(text)
+    bits_xyang = (data.get("$defs") or {}).get("flags", {}).get("x-yang") or {}
+    assert bits_xyang.get("type") == "bits"
+    assert isinstance(bits_xyang.get("bits"), dict)
+    assert bits_xyang["bits"] == {"execute": 0, "read": 2, "write": 3}
     roundtrip = parse_json_schema(data)
     t1 = module.typedefs["flags"].type
     t2 = roundtrip.typedefs["flags"].type
