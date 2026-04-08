@@ -67,10 +67,6 @@ pyang --strict path/to/module.yang
 
 xyang and `pyang` may disagree on edge cases; use `pyang` as supplementary unless the goal is strict IETF tooling parity.
 
-## When the user points at a netlab topology YAML
-
-`xyang validate` only checks data against the **YANG module**; it does **not** turn a stock netlab lab file into that shape. A typical `topology.yml` is a **different encoding** than something like `netlab-topology-lab` expects (e.g. `groups` / `nodes` / `validate` as **maps** vs the module’s **lists** keyed by `name`; `links` as loose dicts vs `links[]` with `name` + `endpoint[]`; `addressing` as a map of pool names vs `addressing.pool[]` entries with a `name` leaf; dotted YAML keys like `defaults.sources.extra` vs nested objects `defaults` → `sources` → `extra`). Either **normalize** in tooling and then validate the result, or author instance JSON/YAML that already matches the module. Use the module’s description and `FEATURES.md`; run **`xyang validate`** on the normalized instance—do not claim success without running it.
-
 ## Agent checklist
 
 1. **Environment:** `pip install -e .` from repo root, **or** `PYTHONPATH` includes **`<repo>/src`**.
