@@ -1,49 +1,64 @@
 # xYang
 
-xYang implements exactly the YANG and XPath features required to correctly validate `examples/meta-model.yang`. This is a narrower scope than full YANG 1.1 compliance, but a deeper implementation than a generic subset library — particularly around `deref()` chaining, union type coercion, and `current()` scoping in leaf-list constraints.
+**YANG models, validated JSON, and JSON Schema—without dragging in a full management stack.**
 
-## Features
+xYang is a pure-Python library and CLI for **parsing YANG 1.1-shaped modules**, **validating instance data** against `must` / `when` / types / leafrefs, and **exporting** a standards-friendly **JSON Schema (2020-12)** layer augmented with **`x-yang`** metadata so tools can round-trip where supported. It is built for real modules (the project’s reference design is [`examples/meta-model.yang`](examples/meta-model.yang)), with **deep** handling of the hard parts—**`deref()`** resolution tied to schema paths, **union** typing, and **`current()`** in list and leaf-list contexts—not a shallow syntax sketch.
 
-xYang implements the YANG and XPath subset needed to validate `examples/meta-model.yang`. The list below is a short overview; [FEATURES.md](FEATURES.md) matches the module line by line.
+- **Zero required runtime dependencies** — drop into apps, agents, and pipelines with minimal footprint.
+- **Honest scope** — not every RFC 7950 statement is modeled; what *is* implemented is described precisely in [**FEATURES.md**](FEATURES.md) (including `import` / `include`, `if-feature`, `anydata` / `anyxml`, and JSON `if-features` round-trip). Constructs such as `rpc`, `notification`, and `deviation` are **recognized and skipped** with a log warning so mixed modules still parse.
+- **MIT licensed** — use it in products and internal tools alike.
 
-- **Module Structure**: Module definition with yang-version, namespace, prefix, organization, contact, description, revision
-- **Type Definitions**: Typedef statements with type constraints
-- **Built-in Types**: e.g. `string`, `int32`, `uint8`, `boolean`, `decimal64`, `empty`, `identityref`, `instance-identifier`, `leafref` as in meta-model; the lexer recognizes the full RFC 7950 built-in set—validation depth varies by type ([FEATURES.md](FEATURES.md))
-- **Derived Types**: enumeration, union (including union members that are leafrefs)
-- **Data Structures**: Container, list (with `key`), leaf, leaf-list; `choice` / `case`; `grouping` / `uses` / `refine`
-- **Constraints**: 
-  - `must` statements (evaluated using XPath)
-  - `when` conditions (evaluated using XPath)
-  - `mandatory`, `default`, `min-elements`, `max-elements`
-  - Type constraints: `pattern`, `length`, `range`, `fraction-digits`
-- **Type References**: Leafref with path and require-instance
-- **Identity** (single module): `identity` / `base`, `identityref`, XPath `derived-from()` / `derived-from-or-self()`
-- **Container Presence**: Presence statements
-- **CLI**: `xyang` with `parse`, `validate`, `convert` (YANG → `.yang.json`)
-- **JSON Schema export**: YANG → JSON Schema (draft 2020-12) with `x-yang` annotations; see [FEATURES.md](FEATURES.md#yangjson-hybrid-format) for the hybrid format
+**Repository:** [github.com/exergy-connect/xYang](https://github.com/exergy-connect/xYang) · **Issues:** [github.com/exergy-connect/xYang/issues](https://github.com/exergy-connect/xYang/issues)
+
+---
+
+## Features (overview)
+
+The list below is the short version; [**FEATURES.md**](FEATURES.md) is the authoritative, line-by-line feature matrix and documents the **YANG.json** hybrid format.
+
+- **Module structure**: `module` / `submodule`, `yang-version`, `namespace`, `prefix`, metadata, `revision`, `import`, `include`, `feature`
+- **Types**: `typedef`, built-in and derived types (`enumeration`, `union`, leafrefs inside unions, etc.); lexer knows the full RFC 7950 built-in name set—**validation depth varies by type** (see FEATURES.md)
+- **Data nodes**: `container`, `list` + `key`, `leaf`, `leaf-list`, `choice` / `case`, `anydata` / `anyxml`, `grouping` / `uses` / `refine`, `augment` (merge when uses expansion is enabled)
+- **Constraints**: `must`, `when`, `if-feature`, `mandatory`, `default`, `min-elements` / `max-elements`, `pattern`, `length`, `range`, `fraction-digits`
+- **References**: `leafref` (+ `require-instance`), `instance-identifier`, `identityref`, `identity` / `base`, XPath `derived-from()` / `derived-from-or-self()`
+- **Interop**: **`xyang`** CLI (`parse`, `validate`, `convert`) and **JSON Schema** export with **`x-yang`** annotations for generator/parser round-trip where supported
+
+---
 
 ## Installation
+
+**From PyPI** (when published):
+
+```bash
+pip install xYang
+```
+
+**From a checkout** (editable, for development):
 
 ```bash
 pip install -e .
 ```
 
-The library has **no required runtime dependencies** (`pyproject.toml`). For `xyang validate` with a **`.yaml` / `.yml` instance file**, install **PyYAML** (`pip install PyYAML` or `pip install -e ".[dev]"`).
+There are **no required runtime dependencies**. For **`xyang validate`** with **`.yaml` / `.yml`** instance files, install **PyYAML** (`pip install PyYAML` or `pip install -e ".[dev]"`).
+
+**Requirements:** Python **≥ 3.8** (see `pyproject.toml`).
+
+---
 
 ## Usage
 
-### Command-line (xyang)
+### Command-line (`xyang`)
 
 ```bash
 xyang -h                    # help
 xyang parse <file.yang>     # print module info
 xyang validate <file.yang> [data.json]  # or .yaml/.yml (needs PyYAML); omit file → JSON from stdin
-xyang convert <file.yang> [-o path]     # convert .yang to .yang.json (output path always ends with .yang.json)
+xyang convert <file.yang> [-o path]     # YANG → .yang.json (output path ends with .yang.json)
 ```
 
-Without installing, run from the repo root: `PYTHONPATH=src python3 -m xyang -h`
+Without installing the package, from the repo root: `PYTHONPATH=src python3 -m xyang -h`
 
-### Parsing a YANG Module
+### Parsing a YANG module
 
 ```python
 from xyang import parse_yang_file, parse_yang_string
@@ -67,28 +82,21 @@ module example {
 """
 module = parse_yang_string(yang_content)
 
-# Access module properties
 print(f"Module: {module.name}")
 print(f"Namespace: {module.namespace}")
 print(f"Prefix: {module.prefix}")
 ```
 
-### Validating Data
+### Validating data
 
 ```python
 from xyang import parse_yang_file, YangValidator
 
-# Parse module
 module = parse_yang_file("examples/meta-model.yang")
-
-# Create validator
 validator = YangValidator(module)
 
-# Validate data
-# Note: The validator accepts raw consolidated JSON. Type coercion happens
-# inline during XPath evaluation - comparison operators receive schema-type
-# context and perform coercion automatically (e.g., string "true" -> bool True
-# for boolean comparisons, string digits -> int for int32 comparisons).
+# Consolidated JSON document: one tree matching your module’s data layout.
+# XPath comparisons use schema-aware coercion (e.g. string "true" vs boolean leaves).
 data = {
     "data-model": {
         "name": "example",
@@ -109,29 +117,25 @@ if not is_valid:
         print(f"Error: {error}")
 ```
 
-### Working with Types
+### Working with types
 
 ```python
 from xyang import TypeConstraint, TypeSystem
 
-# Create type system
 type_system = TypeSystem()
-
-# Register a typedef
 constraint = TypeConstraint(
     pattern=r'[a-z_][a-z0-9_]*',
     length="1..64"
 )
 type_system.register_typedef("entity-name", "string", constraint)
 
-# Validate a value
 is_valid, error = type_system.validate("server_name", "entity-name")
 print(f"Valid: {is_valid}")
 ```
 
-### Converting YANG to JSON Schema (.yang.json)
+### Converting YANG → JSON Schema (`.yang.json`)
 
-Convert a YANG module to JSON Schema (draft 2020-12) with `x-yang` annotations. Output is valid JSON Schema for structure and types; YANG-specific semantics (leafref, must, when) live in `x-yang` for use by the validator. See [FEATURES.md](FEATURES.md#yangjson-hybrid-format) for the hybrid format.
+Valid **JSON Schema** for structure and types; YANG-only rules (`must`, `when`, leafref paths, `if-features`, …) ride in **`x-yang`**. Details: [FEATURES.md — YANG.json hybrid format](FEATURES.md#yangjson-hybrid-format).
 
 ```python
 from xyang.parser import YangParser
@@ -142,70 +146,62 @@ module = parser.parse_file("examples/meta-model.yang")
 schema_to_yang_json(module, output_path="meta-model.yang.json")
 ```
 
-Or use the CLI: `xyang convert examples/meta-model.yang -o meta-model.yang.json`
+CLI: `xyang convert examples/meta-model.yang -o meta-model.yang.json`
 
-## Project Structure
+---
+
+## Project layout
 
 ```
 xYang/
 ├── src/xyang/
 │   ├── __init__.py      # Package exports
 │   ├── __main__.py      # CLI (parse, validate, convert)
-│   ├── parser/          # YANG parser
-│   ├── json/            # JSON Schema export (generator, parser)
-│   ├── validator/        # Validation engine
-│   ├── xpath/            # XPath implementation
-│   ├── ast.py            # YANG AST nodes
-│   ├── types.py          # Type system
-│   ├── module.py         # Module representation
-│   └── errors.py         # Error classes
-├── examples/
-│   ├── basic_usage.py          # Usage examples
-│   ├── meta-model.yang         # Primary example module
-│   ├── meta-model.yang.json    # Generated JSON Schema
-│   ├── generic-field.yang      # Smaller schema samples
-│   ├── generic-field.yaml
-│   └── identity_roundtrip.yang
-├── tests/               # Test suite
-├── benchmarks/           # Performance benchmarks
+│   ├── parser/          # YANG parser (incl. unsupported-statement skip)
+│   ├── json/            # JSON Schema generator + parser
+│   ├── validator/       # Document validation
+│   ├── xpath/           # XPath for must/when
+│   ├── ast.py           # AST nodes
+│   ├── types.py         # Type system
+│   ├── module.py        # Module model
+│   └── errors.py
+├── examples/            # meta-model.yang, samples, generated .yang.json
+├── tests/
+├── benchmarks/
+├── FEATURES.md          # Full feature list & format spec
 ├── pyproject.toml
-├── FEATURES.md           # Feature list and YANG.json hybrid format
 └── README.md
 ```
 
-## XPath Support
+---
 
-xYang implements exactly the XPath features required to correctly validate `meta-model.yang`:
+## XPath (schema-aware)
 
-- **Path navigation**: `../field`, `../../field`, absolute paths `/data-model/entities`
-- **Functions**: `string()`, `number()`, `concat()`, `string-length()`, `translate()`, `count()`, `deref()`, `current()`, `not()`, `true()`, `false()`, `boolean()`, `derived-from()`, `derived-from-or-self()`
-- **Comparisons**: `=`, `!=`, `<=`, `>=`, `<`, `>`
-- **XPath 2.0-style**: literal sequence on RHS of `=`, e.g. `path = ('integer', 'number')` (true when left equals any item in the sequence)
-- **Logical operators**: `or`, `and`
-- **Filtering**: `[name = current()]`, `[type != 'array']`, `[id = current()]`, `[1]`
-- **String concatenation**: `+` operator
+Coverage matches what **meta-model.yang** needs, evaluated with **schema context** (not a generic XPath 1.0 engine):
 
-The evaluator implements the specific XPath patterns used in `meta-model.yang` with schema-aware evaluation, particularly for `deref()` chaining and `current()` scoping. `deref()` is inherently schema-coupled: when called on a leafref node, it uses the leafref's schema definition path to resolve the referenced node, not heuristic lookups.
+- **Paths**: `../field`, `../../field`, absolute paths such as `/data-model/entities`
+- **Functions**: `string()`, `number()`, `concat()`, `string-length()`, `translate()`, `count()`, **`deref()`**, **`current()`**, `not()`, `true()`, `false()`, `boolean()`, `derived-from()`, `derived-from-or-self()`, …
+- **Comparisons & logic**: `=`, `!=`, `<=`, `>=`, `<`, `>`, `and`, `or`
+- **Literal sequences** (xYang extension): RHS `('a', 'b')` for membership-style equality
+- **Predicates & indexing**: e.g. `[name = current()]`, `[1]`
+- **String concat**: `+` between strings in expressions
 
-## When Conditions
+**`deref()`** on leafref values follows the **leafref’s schema path** to resolve the target node; it supports nesting, caching, and cycle detection for the patterns used in production modules here.
 
-xYang supports `when` statements for conditional validation. When a `when` condition evaluates to `false`, the associated statement (container, leaf, etc.) is skipped during validation:
+---
+
+## When & must (examples)
+
+**When** — if the condition is false, the node is out of the effective schema; data there is reported as invalid:
 
 ```yang
 container item_type {
   when "../type = 'array'";
-  description "Only present when type is array";
-  leaf primitive {
-    type string;
-  }
+  leaf primitive { type string; }
 }
 ```
 
-If `../type = 'array'` is false, the `item_type` container is not validated and is treated as optional. The `when` conditions are evaluated using the XPath evaluator.
-
-## Must Statements
-
-xYang supports `must` statements for constraint validation. `must` statements are evaluated using XPath and validation fails if any `must` constraint evaluates to `false`:
+**Must** — XPath must evaluate true or validation fails (with `error-message` when provided):
 
 ```yang
 leaf minDate {
@@ -216,38 +212,30 @@ leaf minDate {
 }
 ```
 
-If a `must` constraint fails, validation returns an error with the specified error message.
+---
 
-## Limitations
+## Scope & limitations
 
-- **Input contract**: The validator receives a consolidated JSON document. All data must be provided in a single, complete structure — there is no support for validating against source documents or handling partial/incremental data.
-- **Type-aware coercion**: The XPath evaluator's comparison operators receive schema-type context and perform coercion inline. This ensures `boolean()` in XPath sees actual booleans, not strings (e.g., string `"true"` is coerced to `True` during boolean comparisons). For union types, coercion is attempted in declared order, using the first success. The validator accepts raw consolidated JSON - type awareness is pushed to exactly where it's needed (the evaluator).
-- **XPath scope**: Only the XPath features used in `meta-model.yang` are supported. Unsupported expressions will raise `UnsupportedXPathError` at parse time.
-- **deref() implementation**: `deref()` is fully implemented for the patterns used in `meta-model.yang`, including:
-  - **Schema-coupled resolution**: When `deref()` is called on a leafref node, it MUST resolve using the path from the leafref's schema definition, not just return the value. This reinforces that `deref()` is inherently schema-coupled and cannot be implemented without schema context.
-  - Nested chaining: `deref(deref(...))` and deeper nesting
-  - Field node identity: `deref(current())` returns the field node when `current()` is already a node (dict)
-  - Entity and field resolution: resolves entity names and field references by name (for non-leafref cases)
-  - Caching: results are cached for performance
-  - Cycle detection: prevents infinite loops in circular references
-  It requires schema-aware XPath evaluation and is not a general-purpose implementation.
+- **Single JSON instance** — validation is against one consolidated document, not NETCONF/XML fragments or incremental edits.
+- **XPath subset** — unsupported expressions fail at XPath parse time (`UnsupportedXPathError`). Extend the evaluator to add features.
+- **`deref()`** — fully handled for meta-model-style patterns; it remains **schema-coupled** by design, not a standalone generic resolver.
+- **RFC surface** — see [**FEATURES.md**](FEATURES.md) for what is partial, skipped, or out of scope; the parser warns when it skips unsupported top-level-like statements.
 
-## Design Rationale
+## Design choices
 
-**No required third-party libraries**: The `xyang` package is pure Python with an empty `dependencies` list in `pyproject.toml`. Optional **PyYAML** is only needed for YAML instance paths on the `validate` CLI. Full XPath 1.0 coverage was available via `elementpath` but was excluded to keep the core footprint minimal. Expressions outside the supported subset require extending the evaluator.
+**No mandatory third-party stack** — core package dependencies are empty in `pyproject.toml`; optional **PyYAML** only for YAML instances on the CLI. That keeps xYang easy to embed and audit.
+
+---
 
 ## Development
 
 ```bash
-# Install development dependencies
 pip install -e ".[dev]"
-
-# Run tests
 pytest
-
-# Format code
 black src/xyang/
 ```
+
+---
 
 ## License
 
