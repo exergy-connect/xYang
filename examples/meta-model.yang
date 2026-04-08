@@ -5,7 +5,47 @@ module meta-model {
 
   organization "Exergy LLC";
   contact "Exergy.connect@gmail.com";
-  description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys always reference the primary key of the referenced entity.";
+  description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys reference the primary key of the referenced entity by default; optional ``field`` names a different target field that must be marked ``unique`` (alternate key).";
+
+  revision "2026-04-14" {
+    description
+      "Broaden the shared entity-reference pattern for reuse beyond array fields and align its public name with that role.";
+  }
+
+  revision "2026-04-13" {
+    description
+      "Model references to entity types inside array-valued fields with a dedicated, typed pattern instead of ad hoc leaves.";
+  }
+
+  revision "2026-04-12" {
+    description
+      "field-unique: leaf unique only when not(../default) — alternate keys must not combine with default.";
+  }
+
+  revision "2026-04-11" {
+    description
+      "grouping field-unique (leaf unique); foreignKeys.field target must have unique true on the referenced entity.";
+  }
+
+  revision "2026-04-10" {
+    description
+      "foreignKeys: optional leaf ``field`` — leafref to a field on the referenced entity; must not equal that entity's primary_key.";
+  }
+
+  revision "2026-04-07" {
+    description
+      "field-default: leaf default only when type uses open-primitive or closed-enum (when type/primitive or type/enum).";
+  }
+
+  revision "2026-04-05" {
+    description
+      "field-default: optional must refinements so default matches closed-enum members or open-primitive family (array element + composite subfield).";
+  }
+
+  revision "2026-04-04" {
+    description
+      "primitive-type-and-enum: enforce open-primitive vs closed-enum with a YANG choice (not must-on-siblings). Data paths unchanged (case is not a data node).";
+  }
 
   revision "2026-04-03" {
     description
@@ -54,7 +94,7 @@ module meta-model {
 
   revision "2026-03-26" {
     description
-      "grouping foreign-keys (list foreignKeys + entity leafref); uses foreign-keys { when ... }
+      "grouping foreign-keys (list foreignKeys + entity leafref, optional field leafref to target field); uses foreign-keys { when ... }
        under type with not(../array) so foreignKeys is invalid when the type branch is array.";
   }
 
@@ -189,78 +229,88 @@ module meta-model {
 
   grouping primitive-type-and-enum {
     description
-      "Either an open primitive (leaf primitive plus optional min, max, minDate, maxDate, outlier)
-       or a closed enumeration (leaf-list enum only). Same logical choice as two YANG cases, expressed
-       as flat siblings so instance data uses primitive *or* enum, not both (must constraints).";
-    leaf primitive {
-      type primitive-type-name;
-      description
-        "Open primitive type. Omit when using enum-only (closed enumeration with implied primitive).";
-    }
-    leaf-list enum {
-      type union {
-        type string;
-        type int32;
-        type decimal64 {
-          fraction-digits 2;
+      "Open primitive (primitive plus optional min, max, minDate, maxDate, outlier) XOR closed enumeration (leaf-list enum).
+       A YANG choice guarantees the branches are not combined. Instance paths stay type/primitive, type/min, … or type/enum (case is not a data node).";
+    choice primitive-or-enum {
+      mandatory true;
+      description "Exactly one of open primitive typing or closed enum.";
+      case open-primitive {
+        leaf primitive {
+          type primitive-type-name;
+          mandatory true;
+          description "Open primitive type.";
+        }
+        leaf min {
+          type int32;
+          description
+            "Minimum string length, or minimum value for integer, number, or year primitives.";
+        }
+        leaf max {
+          type int32;
+          description
+            "Maximum string length, or maximum value for integer, number, or year primitives.";
+        }
+        leaf minDate {
+          type date;
+          description
+            "Minimum date (YYYY-MM-DD) for date or datetime primitive fields.";
+          must "../primitive = ('date','datetime')" {
+            error-message "minDate can only be used with primitive type date or datetime";
+            description "minDate applies only to date and datetime primitives.";
+          }
+          must "not(../maxDate) or . <= ../maxDate" {
+            error-message "minDate must be less than or equal to maxDate when both are specified";
+            description "Ordering between minDate and maxDate.";
+          }
+        }
+        leaf maxDate {
+          type date;
+          description
+            "Maximum date (YYYY-MM-DD) for date or datetime primitive fields.";
+          must "../primitive = ('date','datetime')" {
+            error-message "maxDate can only be used with primitive type date or datetime";
+            description "maxDate applies only to date and datetime primitives.";
+          }
+          must "not(../minDate) or . >= ../minDate" {
+            error-message "maxDate must be greater than or equal to minDate when both are specified";
+            description "Ordering between minDate and maxDate.";
+          }
+        }
+        leaf outlier {
+          when "not(../primitive = ('string', 'boolean', 'qualified_string'))";
+          type decimal64 {
+            fraction-digits 1;
+            range "0.1..4.0";
+          }
+          description
+            "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.
+             Omit to disable sigma-based outlier detection.";
         }
       }
-      description
-        "Closed enumeration; omit when using primitive. Primitive (string, integer, or number) is implied from member types.";
-    }
-    leaf min {
-      type int32;
-      description
-        "Minimum string length, or minimum value for integer, number, or year primitives.";
-    }
-    leaf max {
-      type int32;
-      description
-        "Maximum string length, or maximum value for integer, number, or year primitives.";
-    }
-    leaf minDate {
-      when "../primitive = ('date','datetime')" {
-        description
-          "minDate applies only to date and datetime primitives.";
+      case closed-enum {
+        leaf-list enum {
+          min-elements 1;
+          type union {
+            type string;
+            type int32;
+            type decimal64 {
+              fraction-digits 2;
+            }
+          }
+          description
+            "Closed enumeration; primitive (string, integer, or number) is implied from member types.";
+        }
       }
-      type date;
-      description
-        "Minimum date (YYYY-MM-DD) for date or datetime primitive fields.";
-      must "not(../maxDate) or . <= ../maxDate" {
-        error-message "minDate must be less than or equal to maxDate when both are specified";
-        description "Ordering between minDate and maxDate.";
-      }
-    }
-    leaf maxDate {
-      when "../primitive = ('date','datetime')" {
-        description
-          "maxDate applies only to date and datetime primitives.";
-      }
-      type date;
-      description
-        "Maximum date (YYYY-MM-DD) for date or datetime primitive fields.";
-      must "not(../minDate) or . >= ../minDate" {
-        error-message "maxDate must be greater than or equal to minDate when both are specified";
-        description "Ordering between minDate and maxDate.";
-      }
-    }
-    leaf outlier {
-      when "not(../primitive = ('string', 'boolean', 'qualified_string'))";
-      type decimal64 {
-        fraction-digits 1;
-        range "0.1..4.0";
-      }
-      description
-        "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.
-         Omit to disable sigma-based outlier detection.";
     }
   }
 
   grouping field-default {
     description
       "Optional default value for instance data. Allowed on entity fields, field_definitions,
-       and composite subcomponents; not combinable with required=true on the same node (see generic-field).";
+       and composite subcomponents; not combinable with required=true on the same node (see generic-field).
+       Leaf default is conditional: only when the sibling container type uses primitive or enum (open-type branch).";
     leaf default {
+      when "boolean(../type/primitive) or boolean(../type/enum)";
       type union {
         type string;
         type int32;
@@ -269,25 +319,51 @@ module meta-model {
         }
         type boolean;
       }
-      description "Default value when the field is omitted in instance data.";
+      description
+        "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.";
+    }
+  }
+
+  grouping field-unique {
+    description
+      "Optional flag marking a field as an alternate key: values must be unique per entity instance set (in addition to primary key uniqueness). Required for targets of foreignKeys.field. Mutually exclusive with leaf default (no default may be specified on the same field).";
+    leaf unique {
+      when "not(../default)";
+      type boolean;
+      default false;
+      description
+        "When true, this field's values must be unique across all rows of the entity. Set on business or natural keys that may be referenced by foreignKeys.field on other entities. Only allowed when this field does not specify default (alternate keys must not use default).";
     }
   }
 
   grouping foreign-keys {
     description
-      "References to another entity by name; field value type must match that entity's primary key.
-       Call sites use ``uses foreign-keys { when ... }`` so the condition applies in the parent type context.";
+      "References to another entity by name; the enclosing field's value type must match the referenced entity's primary key field, or the field named by ``field`` when that leaf is set (that target must declare ``unique`` true).
+       Call sites use ``uses foreign-keys { when ... }``: omit when ``type`` uses scalar ``entity`` (target is already named there).";
     list foreignKeys {
       key entity;
       min-elements 1;
-      description "Each entry points at an entity whose primary key this field's type aligns with.";
-      leaf entity {
+      description "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).";
+      uses entity-reference;
+      leaf field {
         type leafref {
-          path "/data-model/entities/name";
+          path "/data-model/entities[name = current()/../entity]/fields/name";
           require-instance true;
         }
-        mandatory true;
-        description "Referenced entity name.";
+        description
+          "Optional: names a field on the referenced entity that this foreign key's value must match. When omitted, the referenced entity's primary key is used. Must not name the primary key (use omission for that case). When set, the named field must declare ``unique`` true (alternate key).";
+        must "/data-model/consolidated = false() or string(.) != string(/data-model/entities[name = string(deref(../entity))]/primary_key)" {
+          error-message
+            "field must not name the referenced entity's primary key; omit field to reference the primary key.";
+          description
+            "When present, field must differ from the target entity's primary_key. Entity key via deref(../entity). Skipped when consolidated is false.";
+        }
+        must "/data-model/consolidated = false() or boolean(deref(.)/../unique) = true()" {
+          error-message
+            "field must name a field on the referenced entity with unique true (alternate key). Set unique: true on that field in the model.";
+          description
+            "Non-primary foreign key targets must be explicitly marked unique: follow this leafref with deref(.) to fields/name, then sibling ../unique. Skipped when consolidated is false.";
+        }
       }
       leaf parent_array {
         type leafref {
@@ -304,6 +380,19 @@ module meta-model {
             "Requires a direct type/array container on the referenced field. Fields that only reference field_definitions are not checked here. Skipped when consolidated is false.";
         }
       }
+    }
+  }
+
+  grouping entity-reference {
+    description
+      "Leaf ``entity``: leafref to /data-model/entities/name. Reused where the model names a target entity.";
+    leaf entity {
+      type leafref {
+        path "/data-model/entities/name";
+        require-instance true;
+      }
+      mandatory true;
+      description "Referenced entity name.";
     }
   }
 
@@ -371,20 +460,10 @@ module meta-model {
         case open-type {
           description
             "Primitive or closed enum (leaf primitive or leaf-list enum). Case name avoids clashing with leaf primitive in JSON.";
-          uses primitive-type-and-enum {
-            refine primitive {
-              must "count(../enum) = 0" {
-                error-message "Open primitive cannot be combined with enum; use enum-only for closed enumeration.";
-                description "primitive leaf excludes enum leaf-list.";
-              }
-            }
-            refine enum {
-              must "not(boolean(../primitive))" {
-                error-message "Closed enum cannot be combined with primitive leaf.";
-                description "enum leaf-list excludes primitive leaf.";
-              }
-            }
-          }
+          uses primitive-type-and-enum;
+        }
+        case entity-type {
+          uses entity-reference;
         }
         case case-array {
           container array {
@@ -394,31 +473,10 @@ module meta-model {
               description "Primitive, array of elements, or composite object.";
               case open-type {
                 description "Array element: primitive or closed enum; case name avoids clashing with leaf primitive.";
-                uses primitive-type-and-enum {
-                  refine primitive {
-                    must "count(../enum) = 0" {
-                      error-message "Open primitive cannot be combined with enum.";
-                      description "primitive leaf excludes enum leaf-list.";
-                    }
-                  }
-                  refine enum {
-                    must "not(boolean(../primitive))" {
-                      error-message "Closed enum cannot be combined with primitive leaf.";
-                      description "enum leaf-list excludes primitive leaf.";
-                    }
-                  }
-                }
+                uses primitive-type-and-enum;
               }
               case array-element-entity {
-                leaf entity {
-                  type leafref {
-                    path "/data-model/entities/name";
-                    require-instance true;
-                  }
-                  mandatory true;
-                  description
-                    "Entity type for each array element (embedded object or primary key value).";
-                }
+                uses entity-reference;
               }
               case case-composite {
                 description "Composite field: named subfields, each a full generic-field.";
@@ -432,9 +490,12 @@ module meta-model {
           uses composite-subfields;
         }
       }
-      uses foreign-keys;
+      uses foreign-keys {
+        when "not(boolean(./entity))";
+      }
     }
     uses field-default;
+    uses field-unique;
     leaf validation {
       type field-validation-mode;
       default enforce;
@@ -487,15 +548,14 @@ module meta-model {
             description "Validates that the field exists: in current entity when entity is omitted, or in referenced entity when entity is specified. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
           }
         }
-        leaf entity {
-          type leafref {
-            path "/data-model/entities/name";
-            require-instance true;
-          }
-          description "Entity name for cross-entity field reference (optional).";
-          must "/data-model/consolidated = false() or count(../../../../fields[type/foreignKeys/entity = current()]) = 1" {
-            error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
-            description "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
+        uses entity-reference {
+          refine entity {
+            mandatory false;
+            description "Entity name for cross-entity field reference (optional).";
+            must "/data-model/consolidated = false() or count(../../../../fields[type/foreignKeys/entity = current()]) = 1" {
+              error-message "Cross-entity computed field references require a foreign key field in the current entity that references the target entity";
+              description "When entity is specified, there must be exactly one field in the current entity with a foreignKeys referencing this entity. Only enforced during consolidated validation (Phase 2) when cross-file references can be resolved.";
+            }
           }
         }
         must "../../operation != 'average' or (not(current()/entity) and ../../../fields[name = current()/field]/type/primitive = ('integer', 'number')) or (current()/entity and /data-model/entities[name = current()/entity]/fields[name = current()/field]/type/primitive = ('integer', 'number'))" {
@@ -523,22 +583,19 @@ module meta-model {
 
       uses field-common-atts;
       container type {
-        uses primitive-type-and-enum {
-          refine primitive {
-            must "count(../enum) = 0" {
-              error-message "Open primitive cannot be combined with enum.";
-              description "primitive leaf excludes enum leaf-list.";
-            }
+        choice composite-subfield-type {
+          mandatory true;
+          description "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).";
+          case open-type {
+            description "Primitive or closed enum; case name avoids clashing with leaf primitive in JSON.";
+            uses primitive-type-and-enum;
           }
-          refine enum {
-            must "not(boolean(../primitive))" {
-              error-message "Closed enum cannot be combined with primitive leaf.";
-              description "enum leaf-list excludes primitive leaf.";
-            }
+          case entity-type {
+            uses entity-reference;
           }
         }
         uses foreign-keys {
-          when "not(../array)";
+          when "not(boolean(./entity))";
         }
       }
       uses field-default;
