@@ -3,7 +3,7 @@ requires = ["setuptools>=61.0", "wheel"]
 build-backend = "setuptools.build_meta"
 
 [project]
-name = "xYang"
+name = "xyang"
 version = "0.1.0"
 description = "A Python library implementing a subset of YANG features focused on constraint validation"
 readme = "README.md"
@@ -31,10 +31,11 @@ dependencies = []
 # No runtime dependencies - pure Python implementation
 
 [project.optional-dependencies]
+# pytest 9 / black 26 need Python >= 3.10 to run; the xyang package still supports 3.8+ at runtime.
 dev = [
-    "pytest>=7.0.0",
-    "black>=23.0.0",
-    "PyYAML>=6.0",
+    "pytest>=9.0.3",
+    "black>=26.3.1",
+    "PyYAML>=6.0.3",
 ]
 
 [project.urls]

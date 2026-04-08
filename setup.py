@@ -8,7 +8,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
     long_description = fh.read()
 
 setup(
-    name="xYang",
+    name="xyang",
     version="0.1.0",
     author="Exergy LLC",
     description="A Python library implementing a subset of YANG features focused on constraint validation",
@@ -35,8 +35,9 @@ setup(
     install_requires=[],  # No dependencies - pure Python
     extras_require={
         "dev": [
-            "pytest>=7.0.0",
-            "black>=23.0.0",
+            "pytest>=9.0.3",
+            "black>=26.3.1",
+            "PyYAML>=6.0.3",
         ],
     },
 )

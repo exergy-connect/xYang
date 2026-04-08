@@ -30,7 +30,7 @@ The list below is the short version; [**FEATURES.md**](FEATURES.md) is the autho
 **From PyPI** (when published):
 
 ```bash
-pip install xYang
+pip install xyang
 ```
 
 **From a checkout** (editable, for development):
