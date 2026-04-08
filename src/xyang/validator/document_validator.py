@@ -23,7 +23,7 @@ RFC 7950 §7.9.4 mandatory ``choice`` / §7.6.5 mandatory ``leaf`` under a ``cas
 from __future__ import annotations
 
 import logging
-from typing import Any, Dict, List, Optional, Tuple
+from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
 from ..ast import (
     YangCaseStmt,
@@ -43,6 +43,7 @@ from ..xpath.node import Context, Node
 from ..xpath.schema_nav import SchemaNav
 from ..xpath.utils import yang_bool
 
+from .if_feature_eval import build_enabled_features_map, stmt_if_features_satisfied
 from .path_builder import PathBuilder
 from .type_checker import TypeChecker
 from .validation_error import ValidationError, Severity
@@ -65,10 +66,23 @@ class DocumentValidator:
         errors = validator.validate(data)
     """
 
-    def __init__(self, root_schema: YangStatementList) -> None:
+    def __init__(
+        self,
+        root_schema: YangStatementList,
+        *,
+        enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = None,
+    ) -> None:
         self._root_schema = root_schema
         self._type_checker = TypeChecker()
         self._evaluator = XPathEvaluator()
+        if isinstance(root_schema, YangModule):
+            self._if_feature_module: Optional[YangModule] = root_schema
+            self._enabled_features = build_enabled_features_map(
+                root_schema, enabled_features_by_module
+            )
+        else:
+            self._if_feature_module = None
+            self._enabled_features = {}
 
     def validate(
         self,
@@ -105,6 +119,14 @@ class DocumentValidator:
             data, self._root_schema, (ctx, node), path, enforce_mandatory_choice=True
         )
         return self._errors
+
+    def _if_features_active(self, stmt: YangStatement) -> bool:
+        if self._if_feature_module is None:
+            return True
+        feats = getattr(stmt, "if_features", None) or []
+        return stmt_if_features_satisfied(
+            feats, self._if_feature_module, self._enabled_features
+        )
 
     def _effective_value(
         self, data: Dict[str, Any], name: str, stmt: YangStatement
@@ -287,6 +309,20 @@ class DocumentValidator:
         child_path = path.child(name)
         parent_ctx_obj, parent_node = parent_ctx
 
+        # -- 0. if-feature (before when; inactive nodes are not in the effective schema) --
+        if not self._if_features_active(stmt):
+            if present:
+                self._errors.append(
+                    ValidationError(
+                        path=child_path,
+                        message=(
+                            f"Node '{name}' is present but its 'if-feature' "
+                            "condition is false — this node must not exist"
+                        ),
+                    )
+                )
+            return
+
         # Need val and (curr_node, curr_ctx) for when, must, and type checks
         val = self._effective_value(data, name, stmt)
         curr_node = parent_node.step(val, stmt)
@@ -465,7 +501,13 @@ class DocumentValidator:
         self, choice: YangChoiceStmt, data: dict[str, Any]
     ) -> set[str]:
         """Keys in ``data`` consumed by this choice (nested choices: leaves stay at this level)."""
-        active_cases = [c for c in choice.cases if self._case_has_any_stmt_data(c, data)]
+        if not self._if_features_active(choice):
+            return set()
+        active_cases = [
+            c
+            for c in choice.cases
+            if self._if_features_active(c) and self._case_has_any_stmt_data(c, data)
+        ]
         if not active_cases:
             return set()
         keys: set[str] = set()
@@ -488,6 +530,19 @@ class DocumentValidator:
     ) -> None:
         parent_ctx_obj, parent_node = parent_ctx
 
+        if not self._if_features_active(choice):
+            if self._choice_has_branch_data(choice, data):
+                self._errors.append(
+                    ValidationError(
+                        path=path.current(),
+                        message=(
+                            f"Choice '{choice.name}' has data but its 'if-feature' "
+                            "condition is false — this branch must not exist"
+                        ),
+                    )
+                )
+            return
+
         if choice.when is not None:
             when_ok = self._eval_expr(choice.when.ast, parent_ctx_obj, parent_node)
             if when_ok is None:
@@ -508,6 +563,20 @@ class DocumentValidator:
 
         active_cases: list[YangCaseStmt] = []
         for case in choice.cases:
+            if not self._if_features_active(case):
+                if self._case_has_any_stmt_data(case, data):
+                    self._errors.append(
+                        ValidationError(
+                            path=path.current(),
+                            message=(
+                                f"Case '{case.name}' of choice '{choice.name}' has "
+                                "data but its 'if-feature' condition is false — "
+                                "this branch must not exist"
+                            ),
+                        )
+                    )
+                    return
+                continue
             if not self._case_has_any_stmt_data(case, data):
                 continue
             if case.when is not None:

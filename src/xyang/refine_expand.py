@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import logging
+from dataclasses import replace
 from typing import List, cast
 
 from .errors import YangRefineTargetNotFoundError
@@ -16,6 +17,7 @@ from .ast import (
     YangRefineStmt,
     YangStatement,
     YangStatementWithMust,
+    YangStatementWithWhen,
     YangUsesStmt,
 )
 
@@ -158,80 +160,49 @@ def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
                 stmt.max_elements,
                 refine,
             )
+    if refine.if_features and isinstance(stmt, YangStatementWithWhen):
+        stmt.if_features.extend(refine.if_features)
 
 
 def copy_yang_statement(stmt: YangStatement) -> YangStatement:
-    """Deep copy of a YANG statement subtree (for ``uses`` expansion without mutating groupings)."""
-    copied_statements = [copy_yang_statement(s) for s in stmt.statements]
+    """Deep copy of a YANG statement subtree (for ``uses`` expansion without mutating groupings).
 
-    if isinstance(stmt, YangContainerStmt):
-        return YangContainerStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            presence=stmt.presence,
-            when=stmt.when,
-            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
-        )
-    if isinstance(stmt, YangListStmt):
-        return YangListStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            key=stmt.key,
-            min_elements=stmt.min_elements,
-            max_elements=stmt.max_elements,
-            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
-            when=stmt.when,
-        )
-    if isinstance(stmt, YangLeafStmt):
-        return YangLeafStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            type=stmt.type,
-            mandatory=stmt.mandatory,
-            default=stmt.default,
-            must_statements=list(stmt.must_statements) if stmt.must_statements else [],
-            when=stmt.when,
-        )
-    if isinstance(stmt, YangLeafListStmt):
-        return YangLeafListStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            type=stmt.type,
-            min_elements=stmt.min_elements,
-            max_elements=stmt.max_elements,
-            must_statements=stmt.must_statements[:] if stmt.must_statements else [],
-            when=stmt.when,
-        )
+    ``dataclasses.replace`` keeps shared references (``type``, ``when``, …) and only
+    substitutes containers that must be independent after expansion.
+    """
+    statements = [copy_yang_statement(s) for s in stmt.statements]
+
     if isinstance(stmt, YangChoiceStmt):
-        copied_cases: List[YangCaseStmt] = [
-            cast(YangCaseStmt, copy_yang_statement(c)) for c in stmt.cases
-        ]
-        return YangChoiceStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            mandatory=stmt.mandatory,
-            cases=copied_cases,
-            when=stmt.when,
+        cases = [cast(YangCaseStmt, copy_yang_statement(c)) for c in stmt.cases]
+        return replace(
+            stmt,
+            statements=statements,
+            cases=cases,
+            if_features=list(stmt.if_features),
         )
     if isinstance(stmt, YangCaseStmt):
-        return YangCaseStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            when=stmt.when,
+        return replace(
+            stmt,
+            statements=statements,
+            if_features=list(stmt.if_features),
         )
     if isinstance(stmt, YangUsesStmt):
-        return YangUsesStmt(
-            name=stmt.name,
-            description=stmt.description,
-            statements=copied_statements,
-            grouping_name=stmt.grouping_name,
-            refines=list(stmt.refines) if stmt.refines else [],
-            when=stmt.when,
+        refines = list(stmt.refines) if stmt.refines else []
+        return replace(
+            stmt,
+            statements=statements,
+            refines=refines,
+            if_features=list(stmt.if_features),
+        )
+    if isinstance(
+        stmt,
+        (YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt),
+    ):
+        must = list(stmt.must_statements) if stmt.must_statements else []
+        return replace(
+            stmt,
+            statements=statements,
+            must_statements=must,
+            if_features=list(stmt.if_features),
         )
     raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")

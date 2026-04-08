@@ -70,7 +70,10 @@ class YangStatementWithMust(YangStatement):
 @dataclass
 class YangStatementWithWhen(YangStatement):
     """Statement that can have a when condition (leaf, leaf-list, container, list)."""
+
     when: Optional['YangWhenStmt'] = None
+    # RFC 7950 / 7952: one or more ``if-feature`` substatements (AND of expressions).
+    if_features: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -87,6 +90,7 @@ class YangIdentityStmt(YangStatement):
     """Identity statement (RFC 7950); may have multiple ``base`` substatements (YANG 1.1)."""
 
     bases: List[str] = field(default_factory=list)
+    if_features: List[str] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -220,6 +224,16 @@ class YangUsesStmt(YangStatementWithWhen):
 
 
 @dataclass
+class YangAugmentStmt(YangStatementWithWhen):
+    """Augment statement (RFC 7950). After parse, children are merged into the target node (see ``augment_expand``)."""
+
+    augment_path: str = ""
+
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
+
+@dataclass
 class YangRefineStmt(YangStatementWithMust):
     """Refine statement - modifies nodes from a grouping when using it."""
     target_path: str = ""  # Descendant path (e.g. "type", or schema path through choice/case nodes)
@@ -228,6 +242,8 @@ class YangRefineStmt(YangStatementWithMust):
     max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)
     # RFC 7950 §7.13.2: leaf / choice may get a different mandatory; None = omit from refine
     refined_mandatory: Optional[bool] = None
+    # RFC 7950 §7.13.2: additional if-feature expressions (AND with target node's own).
+    if_features: List[str] = field(default_factory=list)
 
 
 @dataclass

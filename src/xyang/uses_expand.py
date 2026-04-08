@@ -22,6 +22,18 @@ def _extend_refine_path(prefix: str, segment: str) -> str:
     return f"{prefix}/{segment}" if prefix else segment
 
 
+def _merge_uses_if_features_into_grouping_roots(
+    roots: list[YangStatement],
+    uses_if_features: list[str],
+) -> None:
+    """RFC 7950 §7.13.1: ``if-feature`` on ``uses`` ANDs with each instantiated grouping root."""
+    if not uses_if_features:
+        return
+    for node in roots:
+        if isinstance(node, YangStatementWithWhen):
+            node.if_features = [*uses_if_features, *node.if_features]
+
+
 def _merge_uses_when_into_grouping_roots(
     roots: list[YangStatement],
     uses_when: YangWhenStmt | None,
@@ -89,7 +101,14 @@ def _expand_one_uses_stmt(
     sibling_refines: list,
 ) -> list[YangStatement]:
     gname = stmt.grouping_name
-    grouping = module.get_grouping(gname)
+    if ":" in gname:
+        pref, _, local = gname.partition(":")
+        gmod = module.resolve_prefixed_module(pref)
+        lookup_name = local
+    else:
+        gmod = module
+        lookup_name = gname
+    grouping = gmod.get_grouping(lookup_name) if gmod else None
     if not grouping:
         logger.warning(
             "Grouping '%s' not found when expanding uses statement", gname
@@ -104,15 +123,15 @@ def _expand_one_uses_stmt(
         raise YangCircularUsesError(expanding_chain, gname)
     inner_chain = expanding_chain + (gname,)
     body = [copy_yang_statement(s) for s in grouping.statements]
+    _merge_uses_if_features_into_grouping_roots(body, stmt.if_features)
     _merge_uses_when_into_grouping_roots(body, stmt.when)
     pending_refines = list(stmt.refines)
     inner_prefix = refine_path_prefix if sibling_refines else ""
-    # Own refines are relative to the used grouping: inner prefix "" (e.g. ``composite/...``).
-    # If sibling ``refines`` still hold ancestor pending refines, keep enclosing prefix so
-    # targets like ``composite/...`` match inside nested ``uses`` (e.g. ``composite-field``).
+    # Nested ``uses`` inside the grouping resolve in the module that defined the grouping.
+    scope = gmod if gmod is not None else module
     out = expand_uses_in_statements(
         body,
-        module,
+        scope,
         inner_chain,
         pending_refines,
         inner_prefix,
