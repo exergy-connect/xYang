@@ -5,6 +5,8 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 """
 
 from enum import Enum
+from pathlib import Path
+from types import SimpleNamespace
 from typing import List, Tuple, Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
 from ..errors import YangSyntaxError
@@ -22,7 +24,11 @@ if TYPE_CHECKING:
 
 # Type for parser context parent: statement lists or nested statement contexts (type/must/when)
 _ParserParent = Union[
-    "YangStatementList", "YangTypeStmt", "YangMustStmt", "YangWhenStmt"
+    "YangStatementList",
+    "YangTypeStmt",
+    "YangMustStmt",
+    "YangWhenStmt",
+    SimpleNamespace,
 ]
 
 
@@ -33,6 +39,7 @@ class YangTokenType(Enum):
     LBRACE = "{"
     RBRACE = "}"
     SEMICOLON = ";"
+    COLON = ":"
     EQUALS = "="
     PLUS = "+"
     SLASH = "/"
@@ -109,6 +116,17 @@ class YangTokenType(Enum):
     TRUE = "true"
     FALSE = "false"
 
+    # Cross-module and submodule (RFC 7950 / YANG 1.1)
+    IMPORT = "import"
+    INCLUDE = "include"
+    REVISION_DATE = "revision-date"
+    FEATURE = "feature"
+    IF_FEATURE = "if-feature"
+    AUGMENT = "augment"
+    SUBMODULE = "submodule"
+    BELONGS_TO = "belongs-to"
+    REFERENCE = "reference"
+
 
 def diagnostic_source_lines(content: str) -> List[str]:
     """Split source on newlines for error snippets (verbatim text, comments included)."""
@@ -133,6 +151,7 @@ YANG_KEYWORDS = {
         YangTokenType.LBRACE,
         YangTokenType.RBRACE,
         YangTokenType.SEMICOLON,
+        YangTokenType.COLON,
         YangTokenType.EQUALS,
         YangTokenType.PLUS,
         YangTokenType.SLASH,
@@ -287,7 +306,11 @@ class ParserContext:
     """Context for parsing, holds module and current state."""
     module: "YangModule"
     current_parent: _ParserParent
+    # Directory of the file being parsed (for resolving include of submodules).
+    source_dir: Optional[Path] = None
 
     def push_parent(self, parent: _ParserParent) -> "ParserContext":
         """Create new context with updated parent."""
-        return ParserContext(module=self.module, current_parent=parent)
+        return ParserContext(
+            module=self.module, current_parent=parent, source_dir=self.source_dir
+        )

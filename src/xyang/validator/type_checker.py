@@ -9,7 +9,10 @@ import re
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
-from ..identity_graph import identityref_value_valid, resolve_identity_qname
+from ..identity_graph import (
+    identityref_value_valid,
+    resolve_identity_qname_pair,
+)
 from ..module import YangModule
 from ..xpath import XPathParser
 from ..xpath.ast import PathNode
@@ -40,6 +43,27 @@ class TypeChecker:
         the parent of the leaf). If None, ctx.current is used.
         """
         name = type_stmt.name
+
+        if ":" in name:
+            if not isinstance(root_schema, YangModule):
+                return []
+            pref, _, local = name.partition(":")
+            ext = root_schema.resolve_prefixed_module(pref)
+            if ext is None:
+                return [f"unknown type prefix {pref!r} in type {name!r}"]
+            typedef = ext.get_typedef(local)
+            if typedef is not None and typedef.type is not None:
+                return self.check(
+                    value,
+                    typedef.type,
+                    path,
+                    root_data,
+                    root_schema,
+                    ctx,
+                    evaluator,
+                    leafref_current,
+                )
+            return [f"unknown typedef {local!r} in imported module {pref!r}"]
 
         if name == "union":
             return self._check_union(value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current)
@@ -110,12 +134,11 @@ class TypeChecker:
         bases = getattr(type_stmt, "identityref_bases", None) or []
         if not bases:
             return ["identityref type has no base identities"]
-        local = resolve_identity_qname(root_schema, value)
-        if local is None:
+        if resolve_identity_qname_pair(root_schema, value) is None:
             return [
-                f"identityref value {value!r} is not a valid identity for this module prefix"
+                f"identityref value {value!r} does not resolve to a known identity"
             ]
-        if not identityref_value_valid(root_schema, local, bases):
+        if not identityref_value_valid(root_schema, value, bases):
             return [
                 f"identityref value {value!r} is not derived from all bases {bases!r}"
             ]

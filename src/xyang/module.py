@@ -4,7 +4,7 @@ YANG module representation.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, TYPE_CHECKING
+from typing import Dict, List, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from .ast import YangStatementList
@@ -25,9 +25,26 @@ class YangModule(YangStatementList):
     contact: str = ""
     description: str = ""
     revisions: List[Dict[str, str]] = field(default_factory=list)
+    # Set when this tree was parsed from a submodule (belongs-to argument).
+    belongs_to_module: str = ""
     typedefs: Dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
     identities: Dict[str, 'YangIdentityStmt'] = field(default_factory=dict)
     groupings: Dict[str, 'YangStatement'] = field(default_factory=dict)
+    # Declared ``feature`` names in this module (RFC 7950 §7.18.1).
+    features: Set[str] = field(default_factory=set)
+    # Per-feature ``if-feature`` substatements (RFC 7950 §7.20.1.1); AND of expressions.
+    feature_if_features: Dict[str, List[str]] = field(default_factory=dict)
+    # import prefix (local) -> parsed module (RFC 7950 ``import``).
+    import_prefixes: Dict[str, "YangModule"] = field(default_factory=dict)
+
+    def own_prefix_stripped(self) -> str:
+        return (self.prefix or "").strip("'\"")
+
+    def resolve_prefixed_module(self, prefix: str) -> Optional["YangModule"]:
+        """Module for ``prefix`` in this module's scope (own prefix or ``import``)."""
+        if prefix == self.own_prefix_stripped():
+            return self
+        return self.import_prefixes.get(prefix)
 
     def get_typedef(self, name: str) -> Optional['YangTypedefStmt']:
         """Get a typedef by name."""

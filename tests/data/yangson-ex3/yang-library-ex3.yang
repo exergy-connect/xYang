@@ -1,0 +1,125 @@
+/* Minimal ietf-yang-library for yangson ex3 test data:
+   - container yang-library matches rfc8525-ex3.json (RFC 8525)
+   - container modules-state matches yang-library-ex3.json (RFC 7895-style)
+*/
+module ietf-yang-library {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-yang-library";
+  prefix yanglib;
+
+  container yang-library {
+    list module-set {
+      key name;
+      leaf name {
+        type string;
+        mandatory true;
+      }
+      list module {
+        key name;
+        leaf name {
+          type string;
+          mandatory true;
+        }
+        leaf revision {
+          type string;
+        }
+        leaf namespace {
+          type string;
+          mandatory true;
+        }
+        list submodule {
+          key name;
+          leaf name {
+            type string;
+            mandatory true;
+          }
+          leaf revision {
+            type string;
+          }
+        }
+        leaf-list feature {
+          type string;
+        }
+      }
+      list import-only-module {
+        key "name revision";
+        leaf name {
+          type string;
+          mandatory true;
+        }
+        leaf revision {
+          type string;
+          mandatory true;
+        }
+        leaf namespace {
+          type string;
+          mandatory true;
+        }
+      }
+    }
+    list schema {
+      key name;
+      leaf name {
+        type string;
+        mandatory true;
+      }
+      leaf-list module-set {
+        type string;
+      }
+    }
+    list datastore {
+      key name;
+      leaf name {
+        type string;
+        mandatory true;
+      }
+      leaf schema {
+        type string;
+        mandatory true;
+      }
+    }
+    leaf content-id {
+      type string;
+      mandatory true;
+    }
+  }
+
+  container modules-state {
+    leaf module-set-id {
+      type string;
+      mandatory true;
+    }
+    list module {
+      key "name revision";
+      leaf name {
+        type string;
+        mandatory true;
+      }
+      leaf revision {
+        type string;
+        mandatory true;
+      }
+      leaf namespace {
+        type string;
+        mandatory true;
+      }
+      leaf conformance-type {
+        type string;
+        mandatory true;
+      }
+      leaf-list feature {
+        type string;
+      }
+      list submodule {
+        key name;
+        leaf name {
+          type string;
+          mandatory true;
+        }
+        leaf revision {
+          type string;
+        }
+      }
+    }
+  }
+}

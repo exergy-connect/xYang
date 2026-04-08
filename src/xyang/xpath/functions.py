@@ -139,7 +139,7 @@ def f_derived_from(
     """derived-from(identityref, identity) — value is strict descendant of target (RFC 7950)."""
     if len(ast.args) != 2:
         return False
-    from ..identity_graph import is_derived_from_strict, resolve_identity_qname
+    from ..identity_graph import is_derived_from_strict_qnames
     from ..module import YangModule
 
     root_schema = ctx.root.schema if ctx.root is not None else None
@@ -161,11 +161,7 @@ def f_derived_from(
     v2 = first_value(ev.eval(ast.args[1], ctx, start))
     if not isinstance(v2, str):
         return False
-    local_val = resolve_identity_qname(mod, v1)
-    local_tgt = resolve_identity_qname(mod, v2)
-    if local_val is None or local_tgt is None:
-        return False
-    return is_derived_from_strict(mod, local_val, local_tgt)
+    return is_derived_from_strict_qnames(mod, v1, v2)
 
 
 def f_derived_from_or_self(
@@ -174,7 +170,7 @@ def f_derived_from_or_self(
     """derived-from-or-self(identityref, identity) — equal or strict descendant."""
     if len(ast.args) != 2:
         return False
-    from ..identity_graph import is_derived_from_or_self, resolve_identity_qname
+    from ..identity_graph import is_derived_from_or_self_qnames
     from ..module import YangModule
 
     root_schema = ctx.root.schema if ctx.root is not None else None
@@ -196,11 +192,7 @@ def f_derived_from_or_self(
     v2 = first_value(ev.eval(ast.args[1], ctx, start))
     if not isinstance(v2, str):
         return False
-    local_val = resolve_identity_qname(mod, v1)
-    local_tgt = resolve_identity_qname(mod, v2)
-    if local_val is None or local_tgt is None:
-        return False
-    return is_derived_from_or_self(mod, local_val, local_tgt)
+    return is_derived_from_or_self_qnames(mod, v1, v2)
 
 
 FUNCTIONS = {

@@ -2,6 +2,9 @@
 Statement parsers for YANG statements.
 """
 
+from __future__ import annotations
+
+from types import SimpleNamespace
 from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
@@ -9,7 +12,7 @@ from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangIdentityStmt,
-    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
+    YangGroupingStmt, YangUsesStmt, YangAugmentStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
 )
@@ -19,6 +22,7 @@ from ..refine_expand import apply_refines_by_path, copy_yang_statement
 
 if TYPE_CHECKING:
     from .statement_registry import StatementRegistry
+    from .yang_parser import YangParser
     from ..ast import YangStatement
     from ..module import YangModule
 
@@ -31,9 +35,10 @@ _StatementT = TypeVar("_StatementT", bound="YangStatement")
 
 class StatementParsers:
     """Collection of statement parsing methods."""
-    
-    def __init__(self, registry):
+
+    def __init__(self, registry: "StatementRegistry", yang_parser: Optional["YangParser"] = None):
         self.registry = registry
+        self._yang_parser: Optional["YangParser"] = yang_parser
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
@@ -57,6 +62,25 @@ class StatementParsers:
             current = []
             setattr(obj, attr, current)
         current.append(value)
+
+    def _consume_qname_from_identifier(self, tokens: TokenStream) -> str:
+        """Consume ``name`` or ``prefix:name`` (``prefix:...`` chain). Current token must be IDENTIFIER."""
+        parts = [tokens.consume_type(YangTokenType.IDENTIFIER)]
+        while tokens.consume_if_type(YangTokenType.COLON):
+            parts.append(tokens.consume_type(YangTokenType.IDENTIFIER))
+        return ":".join(parts)
+
+    def _consume_prefix_argument(self, tokens: TokenStream) -> None:
+        """Prefix argument as string or bare identifier (common in example modules)."""
+        tt = tokens.peek_type()
+        if tt == YangTokenType.STRING:
+            tokens.consume_type(YangTokenType.STRING)
+        elif tt == YangTokenType.IDENTIFIER:
+            tokens.consume_type(YangTokenType.IDENTIFIER)
+        else:
+            raise tokens._make_error(
+                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
+            )
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
@@ -84,6 +108,223 @@ class StatementParsers:
         else:
             # Unknown statement - raise error instead of silently skipping
             raise tokens._make_error(f"Unknown statement in module: {stmt_type}")
+
+    def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse submodule statement (YANG 1.1)."""
+        tokens.consume_type(YangTokenType.SUBMODULE)
+        submodule_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        tokens.consume_type(YangTokenType.LBRACE)
+        context.module.name = submodule_name
+        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+            self._parse_submodule_statement(tokens, context)
+        tokens.consume_type(YangTokenType.RBRACE)
+
+    def _parse_submodule_statement(self, tokens: TokenStream, context: ParserContext) -> None:
+        stmt_type = tokens.peek() or ""
+        handler = self.registry.get_handler(f"submodule:{stmt_type}")
+        if handler:
+            handler(tokens, context)
+        else:
+            raise tokens._make_error(f"Unknown statement in submodule: {stmt_type}")
+
+    def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse import and load the referenced module (RFC 7950)."""
+        tokens.consume_type(YangTokenType.IMPORT)
+        imported_module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        if tokens.consume_if_type(YangTokenType.SEMICOLON):
+            return
+        local_prefix: Optional[str] = None
+        revision_date: Optional[str] = None
+        if not tokens.consume_if_type(YangTokenType.LBRACE):
+            raise tokens._make_error("Expected '{' or ';' after import module name")
+        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+            st = tokens.peek() or ""
+            if st == "prefix":
+                tokens.consume_type(YangTokenType.PREFIX)
+                tt = tokens.peek_type()
+                if tt == YangTokenType.STRING:
+                    local_prefix = tokens.consume_type(YangTokenType.STRING)
+                elif tt == YangTokenType.IDENTIFIER:
+                    local_prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
+                else:
+                    raise tokens._make_error(
+                        f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
+                    )
+                tokens.consume_if_type(YangTokenType.SEMICOLON)
+            elif st == "revision-date":
+                tokens.consume_type(YangTokenType.REVISION_DATE)
+                revision_date = self._revision_date_argument_string(tokens)
+                tokens.consume_if_type(YangTokenType.SEMICOLON)
+            elif st == "description":
+                self.parse_description_string_only(tokens, context)
+            elif st == "reference":
+                self.parse_reference_string_only(tokens, context)
+            else:
+                raise tokens._make_error(f"Unknown statement in import: {st!r}")
+        tokens.consume_type(YangTokenType.RBRACE)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        if self._yang_parser is not None and local_prefix:
+            self._yang_parser.register_import(
+                parent=context.module,
+                imported_module_name=imported_module_name,
+                local_prefix=local_prefix,
+                revision_date=revision_date,
+                source_dir=context.source_dir,
+                tokens=tokens,
+            )
+
+    def parse_include_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse include and merge the submodule into the current module (RFC 7950)."""
+        tokens.consume_type(YangTokenType.INCLUDE)
+        sub_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        revision_date: Optional[str] = None
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                st = tokens.peek() or ""
+                if st == "revision-date":
+                    tokens.consume_type(YangTokenType.REVISION_DATE)
+                    revision_date = self._revision_date_argument_string(tokens)
+                    tokens.consume_if_type(YangTokenType.SEMICOLON)
+                else:
+                    handler = self.registry.get_handler(f"include:{st}")
+                    if handler:
+                        handler(tokens, context)
+                    else:
+                        raise tokens._make_error(f"Unknown statement in include: {st!r}")
+            tokens.consume_type(YangTokenType.RBRACE)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        if self._yang_parser is not None:
+            self._yang_parser.merge_included_submodule(
+                parent=context.module,
+                submodule_name=sub_name,
+                revision_date=revision_date,
+                source_dir=context.source_dir,
+                tokens=tokens,
+            )
+
+    def parse_prefix_value_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Prefix substatement inside import or belongs-to (not module-level prefix)."""
+        tokens.consume_type(YangTokenType.PREFIX)
+        self._consume_prefix_argument(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def _revision_date_argument_string(self, tokens: TokenStream) -> str:
+        """Read revision-date value; does not consume the trailing semicolon."""
+        tt0 = tokens.peek_type()
+        if tt0 == YangTokenType.STRING:
+            return tokens.consume_type(YangTokenType.STRING)
+        chunks: list[str] = []
+        while tokens.has_more() and tokens.peek_type() != YangTokenType.SEMICOLON:
+            tt = tokens.peek_type()
+            if tt in (
+                YangTokenType.IDENTIFIER,
+                YangTokenType.DOTTED_NUMBER,
+                YangTokenType.INTEGER,
+            ):
+                chunks.append(tokens.consume_type(tt))
+            else:
+                break
+        if not chunks:
+            raise tokens._make_error(
+                f"Expected revision-date value, got {tt0.name if tt0 else 'end'}"
+            )
+        return "".join(chunks)
+
+    def parse_revision_date_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse revision-date substatement."""
+        tokens.consume_type(YangTokenType.REVISION_DATE)
+        self._revision_date_argument_string(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_description_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Description with no parent field update (e.g. inside import)."""
+        tokens.consume_type(YangTokenType.DESCRIPTION)
+        tokens.consume_type(YangTokenType.STRING)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
+        tokens.consume_type(YangTokenType.REFERENCE)
+        tokens.consume_type(YangTokenType.STRING)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        tokens.consume_type(YangTokenType.FEATURE)
+        name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        context.module.features.add(name)
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            holder = SimpleNamespace(if_features=[])
+            feat_ctx = context.push_parent(holder)
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                st = tokens.peek() or ""
+                if st == "if-feature":
+                    self.parse_if_feature_stmt(tokens, feat_ctx)
+                elif st == "description":
+                    self.parse_description_string_only(tokens, feat_ctx)
+                elif st == "reference":
+                    self.parse_reference_string_only(tokens, feat_ctx)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in feature '{name}': {st!r}"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+            if holder.if_features:
+                if name in context.module.feature_if_features:
+                    raise tokens._make_error(
+                        f"Duplicate if-feature block for feature {name!r}"
+                    )
+                context.module.feature_if_features[name] = list(holder.if_features)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse if-feature; expression is stored on the parent schema node (not evaluated)."""
+        tokens.consume_type(YangTokenType.IF_FEATURE)
+        expression = self._parse_string_concatenation(tokens)
+        parent = context.current_parent
+        if parent is not None and hasattr(parent, "if_features"):
+            parent.if_features.append(expression)
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                st = tokens.peek() or ""
+                if st == "description":
+                    self.parse_description_string_only(tokens, context)
+                elif st == "reference":
+                    self.parse_reference_string_only(tokens, context)
+                else:
+                    raise tokens._make_error(f"Unknown statement in if-feature: {st!r}")
+            tokens.consume_type(YangTokenType.RBRACE)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
+        tokens.consume_type(YangTokenType.BELONGS_TO)
+        parent_module = tokens.consume_type(YangTokenType.IDENTIFIER)
+        context.module.belongs_to_module = parent_module
+        tokens.consume_type(YangTokenType.LBRACE)
+        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+            st = tokens.peek() or ""
+            handler = self.registry.get_handler(f"belongs-to:{st}")
+            if handler:
+                handler(tokens, context)
+            else:
+                raise tokens._make_error(f"Unknown statement in belongs-to: {st!r}")
+        tokens.consume_type(YangTokenType.RBRACE)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
+        tokens.consume_type(YangTokenType.AUGMENT)
+        path = self._parse_string_concatenation(tokens)
+        aug = YangAugmentStmt(name="augment", augment_path=path)
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            new_context = context.push_parent(aug)
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                st = tokens.peek() or ""
+                handler = self.registry.get_handler(f"augment:{st}")
+                if handler:
+                    handler(tokens, new_context)
+                else:
+                    raise tokens._make_error(f"Unknown statement in augment: {st!r}")
+            tokens.consume_type(YangTokenType.RBRACE)
+        self._add_to_parent_or_module(context, aug)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse yang-version statement."""
@@ -104,8 +345,15 @@ class StatementParsers:
     def parse_prefix(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse prefix statement."""
         tokens.consume_type(YangTokenType.PREFIX)
-        prefix = tokens.consume_type(YangTokenType.STRING)
-        context.module.prefix = prefix
+        tt = tokens.peek_type()
+        if tt == YangTokenType.STRING:
+            context.module.prefix = tokens.consume_type(YangTokenType.STRING)
+        elif tt == YangTokenType.IDENTIFIER:
+            context.module.prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
+        else:
+            raise tokens._make_error(
+                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
+            )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_organization(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -133,7 +381,29 @@ class StatementParsers:
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse revision statement."""
         tokens.consume_type(YangTokenType.REVISION)
-        date = tokens.consume().strip('"\'')
+        tt0 = tokens.peek_type()
+        if tt0 == YangTokenType.STRING:
+            date = tokens.consume_type(YangTokenType.STRING)
+        else:
+            chunks: list[str] = []
+            while tokens.has_more() and tokens.peek_type() not in (
+                YangTokenType.LBRACE,
+                YangTokenType.SEMICOLON,
+            ):
+                tt = tokens.peek_type()
+                if tt in (
+                    YangTokenType.IDENTIFIER,
+                    YangTokenType.DOTTED_NUMBER,
+                    YangTokenType.INTEGER,
+                ):
+                    chunks.append(tokens.consume_type(tt))
+                else:
+                    break
+            date = "".join(chunks)
+            if not date:
+                raise tokens._make_error(
+                    f"Expected revision date, got {tt0.name if tt0 else 'end'}"
+                )
         revision = {'date': date, 'description': ''}
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
@@ -190,7 +460,7 @@ class StatementParsers:
     def parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse base substatement inside identity."""
         tokens.consume_type(YangTokenType.BASE)
-        base_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        base_name = self._consume_qname_from_identifier(tokens)
         parent = context.current_parent
         if isinstance(parent, YangIdentityStmt):
             parent.bases.append(base_name)
@@ -279,7 +549,10 @@ class StatementParsers:
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
         tokens.consume_type(YangTokenType.TYPE)
-        type_name = tokens.consume()  # identifier (typedef) or type keyword (leafref, string, etc.)
+        if tokens.peek_type() == YangTokenType.IDENTIFIER:
+            type_name = self._consume_qname_from_identifier(tokens)
+        else:
+            type_name = tokens.consume()
         type_stmt = YangTypeStmt(name=type_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             brace_depth = 1
@@ -636,7 +909,10 @@ class StatementParsers:
         have been parsed. A YangUsesStmt node is created as a placeholder.
         """
         tokens.consume_type(YangTokenType.USES)
-        grouping_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        if tokens.peek_type() == YangTokenType.IDENTIFIER:
+            grouping_name = self._consume_qname_from_identifier(tokens)
+        else:
+            grouping_name = tokens.consume()
         uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)

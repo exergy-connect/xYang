@@ -179,6 +179,9 @@ class YangTokenizer:
             elif char == ";":
                 add_token(YangTokenType.SEMICOLON, ";", i, current_line, line_start)
                 advance()
+            elif char == ":":
+                add_token(YangTokenType.COLON, ":", i, current_line, line_start)
+                advance()
             elif char == "=":
                 add_token(YangTokenType.EQUALS, "=", i, current_line, line_start)
                 advance()
