@@ -72,7 +72,7 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 
 ## Unsupported (do not use in models meant for xYang)
 
-See **`FEATURES.md` § “Features NOT Implemented”** (e.g. `import`, `augment`, `bits`, …). Built-in type **names** may lex as keywords even when validation is incomplete—stick to documented combinations.
+See **`FEATURES.md` § “Features NOT Implemented”** (e.g. `import`, `augment`, `binary`, …). Built-in type **names** may lex as keywords even when validation is incomplete—stick to documented combinations.
 
 ## After authoring
 

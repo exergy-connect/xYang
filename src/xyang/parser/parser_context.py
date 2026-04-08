@@ -16,11 +16,14 @@ if TYPE_CHECKING:
         YangStatementList,
         YangTypeStmt,
         YangMustStmt,
+        YangWhenStmt,
     )
 
 
-# Type for parser context parent: statement lists or nested statement contexts (type/must)
-_ParserParent = Union["YangStatementList", "YangTypeStmt", "YangMustStmt"]
+# Type for parser context parent: statement lists or nested statement contexts (type/must/when)
+_ParserParent = Union[
+    "YangStatementList", "YangTypeStmt", "YangMustStmt", "YangWhenStmt"
+]
 
 
 class YangTokenType(Enum):
@@ -77,6 +80,8 @@ class YangTokenType(Enum):
     PATH = "path"
     REQUIRE_INSTANCE = "require-instance"
     ENUM = "enum"
+    BIT = "bit"
+    POSITION = "position"
     PATTERN = "pattern"
     LENGTH = "length"
     FRACTION_DIGITS = "fraction-digits"

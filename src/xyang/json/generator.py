@@ -239,6 +239,28 @@ def _type_to_schema(
         return out
     if name == "enumeration" and type_stmt.enums:
         return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(type_stmt.enums)}
+    if name == "bits" and type_stmt.bits:
+        ordered = sorted(
+            type_stmt.bits,
+            key=lambda b: (
+                b.position if b.position is not None else 0,
+                b.name,
+            ),
+        )
+        bit_list = [
+            {
+                "name": b.name,
+                "position": int(b.position) if b.position is not None else 0,
+            }
+            for b in ordered
+        ]
+        return {
+            JsonSchemaKey.TYPE: "string",
+            JsonSchemaKey.X_YANG: {
+                XYangKey.TYPE: XYangTypeValue.BITS,
+                XYangKey.BITS: bit_list,
+            },
+        }
     if name == "boolean":
         return {JsonSchemaKey.TYPE: "boolean"}
     if name in ("int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"):

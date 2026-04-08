@@ -93,6 +93,18 @@ class YangIdentityStmt(YangStatement):
 
 
 @dataclass
+class YangBitStmt:
+    """Single bit in a ``type bits { ... }`` (RFC 7950 §9.3.4).
+
+    ``position`` is ``None`` until the parser assigns implicit positions; after
+    parsing a complete ``bits`` type, every bit has a non-negative integer position.
+    """
+
+    name: str
+    position: Optional[int] = None
+
+
+@dataclass
 class YangTypeStmt:
     """Type statement."""
     name: str
@@ -101,6 +113,7 @@ class YangTypeStmt:
     range: Optional[str] = None
     fraction_digits: Optional[int] = None
     enums: List[str] = field(default_factory=list)
+    bits: List[YangBitStmt] = field(default_factory=list)  # For bits type
     types: List['YangTypeStmt'] = field(default_factory=list)  # For union types
     path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
     require_instance: bool = True  # For leafref

@@ -122,6 +122,7 @@ class YangParser:
         self.registry.register('type:range', self.parsers.parse_type_range)
         self.registry.register('type:fraction-digits', self.parsers.parse_type_fraction_digits)
         self.registry.register('type:enum', self.parsers.parse_type_enum)
+        self.registry.register('type:bit', self.parsers.parse_type_bit)
         self.registry.register('type:path', self.parsers.parse_type_path)
         self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
         self.registry.register('type:base', self.parsers.parse_type_base)
