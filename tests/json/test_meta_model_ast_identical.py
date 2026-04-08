@@ -60,6 +60,14 @@ def _normalize_type(type_stmt: Any) -> dict[str, Any] | None:
         out["types"] = [_normalize_type(t) for t in types]
     else:
         out["types"] = []
+    bits = getattr(type_stmt, "bits", None) or []
+    if bits:
+        out["bits"] = sorted(
+            ((b.name, b.position) for b in bits),
+            key=lambda x: (x[1] if x[1] is not None else -1, x[0]),
+        )
+    else:
+        out["bits"] = []
     return out
 
 

@@ -80,6 +80,8 @@ class TypeChecker:
             return self._check_boolean(value)
         if name == "enumeration":
             return self._check_enum(value, type_stmt)
+        if name == "bits":
+            return self._check_bits(value, type_stmt)
         if name == "empty":
             return self._check_empty(value)
         # Resolve typedef and check against the underlying type
@@ -291,6 +293,28 @@ class TypeChecker:
                 f"Value {value!r} is not one of the allowed enum values: "
                 f"{', '.join(str(e) for e in type_stmt.enums)}"
             ]
+        return []
+
+    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[str]:
+        """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
+        if not isinstance(value, str):
+            return [
+                f"bits value must be a string (space-separated bit names), got {type(value).__name__}"
+            ]
+        bits = type_stmt.bits or []
+        allowed = {b.name for b in bits}
+        if not allowed:
+            return ["bits type has no bit definitions"]
+        parts = [p for p in (s.strip() for s in value.split()) if p]
+        seen: set[str] = set()
+        for token in parts:
+            if token in seen:
+                return [f"Duplicate bit {token!r} in bits value"]
+            seen.add(token)
+            if token not in allowed:
+                return [
+                    f"Unknown bit {token!r}; allowed: {', '.join(sorted(allowed))}"
+                ]
         return []
 
     def _check_empty(self, value: Any) -> List[str]:

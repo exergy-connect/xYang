@@ -5,6 +5,7 @@ Statement parsers for YANG statements.
 from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (
+    YangBitStmt,
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangIdentityStmt,
@@ -13,7 +14,6 @@ from ..ast import (
     YangStatementWithWhen,
 )
 from ..xpath import XPathParser
-from types import SimpleNamespace
 
 from ..refine_expand import apply_refines_by_path, copy_yang_statement
 
@@ -309,6 +309,12 @@ class StatementParsers:
             raise tokens._make_error(
                 'enumeration type requires at least one "enum" statement (RFC 7950)'
             )
+        if type_stmt.name == "bits":
+            if not type_stmt.bits:
+                raise tokens._make_error(
+                    'bits type requires at least one "bit" statement (RFC 7950)'
+                )
+            self._finalize_bits_type(type_stmt, tokens)
         if type_stmt.name == "identityref" and not type_stmt.identityref_bases:
             raise tokens._make_error(
                 'identityref type requires at least one "base" statement (RFC 7950)'
@@ -363,6 +369,72 @@ class StatementParsers:
         enum_name = tokens.consume()  # identifier or keyword (e.g. string, boolean)
         type_stmt.enums.append(enum_name)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def _consume_bit_block_description(self, tokens: TokenStream) -> None:
+        """Skip a ``description`` substatement inside ``bit { ... }`` (value not stored on AST)."""
+        tokens.consume_type(YangTokenType.DESCRIPTION)
+        tokens.consume_type(YangTokenType.STRING)
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self._consume_bit_block_description(tokens)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in bit description block: {tokens.peek()!r}"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_type_bit(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
+        """Parse ``bit`` substatement under ``type bits { ... }`` (RFC 7950 §9.3.4)."""
+        tokens.consume_type(YangTokenType.BIT)
+        bit_name = tokens.consume()
+        explicit_pos: Optional[int] = None
+        if tokens.consume_if_type(YangTokenType.LBRACE):
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                pt = tokens.peek_type()
+                if pt == YangTokenType.POSITION:
+                    tokens.consume_type(YangTokenType.POSITION)
+                    if explicit_pos is not None:
+                        raise tokens._make_error("Duplicate position in bit statement")
+                    explicit_pos = int(tokens.consume_type(YangTokenType.INTEGER))
+                    tokens.consume_if_type(YangTokenType.SEMICOLON)
+                elif pt == YangTokenType.DESCRIPTION:
+                    self._consume_bit_block_description(tokens)
+                else:
+                    raise tokens._make_error(
+                        f"Unknown statement in bit: {tokens.peek()!r} "
+                        f"(only position and description allowed)"
+                    )
+            tokens.consume_type(YangTokenType.RBRACE)
+        type_stmt.bits.append(YangBitStmt(name=bit_name, position=explicit_pos))
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def _finalize_bits_type(self, type_stmt: YangTypeStmt, tokens: TokenStream) -> None:
+        """Assign implicit bit positions; validate unique names and positions (RFC 7950 §9.3.4).
+
+        Positions are resolved in **declaration order**: an implicit bit uses the largest
+        position already assigned at that point (+1), or 0 if none yet.
+        """
+        seen_names: set[str] = set()
+        used_positions: set[int] = set()
+        for b in type_stmt.bits:
+            if b.name in seen_names:
+                raise tokens._make_error(f"Duplicate bit name {b.name!r} in bits type")
+            seen_names.add(b.name)
+            if b.position is not None:
+                p = b.position
+                if p < 0:
+                    raise tokens._make_error(f"Invalid negative position {p} for bit {b.name!r}")
+                if p in used_positions:
+                    raise tokens._make_error(
+                        f"Duplicate position {p} for bit {b.name!r} in bits type"
+                    )
+                used_positions.add(p)
+            else:
+                p = 0 if not used_positions else max(used_positions) + 1
+                b.position = p
+                used_positions.add(p)
 
     def parse_type_path(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse path constraint (for leafref). Path is parsed to XPath PathNode during parsing."""
@@ -696,7 +768,9 @@ class StatementParsers:
                 if nested_grouping:
                     body = [copy_yang_statement(s) for s in nested_grouping.statements]
                     nested_expanded = self._expand_uses(
-                        SimpleNamespace(statements=body), stmt.refines, module
+                        YangGroupingStmt(name="", statements=body),
+                        stmt.refines,
+                        module,
                     )
                     expanded.extend(nested_expanded)
             else:

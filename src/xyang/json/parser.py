@@ -15,6 +15,7 @@ from typing import Any
 
 from ..module import YangModule
 from ..ast import (
+    YangBitStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -127,6 +128,36 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             name="instance-identifier",
             require_instance=bool(require),
         )
+    if xyang.get(XYangKey.TYPE) == XYangTypeValue.BITS:
+        raw = xyang.get(XYangKey.BITS)
+        bits: list[YangBitStmt] = []
+        if isinstance(raw, dict):
+            for name, pos in raw.items():
+                if not isinstance(name, str) or not name:
+                    continue
+                try:
+                    p = int(pos)
+                except (TypeError, ValueError):
+                    continue
+                bits.append(YangBitStmt(name=name, position=p))
+            bits.sort(key=lambda b: (b.position if b.position is not None else 0, b.name))
+        elif isinstance(raw, list):
+            # Legacy: [{ "name", "position" }, …] or bare names with index as position
+            for i, item in enumerate(raw):
+                if isinstance(item, dict):
+                    nm = item.get("name")
+                    if not isinstance(nm, str) or not nm:
+                        continue
+                    pos = item.get("position", i)
+                    try:
+                        p = int(pos)
+                    except (TypeError, ValueError):
+                        p = i
+                    bits.append(YangBitStmt(name=nm, position=p))
+                elif isinstance(item, str) and item:
+                    bits.append(YangBitStmt(name=item, position=i))
+        if bits:
+            return YangTypeStmt(name="bits", bits=bits)
     # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
     if xyang.get(XYangKey.TYPE) == "leafref":
         path_val = xyang.get(XYangKey.PATH)
@@ -226,11 +257,15 @@ def _is_identity_def_schema(def_schema: dict[str, Any]) -> bool:
 
 
 def _is_typedef_def_schema(def_schema: dict[str, Any]) -> bool:
-    """$defs entries are typedefs; x-yang.type is optional (omitted = typedef)."""
+    """$defs entries are typedefs unless they are identities.
+
+    The generator may set ``x-yang.type`` on a typedef body (e.g. ``leafref``, ``bits``);
+    those entries must still be treated as typedefs, not skipped.
+    """
     t = _get_xyang(def_schema).get(XYangKey.TYPE)
     if t == XYangTypeValue.IDENTITY:
         return False
-    return t is None or t == "typedef"
+    return True
 
 
 def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, Any]) -> YangTypedefStmt | None:

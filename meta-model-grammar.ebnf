@@ -3,13 +3,13 @@
 
    Covered: module, typedef, grouping, uses (with refine and/or when), container, list, leaf, leaf-list,
    choice/case (including nested choice under container type), must, when, presence, key, min/max-elements,
-   type union (members: typedef ref, string, int32, uint8, boolean, leafref, decimal64, enumeration),
+   type union (members: typedef ref, string, int32, uint8, boolean, leafref, decimal64, enumeration, bits),
    leafref path + require-instance, default, mandatory, error-message, description (incl. block + nested).
 
    Must/when operands are XPath strings; `must` may use `+` to concatenate quoted string fragments.
 
    Out of scope for this module (and omitted here): submodule, import, include, extension, augment,
-   deviation, feature, bits, anydata, RPC/notification. identity / identityref / instance-identifier
+   deviation, feature, anydata, RPC/notification. identity / identityref / instance-identifier
    appear in other xYang examples, not in meta-model.yang. *)
 
 (* === Module === *)
@@ -36,15 +36,19 @@ type_body             = type_stmt { description_stmt } ;
 (* trailing ";" ends the type statement; union / leafref / enum / string / numeric use inner { } *)
 type_stmt             = "type" type_spec ";" ;
 
-type_spec             = union_type | leafref_type | enum_type | string_type | numeric_type
+type_spec             = union_type | leafref_type | enum_type | bits_type | string_type | numeric_type
                       | "boolean" | "empty" | type_name_ref ;
 
 type_name_ref         = identifier ;
 
 union_type            = "union" "{" { union_member } "}" ;
 union_member          = "type" union_member_spec ";" ;
-union_member_spec     = leafref_type | string_type | numeric_type | enum_type
+union_member_spec     = leafref_type | string_type | numeric_type | enum_type | bits_type
                       | "boolean" | "empty" | type_name_ref ;
+
+bits_type             = "bits" "{" { bit_stmt } "}" ;
+bit_stmt              = "bit" identifier [ "{" { bit_substmt } "}" ] ";" ;
+bit_substmt           = "position" integer ";" | description_stmt ;
 
 leafref_type          = "leafref" "{" "path" string ";"
                         [ "require-instance" ( "true" | "false" ) ";" ] "}" ;

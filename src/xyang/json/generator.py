@@ -84,6 +84,8 @@ def _schema_parent_of(
     """Parent of node in the module tree, or None if node is the module root."""
     if node is module:
         return None
+    if not isinstance(node, YangStatement):
+        return None
     return _locate_stmt_with_parent(module.statements, module, node)
 
 
@@ -239,6 +241,25 @@ def _type_to_schema(
         return out
     if name == "enumeration" and type_stmt.enums:
         return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(type_stmt.enums)}
+    if name == "bits" and type_stmt.bits:
+        ordered = sorted(
+            type_stmt.bits,
+            key=lambda b: (
+                b.position if b.position is not None else 0,
+                b.name,
+            ),
+        )
+        # Bit name -> position (JSON object); keys ordered by ascending position for stable output.
+        bits_obj: dict[str, int] = {}
+        for b in ordered:
+            bits_obj[b.name] = int(b.position) if b.position is not None else 0
+        return {
+            JsonSchemaKey.TYPE: "string",
+            JsonSchemaKey.X_YANG: {
+                XYangKey.TYPE: XYangTypeValue.BITS,
+                XYangKey.BITS: bits_obj,
+            },
+        }
     if name == "boolean":
         return {JsonSchemaKey.TYPE: "boolean"}
     if name in ("int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"):

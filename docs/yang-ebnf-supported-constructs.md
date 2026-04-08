@@ -33,7 +33,7 @@ keyword      = "module" | "yang-version" | "namespace" | "prefix" | "organizatio
              | "binary" | "bits" | "boolean" | "decimal64" | "empty" | "enumeration"
              | "identityref" | "instance-identifier" | "int8" | "int16" | "int32" | "int64"
              | "leafref" | "string" | "uint8" | "uint16" | "uint32" | "uint64" | "union"
-             | "path" | "require-instance" | "enum" | "pattern" | "length"
+             | "path" | "require-instance" | "enum" | "bit" | "position" | "pattern" | "length"
              | "fraction-digits" | "range" | "grouping" | "uses" | "refine"
              | "container" | "list" | "leaf" | "leaf-list" | "choice" | "case"
              | "must" | "when" | "presence" | "key" | "min-elements" | "max-elements"
@@ -120,6 +120,7 @@ type_body     = { type_substmt } ;
 
 type_substmt  = "type" type_stmt              (* union member types, including nested leafref *)
               | enum_stmt                     (* only in ``enumeration`` — forms enum_specification *)
+              | bit_stmt                      (* only in ``bits`` *)
               | "pattern" STRING [ ";" ]
               | "length" ( STRING | identifier ) [ ";" ]
               | "range" STRING [ ";" ]
@@ -135,6 +136,12 @@ enum_stmt     = "enum" enum_name [ ";" ] ;   (* RFC 7950 allows a braced enum-st
 
 (* Enum value: lexer token — identifier or any built-in type keyword spelling. *)
 enum_name     = identifier | builtin_type_keyword ;
+
+(* RFC 7950 bits: at least one bit-stmt; optional position and description in bit body. *)
+bit_stmt      = "bit" identifier [ "{" { bit_substmt } "}" ] [ ";" ] ;
+
+bit_substmt   = "position" INTEGER [ ";" ]
+              | description_stmt ;
 ```
 
 **Supported type names** (after `type`):
@@ -147,6 +154,8 @@ enum_name     = identifier | builtin_type_keyword ;
 **Leafref:** `type leafref { "path" STRING ; [ "require-instance" ( "true" | "false" ) ; ] }`.
 
 **Enumeration:** `type enumeration {` **enum-specification** `}` where **enum-specification** is **one or more** **enum-stmt** (each `enum` *enum-name* `;`, or a braced variant if supported). The parser currently takes a single token per `enum` name then `;` (optional nested description blocks are limited; see `parse_type_enum`).
+
+**Bits:** `type bits {` one or more `bit` *name* `;` or `bit` *name* `{` `position` *integer* `;` [ `description` … ] `}` `}`. Implicit `position` values follow RFC 7950 (see `StatementParsers._finalize_bits_type`). Instance JSON: a single string, space-separated bit names. In generated JSON Schema, `x-yang.bits` is an object mapping each bit name to its integer position (legacy array-of-objects input is still parsed).
 
 **String:** optional `{ length … ; pattern … ; description … }`.
 
@@ -306,7 +315,7 @@ Parent context and accepted first tokens are exactly those registered in `YangPa
 
 Typical YANG 1.1 features **outside** xYang’s parser (see also `FEATURES.md`) include among others:
 
-`import`, `include`, `submodule`, `augment`, `deviation`, `extension`, `identity`, `identityref`, `bits`, `empty` (as a first-class keyword — `empty` may still appear as an identifier if treated like a name), `instance-identifier`, `feature`, `if-feature`, `anydata`, `anyxml`, `notification`, `rpc`, `action`, `input`, `output`, etc.
+`import`, `include`, `submodule`, `augment`, `deviation`, `extension`, `feature`, `if-feature`, `anydata`, `anyxml`, `notification`, `rpc`, `action`, `input`, `output`, etc. (Several built-in type keywords are implemented for parsing/validation — see **Supported type names** and `FEATURES.md`.)
 
 ---
 

@@ -58,6 +58,7 @@ class XYangKey:
     REQUIRE_INSTANCE = "require-instance"
     WHEN = "when"
     MUST = "must"
+    BITS = "bits"
     KEY = "key"
     PRESENCE = "presence"
     MANDATORY = "mandatory"
@@ -77,6 +78,7 @@ class XYangTypeValue:
     IDENTITY = "identity"
     IDENTITYREF = "identityref"
     INSTANCE_IDENTIFIER = "instance-identifier"
+    BITS = "bits"
 
 
 class XYangMustEntryKey:
