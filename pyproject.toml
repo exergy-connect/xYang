@@ -46,11 +46,11 @@ Issues = "https://github.com/exergy-connect/xYang/issues"
 [project.scripts]
 xyang = "xyang.__main__:main"
 
-[tool.setuptools]
-packages = ["xyang"]
-
 [tool.setuptools.package-dir]
 "" = "src"
+
+[tool.setuptools.packages.find]
+where = ["src"]
 
 [tool.pyright]
 extraPaths = ["src"]
