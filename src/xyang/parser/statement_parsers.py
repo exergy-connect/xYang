@@ -4,6 +4,7 @@ Statement parsers for YANG statements.
 
 from __future__ import annotations
 
+from types import SimpleNamespace
 from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from ..ast import (

@@ -6,6 +6,7 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 
 from enum import Enum
 from pathlib import Path
+from types import SimpleNamespace
 from typing import List, Tuple, Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
 from ..errors import YangSyntaxError
@@ -23,7 +24,11 @@ if TYPE_CHECKING:
 
 # Type for parser context parent: statement lists or nested statement contexts (type/must/when)
 _ParserParent = Union[
-    "YangStatementList", "YangTypeStmt", "YangMustStmt", "YangWhenStmt"
+    "YangStatementList",
+    "YangTypeStmt",
+    "YangMustStmt",
+    "YangWhenStmt",
+    SimpleNamespace,
 ]
 
 
