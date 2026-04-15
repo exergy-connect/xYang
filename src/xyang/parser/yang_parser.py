@@ -200,6 +200,7 @@ class YangParser:
         self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
         self.registry.register('refine:ordered-by', self.parsers.parse_ordered_by)
         self.registry.register('refine:mandatory', self.parsers.parse_refine_mandatory)
+        self.registry.register('refine:default', self.parsers.parse_refine_default)
         self.registry.register('refine:if-feature', self.parsers.parse_if_feature_stmt)
         
         # Type constraint statements

@@ -819,28 +819,39 @@ class StatementParsers:
             parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
+    def _parse_default_value_tokens(self, tokens: TokenStream) -> str | int:
+        """Consume a YANG ``default`` value (after the ``default`` keyword)."""
+        tt = tokens.peek_type()
+        if tt == YangTokenType.STRING:
+            return tokens.consume_type(YangTokenType.STRING)
+        if tt == YangTokenType.INTEGER:
+            return tokens.consume_type(YangTokenType.INTEGER)
+        if tt == YangTokenType.IDENTIFIER:
+            return tokens.consume_type(YangTokenType.IDENTIFIER)
+        if tt == YangTokenType.TRUE:
+            tokens.consume_type(YangTokenType.TRUE)
+            return "true"
+        if tt == YangTokenType.FALSE:
+            tokens.consume_type(YangTokenType.FALSE)
+            return "false"
+        raise tokens._make_error(
+            f"Expected default value (string, integer, identifier, or true/false), "
+            f"got {tt.name if tt else 'end'}"
+        )
+
     def parse_leaf_default(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse default in leaf statement."""
         tokens.consume_type(YangTokenType.DEFAULT)
         if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
-            tt = tokens.peek_type()
-            if tt == YangTokenType.STRING:
-                context.current_parent.default = tokens.consume_type(YangTokenType.STRING)
-            elif tt == YangTokenType.INTEGER:
-                context.current_parent.default = tokens.consume_type(YangTokenType.INTEGER)
-            elif tt == YangTokenType.IDENTIFIER:
-                context.current_parent.default = tokens.consume_type(YangTokenType.IDENTIFIER)
-            elif tt == YangTokenType.TRUE:
-                tokens.consume_type(YangTokenType.TRUE)
-                context.current_parent.default = "true"
-            elif tt == YangTokenType.FALSE:
-                tokens.consume_type(YangTokenType.FALSE)
-                context.current_parent.default = "false"
-            else:
-                raise tokens._make_error(
-                    f"Expected default value (string, integer, identifier, or true/false), "
-                    f"got {tt.name if tt else 'end'}"
-                )
+            context.current_parent.default = self._parse_default_value_tokens(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_refine_default(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse default in refine (RFC 7950 §7.13.2; applied to expanded leaf / leaf-list)."""
+        tokens.consume_type(YangTokenType.DEFAULT)
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.refined_defaults.append(self._parse_default_value_tokens(tokens))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -1008,8 +1019,6 @@ class StatementParsers:
                     self.parse_description(tokens, new_context)
                 elif tokens.peek_type() == YangTokenType.TYPE:
                     self.parse_type(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.DEFAULT:
-                    tokens.consume()  # Skip for now
                 elif self._skip_unsupported_if_present(tokens, f"refine '{target_path}'"):
                     pass
                 else:

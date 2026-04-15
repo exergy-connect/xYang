@@ -867,6 +867,9 @@ def _leaf_list_stmt_to_property(
         out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
     if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
         out[JsonSchemaKey.MAX_ITEMS] = stmt.max_elements
+    defaults = getattr(stmt, "defaults", None) or []
+    if defaults:
+        out[JsonSchemaKey.DEFAULT] = list(defaults)
     return out
 
 
