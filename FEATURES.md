@@ -170,7 +170,7 @@ container data {
 ```
 
 ### Refine Statement
-The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties. Refine may add **`if-feature`** expressions, which are appended to the target node’s `if_features` (AND with any existing conditions).
+The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties. Supported substatements include **`default`** (for `leaf` and `leaf-list` targets). Multiple `default` lines under one `refine` build the leaf-list default set; the merged values are emitted in JSON Schema as **`default`** (scalar for a leaf, **array** for a leaf-list, matching draft 2020-12). Refine may add **`if-feature`** expressions, which are appended to the target node’s `if_features` (AND with any existing conditions).
 
 Example:
 ```yang

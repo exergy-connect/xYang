@@ -153,9 +153,12 @@ class YangLeafStmt(YangStatementWithMust, YangStatementWithWhen):
 @dataclass
 class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
     """Leaf-list statement."""
+
     type: Optional[YangTypeStmt] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+    # RFC 7950: 0..n ``default`` substatements (ordered set of default values); filled by refine too
+    defaults: List[Any] = field(default_factory=list)
 
 
 @dataclass
@@ -246,6 +249,8 @@ class YangRefineStmt(YangStatementWithMust):
     type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
     min_elements: Optional[int] = None  # Refined min-elements (list / leaf-list)
     max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)
+    # RFC 7950 §7.13.2: ``default`` substatements (one value each); one for leaf targets, 1..n for leaf-list
+    refined_defaults: List[Any] = field(default_factory=list)
     # RFC 7950 §7.13.2: leaf / choice may get a different mandatory; None = omit from refine
     refined_mandatory: Optional[bool] = None
     # RFC 7950 §7.13.2: additional if-feature expressions (AND with target node's own).

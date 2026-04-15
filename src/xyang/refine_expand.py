@@ -136,6 +136,24 @@ def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
         elif isinstance(stmt, YangChoiceStmt):
             stmt.mandatory = rm
             logger.debug("refine applied mandatory: choice=%r mandatory=%r", stmt, rm)
+    rds = getattr(refine, "refined_defaults", None) or []
+    if rds:
+        if isinstance(stmt, YangLeafStmt):
+            stmt.default = rds[0]
+            logger.debug(
+                "refine applied default: stmt=%r default=%r refine=%r",
+                stmt,
+                stmt.default,
+                refine,
+            )
+        elif isinstance(stmt, YangLeafListStmt):
+            stmt.defaults = list(rds)
+            logger.debug(
+                "refine applied defaults: stmt=%r defaults=%r refine=%r",
+                stmt,
+                stmt.defaults,
+                refine,
+            )
     if isinstance(stmt, YangStatementWithMust):
         for refine_must in refine.must_statements:
             stmt.must_statements.append(refine_must)

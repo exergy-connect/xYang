@@ -716,6 +716,12 @@ def _convert_leaf_list(
         ll.min_elements = int(schema[JsonSchemaKey.MIN_ITEMS])
     if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
         ll.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
+    raw_def = schema.get(JsonSchemaKey.DEFAULT)
+    if raw_def is not None:
+        if isinstance(raw_def, list):
+            ll.defaults = list(raw_def)
+        else:
+            ll.defaults = [raw_def]
     _set_if_features_from_xyang(ll, xyang)
     return ll
 
