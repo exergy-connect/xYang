@@ -44,12 +44,17 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `list` - List statements (with key)
 - ✅ `leaf` - Leaf statements
 - ✅ `leaf-list` - Leaf-list statements
-- ✅ `anydata` / `anyxml` — Parsed; inner JSON unconstrained unless you enable the optional ``xyang.ext`` subtree validator ([draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation)). JSON Schema: open union + `x-yang.type` for round-trip.
+- ✅ `anydata` / `anyxml` — Parsed; inner JSON unconstrained unless you enable the optional ``xyang.ext`` subtree validator ([draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation); uses ``xyang.encoding`` / RFC 7951 qualified names). JSON Schema: open union + `x-yang.type` for round-trip.
 - ✅ `choice` - Choice statements (mutually exclusive alternatives)
 - ✅ `case` - Case statements (choice alternatives)
 - ✅ `grouping` - Grouping statements (defines reusable schema components)
 - ✅ `uses` - Uses statements (incorporates groupings)
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
+
+### Instance data encodings
+- ✅ **JSON ([RFC 7951](https://www.rfc-editor.org/rfc/rfc7951))** — Validators consume dict/list instance trees in this shape. Core helper ``xyang.encoding.resolve_qualified_top_level`` (``encoding/rfc7951.py``) maps a namespace-qualified object member ``module-name:node`` to a top-level schema node in that module (used for optional anydata subtree validation and reusable elsewhere).
+- ⚠️ **XML** ([RFC 7950](https://www.rfc-editor.org/rfc/rfc7950) XML encoding) — Not supported yet for instance validation or qualified-name resolution.
+- ⚠️ **Binary encodings** (e.g. [RFC 9254](https://www.rfc-editor.org/rfc/rfc9254) CBOR) — Not supported yet.
 
 ### Constraints
 - ✅ `must` - Must constraints (19 `must "` substatements) - **Parsed and evaluated**

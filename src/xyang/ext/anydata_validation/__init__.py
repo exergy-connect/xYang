@@ -11,8 +11,9 @@ from __future__ import annotations
 from enum import Enum
 from typing import Any, Dict, Tuple
 
-from ...ast import YangLeafStmt, YangStatement
+from ...ast import YangLeafStmt
 from ...module import YangModule
+from ...encoding import resolve_qualified_top_level
 from ...validator.document_validator import DocumentValidator
 from ...validator.path_builder import PathBuilder
 from ...validator.validation_error import ValidationError
@@ -49,20 +50,6 @@ def parse_anydata_extension_kwargs(
         if v.name != k:
             raise TypeError(f"modules dict key {k!r} must match YangModule.name {v.name!r}")
     return modules, mode
-
-
-def _resolve_qualified_top_level(
-    json_key: str, modules: Dict[str, YangModule]
-) -> Tuple[YangStatement | None, YangModule | None]:
-    """RFC 7951 namespace-qualified member at the anydata root: ``module-name:node``."""
-    if ":" not in json_key:
-        return None, None
-    mod_name, _, ident = json_key.partition(":")
-    mod = modules.get(mod_name)
-    if mod is None:
-        return None, None
-    stmt = mod.find_statement(ident)
-    return stmt, mod
 
 
 def _rewrite_error_path(
@@ -104,7 +91,7 @@ def run_anydata_subtree_validation(
     segments = [s for s in anydata_path.strip("/").split("/") if s]
 
     for json_key, child_val in value.items():
-        stmt, mod = _resolve_qualified_top_level(json_key, modules)
+        stmt, mod = resolve_qualified_top_level(json_key, modules)
         if stmt is None or mod is None:
             outer._errors.append(
                 ValidationError(
