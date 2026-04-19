@@ -44,7 +44,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `list` - List statements (with key)
 - ✅ `leaf` - Leaf statements
 - ✅ `leaf-list` - Leaf-list statements
-- ✅ `anydata` / `anyxml` — Parsed; instance values are any JSON-compatible shape (no inner schema). `DocumentValidator` enforces presence, `when`, `must`, `if-feature`, and `mandatory` only. JSON Schema uses an open multi-type union plus `x-yang.type` `anydata` / `anyxml` for round-trip.
+- ✅ `anydata` / `anyxml` — Parsed; inner JSON unconstrained unless you enable the optional ``xyang.ext`` subtree validator ([draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation)). JSON Schema: open union + `x-yang.type` for round-trip.
 - ✅ `choice` - Choice statements (mutually exclusive alternatives)
 - ✅ `case` - Case statements (choice alternatives)
 - ✅ `grouping` - Grouping statements (defines reusable schema components)

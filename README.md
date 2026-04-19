@@ -117,6 +117,12 @@ if not is_valid:
         print(f"Error: {error}")
 ```
 
+### Optional: ``anydata`` subtree validation
+
+An add-on in ``xyang.ext`` for optional validation of JSON under ``anydata`` per
+[draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation).
+See [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py) and [**FEATURES.md**](FEATURES.md).
+
 ### Working with types
 
 ```python

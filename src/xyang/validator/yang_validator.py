@@ -7,6 +7,7 @@ from typing import Any, Dict, List, Tuple
 from ..module import YangModule
 from .document_validator import DocumentValidator
 from .validation_error import Severity, ValidationError
+from .validator_extension import ValidatorExtension
 
 
 class YangValidator:
@@ -21,6 +22,10 @@ class YangValidator:
         self.module = module
         self._doc_validator = DocumentValidator(module)
 
+    def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
+        """Enable a :class:`DocumentValidator` extension (see ``ValidatorExtension``)."""
+        self._doc_validator.enable_extension(extension, **kwargs)
+
     def validate(
         self,
         data: Dict[str, Any],
@@ -33,19 +38,9 @@ class YangValidator:
         Returns:
             (is_valid, errors, warnings)
         """
-        doc_errors: List[ValidationError] = self._doc_validator.validate(
-            data, leafref_severity=leafref_severity
-        )
-        errors = [
-            self._format_error(e)
-            for e in doc_errors
-            if e.severity == Severity.ERROR
-        ]
-        warnings = [
-            self._format_error(e)
-            for e in doc_errors
-            if e.severity == Severity.WARNING
-        ]
+        doc_errors: List[ValidationError] = self._doc_validator.validate(data, leafref_severity=leafref_severity)
+        errors = [self._format_error(e) for e in doc_errors if e.severity == Severity.ERROR]
+        warnings = [self._format_error(e) for e in doc_errors if e.severity == Severity.WARNING]
         return len(errors) == 0, errors, warnings
 
     @staticmethod

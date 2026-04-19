@@ -11,8 +11,8 @@ class PathBuilder:
     List entries use key predicates: /data-model/entities[name='foo']
     """
 
-    def __init__(self) -> None:
-        self._segments: List[str] = []
+    def __init__(self, initial_segments: Optional[List[str]] = None) -> None:
+        self._segments: List[str] = list(initial_segments) if initial_segments else []
 
     def push(self, name: str, key: Optional[str] = None) -> None:
         self._segments.append(f"{name}[{key}]" if key is not None else name)

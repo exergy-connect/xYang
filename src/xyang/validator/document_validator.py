@@ -47,6 +47,7 @@ from ..xpath.utils import yang_bool
 
 from .if_feature_eval import build_enabled_features_map, stmt_if_features_satisfied
 from .path_builder import PathBuilder
+from .validator_extension import ValidatorExtension
 from .type_checker import TypeChecker
 from .validation_error import ValidationError, Severity
 
@@ -73,18 +74,20 @@ class DocumentValidator:
         root_schema: YangStatementList,
         *,
         enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = None,
+        constraint_checks: bool = True,
     ) -> None:
         self._root_schema = root_schema
+        self._constraint_checks = constraint_checks
+        self._enabled_features_by_module = enabled_features_by_module
         self._type_checker = TypeChecker()
         self._evaluator = XPathEvaluator()
         if isinstance(root_schema, YangModule):
             self._if_feature_module: Optional[YangModule] = root_schema
-            self._enabled_features = build_enabled_features_map(
-                root_schema, enabled_features_by_module
-            )
+            self._enabled_features = build_enabled_features_map(root_schema, enabled_features_by_module)
         else:
             self._if_feature_module = None
             self._enabled_features = {}
+        self._anydata_validation: Optional[Dict[str, Any]] = None
 
     def validate(
         self,
@@ -92,6 +95,8 @@ class DocumentValidator:
         *,
         leafref_severity: Severity = Severity.ERROR,
         cache: bool = True,
+        leafref_root_data: Optional[Any] = None,
+        path: Optional[PathBuilder] = None,
     ) -> List[ValidationError]:
         """Validate data against the root schema.
 
@@ -103,12 +108,15 @@ class DocumentValidator:
             data: Root data to validate (typically a dict or list).
             leafref_severity: Severity for leafref violations (ERROR or WARNING).
             cache: If True, cache XPath path results for reuse; if False, disable.
+            leafref_root_data: If set, used as XPath / leafref root data instead of
+                ``data`` (for validating a fragment in full-document context).
+            path: Optional path prefix (e.g. subtree validation under ``anydata``).
 
         Returns:
             List of ValidationError (empty when valid).
         """
         self._leafref_severity = leafref_severity
-        self._root_data = data
+        self._root_data = leafref_root_data if leafref_root_data is not None else data
         self._errors = []
         self._case_stack: list[YangCaseStmt] = []
         self._case_level_data_stack: list[dict[str, Any]] = []
@@ -116,23 +124,33 @@ class DocumentValidator:
         path_cache: Dict[Any, Any] | None = {} if cache else None
         node = Node(data, self._root_schema, None)
         ctx = Context(current=node, root=node, path_cache=path_cache)
-        path = PathBuilder()
+        path_builder = path if path is not None else PathBuilder()
         self._visit_children(
-            data, self._root_schema, (ctx, node), path, enforce_mandatory_choice=True
+            data,
+            self._root_schema,
+            (ctx, node),
+            path_builder,
+            enforce_mandatory_choice=True,
         )
         return self._errors
+
+    def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
+        """Enable an optional validation extension (see ``ValidatorExtension``)."""
+        if extension is ValidatorExtension.ANYDATA_VALIDATION:
+            from ..ext.anydata_validation import AnydataValidationMode, parse_anydata_extension_kwargs
+
+            modules, mode = parse_anydata_extension_kwargs(kwargs)
+            self._anydata_validation = {"modules": modules, "mode": mode}
+            return
+        raise ValueError(f"unknown validator extension: {extension!r}")
 
     def _if_features_active(self, stmt: YangStatement) -> bool:
         if self._if_feature_module is None:
             return True
         feats = getattr(stmt, "if_features", None) or []
-        return stmt_if_features_satisfied(
-            feats, self._if_feature_module, self._enabled_features
-        )
+        return stmt_if_features_satisfied(feats, self._if_feature_module, self._enabled_features)
 
-    def _effective_value(
-        self, data: Dict[str, Any], name: str, stmt: YangStatement
-    ) -> Any:
+    def _effective_value(self, data: Dict[str, Any], name: str, stmt: YangStatement) -> Any:
         """
         Return the effective value for a node:
         - data[name] if present
@@ -145,9 +163,7 @@ class DocumentValidator:
             return data[name]
         return SchemaNav.default(stmt)
 
-    def _child_enforce_mandatory_choice(
-        self, owner: YangStatementList, parent_enforce: bool
-    ) -> bool:
+    def _child_enforce_mandatory_choice(self, owner: YangStatementList, parent_enforce: bool) -> bool:
         """RFC 7950 §7.9.4: whether mandatory ``choice`` is enforced without case-sibling deferral.
 
         When ``False``, the innermost ``case`` on ``_case_stack`` (with data from
@@ -167,9 +183,7 @@ class DocumentValidator:
             return True
         return parent_enforce
 
-    def _statement_has_matching_data(
-        self, stmt: YangStatement, data: dict[str, Any]
-    ) -> bool:
+    def _statement_has_matching_data(self, stmt: YangStatement, data: dict[str, Any]) -> bool:
         """True if this statement (or a nested choice branch) has a key in ``data``."""
         if isinstance(stmt, YangLeafStmt):
             return stmt.name in data
@@ -203,9 +217,7 @@ class DocumentValidator:
                 return True
         return False
 
-    def _case_has_any_stmt_data(
-        self, case: YangCaseStmt, data: dict[str, Any]
-    ) -> bool:
+    def _case_has_any_stmt_data(self, case: YangCaseStmt, data: dict[str, Any]) -> bool:
         """§7.6.5: any node from this case appears in ``data`` at the current level."""
         return any(self._statement_has_matching_data(s, data) for s in case.statements)
 
@@ -228,9 +240,7 @@ class DocumentValidator:
             return True
         if not self._case_stack:
             return True
-        return self._case_has_other_stmt_data(
-            self._case_stack[-1], self._case_level_data(), skip=choice
-        )
+        return self._case_has_other_stmt_data(self._case_stack[-1], self._case_level_data(), skip=choice)
 
     def _leaf_mandatory_must_exist(
         self,
@@ -245,9 +255,7 @@ class DocumentValidator:
             return True
         if not self._case_stack:
             return True
-        return self._case_has_any_stmt_data(
-            self._case_stack[-1], self._case_level_data()
-        )
+        return self._case_has_any_stmt_data(self._case_stack[-1], self._case_level_data())
 
     # ------------------------------------------------------------------
     # Tree walk
@@ -263,9 +271,7 @@ class DocumentValidator:
     ) -> None:
         if not isinstance(data, dict):
             return
-        child_enforce = self._child_enforce_mandatory_choice(
-            schema, enforce_mandatory_choice
-        )
+        child_enforce = self._child_enforce_mandatory_choice(schema, enforce_mandatory_choice)
         visited_names: set[str] = set()
         for stmt in schema.statements:
             if isinstance(stmt, YangChoiceStmt):
@@ -299,9 +305,7 @@ class DocumentValidator:
             self._case_stack.append(stmt)
             self._case_level_data_stack.append(data)
             try:
-                ce = self._child_enforce_mandatory_choice(
-                    stmt, enforce_mandatory_choice
-                )
+                ce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
                 self._visit_children(data, stmt, parent_ctx, path, ce)
             finally:
                 self._case_level_data_stack.pop()
@@ -334,7 +338,7 @@ class DocumentValidator:
 
         # -- 1. when (RFC 7950: applicability first; report when-false before structural) --
         logger.debug("phase 1 when path=%s", child_path)
-        if isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
+        if self._constraint_checks and isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
             if getattr(stmt.when, "evaluate_with_parent_context", False):
                 when_ctx, when_node = parent_ctx_obj, parent_node
             else:
@@ -359,23 +363,15 @@ class DocumentValidator:
 
         # -- 2. Structural (mandatory, min/max-elements, presence) —
         logger.debug("phase 2 structural path=%s", child_path)
-        if not self._check_structural(
-            stmt, name, data, child_path, enforce_mandatory_choice
-        ):
+        if not self._check_structural(stmt, name, data, child_path, enforce_mandatory_choice):
             return
 
         # -- 3. must (evaluated in current node context) --
         logger.debug("phase 3 must path=%s", child_path)
-        if isinstance(stmt, YangStatementWithMust) and not isinstance(
-            stmt, YangListStmt
-        ):
+        if self._constraint_checks and isinstance(stmt, YangStatementWithMust) and not isinstance(stmt, YangListStmt):
             if isinstance(stmt, YangLeafListStmt):
                 # Leaf-list: evaluate must per element; skip when empty
-                items = (
-                    val
-                    if isinstance(val, list)
-                    else ([val] if val is not None else [])
-                )
+                items = val if isinstance(val, list) else ([val] if val is not None else [])
                 for i, item in enumerate(items):
                     item_node = parent_node.step(item, stmt)
                     item_ctx = parent_ctx_obj.child(item_node)
@@ -384,15 +380,17 @@ class DocumentValidator:
             else:
                 self._check_must(stmt, curr_ctx, curr_node, child_path)
 
+        if isinstance(stmt, YangAnydataStmt) and self._anydata_validation is not None:
+            if isinstance(val, dict):
+                from ..ext.anydata_validation import run_anydata_subtree_validation
+
+                run_anydata_subtree_validation(self, val, child_path)
+
         # -- 4. Type check --
         type_stmt = getattr(stmt, "type", None)
         type_name = getattr(type_stmt, "name", None) if type_stmt else None
         logger.debug("phase 4 type path=%s type=%s", child_path, type_name)
-        if (
-            isinstance(stmt, YangLeafStmt)
-            and stmt.type is not None
-            and val is not None
-        ):
+        if self._constraint_checks and (isinstance(stmt, YangLeafStmt) and stmt.type is not None and val is not None):
             if type_name == "leafref":
                 logger.debug("phase 4 type: leafref require-instance check path=%s", child_path)
             for msg in self._type_checker.check(
@@ -405,9 +403,7 @@ class DocumentValidator:
                 evaluator=self._evaluator,
                 leafref_current=curr_node,
             ):
-                severity = (
-                    self._leafref_severity if type_name == "leafref" else Severity.ERROR
-                )
+                severity = self._leafref_severity if type_name == "leafref" else Severity.ERROR
                 self._errors.append(
                     ValidationError(
                         path=child_path,
@@ -415,10 +411,8 @@ class DocumentValidator:
                         severity=severity,
                     )
                 )
-        elif isinstance(stmt, YangLeafListStmt) and stmt.type is not None:
-            items = (
-                val if isinstance(val, list) else ([val] if val is not None else [])
-            )
+        elif self._constraint_checks and isinstance(stmt, YangLeafListStmt) and stmt.type is not None:
+            items = val if isinstance(val, list) else ([val] if val is not None else [])
             leaf_list_leafref = getattr(stmt.type, "name", None) == "leafref"
             for i, item in enumerate(items):
                 item_node = parent_node.step(item, stmt)
@@ -434,11 +428,7 @@ class DocumentValidator:
                     evaluator=self._evaluator,
                     leafref_current=parent_node,
                 ):
-                    severity = (
-                        self._leafref_severity
-                        if leaf_list_leafref
-                        else Severity.ERROR
-                    )
+                    severity = self._leafref_severity if leaf_list_leafref else Severity.ERROR
                     self._errors.append(
                         ValidationError(
                             path=item_path,
@@ -451,43 +441,28 @@ class DocumentValidator:
         logger.debug("phase 5 descend path=%s", child_path)
         if isinstance(stmt, YangContainerStmt) and isinstance(val, dict):
             path.push(name)
-            child_enforce = self._child_enforce_mandatory_choice(
-                stmt, enforce_mandatory_choice
-            )
-            self._visit_children(
-                val, stmt, (curr_ctx, curr_node), path, child_enforce
-            )
+            child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
+            self._visit_children(val, stmt, (curr_ctx, curr_node), path, child_enforce)
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
-            if self._check_list_key_uniqueness(
-                val, key_names, name, child_path
-            ):
+            if self._check_list_key_uniqueness(val, key_names, name, child_path):
                 return  # duplicate key; skip per-entry validation
             for entry in val:
                 path.push(name, self._entry_key_from_names(entry, key_names))
                 entry_node = Node(entry, stmt, parent_node)
                 entry_ctx = curr_ctx.child(entry_node)
-                self._check_must(
-                    stmt, entry_ctx, entry_node, path.current()
-                )
-                entry_enforce = self._child_enforce_mandatory_choice(
-                    stmt, enforce_mandatory_choice
-                )
-                self._visit_children(
-                    entry, stmt, (entry_ctx, entry_node), path, entry_enforce
-                )
+                if self._constraint_checks:
+                    self._check_must(stmt, entry_ctx, entry_node, path.current())
+                entry_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
+                self._visit_children(entry, stmt, (entry_ctx, entry_node), path, entry_enforce)
                 path.pop()
 
-    def _choice_has_branch_data(
-        self, choice: YangChoiceStmt, data: Dict[str, Any]
-    ) -> bool:
+    def _choice_has_branch_data(self, choice: YangChoiceStmt, data: Dict[str, Any]) -> bool:
         """True if any schema child under any case has matching data in ``data``."""
         return any(self._case_has_any_stmt_data(c, data) for c in choice.cases)
 
-    def _stmt_instance_keys_from_data(
-        self, stmt: YangStatement, data: dict[str, Any]
-    ) -> set[str]:
+    def _stmt_instance_keys_from_data(self, stmt: YangStatement, data: dict[str, Any]) -> set[str]:
         """Instance keys under ``data`` claimed by this statement (same nesting level)."""
         if isinstance(stmt, YangLeafStmt):
             return {stmt.name} if stmt.name in data else set()
@@ -503,16 +478,12 @@ class DocumentValidator:
             return self._choice_instance_keys(stmt, data)
         return set()
 
-    def _choice_instance_keys(
-        self, choice: YangChoiceStmt, data: dict[str, Any]
-    ) -> set[str]:
+    def _choice_instance_keys(self, choice: YangChoiceStmt, data: dict[str, Any]) -> set[str]:
         """Keys in ``data`` consumed by this choice (nested choices: leaves stay at this level)."""
         if not self._if_features_active(choice):
             return set()
         active_cases = [
-            c
-            for c in choice.cases
-            if self._if_features_active(c) and self._case_has_any_stmt_data(c, data)
+            c for c in choice.cases if self._if_features_active(c) and self._case_has_any_stmt_data(c, data)
         ]
         if not active_cases:
             return set()
@@ -549,7 +520,7 @@ class DocumentValidator:
                 )
             return
 
-        if choice.when is not None:
+        if self._constraint_checks and choice.when is not None:
             when_ok = self._eval_expr(choice.when.ast, parent_ctx_obj, parent_node)
             if when_ok is None:
                 when_ok = True
@@ -585,7 +556,7 @@ class DocumentValidator:
                 continue
             if not self._case_has_any_stmt_data(case, data):
                 continue
-            if case.when is not None:
+            if self._constraint_checks and case.when is not None:
                 c_ok = self._eval_expr(case.when.ast, parent_ctx_obj, parent_node)
                 if c_ok is None:
                     c_ok = True
@@ -609,10 +580,7 @@ class DocumentValidator:
             self._errors.append(
                 ValidationError(
                     path=path.current(),
-                    message=(
-                        f"Choice '{choice.name}' allows only one case; "
-                        f"data matches multiple cases: {names}"
-                    ),
+                    message=(f"Choice '{choice.name}' allows only one case; " f"data matches multiple cases: {names}"),
                 )
             )
             return
@@ -620,9 +588,7 @@ class DocumentValidator:
         active_case = active_cases[0] if active_cases else None
 
         if active_case is None:
-            if self._mandatory_choice_violation(
-                choice, data, enforce_mandatory_choice
-            ):
+            if self._mandatory_choice_violation(choice, data, enforce_mandatory_choice):
                 self._errors.append(
                     ValidationError(
                         path=path.current(),
@@ -638,9 +604,7 @@ class DocumentValidator:
         self._case_stack.append(active_case)
         self._case_level_data_stack.append(data)
         try:
-            inner_enforce = self._child_enforce_mandatory_choice(
-                active_case, enforce_mandatory_choice
-            )
+            inner_enforce = self._child_enforce_mandatory_choice(active_case, enforce_mandatory_choice)
             for stmt in active_case.statements:
                 self._visit_stmt(stmt, data, parent_ctx, path, inner_enforce)
         finally:
@@ -669,9 +633,7 @@ class DocumentValidator:
             if type_name == "empty" and present:
                 return True
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(
-                    stmt, data, enforce_mandatory_choice
-                ):
+                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
                     self._errors.append(
                         ValidationError(
                             path=path,
@@ -682,9 +644,7 @@ class DocumentValidator:
 
         if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(
-                    stmt, data, enforce_mandatory_choice
-                ):
+                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
                     kind = "anydata" if isinstance(stmt, YangAnydataStmt) else "anyxml"
                     self._errors.append(
                         ValidationError(
@@ -698,11 +658,7 @@ class DocumentValidator:
             return present
 
         if isinstance(stmt, (YangListStmt, YangLeafListStmt)):
-            count = (
-                len(effective)
-                if isinstance(effective, list)
-                else (1 if effective is not None else 0)
-            )
+            count = len(effective) if isinstance(effective, list) else (1 if effective is not None else 0)
             min_e = getattr(stmt, "min_elements", None)
             max_e = getattr(stmt, "max_elements", None)
             # Only enforce min/max when list is present (YANG: optional list may be omitted)
@@ -710,20 +666,14 @@ class DocumentValidator:
                 self._errors.append(
                     ValidationError(
                         path=path,
-                        message=(
-                            f"'{name}' has {count} element(s) but "
-                            f"requires at least {min_e}"
-                        ),
+                        message=(f"'{name}' has {count} element(s) but " f"requires at least {min_e}"),
                     )
                 )
             if max_e is not None and present and count > max_e:
                 self._errors.append(
                     ValidationError(
                         path=path,
-                        message=(
-                            f"'{name}' has {count} element(s) but "
-                            f"allows at most {max_e}"
-                        ),
+                        message=(f"'{name}' has {count} element(s) but " f"allows at most {max_e}"),
                     )
                 )
             return present
@@ -734,9 +684,7 @@ class DocumentValidator:
     # XPath evaluation
     # ------------------------------------------------------------------
 
-    def _eval_expr(
-        self, ast: Any, ctx: Context, node: Node
-    ) -> Optional[bool]:
+    def _eval_expr(self, ast: Any, ctx: Context, node: Node) -> Optional[bool]:
         """Evaluate an XPath AST. Returns None on error."""
         if ast is None:
             return None
@@ -772,8 +720,7 @@ class DocumentValidator:
                 self._errors.append(
                     ValidationError(
                         path=path,
-                        message=must.error_message
-                        or (f"must constraint not satisfied on '{stmt.name}'"),
+                        message=must.error_message or (f"must constraint not satisfied on '{stmt.name}'"),
                         expression=must.expression,
                     )
                 )
@@ -799,9 +746,7 @@ class DocumentValidator:
             key_tuple = tuple(entry.get(k) for k in key_names)
             if key_tuple in seen_keys:
                 first_idx = seen_keys[key_tuple]
-                key_display = ", ".join(
-                    f"{k}='{entry.get(k)}'" for k in key_names
-                )
+                key_display = ", ".join(f"{k}='{entry.get(k)}'" for k in key_names)
                 self._errors.append(
                     ValidationError(
                         path=path_str,
@@ -816,9 +761,7 @@ class DocumentValidator:
             seen_keys[key_tuple] = i
         return False
 
-    def _entry_key_from_names(
-        self, entry: Any, key_names: List[str]
-    ) -> Optional[str]:
+    def _entry_key_from_names(self, entry: Any, key_names: List[str]) -> Optional[str]:
         """Path key string for a list entry from key leaf names."""
         if not isinstance(entry, dict) or not key_names:
             return None
