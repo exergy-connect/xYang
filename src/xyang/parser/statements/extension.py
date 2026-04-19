@@ -30,7 +30,7 @@ class ExtensionStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 tt = tokens.peek_type()
                 if tt == YangTokenType.ARGUMENT:
-                    self.parse_extension_argument_stmt(tokens, new_context)
+                    self._parse_extension_argument_stmt(tokens, new_context)
                 elif tt == YangTokenType.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
                 elif tt == YangTokenType.REFERENCE:
@@ -58,7 +58,7 @@ class ExtensionStatementParser:
         context.module.extensions[name] = ext
         self._parsers._add_to_parent_or_module(context, ext)
 
-    def parse_extension_argument_stmt(
+    def _parse_extension_argument_stmt(
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """Parse ``argument`` substatement inside ``extension``."""
@@ -78,7 +78,7 @@ class ExtensionStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.peek_type() == YangTokenType.YIN_ELEMENT:
-                    self.parse_extension_argument_yin_element(tokens, context)
+                    self._parse_extension_argument_yin_element(tokens, context)
                 elif self._parsers._skip_unsupported_if_present(tokens, "extension argument"):
                     continue
                 else:
@@ -88,7 +88,7 @@ class ExtensionStatementParser:
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_extension_argument_yin_element(
+    def _parse_extension_argument_yin_element(
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """Parse ``yin-element`` under ``extension argument``."""

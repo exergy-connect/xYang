@@ -31,7 +31,7 @@ from ..ext import (
 )
 from ..xpath import XPathParser
 
-from ..refine_expand import apply_refines_by_path, copy_yang_statement
+from ..refine_expand import copy_yang_statement
 from .unsupported_skip import is_unsupported_construct_start, skip_unsupported_construct
 
 if TYPE_CHECKING:
@@ -316,12 +316,6 @@ class StatementParsers:
     def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._extension_parser.parse_extension_stmt(tokens, context)
 
-    def parse_extension_argument_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        self._extension_parser.parse_extension_argument_stmt(tokens, context)
-
-    def parse_extension_argument_yin_element(self, tokens: TokenStream, context: ParserContext) -> None:
-        self._extension_parser.parse_extension_argument_yin_element(tokens, context)
-
     def parse_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._feature_parser.parse_feature_stmt(tokens, context)
 
@@ -395,9 +389,6 @@ class StatementParsers:
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         self._identity_parser.parse_identity(tokens, context)
-
-    def parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
-        self._identity_parser.parse_identity_base(tokens, context)
 
     def parse_type_base(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse base substatement inside identityref type."""
@@ -753,14 +744,6 @@ class StatementParsers:
             context.current_parent.default = self._parse_default_value_tokens(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_refine_default(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse default in refine (RFC 7950 §7.13.2; applied to expanded leaf / leaf-list)."""
-        tokens.consume_type(YangTokenType.DEFAULT)
-        parent = context.current_parent
-        if isinstance(parent, YangRefineStmt):
-            parent.refined_defaults.append(self._parse_default_value_tokens(tokens))
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse presence statement for container."""
         tokens.consume_type(YangTokenType.PRESENCE)
@@ -916,53 +899,6 @@ class StatementParsers:
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.mandatory = tt == YangTokenType.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse mandatory in refine (RFC 7950 §7.13.2: leaf / choice target)."""
-        tokens.consume_type(YangTokenType.MANDATORY)
-        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
-        parent = context.current_parent
-        if isinstance(parent, YangRefineStmt):
-            parent.refined_mandatory = tt == YangTokenType.TRUE
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
-    def _expand_uses(
-        self,
-        grouping: "YangStatement",
-        refines: list,
-        module: Optional["YangModule"] = None,
-    ) -> list:
-        """Legacy helper: expand nested ``uses`` inside a grouping (rarely used)."""
-        from ..ast import YangUsesStmt
-
-        expanded = []
-        for stmt in grouping.statements:
-            if isinstance(stmt, YangUsesStmt):
-                nested_grouping = module.get_grouping(stmt.grouping_name) if module else None
-                if nested_grouping:
-                    body = [copy_yang_statement(s) for s in nested_grouping.statements]
-                    nested_expanded = self._expand_uses(
-                        YangGroupingStmt(name="", statements=body),
-                        stmt.refines,
-                        module,
-                    )
-                    expanded.extend(nested_expanded)
-            else:
-                stmt_copy = self._copy_statement(stmt)
-                apply_refines_by_path([stmt_copy], refines)
-                expanded.append(stmt_copy)
-
-        return expanded
-    
-    def _expand_uses_with_statements(
-        self,
-        statements: list,
-        refines: list,
-        module: Optional["YangModule"] = None,
-    ) -> list:
-        """Apply path-based refines to an already-expanded statement list (legacy helper)."""
-        apply_refines_by_path(statements, refines)
-        return statements
     
     def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
         """Create a copy of a statement, handling AST nodes properly."""

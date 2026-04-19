@@ -36,9 +36,9 @@ class RefineStatementParser:
         elif tt == YangTokenType.ORDERED_BY:
             self._parsers.parse_ordered_by(tokens, context)
         elif tt == YangTokenType.MANDATORY:
-            self._parsers.parse_refine_mandatory(tokens, context)
+            self._parse_refine_mandatory(tokens, context)
         elif tt == YangTokenType.DEFAULT:
-            self._parsers.parse_refine_default(tokens, context)
+            self._parse_refine_default(tokens, context)
         elif tt == YangTokenType.IF_FEATURE:
             self._parsers.parse_if_feature_stmt(tokens, context)
         elif tt == YangTokenType.TYPE:
@@ -51,6 +51,23 @@ class RefineStatementParser:
             raise tokens._make_error(
                 f"Unknown statement in {unsupported}: {tokens.peek()!r}"
             )
+
+    def _parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse mandatory in refine (RFC 7950 section 7.13.2: leaf / choice target)."""
+        tokens.consume_type(YangTokenType.MANDATORY)
+        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.refined_mandatory = tt == YangTokenType.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def _parse_refine_default(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse default in refine (RFC 7950 section 7.13.2; applied to expanded leaf / leaf-list)."""
+        tokens.consume_type(YangTokenType.DEFAULT)
+        parent = context.current_parent
+        if isinstance(parent, YangRefineStmt):
+            parent.refined_defaults.append(self._parsers._parse_default_value_tokens(tokens))
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse refine statement (supports descendant paths ``a/b``)."""

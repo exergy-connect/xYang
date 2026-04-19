@@ -25,7 +25,7 @@ class IdentityStatementParser:
         unsupported = f"identity '{identity_name}'"
         tt = tokens.peek_type()
         if tt == YangTokenType.BASE:
-            self.parse_identity_base(tokens, context)
+            self._parse_identity_base(tokens, context)
         elif tt == YangTokenType.IF_FEATURE:
             self._parsers.parse_if_feature_stmt(tokens, context)
         elif tt == YangTokenType.IDENTIFIER:
@@ -51,7 +51,7 @@ class IdentityStatementParser:
         context.module.identities[identity_name] = identity_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
+    def _parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse base substatement inside identity."""
         tokens.consume_type(YangTokenType.BASE)
         base_name = self._parsers._consume_qname_from_identifier(tokens)
