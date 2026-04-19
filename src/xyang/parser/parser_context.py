@@ -87,6 +87,8 @@ class YangTokenType(Enum):
     PATH = "path"
     REQUIRE_INSTANCE = "require-instance"
     ENUM = "enum"
+    VALUE = "value"
+    STATUS = "status"
     BIT = "bit"
     POSITION = "position"
     PATTERN = "pattern"
@@ -115,6 +117,7 @@ class YangTokenType(Enum):
     MANDATORY = "mandatory"
     DEFAULT = "default"
     ERROR_MESSAGE = "error-message"
+    ERROR_APP_TAG = "error-app-tag"
     TRUE = "true"
     FALSE = "false"
 
@@ -239,6 +242,13 @@ class TokenStream:
         """Peek at current token type without consuming."""
         tok = self.peek_token()
         return tok.type if tok else None
+
+    def peek_type_at(self, offset: int = 0) -> Optional[YangTokenType]:
+        """Peek token type at ``index + offset`` without consuming."""
+        i = self.index + offset
+        if i < len(self._token_list):
+            return self._token_list[i].type
+        return None
 
     def consume_type(self, expected: YangTokenType) -> str:
         """Consume current token if its type matches expected; raise otherwise. Returns value."""

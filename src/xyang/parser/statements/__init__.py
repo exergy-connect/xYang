@@ -1,5 +1,6 @@
 """Per-statement parser helpers (split from ``statement_parsers``)."""
 
+from .augment import AugmentStatementParser
 from .extension import ExtensionStatementParser
 from .feature import FeatureStatementParser
 from .identity import IdentityStatementParser
@@ -12,6 +13,7 @@ from .type import TypeStatementParser
 from .uses import UsesStatementParser
 
 __all__ = [
+    "AugmentStatementParser",
     "BitsStatementParser",
     "ExtensionStatementParser",
     "FeatureStatementParser",

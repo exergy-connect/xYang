@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
-from ..statement_dispatch import StatementDispatchSpec
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -28,18 +27,22 @@ class FeatureStatementParser:
             holder = SimpleNamespace(if_features=[])
             feat_ctx = context.push_parent(holder)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                tt = tokens.peek_type()
+                if tt == YangTokenType.DESCRIPTION:
                     self._parsers.parse_optional_description(tokens, feat_ctx)
                     continue
-                self._parsers._parse_statement(
-                    tokens,
-                    feat_ctx,
-                    StatementDispatchSpec(
-                        registry_prefix="feature",
-                        unsupported_context=f"feature '{name}'",
-                        allowed_keywords=frozenset({"if-feature", "reference"}),
-                        try_skip_when_disallowed=True,
-                    ),
+                if tt == YangTokenType.IF_FEATURE:
+                    self._parsers.parse_if_feature_stmt(tokens, feat_ctx)
+                    continue
+                if tt == YangTokenType.REFERENCE:
+                    self._parsers.parse_reference_string_only(tokens, feat_ctx)
+                    continue
+                if self._parsers._skip_unsupported_if_present(
+                    tokens, f"feature '{name}'"
+                ):
+                    continue
+                raise tokens._make_error(
+                    f"Unknown statement in feature '{name}': {tokens.peek()!r}"
                 )
             tokens.consume_type(YangTokenType.RBRACE)
             if holder.if_features:
@@ -61,20 +64,21 @@ class FeatureStatementParser:
                 feats.append(expression)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                tt = tokens.peek_type()
+                if tt == YangTokenType.DESCRIPTION:
                     self._parsers.parse_optional_description(
                         tokens, context.push_parent(SimpleNamespace())
                     )
                     continue
-                self._parsers._parse_statement(
-                    tokens,
-                    context,
-                    StatementDispatchSpec(
-                        registry_prefix="if_feature",
-                        unsupported_context="if-feature substatement",
-                        allowed_keywords=frozenset({"reference"}),
-                        try_skip_when_disallowed=True,
-                    ),
+                if tt == YangTokenType.REFERENCE:
+                    self._parsers.parse_reference_string_only(tokens, context)
+                    continue
+                if self._parsers._skip_unsupported_if_present(
+                    tokens, "if-feature substatement"
+                ):
+                    continue
+                raise tokens._make_error(
+                    f"Unknown statement in if-feature substatement: {tokens.peek()!r}"
                 )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

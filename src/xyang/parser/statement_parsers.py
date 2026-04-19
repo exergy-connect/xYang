@@ -5,9 +5,10 @@ Statement parsers for YANG statements.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Optional, TYPE_CHECKING, TypeVar
+from typing import Callable, Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statement_dispatch import StatementDispatchSpec
+from .statements.augment import AugmentStatementParser
 from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
 from .statements.identity import IdentityStatementParser
@@ -24,7 +25,7 @@ from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangExtensionInvocationStmt,
-    YangGroupingStmt, YangUsesStmt, YangAugmentStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
+    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
 )
@@ -70,7 +71,163 @@ class StatementParsers:
         self._bits_parser = BitsStatementParser(self)
         self._type_parser = TypeStatementParser(self)
         self._uses_parser = UsesStatementParser(self)
+        self._augment_parser = AugmentStatementParser(self)
         ensure_builtin_extensions_loaded()
+
+    def get_registry_bindings(self) -> dict[str, Callable]:
+        """Return the default statement registry bindings."""
+        mp = self._module_parser
+        bindings: dict[str, Callable] = {
+            "import:prefix": mp.parse_import_prefix_binding,
+            "import:reference": self.parse_reference_string_only,
+            "include:prefix": mp.parse_prefix_value_stmt,
+            "include:reference": self.parse_reference_string_only,
+            "include:revision-date": self.parse_revision_date_statement,
+            "must:error-message": self.parse_must_error_message,
+            "must:description": self.parse_description,
+            "when:description": self.parse_description,
+            "feature:if-feature": self.parse_if_feature_stmt,
+            "feature:reference": self.parse_reference_string_only,
+            "if_feature:reference": self.parse_reference_string_only,
+        }
+
+        extension_handlers: tuple[tuple[str, Callable], ...] = (
+            ("if-feature", self.parse_if_feature_stmt),
+            ("when", self.parse_when),
+            ("must", self.parse_must),
+            ("description", self.parse_description),
+            ("reference", self.parse_reference_string_only),
+            ("uses", self.parse_uses),
+            ("leaf", self.parse_leaf),
+            ("leaf-list", self.parse_leaf_list),
+            ("container", self.parse_container),
+            ("list", self.parse_list),
+            ("choice", self.parse_choice),
+            ("case", self.parse_case),
+            ("anydata", self.parse_anydata),
+            ("anyxml", self.parse_anyxml),
+        )
+        for keyword, handler in extension_handlers:
+            bindings[f"extension_invocation:{keyword}"] = handler
+
+        context_handlers: dict[str, tuple[tuple[str, Callable], ...]] = {
+            "augment": (
+                ("if-feature", self.parse_if_feature_stmt),
+                ("uses", self.parse_uses),
+                ("leaf", self.parse_leaf),
+                ("leaf-list", self.parse_leaf_list),
+                ("container", self.parse_container),
+                ("list", self.parse_list),
+                ("choice", self.parse_choice),
+                ("anydata", self.parse_anydata),
+                ("anyxml", self.parse_anyxml),
+                ("description", self.parse_description),
+                ("when", self.parse_when),
+                ("must", self.parse_must),
+            ),
+            "container": (
+                ("description", self.parse_description),
+                ("presence", self.parse_presence),
+                ("when", self.parse_when),
+                ("must", self.parse_must),
+                ("leaf", self.parse_leaf),
+                ("container", self.parse_container),
+                ("list", self.parse_list),
+                ("leaf-list", self.parse_leaf_list),
+                ("uses", self.parse_uses),
+                ("choice", self.parse_choice),
+                ("anydata", self.parse_anydata),
+                ("anyxml", self.parse_anyxml),
+                ("if-feature", self.parse_if_feature_stmt),
+            ),
+            "list": (
+                ("key", self.parse_list_key),
+                ("min-elements", self.parse_min_elements),
+                ("max-elements", self.parse_max_elements),
+                ("ordered-by", self.parse_ordered_by),
+                ("description", self.parse_description),
+                ("when", self.parse_when),
+                ("leaf", self.parse_leaf),
+                ("container", self.parse_container),
+                ("list", self.parse_list),
+                ("leaf-list", self.parse_leaf_list),
+                ("must", self.parse_must),
+                ("uses", self.parse_uses),
+                ("choice", self.parse_choice),
+                ("anydata", self.parse_anydata),
+                ("anyxml", self.parse_anyxml),
+                ("if-feature", self.parse_if_feature_stmt),
+            ),
+            "leaf": (
+                ("type", self.parse_type),
+                ("mandatory", self.parse_leaf_mandatory),
+                ("default", self.parse_leaf_default),
+                ("description", self.parse_description),
+                ("must", self.parse_must),
+                ("when", self.parse_when),
+                ("if-feature", self.parse_if_feature_stmt),
+            ),
+            "leaf-list": (
+                ("type", self.parse_type),
+                ("min-elements", self.parse_min_elements),
+                ("max-elements", self.parse_max_elements),
+                ("ordered-by", self.parse_ordered_by),
+                ("description", self.parse_description),
+                ("when", self.parse_when),
+                ("must", self.parse_must),
+                ("if-feature", self.parse_if_feature_stmt),
+            ),
+            "typedef": (
+                ("type", self.parse_type),
+                ("description", self.parse_description),
+            ),
+            "grouping": (
+                ("description", self.parse_description),
+                ("choice", self.parse_choice),
+                ("container", self.parse_container),
+                ("list", self.parse_list),
+                ("leaf", self.parse_leaf),
+                ("leaf-list", self.parse_leaf_list),
+                ("uses", self.parse_uses),
+                ("anydata", self.parse_anydata),
+                ("anyxml", self.parse_anyxml),
+                ("if-feature", self.parse_if_feature_stmt),
+                ("when", self.parse_when),
+                ("must", self.parse_must),
+            ),
+            "choice": (
+                ("mandatory", self.parse_choice_mandatory),
+                ("description", self.parse_description),
+                ("when", self.parse_when),
+                ("if-feature", self.parse_if_feature_stmt),
+                ("case", self.parse_case),
+            ),
+            "case": (
+                ("description", self.parse_description),
+                ("when", self.parse_when),
+                ("if-feature", self.parse_if_feature_stmt),
+                ("uses", self.parse_uses),
+                ("anydata", self.parse_anydata),
+                ("anyxml", self.parse_anyxml),
+                ("leaf", self.parse_leaf),
+                ("container", self.parse_container),
+                ("list", self.parse_list),
+                ("leaf-list", self.parse_leaf_list),
+                ("choice", self.parse_choice),
+            ),
+        }
+        for context, handlers in context_handlers.items():
+            for keyword, handler in handlers:
+                bindings[f"{context}:{keyword}"] = handler
+
+        for context in ("anydata", "anyxml"):
+            bindings[f"{context}:description"] = self.parse_description
+            bindings[f"{context}:when"] = self.parse_when
+            bindings[f"{context}:must"] = self.parse_must
+            bindings[f"{context}:if-feature"] = self.parse_if_feature_stmt
+            bindings[f"{context}:mandatory"] = self.parse_leaf_mandatory
+
+        return bindings
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
@@ -298,20 +455,7 @@ class StatementParsers:
         return self._uses_parser.parse_uses(tokens, context)
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.AUGMENT)
-        path = self._parse_string_concatenation(tokens)
-        aug = YangAugmentStmt(name="augment", augment_path=path)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(aug)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(registry_prefix="augment", unsupported_context="augment"),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, aug)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._augment_parser.parse_augment(tokens, context)
     
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement (optional braced extension substatements are skipped)."""

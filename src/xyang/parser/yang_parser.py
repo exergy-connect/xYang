@@ -62,24 +62,6 @@ class YangParser:
         """Register all statement handlers."""
         mp = self.parsers._module_parser
 
-        # Submodule top-level (same handlers as module where applicable)
-        self.registry.register('submodule:yang-version', mp.parse_yang_version)
-        self.registry.register('submodule:import', mp.parse_import_stmt)
-        self.registry.register('submodule:include', mp.parse_include_stmt)
-        self.registry.register('submodule:revision', self.parsers.parse_revision)
-        self.registry.register('submodule:feature', self.parsers.parse_feature_stmt)
-        self.registry.register('submodule:extension', self.parsers.parse_extension_stmt)
-        self.registry.register('submodule:typedef', self.parsers.parse_typedef)
-        self.registry.register('submodule:identity', self.parsers.parse_identity)
-        self.registry.register('submodule:grouping', self.parsers.parse_grouping)
-        self.registry.register('submodule:augment', self.parsers.parse_augment)
-        self.registry.register('submodule:container', self.parsers.parse_container)
-        self.registry.register('submodule:list', self.parsers.parse_list)
-        self.registry.register('submodule:leaf', self.parsers.parse_leaf)
-        self.registry.register('submodule:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('submodule:anydata', self.parsers.parse_anydata)
-        self.registry.register('submodule:anyxml', self.parsers.parse_anyxml)
-
         # import / include substatements
         for _pfx in ('import', 'include'):
             self.registry.register(f'{_pfx}:prefix', mp.parse_prefix_value_stmt)
@@ -93,15 +75,22 @@ class YangParser:
             ('must', self.parsers.parse_must),
             ('description', self.parsers.parse_description),
             ('reference', self.parsers.parse_reference_string_only),
+            # Generic extension bodies (e.g. RFC 8791 ``structure``) allow data definition statements.
+            ('uses', self.parsers.parse_uses),
+            ('leaf', self.parsers.parse_leaf),
+            ('leaf-list', self.parsers.parse_leaf_list),
+            ('container', self.parsers.parse_container),
+            ('list', self.parsers.parse_list),
+            ('choice', self.parsers.parse_choice),
+            ('case', self.parsers.parse_case),
+            ('anydata', self.parsers.parse_anydata),
+            ('anyxml', self.parsers.parse_anyxml),
         ):
             self.registry.register(f'extension_invocation:{_kw}', _handler)
 
         self.registry.register('must:error-message', self.parsers.parse_must_error_message)
         self.registry.register('must:description', self.parsers.parse_description)
         self.registry.register('when:description', self.parsers.parse_description)
-        self.registry.register('feature:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('feature:reference', self.parsers.parse_reference_string_only)
-        self.registry.register('if_feature:reference', self.parsers.parse_reference_string_only)
 
         # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
         # parser implements — container, leaf, leaf-list, list, choice, case, uses, refine,
