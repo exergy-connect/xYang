@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Optional **anydata subtree validation** aligned with [draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation): ``YangValidator.enable_extension`` / ``DocumentValidator.enable_extension`` with ``ValidatorExtension.ANYDATA_VALIDATION``, caller ``modules: dict[str, YangModule]``, and ``AnydataValidationMode`` (**complete** vs **candidate**) from ``xyang.ext.anydata_validation``. CLI: ``xyang validate … --anydata-validation complete|candidate`` with ``--anydata-module`` for extra YANG files. Example: [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py).
+
 ### Changed
 
 ### Fixed

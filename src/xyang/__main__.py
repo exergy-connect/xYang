@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any
+from typing import Any, Dict
 
 
 def _load_instance_data(data_path: Path) -> Any:
@@ -17,9 +17,7 @@ def _load_instance_data(data_path: Path) -> Any:
         try:
             import yaml  # type: ignore[import-not-found]
         except ImportError as exc:
-            raise ImportError(
-                "Reading .yaml or .yml requires PyYAML. Install it with: pip install PyYAML"
-            ) from exc
+            raise ImportError("Reading .yaml or .yml requires PyYAML. Install it with: pip install PyYAML") from exc
         return yaml.safe_load(text)
     return json.loads(text)
 
@@ -30,7 +28,8 @@ def main() -> int:
         description="xYang: YANG parsing and validation (subset for meta-model.yang)",
     )
     parser.add_argument(
-        "-V", "--version",
+        "-V",
+        "--version",
         action="version",
         version="%(prog)s 0.1.0",
     )
@@ -42,14 +41,35 @@ def main() -> int:
     validate_parser = subparsers.add_parser("validate", help="Validate JSON data against a YANG module")
     validate_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
     validate_parser.add_argument(
-        "data_file", type=Path, nargs="?", default=None,
+        "data_file",
+        type=Path,
+        nargs="?",
+        default=None,
         help="Path to JSON or YAML data file (.yaml/.yml need PyYAML; read from stdin if omitted)",
+    )
+    validate_parser.add_argument(
+        "--anydata-validation",
+        choices=("off", "complete", "candidate"),
+        default="off",
+        help=(
+            "Optional draft-ietf-netmod-yang-anydata-validation: validate JSON under "
+            "anydata using extra modules (RFC 7951 names). Default: off."
+        ),
+    )
+    validate_parser.add_argument(
+        "--anydata-module",
+        type=Path,
+        action="append",
+        default=[],
+        metavar="PATH",
+        help="Additional .yang file to load into the anydata module map (repeatable).",
     )
 
     convert_parser = subparsers.add_parser("convert", help="Convert .yang to .yang.json (JSON Schema with x-yang)")
     convert_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
     convert_parser.add_argument(
-        "-o", "--output",
+        "-o",
+        "--output",
         type=Path,
         default=None,
         help="Output path (default: <stem>.yang.json alongside input)",
@@ -63,6 +83,7 @@ def main() -> int:
 
     if args.cmd == "parse":
         from xyang import parse_yang_file
+
         p = Path(args.yang_file)
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
@@ -84,6 +105,10 @@ def main() -> int:
 
     if args.cmd == "validate":
         from xyang import parse_yang_file, YangValidator
+        from xyang.ext.anydata_validation import AnydataValidationMode
+        from xyang.module import YangModule
+        from xyang.validator import ValidatorExtension
+
         p = Path(args.yang_file)
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
@@ -91,6 +116,31 @@ def main() -> int:
         try:
             module = parse_yang_file(str(p))
             validator = YangValidator(module)
+            if args.anydata_validation != "off":
+                extra_paths: list[Path] = list(args.anydata_module)
+                if not extra_paths:
+                    print(
+                        "Error: --anydata-validation requires at least one --anydata-module",
+                        file=sys.stderr,
+                    )
+                    return 1
+                modules: Dict[str, YangModule] = {module.name: module}
+                for ep in extra_paths:
+                    if not ep.exists():
+                        print(f"Error: file not found: {ep}", file=sys.stderr)
+                        return 1
+                    m = parse_yang_file(str(ep))
+                    modules[m.name] = m
+                mode = (
+                    AnydataValidationMode.COMPLETE
+                    if args.anydata_validation == "complete"
+                    else AnydataValidationMode.CANDIDATE
+                )
+                validator.enable_extension(
+                    ValidatorExtension.ANYDATA_VALIDATION,
+                    modules=modules,
+                    mode=mode,
+                )
             if args.data_file is not None:
                 data_path = Path(args.data_file)
                 if not data_path.exists():
@@ -116,6 +166,7 @@ def main() -> int:
     if args.cmd == "convert":
         from xyang.parser import YangParser
         from xyang.json import schema_to_yang_json
+
         p = Path(args.yang_file)
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
