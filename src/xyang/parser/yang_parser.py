@@ -62,30 +62,6 @@ class YangParser:
         """Register all statement handlers."""
         mp = self.parsers._module_parser
 
-        # Module-level statements
-        self.registry.register('module', mp.parse_module)
-        self.registry.register('module:yang-version', mp.parse_yang_version)
-        self.registry.register('module:namespace', mp.parse_namespace)
-        self.registry.register('module:prefix', mp.parse_prefix)
-        self.registry.register('module:organization', mp.parse_organization)
-        self.registry.register('module:contact', mp.parse_contact)
-        self.registry.register('module:description', self.parsers.parse_description)
-        self.registry.register('module:revision', self.parsers.parse_revision)
-        self.registry.register('module:typedef', self.parsers.parse_typedef)
-        self.registry.register('module:identity', self.parsers.parse_identity)
-        self.registry.register('module:grouping', self.parsers.parse_grouping)
-        self.registry.register('module:container', self.parsers.parse_container)
-        self.registry.register('module:list', self.parsers.parse_list)
-        self.registry.register('module:leaf', self.parsers.parse_leaf)
-        self.registry.register('module:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('module:anydata', self.parsers.parse_anydata)
-        self.registry.register('module:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('module:import', mp.parse_import_stmt)
-        self.registry.register('module:include', mp.parse_include_stmt)
-        self.registry.register('module:feature', self.parsers.parse_feature_stmt)
-        self.registry.register('module:extension', self.parsers.parse_extension_stmt)
-        self.registry.register('module:augment', self.parsers.parse_augment)
-
         # Submodule top-level (same handlers as module where applicable)
         self.registry.register('submodule:yang-version', mp.parse_yang_version)
         self.registry.register('submodule:import', mp.parse_import_stmt)

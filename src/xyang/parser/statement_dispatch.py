@@ -18,8 +18,6 @@ class StatementDispatchSpec:
     type_stmt: Optional[YangTypeStmt] = None
     #: If set, use this prefix for ``{prefix}:{keyword}`` lookups instead of ``registry_prefix``.
     registry_key_prefix: Optional[str] = None
-    #: IDENTIFIER lexemes treated as statement keywords (e.g. ``argument`` under ``extension``).
-    identifier_dispatch_keywords: Optional[AbstractSet[str]] = None
     #: If True, when the keyword is not in ``allowed_keywords``, try unsupported-skip before error.
     try_skip_when_disallowed: bool = False
     #: If set, try ``{fallback}:{keyword}`` when the primary registry key has no handler.

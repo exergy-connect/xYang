@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ..statement_dispatch import StatementDispatchSpec
-
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
 
@@ -19,6 +18,29 @@ class ModuleStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
+        self._module_dispatch = {
+            YangTokenType.LEAF: self._parsers.parse_leaf,
+            YangTokenType.LIST: self._parsers.parse_list,
+            YangTokenType.LEAF_LIST: self._parsers.parse_leaf_list,
+            YangTokenType.CONTAINER: self._parsers.parse_container,
+            YangTokenType.ANYDATA: self._parsers.parse_anydata,
+            YangTokenType.ANYXML: self._parsers.parse_anyxml,
+            YangTokenType.TYPEDEF: self._parsers.parse_typedef,
+            YangTokenType.GROUPING: self._parsers.parse_grouping,
+            YangTokenType.IMPORT: self.parse_import_stmt,
+            YangTokenType.INCLUDE: self.parse_include_stmt,
+            YangTokenType.REVISION: self._parsers.parse_revision,
+            YangTokenType.DESCRIPTION: self._parsers.parse_description,
+            YangTokenType.FEATURE: self._parsers.parse_feature_stmt,
+            YangTokenType.IDENTITY: self._parsers.parse_identity,
+            YangTokenType.EXTENSION: self._parsers.parse_extension_stmt,
+            YangTokenType.AUGMENT: self._parsers.parse_augment,
+            YangTokenType.YANG_VERSION: self.parse_yang_version,
+            YangTokenType.NAMESPACE: self.parse_namespace,
+            YangTokenType.PREFIX: self.parse_prefix,
+            YangTokenType.ORGANIZATION: self.parse_organization,
+            YangTokenType.CONTACT: self.parse_contact,
+        }
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
@@ -35,11 +57,19 @@ class ModuleStatementParser:
 
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse one statement in module body."""
-        self._parsers._parse_statement(
-            tokens,
-            context,
-            StatementDispatchSpec(registry_prefix="module", unsupported_context="module body"),
-        )
+        tt = tokens.peek_type()
+        if tt == YangTokenType.IDENTIFIER:
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
+            return
+        if tt is None:
+            raise tokens._make_error("Unexpected end of input in module body")
+        handler = self._module_dispatch.get(tt)
+        if handler:
+            handler(tokens, context)
+            return
+        if self._parsers._skip_unsupported_if_present(tokens, "module body"):
+            return
+        raise tokens._make_error(f"Unknown statement in module body: {tokens.peek()!r}")
 
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse import and load the referenced module (RFC 7950)."""

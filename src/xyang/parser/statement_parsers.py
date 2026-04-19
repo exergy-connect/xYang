@@ -153,7 +153,7 @@ class StatementParsers:
             StatementDispatchSpec(
                 registry_prefix="extension_invocation",
                 unsupported_context=f"extension invocation '{inv_name}'",
-                fallback_registry_key_prefix="module",
+                fallback_registry_key_prefix="submodule",
             ),
         )
 
@@ -210,7 +210,7 @@ class StatementParsers:
         context: ParserContext,
         spec: StatementDispatchSpec,
     ) -> None:
-        """Parse one substatement: optional identifier-as-keyword, extension, registry, skip, error."""
+        """Parse one substatement: extension invocation, registry, skip, or error."""
         key_prefix = (
             spec.registry_key_prefix
             if spec.registry_key_prefix is not None
@@ -218,44 +218,6 @@ class StatementParsers:
         )
 
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            ident = tokens.peek() or ""
-            if (
-                spec.identifier_dispatch_keywords is not None
-                and ident in spec.identifier_dispatch_keywords
-            ):
-                keyword = ident
-                if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
-                    if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
-                        tokens, spec.unsupported_context
-                    ):
-                        return
-                    allowed = ", ".join(sorted(spec.allowed_keywords))
-                    raise tokens._make_error(
-                        f"Unknown statement in {spec.unsupported_context}: "
-                        f"{keyword!r} (allowed: {allowed})"
-                    )
-                if spec.type_stmt is not None:
-                    handler = self.registry.get_handler(f"type:{keyword}")
-                    if handler:
-                        if tokens.peek_type() == YangTokenType.TYPE:
-                            handler(tokens, context)
-                        else:
-                            handler(tokens, context, spec.type_stmt)
-                        return
-                    if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
-                        return
-                    raise tokens._make_error(
-                        f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-                    )
-                handler = self.registry.get_handler(f"{key_prefix}:{keyword}")
-                if handler:
-                    handler(tokens, context)
-                    return
-                if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
-                    return
-                raise tokens._make_error(
-                    f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-                )
             self._parse_prefixed_extension_statement(tokens, context)
             return
 
