@@ -8,7 +8,6 @@ from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
-from ..statement_dispatch import StatementDispatchSpec
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
 
@@ -91,17 +90,20 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                     continue
-                self._parsers._parse_statement(
-                    tokens,
-                    context,
-                    StatementDispatchSpec(
-                        registry_prefix="import",
-                        unsupported_context="import",
-                        allowed_keywords=frozenset(
-                            {"prefix", "revision-date", "reference"}
-                        ),
-                    ),
-                )
+                tt = tokens.peek_type()
+                if tt == YangTokenType.IDENTIFIER:
+                    self._parsers._parse_prefixed_extension_statement(tokens, context)
+                elif tt == YangTokenType.PREFIX:
+                    self.parse_import_prefix_binding(tokens, context)
+                elif tt == YangTokenType.REFERENCE:
+                    self._parsers.parse_reference_string_only(tokens, context)
+                elif self._parsers._skip_unsupported_if_present(tokens, "import"):
+                    continue
+                else:
+                    raise tokens._make_error(
+                        "Unknown statement in import: "
+                        f"{tokens.peek()!r} (allowed: prefix, reference, revision-date)"
+                    )
         finally:
             self._parsers._import_parse_state = None
         tokens.consume_type(YangTokenType.RBRACE)
@@ -132,13 +134,19 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                 else:
-                    self._parsers._parse_statement(
-                        tokens,
-                        context,
-                        StatementDispatchSpec(
-                            registry_prefix="include", unsupported_context="include"
-                        ),
-                    )
+                    tt = tokens.peek_type()
+                    if tt == YangTokenType.IDENTIFIER:
+                        self._parsers._parse_prefixed_extension_statement(tokens, context)
+                    elif tt == YangTokenType.PREFIX:
+                        self.parse_prefix_value_stmt(tokens, context)
+                    elif tt == YangTokenType.REFERENCE:
+                        self._parsers.parse_reference_string_only(tokens, context)
+                    elif self._parsers._skip_unsupported_if_present(tokens, "include"):
+                        continue
+                    else:
+                        raise tokens._make_error(
+                            f"Unknown statement in include: {tokens.peek()!r}"
+                        )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         if self._parsers._yang_parser is not None:

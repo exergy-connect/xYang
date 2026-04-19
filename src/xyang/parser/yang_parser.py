@@ -60,15 +60,6 @@ class YangParser:
 
     def _register_handlers(self):
         """Register all statement handlers."""
-        mp = self.parsers._module_parser
-
-        # import / include substatements
-        for _pfx in ('import', 'include'):
-            self.registry.register(f'{_pfx}:prefix', mp.parse_prefix_value_stmt)
-            self.registry.register(f'{_pfx}:reference', self.parsers.parse_reference_string_only)
-        self.registry.register('include:revision-date', self.parsers.parse_revision_date_statement)
-        self.registry.register('import:prefix', mp.parse_import_prefix_binding)
-
         for _kw, _handler in (
             ('if-feature', self.parsers.parse_if_feature_stmt),
             ('when', self.parsers.parse_when),

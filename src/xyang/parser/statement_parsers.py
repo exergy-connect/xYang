@@ -76,13 +76,7 @@ class StatementParsers:
 
     def get_registry_bindings(self) -> dict[str, Callable]:
         """Return the default statement registry bindings."""
-        mp = self._module_parser
         bindings: dict[str, Callable] = {
-            "import:prefix": mp.parse_import_prefix_binding,
-            "import:reference": self.parse_reference_string_only,
-            "include:prefix": mp.parse_prefix_value_stmt,
-            "include:reference": self.parse_reference_string_only,
-            "include:revision-date": self.parse_revision_date_statement,
             "must:error-message": self.parse_must_error_message,
             "must:description": self.parse_description,
             "when:description": self.parse_description,
