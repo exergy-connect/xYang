@@ -1,6 +1,6 @@
 """
-Skip unsupported YANG constructs (deviation, extension, rpc, action, notification,
-input, output) after emitting a warning.
+Skip unsupported YANG constructs (deviation, rpc, action, notification, input, output)
+after emitting a warning.
 
 These statements are not modeled in the AST; braces and arguments are consumed so the
 rest of the module can parse.
@@ -22,7 +22,6 @@ logger = logging.getLogger(__name__)
 UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
     {
         YangTokenType.DEVIATION,
-        YangTokenType.EXTENSION,
         YangTokenType.RPC,
         YangTokenType.ACTION,
         YangTokenType.NOTIFICATION,

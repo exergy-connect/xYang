@@ -128,6 +128,8 @@ class YangTokenType(Enum):
     SUBMODULE = "submodule"
     BELONGS_TO = "belongs-to"
     REFERENCE = "reference"
+    ARGUMENT = "argument"
+    YIN_ELEMENT = "yin-element"
     # Parsed only to skip (see unsupported_skip); not represented in the AST.
     DEVIATION = "deviation"
     EXTENSION = "extension"

@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 from ..augment_expand import apply_augmentations
 from ..errors import YangSyntaxError
+from ..ext import apply_extension_invocations
 from ..module import YangModule
 from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
@@ -55,16 +56,19 @@ class YangParser:
         if self.expand_uses:
             expand_all_uses_in_module(module)
             apply_augmentations(module)
+            apply_extension_invocations(module)
 
     def _register_handlers(self):
         """Register all statement handlers."""
+        mh = self.parsers._module_header_parser
+
         # Module-level statements
-        self.registry.register('module', self.parsers.parse_module)
-        self.registry.register('module:yang-version', self.parsers.parse_yang_version)
-        self.registry.register('module:namespace', self.parsers.parse_namespace)
-        self.registry.register('module:prefix', self.parsers.parse_prefix)
-        self.registry.register('module:organization', self.parsers.parse_organization)
-        self.registry.register('module:contact', self.parsers.parse_contact)
+        self.registry.register('module', mh.parse_module)
+        self.registry.register('module:yang-version', mh.parse_yang_version)
+        self.registry.register('module:namespace', mh.parse_namespace)
+        self.registry.register('module:prefix', mh.parse_prefix)
+        self.registry.register('module:organization', mh.parse_organization)
+        self.registry.register('module:contact', mh.parse_contact)
         self.registry.register('module:description', self.parsers.parse_description)
         self.registry.register('module:revision', self.parsers.parse_revision)
         self.registry.register('module:typedef', self.parsers.parse_typedef)
@@ -76,18 +80,19 @@ class YangParser:
         self.registry.register('module:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('module:anydata', self.parsers.parse_anydata)
         self.registry.register('module:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('module:import', self.parsers.parse_import_stmt)
-        self.registry.register('module:include', self.parsers.parse_include_stmt)
+        self.registry.register('module:import', mh.parse_import_stmt)
+        self.registry.register('module:include', mh.parse_include_stmt)
         self.registry.register('module:feature', self.parsers.parse_feature_stmt)
+        self.registry.register('module:extension', self.parsers.parse_extension_stmt)
         self.registry.register('module:augment', self.parsers.parse_augment)
 
         # Submodule top-level (same handlers as module where applicable)
-        self.registry.register('submodule:yang-version', self.parsers.parse_yang_version)
-        self.registry.register('submodule:belongs-to', self.parsers.parse_belongs_to)
-        self.registry.register('submodule:import', self.parsers.parse_import_stmt)
-        self.registry.register('submodule:include', self.parsers.parse_include_stmt)
+        self.registry.register('submodule:yang-version', mh.parse_yang_version)
+        self.registry.register('submodule:import', mh.parse_import_stmt)
+        self.registry.register('submodule:include', mh.parse_include_stmt)
         self.registry.register('submodule:revision', self.parsers.parse_revision)
         self.registry.register('submodule:feature', self.parsers.parse_feature_stmt)
+        self.registry.register('submodule:extension', self.parsers.parse_extension_stmt)
         self.registry.register('submodule:typedef', self.parsers.parse_typedef)
         self.registry.register('submodule:identity', self.parsers.parse_identity)
         self.registry.register('submodule:grouping', self.parsers.parse_grouping)
@@ -99,18 +104,36 @@ class YangParser:
         self.registry.register('submodule:anydata', self.parsers.parse_anydata)
         self.registry.register('submodule:anyxml', self.parsers.parse_anyxml)
 
-        # import / include / belongs-to substatements
+        # import / include substatements
         for _pfx in ('import', 'include'):
-            self.registry.register(f'{_pfx}:prefix', self.parsers.parse_prefix_value_stmt)
-            self.registry.register(f'{_pfx}:revision-date', self.parsers.parse_revision_date_stmt)
+            self.registry.register(f'{_pfx}:prefix', mh.parse_prefix_value_stmt)
             self.registry.register(f'{_pfx}:description', self.parsers.parse_description_string_only)
             self.registry.register(f'{_pfx}:reference', self.parsers.parse_reference_string_only)
-        self.registry.register('belongs-to:prefix', self.parsers.parse_prefix_value_stmt)
+        self.registry.register('include:revision-date', self.parsers.parse_revision_date_statement)
+        self.registry.register('import:prefix', mh.parse_import_prefix_binding)
+
+        for _kw, _handler in (
+            ('if-feature', self.parsers.parse_if_feature_stmt),
+            ('when', self.parsers.parse_when),
+            ('must', self.parsers.parse_must),
+            ('description', self.parsers.parse_description),
+            ('reference', self.parsers.parse_reference_string_only),
+        ):
+            self.registry.register(f'extension_invocation:{_kw}', _handler)
+
+        self.registry.register('must:error-message', self.parsers.parse_must_error_message)
+        self.registry.register('must:description', self.parsers.parse_description)
+        self.registry.register('when:description', self.parsers.parse_description)
+        self.registry.register('feature:if-feature', self.parsers.parse_if_feature_stmt)
+        self.registry.register('feature:description', self.parsers.parse_description_string_only)
+        self.registry.register('feature:reference', self.parsers.parse_reference_string_only)
+        self.registry.register('if_feature:description', self.parsers.parse_description_string_only)
+        self.registry.register('if_feature:reference', self.parsers.parse_reference_string_only)
 
         # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
         # parser implements — container, leaf, leaf-list, list, choice, case, uses, refine,
         # augment, identity — plus ``feature`` (§7.20.1.1).  Not on ``enum`` / ``bit`` per
-        # RFC 7950 §9.  ``deviation``, ``extension``, ``rpc``, ``action``, ``notification``,
+        # RFC 7950 §9.  ``deviation``, ``rpc``, ``action``, ``notification``,
         # ``input``, ``output`` are skipped with a warning (see ``unsupported_skip``).
 
         # Augment body
@@ -186,7 +209,17 @@ class YangParser:
         # Grouping body statements
         self.registry.register('grouping:description', self.parsers.parse_description)
         self.registry.register('grouping:choice', self.parsers.parse_choice)
-        
+        self.registry.register('grouping:container', self.parsers.parse_container)
+        self.registry.register('grouping:list', self.parsers.parse_list)
+        self.registry.register('grouping:leaf', self.parsers.parse_leaf)
+        self.registry.register('grouping:leaf-list', self.parsers.parse_leaf_list)
+        self.registry.register('grouping:uses', self.parsers.parse_uses)
+        self.registry.register('grouping:anydata', self.parsers.parse_anydata)
+        self.registry.register('grouping:anyxml', self.parsers.parse_anyxml)
+        self.registry.register('grouping:if-feature', self.parsers.parse_if_feature_stmt)
+        self.registry.register('grouping:when', self.parsers.parse_when)
+        self.registry.register('grouping:must', self.parsers.parse_must)
+
         # Uses body statements
         self.registry.register('uses:refine', self.parsers.parse_refine)
         self.registry.register('uses:description', self.parsers.parse_description)
@@ -202,7 +235,8 @@ class YangParser:
         self.registry.register('refine:mandatory', self.parsers.parse_refine_mandatory)
         self.registry.register('refine:default', self.parsers.parse_refine_default)
         self.registry.register('refine:if-feature', self.parsers.parse_if_feature_stmt)
-        
+        self.registry.register('refine:type', self.parsers.parse_type)
+
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types
         self.registry.register('type:pattern', self.parsers.parse_type_pattern)
@@ -231,6 +265,11 @@ class YangParser:
         self.registry.register('case:uses', self.parsers.parse_uses)
         self.registry.register('case:anydata', self.parsers.parse_anydata)
         self.registry.register('case:anyxml', self.parsers.parse_anyxml)
+        self.registry.register('case:leaf', self.parsers.parse_leaf)
+        self.registry.register('case:container', self.parsers.parse_container)
+        self.registry.register('case:list', self.parsers.parse_list)
+        self.registry.register('case:leaf-list', self.parsers.parse_leaf_list)
+        self.registry.register('case:choice', self.parsers.parse_choice)
 
         for _ctx in ("anydata", "anyxml"):
             self.registry.register(f"{_ctx}:description", self.parsers.parse_description)
@@ -479,10 +518,11 @@ class YangParser:
             current_parent=module,
             source_dir=source_path.parent if source_path else None,
         )
+        mh = self.parsers._module_header_parser
         if root == "module":
-            self.parsers.parse_module(tokens, context)
+            mh.parse_module(tokens, context)
         elif root == "submodule":
-            self.parsers.parse_submodule(tokens, context)
+            mh.parse_submodule(tokens, context)
         else:
             raise tokens._make_error("Expected 'module' or 'submodule' statement at start of file")
 
@@ -493,7 +533,7 @@ class YangParser:
 
 
 def parse_yang_file(
-    file_path: str,
+    file_path: str | Path,
     *,
     include_path: Tuple[str, ...] = (),
 ) -> YangModule:

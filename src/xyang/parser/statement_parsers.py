@@ -7,16 +7,25 @@ from __future__ import annotations
 from types import SimpleNamespace
 from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
+from .statement_dispatch import StatementDispatchSpec
+from .statements.extension import ExtensionStatementParser
+from .statements.feature import FeatureStatementParser
+from .statements.module_header import ModuleHeaderStatementParser
+from .statements.revision import RevisionStatementParser
 from ..ast import (
     YangBitStmt,
     YangAnydataStmt,
     YangAnyxmlStmt,
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
+    YangExtensionInvocationStmt,
     YangIdentityStmt,
     YangGroupingStmt, YangUsesStmt, YangAugmentStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
+)
+from ..ext import (
+    ensure_builtin_extensions_loaded,
 )
 from ..xpath import XPathParser
 
@@ -36,12 +45,27 @@ if TYPE_CHECKING:
 _StatementT = TypeVar("_StatementT", bound="YangStatement")
 
 
+def consume_description_substatement(tokens: TokenStream) -> str:
+    """Consume ``description`` ``quoted-string`` ``;`` and return the string."""
+    tokens.consume_type(YangTokenType.DESCRIPTION)
+    text = tokens.consume_type(YangTokenType.STRING)
+    tokens.consume_if_type(YangTokenType.SEMICOLON)
+    return text
+
+
 class StatementParsers:
     """Collection of statement parsing methods."""
 
     def __init__(self, registry: "StatementRegistry", yang_parser: Optional["YangParser"] = None):
         self.registry = registry
         self._yang_parser: Optional["YangParser"] = yang_parser
+        #: Set only while parsing an ``import { ... }`` block (prefix / revision-date capture).
+        self._import_parse_state: Optional[SimpleNamespace] = None
+        self._extension_parser = ExtensionStatementParser(self)
+        self._feature_parser = FeatureStatementParser(self)
+        self._module_header_parser = ModuleHeaderStatementParser(self)
+        self._revision_parser = RevisionStatementParser(self)
+        ensure_builtin_extensions_loaded()
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
@@ -92,241 +116,224 @@ class StatementParsers:
                 f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
             )
 
-    def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse module statement."""
-        tokens.consume_type(YangTokenType.MODULE)
-        module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        tokens.consume_type(YangTokenType.LBRACE)
+    def _consume_optional_extension_argument(
+        self, tokens: TokenStream
+    ) -> Optional[str]:
+        """Consume optional extension argument as normalized string (unquoted)."""
+        tt = tokens.peek_type()
+        if tt is None or tt in (YangTokenType.LBRACE, YangTokenType.SEMICOLON):
+            return None
+        if tt == YangTokenType.STRING:
+            return self._parse_string_concatenation(tokens)
+        if tt in (
+            YangTokenType.IDENTIFIER,
+            YangTokenType.INTEGER,
+            YangTokenType.DOTTED_NUMBER,
+            YangTokenType.TRUE,
+            YangTokenType.FALSE,
+        ):
+            return tokens.consume()
+        return None
 
-        context.module.name = module_name
+    def _parse_extension_invocation_substatement(
+        self,
+        tokens: TokenStream,
+        context: ParserContext,
+        inv_name: str,
+    ) -> None:
+        """One substatement inside ``prefix:extension { ... }`` (after the opening ``{``)."""
+        self._parse_statement(
+            tokens,
+            context,
+            StatementDispatchSpec(
+                registry_prefix="extension_invocation",
+                unsupported_context=f"extension invocation '{inv_name}'",
+                fallback_registry_key_prefix="module",
+            ),
+        )
 
-        # Parse module body
-        # Nested parsers (container, list, etc.) handle their own braces
-        # So we just need to stop when we see the module's closing brace
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            self._parse_module_statement(tokens, context)
+    def _parse_prefixed_extension_statement(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> None:
+        """Parse ``prefix:extension``; current token must be the *prefix* (IDENTIFIER).
 
-        # Consume the module's closing brace
-        tokens.consume_type(YangTokenType.RBRACE)
-
-    def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse a statement in module body."""
-        stmt_type = tokens.peek() or ""
-        handler = self.registry.get_handler(f"module:{stmt_type}")
-        if handler:
-            handler(tokens, context)
-        elif self._skip_unsupported_if_present(tokens, "module body"):
-            return
-        else:
-            raise tokens._make_error(f"Unknown statement in module: {stmt_type}")
-
-    def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse submodule statement (YANG 1.1)."""
-        tokens.consume_type(YangTokenType.SUBMODULE)
-        submodule_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        tokens.consume_type(YangTokenType.LBRACE)
-        context.module.name = submodule_name
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            self._parse_submodule_statement(tokens, context)
-        tokens.consume_type(YangTokenType.RBRACE)
-
-    def _parse_submodule_statement(self, tokens: TokenStream, context: ParserContext) -> None:
-        stmt_type = tokens.peek() or ""
-        handler = self.registry.get_handler(f"submodule:{stmt_type}")
-        if handler:
-            handler(tokens, context)
-        elif self._skip_unsupported_if_present(tokens, "submodule body"):
-            return
-        else:
-            raise tokens._make_error(f"Unknown statement in submodule: {stmt_type}")
-
-    def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse import and load the referenced module (RFC 7950)."""
-        tokens.consume_type(YangTokenType.IMPORT)
-        imported_module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        if tokens.consume_if_type(YangTokenType.SEMICOLON):
-            return
-        local_prefix: Optional[str] = None
-        revision_date: Optional[str] = None
-        if not tokens.consume_if_type(YangTokenType.LBRACE):
-            raise tokens._make_error("Expected '{' or ';' after import module name")
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            st = tokens.peek() or ""
-            if st == "prefix":
-                tokens.consume_type(YangTokenType.PREFIX)
-                tt = tokens.peek_type()
-                if tt == YangTokenType.STRING:
-                    local_prefix = tokens.consume_type(YangTokenType.STRING)
-                elif tt == YangTokenType.IDENTIFIER:
-                    local_prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
-                else:
-                    raise tokens._make_error(
-                        f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
-                    )
-                tokens.consume_if_type(YangTokenType.SEMICOLON)
-            elif st == "revision-date":
-                tokens.consume_type(YangTokenType.REVISION_DATE)
-                revision_date = self._revision_date_argument_string(tokens)
-                tokens.consume_if_type(YangTokenType.SEMICOLON)
-            elif st == "description":
-                self.parse_description_string_only(tokens, context)
-            elif st == "reference":
-                self.parse_reference_string_only(tokens, context)
-            else:
-                raise tokens._make_error(f"Unknown statement in import: {st!r}")
-        tokens.consume_type(YangTokenType.RBRACE)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        if self._yang_parser is not None and local_prefix:
-            self._yang_parser.register_import(
-                parent=context.module,
-                imported_module_name=imported_module_name,
-                local_prefix=local_prefix,
-                revision_date=revision_date,
-                source_dir=context.source_dir,
-                tokens=tokens,
+        The prefix is consumed, then ``:`` and the extension name. No handler lookup is
+        used for the prefix token (only ``identifier`` … ``:`` commits to an extension).
+        """
+        prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
+        if not tokens.consume_if_type(YangTokenType.COLON):
+            raise tokens._make_error(
+                f"Expected ':' after extension prefix {prefix!r}"
             )
-
-    def parse_include_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse include and merge the submodule into the current module (RFC 7950)."""
-        tokens.consume_type(YangTokenType.INCLUDE)
-        sub_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        revision_date: Optional[str] = None
+        if tokens.peek_type() != YangTokenType.IDENTIFIER:
+            raise tokens._make_error(
+                f"Expected extension name after prefix {prefix!r} and ':'"
+            )
+        ext_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        resolved_module = context.module.resolve_prefixed_module(prefix)
+        if resolved_module is None:
+            raise tokens._make_error(
+                f"Unknown extension prefix {prefix!r} in invocation {prefix}:{ext_name}"
+            )
+        resolved_extension = resolved_module.get_extension(ext_name)
+        if resolved_extension is None:
+            raise tokens._make_error(
+                f"Unknown extension {ext_name!r} in module {resolved_module.name!r} "
+                f"for invocation {prefix}:{ext_name}"
+            )
+        arg = self._consume_optional_extension_argument(tokens)
+        inv = YangExtensionInvocationStmt(
+            name=f"{prefix}:{ext_name}",
+            prefix=prefix,
+            resolved_module=resolved_module,
+            resolved_extension=resolved_extension,
+            argument=arg,
+        )
         if tokens.consume_if_type(YangTokenType.LBRACE):
+            new_context = context.push_parent(inv)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                st = tokens.peek() or ""
-                if st == "revision-date":
-                    tokens.consume_type(YangTokenType.REVISION_DATE)
-                    revision_date = self._revision_date_argument_string(tokens)
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                else:
-                    handler = self.registry.get_handler(f"include:{st}")
-                    if handler:
-                        handler(tokens, context)
-                    else:
-                        raise tokens._make_error(f"Unknown statement in include: {st!r}")
+                self._parse_extension_invocation_substatement(
+                    tokens, new_context, inv.name
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-        if self._yang_parser is not None:
-            self._yang_parser.merge_included_submodule(
-                parent=context.module,
-                submodule_name=sub_name,
-                revision_date=revision_date,
-                source_dir=context.source_dir,
-                tokens=tokens,
-            )
+        self._add_to_parent_or_module(context, inv)
 
-    def parse_prefix_value_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Prefix substatement inside import or belongs-to (not module-level prefix)."""
-        tokens.consume_type(YangTokenType.PREFIX)
-        self._consume_prefix_argument(tokens)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+    def _parse_statement(
+        self,
+        tokens: TokenStream,
+        context: ParserContext,
+        spec: StatementDispatchSpec,
+    ) -> None:
+        """Parse one substatement: optional identifier-as-keyword, extension, registry, skip, error."""
+        key_prefix = (
+            spec.registry_key_prefix
+            if spec.registry_key_prefix is not None
+            else spec.registry_prefix
+        )
 
-    def _revision_date_argument_string(self, tokens: TokenStream) -> str:
-        """Read revision-date value; does not consume the trailing semicolon."""
-        tt0 = tokens.peek_type()
-        if tt0 == YangTokenType.STRING:
-            return tokens.consume_type(YangTokenType.STRING)
-        chunks: list[str] = []
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.SEMICOLON:
-            tt = tokens.peek_type()
-            if tt in (
-                YangTokenType.IDENTIFIER,
-                YangTokenType.DOTTED_NUMBER,
-                YangTokenType.INTEGER,
+        if tokens.peek_type() == YangTokenType.IDENTIFIER:
+            ident = tokens.peek() or ""
+            if (
+                spec.identifier_dispatch_keywords is not None
+                and ident in spec.identifier_dispatch_keywords
             ):
-                chunks.append(tokens.consume_type(tt))
-            else:
-                break
-        if not chunks:
-            raise tokens._make_error(
-                f"Expected revision-date value, got {tt0.name if tt0 else 'end'}"
-            )
-        return "".join(chunks)
+                keyword = ident
+                if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
+                    if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
+                        tokens, spec.unsupported_context
+                    ):
+                        return
+                    allowed = ", ".join(sorted(spec.allowed_keywords))
+                    raise tokens._make_error(
+                        f"Unknown statement in {spec.unsupported_context}: "
+                        f"{keyword!r} (allowed: {allowed})"
+                    )
+                if spec.type_stmt is not None:
+                    handler = self.registry.get_handler(f"type:{keyword}")
+                    if handler:
+                        if tokens.peek_type() == YangTokenType.TYPE:
+                            handler(tokens, context)
+                        else:
+                            handler(tokens, context, spec.type_stmt)
+                        return
+                    if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+                        return
+                    raise tokens._make_error(
+                        f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+                    )
+                handler = self.registry.get_handler(f"{key_prefix}:{keyword}")
+                if handler:
+                    handler(tokens, context)
+                    return
+                if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+                    return
+                raise tokens._make_error(
+                    f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+                )
+            self._parse_prefixed_extension_statement(tokens, context)
+            return
 
-    def parse_revision_date_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse revision-date substatement."""
-        tokens.consume_type(YangTokenType.REVISION_DATE)
-        self._revision_date_argument_string(tokens)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        keyword = tokens.peek() or ""
+
+        if spec.type_stmt is not None:
+            if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
+                if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
+                    tokens, spec.unsupported_context
+                ):
+                    return
+                allowed = ", ".join(sorted(spec.allowed_keywords))
+                raise tokens._make_error(
+                    f"Unknown statement in {spec.unsupported_context}: "
+                    f"{keyword!r} (allowed: {allowed})"
+                )
+            handler = self.registry.get_handler(f"type:{keyword}")
+            if handler:
+                if tokens.peek_type() == YangTokenType.TYPE:
+                    handler(tokens, context)
+                else:
+                    handler(tokens, context, spec.type_stmt)
+                return
+            if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+                return
+            raise tokens._make_error(
+                f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+            )
+
+        if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
+            if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
+                tokens, spec.unsupported_context
+            ):
+                return
+            allowed = ", ".join(sorted(spec.allowed_keywords))
+            raise tokens._make_error(
+                f"Unknown statement in {spec.unsupported_context}: "
+                f"{keyword!r} (allowed: {allowed})"
+            )
+
+        handler = self.registry.get_handler(f"{key_prefix}:{keyword}")
+        if not handler and spec.fallback_registry_key_prefix is not None:
+            handler = self.registry.get_handler(
+                f"{spec.fallback_registry_key_prefix}:{keyword}"
+            )
+        if handler:
+            handler(tokens, context)
+            return
+        if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+            return
+        raise tokens._make_error(
+            f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+        )
+
+    def parse_revision_date_statement(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> None:
+        """Parse ``revision-date`` substatement (e.g. under ``include``)."""
+        self._revision_parser.parse_revision_date_statement(tokens)
 
     def parse_description_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
         """Description with no parent field update (e.g. inside import)."""
-        tokens.consume_type(YangTokenType.DESCRIPTION)
-        tokens.consume_type(YangTokenType.STRING)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        consume_description_substatement(tokens)
 
     def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.REFERENCE)
         tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
+    def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        self._extension_parser.parse_extension_stmt(tokens, context)
+
+    def parse_extension_argument_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
+        self._extension_parser.parse_extension_argument_stmt(tokens, context)
+
+    def parse_extension_argument_yin_element(self, tokens: TokenStream, context: ParserContext) -> None:
+        self._extension_parser.parse_extension_argument_yin_element(tokens, context)
+
     def parse_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.FEATURE)
-        name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        context.module.features.add(name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            holder = SimpleNamespace(if_features=[])
-            feat_ctx = context.push_parent(holder)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                st = tokens.peek() or ""
-                if st == "if-feature":
-                    self.parse_if_feature_stmt(tokens, feat_ctx)
-                elif st == "description":
-                    self.parse_description_string_only(tokens, feat_ctx)
-                elif st == "reference":
-                    self.parse_reference_string_only(tokens, feat_ctx)
-                elif self._skip_unsupported_if_present(tokens, f"feature '{name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in feature '{name}': {st!r}"
-                    )
-            tokens.consume_type(YangTokenType.RBRACE)
-            if holder.if_features:
-                if name in context.module.feature_if_features:
-                    raise tokens._make_error(
-                        f"Duplicate if-feature block for feature {name!r}"
-                    )
-                context.module.feature_if_features[name] = list(holder.if_features)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._feature_parser.parse_feature_stmt(tokens, context)
 
     def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse if-feature; expression is stored on the parent schema node (not evaluated)."""
-        tokens.consume_type(YangTokenType.IF_FEATURE)
-        expression = self._parse_string_concatenation(tokens)
-        parent = context.current_parent
-        if parent is not None and hasattr(parent, "if_features"):
-            parent.if_features.append(expression)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                st = tokens.peek() or ""
-                if st == "description":
-                    self.parse_description_string_only(tokens, context)
-                elif st == "reference":
-                    self.parse_reference_string_only(tokens, context)
-                elif self._skip_unsupported_if_present(tokens, "if-feature substatement"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in if-feature: {st!r}")
-            tokens.consume_type(YangTokenType.RBRACE)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.BELONGS_TO)
-        parent_module = tokens.consume_type(YangTokenType.IDENTIFIER)
-        context.module.belongs_to_module = parent_module
-        tokens.consume_type(YangTokenType.LBRACE)
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            st = tokens.peek() or ""
-            handler = self.registry.get_handler(f"belongs-to:{st}")
-            if handler:
-                handler(tokens, context)
-            elif self._skip_unsupported_if_present(tokens, "belongs-to"):
-                pass
-            else:
-                raise tokens._make_error(f"Unknown statement in belongs-to: {st!r}")
-        tokens.consume_type(YangTokenType.RBRACE)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._feature_parser.parse_if_feature_stmt(tokens, context)
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.AUGMENT)
@@ -335,129 +342,55 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(aug)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                st = tokens.peek() or ""
-                handler = self.registry.get_handler(f"augment:{st}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, "augment"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in augment: {st!r}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(registry_prefix="augment", unsupported_context="augment"),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, aug)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
-    def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse yang-version statement."""
-        tokens.consume_type(YangTokenType.YANG_VERSION)
-        version, _ = tokens.consume_oneof(
-            [YangTokenType.IDENTIFIER, YangTokenType.DOTTED_NUMBER]
-        )
-        context.module.yang_version = version
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_namespace(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse namespace statement."""
-        tokens.consume_type(YangTokenType.NAMESPACE)
-        namespace = tokens.consume_type(YangTokenType.STRING)
-        context.module.namespace = namespace
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_prefix(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse prefix statement."""
-        tokens.consume_type(YangTokenType.PREFIX)
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            context.module.prefix = tokens.consume_type(YangTokenType.STRING)
-        elif tt == YangTokenType.IDENTIFIER:
-            context.module.prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
-        else:
-            raise tokens._make_error(
-                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
-            )
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_organization(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse organization statement."""
-        tokens.consume_type(YangTokenType.ORGANIZATION)
-        org = tokens.consume_type(YangTokenType.STRING)
-        context.module.organization = org
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-    def parse_contact(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse contact statement."""
-        tokens.consume_type(YangTokenType.CONTACT)
-        contact = tokens.consume_type(YangTokenType.STRING)
-        context.module.contact = contact
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement."""
-        tokens.consume_type(YangTokenType.DESCRIPTION)
-        desc = tokens.consume_type(YangTokenType.STRING)
-        if context.current_parent and hasattr(context.current_parent, "description"):
-            setattr(context.current_parent, "description", desc)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        desc = consume_description_substatement(tokens)
+        parent = context.current_parent
+        if parent is not None and hasattr(parent, "description"):
+            setattr(parent, "description", desc)
+
+    def parse_optional_description(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> None:
+        """If the next token is ``description``, parse it into ``current_parent.description``."""
+        if tokens.peek_type() != YangTokenType.DESCRIPTION:
+            return
+        self.parse_description(tokens, context)
 
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse revision statement."""
-        tokens.consume_type(YangTokenType.REVISION)
-        tt0 = tokens.peek_type()
-        if tt0 == YangTokenType.STRING:
-            date = tokens.consume_type(YangTokenType.STRING)
-        else:
-            chunks: list[str] = []
-            while tokens.has_more() and tokens.peek_type() not in (
-                YangTokenType.LBRACE,
-                YangTokenType.SEMICOLON,
-            ):
-                tt = tokens.peek_type()
-                if tt in (
-                    YangTokenType.IDENTIFIER,
-                    YangTokenType.DOTTED_NUMBER,
-                    YangTokenType.INTEGER,
-                ):
-                    chunks.append(tokens.consume_type(tt))
-                else:
-                    break
-            date = "".join(chunks)
-            if not date:
-                raise tokens._make_error(
-                    f"Expected revision date, got {tt0.name if tt0 else 'end'}"
-                )
-        revision = {'date': date, 'description': ''}
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    tokens.consume_type(YangTokenType.DESCRIPTION)
-                    revision['description'] = tokens.consume_type(YangTokenType.STRING)
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                else:
-                    raise tokens._make_error(f"Unknown statement in revision: {tokens.peek()}")
-            tokens.consume_type(YangTokenType.RBRACE)
-        context.module.revisions.append(revision)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
+        self._revision_parser.parse_revision(tokens, context)
+
     def parse_typedef(self, tokens: TokenStream, context: ParserContext) -> Optional[YangTypedefStmt]:
         """Parse typedef statement."""
         tokens.consume_type(YangTokenType.TYPEDEF)
         typedef_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         typedef_stmt = YangTypedefStmt(name=typedef_name)
         
-        if tokens.consume_if('{'):
+        if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(typedef_stmt)
-            while tokens.has_more() and tokens.peek() != '}':
-                handler = self.registry.get_handler(f"typedef:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"typedef '{typedef_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in typedef '{typedef_name}': {tokens.peek()}")
-            tokens.consume('}')
-        
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="typedef",
+                        unsupported_context=f"typedef '{typedef_name}'",
+                    ),
+                )
+            tokens.consume_type(YangTokenType.RBRACE)
+
         context.module.typedefs[typedef_name] = typedef_stmt
-        tokens.consume_if(';')
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
         return None  # Typedefs are stored in module, not returned as statements
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -469,15 +402,14 @@ class StatementParsers:
             tokens.consume_type(YangTokenType.LBRACE)
             new_context = context.push_parent(identity_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"identity:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"identity '{identity_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in identity '{identity_name}': {tokens.peek()}"
-                    )
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="identity",
+                        unsupported_context=f"identity '{identity_name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         context.module.identities[identity_name] = identity_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -512,13 +444,14 @@ class StatementParsers:
                         f"Infinite loop detected at token: {tokens.peek()}"
                     )
                 prev_index = tokens.index
-                handler = self.registry.get_handler(f"container:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"container '{container_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in container '{container_name}': {tokens.peek()}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="container",
+                        unsupported_context=f"container '{container_name}'",
+                    ),
+                )
             if tokens.has_more() and tokens.peek_type() == YangTokenType.RBRACE:
                 tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, container_stmt)
@@ -541,15 +474,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"{block_type}:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"{block_type} '{name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in {block_type} '{name}': {tokens.peek()}"
-                    )
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix=block_type,
+                        unsupported_context=f"{block_type} '{name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -609,16 +541,15 @@ class StatementParsers:
                         break
                     tokens.consume_type(YangTokenType.RBRACE)
                 elif brace_depth == 1:
-                    handler = self.registry.get_handler(f"type:{tokens.peek()}")
-                    if handler:
-                        if tokens.peek_type() == YangTokenType.TYPE:
-                            handler(tokens, type_context)
-                        else:
-                            handler(tokens, type_context, type_stmt)
-                    elif self._skip_unsupported_if_present(tokens, f"type '{type_name}'"):
-                        pass
-                    else:
-                        raise tokens._make_error(f"Unknown statement in type '{type_name}': {tokens.peek()}")
+                    self._parse_statement(
+                        tokens,
+                        type_context,
+                        StatementDispatchSpec(
+                            registry_prefix="type",
+                            unsupported_context=f"type '{type_name}'",
+                            type_stmt=type_stmt,
+                        ),
+                    )
                 else:
                     tokens.consume()  # Skip nested braces content
         if type_stmt.name == "enumeration" and not type_stmt.enums:
@@ -878,17 +809,16 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(must_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.ERROR_MESSAGE:
-                    self.parse_must_error_message(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    self.parse_description(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, "must"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in must: {tokens.peek()!r} "
-                        f"(only error-message and description allowed)"
-                    )
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="must",
+                        unsupported_context="must",
+                        allowed_keywords=frozenset({"error-message", "description"}),
+                        try_skip_when_disallowed=True,
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         # Add to appropriate parent (leaf, leaf-list, container, list, refine)
         if isinstance(context.current_parent, YangStatementWithMust):
@@ -919,15 +849,16 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(when_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    self.parse_description(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, "when"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in when: {tokens.peek()!r} "
-                        f"(only description allowed)"
-                    )
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="when",
+                        unsupported_context="when",
+                        allowed_keywords=frozenset({"description"}),
+                        try_skip_when_disallowed=True,
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         if parent_for_when and isinstance(parent_for_when, YangStatementWithWhen):
             parent_for_when.when = when_stmt
@@ -941,31 +872,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(grouping_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"grouping:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                else:
-                    pt = tokens.peek_type()
-                    if pt == YangTokenType.CONTAINER:
-                        self.parse_container(tokens, new_context)
-                    elif pt == YangTokenType.LIST:
-                        self.parse_list(tokens, new_context)
-                    elif pt == YangTokenType.LEAF:
-                        self.parse_leaf(tokens, new_context)
-                    elif pt == YangTokenType.LEAF_LIST:
-                        self.parse_leaf_list(tokens, new_context)
-                    elif pt == YangTokenType.USES:
-                        self.parse_uses(tokens, new_context)
-                    elif pt == YangTokenType.DESCRIPTION:
-                        self.parse_description(tokens, new_context)
-                    elif pt == YangTokenType.ANYDATA:
-                        self.parse_anydata(tokens, new_context)
-                    elif pt == YangTokenType.ANYXML:
-                        self.parse_anyxml(tokens, new_context)
-                    elif self._skip_unsupported_if_present(tokens, f"grouping '{grouping_name}'"):
-                        pass
-                    else:
-                        raise tokens._make_error(f"Unknown statement in grouping '{grouping_name}': {tokens.peek()}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="grouping",
+                        unsupported_context=f"grouping '{grouping_name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         context.module.groupings[grouping_name] = grouping_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -984,15 +898,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"uses:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"uses '{grouping_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in uses '{grouping_name}': {tokens.peek()}"
-                    )
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="uses",
+                        unsupported_context=f"uses '{grouping_name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         self._add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -1010,19 +923,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(refine_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"refine:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.MUST:
-                    self.parse_must(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    self.parse_description(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.TYPE:
-                    self.parse_type(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"refine '{target_path}'"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in refine '{target_path}': {tokens.peek()}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="refine",
+                        unsupported_context=f"refine '{target_path}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         if context.current_parent and isinstance(context.current_parent, YangUsesStmt):
             context.current_parent.refines.append(refine_stmt)
@@ -1036,13 +944,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(choice_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"choice:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"choice '{choice_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in choice '{choice_name}': {tokens.peek()}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="choice",
+                        unsupported_context=f"choice '{choice_name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
             choice_stmt.validate_case_unique_child_names()
         self._add_to_parent_or_module(context, choice_stmt)
@@ -1057,29 +966,14 @@ class StatementParsers:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(case_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self.registry.get_handler(f"case:{tokens.peek()}")
-                if handler:
-                    handler(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.LEAF:
-                    self.parse_leaf(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.CONTAINER:
-                    self.parse_container(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.LIST:
-                    self.parse_list(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.LEAF_LIST:
-                    self.parse_leaf_list(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.CHOICE:
-                    self.parse_choice(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
-                    self.parse_description(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.ANYDATA:
-                    self.parse_anydata(tokens, new_context)
-                elif tokens.peek_type() == YangTokenType.ANYXML:
-                    self.parse_anyxml(tokens, new_context)
-                elif self._skip_unsupported_if_present(tokens, f"case '{case_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(f"Unknown statement in case '{case_name}': {tokens.peek()}")
+                self._parse_statement(
+                    tokens,
+                    new_context,
+                    StatementDispatchSpec(
+                        registry_prefix="case",
+                        unsupported_context=f"case '{case_name}'",
+                    ),
+                )
             tokens.consume_type(YangTokenType.RBRACE)
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.cases.append(case_stmt)

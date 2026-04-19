@@ -109,7 +109,15 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 - ⚠️ **`augment`** — Parsed into `YangAugmentStmt` (including `if-feature`, `when`, `must`, nested data definitions). With `YangParser(expand_uses=True)`, augments are resolved and merged into the target module (same gate as `uses` expansion). With `expand_uses=False`, augments stay as statements for reversible convert. **JSON Schema** emission today still does not walk merged augment semantics end-to-end for every case; validate with an expanded module when you need full augmented-tree checks.
 
 ### Not implemented (skipped when parsing)
-- ⚠️ `deviation`, `extension`, `rpc`, `action`, `notification`, `input`, `output` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
+- ⚠️ `deviation`, `rpc`, `action`, `notification`, `input`, `output` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
+
+### Dynamic extension framework
+- ✅ `extension` definitions are parsed into the AST and tracked on `YangModule.extensions`.
+- ✅ Prefixed extension invocations (`prefix:name`) are parsed generically into AST nodes, including nested statement bodies.
+- ✅ Capability registry (`xyang.ext.capabilities`) allows semantic plugins to transform generic invocations without hardcoding extension names in the core parser.
+- ✅ Built-in capability plugin for RFC 8791 (`ietf-yang-structure-ext`) maps:
+  - `sx:structure` and `sx:augment-structure` remain generic extension-invocation AST nodes
+  - RFC 8791 semantics are applied by extension post-parse hooks (including `augment-structure` merge pass)
 
 Other reserved built-in type names may parse but lack full validation or JSON Schema parity; see **Built-in Types** and sections above.
 

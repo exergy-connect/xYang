@@ -4,13 +4,13 @@ YANG module representation.
 
 from __future__ import annotations
 
-from typing import Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from .ast import YangStatementList
 
 if TYPE_CHECKING:
-    from .ast import YangIdentityStmt, YangStatement, YangTypedefStmt
+    from .ast import YangExtensionStmt, YangIdentityStmt, YangStatement, YangTypedefStmt
 
 
 @dataclass
@@ -36,6 +36,10 @@ class YangModule(YangStatementList):
     feature_if_features: Dict[str, List[str]] = field(default_factory=dict)
     # import prefix (local) -> parsed module (RFC 7950 ``import``).
     import_prefixes: Dict[str, "YangModule"] = field(default_factory=dict)
+    # extension name -> extension definition from this module.
+    extensions: Dict[str, "YangExtensionStmt"] = field(default_factory=dict)
+    # Generic runtime storage for extension callbacks.
+    extension_runtime: Dict[str, Any] = field(default_factory=dict)
 
     def own_prefix_stripped(self) -> str:
         return (self.prefix or "").strip("'\"")
@@ -57,3 +61,7 @@ class YangModule(YangStatementList):
     def get_identity(self, name: str) -> Optional['YangIdentityStmt']:
         """Get an identity by name."""
         return self.identities.get(name)
+
+    def get_extension(self, name: str) -> Optional["YangExtensionStmt"]:
+        """Get an extension definition by local name."""
+        return self.extensions.get(name)
