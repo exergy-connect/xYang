@@ -217,18 +217,6 @@ class YangParser:
         self.registry.register('grouping:when', self.parsers.parse_when)
         self.registry.register('grouping:must', self.parsers.parse_must)
 
-        # Type constraint statements
-        self.registry.register('type:type', self.parsers.parse_type)  # For union types
-        self.registry.register('type:pattern', self.parsers.parse_type_pattern)
-        self.registry.register('type:length', self.parsers.parse_type_length)
-        self.registry.register('type:range', self.parsers.parse_type_range)
-        self.registry.register('type:fraction-digits', self.parsers.parse_type_fraction_digits)
-        self.registry.register('type:enum', self.parsers.parse_type_enum)
-        self.registry.register('type:bit', self.parsers.parse_type_bit)
-        self.registry.register('type:path', self.parsers.parse_type_path)
-        self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
-        self.registry.register('type:base', self.parsers.parse_type_base)
-        
         # Choice body statements
         self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
         self.registry.register('choice:description', self.parsers.parse_description)
