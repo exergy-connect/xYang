@@ -10,9 +10,11 @@ from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statement_dispatch import StatementDispatchSpec
 from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
+from .statements.identity import IdentityStatementParser
 from .statements.module_header import ModuleHeaderStatementParser
 from .statements.refine import RefineStatementParser
 from .statements.revision import RevisionStatementParser
+from .statements.uses import UsesStatementParser
 from ..ast import (
     YangBitStmt,
     YangAnydataStmt,
@@ -20,7 +22,6 @@ from ..ast import (
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
     YangExtensionInvocationStmt,
-    YangIdentityStmt,
     YangGroupingStmt, YangUsesStmt, YangAugmentStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
     YangStatementList, YangStatementWithMust,
     YangStatementWithWhen,
@@ -56,9 +57,11 @@ class StatementParsers:
         self._import_parse_state: Optional[SimpleNamespace] = None
         self._extension_parser = ExtensionStatementParser(self)
         self._feature_parser = FeatureStatementParser(self)
+        self._identity_parser = IdentityStatementParser(self)
         self._module_header_parser = ModuleHeaderStatementParser(self)
         self._refine_parser = RefineStatementParser(self)
         self._revision_parser = RevisionStatementParser(self)
+        self._uses_parser = UsesStatementParser(self)
         ensure_builtin_extensions_loaded()
 
     # ------------------------------------------------------------------
@@ -325,11 +328,10 @@ class StatementParsers:
     def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._feature_parser.parse_if_feature_stmt(tokens, context)
 
-    def register_uses_refine_handler(self) -> None:
-        self._refine_parser.register_uses_refine_handler(self.registry)
-
-    def register_refine_body_handlers(self) -> None:
-        self._refine_parser.register_refine_body_handlers(self.registry)
+    def parse_uses(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> Optional[YangUsesStmt]:
+        return self._uses_parser.parse_uses(tokens, context)
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.AUGMENT)
@@ -392,34 +394,10 @@ class StatementParsers:
         return None  # Typedefs are stored in module, not returned as statements
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse identity statement."""
-        tokens.consume_type(YangTokenType.IDENTITY)
-        identity_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        identity_stmt = YangIdentityStmt(name=identity_name)
-        if tokens.peek_type() == YangTokenType.LBRACE:
-            tokens.consume_type(YangTokenType.LBRACE)
-            new_context = context.push_parent(identity_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="identity",
-                        unsupported_context=f"identity '{identity_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        context.module.identities[identity_name] = identity_stmt
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._identity_parser.parse_identity(tokens, context)
 
     def parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse base substatement inside identity."""
-        tokens.consume_type(YangTokenType.BASE)
-        base_name = self._consume_qname_from_identifier(tokens)
-        parent = context.current_parent
-        if isinstance(parent, YangIdentityStmt):
-            parent.bases.append(base_name)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._identity_parser.parse_identity_base(tokens, context)
 
     def parse_type_base(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse base substatement inside identityref type."""
@@ -881,33 +859,6 @@ class StatementParsers:
             tokens.consume_type(YangTokenType.RBRACE)
         context.module.groupings[grouping_name] = grouping_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-    
-    def parse_uses(self, tokens: TokenStream, context: ParserContext) -> Optional[YangUsesStmt]:
-        """Parse uses statement.
-        Uses statements are stored temporarily and expanded after all groupings
-        have been parsed. A YangUsesStmt node is created as a placeholder.
-        """
-        tokens.consume_type(YangTokenType.USES)
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            grouping_name = self._consume_qname_from_identifier(tokens)
-        else:
-            grouping_name = tokens.consume()
-        uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(uses_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="uses",
-                        unsupported_context=f"uses '{grouping_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, uses_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return uses_stmt
     
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         self._refine_parser.parse_refine(tokens, context)

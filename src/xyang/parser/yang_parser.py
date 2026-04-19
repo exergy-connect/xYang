@@ -217,13 +217,6 @@ class YangParser:
         self.registry.register('grouping:when', self.parsers.parse_when)
         self.registry.register('grouping:must', self.parsers.parse_must)
 
-        # Uses body statements
-        self.parsers.register_uses_refine_handler()
-        self.registry.register('uses:description', self.parsers.parse_description)
-        self.registry.register('uses:when', self.parsers.parse_when)
-        self.registry.register('uses:if-feature', self.parsers.parse_if_feature_stmt)
-        self.parsers.register_refine_body_handlers()
-
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types
         self.registry.register('type:pattern', self.parsers.parse_type_pattern)
@@ -235,8 +228,6 @@ class YangParser:
         self.registry.register('type:path', self.parsers.parse_type_path)
         self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
         self.registry.register('type:base', self.parsers.parse_type_base)
-        self.registry.register('identity:base', self.parsers.parse_identity_base)
-        self.registry.register('identity:if-feature', self.parsers.parse_if_feature_stmt)
         
         # Choice body statements
         self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
