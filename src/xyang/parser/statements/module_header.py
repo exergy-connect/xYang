@@ -80,6 +80,11 @@ class ModuleHeaderStatementParser:
                 if tokens.peek_type() == YangTokenType.REVISION_DATE:
                     self._parse_import_revision_date_binding(tokens, context)
                     continue
+                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self._parsers.parse_optional_description(
+                        tokens, context.push_parent(SimpleNamespace())
+                    )
+                    continue
                 self._parsers._parse_statement(
                     tokens,
                     context,
@@ -87,7 +92,7 @@ class ModuleHeaderStatementParser:
                         registry_prefix="import",
                         unsupported_context="import",
                         allowed_keywords=frozenset(
-                            {"prefix", "revision-date", "description", "reference"}
+                            {"prefix", "revision-date", "reference"}
                         ),
                     ),
                 )
@@ -115,6 +120,10 @@ class ModuleHeaderStatementParser:
                 if tokens.peek_type() == YangTokenType.REVISION_DATE:
                     revision_date = self._parsers._revision_parser.parse_revision_date_statement(
                         tokens
+                    )
+                elif tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self._parsers.parse_optional_description(
+                        tokens, context.push_parent(SimpleNamespace())
                     )
                 else:
                     self._parsers._parse_statement(

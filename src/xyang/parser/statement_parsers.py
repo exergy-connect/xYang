@@ -11,6 +11,7 @@ from .statement_dispatch import StatementDispatchSpec
 from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
 from .statements.module_header import ModuleHeaderStatementParser
+from .statements.refine import RefineStatementParser
 from .statements.revision import RevisionStatementParser
 from ..ast import (
     YangBitStmt,
@@ -45,14 +46,6 @@ if TYPE_CHECKING:
 _StatementT = TypeVar("_StatementT", bound="YangStatement")
 
 
-def consume_description_substatement(tokens: TokenStream) -> str:
-    """Consume ``description`` ``quoted-string`` ``;`` and return the string."""
-    tokens.consume_type(YangTokenType.DESCRIPTION)
-    text = tokens.consume_type(YangTokenType.STRING)
-    tokens.consume_if_type(YangTokenType.SEMICOLON)
-    return text
-
-
 class StatementParsers:
     """Collection of statement parsing methods."""
 
@@ -64,6 +57,7 @@ class StatementParsers:
         self._extension_parser = ExtensionStatementParser(self)
         self._feature_parser = FeatureStatementParser(self)
         self._module_header_parser = ModuleHeaderStatementParser(self)
+        self._refine_parser = RefineStatementParser(self)
         self._revision_parser = RevisionStatementParser(self)
         ensure_builtin_extensions_loaded()
 
@@ -311,10 +305,6 @@ class StatementParsers:
         """Parse ``revision-date`` substatement (e.g. under ``include``)."""
         self._revision_parser.parse_revision_date_statement(tokens)
 
-    def parse_description_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Description with no parent field update (e.g. inside import)."""
-        consume_description_substatement(tokens)
-
     def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.REFERENCE)
         tokens.consume_type(YangTokenType.STRING)
@@ -335,6 +325,12 @@ class StatementParsers:
     def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._feature_parser.parse_if_feature_stmt(tokens, context)
 
+    def register_uses_refine_handler(self) -> None:
+        self._refine_parser.register_uses_refine_handler(self.registry)
+
+    def register_refine_body_handlers(self) -> None:
+        self._refine_parser.register_refine_body_handlers(self.registry)
+
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.AUGMENT)
         path = self._parse_string_concatenation(tokens)
@@ -353,7 +349,9 @@ class StatementParsers:
     
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement."""
-        desc = consume_description_substatement(tokens)
+        tokens.consume_type(YangTokenType.DESCRIPTION)
+        desc = tokens.consume_type(YangTokenType.STRING)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
         parent = context.current_parent
         if parent is not None and hasattr(parent, "description"):
             setattr(parent, "description", desc)
@@ -912,29 +910,7 @@ class StatementParsers:
         return uses_stmt
     
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse refine statement (supports descendant paths ``a/b``)."""
-        tokens.consume_type(YangTokenType.REFINE)
-        parts = [tokens.consume()]
-        while tokens.peek_type() == YangTokenType.SLASH:
-            tokens.consume_type(YangTokenType.SLASH)
-            parts.append(tokens.consume())
-        target_path = "/".join(parts)
-        refine_stmt = YangRefineStmt(name="refine", target_path=target_path)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(refine_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="refine",
-                        unsupported_context=f"refine '{target_path}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        if context.current_parent and isinstance(context.current_parent, YangUsesStmt):
-            context.current_parent.refines.append(refine_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._refine_parser.parse_refine(tokens, context)
     
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
         """Parse choice statement."""

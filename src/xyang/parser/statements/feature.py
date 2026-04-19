@@ -28,15 +28,16 @@ class FeatureStatementParser:
             holder = SimpleNamespace(if_features=[])
             feat_ctx = context.push_parent(holder)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self._parsers.parse_optional_description(tokens, feat_ctx)
+                    continue
                 self._parsers._parse_statement(
                     tokens,
                     feat_ctx,
                     StatementDispatchSpec(
                         registry_prefix="feature",
                         unsupported_context=f"feature '{name}'",
-                        allowed_keywords=frozenset(
-                            {"if-feature", "description", "reference"}
-                        ),
+                        allowed_keywords=frozenset({"if-feature", "reference"}),
                         try_skip_when_disallowed=True,
                     ),
                 )
@@ -60,13 +61,18 @@ class FeatureStatementParser:
                 feats.append(expression)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                if tokens.peek_type() == YangTokenType.DESCRIPTION:
+                    self._parsers.parse_optional_description(
+                        tokens, context.push_parent(SimpleNamespace())
+                    )
+                    continue
                 self._parsers._parse_statement(
                     tokens,
                     context,
                     StatementDispatchSpec(
                         registry_prefix="if_feature",
                         unsupported_context="if-feature substatement",
-                        allowed_keywords=frozenset({"description", "reference"}),
+                        allowed_keywords=frozenset({"reference"}),
                         try_skip_when_disallowed=True,
                     ),
                 )

@@ -107,7 +107,6 @@ class YangParser:
         # import / include substatements
         for _pfx in ('import', 'include'):
             self.registry.register(f'{_pfx}:prefix', mh.parse_prefix_value_stmt)
-            self.registry.register(f'{_pfx}:description', self.parsers.parse_description_string_only)
             self.registry.register(f'{_pfx}:reference', self.parsers.parse_reference_string_only)
         self.registry.register('include:revision-date', self.parsers.parse_revision_date_statement)
         self.registry.register('import:prefix', mh.parse_import_prefix_binding)
@@ -125,9 +124,7 @@ class YangParser:
         self.registry.register('must:description', self.parsers.parse_description)
         self.registry.register('when:description', self.parsers.parse_description)
         self.registry.register('feature:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('feature:description', self.parsers.parse_description_string_only)
         self.registry.register('feature:reference', self.parsers.parse_reference_string_only)
-        self.registry.register('if_feature:description', self.parsers.parse_description_string_only)
         self.registry.register('if_feature:reference', self.parsers.parse_reference_string_only)
 
         # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
@@ -221,21 +218,11 @@ class YangParser:
         self.registry.register('grouping:must', self.parsers.parse_must)
 
         # Uses body statements
-        self.registry.register('uses:refine', self.parsers.parse_refine)
+        self.parsers.register_uses_refine_handler()
         self.registry.register('uses:description', self.parsers.parse_description)
         self.registry.register('uses:when', self.parsers.parse_when)
         self.registry.register('uses:if-feature', self.parsers.parse_if_feature_stmt)
-        
-        # Refine body statements
-        self.registry.register('refine:must', self.parsers.parse_must)
-        self.registry.register('refine:description', self.parsers.parse_description)
-        self.registry.register('refine:min-elements', self.parsers.parse_min_elements)
-        self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
-        self.registry.register('refine:ordered-by', self.parsers.parse_ordered_by)
-        self.registry.register('refine:mandatory', self.parsers.parse_refine_mandatory)
-        self.registry.register('refine:default', self.parsers.parse_refine_default)
-        self.registry.register('refine:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('refine:type', self.parsers.parse_type)
+        self.parsers.register_refine_body_handlers()
 
         # Type constraint statements
         self.registry.register('type:type', self.parsers.parse_type)  # For union types
