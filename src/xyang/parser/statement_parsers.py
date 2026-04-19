@@ -12,7 +12,8 @@ from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
 from .statements.identity import IdentityStatementParser
 from .statements.bits import BitsStatementParser
-from .statements.module_header import ModuleHeaderStatementParser
+from .statements.module import ModuleStatementParser
+from .statements.submodule import SubmoduleStatementParser
 from .statements.refine import RefineStatementParser
 from .statements.revision import RevisionStatementParser
 from .statements.type import TypeStatementParser
@@ -62,7 +63,8 @@ class StatementParsers:
         self._extension_parser = ExtensionStatementParser(self)
         self._feature_parser = FeatureStatementParser(self)
         self._identity_parser = IdentityStatementParser(self)
-        self._module_header_parser = ModuleHeaderStatementParser(self)
+        self._module_parser = ModuleStatementParser(self)
+        self._submodule_parser = SubmoduleStatementParser(self, self._module_parser)
         self._refine_parser = RefineStatementParser(self)
         self._revision_parser = RevisionStatementParser(self)
         self._bits_parser = BitsStatementParser(self)

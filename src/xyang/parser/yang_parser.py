@@ -60,15 +60,15 @@ class YangParser:
 
     def _register_handlers(self):
         """Register all statement handlers."""
-        mh = self.parsers._module_header_parser
+        mp = self.parsers._module_parser
 
         # Module-level statements
-        self.registry.register('module', mh.parse_module)
-        self.registry.register('module:yang-version', mh.parse_yang_version)
-        self.registry.register('module:namespace', mh.parse_namespace)
-        self.registry.register('module:prefix', mh.parse_prefix)
-        self.registry.register('module:organization', mh.parse_organization)
-        self.registry.register('module:contact', mh.parse_contact)
+        self.registry.register('module', mp.parse_module)
+        self.registry.register('module:yang-version', mp.parse_yang_version)
+        self.registry.register('module:namespace', mp.parse_namespace)
+        self.registry.register('module:prefix', mp.parse_prefix)
+        self.registry.register('module:organization', mp.parse_organization)
+        self.registry.register('module:contact', mp.parse_contact)
         self.registry.register('module:description', self.parsers.parse_description)
         self.registry.register('module:revision', self.parsers.parse_revision)
         self.registry.register('module:typedef', self.parsers.parse_typedef)
@@ -80,16 +80,16 @@ class YangParser:
         self.registry.register('module:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('module:anydata', self.parsers.parse_anydata)
         self.registry.register('module:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('module:import', mh.parse_import_stmt)
-        self.registry.register('module:include', mh.parse_include_stmt)
+        self.registry.register('module:import', mp.parse_import_stmt)
+        self.registry.register('module:include', mp.parse_include_stmt)
         self.registry.register('module:feature', self.parsers.parse_feature_stmt)
         self.registry.register('module:extension', self.parsers.parse_extension_stmt)
         self.registry.register('module:augment', self.parsers.parse_augment)
 
         # Submodule top-level (same handlers as module where applicable)
-        self.registry.register('submodule:yang-version', mh.parse_yang_version)
-        self.registry.register('submodule:import', mh.parse_import_stmt)
-        self.registry.register('submodule:include', mh.parse_include_stmt)
+        self.registry.register('submodule:yang-version', mp.parse_yang_version)
+        self.registry.register('submodule:import', mp.parse_import_stmt)
+        self.registry.register('submodule:include', mp.parse_include_stmt)
         self.registry.register('submodule:revision', self.parsers.parse_revision)
         self.registry.register('submodule:feature', self.parsers.parse_feature_stmt)
         self.registry.register('submodule:extension', self.parsers.parse_extension_stmt)
@@ -106,10 +106,10 @@ class YangParser:
 
         # import / include substatements
         for _pfx in ('import', 'include'):
-            self.registry.register(f'{_pfx}:prefix', mh.parse_prefix_value_stmt)
+            self.registry.register(f'{_pfx}:prefix', mp.parse_prefix_value_stmt)
             self.registry.register(f'{_pfx}:reference', self.parsers.parse_reference_string_only)
         self.registry.register('include:revision-date', self.parsers.parse_revision_date_statement)
-        self.registry.register('import:prefix', mh.parse_import_prefix_binding)
+        self.registry.register('import:prefix', mp.parse_import_prefix_binding)
 
         for _kw, _handler in (
             ('if-feature', self.parsers.parse_if_feature_stmt),
@@ -484,11 +484,10 @@ class YangParser:
             current_parent=module,
             source_dir=source_path.parent if source_path else None,
         )
-        mh = self.parsers._module_header_parser
         if root == "module":
-            mh.parse_module(tokens, context)
+            self.parsers._module_parser.parse_module(tokens, context)
         elif root == "submodule":
-            mh.parse_submodule(tokens, context)
+            self.parsers._submodule_parser.parse_submodule(tokens, context)
         else:
             raise tokens._make_error("Expected 'module' or 'submodule' statement at start of file")
 

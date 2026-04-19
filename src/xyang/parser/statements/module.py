@@ -1,5 +1,5 @@
 """
-Parsing helpers for module/submodule header and import/include statements.
+Parsing helpers for ``module`` header and linkage statements.
 """
 
 from __future__ import annotations
@@ -14,10 +14,10 @@ if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
 
 
-class ModuleHeaderStatementParser:
-    """Parsers for module/submodule header and linkage statements."""
+class ModuleStatementParser:
+    """Parsers for module header and import/include linkage statements."""
 
-    def __init__(self, parsers: StatementParsers) -> None:
+    def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -39,30 +39,6 @@ class ModuleHeaderStatementParser:
             tokens,
             context,
             StatementDispatchSpec(registry_prefix="module", unsupported_context="module body"),
-        )
-
-    def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse submodule statement (YANG 1.1)."""
-        tokens.consume_type(YangTokenType.SUBMODULE)
-        submodule_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        tokens.consume_type(YangTokenType.LBRACE)
-        context.module.name = submodule_name
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            if tokens.peek_type() == YangTokenType.BELONGS_TO:
-                self._parse_belongs_to(tokens, context)
-            else:
-                self._parse_submodule_statement(tokens, context)
-        tokens.consume_type(YangTokenType.RBRACE)
-
-    def _parse_submodule_statement(
-        self, tokens: TokenStream, context: ParserContext
-    ) -> None:
-        self._parsers._parse_statement(
-            tokens,
-            context,
-            StatementDispatchSpec(
-                registry_prefix="submodule", unsupported_context="submodule body"
-            ),
         )
 
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -179,23 +155,6 @@ class ModuleHeaderStatementParser:
         if acc is None:
             raise tokens._make_error("internal: revision-date outside import block")
         acc.revision_date = self._parsers._revision_parser.parse_revision_date_statement(tokens)
-
-    def _parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.BELONGS_TO)
-        parent_module = tokens.consume_type(YangTokenType.IDENTIFIER)
-        context.module.belongs_to_module = parent_module
-        tokens.consume_type(YangTokenType.LBRACE)
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            if tokens.peek_type() == YangTokenType.PREFIX:
-                self.parse_prefix_value_stmt(tokens, context)
-            elif self._parsers._skip_unsupported_if_present(tokens, "belongs-to"):
-                continue
-            else:
-                raise tokens._make_error(
-                    f"Unknown statement in belongs-to: {tokens.peek()!r}"
-                )
-        tokens.consume_type(YangTokenType.RBRACE)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse yang-version statement."""

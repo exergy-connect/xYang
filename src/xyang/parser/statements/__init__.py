@@ -4,7 +4,8 @@ from .extension import ExtensionStatementParser
 from .feature import FeatureStatementParser
 from .identity import IdentityStatementParser
 from .bits import BitsStatementParser
-from .module_header import ModuleHeaderStatementParser
+from .module import ModuleStatementParser
+from .submodule import SubmoduleStatementParser
 from .refine import RefineStatementParser
 from .revision import RevisionStatementParser
 from .type import TypeStatementParser
@@ -15,7 +16,8 @@ __all__ = [
     "ExtensionStatementParser",
     "FeatureStatementParser",
     "IdentityStatementParser",
-    "ModuleHeaderStatementParser",
+    "ModuleStatementParser",
+    "SubmoduleStatementParser",
     "RefineStatementParser",
     "RevisionStatementParser",
     "TypeStatementParser",
