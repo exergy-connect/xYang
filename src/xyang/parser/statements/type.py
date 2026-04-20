@@ -134,11 +134,7 @@ class TypeStatementParser:
                 elif pt == YangTokenType.IDENTIFIER and tokens.peek_type_at(1) == YangTokenType.COLON:
                     self._parsers._parse_prefixed_extension_statement(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
-                    tokens,
-                    "pattern",
-                    error_message=(
-                        f"Unknown substatement in pattern: {tokens.peek()!r}"
-                    ),
+                    tokens, "pattern"
                 ):
                     pass
             tokens.consume_type(YangTokenType.RBRACE)
@@ -189,11 +185,7 @@ class TypeStatementParser:
                 elif pt == YangTokenType.IDENTIFIER and tokens.peek_type_at(1) == YangTokenType.COLON:
                     self._parsers._parse_prefixed_extension_statement(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
-                    tokens,
-                    f"enum '{enum_name}'",
-                    error_message=(
-                        f"Unknown substatement in enum '{enum_name}': {tokens.peek()!r}"
-                    ),
+                    tokens, f"enum '{enum_name}'"
                 ):
                     pass
             tokens.consume_type(YangTokenType.RBRACE)

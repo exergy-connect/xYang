@@ -100,12 +100,7 @@ class ModuleStatementParser:
                 if handler:
                     handler(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
-                    tokens,
-                    "import",
-                    error_message=(
-                        "Unknown statement in import: "
-                        f"{tokens.peek()!r} (allowed: prefix, reference, revision-date)"
-                    ),
+                    tokens, "import"
                 ):
                     continue
         finally:

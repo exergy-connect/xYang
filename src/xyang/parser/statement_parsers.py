@@ -22,15 +22,16 @@ from .statements.refine import RefineStatementParser
 from .statements.revision import RevisionStatementParser
 from .statements.type import TypeStatementParser
 from .statements.uses import UsesStatementParser
+from .statements.must import MustStatementParser
+from .statements.when import WhenStatementParser
 from ..ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
     YangContainerStmt, YangListStmt, YangLeafStmt,
-    YangLeafListStmt, YangTypeStmt, YangMustStmt, YangWhenStmt, YangTypedefStmt,
+    YangLeafListStmt, YangTypeStmt, YangMustStmt, YangTypedefStmt,
     YangExtensionInvocationStmt,
     YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
-    YangStatementList, YangStatementWithMust,
-    YangStatementWithWhen,
+    YangStatementList,
 )
 from ..ext import (
     ensure_builtin_extensions_loaded,
@@ -80,6 +81,8 @@ class StatementParsers:
         self._bits_parser = BitsStatementParser(self)
         self._type_parser = TypeStatementParser(self)
         self._uses_parser = UsesStatementParser(self)
+        self._must_parser = MustStatementParser(self)
+        self._when_parser = WhenStatementParser(self)
         self._augment_parser = AugmentStatementParser(self)
         self._typedef_parser = TypedefStatementParser(self)
         self._statement_token_dispatch = {
@@ -118,21 +121,11 @@ class StatementParsers:
         return True
 
     def _skip_unsupported_or_raise_unknown_stmt(
-        self,
-        tokens: TokenStream,
-        context: str,
-        *,
-        error_message: Optional[str] = None,
+        self, tokens: TokenStream, context: str
     ) -> bool:
-        """Skip unsupported constructs when applicable; otherwise raise for an unknown statement.
-
-        If ``error_message`` is set, it is used as the full parse error text; otherwise the
-        message is ``Unknown statement in {context}: {peek}``.
-        """
+        """Skip unsupported constructs when applicable; otherwise raise ``Unknown statement in {context}: …``."""
         if self._skip_unsupported_if_present(tokens, context):
             return True
-        if error_message is not None:
-            raise tokens._make_error(error_message)
         raise tokens._make_error(
             f"Unknown statement in {context}: {tokens.peek()!r}"
         )
@@ -290,11 +283,7 @@ class StatementParsers:
                     handler(tokens, context, spec.type_stmt)
                 return
             if self._skip_unsupported_or_raise_unknown_stmt(
-                tokens,
-                spec.unsupported_context,
-                error_message=(
-                    f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-                ),
+                tokens, spec.unsupported_context
             ):
                 return
 
@@ -318,11 +307,7 @@ class StatementParsers:
             handler(tokens, context)
             return
         if self._skip_unsupported_or_raise_unknown_stmt(
-            tokens,
-            spec.unsupported_context,
-            error_message=(
-                f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-            ),
+            tokens, spec.unsupported_context
         ):
             return
 
@@ -591,68 +576,13 @@ class StatementParsers:
         return ''.join(parts)
 
     def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
-        """Parse must statement. Argument is one or more string tokens (YANG allows + concatenation)."""
-        tokens.consume_type(YangTokenType.MUST)
-        expression = self._parse_string_concatenation(tokens)
-        must_stmt = YangMustStmt(expression=expression)
-        
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(must_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="must",
-                        unsupported_context="must",
-                        allowed_keywords=frozenset({"error-message", "description"}),
-                        try_skip_when_disallowed=True,
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        # Add to appropriate parent (leaf, leaf-list, container, list, refine)
-        if isinstance(context.current_parent, YangStatementWithMust):
-            context.current_parent.must_statements.append(must_stmt)
-        # For YangListStmt, parse_list_must also appends; both paths are valid
-        
-        # Consume semicolon if present (optional for must statements in containers/lists)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return must_stmt
+        return self._must_parser.parse_must(tokens, context)
 
     def parse_must_error_message(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse error-message in must statement."""
-        tokens.consume_type(YangTokenType.ERROR_MESSAGE)
-        if context.current_parent and isinstance(context.current_parent, YangMustStmt):
-            context.current_parent.error_message = tokens.consume_type(YangTokenType.STRING)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._must_parser.parse_must_error_message(tokens, context)
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse when statement. Argument is string (with optional + concatenation). Uses xpath.
-
-        RFC 7950 allows optional substatements ``description`` and ``reference`` in the braced form;
-        xYang currently supports ``description`` only.
-        """
-        tokens.consume_type(YangTokenType.WHEN)
-        condition = self._parse_string_concatenation(tokens)
-        when_stmt = YangWhenStmt(expression=condition)
-        parent_for_when = context.current_parent
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(when_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="when",
-                        unsupported_context="when",
-                        allowed_keywords=frozenset({"description"}),
-                        try_skip_when_disallowed=True,
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        if parent_for_when and isinstance(parent_for_when, YangStatementWithWhen):
-            parent_for_when.when = when_stmt
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._when_parser.parse_when(tokens, context)
     
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse grouping statement."""

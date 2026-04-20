@@ -36,12 +36,7 @@ class BitsStatementParser:
                 elif pt == YangTokenType.DESCRIPTION:
                     self._parsers.parse_description(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
-                    tokens,
-                    "bit",
-                    error_message=(
-                        f"Unknown statement in bit: {tokens.peek()!r} "
-                        f"(only position and description allowed)"
-                    ),
+                    tokens, "bit"
                 ):
                     pass
             tokens.consume_type(YangTokenType.RBRACE)

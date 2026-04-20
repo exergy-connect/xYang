@@ -14,6 +14,8 @@ from .refine import RefineStatementParser
 from .revision import RevisionStatementParser
 from .type import TypeStatementParser
 from .uses import UsesStatementParser
+from .must import MustStatementParser
+from .when import WhenStatementParser
 
 __all__ = [
     "AnydataStatementParser",
@@ -30,4 +32,6 @@ __all__ = [
     "RevisionStatementParser",
     "TypeStatementParser",
     "UsesStatementParser",
+    "MustStatementParser",
+    "WhenStatementParser",
 ]

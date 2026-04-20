@@ -77,10 +77,6 @@ class YangParser:
         ):
             self.registry.register(f'extension_invocation:{_kw}', _handler)
 
-        self.registry.register('must:error-message', self.parsers.parse_must_error_message)
-        self.registry.register('must:description', self.parsers.parse_description)
-        self.registry.register('when:description', self.parsers.parse_description)
-
         # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
         # parser implements — container, leaf, leaf-list, list, choice, case, uses, refine,
         # augment, identity — plus ``feature`` (§7.20.1.1).  Not on ``enum`` / ``bit`` per
