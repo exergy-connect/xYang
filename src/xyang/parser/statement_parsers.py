@@ -5,7 +5,7 @@ Statement parsers for YANG statements.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Callable, Optional, TYPE_CHECKING, TypeVar
+from typing import Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statement_dispatch import StatementDispatchSpec
 from .statements.anydata import AnydataStatementParser
@@ -86,120 +86,6 @@ class StatementParsers:
             YangTokenType.IDENTIFIER: self._parse_prefixed_extension_statement,
         }
         ensure_builtin_extensions_loaded()
-
-    def get_registry_bindings(self) -> dict[str, Callable]:
-        """Return the default statement registry bindings."""
-        bindings: dict[str, Callable] = {
-            "must:error-message": self.parse_must_error_message,
-            "must:description": self.parse_description,
-            "when:description": self.parse_description,
-            "feature:if-feature": self.parse_if_feature_stmt,
-            "feature:reference": self.parse_reference_string_only,
-            "if_feature:reference": self.parse_reference_string_only,
-        }
-
-        extension_handlers: tuple[tuple[str, Callable], ...] = (
-            ("if-feature", self.parse_if_feature_stmt),
-            ("when", self.parse_when),
-            ("must", self.parse_must),
-            ("description", self.parse_description),
-            ("reference", self.parse_reference_string_only),
-            ("uses", self.parse_uses),
-            ("leaf", self.parse_leaf),
-            ("leaf-list", self.parse_leaf_list),
-            ("container", self.parse_container),
-            ("list", self.parse_list),
-            ("choice", self.parse_choice),
-            ("case", self.parse_case),
-        )
-        for keyword, handler in extension_handlers:
-            bindings[f"extension_invocation:{keyword}"] = handler
-
-        context_handlers: dict[str, tuple[tuple[str, Callable], ...]] = {
-            "container": (
-                ("description", self.parse_description),
-                ("presence", self.parse_presence),
-                ("when", self.parse_when),
-                ("must", self.parse_must),
-                ("leaf", self.parse_leaf),
-                ("container", self.parse_container),
-                ("list", self.parse_list),
-                ("leaf-list", self.parse_leaf_list),
-                ("uses", self.parse_uses),
-                ("choice", self.parse_choice),
-                ("if-feature", self.parse_if_feature_stmt),
-            ),
-            "list": (
-                ("key", self.parse_list_key),
-                ("min-elements", self.parse_min_elements),
-                ("max-elements", self.parse_max_elements),
-                ("ordered-by", self.parse_ordered_by),
-                ("description", self.parse_description),
-                ("when", self.parse_when),
-                ("leaf", self.parse_leaf),
-                ("container", self.parse_container),
-                ("list", self.parse_list),
-                ("leaf-list", self.parse_leaf_list),
-                ("must", self.parse_must),
-                ("uses", self.parse_uses),
-                ("choice", self.parse_choice),
-                ("if-feature", self.parse_if_feature_stmt),
-            ),
-            "leaf": (
-                ("type", self.parse_type),
-                ("mandatory", self.parse_leaf_mandatory),
-                ("default", self.parse_leaf_default),
-                ("description", self.parse_description),
-                ("must", self.parse_must),
-                ("when", self.parse_when),
-                ("if-feature", self.parse_if_feature_stmt),
-            ),
-            "leaf-list": (
-                ("type", self.parse_type),
-                ("min-elements", self.parse_min_elements),
-                ("max-elements", self.parse_max_elements),
-                ("ordered-by", self.parse_ordered_by),
-                ("description", self.parse_description),
-                ("when", self.parse_when),
-                ("must", self.parse_must),
-                ("if-feature", self.parse_if_feature_stmt),
-            ),
-            "grouping": (
-                ("description", self.parse_description),
-                ("choice", self.parse_choice),
-                ("container", self.parse_container),
-                ("list", self.parse_list),
-                ("leaf", self.parse_leaf),
-                ("leaf-list", self.parse_leaf_list),
-                ("uses", self.parse_uses),
-                ("if-feature", self.parse_if_feature_stmt),
-                ("when", self.parse_when),
-                ("must", self.parse_must),
-            ),
-            "choice": (
-                ("mandatory", self.parse_choice_mandatory),
-                ("description", self.parse_description),
-                ("when", self.parse_when),
-                ("if-feature", self.parse_if_feature_stmt),
-                ("case", self.parse_case),
-            ),
-            "case": (
-                ("description", self.parse_description),
-                ("when", self.parse_when),
-                ("if-feature", self.parse_if_feature_stmt),
-                ("uses", self.parse_uses),
-                ("leaf", self.parse_leaf),
-                ("container", self.parse_container),
-                ("list", self.parse_list),
-                ("leaf-list", self.parse_leaf_list),
-                ("choice", self.parse_choice),
-            ),
-        }
-        for context, handlers in context_handlers.items():
-            for keyword, handler in handlers:
-                bindings[f"{context}:{keyword}"] = handler
-
-        return bindings
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
