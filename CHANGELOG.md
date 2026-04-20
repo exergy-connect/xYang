@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **TypeScript** implementation in [`ts/`](ts/): publishable npm package **`@xyang/ts`** (parser, validator, RFC 7951 encoding helpers, XPath, CLI `xyang-ts`), Vitest suite, and GitHub Actions workflows for tests and npm publish.
+
 ### Changed
 
 - Documentation: removed the top-level "Working with types" usage example from [README.md](README.md) to reflect the current package surface.

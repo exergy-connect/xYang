@@ -1,0 +1,1 @@
+export { resolveQualifiedTopLevel } from "./encoding";
