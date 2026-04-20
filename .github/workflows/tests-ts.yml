@@ -1,0 +1,51 @@
+name: Tests (TypeScript)
+
+on:
+  push:
+    branches: [main, master]
+    paths:
+      - "ts/**"
+      - ".github/workflows/tests-ts.yml"
+  pull_request:
+    paths:
+      - "ts/**"
+      - ".github/workflows/tests-ts.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: tests-ts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  test:
+    name: Node 24
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Lint (typecheck)
+        working-directory: ts
+        run: npm run lint
+
+      - name: Build
+        working-directory: ts
+        run: npm run build:check
+
+      - name: Test
+        working-directory: ts
+        run: npm test

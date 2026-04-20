@@ -1,0 +1,49 @@
+{
+  "name": "@xyang/ts",
+  "version": "0.1.0",
+  "description": "TypeScript xYang bridge and compatibility surface",
+  "license": "MIT",
+  "type": "module",
+  "main": "./dist/index.js",
+  "module": "./dist/index.js",
+  "types": "./dist/index.d.ts",
+  "browser": "./dist/index.umd.min.js",
+  "exports": {
+    ".": {
+      "types": "./dist/index.d.ts",
+      "import": "./dist/index.js",
+      "default": "./dist/index.js"
+    },
+    "./encoding": {
+      "types": "./dist/encoding-entry.d.ts",
+      "import": "./dist/encoding-entry.js",
+      "default": "./dist/encoding-entry.js"
+    },
+    "./types": {
+      "types": "./dist/types-entry.d.ts",
+      "import": "./dist/types-entry.js",
+      "default": "./dist/types-entry.js"
+    }
+  },
+  "bin": {
+    "xyang-ts": "./dist/cli.js"
+  },
+  "engines": {
+    "node": ">=24"
+  },
+  "scripts": {
+    "build": "tsup",
+    "build:check": "npm run build && node ./scripts/check-artifacts.mjs",
+    "test": "vitest run",
+    "test:coverage": "vitest run --coverage",
+    "lint": "tsc --noEmit",
+    "pack:check": "npm pack --dry-run"
+  },
+  "devDependencies": {
+    "@types/node": "^24.0.0",
+    "tsup": "^8.0.0",
+    "typescript": "^5.9.0",
+    "vitest": "^3.2.0",
+    "yaml": "^2.8.3"
+  }
+}

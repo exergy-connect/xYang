@@ -44,5 +44,14 @@ htmlcov/
 .dmypy.json
 dmypy.json
 
+# TypeScript / Node (ts/)
+node_modules/
+coverage/
+*.tsbuildinfo
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+
 # Distribution
 *.whl
