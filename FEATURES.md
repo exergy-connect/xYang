@@ -413,7 +413,6 @@ src/xyang/
 │   ├── yang_parser.py           # YANG file/module parsing
 │   ├── tokenizer.py             # YANG tokenizer
 │   ├── statement_parsers.py     # Statement-level parsers
-│   ├── statement_registry.py    # Statement registry
 │   └── parser_context.py        # Parser context
 ├── json/                        # JSON Schema export
 │   ├── __init__.py              # generate_json_schema, schema_to_yang_json, parse_json_schema

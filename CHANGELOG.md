@@ -9,12 +9,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
-- Optional **anydata subtree validation** aligned with [draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation): ``YangValidator.enable_extension`` / ``DocumentValidator.enable_extension`` with ``ValidatorExtension.ANYDATA_VALIDATION``, caller ``modules: dict[str, YangModule]``, and ``AnydataValidationMode`` (**complete** vs **candidate**) from ``xyang.ext.anydata_validation``. CLI: ``xyang validate … --anydata-validation complete|candidate`` with ``--anydata-module`` for extra YANG files. Example: [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py).
-- ``xyang.ext`` apply hooks for ``extension`` definitions and prefixed invocations (see [FEATURES.md](FEATURES.md)).
+- Optional **anydata subtree validation** (draft [yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation)): validator extension, CLI flags, and [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py). Details in [FEATURES.md](FEATURES.md).
+- ``xyang.ext`` hooks for extension definitions and prefixed invocations (see [FEATURES.md](FEATURES.md)).
 
 ### Changed
 
-- Parser: ``anydata``, ``anyxml``, and ``typedef`` moved into small dedicated modules.
+- **Parser:** Reorganized for clearer **extension** support (prefixed extension bodies and related statements); statement logic split across smaller modules. **Breaking:** ``YangParser.registry`` was removed—use ``YangParser.parsers`` if you need the statement parser facade. Syntax errors for invalid statements **inside extension blocks** may use different messages or context than before.
 
 ### Fixed
 

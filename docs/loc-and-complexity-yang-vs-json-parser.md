@@ -11,12 +11,12 @@ Both outputs feed the same validation pipeline (`YangValidator`, `DocumentValida
 
 | Metric | Native YANG parser | JSON/YANG parser |
 |--------|-------------------|------------------|
-| **LOC (parser only)** | **1,411** | **764** |
-| **LOC (including shared AST + module)** | **1,708** | **1,061** |
-| **Files** | 6 | 1 |
+| **LOC (parser only)** | **1,382** | **764** |
+| **LOC (including shared AST + module)** | **1,679** | **1,061** |
+| **Files** | 5 | 1 |
 | **Classes** | 8 | 0 |
 | **Top-level functions** | 3 | 23 |
-| **Statement/context types** | Token stream, context, registry, ~39 `parse_*` methods | Dict walk + helpers |
+| **Statement/context types** | Token stream, context, per-statement dispatch, ~39 `parse_*` methods | Dict walk + helpers |
 | **Input format** | YANG 1.1 text | JSON (pre-flattened schema) |
 
 The JSON parser is **~1.8× fewer LOC** (parser-only) and **single-file** with no lexer or grammar layer.
@@ -31,14 +31,13 @@ The JSON parser is **~1.8× fewer LOC** (parser-only) and **single-file** with n
 |------|-----|------|
 | `parser/statement_parsers.py` | 705 | One parse method per statement kind (module, container, list, leaf, leaf-list, typedef, grouping, uses, refine, choice, case, type, must, when, key, …). |
 | `parser/parser_context.py` | 286 | Token types, `Token`, `YangToken`, `TokenStream`, `ParserContext` (current statement stack, expectations). |
-| `parser/yang_parser.py` | 185 | `YangParser`: registry setup, driver, uses-expansion hook, `parse_file` / `parse_string`. |
+| `parser/yang_parser.py` | 185 | `YangParser`: driver, uses-expansion hook, `parse_file` / `parse_string`. |
 | `parser/tokenizer.py` | 195 | `YangTokenizer`: lexer for YANG keywords, identifiers, strings, numbers, braces, semicolons. |
-| `parser/statement_registry.py` | 29 | `StatementRegistry`: map (parent, statement_name) → parse function. |
 | `parser/__init__.py` | 11 | Re-exports. |
-| **Subtotal (parser)** | **1,411** | |
+| **Subtotal (parser)** | **1,382** | |
 | `ast.py` | 255 | Shared AST node types (container, list, leaf, leaf-list, typedef, type, must, when, uses, …) plus shared parsed XPath storage for `must`/`when`. |
 | `module.py` | 42 | `YangModule` (name, namespace, prefix, typedefs, statements). |
-| **Total (parser + shared)** | **1,708** | |
+| **Total (parser + shared)** | **1,679** | |
 
 ### JSON/YANG parser
 
@@ -60,13 +59,12 @@ The JSON parser is **~1.8× fewer LOC** (parser-only) and **single-file** with n
 
 ### Native YANG parser
 
-- **Pipeline:** Source text → **tokenizer** (lexer) → **token stream** → **parser** (registry-driven recursive descent) → **AST**.
+- **Pipeline:** Source text → **tokenizer** (lexer) → **token stream** → **parser** (recursive descent with per-statement dispatch) → **AST**.
 - **Layers:**
   1. **Lexer** (`tokenizer.py`): Character-level scanning; emits tokens (keyword, identifier, string, number, `{`, `}`, `;`, etc.).
   2. **Context** (`parser_context.py`): Token stream abstraction, `ParserContext` with current module and statement stack for error reporting and expectations.
-  3. **Registry** (`statement_registry.py`): Maps (parent_statement, child_statement_name) to a handler function (e.g. `module:container` → `parse_container`).
-  4. **Statement parsers** (`statement_parsers.py`): **~39 `parse_*` methods** (one per YANG statement or sub-statement). Handles grammar rules, nesting, grouping/uses/refine, choice/case, type constraints, must/when, etc.
-  5. **Driver** (`yang_parser.py`): Creates tokenizer + registry + parsers, drives parse, optionally runs **uses expansion** after parse.
+  3. **Statement parsers** (`statement_parsers.py`): **~39 `parse_*` methods** (one per YANG statement or sub-statement). Handles grammar rules, nesting, grouping/uses/refine, choice/case, type constraints, must/when, etc.
+  4. **Driver** (`yang_parser.py`): Creates tokenizer + parsers, drives parse, optionally runs **uses expansion** after parse.
 - **Complexity drivers:**
   - Full YANG 1.1 grammar (keywords, nesting, grouping/uses/refine, choice/case).
   - Uses expansion can be done in parser (default) or deferred to JSON generator; either way the native path must understand grouping/uses/refine.

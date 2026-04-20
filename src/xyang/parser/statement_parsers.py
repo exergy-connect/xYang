@@ -5,9 +5,8 @@ Statement parsers for YANG statements.
 from __future__ import annotations
 
 from types import SimpleNamespace
-from typing import Optional, TYPE_CHECKING, TypeVar
+from typing import Optional, TYPE_CHECKING
 from .parser_context import TokenStream, ParserContext, YangTokenType
-from .statement_dispatch import StatementDispatchSpec
 from .statements.anydata import AnydataStatementParser
 from .statements.anyxml import AnyxmlStatementParser
 from .statements.augment import AugmentStatementParser
@@ -24,13 +23,19 @@ from .statements.type import TypeStatementParser
 from .statements.uses import UsesStatementParser
 from .statements.must import MustStatementParser
 from .statements.when import WhenStatementParser
+from .statements.choice import ChoiceStatementParser
+from .statements.grouping import GroupingStatementParser
+from .statements.container import ContainerStatementParser
+from .statements.list import ListStatementParser
+from .statements.leaf import LeafStatementParser
+from .statements.leaf_list import LeafListStatementParser
 from ..ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
     YangContainerStmt, YangListStmt, YangLeafStmt,
     YangLeafListStmt, YangTypeStmt, YangMustStmt, YangTypedefStmt,
     YangExtensionInvocationStmt,
-    YangGroupingStmt, YangUsesStmt, YangRefineStmt, YangChoiceStmt, YangCaseStmt,
+    YangUsesStmt, YangRefineStmt,
     YangStatementList,
 )
 from ..ext import (
@@ -45,27 +50,14 @@ from .unsupported_skip import (
 )
 
 if TYPE_CHECKING:
-    from .statement_registry import StatementRegistry
     from .yang_parser import YangParser
-    from ..ast import YangStatement
+    from ..ast import YangCaseStmt, YangChoiceStmt, YangStatement
     from ..module import YangModule
-
-# Generic statement type used for blocks like container/list/leaf/leaf-list.
-# These concrete statement classes all inherit from YangStatement, so bind
-# the type variable to YangStatement (not YangStatementList) to satisfy
-# type checkers when passing instances to _add_to_parent_or_module.
-_StatementT = TypeVar("_StatementT", bound="YangStatement")
-
 
 class StatementParsers:
     """Collection of statement parsing methods."""
 
-    _DIRECT_ANYDATA_ANYXML_CONTEXTS = frozenset(
-        {"extension_invocation", "container", "list", "grouping", "case"}
-    )
-
-    def __init__(self, registry: "StatementRegistry", yang_parser: Optional["YangParser"] = None):
-        self.registry = registry
+    def __init__(self, yang_parser: Optional["YangParser"] = None):
         self._yang_parser: Optional["YangParser"] = yang_parser
         #: Set only while parsing an ``import { ... }`` block (prefix / revision-date capture).
         self._import_parse_state: Optional[SimpleNamespace] = None
@@ -83,12 +75,33 @@ class StatementParsers:
         self._uses_parser = UsesStatementParser(self)
         self._must_parser = MustStatementParser(self)
         self._when_parser = WhenStatementParser(self)
+        self._choice_parser = ChoiceStatementParser(self)
+        self._grouping_parser = GroupingStatementParser(self)
+        self._container_parser = ContainerStatementParser(self)
+        self._list_parser = ListStatementParser(self)
+        self._leaf_parser = LeafStatementParser(self)
+        self._leaf_list_parser = LeafListStatementParser(self)
         self._augment_parser = AugmentStatementParser(self)
         self._typedef_parser = TypedefStatementParser(self)
         self._statement_token_dispatch = {
             YangTokenType.IDENTIFIER: self._parse_prefixed_extension_statement,
         }
         ensure_builtin_extensions_loaded()
+        # Substatements allowed inside ``prefix:extension { ... }`` (e.g. RFC 8791 ``structure``).
+        self._extension_invocation_stmt = {
+            YangTokenType.IF_FEATURE: self.parse_if_feature_stmt,
+            YangTokenType.WHEN: self.parse_when,
+            YangTokenType.MUST: self.parse_must,
+            YangTokenType.DESCRIPTION: self.parse_description,
+            YangTokenType.REFERENCE: self.parse_reference_string_only,
+            YangTokenType.USES: self.parse_uses,
+            YangTokenType.LEAF: self.parse_leaf,
+            YangTokenType.LEAF_LIST: self.parse_leaf_list,
+            YangTokenType.CONTAINER: self.parse_container,
+            YangTokenType.LIST: self.parse_list,
+            YangTokenType.CHOICE: self.parse_choice,
+            YangTokenType.CASE: self.parse_case,
+        }
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
@@ -127,7 +140,7 @@ class StatementParsers:
         if self._skip_unsupported_if_present(tokens, context):
             return True
         raise tokens._make_error(
-            f"Unknown statement in {context}: {tokens.peek()!r}"
+            f"Invalid or unknown statement in {context}: {tokens.peek()!r}"
         )
 
     def _consume_qname_from_identifier(self, tokens: TokenStream) -> str:
@@ -177,15 +190,24 @@ class StatementParsers:
         inv_name: str,
     ) -> None:
         """One substatement inside ``prefix:extension { ... }`` (after the opening ``{``)."""
-        self._parse_statement(
-            tokens,
-            context,
-            StatementDispatchSpec(
-                registry_prefix="extension_invocation",
-                unsupported_context=f"extension invocation '{inv_name}'",
-                fallback_registry_key_prefix="submodule",
-            ),
-        )
+        unsupported = f"extension invocation '{inv_name}'"
+        token_handler = self._statement_token_dispatch.get(tokens.peek_type())
+        if token_handler:
+            token_handler(tokens, context)
+            return
+        token_type = tokens.peek_type()
+        if token_type == YangTokenType.ANYDATA:
+            self.parse_anydata(tokens, context)
+            return
+        if token_type == YangTokenType.ANYXML:
+            self.parse_anyxml(tokens, context)
+            return
+        handler = self._extension_invocation_stmt.get(token_type)
+        if handler:
+            handler(tokens, context)
+            return
+        if self._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+            return
 
     def _parse_prefixed_extension_statement(
         self, tokens: TokenStream, context: ParserContext
@@ -233,83 +255,6 @@ class StatementParsers:
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         self._add_to_parent_or_module(context, inv)
-
-    def _parse_statement(
-        self,
-        tokens: TokenStream,
-        context: ParserContext,
-        spec: StatementDispatchSpec,
-    ) -> None:
-        """Parse one substatement: extension invocation, registry, skip, or error."""
-        key_prefix = (
-            spec.registry_key_prefix
-            if spec.registry_key_prefix is not None
-            else spec.registry_prefix
-        )
-
-        token_handler = self._statement_token_dispatch.get(tokens.peek_type())
-        if token_handler:
-            token_handler(tokens, context)
-            return
-
-        # Route anydata/anyxml directly from parser logic instead of registry bindings.
-        token_type = tokens.peek_type()
-        if key_prefix in self._DIRECT_ANYDATA_ANYXML_CONTEXTS:
-            if token_type == YangTokenType.ANYDATA:
-                self.parse_anydata(tokens, context)
-                return
-            if token_type == YangTokenType.ANYXML:
-                self.parse_anyxml(tokens, context)
-                return
-
-        keyword = tokens.peek() or ""
-
-        if spec.type_stmt is not None:
-            if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
-                if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
-                    tokens, spec.unsupported_context
-                ):
-                    return
-                allowed = ", ".join(sorted(spec.allowed_keywords))
-                raise tokens._make_error(
-                    f"Unknown statement in {spec.unsupported_context}: "
-                    f"{keyword!r} (allowed: {allowed})"
-                )
-            handler = self.registry.get_handler(f"type:{keyword}")
-            if handler:
-                if tokens.peek_type() == YangTokenType.TYPE:
-                    handler(tokens, context)
-                else:
-                    handler(tokens, context, spec.type_stmt)
-                return
-            if self._skip_unsupported_or_raise_unknown_stmt(
-                tokens, spec.unsupported_context
-            ):
-                return
-
-        if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
-            if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
-                tokens, spec.unsupported_context
-            ):
-                return
-            allowed = ", ".join(sorted(spec.allowed_keywords))
-            raise tokens._make_error(
-                f"Unknown statement in {spec.unsupported_context}: "
-                f"{keyword!r} (allowed: {allowed})"
-            )
-
-        handler = self.registry.get_handler(f"{key_prefix}:{keyword}")
-        if not handler and spec.fallback_registry_key_prefix is not None:
-            handler = self.registry.get_handler(
-                f"{spec.fallback_registry_key_prefix}:{keyword}"
-            )
-        if handler:
-            handler(tokens, context)
-            return
-        if self._skip_unsupported_or_raise_unknown_stmt(
-            tokens, spec.unsupported_context
-        ):
-            return
 
     def parse_revision_date_statement(
         self, tokens: TokenStream, context: ParserContext
@@ -373,81 +318,16 @@ class StatementParsers:
         self._type_parser.parse_type_base(tokens, context, type_stmt)
 
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
-        """Parse container statement."""
-        tokens.consume_type(YangTokenType.CONTAINER)
-        container_name = tokens.consume()  # identifier or keyword (e.g. type)
-        container_stmt = YangContainerStmt(name=container_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(container_stmt)
-            prev_index = -1
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.index == prev_index:
-                    raise tokens._make_error(
-                        f"Infinite loop detected at token: {tokens.peek()}"
-                    )
-                prev_index = tokens.index
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="container",
-                        unsupported_context=f"container '{container_name}'",
-                    ),
-                )
-            if tokens.has_more() and tokens.peek_type() == YangTokenType.RBRACE:
-                tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, container_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return container_stmt
-
-    def _parse_block(
-        self,
-        tokens: TokenStream,
-        context: ParserContext,
-        block_type: str,
-        stmt: _StatementT,
-        name: str,
-    ) -> _StatementT:
-        """Parse a braced block of statements, add stmt to parent, consume semicolon.
-        Handler prefix is block_type (e.g. 'leaf-list', 'list', 'leaf').
-        For block_type 'list', marks key leaf/leaves on stmt after parsing the block.
-        Returns stmt.
-        """
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix=block_type,
-                        unsupported_context=f"{block_type} '{name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        self._add_to_parent_or_module(context, stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return stmt
+        return self._container_parser.parse_container(tokens, context)
 
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
-        """Parse list statement."""
-        tokens.consume_type(YangTokenType.LIST)
-        list_name = tokens.consume()  # identifier or keyword
-        return self._parse_block(tokens, context, "list", YangListStmt(name=list_name), list_name)
+        return self._list_parser.parse_list(tokens, context)
 
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
-        """Parse leaf statement."""
-        tokens.consume_type(YangTokenType.LEAF)
-        leaf_name = tokens.consume()  # identifier or keyword (e.g. type)
-        return self._parse_block(tokens, context, "leaf", YangLeafStmt(name=leaf_name), leaf_name)
+        return self._leaf_parser.parse_leaf(tokens, context)
 
     def parse_leaf_list(self, tokens: TokenStream, context: ParserContext) -> YangLeafListStmt:
-        """Parse leaf-list statement."""
-        tokens.consume_type(YangTokenType.LEAF_LIST)
-        leaf_list_name = tokens.consume()  # identifier or keyword
-        return self._parse_block(
-            tokens, context, "leaf-list", YangLeafListStmt(name=leaf_list_name), leaf_list_name
-        )
+        return self._leaf_list_parser.parse_leaf_list(tokens, context)
 
     def parse_anydata(self, tokens: TokenStream, context: ParserContext) -> YangAnydataStmt:
         return self._anydata_parser.parse_anydata(tokens, context)
@@ -585,81 +465,19 @@ class StatementParsers:
         self._when_parser.parse_when(tokens, context)
     
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse grouping statement."""
-        tokens.consume_type(YangTokenType.GROUPING)
-        grouping_name = tokens.consume()  # identifier or keyword
-        grouping_stmt = YangGroupingStmt(name=grouping_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(grouping_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="grouping",
-                        unsupported_context=f"grouping '{grouping_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        context.module.groupings[grouping_name] = grouping_stmt
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._grouping_parser.parse_grouping(tokens, context)
     
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         self._refine_parser.parse_refine(tokens, context)
     
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
-        """Parse choice statement."""
-        tokens.consume_type(YangTokenType.CHOICE)
-        choice_name = tokens.consume()  # identifier or keyword
-        choice_stmt = YangChoiceStmt(name=choice_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(choice_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="choice",
-                        unsupported_context=f"choice '{choice_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-            choice_stmt.validate_case_unique_child_names()
-        self._add_to_parent_or_module(context, choice_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return choice_stmt
+        return self._choice_parser.parse_choice(tokens, context)
     
     def parse_case(self, tokens: TokenStream, context: ParserContext) -> YangCaseStmt:
-        """Parse case statement."""
-        tokens.consume_type(YangTokenType.CASE)
-        case_name = tokens.consume()  # identifier or keyword
-        case_stmt = YangCaseStmt(name=case_name)
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(case_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="case",
-                        unsupported_context=f"case '{case_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-        if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
-            context.current_parent.cases.append(case_stmt)
-        else:
-            self._add_to_parent_or_module(context, case_stmt)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return case_stmt
+        return self._choice_parser.parse_case(tokens, context)
 
     def parse_choice_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse mandatory statement in choice."""
-        tokens.consume_type(YangTokenType.MANDATORY)
-        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
-        if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
-            context.current_parent.mandatory = tt == YangTokenType.TRUE
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._choice_parser.parse_choice_mandatory(tokens, context)
     
     def _copy_statement(self, stmt: 'YangStatement') -> 'YangStatement':
         """Create a copy of a statement, handling AST nodes properly."""
