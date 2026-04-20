@@ -123,22 +123,6 @@ An add-on in ``xyang.ext`` for optional validation of JSON under ``anydata`` per
 [draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation).
 See [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py) and [**FEATURES.md**](FEATURES.md).
 
-### Working with types
-
-```python
-from xyang import TypeConstraint, TypeSystem
-
-type_system = TypeSystem()
-constraint = TypeConstraint(
-    pattern=r'[a-z_][a-z0-9_]*',
-    length="1..64"
-)
-type_system.register_typedef("entity-name", "string", constraint)
-
-is_valid, error = type_system.validate("server_name", "entity-name")
-print(f"Valid: {is_valid}")
-```
-
 ### Converting YANG → JSON Schema (`.yang.json`)
 
 Valid **JSON Schema** for structure and types; YANG-only rules (`must`, `when`, leafref paths, `if-features`, …) ride in **`x-yang`**. Details: [FEATURES.md — YANG.json hybrid format](FEATURES.md#yangjson-hybrid-format).

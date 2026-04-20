@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Documentation: removed the top-level "Working with types" usage example from [README.md](README.md) to reflect the current package surface.
+
+### Removed
+
+- Public API: stopped re-exporting `resolve_qualified_top_level` from `xyang` package root; import it from `xyang.encoding` instead.
+- Public API: stopped re-exporting `TypeConstraint` and `TypeSystem` from `xyang` package root.
+
 ## [0.1.1] — 2026-04-19
 
 ### Added
