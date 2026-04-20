@@ -84,5 +84,6 @@ def skip_unsupported_construct(tokens: TokenStream, *, context: str) -> None:
 
 
 def is_unsupported_construct_start(tokens: TokenStream) -> bool:
-    tt = tokens.peek_type()
-    return tt is not None and tt in UNSUPPORTED_CONSTRUCT_TYPES
+    if not tokens.has_more():
+        return False
+    return tokens.peek_type() in UNSUPPORTED_CONSTRUCT_TYPES

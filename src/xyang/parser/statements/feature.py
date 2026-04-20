@@ -37,13 +37,10 @@ class FeatureStatementParser:
                 if tt == YangTokenType.REFERENCE:
                     self._parsers.parse_reference_string_only(tokens, feat_ctx)
                     continue
-                if self._parsers._skip_unsupported_if_present(
+                if self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"feature '{name}'"
                 ):
                     continue
-                raise tokens._make_error(
-                    f"Unknown statement in feature '{name}': {tokens.peek()!r}"
-                )
             tokens.consume_type(YangTokenType.RBRACE)
             if holder.if_features:
                 if name in context.module.feature_if_features:
@@ -73,12 +70,9 @@ class FeatureStatementParser:
                 if tt == YangTokenType.REFERENCE:
                     self._parsers.parse_reference_string_only(tokens, context)
                     continue
-                if self._parsers._skip_unsupported_if_present(
+                if self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "if-feature substatement"
                 ):
                     continue
-                raise tokens._make_error(
-                    f"Unknown statement in if-feature substatement: {tokens.peek()!r}"
-                )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

@@ -19,6 +19,21 @@ class TypeStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
+        self._type_substatement_dispatch = {
+            YangTokenType.TYPE: lambda t, c, _s: self.parse_type(t, c),
+            YangTokenType.PATTERN: self.parse_type_pattern,
+            YangTokenType.LENGTH: self.parse_type_length,
+            YangTokenType.RANGE: self.parse_type_range,
+            YangTokenType.FRACTION_DIGITS: self.parse_type_fraction_digits,
+            YangTokenType.ENUM: self.parse_type_enum,
+            YangTokenType.BIT: self._parsers._bits_parser.parse_type_bit,
+            YangTokenType.PATH: self.parse_type_path,
+            YangTokenType.REQUIRE_INSTANCE: self.parse_type_require_instance,
+            YangTokenType.BASE: self.parse_type_base,
+            YangTokenType.IDENTIFIER: (
+                lambda t, c, _s: self._parsers._parse_prefixed_extension_statement(t, c)
+            ),
+        }
 
     def _parse_type_substatement(
         self,
@@ -29,45 +44,14 @@ class TypeStatementParser:
     ) -> None:
         """Parse one substatement inside ``type { ... }`` without registry indirection."""
         token_type = tokens.peek_type()
-        if token_type == YangTokenType.TYPE:
-            self.parse_type(tokens, context)
+        handler = self._type_substatement_dispatch.get(token_type)
+        if handler:
+            handler(tokens, context, type_stmt)
             return
-        if token_type == YangTokenType.PATTERN:
-            self.parse_type_pattern(tokens, context, type_stmt)
+        if self._parsers._skip_unsupported_or_raise_unknown_stmt(
+            tokens, f"type '{type_name}'"
+        ):
             return
-        if token_type == YangTokenType.LENGTH:
-            self.parse_type_length(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.RANGE:
-            self.parse_type_range(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.FRACTION_DIGITS:
-            self.parse_type_fraction_digits(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.ENUM:
-            self.parse_type_enum(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.BIT:
-            self._parsers._bits_parser.parse_type_bit(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.PATH:
-            self.parse_type_path(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.REQUIRE_INSTANCE:
-            self.parse_type_require_instance(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.BASE:
-            self.parse_type_base(tokens, context, type_stmt)
-            return
-        if token_type == YangTokenType.IDENTIFIER:
-            # Keep extension invocation support in type blocks (`prefix:ext ...`).
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-            return
-        if self._parsers._skip_unsupported_if_present(tokens, f"type '{type_name}'"):
-            return
-        raise tokens._make_error(
-            f"Unknown statement in type '{type_name}': {tokens.peek()!r}"
-        )
 
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
@@ -126,6 +110,8 @@ class TypeStatementParser:
         tokens.consume_type(YangTokenType.PATTERN)
         pattern = tokens.consume_type(YangTokenType.STRING)
         type_stmt.pattern = pattern
+        type_stmt.pattern_error_message = None
+        type_stmt.pattern_error_app_tag = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 pt = tokens.peek_type()
@@ -135,20 +121,26 @@ class TypeStatementParser:
                     self._parsers.parse_reference_string_only(tokens, context)
                 elif pt == YangTokenType.ERROR_MESSAGE:
                     tokens.consume_type(YangTokenType.ERROR_MESSAGE)
-                    tokens.consume_type(YangTokenType.STRING)
+                    type_stmt.pattern_error_message = tokens.consume_type(
+                        YangTokenType.STRING
+                    )
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == YangTokenType.ERROR_APP_TAG:
                     tokens.consume_type(YangTokenType.ERROR_APP_TAG)
-                    tokens.consume_type(YangTokenType.STRING)
+                    type_stmt.pattern_error_app_tag = tokens.consume_type(
+                        YangTokenType.STRING
+                    )
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == YangTokenType.IDENTIFIER and tokens.peek_type_at(1) == YangTokenType.COLON:
                     self._parsers._parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers._skip_unsupported_if_present(tokens, "pattern"):
-                    pass
-                else:
-                    raise tokens._make_error(
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    tokens,
+                    "pattern",
+                    error_message=(
                         f"Unknown substatement in pattern: {tokens.peek()!r}"
-                    )
+                    ),
+                ):
+                    pass
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -196,12 +188,14 @@ class TypeStatementParser:
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == YangTokenType.IDENTIFIER and tokens.peek_type_at(1) == YangTokenType.COLON:
                     self._parsers._parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers._skip_unsupported_if_present(tokens, f"enum '{enum_name}'"):
-                    pass
-                else:
-                    raise tokens._make_error(
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    tokens,
+                    f"enum '{enum_name}'",
+                    error_message=(
                         f"Unknown substatement in enum '{enum_name}': {tokens.peek()!r}"
-                    )
+                    ),
+                ):
+                    pass
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

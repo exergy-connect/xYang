@@ -35,13 +35,15 @@ class BitsStatementParser:
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == YangTokenType.DESCRIPTION:
                     self._parsers.parse_description(tokens, context)
-                elif self._parsers._skip_unsupported_if_present(tokens, "bit"):
-                    pass
-                else:
-                    raise tokens._make_error(
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    tokens,
+                    "bit",
+                    error_message=(
                         f"Unknown statement in bit: {tokens.peek()!r} "
                         f"(only position and description allowed)"
-                    )
+                    ),
+                ):
+                    pass
             tokens.consume_type(YangTokenType.RBRACE)
         type_stmt.bits.append(YangBitStmt(name=bit_name, position=explicit_pos))
         tokens.consume_if_type(YangTokenType.SEMICOLON)

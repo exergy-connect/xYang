@@ -37,14 +37,10 @@ class ExtensionStatementParser:
                     self._parsers.parse_reference_string_only(tokens, new_context)
                 elif tt == YangTokenType.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, new_context)
-                elif self._parsers._skip_unsupported_if_present(
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"extension '{name}'"
                 ):
                     continue
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in extension '{name}': {tokens.peek()!r}"
-                    )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         cb = get_extension_apply_callback(
@@ -79,12 +75,10 @@ class ExtensionStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.peek_type() == YangTokenType.YIN_ELEMENT:
                     self._parse_extension_argument_yin_element(tokens, context)
-                elif self._parsers._skip_unsupported_if_present(tokens, "extension argument"):
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    tokens, "extension argument"
+                ):
                     continue
-                else:
-                    raise tokens._make_error(
-                        f"Unknown statement in extension argument: {tokens.peek()!r}"
-                    )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

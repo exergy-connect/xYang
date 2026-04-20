@@ -39,6 +39,17 @@ class ModuleStatementParser:
             YangTokenType.PREFIX: self.parse_prefix,
             YangTokenType.ORGANIZATION: self.parse_organization,
             YangTokenType.CONTACT: self.parse_contact,
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+        }
+        self._import_body_dispatch = {
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            YangTokenType.PREFIX: self.parse_import_prefix_binding,
+            YangTokenType.REFERENCE: self._parsers.parse_reference_string_only,
+        }
+        self._include_body_dispatch = {
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            YangTokenType.PREFIX: self.parse_prefix_value_stmt,
+            YangTokenType.REFERENCE: self._parsers.parse_reference_string_only,
         }
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -57,18 +68,12 @@ class ModuleStatementParser:
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse one statement in module body."""
         tt = tokens.peek_type()
-        if tt == YangTokenType.IDENTIFIER:
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-            return
-        if tt is None:
-            raise tokens._make_error("Unexpected end of input in module body")
         handler = self._module_dispatch.get(tt)
         if handler:
             handler(tokens, context)
             return
-        if self._parsers._skip_unsupported_if_present(tokens, "module body"):
+        if self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, "module body"):
             return
-        raise tokens._make_error(f"Unknown statement in module body: {tokens.peek()!r}")
 
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse import and load the referenced module (RFC 7950)."""
@@ -91,19 +96,18 @@ class ModuleStatementParser:
                     )
                     continue
                 tt = tokens.peek_type()
-                if tt == YangTokenType.IDENTIFIER:
-                    self._parsers._parse_prefixed_extension_statement(tokens, context)
-                elif tt == YangTokenType.PREFIX:
-                    self.parse_import_prefix_binding(tokens, context)
-                elif tt == YangTokenType.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, context)
-                elif self._parsers._skip_unsupported_if_present(tokens, "import"):
-                    continue
-                else:
-                    raise tokens._make_error(
+                handler = self._import_body_dispatch.get(tt)
+                if handler:
+                    handler(tokens, context)
+                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    tokens,
+                    "import",
+                    error_message=(
                         "Unknown statement in import: "
                         f"{tokens.peek()!r} (allowed: prefix, reference, revision-date)"
-                    )
+                    ),
+                ):
+                    continue
         finally:
             self._parsers._import_parse_state = None
         tokens.consume_type(YangTokenType.RBRACE)
@@ -135,18 +139,13 @@ class ModuleStatementParser:
                     )
                 else:
                     tt = tokens.peek_type()
-                    if tt == YangTokenType.IDENTIFIER:
-                        self._parsers._parse_prefixed_extension_statement(tokens, context)
-                    elif tt == YangTokenType.PREFIX:
-                        self.parse_prefix_value_stmt(tokens, context)
-                    elif tt == YangTokenType.REFERENCE:
-                        self._parsers.parse_reference_string_only(tokens, context)
-                    elif self._parsers._skip_unsupported_if_present(tokens, "include"):
+                    handler = self._include_body_dispatch.get(tt)
+                    if handler:
+                        handler(tokens, context)
+                    elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                        tokens, "include"
+                    ):
                         continue
-                    else:
-                        raise tokens._make_error(
-                            f"Unknown statement in include: {tokens.peek()!r}"
-                        )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         if self._parsers._yang_parser is not None:

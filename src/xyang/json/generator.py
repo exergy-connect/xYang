@@ -282,6 +282,17 @@ def _type_to_schema(
                 out[JsonSchemaKey.MIN_LENGTH] = min_len
             if max_len is not None:
                 out[JsonSchemaKey.MAX_LENGTH] = max_len
+        xyang_pattern: dict[str, Any] = {}
+        if type_stmt.pattern_error_message is not None:
+            xyang_pattern[XYangKey.PATTERN_ERROR_MESSAGE] = (
+                type_stmt.pattern_error_message
+            )
+        if type_stmt.pattern_error_app_tag is not None:
+            xyang_pattern[XYangKey.PATTERN_ERROR_APP_TAG] = (
+                type_stmt.pattern_error_app_tag
+            )
+        if xyang_pattern:
+            out[JsonSchemaKey.X_YANG] = xyang_pattern
         return out
     if name == "enumeration" and type_stmt.enums:
         return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(type_stmt.enums)}

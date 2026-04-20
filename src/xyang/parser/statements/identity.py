@@ -18,31 +18,29 @@ class IdentityStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
+        self._identity_substatement_dispatch = {
+            YangTokenType.BASE: self._parse_identity_base,
+            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+        }
 
     def _parse_identity_substatement(
         self, tokens: TokenStream, context: ParserContext, identity_name: str
     ) -> None:
         unsupported = f"identity '{identity_name}'"
         tt = tokens.peek_type()
-        if tt == YangTokenType.BASE:
-            self._parse_identity_base(tokens, context)
-        elif tt == YangTokenType.IF_FEATURE:
-            self._parsers.parse_if_feature_stmt(tokens, context)
-        elif tt == YangTokenType.IDENTIFIER:
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_if_present(tokens, unsupported):
+        handler = self._identity_substatement_dispatch.get(tt)
+        if handler:
+            handler(tokens, context)
+        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
-        else:
-            raise tokens._make_error(
-                f"Unknown statement in {unsupported}: {tokens.peek()!r}"
-            )
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse identity statement."""
         tokens.consume_type(YangTokenType.IDENTITY)
         identity_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         identity_stmt = YangIdentityStmt(name=identity_name)
-        if tokens.peek_type() == YangTokenType.LBRACE:
+        if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             tokens.consume_type(YangTokenType.LBRACE)
             new_context = context.push_parent(identity_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:

@@ -74,8 +74,6 @@ class YangParser:
             ('list', self.parsers.parse_list),
             ('choice', self.parsers.parse_choice),
             ('case', self.parsers.parse_case),
-            ('anydata', self.parsers.parse_anydata),
-            ('anyxml', self.parsers.parse_anyxml),
         ):
             self.registry.register(f'extension_invocation:{_kw}', _handler)
 
@@ -89,20 +87,6 @@ class YangParser:
         # RFC 7950 §9.  ``deviation``, ``rpc``, ``action``, ``notification``,
         # ``input``, ``output`` are skipped with a warning (see ``unsupported_skip``).
 
-        # Augment body
-        self.registry.register('augment:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('augment:uses', self.parsers.parse_uses)
-        self.registry.register('augment:leaf', self.parsers.parse_leaf)
-        self.registry.register('augment:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('augment:container', self.parsers.parse_container)
-        self.registry.register('augment:list', self.parsers.parse_list)
-        self.registry.register('augment:choice', self.parsers.parse_choice)
-        self.registry.register('augment:anydata', self.parsers.parse_anydata)
-        self.registry.register('augment:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('augment:description', self.parsers.parse_description)
-        self.registry.register('augment:when', self.parsers.parse_when)
-        self.registry.register('augment:must', self.parsers.parse_must)
-
         # Container body statements
         self.registry.register('container:description', self.parsers.parse_description)
         self.registry.register('container:presence', self.parsers.parse_presence)
@@ -114,8 +98,6 @@ class YangParser:
         self.registry.register('container:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('container:uses', self.parsers.parse_uses)
         self.registry.register('container:choice', self.parsers.parse_choice)
-        self.registry.register('container:anydata', self.parsers.parse_anydata)
-        self.registry.register('container:anyxml', self.parsers.parse_anyxml)
         self.registry.register('container:if-feature', self.parsers.parse_if_feature_stmt)
 
         # List body statements
@@ -132,8 +114,6 @@ class YangParser:
         self.registry.register('list:must', self.parsers.parse_must)
         self.registry.register('list:uses', self.parsers.parse_uses)
         self.registry.register('list:choice', self.parsers.parse_choice)
-        self.registry.register('list:anydata', self.parsers.parse_anydata)
-        self.registry.register('list:anyxml', self.parsers.parse_anyxml)
         self.registry.register('list:if-feature', self.parsers.parse_if_feature_stmt)
 
         # Leaf body statements
@@ -155,10 +135,6 @@ class YangParser:
         self.registry.register('leaf-list:must', self.parsers.parse_must)
         self.registry.register('leaf-list:if-feature', self.parsers.parse_if_feature_stmt)
 
-        # Typedef body statements
-        self.registry.register('typedef:type', self.parsers.parse_type)
-        self.registry.register('typedef:description', self.parsers.parse_description)
-        
         # Grouping body statements
         self.registry.register('grouping:description', self.parsers.parse_description)
         self.registry.register('grouping:choice', self.parsers.parse_choice)
@@ -167,8 +143,6 @@ class YangParser:
         self.registry.register('grouping:leaf', self.parsers.parse_leaf)
         self.registry.register('grouping:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('grouping:uses', self.parsers.parse_uses)
-        self.registry.register('grouping:anydata', self.parsers.parse_anydata)
-        self.registry.register('grouping:anyxml', self.parsers.parse_anyxml)
         self.registry.register('grouping:if-feature', self.parsers.parse_if_feature_stmt)
         self.registry.register('grouping:when', self.parsers.parse_when)
         self.registry.register('grouping:must', self.parsers.parse_must)
@@ -185,20 +159,11 @@ class YangParser:
         self.registry.register('case:when', self.parsers.parse_when)
         self.registry.register('case:if-feature', self.parsers.parse_if_feature_stmt)
         self.registry.register('case:uses', self.parsers.parse_uses)
-        self.registry.register('case:anydata', self.parsers.parse_anydata)
-        self.registry.register('case:anyxml', self.parsers.parse_anyxml)
         self.registry.register('case:leaf', self.parsers.parse_leaf)
         self.registry.register('case:container', self.parsers.parse_container)
         self.registry.register('case:list', self.parsers.parse_list)
         self.registry.register('case:leaf-list', self.parsers.parse_leaf_list)
         self.registry.register('case:choice', self.parsers.parse_choice)
-
-        for _ctx in ("anydata", "anyxml"):
-            self.registry.register(f"{_ctx}:description", self.parsers.parse_description)
-            self.registry.register(f"{_ctx}:when", self.parsers.parse_when)
-            self.registry.register(f"{_ctx}:must", self.parsers.parse_must)
-            self.registry.register(f"{_ctx}:if-feature", self.parsers.parse_if_feature_stmt)
-            self.registry.register(f"{_ctx}:mandatory", self.parsers.parse_leaf_mandatory)
 
     def merge_included_submodule(
         self,

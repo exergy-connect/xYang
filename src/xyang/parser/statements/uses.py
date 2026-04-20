@@ -21,6 +21,13 @@ class UsesStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
+        self._uses_substatement_dispatch = {
+            YangTokenType.DESCRIPTION: self._parsers.parse_description,
+            YangTokenType.WHEN: self._parsers.parse_when,
+            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            YangTokenType.REFINE: self._parsers.parse_refine,
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+        }
 
     def _parse_uses_substatement(
         self, tokens: TokenStream, context: ParserContext, grouping_name: str
@@ -28,22 +35,11 @@ class UsesStatementParser:
         """One substatement inside ``uses { ... }``."""
         unsupported = f"uses '{grouping_name}'"
         tt = tokens.peek_type()
-        if tt == YangTokenType.DESCRIPTION:
-            self._parsers.parse_description(tokens, context)
-        elif tt == YangTokenType.WHEN:
-            self._parsers.parse_when(tokens, context)
-        elif tt == YangTokenType.IF_FEATURE:
-            self._parsers.parse_if_feature_stmt(tokens, context)
-        elif tt == YangTokenType.REFINE:
-            self._parsers.parse_refine(tokens, context)
-        elif tt == YangTokenType.IDENTIFIER:
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_if_present(tokens, unsupported):
+        handler = self._uses_substatement_dispatch.get(tt)
+        if handler:
+            handler(tokens, context)
+        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
-        else:
-            raise tokens._make_error(
-                f"Unknown statement in {unsupported}: {tokens.peek()!r}"
-            )
 
     def parse_uses(
         self, tokens: TokenStream, context: ParserContext

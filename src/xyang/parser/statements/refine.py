@@ -18,6 +18,18 @@ class RefineStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
+        self._refine_substatement_dispatch = {
+            YangTokenType.MUST: self._parsers.parse_must,
+            YangTokenType.DESCRIPTION: self._parsers.parse_description,
+            YangTokenType.MIN_ELEMENTS: self._parsers.parse_min_elements,
+            YangTokenType.MAX_ELEMENTS: self._parsers.parse_max_elements,
+            YangTokenType.ORDERED_BY: self._parsers.parse_ordered_by,
+            YangTokenType.MANDATORY: self._parse_refine_mandatory,
+            YangTokenType.DEFAULT: self._parse_refine_default,
+            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            YangTokenType.TYPE: self._parsers.parse_type,
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+        }
 
     def _parse_refine_substatement(
         self, tokens: TokenStream, context: ParserContext, target_path: str
@@ -25,32 +37,11 @@ class RefineStatementParser:
         """One substatement inside ``refine { ... }`` (no ``refine:*`` registry keys)."""
         unsupported = f"refine '{target_path}'"
         tt = tokens.peek_type()
-        if tt == YangTokenType.MUST:
-            self._parsers.parse_must(tokens, context)
-        elif tt == YangTokenType.DESCRIPTION:
-            self._parsers.parse_description(tokens, context)
-        elif tt == YangTokenType.MIN_ELEMENTS:
-            self._parsers.parse_min_elements(tokens, context)
-        elif tt == YangTokenType.MAX_ELEMENTS:
-            self._parsers.parse_max_elements(tokens, context)
-        elif tt == YangTokenType.ORDERED_BY:
-            self._parsers.parse_ordered_by(tokens, context)
-        elif tt == YangTokenType.MANDATORY:
-            self._parse_refine_mandatory(tokens, context)
-        elif tt == YangTokenType.DEFAULT:
-            self._parse_refine_default(tokens, context)
-        elif tt == YangTokenType.IF_FEATURE:
-            self._parsers.parse_if_feature_stmt(tokens, context)
-        elif tt == YangTokenType.TYPE:
-            self._parsers.parse_type(tokens, context)
-        elif tt == YangTokenType.IDENTIFIER:
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_if_present(tokens, unsupported):
+        handler = self._refine_substatement_dispatch.get(tt)
+        if handler:
+            handler(tokens, context)
+        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
-        else:
-            raise tokens._make_error(
-                f"Unknown statement in {unsupported}: {tokens.peek()!r}"
-            )
 
     def _parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in refine (RFC 7950 section 7.13.2: leaf / choice target)."""
@@ -73,7 +64,7 @@ class RefineStatementParser:
         """Parse refine statement (supports descendant paths ``a/b``)."""
         tokens.consume_type(YangTokenType.REFINE)
         parts = [tokens.consume()]
-        while tokens.peek_type() == YangTokenType.SLASH:
+        while tokens.has_more() and tokens.peek_type() == YangTokenType.SLASH:
             tokens.consume_type(YangTokenType.SLASH)
             parts.append(tokens.consume())
         target_path = "/".join(parts)

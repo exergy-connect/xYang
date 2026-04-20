@@ -71,6 +71,9 @@ class XYangKey:
     PREFIX = "prefix"
     ORGANIZATION = "organization"
     CONTACT = "contact"
+    #: From ``pattern { error-message "..."; }`` (RFC 7950 §9.4.6), echoed on string JSON Schema.
+    PATTERN_ERROR_MESSAGE = "pattern-error-message"
+    PATTERN_ERROR_APP_TAG = "pattern-error-app-tag"
 
 
 class XYangTypeValue:

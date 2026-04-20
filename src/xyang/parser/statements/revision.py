@@ -50,6 +50,8 @@ class RevisionStatementParser:
             body = SimpleNamespace(description="")
             body_ctx = context.push_parent(body)
             self._parsers.parse_optional_description(tokens, body_ctx)
+            if not tokens.has_more():
+                raise tokens._make_error("Unexpected end of input in revision body")
             if tokens.peek_type() != YangTokenType.RBRACE:
                 raise tokens._make_error(
                     f"Unknown statement in revision: {tokens.peek()!r}"

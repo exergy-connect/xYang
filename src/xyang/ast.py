@@ -115,9 +115,18 @@ class YangBitStmt:
 
 @dataclass
 class YangTypeStmt:
-    """Type statement."""
+    """Type statement.
+
+    For ``pattern`` under string-related types (RFC 7950 §9.4.6), optional
+    ``error-message`` / ``error-app-tag`` from the pattern's substatement block
+    are stored on the same node as ``pattern`` (the last ``pattern`` wins if
+    several are present, matching how ``pattern`` overwrites).
+    """
+
     name: str
     pattern: Optional[str] = None
+    pattern_error_message: Optional[str] = None
+    pattern_error_app_tag: Optional[str] = None
     length: Optional[str] = None
     range: Optional[str] = None
     fraction_digits: Optional[int] = None

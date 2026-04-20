@@ -8,6 +8,8 @@ from types import SimpleNamespace
 from typing import Callable, Optional, TYPE_CHECKING, TypeVar
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statement_dispatch import StatementDispatchSpec
+from .statements.anydata import AnydataStatementParser
+from .statements.anyxml import AnyxmlStatementParser
 from .statements.augment import AugmentStatementParser
 from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
@@ -15,6 +17,7 @@ from .statements.identity import IdentityStatementParser
 from .statements.bits import BitsStatementParser
 from .statements.module import ModuleStatementParser
 from .statements.submodule import SubmoduleStatementParser
+from .statements.typedef import TypedefStatementParser
 from .statements.refine import RefineStatementParser
 from .statements.revision import RevisionStatementParser
 from .statements.type import TypeStatementParser
@@ -56,6 +59,10 @@ _StatementT = TypeVar("_StatementT", bound="YangStatement")
 class StatementParsers:
     """Collection of statement parsing methods."""
 
+    _DIRECT_ANYDATA_ANYXML_CONTEXTS = frozenset(
+        {"extension_invocation", "container", "list", "grouping", "case"}
+    )
+
     def __init__(self, registry: "StatementRegistry", yang_parser: Optional["YangParser"] = None):
         self.registry = registry
         self._yang_parser: Optional["YangParser"] = yang_parser
@@ -64,6 +71,8 @@ class StatementParsers:
         self._extension_parser = ExtensionStatementParser(self)
         self._feature_parser = FeatureStatementParser(self)
         self._identity_parser = IdentityStatementParser(self)
+        self._anydata_parser = AnydataStatementParser(self)
+        self._anyxml_parser = AnyxmlStatementParser(self)
         self._module_parser = ModuleStatementParser(self)
         self._submodule_parser = SubmoduleStatementParser(self, self._module_parser)
         self._refine_parser = RefineStatementParser(self)
@@ -72,6 +81,10 @@ class StatementParsers:
         self._type_parser = TypeStatementParser(self)
         self._uses_parser = UsesStatementParser(self)
         self._augment_parser = AugmentStatementParser(self)
+        self._typedef_parser = TypedefStatementParser(self)
+        self._statement_token_dispatch = {
+            YangTokenType.IDENTIFIER: self._parse_prefixed_extension_statement,
+        }
         ensure_builtin_extensions_loaded()
 
     def get_registry_bindings(self) -> dict[str, Callable]:
@@ -98,27 +111,11 @@ class StatementParsers:
             ("list", self.parse_list),
             ("choice", self.parse_choice),
             ("case", self.parse_case),
-            ("anydata", self.parse_anydata),
-            ("anyxml", self.parse_anyxml),
         )
         for keyword, handler in extension_handlers:
             bindings[f"extension_invocation:{keyword}"] = handler
 
         context_handlers: dict[str, tuple[tuple[str, Callable], ...]] = {
-            "augment": (
-                ("if-feature", self.parse_if_feature_stmt),
-                ("uses", self.parse_uses),
-                ("leaf", self.parse_leaf),
-                ("leaf-list", self.parse_leaf_list),
-                ("container", self.parse_container),
-                ("list", self.parse_list),
-                ("choice", self.parse_choice),
-                ("anydata", self.parse_anydata),
-                ("anyxml", self.parse_anyxml),
-                ("description", self.parse_description),
-                ("when", self.parse_when),
-                ("must", self.parse_must),
-            ),
             "container": (
                 ("description", self.parse_description),
                 ("presence", self.parse_presence),
@@ -130,8 +127,6 @@ class StatementParsers:
                 ("leaf-list", self.parse_leaf_list),
                 ("uses", self.parse_uses),
                 ("choice", self.parse_choice),
-                ("anydata", self.parse_anydata),
-                ("anyxml", self.parse_anyxml),
                 ("if-feature", self.parse_if_feature_stmt),
             ),
             "list": (
@@ -148,8 +143,6 @@ class StatementParsers:
                 ("must", self.parse_must),
                 ("uses", self.parse_uses),
                 ("choice", self.parse_choice),
-                ("anydata", self.parse_anydata),
-                ("anyxml", self.parse_anyxml),
                 ("if-feature", self.parse_if_feature_stmt),
             ),
             "leaf": (
@@ -171,10 +164,6 @@ class StatementParsers:
                 ("must", self.parse_must),
                 ("if-feature", self.parse_if_feature_stmt),
             ),
-            "typedef": (
-                ("type", self.parse_type),
-                ("description", self.parse_description),
-            ),
             "grouping": (
                 ("description", self.parse_description),
                 ("choice", self.parse_choice),
@@ -183,8 +172,6 @@ class StatementParsers:
                 ("leaf", self.parse_leaf),
                 ("leaf-list", self.parse_leaf_list),
                 ("uses", self.parse_uses),
-                ("anydata", self.parse_anydata),
-                ("anyxml", self.parse_anyxml),
                 ("if-feature", self.parse_if_feature_stmt),
                 ("when", self.parse_when),
                 ("must", self.parse_must),
@@ -201,8 +188,6 @@ class StatementParsers:
                 ("when", self.parse_when),
                 ("if-feature", self.parse_if_feature_stmt),
                 ("uses", self.parse_uses),
-                ("anydata", self.parse_anydata),
-                ("anyxml", self.parse_anyxml),
                 ("leaf", self.parse_leaf),
                 ("container", self.parse_container),
                 ("list", self.parse_list),
@@ -213,13 +198,6 @@ class StatementParsers:
         for context, handlers in context_handlers.items():
             for keyword, handler in handlers:
                 bindings[f"{context}:{keyword}"] = handler
-
-        for context in ("anydata", "anyxml"):
-            bindings[f"{context}:description"] = self.parse_description
-            bindings[f"{context}:when"] = self.parse_when
-            bindings[f"{context}:must"] = self.parse_must
-            bindings[f"{context}:if-feature"] = self.parse_if_feature_stmt
-            bindings[f"{context}:mandatory"] = self.parse_leaf_mandatory
 
         return bindings
 
@@ -253,6 +231,26 @@ class StatementParsers:
         skip_unsupported_construct(tokens, context=context)
         return True
 
+    def _skip_unsupported_or_raise_unknown_stmt(
+        self,
+        tokens: TokenStream,
+        context: str,
+        *,
+        error_message: Optional[str] = None,
+    ) -> bool:
+        """Skip unsupported constructs when applicable; otherwise raise for an unknown statement.
+
+        If ``error_message`` is set, it is used as the full parse error text; otherwise the
+        message is ``Unknown statement in {context}: {peek}``.
+        """
+        if self._skip_unsupported_if_present(tokens, context):
+            return True
+        if error_message is not None:
+            raise tokens._make_error(error_message)
+        raise tokens._make_error(
+            f"Unknown statement in {context}: {tokens.peek()!r}"
+        )
+
     def _consume_qname_from_identifier(self, tokens: TokenStream) -> str:
         """Consume ``name`` or ``prefix:name`` (``prefix:...`` chain). Current token must be IDENTIFIER."""
         parts = [tokens.consume_type(YangTokenType.IDENTIFIER)]
@@ -276,8 +274,10 @@ class StatementParsers:
         self, tokens: TokenStream
     ) -> Optional[str]:
         """Consume optional extension argument as normalized string (unquoted)."""
+        if not tokens.has_more():
+            return None
         tt = tokens.peek_type()
-        if tt is None or tt in (YangTokenType.LBRACE, YangTokenType.SEMICOLON):
+        if tt in (YangTokenType.LBRACE, YangTokenType.SEMICOLON):
             return None
         if tt == YangTokenType.STRING:
             return self._parse_string_concatenation(tokens)
@@ -368,9 +368,20 @@ class StatementParsers:
             else spec.registry_prefix
         )
 
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            self._parse_prefixed_extension_statement(tokens, context)
+        token_handler = self._statement_token_dispatch.get(tokens.peek_type())
+        if token_handler:
+            token_handler(tokens, context)
             return
+
+        # Route anydata/anyxml directly from parser logic instead of registry bindings.
+        token_type = tokens.peek_type()
+        if key_prefix in self._DIRECT_ANYDATA_ANYXML_CONTEXTS:
+            if token_type == YangTokenType.ANYDATA:
+                self.parse_anydata(tokens, context)
+                return
+            if token_type == YangTokenType.ANYXML:
+                self.parse_anyxml(tokens, context)
+                return
 
         keyword = tokens.peek() or ""
 
@@ -392,11 +403,14 @@ class StatementParsers:
                 else:
                     handler(tokens, context, spec.type_stmt)
                 return
-            if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+            if self._skip_unsupported_or_raise_unknown_stmt(
+                tokens,
+                spec.unsupported_context,
+                error_message=(
+                    f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+                ),
+            ):
                 return
-            raise tokens._make_error(
-                f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-            )
 
         if spec.allowed_keywords is not None and keyword not in spec.allowed_keywords:
             if spec.try_skip_when_disallowed and self._skip_unsupported_if_present(
@@ -417,11 +431,14 @@ class StatementParsers:
         if handler:
             handler(tokens, context)
             return
-        if self._skip_unsupported_if_present(tokens, spec.unsupported_context):
+        if self._skip_unsupported_or_raise_unknown_stmt(
+            tokens,
+            spec.unsupported_context,
+            error_message=(
+                f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
+            ),
+        ):
             return
-        raise tokens._make_error(
-            f"Unknown statement in {spec.unsupported_context}: {keyword!r}"
-        )
 
     def parse_revision_date_statement(
         self, tokens: TokenStream, context: ParserContext
@@ -455,7 +472,7 @@ class StatementParsers:
         """Parse description statement (optional braced extension substatements are skipped)."""
         tokens.consume_type(YangTokenType.DESCRIPTION)
         desc = tokens.consume_type(YangTokenType.STRING)
-        if tokens.peek_type() == YangTokenType.LBRACE:
+        if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             _consume_balanced_braces(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         parent = context.current_parent
@@ -466,7 +483,7 @@ class StatementParsers:
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """If the next token is ``description``, parse it into ``current_parent.description``."""
-        if tokens.peek_type() != YangTokenType.DESCRIPTION:
+        if not tokens.has_more() or tokens.peek_type() != YangTokenType.DESCRIPTION:
             return
         self.parse_description(tokens, context)
 
@@ -476,26 +493,7 @@ class StatementParsers:
 
     def parse_typedef(self, tokens: TokenStream, context: ParserContext) -> Optional[YangTypedefStmt]:
         """Parse typedef statement."""
-        tokens.consume_type(YangTokenType.TYPEDEF)
-        typedef_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        typedef_stmt = YangTypedefStmt(name=typedef_name)
-        
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(typedef_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_statement(
-                    tokens,
-                    new_context,
-                    StatementDispatchSpec(
-                        registry_prefix="typedef",
-                        unsupported_context=f"typedef '{typedef_name}'",
-                    ),
-                )
-            tokens.consume_type(YangTokenType.RBRACE)
-
-        context.module.typedefs[typedef_name] = typedef_stmt
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return None  # Typedefs are stored in module, not returned as statements
+        return self._typedef_parser.parse_typedef(tokens, context)
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         self._identity_parser.parse_identity(tokens, context)
@@ -581,16 +579,10 @@ class StatementParsers:
         )
 
     def parse_anydata(self, tokens: TokenStream, context: ParserContext) -> YangAnydataStmt:
-        """Parse anydata statement (RFC 7950 §7.12)."""
-        tokens.consume_type(YangTokenType.ANYDATA)
-        n = tokens.consume()
-        return self._parse_block(tokens, context, "anydata", YangAnydataStmt(name=n), n)
+        return self._anydata_parser.parse_anydata(tokens, context)
 
     def parse_anyxml(self, tokens: TokenStream, context: ParserContext) -> YangAnyxmlStmt:
-        """Parse anyxml statement (RFC 7950 §7.11)."""
-        tokens.consume_type(YangTokenType.ANYXML)
-        n = tokens.consume()
-        return self._parse_block(tokens, context, "anyxml", YangAnyxmlStmt(name=n), n)
+        return self._anyxml_parser.parse_anyxml(tokens, context)
 
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         return self._type_parser.parse_type(tokens, context)
@@ -707,7 +699,7 @@ class StatementParsers:
     def _parse_string_concatenation(self, tokens: TokenStream) -> str:
         """Consume one or more STRING tokens with optional PLUS between; return concatenated string."""
         parts = [tokens.consume_type(YangTokenType.STRING)]
-        while tokens.peek_type() == YangTokenType.PLUS:
+        while tokens.has_more() and tokens.peek_type() == YangTokenType.PLUS:
             tokens.consume_type(YangTokenType.PLUS)
             parts.append(tokens.consume_type(YangTokenType.STRING))
         return ''.join(parts)

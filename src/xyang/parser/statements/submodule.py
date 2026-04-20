@@ -38,6 +38,7 @@ class SubmoduleStatementParser:
             YangTokenType.LEAF_LIST: self._parsers.parse_leaf_list,
             YangTokenType.ANYDATA: self._parsers.parse_anydata,
             YangTokenType.ANYXML: self._parsers.parse_anyxml,
+            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
         }
 
     def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -57,18 +58,12 @@ class SubmoduleStatementParser:
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         tt = tokens.peek_type()
-        if tt == YangTokenType.IDENTIFIER:
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-            return
         handler = self._submodule_dispatch.get(tt)
         if handler:
             handler(tokens, context)
             return
-        if self._parsers._skip_unsupported_if_present(tokens, "submodule body"):
+        if self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, "submodule body"):
             return
-        raise tokens._make_error(
-            f"Unknown statement in submodule body: {tokens.peek()!r}"
-        )
 
     def _parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume_type(YangTokenType.BELONGS_TO)
@@ -78,11 +73,9 @@ class SubmoduleStatementParser:
         while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
             if tokens.peek_type() == YangTokenType.PREFIX:
                 self._module_parser.parse_prefix_value_stmt(tokens, context)
-            elif self._parsers._skip_unsupported_if_present(tokens, "belongs-to"):
+            elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                tokens, "belongs-to"
+            ):
                 continue
-            else:
-                raise tokens._make_error(
-                    f"Unknown statement in belongs-to: {tokens.peek()!r}"
-                )
         tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
