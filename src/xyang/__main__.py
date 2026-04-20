@@ -31,7 +31,7 @@ def main() -> int:
         "-V",
         "--version",
         action="version",
-        version="%(prog)s 0.1.0",
+        version="%(prog)s 0.1.1",
     )
     subparsers = parser.add_subparsers(dest="cmd", help="Commands")
 

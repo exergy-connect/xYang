@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.1] — 2026-04-19
+
 ### Added
 
 - Optional **anydata subtree validation** (draft [yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation)): validator extension, CLI flags, and [`examples/anydata_validation_usage.py`](examples/anydata_validation_usage.py). Details in [FEATURES.md](FEATURES.md).
@@ -33,5 +35,6 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.0...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.1...HEAD
+[0.1.1]: https://github.com/exergy-connect/xYang/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/exergy-connect/xYang/releases/tag/v0.1.0
