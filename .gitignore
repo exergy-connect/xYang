@@ -55,3 +55,6 @@ pnpm-debug.log*
 
 # Distribution
 *.whl
+
+# Docs — browser bundle produced by `npm run build:check` in ts/
+docs/xyang.umd.min.js

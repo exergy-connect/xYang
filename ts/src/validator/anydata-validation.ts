@@ -10,22 +10,24 @@ export type AnydataValidationConfig = {
   mode: AnydataValidationMode;
 };
 
-export function parseAnydataValidationConfig(config: Record<string, unknown>): AnydataValidationConfig {
-  const rest = { ...config };
-  const modules = rest.modules;
-  delete rest.modules;
-  const modeRaw = rest.mode;
-  delete rest.mode;
-
-  const unknownKeys = Object.keys(rest);
-  if (unknownKeys.length > 0) {
-    throw new TypeError(`unexpected keyword arguments: ${JSON.stringify(unknownKeys)}`);
+function rejectUnknownKeys(kwargs: Record<string, unknown>, allowed: ReadonlySet<string>): void {
+  const unknown = Object.keys(kwargs)
+    .filter((k) => !allowed.has(k))
+    .sort();
+  if (unknown.length > 0) {
+    throw new TypeError(`unexpected keyword arguments: ${JSON.stringify(unknown)}`);
   }
+}
 
+export function parseAnydataValidationConfig(config: Record<string, unknown>): AnydataValidationConfig {
+  rejectUnknownKeys(config, new Set(["modules", "mode"]));
+
+  const modules = config.modules;
   if (!Array.isArray(modules)) {
     throw new TypeError("'modules' must be an array of YangModule");
   }
 
+  const modeRaw = config.mode;
   const mode = modeRaw === undefined ? AnydataValidationMode.COMPLETE : modeRaw;
   if (mode !== AnydataValidationMode.COMPLETE && mode !== AnydataValidationMode.CANDIDATE) {
     throw new TypeError("'mode' must be an AnydataValidationMode");

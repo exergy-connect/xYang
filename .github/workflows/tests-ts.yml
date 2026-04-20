@@ -1,3 +1,7 @@
+# Lint, build, test TypeScript; then ensure docs/xyang.umd.min.js matches the build.
+# On pull requests (or non-default branches), mismatch fails the job.
+# On push or workflow_dispatch to main/master, mismatch is fixed with git add -f and a bot push.
+
 name: Tests (TypeScript)
 
 on:
@@ -15,7 +19,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: tests-ts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -48,14 +52,27 @@ jobs:
         working-directory: ts
         run: npm run build:check
 
-      - name: Verify docs browser bundle is committed and current
-        run: |
-          if [ -n "$(git status --porcelain docs/xyang.umd.min.js)" ]; then
-            echo "::error::docs/xyang.umd.min.js is missing or out of date. Run \`(cd ts && npm run build:check)\` from the repo root and commit the updated file."
-            git status docs/xyang.umd.min.js
-            exit 1
-          fi
-
       - name: Test
         working-directory: ts
         run: npm test
+
+      - name: Docs browser bundle — verify or commit
+        env:
+          AUTO_COMMIT_BUNDLE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+        run: |
+          git add -f docs/xyang.umd.min.js
+          if git diff --cached --quiet HEAD -- docs/xyang.umd.min.js; then
+            echo "docs/xyang.umd.min.js matches build."
+            exit 0
+          fi
+          if [ "$AUTO_COMMIT_BUNDLE" = "true" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(docs): sync xyang.umd.min.js"
+            git push
+            exit 0
+          fi
+          echo "::error::docs/xyang.umd.min.js is missing or out of date with the TypeScript build."
+          echo "From the repo root: (cd ts && npm run build:check) then git add -f docs/xyang.umd.min.js and commit."
+          git diff --cached HEAD -- docs/xyang.umd.min.js | head -n 60
+          exit 1

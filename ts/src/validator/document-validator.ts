@@ -6,75 +6,118 @@ import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/e
 import { resolveQualifiedTopLevel } from "../encoding";
 import { AnydataValidationConfig, AnydataValidationMode } from "./anydata-validation";
 import { ValidatorExtension } from "./validator-extension";
+import { unsignedTypeCandidateViolation } from "../types";
 import { TypeChecker } from "./type-checker";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
 export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
 
+export type LeafTypeMode = "full" | "none" | "unsigned_non_negative";
+
+/** Per-document validation context (host module or an anydata payload shape module). */
+export type ValidationContext = {
+  module: YangModule;
+  typeChecker: TypeChecker;
+  constraintChecks: boolean;
+  leafTypeMode: LeafTypeMode;
+  anydataValidation: AnydataValidationConfig | undefined;
+  ifFeatureCtx: ModuleData;
+  enabledByModule: Readonly<Record<string, ReadonlySet<string>>>;
+};
+
 export class DocumentValidator {
-  private readonly typeChecker: TypeChecker;
   private readonly xpath = new XPathEvaluator();
   private readonly xpathCache = new Map<string, XPathAstNode>();
-  private readonly constraintChecks: boolean;
-  private anydataValidation?: AnydataValidationConfig;
-  private readonly ifFeatureCtx: ModuleData;
-  private readonly enabledByModule: Readonly<Record<string, ReadonlySet<string>>>;
+  private readonly rootCtx: ValidationContext;
   private readonly enabledFeaturesOverride: EnabledFeaturesByModule | null;
+  private readonly contextStack: ValidationContext[] = [];
 
   constructor(
-    private readonly module: YangModule,
-    options: { constraintChecks?: boolean; enabledFeaturesByModule?: EnabledFeaturesByModule | null } = {}
+    module: YangModule,
+    options: {
+      constraintChecks?: boolean;
+      leafTypeMode?: LeafTypeMode;
+      enabledFeaturesByModule?: EnabledFeaturesByModule | null;
+    } = {}
   ) {
-    this.typeChecker = new TypeChecker(module);
-    this.constraintChecks = options.constraintChecks ?? true;
     this.enabledFeaturesOverride = options.enabledFeaturesByModule ?? null;
-    this.ifFeatureCtx = this.module.data as ModuleData;
-    this.enabledByModule = buildEnabledFeaturesMap(this.ifFeatureCtx, this.enabledFeaturesOverride);
+    const constraintChecks = options.constraintChecks ?? true;
+    const leafTypeMode = options.leafTypeMode ?? (constraintChecks ? "full" : "none");
+    const ifFeatureCtx = module.data as ModuleData;
+    this.rootCtx = {
+      module,
+      typeChecker: new TypeChecker(module),
+      constraintChecks,
+      leafTypeMode,
+      anydataValidation: undefined,
+      ifFeatureCtx,
+      enabledByModule: buildEnabledFeaturesMap(ifFeatureCtx, this.enabledFeaturesOverride)
+    };
+  }
+
+  private get ctx(): ValidationContext {
+    const c = this.contextStack[this.contextStack.length - 1];
+    if (!c) {
+      throw new Error("DocumentValidator: internal error — no active validation context");
+    }
+    return c;
   }
 
   enableExtension(extension: ValidatorExtension, config: Record<string, unknown>): void {
     if (extension !== ValidatorExtension.ANYDATA_VALIDATION) {
       throw new Error(`unknown validator extension: ${String(extension)}`);
     }
-    // Lazy import to keep modules isolated.
-    this.anydataValidation = {
+    this.rootCtx.anydataValidation = {
       modules: (config.modules as YangModule[]) ?? [],
       mode: (config.mode as AnydataValidationMode | undefined) ?? AnydataValidationMode.COMPLETE
     };
   }
 
   validate(data: unknown): [boolean, string[], string[]] {
-    const errors: string[] = [];
-    const warnings: string[] = [];
+    return this.validateWithContext(this.rootCtx, data);
+  }
 
-    if (!data || typeof data !== "object" || Array.isArray(data)) {
-      return [false, ["Document must be an object"], warnings];
-    }
+  /**
+   * Validate instance data against one module’s top-level data nodes. Used for the root document
+   * and, recursively, for each anydata payload shape without constructing a second DocumentValidator.
+   */
+  private validateWithContext(ctx: ValidationContext, data: unknown): [boolean, string[], string[]] {
+    this.contextStack.push(ctx);
+    try {
+      const errors: string[] = [];
+      const warnings: string[] = [];
 
-    const root = data as Record<string, unknown>;
-    const rootNode: XPathNode = { data: root, schema: this.module as unknown as XPathSchema, parent: null };
-    for (const stmt of this.module.statements) {
-      if (!stmt.name) {
-        continue;
+      if (!data || typeof data !== "object" || Array.isArray(data)) {
+        return [false, ["Document must be an object"], warnings];
       }
-      const keyword = this.effectiveKeyword(stmt);
-      if (
-        ![
-          YangTokenType.CONTAINER,
-          YangTokenType.LIST,
-          YangTokenType.LEAF,
-          YangTokenType.LEAF_LIST,
-          YangTokenType.ANYDATA,
-          YangTokenType.ANYXML,
-          YangTokenType.CHOICE
-        ].includes(keyword as YangTokenType)
-      ) {
-        continue;
-      }
-      this.validateStatement(stmt, root[stmt.name], stmt.name, errors, rootNode, rootNode);
-    }
 
-    return [errors.length === 0, errors, warnings];
+      const root = data as Record<string, unknown>;
+      const rootNode: XPathNode = { data: root, schema: ctx.module as unknown as XPathSchema, parent: null };
+      for (const stmt of ctx.module.statements) {
+        if (!stmt.name) {
+          continue;
+        }
+        const keyword = this.effectiveKeyword(stmt);
+        if (
+          ![
+            YangTokenType.CONTAINER,
+            YangTokenType.LIST,
+            YangTokenType.LEAF,
+            YangTokenType.LEAF_LIST,
+            YangTokenType.ANYDATA,
+            YangTokenType.ANYXML,
+            YangTokenType.CHOICE
+          ].includes(keyword as YangTokenType)
+        ) {
+          continue;
+        }
+        this.validateStatement(stmt, root[stmt.name], stmt.name, errors, rootNode, rootNode);
+      }
+
+      return [errors.length === 0, errors, warnings];
+    } finally {
+      this.contextStack.pop();
+    }
   }
 
   private validateStatement(
@@ -109,7 +152,7 @@ export class DocumentValidator {
 
     const ifFeatures = stmt.data.if_features;
     const ifFeatureList = Array.isArray(ifFeatures) ? (ifFeatures as string[]) : [];
-    if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ifFeatureCtx, this.enabledByModule)) {
+    if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
       if (value !== undefined) {
         errors.push(
           `${path}: Node '${stmt.name ?? "node"}' is present but its 'if-feature' condition is false — this node must not exist`
@@ -118,7 +161,7 @@ export class DocumentValidator {
       return;
     }
 
-    if (this.constraintChecks && !this.checkWhen(stmt, value, path, errors, currentNode, rootNode, parentNode)) {
+    if (this.ctx.constraintChecks && !this.checkWhen(stmt, value, path, errors, currentNode, rootNode, parentNode)) {
       return;
     }
 
@@ -135,7 +178,7 @@ export class DocumentValidator {
         return;
       }
       const obj = value as Record<string, unknown>;
-      if (this.constraintChecks) {
+      if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
       for (const child of stmt.statements) {
@@ -149,7 +192,7 @@ export class DocumentValidator {
         }
         this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, currentNode, rootNode);
       }
-      if (this.constraintChecks) {
+      if (this.ctx.constraintChecks) {
         this.rejectUnknownContainerKeys(stmt, obj, path, errors);
       }
       return;
@@ -165,7 +208,7 @@ export class DocumentValidator {
       }
       const keyRaw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
       const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).map((k) => k.trim()).filter(Boolean) : [];
-      if (this.constraintChecks && keyNames.length > 0 && this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors)) {
+      if (this.ctx.constraintChecks && keyNames.length > 0 && this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors)) {
         return;
       }
       for (let i = 0; i < value.length; i += 1) {
@@ -175,7 +218,7 @@ export class DocumentValidator {
           continue;
         }
         const itemNode: XPathNode = { data: item, schema: stmt as unknown as XPathSchema, parent: parentNode };
-        if (this.constraintChecks) {
+        if (this.ctx.constraintChecks) {
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
         }
         const row = item as Record<string, unknown>;
@@ -190,7 +233,7 @@ export class DocumentValidator {
           }
           this.validateStatement(child, row[child.name], `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
         }
-        if (this.constraintChecks) {
+        if (this.ctx.constraintChecks) {
           this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
         }
       }
@@ -205,7 +248,7 @@ export class DocumentValidator {
         }
         return;
       }
-      if (this.constraintChecks) {
+      if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
         const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
         if (typeName === YangTokenType.LEAFREF) {
@@ -213,13 +256,21 @@ export class DocumentValidator {
         } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
-          const [ok, reason] = this.typeChecker.validate(value, typeName, typeShape);
+          const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
           if (!ok) {
             errors.push(`${path}: ${reason ?? `invalid value for type ${typeName}`}`);
           }
         }
+      } else if (this.ctx.leafTypeMode === "unsigned_non_negative") {
+        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
+        const declared = (typeShape.name as string | undefined) ?? "string";
+        const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
+        const reason = unsignedTypeCandidateViolation(value, resolved);
+        if (reason) {
+          errors.push(`${path}: ${reason}`);
+        }
       }
-      if (this.constraintChecks) {
+      if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
       return;
@@ -233,7 +284,7 @@ export class DocumentValidator {
         errors.push(`${path}: leaf-list must be an array`);
         return;
       }
-      if (this.constraintChecks) {
+      if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
         const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
         for (let i = 0; i < value.length; i += 1) {
@@ -243,12 +294,22 @@ export class DocumentValidator {
           } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
-            const [ok, reason] = this.typeChecker.validate(value[i], typeName, typeShape);
+            const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
             if (!ok) {
               errors.push(`${path}[${i}]: ${reason ?? `invalid value for type ${typeName}`}`);
             }
           }
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
+        }
+      } else if (this.ctx.leafTypeMode === "unsigned_non_negative") {
+        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
+        const declared = (typeShape.name as string | undefined) ?? "string";
+        const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
+        for (let i = 0; i < value.length; i += 1) {
+          const reason = unsignedTypeCandidateViolation(value[i], resolved);
+          if (reason) {
+            errors.push(`${path}[${i}]: ${reason}`);
+          }
         }
       }
     }
@@ -261,7 +322,7 @@ export class DocumentValidator {
         }
         return;
       }
-      if (this.constraintChecks) {
+      if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
       if (keyword === YangTokenType.ANYDATA) {
@@ -384,7 +445,7 @@ export class DocumentValidator {
     const obj = parentValue as Record<string, unknown>;
 
     const choiceIfs = Array.isArray(choice.data.if_features) ? (choice.data.if_features as string[]) : [];
-    const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ifFeatureCtx, this.enabledByModule);
+    const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule);
     if (!choiceActive && this.choiceHasBranchData(choice, obj)) {
       errors.push(
         `${path}: Choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
@@ -397,7 +458,7 @@ export class DocumentValidator {
 
     // For choice/case, evaluate "when" in parent context (branch applicability).
     if (
-      this.constraintChecks &&
+      this.ctx.constraintChecks &&
       !this.checkWhen(choice, this.choiceHasBranchData(choice, obj) ? true : undefined, path, errors, parentNode, rootNode, parentNode)
     ) {
       return;
@@ -412,13 +473,13 @@ export class DocumentValidator {
         continue;
       }
       const caseIfs = Array.isArray(c.data.if_features) ? (c.data.if_features as string[]) : [];
-      if (!stmtIfFeaturesSatisfied(caseIfs, this.ifFeatureCtx, this.enabledByModule)) {
+      if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
         errors.push(
           `${path}: Case '${c.name ?? "case"}' of choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
         );
         return;
       }
-      if (this.constraintChecks && !this.checkWhen(c, true, `${path}.${c.name ?? "case"}`, errors, parentNode, rootNode, parentNode)) {
+      if (this.ctx.constraintChecks && !this.checkWhen(c, true, `${path}.${c.name ?? "case"}`, errors, parentNode, rootNode, parentNode)) {
         // case has data but when is false: checkWhen already produced an error
         hadBlockedCaseWithData = true;
         continue;
@@ -757,7 +818,7 @@ export class DocumentValidator {
         continue;
       }
       const cIf = Array.isArray(child.data.if_features) ? (child.data.if_features as string[]) : [];
-      if (!stmtIfFeaturesSatisfied(cIf, this.ifFeatureCtx, this.enabledByModule)) {
+      if (!stmtIfFeaturesSatisfied(cIf, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
         continue;
       }
       if (!child.data.mandatory) {
@@ -765,7 +826,7 @@ export class DocumentValidator {
       }
       const childValue = obj?.[child.name];
       const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
-      if (this.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
+      if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
         continue;
       }
       if (!obj || obj[child.name] === undefined) {
@@ -791,11 +852,11 @@ export class DocumentValidator {
     anydataPath: string,
     errors: string[]
   ): void {
-    if (!this.anydataValidation || !value || typeof value !== "object" || Array.isArray(value)) {
+    if (!this.ctx.anydataValidation || !value || typeof value !== "object" || Array.isArray(value)) {
       return;
     }
-    const mode = this.anydataValidation.mode;
-    const modules = this.anydataValidation.modules;
+    const mode = this.ctx.anydataValidation.mode;
+    const modules = this.ctx.anydataValidation.modules;
     const moduleMap = this.anydataModuleMap(modules);
     const obj = value as Record<string, unknown>;
 
@@ -823,14 +884,20 @@ export class DocumentValidator {
       }
 
       const fragment = { [statementName]: childVal };
-      const inner = new DocumentValidator(mod, {
+      const payloadIfCtx = mod.data as ModuleData;
+      const payloadCtx: ValidationContext = {
+        module: mod,
+        typeChecker: new TypeChecker(mod),
         constraintChecks: mode === AnydataValidationMode.COMPLETE,
-        enabledFeaturesByModule: this.enabledFeaturesOverride
-      });
-      const [ok, innerErrors] = inner.validate(fragment);
+        leafTypeMode:
+          mode === AnydataValidationMode.COMPLETE ? "full" : "unsigned_non_negative",
+        anydataValidation: undefined,
+        ifFeatureCtx: payloadIfCtx,
+        enabledByModule: buildEnabledFeaturesMap(payloadIfCtx, this.enabledFeaturesOverride)
+      };
+      const [ok, innerErrors] = this.validateWithContext(payloadCtx, fragment);
       if (!ok) {
         for (const error of innerErrors) {
-          // Keep error details; prefix at the anydata entry point for clarity.
           errors.push(`${anydataPath}.${jsonKey}: ${error}`);
         }
       }

@@ -54,7 +54,7 @@
 
     main {
       display: grid;
-      grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(220px, 320px);
+      grid-template-columns: minmax(380px, 1.85fr) minmax(260px, 1fr) minmax(200px, 300px);
       gap: 1rem;
       padding: 1rem 1.5rem 2rem;
       align-items: stretch;
@@ -220,7 +220,7 @@
           Anydata validation mode
           <select id="mode" aria-label="Validation mode">
             <option value="complete">complete — validate payload leaf types</option>
-            <option value="candidate">candidate — structural checks only</option>
+            <option value="candidate">candidate — loose types; still rejects negative uint*</option>
           </select>
         </label>
         <button type="button" id="validate">Validate</button>
@@ -231,8 +231,8 @@
 
   <footer>
     Edit the JSON to try valid data, <code>"in-octets": "not-a-number"</code> (fails in
-    <em>complete</em>, passes in <em>candidate</em>), or
-    <code>"example-rfc8343-shape:nonexistent"</code> (fails in both).
+    <em>complete</em>, passes in <em>candidate</em> — candidate still allows non-numeric strings but rejects
+    negative values for <code>uint64</code>), or <code>"example-rfc8343-shape:nonexistent"</code> (fails in both).
   </footer>
 
   <script src="../xyang.umd.min.js"></script>
@@ -280,7 +280,7 @@
     function getXyang() {
       if (typeof xYang === "undefined") {
         throw new Error(
-          "xYang global missing — ensure docs/xyang.umd.min.js exists (run `npm run build:check` in ts/ and commit the updated bundle)."
+          "xYang global missing — ensure docs/xyang.umd.min.js exists (run `(cd ts && npm run build:check)` from the repo root; the bundle is not checked in)."
         );
       }
       return xYang;

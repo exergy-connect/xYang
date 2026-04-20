@@ -90,6 +90,22 @@ module example-rfc8343-shape {
     expect(result.errors).toEqual([]);
   });
 
+  it("anydata candidate rejects negative in-octets for uint64", () => {
+    const validator = buildValidator(AnydataValidationMode.CANDIDATE);
+    const result = validator.validate({
+      notification: {
+        payload: {
+          "example-rfc8343-shape:interfaces-state": {
+            interface: [{ name: "eth0", "in-octets": -42 }]
+          }
+        }
+      }
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((e) => e.includes("in-octets") && e.includes("non-negative"))).toBe(true);
+  });
+
   it("anydata unknown qualified member errors", () => {
     const validator = buildValidator(AnydataValidationMode.COMPLETE);
     const result = validator.validate({
@@ -114,5 +130,41 @@ module example-rfc8343-shape {
         mode: AnydataValidationMode.COMPLETE
       })
     ).toThrow(/YangModule|module/i);
+  });
+
+  it("enable extension accepts modules list including host and payload", () => {
+    const host = parseYangString(HOST_YANG);
+    const payload = parseYangString(PAYLOAD_YANG);
+    const validator = new YangValidator(host);
+
+    validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, {
+      modules: [host, payload],
+      mode: AnydataValidationMode.COMPLETE
+    });
+
+    const result = validator.validate({
+      notification: {
+        payload: {
+          "example-rfc8343-shape:interfaces-state": {
+            interface: [{ name: "eth0", "in-octets": 42 }]
+          }
+        }
+      }
+    });
+
+    expect(result.isValid).toBe(true);
+  });
+
+  it("enable extension rejects duplicate YangModule.name in modules list", () => {
+    const host = parseYangString(HOST_YANG);
+    const payload = parseYangString(PAYLOAD_YANG);
+    const validator = new YangValidator(host);
+
+    expect(() =>
+      validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, {
+        modules: [payload, payload],
+        mode: AnydataValidationMode.COMPLETE
+      })
+    ).toThrow(/duplicate module name/i);
   });
 });

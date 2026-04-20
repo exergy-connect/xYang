@@ -1,5 +1,6 @@
 import { YangModule } from "../core/model";
-import { AnydataValidationMode, parseAnydataValidationConfig } from "./anydata-validation";
+import { AnydataValidationMode } from "./anydata-validation";
+import { parseAnydataExtensionConfig } from "../ext/anydata_validation";
 import { DocumentValidator, EnabledFeaturesByModule } from "./document-validator";
 import { ValidatorExtension, ValidatorExtensionConfig } from "./validator-extension";
 
@@ -24,7 +25,7 @@ export class YangValidator {
 
   enableExtension(extension: ValidatorExtension, config: ValidatorExtensionConfig): void {
     if (extension === ValidatorExtension.ANYDATA_VALIDATION) {
-      const parsed = parseAnydataValidationConfig(config as Record<string, unknown>);
+      const parsed = parseAnydataExtensionConfig(config as Record<string, unknown>);
       this.documentValidator.enableExtension(extension, {
         modules: parsed.modules,
         mode: parsed.mode

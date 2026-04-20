@@ -7,6 +7,30 @@ export class TypeChecker {
 
   constructor(private readonly module: YangModule) {}
 
+  /**
+   * Follow a typedef chain to the underlying builtin type name (stops at unions or unknown).
+   */
+  resolveUnderlyingBuiltinName(typeName: string): string {
+    const seen = new Set<string>();
+    let name = typeName;
+    while (seen.size < 64) {
+      const typedef = this.module.typedefs[name] as { type?: Record<string, unknown> } | undefined;
+      if (!typedef?.type || typeof typedef.type.name !== "string") {
+        return name;
+      }
+      if (typedef.type.name === YangTokenType.UNION) {
+        return name;
+      }
+      seen.add(name);
+      const next = typedef.type.name;
+      if (next === name) {
+        return name;
+      }
+      name = next;
+    }
+    return name;
+  }
+
   validate(value: unknown, typeName: string, constraint?: Record<string, unknown>): [boolean, string | null] {
     const typedef = this.module.typedefs[typeName] as { type?: Record<string, unknown> } | undefined;
     if (typedef?.type && typeof typedef.type.name === "string") {
