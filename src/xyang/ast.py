@@ -4,13 +4,14 @@ Abstract Syntax Tree (AST) nodes for YANG statements.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, List, Optional
 from dataclasses import dataclass, field
 
 from .errors import YangSemanticError
 
 if TYPE_CHECKING:
     from .xpath.ast import ASTNode, PathNode
+    from .module import YangModule
 
 
 @dataclass
@@ -114,9 +115,18 @@ class YangBitStmt:
 
 @dataclass
 class YangTypeStmt:
-    """Type statement."""
+    """Type statement.
+
+    For ``pattern`` under string-related types (RFC 7950 §9.4.6), optional
+    ``error-message`` / ``error-app-tag`` from the pattern's substatement block
+    are stored on the same node as ``pattern`` (the last ``pattern`` wins if
+    several are present, matching how ``pattern`` overwrites).
+    """
+
     name: str
     pattern: Optional[str] = None
+    pattern_error_message: Optional[str] = None
+    pattern_error_app_tag: Optional[str] = None
     length: Optional[str] = None
     range: Optional[str] = None
     fraction_digits: Optional[int] = None
@@ -173,6 +183,52 @@ class YangAnyxmlStmt(YangStatementWithMust, YangStatementWithWhen):
     """Anyxml statement (RFC 7950 §7.11, deprecated in YANG 1.1); treated like anydata for JSON."""
 
     mandatory: bool = False
+
+
+@dataclass
+class YangExtensionStmt(YangStatement):
+    """YANG ``extension`` definition (RFC 7950 §7.17)."""
+
+    argument_name: str = ""
+    argument_yin_element: Optional[bool] = None
+    apply_callback: Optional[
+        Callable[["YangExtensionInvocationStmt", "YangModule"], Optional["YangStatement"]]
+    ] = None
+
+    def apply(
+        self,
+        invocation: "YangExtensionInvocationStmt",
+        *,
+        context_module: "YangModule",
+    ) -> Optional["YangStatement"]:
+        if self.apply_callback is None:
+            return invocation
+        return self.apply_callback(invocation, context_module)
+
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
+
+@dataclass
+class YangExtensionInvocationStmt(YangStatementWithMust, YangStatementWithWhen):
+    """A generic prefixed extension invocation (e.g. ``abc:foo ...``)."""
+
+    prefix: str = ""
+    resolved_module: "YangModule" = field(default=None)  # type: ignore[assignment]
+    resolved_extension: YangExtensionStmt = field(default=None)  # type: ignore[assignment]
+    argument: Optional[str] = None
+
+    def __post_init__(self) -> None:
+        if not self.prefix:
+            raise ValueError("extension invocation requires a non-empty prefix")
+        if self.resolved_module is None:
+            raise ValueError("extension invocation requires resolved_module")
+        if self.resolved_extension is None:
+            raise ValueError("extension invocation requires resolved_extension")
+
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
 
 
 @dataclass

@@ -48,6 +48,26 @@ def _get_xyang(schema: dict[str, Any]) -> dict[str, Any]:
     return schema.get(JsonSchemaKey.X_YANG) or {}
 
 
+def _merge_schema_xyang(schema: dict[str, Any], xyang: dict[str, Any]) -> dict[str, Any]:
+    """Merge caller ``xyang`` with ``schema``'s own ``x-yang`` (schema wins on duplicate keys)."""
+    inner = schema.get(JsonSchemaKey.X_YANG) if isinstance(schema, dict) else None
+    if not isinstance(inner, dict):
+        inner = {}
+    return {**xyang, **inner}
+
+
+def _apply_pattern_constraint_metadata(
+    type_stmt: YangTypeStmt, xyang_merged: dict[str, Any]
+) -> None:
+    """Restore ``pattern`` error-message / error-app-tag from JSON ``x-yang``."""
+    em = xyang_merged.get(XYangKey.PATTERN_ERROR_MESSAGE)
+    if isinstance(em, str):
+        type_stmt.pattern_error_message = em
+    tag = xyang_merged.get(XYangKey.PATTERN_ERROR_APP_TAG)
+    if isinstance(tag, str):
+        type_stmt.pattern_error_app_tag = tag
+
+
 def _if_features_from_xyang(xyang: dict[str, Any]) -> list[str]:
     """Parse ``x-yang`` ``if-features``: AND of RFC ``if-feature`` substatements (string or string list)."""
     raw = xyang.get(XYangKey.IF_FEATURES)
@@ -206,6 +226,9 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
         if len(enums) == 1 and t == "string" and isinstance(enums[0], str):
             type_stmt = YangTypeStmt(name="string")
             type_stmt.pattern = "\\*" if enums[0] == "*" else enums[0]
+            _apply_pattern_constraint_metadata(
+                type_stmt, _merge_schema_xyang(schema, xyang)
+            )
             return type_stmt
     if t == "string":
         type_stmt = YangTypeStmt(name="string")
@@ -222,6 +245,7 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             type_stmt.length = f"0..{max_len}"
         elif min_len is not None:
             type_stmt.length = f"{min_len}.."
+        _apply_pattern_constraint_metadata(type_stmt, _merge_schema_xyang(schema, xyang))
         return type_stmt
     if t == "integer":
         min_val = schema.get(JsonSchemaKey.MINIMUM)

@@ -87,6 +87,8 @@ class YangTokenType(Enum):
     PATH = "path"
     REQUIRE_INSTANCE = "require-instance"
     ENUM = "enum"
+    VALUE = "value"
+    STATUS = "status"
     BIT = "bit"
     POSITION = "position"
     PATTERN = "pattern"
@@ -115,6 +117,7 @@ class YangTokenType(Enum):
     MANDATORY = "mandatory"
     DEFAULT = "default"
     ERROR_MESSAGE = "error-message"
+    ERROR_APP_TAG = "error-app-tag"
     TRUE = "true"
     FALSE = "false"
 
@@ -128,6 +131,8 @@ class YangTokenType(Enum):
     SUBMODULE = "submodule"
     BELONGS_TO = "belongs-to"
     REFERENCE = "reference"
+    ARGUMENT = "argument"
+    YIN_ELEMENT = "yin-element"
     # Parsed only to skip (see unsupported_skip); not represented in the AST.
     DEVIATION = "deviation"
     EXTENSION = "extension"
@@ -233,10 +238,18 @@ class TokenStream:
             return True
         return False
 
-    def peek_type(self) -> Optional[YangTokenType]:
-        """Peek at current token type without consuming."""
-        tok = self.peek_token()
-        return tok.type if tok else None
+    def peek_type(self) -> YangTokenType:
+        """Peek at current token type without consuming. Raises at end of input."""
+        if self.index >= len(self._token_list):
+            raise self._make_error("Unexpected end of input")
+        return self._token_list[self.index].type
+
+    def peek_type_at(self, offset: int = 0) -> Optional[YangTokenType]:
+        """Peek token type at ``index + offset`` without consuming."""
+        i = self.index + offset
+        if i < len(self._token_list):
+            return self._token_list[i].type
+        return None
 
     def consume_type(self, expected: YangTokenType) -> str:
         """Consume current token if its type matches expected; raise otherwise. Returns value."""
@@ -250,7 +263,9 @@ class TokenStream:
 
     def consume_if_type(self, expected: YangTokenType) -> bool:
         """Consume token if its type matches expected, return True if consumed."""
-        if self.peek_type() == expected:
+        if self.index >= len(self._token_list):
+            return False
+        if self._token_list[self.index].type == expected:
             self.consume_type(expected)
             return True
         return False

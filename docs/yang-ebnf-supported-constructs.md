@@ -307,7 +307,7 @@ when_stmt        = "when" string_concat [ ";" ] ;
 
 ## Statement registry summary
 
-Parent context and accepted first tokens are exactly those registered in `YangParser._register_handlers()` in `yang_parser.py`. Unknown statements in a given context produce a syntax error.
+Parent context and accepted first tokens are exactly those in `StatementParsers._extension_invocation_stmt` in `statement_parsers.py`. Unknown statements in a given context produce a syntax error.
 
 ---
 

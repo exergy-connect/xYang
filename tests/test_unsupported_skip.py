@@ -36,7 +36,6 @@ module ex {
     # Nested input/output under rpc/action are skipped inside the outer block (no extra warnings).
     for kw in (
         "deviation",
-        "extension",
         "rpc",
         "action",
         "notification",

@@ -11,11 +11,11 @@ from typing import Optional, Tuple
 
 from ..augment_expand import apply_augmentations
 from ..errors import YangSyntaxError
+from ..ext import apply_extension_invocations
 from ..module import YangModule
 from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext, TokenStream
-from .statement_registry import StatementRegistry
 from .statement_parsers import StatementParsers
 
 
@@ -41,203 +41,19 @@ class YangParser:
                 (after the directory of the file being parsed).
         """
         self.tokenizer = YangTokenizer()
-        self.registry = StatementRegistry()
-        self.parsers = StatementParsers(self.registry, yang_parser=self)
+        self.parsers = StatementParsers(yang_parser=self)
         self.expand_uses = expand_uses
         self.include_path = include_path
         self._include_stack: list[Path] = []
         self._module_cache: dict[Path, YangModule] = {}
         self._import_pending: set[Path] = set()
-        self._register_handlers()
 
     def _expand_and_augment(self, module: YangModule) -> None:
         """Runs only when ``expand_uses`` is True (same gate as reversibility)."""
         if self.expand_uses:
             expand_all_uses_in_module(module)
             apply_augmentations(module)
-
-    def _register_handlers(self):
-        """Register all statement handlers."""
-        # Module-level statements
-        self.registry.register('module', self.parsers.parse_module)
-        self.registry.register('module:yang-version', self.parsers.parse_yang_version)
-        self.registry.register('module:namespace', self.parsers.parse_namespace)
-        self.registry.register('module:prefix', self.parsers.parse_prefix)
-        self.registry.register('module:organization', self.parsers.parse_organization)
-        self.registry.register('module:contact', self.parsers.parse_contact)
-        self.registry.register('module:description', self.parsers.parse_description)
-        self.registry.register('module:revision', self.parsers.parse_revision)
-        self.registry.register('module:typedef', self.parsers.parse_typedef)
-        self.registry.register('module:identity', self.parsers.parse_identity)
-        self.registry.register('module:grouping', self.parsers.parse_grouping)
-        self.registry.register('module:container', self.parsers.parse_container)
-        self.registry.register('module:list', self.parsers.parse_list)
-        self.registry.register('module:leaf', self.parsers.parse_leaf)
-        self.registry.register('module:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('module:anydata', self.parsers.parse_anydata)
-        self.registry.register('module:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('module:import', self.parsers.parse_import_stmt)
-        self.registry.register('module:include', self.parsers.parse_include_stmt)
-        self.registry.register('module:feature', self.parsers.parse_feature_stmt)
-        self.registry.register('module:augment', self.parsers.parse_augment)
-
-        # Submodule top-level (same handlers as module where applicable)
-        self.registry.register('submodule:yang-version', self.parsers.parse_yang_version)
-        self.registry.register('submodule:belongs-to', self.parsers.parse_belongs_to)
-        self.registry.register('submodule:import', self.parsers.parse_import_stmt)
-        self.registry.register('submodule:include', self.parsers.parse_include_stmt)
-        self.registry.register('submodule:revision', self.parsers.parse_revision)
-        self.registry.register('submodule:feature', self.parsers.parse_feature_stmt)
-        self.registry.register('submodule:typedef', self.parsers.parse_typedef)
-        self.registry.register('submodule:identity', self.parsers.parse_identity)
-        self.registry.register('submodule:grouping', self.parsers.parse_grouping)
-        self.registry.register('submodule:augment', self.parsers.parse_augment)
-        self.registry.register('submodule:container', self.parsers.parse_container)
-        self.registry.register('submodule:list', self.parsers.parse_list)
-        self.registry.register('submodule:leaf', self.parsers.parse_leaf)
-        self.registry.register('submodule:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('submodule:anydata', self.parsers.parse_anydata)
-        self.registry.register('submodule:anyxml', self.parsers.parse_anyxml)
-
-        # import / include / belongs-to substatements
-        for _pfx in ('import', 'include'):
-            self.registry.register(f'{_pfx}:prefix', self.parsers.parse_prefix_value_stmt)
-            self.registry.register(f'{_pfx}:revision-date', self.parsers.parse_revision_date_stmt)
-            self.registry.register(f'{_pfx}:description', self.parsers.parse_description_string_only)
-            self.registry.register(f'{_pfx}:reference', self.parsers.parse_reference_string_only)
-        self.registry.register('belongs-to:prefix', self.parsers.parse_prefix_value_stmt)
-
-        # ``if-feature`` (RFC 7950 §7.20.2): supported under data/schema constructs this
-        # parser implements — container, leaf, leaf-list, list, choice, case, uses, refine,
-        # augment, identity — plus ``feature`` (§7.20.1.1).  Not on ``enum`` / ``bit`` per
-        # RFC 7950 §9.  ``deviation``, ``extension``, ``rpc``, ``action``, ``notification``,
-        # ``input``, ``output`` are skipped with a warning (see ``unsupported_skip``).
-
-        # Augment body
-        self.registry.register('augment:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('augment:uses', self.parsers.parse_uses)
-        self.registry.register('augment:leaf', self.parsers.parse_leaf)
-        self.registry.register('augment:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('augment:container', self.parsers.parse_container)
-        self.registry.register('augment:list', self.parsers.parse_list)
-        self.registry.register('augment:choice', self.parsers.parse_choice)
-        self.registry.register('augment:anydata', self.parsers.parse_anydata)
-        self.registry.register('augment:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('augment:description', self.parsers.parse_description)
-        self.registry.register('augment:when', self.parsers.parse_when)
-        self.registry.register('augment:must', self.parsers.parse_must)
-
-        # Container body statements
-        self.registry.register('container:description', self.parsers.parse_description)
-        self.registry.register('container:presence', self.parsers.parse_presence)
-        self.registry.register('container:when', self.parsers.parse_when)
-        self.registry.register('container:must', self.parsers.parse_must)
-        self.registry.register('container:leaf', self.parsers.parse_leaf)
-        self.registry.register('container:container', self.parsers.parse_container)
-        self.registry.register('container:list', self.parsers.parse_list)
-        self.registry.register('container:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('container:uses', self.parsers.parse_uses)
-        self.registry.register('container:choice', self.parsers.parse_choice)
-        self.registry.register('container:anydata', self.parsers.parse_anydata)
-        self.registry.register('container:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('container:if-feature', self.parsers.parse_if_feature_stmt)
-
-        # List body statements
-        self.registry.register('list:key', self.parsers.parse_list_key)
-        self.registry.register('list:min-elements', self.parsers.parse_min_elements)
-        self.registry.register('list:max-elements', self.parsers.parse_max_elements)
-        self.registry.register('list:ordered-by', self.parsers.parse_ordered_by)
-        self.registry.register('list:description', self.parsers.parse_description)
-        self.registry.register('list:when', self.parsers.parse_when)
-        self.registry.register('list:leaf', self.parsers.parse_leaf)
-        self.registry.register('list:container', self.parsers.parse_container)
-        self.registry.register('list:list', self.parsers.parse_list)
-        self.registry.register('list:leaf-list', self.parsers.parse_leaf_list)
-        self.registry.register('list:must', self.parsers.parse_must)
-        self.registry.register('list:uses', self.parsers.parse_uses)
-        self.registry.register('list:choice', self.parsers.parse_choice)
-        self.registry.register('list:anydata', self.parsers.parse_anydata)
-        self.registry.register('list:anyxml', self.parsers.parse_anyxml)
-        self.registry.register('list:if-feature', self.parsers.parse_if_feature_stmt)
-
-        # Leaf body statements
-        self.registry.register('leaf:type', self.parsers.parse_type)
-        self.registry.register('leaf:mandatory', self.parsers.parse_leaf_mandatory)
-        self.registry.register('leaf:default', self.parsers.parse_leaf_default)
-        self.registry.register('leaf:description', self.parsers.parse_description)
-        self.registry.register('leaf:must', self.parsers.parse_must)
-        self.registry.register('leaf:when', self.parsers.parse_when)
-        self.registry.register('leaf:if-feature', self.parsers.parse_if_feature_stmt)
-
-        # Leaf-list body statements
-        self.registry.register('leaf-list:type', self.parsers.parse_type)
-        self.registry.register('leaf-list:min-elements', self.parsers.parse_min_elements)
-        self.registry.register('leaf-list:max-elements', self.parsers.parse_max_elements)
-        self.registry.register('leaf-list:ordered-by', self.parsers.parse_ordered_by)
-        self.registry.register('leaf-list:description', self.parsers.parse_description)
-        self.registry.register('leaf-list:when', self.parsers.parse_when)
-        self.registry.register('leaf-list:must', self.parsers.parse_must)
-        self.registry.register('leaf-list:if-feature', self.parsers.parse_if_feature_stmt)
-
-        # Typedef body statements
-        self.registry.register('typedef:type', self.parsers.parse_type)
-        self.registry.register('typedef:description', self.parsers.parse_description)
-        
-        # Grouping body statements
-        self.registry.register('grouping:description', self.parsers.parse_description)
-        self.registry.register('grouping:choice', self.parsers.parse_choice)
-        
-        # Uses body statements
-        self.registry.register('uses:refine', self.parsers.parse_refine)
-        self.registry.register('uses:description', self.parsers.parse_description)
-        self.registry.register('uses:when', self.parsers.parse_when)
-        self.registry.register('uses:if-feature', self.parsers.parse_if_feature_stmt)
-        
-        # Refine body statements
-        self.registry.register('refine:must', self.parsers.parse_must)
-        self.registry.register('refine:description', self.parsers.parse_description)
-        self.registry.register('refine:min-elements', self.parsers.parse_min_elements)
-        self.registry.register('refine:max-elements', self.parsers.parse_max_elements)
-        self.registry.register('refine:ordered-by', self.parsers.parse_ordered_by)
-        self.registry.register('refine:mandatory', self.parsers.parse_refine_mandatory)
-        self.registry.register('refine:default', self.parsers.parse_refine_default)
-        self.registry.register('refine:if-feature', self.parsers.parse_if_feature_stmt)
-        
-        # Type constraint statements
-        self.registry.register('type:type', self.parsers.parse_type)  # For union types
-        self.registry.register('type:pattern', self.parsers.parse_type_pattern)
-        self.registry.register('type:length', self.parsers.parse_type_length)
-        self.registry.register('type:range', self.parsers.parse_type_range)
-        self.registry.register('type:fraction-digits', self.parsers.parse_type_fraction_digits)
-        self.registry.register('type:enum', self.parsers.parse_type_enum)
-        self.registry.register('type:bit', self.parsers.parse_type_bit)
-        self.registry.register('type:path', self.parsers.parse_type_path)
-        self.registry.register('type:require-instance', self.parsers.parse_type_require_instance)
-        self.registry.register('type:base', self.parsers.parse_type_base)
-        self.registry.register('identity:base', self.parsers.parse_identity_base)
-        self.registry.register('identity:if-feature', self.parsers.parse_if_feature_stmt)
-        
-        # Choice body statements
-        self.registry.register('choice:mandatory', self.parsers.parse_choice_mandatory)
-        self.registry.register('choice:description', self.parsers.parse_description)
-        self.registry.register('choice:when', self.parsers.parse_when)
-        self.registry.register('choice:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('choice:case', self.parsers.parse_case)
-        
-        # Case body statements
-        self.registry.register('case:description', self.parsers.parse_description)
-        self.registry.register('case:when', self.parsers.parse_when)
-        self.registry.register('case:if-feature', self.parsers.parse_if_feature_stmt)
-        self.registry.register('case:uses', self.parsers.parse_uses)
-        self.registry.register('case:anydata', self.parsers.parse_anydata)
-        self.registry.register('case:anyxml', self.parsers.parse_anyxml)
-
-        for _ctx in ("anydata", "anyxml"):
-            self.registry.register(f"{_ctx}:description", self.parsers.parse_description)
-            self.registry.register(f"{_ctx}:when", self.parsers.parse_when)
-            self.registry.register(f"{_ctx}:must", self.parsers.parse_must)
-            self.registry.register(f"{_ctx}:if-feature", self.parsers.parse_if_feature_stmt)
-            self.registry.register(f"{_ctx}:mandatory", self.parsers.parse_leaf_mandatory)
+            apply_extension_invocations(module)
 
     def merge_included_submodule(
         self,
@@ -480,9 +296,9 @@ class YangParser:
             source_dir=source_path.parent if source_path else None,
         )
         if root == "module":
-            self.parsers.parse_module(tokens, context)
+            self.parsers._module_parser.parse_module(tokens, context)
         elif root == "submodule":
-            self.parsers.parse_submodule(tokens, context)
+            self.parsers._submodule_parser.parse_submodule(tokens, context)
         else:
             raise tokens._make_error("Expected 'module' or 'submodule' statement at start of file")
 
@@ -493,7 +309,7 @@ class YangParser:
 
 
 def parse_yang_file(
-    file_path: str,
+    file_path: str | Path,
     *,
     include_path: Tuple[str, ...] = (),
 ) -> YangModule:

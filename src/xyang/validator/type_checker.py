@@ -24,6 +24,19 @@ from ..xpath.node import Context, Node
 logger = logging.getLogger("xyang.validator")
 
 
+def _pattern_constraint_violation_message(
+    type_stmt: YangTypeStmt, *, default: str
+) -> str:
+    """RFC 7950 §9.4.6: use ``error-message`` / ``error-app-tag`` when present."""
+    if type_stmt.pattern_error_message is not None:
+        msg = type_stmt.pattern_error_message
+    else:
+        msg = default
+    if type_stmt.pattern_error_app_tag:
+        return f"{msg} (error-app-tag: {type_stmt.pattern_error_app_tag})"
+    return msg
+
+
 class TypeChecker:
     """
     Checks a data value against a YangTypeStmt.
@@ -266,7 +279,12 @@ class TypeChecker:
         if type_stmt.pattern:
             if not re.fullmatch(type_stmt.pattern, s):
                 errors.append(
-                    f"Value {s!r} does not match pattern {type_stmt.pattern!r}"
+                    _pattern_constraint_violation_message(
+                        type_stmt,
+                        default=(
+                            f"Value {s!r} does not match pattern {type_stmt.pattern!r}"
+                        ),
+                    )
                 )
         if type_stmt.enums:
             if s not in [str(e) for e in type_stmt.enums]:
@@ -388,7 +406,13 @@ class TypeChecker:
                 ]
         if type_stmt.pattern and not re.fullmatch(type_stmt.pattern, s):
             return [
-                f"binary value {s!r} does not match pattern {type_stmt.pattern!r}"
+                _pattern_constraint_violation_message(
+                    type_stmt,
+                    default=(
+                        f"binary value {s!r} does not match pattern "
+                        f"{type_stmt.pattern!r}"
+                    ),
+                )
             ]
         return []
 

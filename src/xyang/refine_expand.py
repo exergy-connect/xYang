@@ -13,6 +13,8 @@ from .ast import (
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
+    YangExtensionInvocationStmt,
+    YangExtensionStmt,
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
@@ -231,5 +233,18 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
             statements=statements,
             must_statements=must,
             if_features=list(stmt.if_features),
+        )
+    if isinstance(stmt, YangExtensionInvocationStmt):
+        must = list(stmt.must_statements) if stmt.must_statements else []
+        return replace(
+            stmt,
+            statements=statements,
+            must_statements=must,
+            if_features=list(stmt.if_features),
+        )
+    if isinstance(stmt, YangExtensionStmt):
+        return replace(
+            stmt,
+            statements=statements,
         )
     raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")

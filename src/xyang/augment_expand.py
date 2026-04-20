@@ -7,7 +7,7 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 
 from __future__ import annotations
 
-from typing import List, Optional, Tuple
+from typing import Callable, List, Optional, Tuple
 
 from .ast import (
     YangAugmentStmt,
@@ -78,36 +78,57 @@ def resolve_augment_target(ctx_module: YangModule, path: str) -> YangStatement:
 
     Each path segment is ``prefix:identifier`` (RFC 7950 absolute schema node identifier).
     """
+    return resolve_absolute_schema_path(
+        ctx_module=ctx_module,
+        path=path,
+        kind="augment",
+        find_toplevel=_find_toplevel_schema_child,
+    )
+
+
+def resolve_absolute_schema_path(
+    *,
+    ctx_module: YangModule,
+    path: str,
+    kind: str,
+    find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
+) -> YangStatement:
+    """Resolve absolute ``/prefix:name/...`` path into a target schema node.
+
+    ``find_toplevel`` provides the root-node lookup strategy for segment 0.
+    Child traversal semantics are shared (choice/case aware) via
+    ``_find_named_schema_child``.
+    """
     segments = _parse_augment_path(path)
     pref0, name0 = _split_prefixed_identifier(segments[0])
     mod0 = ctx_module.resolve_prefixed_module(pref0)
     if mod0 is None:
         raise YangSyntaxError(
-            f"augment: unknown prefix {pref0!r} in path {path!r} "
+            f"{kind}: unknown prefix {pref0!r} in path {path!r} "
             f"(module {ctx_module.name!r})"
         )
-    cur = _find_toplevel_schema_child(mod0, name0)
+    cur = find_toplevel(mod0, name0)
     if cur is None:
         raise YangSyntaxError(
-            f"augment: no top-level schema node {name0!r} in module {mod0.name!r} "
+            f"{kind}: no top-level schema node {name0!r} in module {mod0.name!r} "
             f"(path {path!r})"
         )
     for seg in segments[1:]:
         pref, nm = _split_prefixed_identifier(seg)
         if ctx_module.resolve_prefixed_module(pref) is None:
             raise YangSyntaxError(
-                f"augment: unknown prefix {pref!r} in path {path!r}"
+                f"{kind}: unknown prefix {pref!r} in path {path!r}"
             )
         nxt = _find_named_schema_child(cur, nm)
         if nxt is None:
             raise YangSyntaxError(
-                f"augment: no child {nm!r} under node in path {path!r} "
+                f"{kind}: no child {nm!r} under node in path {path!r} "
                 f"(after {cur.name!r})"
             )
         cur = nxt
     if not hasattr(cur, "statements"):
         raise YangSyntaxError(
-            f"augment: target node {getattr(cur, 'name', '?')!r} cannot contain "
+            f"{kind}: target node {getattr(cur, 'name', '?')!r} cannot contain "
             f"schema substatements (path {path!r})"
         )
     return cur
