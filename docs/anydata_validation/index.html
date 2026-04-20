@@ -1,0 +1,354 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Anydata validation example — xYang</title>
+  <style>
+    :root {
+      --bg: #0f1419;
+      --surface: #1a2332;
+      --border: #2d3a4f;
+      --text: #e7ecf3;
+      --muted: #8b9cb3;
+      --accent: #5b9cf5;
+      --accent-hover: #7eb0f7;
+      --ok: #3ecf8e;
+      --err: #f07178;
+      --font: "JetBrains Mono", "Fira Code", "SF Mono", Consolas, monospace;
+      --radius: 8px;
+    }
+
+    * {
+      box-sizing: border-box;
+    }
+
+    body {
+      margin: 0;
+      min-height: 100vh;
+      background: var(--bg);
+      color: var(--text);
+      font-family: system-ui, -apple-system, "Segoe UI", Roboto, sans-serif;
+      line-height: 1.5;
+    }
+
+    header {
+      padding: 1.25rem 1.5rem;
+      border-bottom: 1px solid var(--border);
+      background: var(--surface);
+    }
+
+    header h1 {
+      margin: 0;
+      font-size: 1.15rem;
+      font-weight: 600;
+      letter-spacing: -0.02em;
+    }
+
+    header p {
+      margin: 0.35rem 0 0;
+      font-size: 0.875rem;
+      color: var(--muted);
+      max-width: 52rem;
+    }
+
+    main {
+      display: grid;
+      grid-template-columns: minmax(280px, 1fr) minmax(280px, 1fr) minmax(220px, 320px);
+      gap: 1rem;
+      padding: 1rem 1.5rem 2rem;
+      align-items: stretch;
+    }
+
+    @media (max-width: 960px) {
+      main {
+        grid-template-columns: 1fr;
+      }
+    }
+
+    .panel {
+      display: flex;
+      flex-direction: column;
+      gap: 0.5rem;
+      min-height: 0;
+    }
+
+    .panel h2 {
+      margin: 0;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: var(--muted);
+    }
+
+    .sub {
+      font-size: 0.7rem;
+      color: var(--muted);
+      margin-top: 0.25rem;
+    }
+
+    textarea {
+      flex: 1;
+      min-height: 12rem;
+      padding: 0.75rem;
+      border: 1px solid var(--border);
+      border-radius: var(--radius);
+      background: #121820;
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 0.8rem;
+      line-height: 1.45;
+      resize: vertical;
+      tab-size: 2;
+    }
+
+    textarea:focus {
+      outline: 2px solid var(--accent);
+      outline-offset: 1px;
+    }
+
+    #instance {
+      min-height: 24rem;
+    }
+
+    .actions {
+      display: flex;
+      flex-direction: column;
+      gap: 0.75rem;
+    }
+
+    label.mode {
+      display: flex;
+      flex-direction: column;
+      gap: 0.35rem;
+      font-size: 0.8rem;
+      color: var(--muted);
+    }
+
+    select {
+      padding: 0.5rem 0.65rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #121820;
+      color: var(--text);
+      font-size: 0.875rem;
+    }
+
+    button#validate {
+      padding: 0.65rem 1rem;
+      border: none;
+      border-radius: var(--radius);
+      background: var(--accent);
+      color: #0a0e14;
+      font-weight: 600;
+      font-size: 0.9rem;
+      cursor: pointer;
+    }
+
+    button#validate:hover {
+      background: var(--accent-hover);
+    }
+
+    #output {
+      margin: 0;
+      padding: 0.75rem;
+      border-radius: var(--radius);
+      border: 1px solid var(--border);
+      background: #121820;
+      font-family: var(--font);
+      font-size: 0.78rem;
+      line-height: 1.5;
+      white-space: pre-wrap;
+      word-break: break-word;
+      min-height: 8rem;
+      flex: 1;
+    }
+
+    #output.ok {
+      border-color: rgba(62, 207, 142, 0.35);
+      color: var(--ok);
+    }
+
+    #output.err {
+      border-color: rgba(240, 113, 120, 0.4);
+      color: var(--err);
+    }
+
+    footer {
+      padding: 0 1.5rem 1.5rem;
+      font-size: 0.75rem;
+      color: var(--muted);
+      max-width: 48rem;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <h1>Anydata validation</h1>
+    <p>
+      Same scenario as <code>ts/test/anydata_validation_extension.test.ts</code>: a host module with an
+      <code>anydata payload</code>, a separate YANG module describing the JSON shape (RFC 7951
+      <code>module:node</code> members), and instance data. Validation uses the checked-in
+      <code>../xyang.umd.min.js</code> bundle (<code>parseYangString</code>, <code>YangValidator</code>, and the
+      anydata validation extension). File-backed <code>parseYangFile</code> is not available in the browser.
+    </p>
+  </header>
+
+  <main>
+    <section class="panel" aria-labelledby="yang-heading">
+      <h2 id="yang-heading">YANG</h2>
+      <div>
+        <div class="sub">Host — <code>example-push-host</code></div>
+        <textarea id="host-yang" spellcheck="false" aria-label="Host YANG module"></textarea>
+      </div>
+      <div>
+        <div class="sub">Payload shape — <code>example-rfc8343-shape</code></div>
+        <textarea id="payload-yang" spellcheck="false" aria-label="Payload shape YANG module"></textarea>
+      </div>
+    </section>
+
+    <section class="panel" aria-labelledby="instance-heading">
+      <h2 id="instance-heading">Instance (JSON)</h2>
+      <textarea id="instance" spellcheck="false" aria-label="JSON instance document"></textarea>
+    </section>
+
+    <section class="panel" aria-labelledby="validate-heading">
+      <h2 id="validate-heading">Run</h2>
+      <div class="actions">
+        <label class="mode">
+          Anydata validation mode
+          <select id="mode" aria-label="Validation mode">
+            <option value="complete">complete — validate payload leaf types</option>
+            <option value="candidate">candidate — structural checks only</option>
+          </select>
+        </label>
+        <button type="button" id="validate">Validate</button>
+        <pre id="output" role="status" aria-live="polite">Click Validate to run checks.</pre>
+      </div>
+    </section>
+  </main>
+
+  <footer>
+    Edit the JSON to try valid data, <code>"in-octets": "not-a-number"</code> (fails in
+    <em>complete</em>, passes in <em>candidate</em>), or
+    <code>"example-rfc8343-shape:nonexistent"</code> (fails in both).
+  </footer>
+
+  <script src="../xyang.umd.min.js"></script>
+  <script>
+    const HOST_DEFAULT = `module example-push-host {
+  yang-version 1.1;
+  namespace "urn:ietf:params:draft:anydata-validation:host";
+  prefix ph;
+  container notification {
+    anydata payload {
+      description "Opaque subtree; draft JSON uses module:node members.";
+    }
+  }
+}`;
+
+    const PAYLOAD_DEFAULT = `module example-rfc8343-shape {
+  yang-version 1.1;
+  namespace "urn:ietf:params:draft:anydata-validation:8343-shape";
+  prefix ifshape;
+  container interfaces-state {
+    list interface {
+      key name;
+      leaf name { type string; }
+      leaf in-octets { type uint64; }
+    }
+  }
+}`;
+
+    const INSTANCE_DEFAULT = `{
+  "notification": {
+    "payload": {
+      "example-rfc8343-shape:interfaces-state": {
+        "interface": [
+          { "name": "eth0", "in-octets": 42 }
+        ]
+      }
+    }
+  }
+}`;
+
+    document.getElementById("host-yang").value = HOST_DEFAULT;
+    document.getElementById("payload-yang").value = PAYLOAD_DEFAULT;
+    document.getElementById("instance").value = INSTANCE_DEFAULT;
+
+    function getXyang() {
+      if (typeof xYang === "undefined") {
+        throw new Error(
+          "xYang global missing — ensure docs/xyang.umd.min.js exists (run `npm run build:check` in ts/ and commit the updated bundle)."
+        );
+      }
+      return xYang;
+    }
+
+    document.getElementById("validate").addEventListener("click", () => {
+      const out = document.getElementById("output");
+      out.classList.remove("ok", "err");
+
+      let x;
+      try {
+        x = getXyang();
+      } catch (e) {
+        out.classList.add("err");
+        out.textContent = e.message;
+        return;
+      }
+
+      const hostText = document.getElementById("host-yang").value;
+      const payloadText = document.getElementById("payload-yang").value;
+      const modeSelect = document.getElementById("mode").value;
+
+      let data;
+      try {
+        data = JSON.parse(document.getElementById("instance").value);
+      } catch (e) {
+        out.classList.add("err");
+        out.textContent = "Invalid JSON: " + e.message;
+        return;
+      }
+
+      let hostMod;
+      let payloadMod;
+      try {
+        hostMod = x.parseYangString(hostText);
+        payloadMod = x.parseYangString(payloadText);
+      } catch (e) {
+        out.classList.add("err");
+        out.textContent = "YANG parse error:\n" + (e && e.message ? e.message : String(e));
+        return;
+      }
+
+      const mode =
+        modeSelect === "complete"
+          ? x.AnydataValidationMode.COMPLETE
+          : x.AnydataValidationMode.CANDIDATE;
+
+      try {
+        const validator = new x.YangValidator(hostMod);
+        validator.enableExtension(x.ValidatorExtension.ANYDATA_VALIDATION, {
+          modules: [payloadMod],
+          mode
+        });
+        const result = validator.validate(data);
+
+        if (result.isValid) {
+          out.classList.add("ok");
+          out.textContent = "Valid.";
+        } else {
+          out.classList.add("err");
+          out.textContent =
+            "Validation failed:\n" + (result.errors || []).map((err) => "• " + err).join("\n");
+        }
+      } catch (e) {
+        out.classList.add("err");
+        out.textContent = "Error:\n" + (e && e.message ? e.message : String(e));
+      }
+    });
+  </script>
+</body>
+</html>

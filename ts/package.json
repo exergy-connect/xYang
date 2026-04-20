@@ -7,7 +7,7 @@
   "main": "./dist/index.js",
   "module": "./dist/index.js",
   "types": "./dist/index.d.ts",
-  "browser": "./dist/index.umd.min.js",
+  "browser": "./dist/index.umd.min.global.js",
   "exports": {
     ".": {
       "types": "./dist/index.d.ts",
@@ -32,8 +32,8 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsup",
-    "build:check": "npm run build && node ./scripts/check-artifacts.mjs",
+    "build": "tsup && node ./scripts/build-browser-iife.mjs",
+    "build:check": "npm run build && node ./scripts/check-artifacts.mjs && node ./scripts/sync-docs-browser-bundle.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
@@ -41,6 +41,7 @@
   },
   "devDependencies": {
     "@types/node": "^24.0.0",
+    "esbuild": "^0.27.7",
     "tsup": "^8.0.0",
     "typescript": "^5.9.0",
     "vitest": "^3.2.0",

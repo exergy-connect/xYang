@@ -5,10 +5,12 @@ on:
     branches: [main, master]
     paths:
       - "ts/**"
+      - "docs/**"
       - ".github/workflows/tests-ts.yml"
   pull_request:
     paths:
       - "ts/**"
+      - "docs/**"
       - ".github/workflows/tests-ts.yml"
   workflow_dispatch:
 
@@ -45,6 +47,14 @@ jobs:
       - name: Build
         working-directory: ts
         run: npm run build:check
+
+      - name: Verify docs browser bundle is committed and current
+        run: |
+          if [ -n "$(git status --porcelain docs/xyang.umd.min.js)" ]; then
+            echo "::error::docs/xyang.umd.min.js is missing or out of date. Run \`(cd ts && npm run build:check)\` from the repo root and commit the updated file."
+            git status docs/xyang.umd.min.js
+            exit 1
+          fi
 
       - name: Test
         working-directory: ts
