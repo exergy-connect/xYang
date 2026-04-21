@@ -10,14 +10,13 @@ import {
   parseAnydataExtensionConfig
 } from "../ext/anydata_validation";
 import { ValidatorExtension } from "./validator-extension";
-import { unsignedTypeCandidateViolation } from "../types";
 import { TypeChecker } from "./type-checker";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
 export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
 
-export type LeafTypeMode = "full" | "none" | "unsigned_non_negative";
+export type LeafTypeMode = "full" | "none";
 
 /** Per-document validation context (host module or an anydata payload shape module). */
 export type ValidationContext = {
@@ -286,21 +285,6 @@ export class DocumentValidator {
             errors.push(`${path}: ${reason ?? `invalid value for type ${typeName}`}`);
           }
         }
-      } else if (this.ctx.leafTypeMode === "unsigned_non_negative") {
-        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
-        const declared = (typeShape.name as string | undefined) ?? "string";
-        const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
-        const reason = unsignedTypeCandidateViolation(value, resolved);
-        traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf:unsigned_candidate", {
-          path,
-          declared,
-          resolved,
-          violation: reason,
-          value: summarizeValue(value)
-        });
-        if (reason) {
-          errors.push(`${path}: ${reason}`);
-        }
       }
       if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
@@ -342,24 +326,8 @@ export class DocumentValidator {
           }
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
         }
-      } else if (this.ctx.leafTypeMode === "unsigned_non_negative") {
-        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
-        const declared = (typeShape.name as string | undefined) ?? "string";
-        const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
-        for (let i = 0; i < value.length; i += 1) {
-          const reason = unsignedTypeCandidateViolation(value[i], resolved);
-          traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf-list:unsigned_candidate", {
-            path: `${path}[${i}]`,
-            declared,
-            resolved,
-            violation: reason,
-            value: summarizeValue(value[i])
-          });
-          if (reason) {
-            errors.push(`${path}[${i}]: ${reason}`);
-          }
-        }
       }
+      return;
     }
 
     if (keyword === YangTokenType.ANYDATA || keyword === YangTokenType.ANYXML) {
@@ -894,6 +862,10 @@ export class DocumentValidator {
     return map;
   }
 
+  /**
+   * RFC 7951 qualified members under `anydata` (draft-ietf-netmod-yang-anydata-validation §4–§5).
+   * Nested validation uses anydata-complete (full constraints) vs anydata-candidate (no constraint checks).
+   */
   private runAnydataSubtreeValidation(
     stmt: YangStatement,
     value: unknown,
@@ -937,8 +909,7 @@ export class DocumentValidator {
         module: mod,
         typeChecker: new TypeChecker(mod, { typeValidationDebug: this.rootCtx.typeValidationDebug }),
         constraintChecks: mode === AnydataValidationMode.COMPLETE,
-        leafTypeMode:
-          mode === AnydataValidationMode.COMPLETE ? "full" : "unsigned_non_negative",
+        leafTypeMode: mode === AnydataValidationMode.COMPLETE ? "full" : "none",
         typeValidationDebug: this.rootCtx.typeValidationDebug,
         anydataValidation: undefined,
         ifFeatureCtx: payloadIfCtx,

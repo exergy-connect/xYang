@@ -331,7 +331,7 @@
               Anydata validation mode
               <select id="mode" aria-label="Validation mode">
                 <option value="complete">complete — validate payload leaf types</option>
-                <option value="candidate">candidate — loose types; still rejects negative uint*</option>
+                <option value="candidate">candidate — no RFC 7950 constraint checks (draft §5)</option>
               </select>
             </label>
             <button type="button" id="validate">Validate</button>
@@ -345,8 +345,8 @@
   <footer>
     <p>
       Edit the JSON to try valid data, <code>"in-octets": "not-a-number"</code> (fails in
-      <em>complete</em>, passes in <em>candidate</em> — candidate still allows non-numeric strings but rejects
-      negative values for <code>uint64</code>), or <code>"example-rfc8343-shape:nonexistent"</code> (fails in both).
+      <em>complete</em>, passes in <em>candidate</em> per draft-ietf-netmod-yang-anydata-validation §5 /
+      RFC 7950 §8.3.3 candidate semantics), or <code>"example-rfc8343-shape:nonexistent"</code> (fails in both).
     </p>
     <p class="copyright">Copyright(C) 2026 Exergy ∞ LLC</p>
   </footer>
@@ -439,10 +439,7 @@
         return;
       }
 
-      const mode =
-        modeSelect === "complete"
-          ? x.AnydataValidationMode.COMPLETE
-          : x.AnydataValidationMode.CANDIDATE;
+      const mode = modeSelect === "complete" ? "complete" : "candidate";
 
       try {
         const validator = new x.YangValidator(hostMod, { typeValidationDebug: true });

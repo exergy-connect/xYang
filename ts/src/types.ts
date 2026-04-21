@@ -76,42 +76,13 @@ function matchesRange(value: number, raw: string): boolean {
   return false;
 }
 
-/** @internal Exported for anydata candidate-mode unsigned checks. */
+/** @internal Parse JSON integer scalars for built-in numeric type checks. */
 export function integerLike(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)) {
     return value;
   }
   if (typeof value === "string" && /^-?\d+$/.test(value)) {
     return Number.parseInt(value, 10);
-  }
-  return null;
-}
-
-const UNSIGNED_BUILTINS = new Set<string>([
-  YangTokenType.UINT8,
-  YangTokenType.UINT16,
-  YangTokenType.UINT32,
-  YangTokenType.UINT64
-]);
-
-export function isUnsignedBuiltinTypeName(typeName: string): boolean {
-  return UNSIGNED_BUILTINS.has(typeName.trim());
-}
-
-/**
- * Anydata "candidate" mode: reject values that are clearly invalid for unsigned types (negative
- * integers) while still allowing non-numeric strings (e.g. wrong JSON encoding).
- */
-export function unsignedTypeCandidateViolation(value: unknown, resolvedTypeName: string): string | null {
-  if (!isUnsignedBuiltinTypeName(resolvedTypeName)) {
-    return null;
-  }
-  const n = integerLike(value);
-  if (n === null) {
-    return null;
-  }
-  if (n < 0) {
-    return `Expected non-negative value for type ${resolvedTypeName}`;
   }
   return null;
 }

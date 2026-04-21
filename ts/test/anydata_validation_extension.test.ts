@@ -91,7 +91,7 @@ module example-rfc8343-shape {
     expect(result.errors).toEqual([]);
   });
 
-  it("anydata candidate rejects negative in-octets for uint64", () => {
+  it("anydata candidate skips type/constraint checks (draft §5 / RFC 7950 §8.3.3)", () => {
     const validator = buildValidator(AnydataValidationMode.CANDIDATE);
     const result = validator.validate({
       notification: {
@@ -103,8 +103,8 @@ module example-rfc8343-shape {
       }
     });
 
-    expect(result.isValid).toBe(false);
-    expect(result.errors.some((e) => e.includes("in-octets") && e.includes("non-negative"))).toBe(true);
+    expect(result.isValid).toBe(true);
+    expect(result.errors).toEqual([]);
   });
 
   it("anydata unknown qualified member errors", () => {

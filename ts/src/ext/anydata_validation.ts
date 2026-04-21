@@ -1,7 +1,14 @@
 import { YangModule } from "../core/model";
 
+/**
+ * Optional anydata subtree validation modes from
+ * [draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation) §5
+ * (anydata-complete / anydata-candidate, aligned with RFC 7950 §8.3.3 datastore semantics).
+ */
 export enum AnydataValidationMode {
+  /** Full RFC 7950 validation for resolved subtree members (anydata-complete). */
   COMPLETE = "complete",
+  /** Structural validation without constraint checks: no type, must, when, etc. (anydata-candidate). */
   CANDIDATE = "candidate"
 }
 
