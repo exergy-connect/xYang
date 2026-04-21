@@ -4,7 +4,11 @@ import { parseXPath } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
 import { resolveQualifiedTopLevel } from "../encoding";
-import { AnydataValidationConfig, AnydataValidationMode } from "./anydata-validation";
+import {
+  AnydataValidationConfig,
+  AnydataValidationMode,
+  parseAnydataExtensionConfig
+} from "../ext/anydata_validation";
 import { ValidatorExtension } from "./validator-extension";
 import { unsignedTypeCandidateViolation } from "../types";
 import { TypeChecker } from "./type-checker";
@@ -82,10 +86,7 @@ export class DocumentValidator {
     if (extension !== ValidatorExtension.ANYDATA_VALIDATION) {
       throw new Error(`unknown validator extension: ${String(extension)}`);
     }
-    this.rootCtx.anydataValidation = {
-      modules: (config.modules as YangModule[]) ?? [],
-      mode: (config.mode as AnydataValidationMode | undefined) ?? AnydataValidationMode.COMPLETE
-    };
+    this.rootCtx.anydataValidation = parseAnydataExtensionConfig(config);
   }
 
   validate(data: unknown): [boolean, string[], string[]] {

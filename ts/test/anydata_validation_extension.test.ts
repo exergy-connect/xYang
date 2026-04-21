@@ -1,5 +1,6 @@
 import { describe, expect, it } from "vitest";
-import { AnydataValidationMode, parseYangString, ValidatorExtension, YangValidator } from "../src";
+import { parseYangString, ValidatorExtension, YangValidator } from "../src";
+import { AnydataValidationMode } from "../src/ext/anydata_validation";
 
 describe("python parity: test_anydata_validation_extension", () => {
   const HOST_YANG = `
