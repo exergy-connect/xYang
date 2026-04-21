@@ -38,6 +38,7 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
       const typeStmt = stmt.statements?.find((child) => child.keyword === "type");
       typedefs[stmt.argument] = {
         name: stmt.argument,
+        description: typeof stmt.description === "string" ? stmt.description : "",
         type: stmt.type ?? typeStmt?.type,
         statements: stmt.statements ?? []
       };
@@ -47,6 +48,10 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
   const features = moduleState.features;
   const featureIfFeatures = moduleState.feature_if_features;
 
+  const moduleDescriptionStmt = statements.find((stmt) => stmt.keyword === "description");
+  const moduleDescription =
+    typeof moduleDescriptionStmt?.argument === "string" ? moduleDescriptionStmt.argument : "";
+
   return {
     __class__: "YangModule",
     name: root.argument,
@@ -55,6 +60,7 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
     prefix: statements.find((stmt) => stmt.keyword === "prefix")?.argument ?? "",
     organization: String(moduleState.organization ?? ""),
     contact: String(moduleState.contact ?? ""),
+    description: moduleDescription,
     typedefs,
     identities: serializeIdentities(moduleState.identities as Record<string, { bases?: string[] }> | undefined),
     import_prefixes: (moduleState.import_prefixes as Record<string, unknown>) ?? {},

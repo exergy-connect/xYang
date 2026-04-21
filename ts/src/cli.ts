@@ -1,8 +1,6 @@
-#!/usr/bin/env node
-
 import { readFileSync } from "node:fs";
 import process from "node:process";
-import { parseYangFile, parseYangString } from "./parser";
+import { parseYangFile, YangParser } from "./parser";
 import { YangValidator } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
 
@@ -61,7 +59,8 @@ function main(argv: string[]): number {
     if (!file) {
       throw new Error("Missing <file.yang>");
     }
-    const module = parseYangString(readFileSync(file, "utf-8"));
+    // Keep source-level uses/augment shape in AST for reversible convert.
+    const module = new YangParser({ expand_uses: false }).parseFile(file);
     const schema = generateJsonSchema(module);
     process.stdout.write(`${JSON.stringify(schema, null, 2)}\n`);
     return 0;

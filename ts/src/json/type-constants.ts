@@ -19,31 +19,96 @@ export const JSON_TYPE_FREE_FORM = [
   JSON_TYPE_NULL
 ] as const;
 
+function fractionDigitsFromMultipleOf(value: unknown): number | undefined {
+  if (typeof value !== "number" || !Number.isFinite(value) || value <= 0 || value >= 1) {
+    return undefined;
+  }
+  let n = 0;
+  let t = value;
+  while (t < 1 && n < 18) {
+    t *= 10;
+    n += 1;
+  }
+  return t === 1 ? n : undefined;
+}
+
 export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<string, unknown> {
   const typeName = (typeShape.name as string | undefined) ?? YangTokenType.STRING_KW;
 
   if (typeName === YangTokenType.STRING_KW) {
     const out: Record<string, unknown> = { type: JSON_TYPE_STRING };
     if (typeof typeShape.pattern === "string") {
-      out.pattern = typeShape.pattern;
+      const p = typeShape.pattern;
+      out.pattern = p.startsWith("^") && p.endsWith("$") ? p : `^${p}$`;
+    }
+    if (typeof typeShape.length === "string") {
+      const [rawMin, rawMax] = typeShape.length.split("..");
+      const min = Number.parseInt((rawMin ?? "").trim(), 10);
+      const maxRaw = (rawMax ?? "").trim().toLowerCase();
+      const max = Number.parseInt((rawMax ?? "").trim(), 10);
+      if (!Number.isNaN(min)) {
+        out.minLength = min;
+      }
+      if (!Number.isNaN(max) && maxRaw !== "max") {
+        out.maxLength = max;
+      }
     }
     return out;
   }
 
   if (
     [
+      YangTokenType.INT8,
+      YangTokenType.INT16,
       YangTokenType.INT32,
       YangTokenType.INT64,
       JSON_TYPE_INTEGER,
       YangTokenType.UINT8,
+      YangTokenType.UINT16,
+      YangTokenType.UINT32,
       YangTokenType.UINT64
     ].includes(typeName)
   ) {
-    return { type: JSON_TYPE_INTEGER };
+    const out: Record<string, unknown> = { type: JSON_TYPE_INTEGER };
+    if (typeName === YangTokenType.UINT8) {
+      out.minimum = 0;
+      out.maximum = 255;
+      return out;
+    }
+    if (typeof typeShape.range === "string") {
+      const [rawMin, rawMax] = typeShape.range.split("..");
+      const min = Number.parseInt((rawMin ?? "").trim(), 10);
+      const maxRaw = (rawMax ?? "").trim().toLowerCase();
+      const max = Number.parseInt((rawMax ?? "").trim(), 10);
+      if (!Number.isNaN(min) && (rawMin ?? "").trim().toLowerCase() !== "min") {
+        out.minimum = min;
+      }
+      if (!Number.isNaN(max) && maxRaw !== "max") {
+        out.maximum = max;
+      }
+    }
+    return out;
   }
 
   if ([YangTokenType.DECIMAL64, JSON_TYPE_NUMBER].includes(typeName)) {
-    return { type: JSON_TYPE_NUMBER };
+    const out: Record<string, unknown> = { type: JSON_TYPE_NUMBER };
+    if (typeof typeShape.fraction_digits === "number" && typeShape.fraction_digits > 0) {
+      out.multipleOf = 10 ** -typeShape.fraction_digits;
+    }
+    if (typeof typeShape.range === "string") {
+      const [rawMin, rawMax] = typeShape.range.split("..");
+      const minRaw = (rawMin ?? "").trim();
+      const maxRaw = (rawMax ?? "").trim();
+      const min = Number.parseFloat(minRaw);
+      const max = Number.parseFloat(maxRaw);
+      if (!Number.isNaN(min) && minRaw.toLowerCase() !== "min") {
+        out.minimum = min;
+      }
+      if (!Number.isNaN(max) && maxRaw.toLowerCase() !== "max") {
+        out.maximum = max;
+      }
+    }
+    return out;
   }
 
   if (typeName === YangTokenType.BOOLEAN) {
@@ -76,7 +141,7 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
   if (typeName === YangTokenType.UNION) {
     const members = Array.isArray(typeShape.types) ? typeShape.types : [];
     return {
-      anyOf: members.map((member) => leafTypeToSchema(member as Record<string, unknown>))
+      oneOf: members.map((member) => leafTypeToSchema(member as Record<string, unknown>))
     };
   }
 
@@ -110,4 +175,8 @@ export function schemaTypeToYangType(schema: Record<string, unknown>): string {
     return YangTokenType.BOOLEAN;
   }
   return YangTokenType.STRING_KW;
+}
+
+export function decimal64FractionDigitsFromSchema(schema: Record<string, unknown>): number | undefined {
+  return fractionDigitsFromMultipleOf(schema.multipleOf);
 }

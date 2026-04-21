@@ -86,6 +86,12 @@ export class YangModule {
     return typeof v === "string" && v.length > 0 ? v : undefined;
   }
 
+  /** First module-level ``description`` substatement (RFC 7950). */
+  get description(): string | undefined {
+    const v = this.data.description;
+    return typeof v === "string" ? v : undefined;
+  }
+
   get typedefs(): Record<string, unknown> {
     return (this.data.typedefs as Record<string, unknown>) ?? {};
   }

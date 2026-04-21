@@ -150,11 +150,11 @@ export class StatementParsers {
       return { __class__: "YangStatement", keyword: "revision", statements: [] };
     },
     [YangTokenType.DESCRIPTION]: (tokens, context) => {
-      this.parse_description(tokens, context);
+      const desc = this.parse_description(tokens, context);
       return {
         __class__: "YangStatement",
         keyword: "description",
-        argument: (context.current_parent as any)?.description ?? "",
+        argument: desc,
         name: "description",
         statements: []
       };
@@ -478,6 +478,14 @@ export class StatementParsers {
     if (stmt.key !== undefined) {
       out.key = stmt.key;
     }
+    const minElements = (stmt as { min_elements?: number }).min_elements;
+    if (typeof minElements === "number") {
+      out.min_elements = minElements;
+    }
+    const maxElements = (stmt as { max_elements?: number }).max_elements;
+    if (typeof maxElements === "number") {
+      out.max_elements = maxElements;
+    }
     if (stmt.description) {
       out.description = stmt.description;
     }
@@ -593,6 +601,7 @@ export class StatementParsers {
       name: must_stmt.expression,
       argument: must_stmt.expression,
       error_message: must_stmt.error_message,
+      description: must_stmt.description,
       statements: []
     };
   }
@@ -639,7 +648,7 @@ export class StatementParsers {
     return shape;
   }
 
-  parse_description(tokens: TokenStream, context: ParserContext): void {
+  parse_description(tokens: TokenStream, context: ParserContext): string {
     tokens.consume_type(YangTokenType.DESCRIPTION);
     const desc = tokens.consume_type(YangTokenType.STRING);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
@@ -654,6 +663,7 @@ export class StatementParsers {
     if (parent && "description" in parent) {
       parent.description = desc;
     }
+    return desc;
   }
 
   parse_optional_description(tokens: TokenStream, context: ParserContext): void {

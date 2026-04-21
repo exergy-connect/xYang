@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { generateJsonSchema, parseJsonSchema, parseYangString } from "../../src";
+import { generateJsonSchema, parseJsonSchema, parseYangString, YangParser } from "../../src";
 
 describe("python parity: json/test_generator", () => {
   it("emits typedefs under $defs and uses $ref on leafs", () => {
@@ -26,7 +26,7 @@ module v {
     const schema = generateJsonSchema(module);
     const defs = schema.$defs as Record<string, unknown>;
     expect(defs).toBeDefined();
-    expect((defs["version-string"] as Record<string, unknown>)["x-yang"]).toEqual({ type: "typedef" });
+    expect((defs["version-string"] as Record<string, unknown>)["x-yang"]).toBeUndefined();
 
     const leaf = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>)["version"] as Record<string, unknown>;
@@ -134,5 +134,54 @@ module c {
     expect(choice).toBeDefined();
     expect(choice?.name).toBe("mode");
     expect(choice?.statements.length).toBe(2);
+  });
+
+  it("decimal64 emits multipleOf and round-trips fraction-digits", () => {
+    const module = parseYangString(`
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix t;
+  container data-model {
+    leaf x { type decimal64 { fraction-digits 3; } }
+  }
+}
+`);
+    const schema = generateJsonSchema(module);
+    const x = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
+      .properties as Record<string, unknown>)["x"] as Record<string, unknown>;
+    expect(x.type).toBe("number");
+    expect(x.multipleOf).toBe(0.001);
+
+    const round = parseJsonSchema(schema);
+    const dm = round.findStatement("data-model");
+    const leaf = dm?.findStatement("x");
+    const t = (leaf?.data.type as Record<string, unknown> | undefined) ?? {};
+    expect(t.name).toBe("decimal64");
+    expect(t.fraction_digits).toBe(3);
+  });
+
+  it("expands uses at emit time when parser keeps uses in AST", () => {
+    const module = new YangParser({ expand_uses: false }).parseString(`
+module u {
+  yang-version 1.1;
+  namespace "urn:u";
+  prefix u;
+  grouping common {
+    leaf x { type string; }
+  }
+  container data-model {
+    uses common;
+  }
+}
+`);
+
+    const dataModel = module.findStatement("data-model");
+    expect(dataModel?.statements.some((s) => s.keyword === "uses")).toBe(true);
+
+    const schema = generateJsonSchema(module);
+    const dmSchema = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
+    const dmProps = dmSchema.properties as Record<string, unknown>;
+    expect(dmProps.x).toBeDefined();
   });
 });

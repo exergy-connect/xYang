@@ -3,6 +3,8 @@ import { YangParser } from "./yang-parser";
 
 const defaultParser = new YangParser();
 
+export { YangParser };
+
 export function parseYangString(content: string): YangModule {
   return defaultParser.parseString(content);
 }

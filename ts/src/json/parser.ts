@@ -3,6 +3,7 @@ import { YangTokenType } from "../parser/parser-context";
 import { parseXPath } from "../xpath/parser";
 import { YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
+  decimal64FractionDigitsFromSchema,
   JSON_TYPE_ARRAY,
   JSON_TYPE_OBJECT,
   JSON_TYPE_STRING,
@@ -118,6 +119,12 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
   const hasStringEnum = schema.type === JSON_TYPE_STRING && Array.isArray(schema.enum);
   const name = hasStringEnum ? YangTokenType.ENUMERATION : schemaTypeToYangType(schema);
   const shape: Record<string, unknown> = { name };
+  if (name === YangTokenType.DECIMAL64) {
+    const fd = decimal64FractionDigitsFromSchema(schema);
+    if (typeof fd === "number") {
+      shape.fraction_digits = fd;
+    }
+  }
   if (typeof schema.minLength === "number" || typeof schema.maxLength === "number") {
     const min = typeof schema.minLength === "number" ? `${schema.minLength}` : "min";
     const max = typeof schema.maxLength === "number" ? `${schema.maxLength}` : "max";
@@ -143,7 +150,11 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     }
   }
   if (name === YangTokenType.STRING_KW && typeof schema.pattern === "string") {
-    shape.pattern = schema.pattern;
+    let p = schema.pattern;
+    if (p.startsWith("^") && p.endsWith("$")) {
+      p = p.slice(1, -1);
+    }
+    shape.pattern = p;
   }
   const pem = xy["pattern-error-message"];
   if (typeof pem === "string" && pem.length > 0) {
@@ -490,8 +501,14 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
     argument: name,
     statements: children,
     key: typeof xy.key === "string" ? xy.key : undefined,
-    min_elements: typeof xy["min-elements"] === "number" ? (xy["min-elements"] as number) : undefined,
-    max_elements: typeof xy["max-elements"] === "number" ? (xy["max-elements"] as number) : undefined
+    min_elements:
+      typeof schema.minItems === "number"
+        ? (schema.minItems as number)
+        : (typeof xy["min-elements"] === "number" ? (xy["min-elements"] as number) : undefined),
+    max_elements:
+      typeof schema.maxItems === "number"
+        ? (schema.maxItems as number)
+        : (typeof xy["max-elements"] === "number" ? (xy["max-elements"] as number) : undefined)
   };
   const itemReq = Array.isArray(resolvedItems.required)
     ? resolvedItems.required.filter((x): x is string => typeof x === "string")
@@ -555,10 +572,14 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
     type: typeShape,
     statements: mustStatementsFromXyang(xy)
   };
-  if (typeof xy["min-elements"] === "number") {
+  if (typeof schema.minItems === "number") {
+    out.min_elements = schema.minItems as number;
+  } else if (typeof xy["min-elements"] === "number") {
     out.min_elements = xy["min-elements"] as number;
   }
-  if (typeof xy["max-elements"] === "number") {
+  if (typeof schema.maxItems === "number") {
+    out.max_elements = schema.maxItems as number;
+  } else if (typeof xy["max-elements"] === "number") {
     out.max_elements = xy["max-elements"] as number;
   }
   if (typeof schema.description === "string" && schema.description.length > 0) {
