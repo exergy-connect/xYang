@@ -8,7 +8,7 @@ import { AnydataValidationConfig, AnydataValidationMode } from "./anydata-valida
 import { ValidatorExtension } from "./validator-extension";
 import { unsignedTypeCandidateViolation } from "../types";
 import { TypeChecker } from "./type-checker";
-import { isTypeValidationDebugEnabled, summarizeValue, traceTypeValidation } from "./type-validation-debug";
+import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
 export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
@@ -21,6 +21,7 @@ export type ValidationContext = {
   typeChecker: TypeChecker;
   constraintChecks: boolean;
   leafTypeMode: LeafTypeMode;
+  typeValidationDebug: boolean;
   anydataValidation: AnydataValidationConfig | undefined;
   ifFeatureCtx: ModuleData;
   enabledByModule: Readonly<Record<string, ReadonlySet<string>>>;
@@ -32,6 +33,7 @@ export class DocumentValidator {
   private readonly rootCtx: ValidationContext;
   private readonly enabledFeaturesOverride: EnabledFeaturesByModule | null;
   private readonly contextStack: ValidationContext[] = [];
+  private typeValidationDebug: boolean;
 
   constructor(
     module: YangModule,
@@ -39,21 +41,33 @@ export class DocumentValidator {
       constraintChecks?: boolean;
       leafTypeMode?: LeafTypeMode;
       enabledFeaturesByModule?: EnabledFeaturesByModule | null;
+      typeValidationDebug?: boolean;
     } = {}
   ) {
     this.enabledFeaturesOverride = options.enabledFeaturesByModule ?? null;
+    this.typeValidationDebug = options.typeValidationDebug === true;
     const constraintChecks = options.constraintChecks ?? true;
     const leafTypeMode = options.leafTypeMode ?? (constraintChecks ? "full" : "none");
     const ifFeatureCtx = module.data as ModuleData;
     this.rootCtx = {
       module,
-      typeChecker: new TypeChecker(module),
+      typeChecker: new TypeChecker(module, { typeValidationDebug: this.typeValidationDebug }),
       constraintChecks,
       leafTypeMode,
+      typeValidationDebug: this.typeValidationDebug,
       anydataValidation: undefined,
       ifFeatureCtx,
       enabledByModule: buildEnabledFeaturesMap(ifFeatureCtx, this.enabledFeaturesOverride)
     };
+  }
+
+  /** When true, this validator emits `console.debug` lines for leaf type checks. */
+  setTypeValidationDebug(on: boolean): void {
+    this.typeValidationDebug = on;
+    this.rootCtx.typeValidationDebug = on;
+    this.rootCtx.typeChecker = new TypeChecker(this.rootCtx.module, {
+      typeValidationDebug: this.typeValidationDebug
+    });
   }
 
   private get ctx(): ValidationContext {
@@ -258,17 +272,15 @@ export class DocumentValidator {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
           const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
-          if (isTypeValidationDebugEnabled()) {
-            traceTypeValidation("DocumentValidator.leaf:full", {
-              path,
-              typeName,
-              leafTypeMode: this.ctx.leafTypeMode,
-              constraintChecks: this.ctx.constraintChecks,
-              ok,
-              reason,
-              value: summarizeValue(value)
-            });
-          }
+          traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf:full", {
+            path,
+            typeName,
+            leafTypeMode: this.ctx.leafTypeMode,
+            constraintChecks: this.ctx.constraintChecks,
+            ok,
+            reason,
+            value: summarizeValue(value)
+          });
           if (!ok) {
             errors.push(`${path}: ${reason ?? `invalid value for type ${typeName}`}`);
           }
@@ -278,15 +290,13 @@ export class DocumentValidator {
         const declared = (typeShape.name as string | undefined) ?? "string";
         const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
         const reason = unsignedTypeCandidateViolation(value, resolved);
-        if (isTypeValidationDebugEnabled()) {
-          traceTypeValidation("DocumentValidator.leaf:unsigned_candidate", {
-            path,
-            declared,
-            resolved,
-            violation: reason,
-            value: summarizeValue(value)
-          });
-        }
+        traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf:unsigned_candidate", {
+          path,
+          declared,
+          resolved,
+          violation: reason,
+          value: summarizeValue(value)
+        });
         if (reason) {
           errors.push(`${path}: ${reason}`);
         }
@@ -316,17 +326,15 @@ export class DocumentValidator {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
             const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
-            if (isTypeValidationDebugEnabled()) {
-              traceTypeValidation("DocumentValidator.leaf-list:full", {
-                path: `${path}[${i}]`,
-                typeName,
-                leafTypeMode: this.ctx.leafTypeMode,
-                constraintChecks: this.ctx.constraintChecks,
-                ok,
-                reason,
-                value: summarizeValue(value[i])
-              });
-            }
+            traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf-list:full", {
+              path: `${path}[${i}]`,
+              typeName,
+              leafTypeMode: this.ctx.leafTypeMode,
+              constraintChecks: this.ctx.constraintChecks,
+              ok,
+              reason,
+              value: summarizeValue(value[i])
+            });
             if (!ok) {
               errors.push(`${path}[${i}]: ${reason ?? `invalid value for type ${typeName}`}`);
             }
@@ -339,15 +347,13 @@ export class DocumentValidator {
         const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
         for (let i = 0; i < value.length; i += 1) {
           const reason = unsignedTypeCandidateViolation(value[i], resolved);
-          if (isTypeValidationDebugEnabled()) {
-            traceTypeValidation("DocumentValidator.leaf-list:unsigned_candidate", {
-              path: `${path}[${i}]`,
-              declared,
-              resolved,
-              violation: reason,
-              value: summarizeValue(value[i])
-            });
-          }
+          traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf-list:unsigned_candidate", {
+            path: `${path}[${i}]`,
+            declared,
+            resolved,
+            violation: reason,
+            value: summarizeValue(value[i])
+          });
           if (reason) {
             errors.push(`${path}[${i}]: ${reason}`);
           }
@@ -928,10 +934,11 @@ export class DocumentValidator {
       const payloadIfCtx = mod.data as ModuleData;
       const payloadCtx: ValidationContext = {
         module: mod,
-        typeChecker: new TypeChecker(mod),
+        typeChecker: new TypeChecker(mod, { typeValidationDebug: this.rootCtx.typeValidationDebug }),
         constraintChecks: mode === AnydataValidationMode.COMPLETE,
         leafTypeMode:
           mode === AnydataValidationMode.COMPLETE ? "full" : "unsigned_non_negative",
+        typeValidationDebug: this.rootCtx.typeValidationDebug,
         anydataValidation: undefined,
         ifFeatureCtx: payloadIfCtx,
         enabledByModule: buildEnabledFeaturesMap(payloadIfCtx, this.enabledFeaturesOverride)

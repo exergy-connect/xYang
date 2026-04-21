@@ -12,6 +12,8 @@ export type ValidationResult = {
 
 export type YangValidatorOptions = {
   enabledFeaturesByModule?: EnabledFeaturesByModule;
+  /** When true, this instance emits `console.debug` for leaf type validation. */
+  typeValidationDebug?: boolean;
 };
 
 export class YangValidator {
@@ -19,8 +21,17 @@ export class YangValidator {
 
   constructor(private readonly module: YangModule, options: YangValidatorOptions = {}) {
     this.documentValidator = new DocumentValidator(module, {
-      enabledFeaturesByModule: options.enabledFeaturesByModule ?? null
+      enabledFeaturesByModule: options.enabledFeaturesByModule ?? null,
+      typeValidationDebug: options.typeValidationDebug
     });
+  }
+
+  /**
+   * Toggle `console.debug` tracing for leaf type checks performed by this validator only.
+   */
+  setTypeValidationDebug(on: boolean): this {
+    this.documentValidator.setTypeValidationDebug(on);
+    return this;
   }
 
   enableExtension(extension: ValidatorExtension, config: ValidatorExtensionConfig): void {

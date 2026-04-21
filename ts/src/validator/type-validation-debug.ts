@@ -1,46 +1,7 @@
 /**
- * Opt-in tracing for leaf / typedef / union type checks.
- *
- * Enable any of:
- * - `globalThis.__XYANG_DEBUG_TYPE_VALIDATION__ = true` (browser or Node)
- * - `process.env.XYANG_DEBUG_TYPE_VALIDATION=1` (Node / Vitest)
- * - `setTypeValidationDebug(true)` from the public API
+ * Helpers for per-validator type-validation tracing (see `YangValidator` /
+ * `DocumentValidator.setTypeValidationDebug`).
  */
-
-const GLOBAL_KEY = "__XYANG_DEBUG_TYPE_VALIDATION__";
-
-let forcedOverride: boolean | undefined;
-
-export function setTypeValidationDebug(on: boolean): void {
-  forcedOverride = on;
-  try {
-    (globalThis as Record<string, unknown>)[GLOBAL_KEY] = on;
-  } catch {
-    /* ignore */
-  }
-}
-
-export function isTypeValidationDebugEnabled(): boolean {
-  if (forcedOverride !== undefined) {
-    return forcedOverride;
-  }
-  try {
-    if ((globalThis as Record<string, unknown>)[GLOBAL_KEY] === true) {
-      return true;
-    }
-  } catch {
-    /* ignore */
-  }
-  try {
-    const proc = typeof process !== "undefined" ? process : undefined;
-    if (proc?.env?.XYANG_DEBUG_TYPE_VALIDATION === "1") {
-      return true;
-    }
-  } catch {
-    /* ignore */
-  }
-  return false;
-}
 
 export function summarizeValue(value: unknown): string {
   if (value === null) {
@@ -74,8 +35,12 @@ export function summarizeValue(value: unknown): string {
   return String(value);
 }
 
-export function traceTypeValidation(message: string, fields: Record<string, unknown>): void {
-  if (!isTypeValidationDebugEnabled()) {
+export function traceTypeValidation(
+  enabled: boolean,
+  message: string,
+  fields: Record<string, unknown>
+): void {
+  if (!enabled) {
     return;
   }
   console.debug(`[xYang:type-validation] ${message}`, fields);

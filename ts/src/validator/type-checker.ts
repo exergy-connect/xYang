@@ -3,10 +3,20 @@ import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem } from "../types";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 
+export type TypeCheckerOptions = {
+  typeValidationDebug?: boolean;
+};
+
 export class TypeChecker {
   private readonly system = new TypeSystem();
+  private readonly typeValidationDebug: boolean;
 
-  constructor(private readonly module: YangModule) {}
+  constructor(
+    private readonly module: YangModule,
+    options: TypeCheckerOptions = {}
+  ) {
+    this.typeValidationDebug = options.typeValidationDebug === true;
+  }
 
   /**
    * Follow a typedef chain to the underlying builtin type name (stops at unions or unknown).
@@ -57,7 +67,7 @@ export class TypeChecker {
       }
     }
 
-    traceTypeValidation("TypeChecker.validate", {
+    traceTypeValidation(this.typeValidationDebug, "TypeChecker.validate", {
       module: this.module.name ?? "(anonymous)",
       typeName,
       via,
@@ -70,7 +80,7 @@ export class TypeChecker {
 
   /** Union members may name typedefs; validate through this checker so typedefs resolve. */
   private validateUnion(value: unknown, constraint: TypeConstraint): [boolean, string | null] {
-    traceTypeValidation("TypeChecker.validateUnion", {
+    traceTypeValidation(this.typeValidationDebug, "TypeChecker.validateUnion", {
       module: this.module.name ?? "(anonymous)",
       memberCount: constraint.types?.length ?? 0,
       value: summarizeValue(value)

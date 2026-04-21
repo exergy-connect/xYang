@@ -353,10 +353,6 @@
 
   <script src="../xyang.umd.min.js"></script>
   <script>
-    if (typeof xYang !== "undefined" && typeof xYang.setTypeValidationDebug === "function") {
-      xYang.setTypeValidationDebug(true);
-    }
-
     const HOST_DEFAULT = `module example-push-host {
   yang-version 1.1;
   namespace "urn:ietf:params:draft:anydata-validation:host";
@@ -449,7 +445,7 @@
           : x.AnydataValidationMode.CANDIDATE;
 
       try {
-        const validator = new x.YangValidator(hostMod);
+        const validator = new x.YangValidator(hostMod, { typeValidationDebug: true });
         validator.enableExtension(x.ValidatorExtension.ANYDATA_VALIDATION, {
           modules: [payloadMod],
           mode
