@@ -49,11 +49,13 @@ export class YangStatementList {
 }
 
 export class YangStatement extends YangStatementList {
+  keyword: string;
   name: string;
   description: string;
 
   constructor(init: Partial<YangStatement> = {}) {
     super(init.statements ?? []);
+    this.keyword = init.keyword ?? "";
     this.name = init.name ?? "";
     this.description = init.description ?? "";
   }
@@ -104,6 +106,7 @@ export class YangTypedefStmt extends YangStatement {
 
   constructor(init: Partial<YangTypedefStmt> = {}) {
     super(init);
+    this.keyword = "typedef";
     this.type = init.type;
   }
 
@@ -118,6 +121,7 @@ export class YangIdentityStmt extends YangStatement {
 
   constructor(init: Partial<YangIdentityStmt> = {}) {
     super(init);
+    this.keyword = "identity";
     this.bases = init.bases ?? [];
     this.if_features = init.if_features ?? [];
   }
@@ -175,6 +179,7 @@ export class YangContainerStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangContainerStmt> = {}) {
     super(init);
+    this.keyword = "container";
     this.must_statements = init.must_statements ?? [];
     this.presence = init.presence;
   }
@@ -188,6 +193,7 @@ export class YangListStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangListStmt> = {}) {
     super(init);
+    this.keyword = "list";
     this.must_statements = init.must_statements ?? [];
     this.key = init.key;
     this.min_elements = init.min_elements;
@@ -203,6 +209,7 @@ export class YangLeafStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangLeafStmt> = {}) {
     super(init);
+    this.keyword = "leaf";
     this.must_statements = init.must_statements ?? [];
     this.type = init.type;
     this.mandatory = init.mandatory ?? false;
@@ -219,6 +226,7 @@ export class YangLeafListStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangLeafListStmt> = {}) {
     super(init);
+    this.keyword = "leaf-list";
     this.must_statements = init.must_statements ?? [];
     this.type = init.type;
     this.min_elements = init.min_elements;
@@ -233,6 +241,7 @@ export class YangAnydataStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangAnydataStmt> = {}) {
     super(init);
+    this.keyword = "anydata";
     this.must_statements = init.must_statements ?? [];
     this.mandatory = init.mandatory ?? false;
   }
@@ -244,6 +253,7 @@ export class YangAnyxmlStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangAnyxmlStmt> = {}) {
     super(init);
+    this.keyword = "anyxml";
     this.must_statements = init.must_statements ?? [];
     this.mandatory = init.mandatory ?? false;
   }
@@ -261,6 +271,7 @@ export class YangExtensionStmt extends YangStatement {
 
   constructor(init: Partial<YangExtensionStmt> = {}) {
     super(init);
+    this.keyword = "extension";
     this.argument_name = init.argument_name ?? "";
     this.argument_yin_element = init.argument_yin_element;
     this.apply_callback = init.apply_callback;
@@ -292,6 +303,7 @@ export class YangExtensionInvocationStmt extends YangStatementWithWhen {
     argument?: string;
   } & Partial<YangExtensionInvocationStmt>) {
     super(init);
+    this.keyword = "extension-invocation";
     this.must_statements = init.must_statements ?? [];
     this.prefix = init.prefix;
     this.resolved_module = init.resolved_module;
@@ -360,7 +372,12 @@ export class YangLeafrefStmt {
   }
 }
 
-export class YangGroupingStmt extends YangStatement {}
+export class YangGroupingStmt extends YangStatement {
+  constructor(init: Partial<YangGroupingStmt> = {}) {
+    super(init);
+    this.keyword = "grouping";
+  }
+}
 
 export class YangUsesStmt extends YangStatementWithWhen {
   grouping_name: string;
@@ -368,6 +385,7 @@ export class YangUsesStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangUsesStmt> = {}) {
     super(init);
+    this.keyword = "uses";
     this.grouping_name = init.grouping_name ?? "";
     this.refines = init.refines ?? [];
   }
@@ -382,6 +400,7 @@ export class YangAugmentStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangAugmentStmt> = {}) {
     super(init);
+    this.keyword = "augment";
     this.augment_path = init.augment_path ?? "";
   }
 
@@ -401,6 +420,7 @@ export class YangRefineStmt extends YangStatementWithMust {
 
   constructor(init: Partial<YangRefineStmt> = {}) {
     super(init);
+    this.keyword = "refine";
     this.target_path = init.target_path ?? "";
     this.type = init.type;
     this.min_elements = init.min_elements;
@@ -417,6 +437,7 @@ export class YangChoiceStmt extends YangStatementWithWhen {
 
   constructor(init: Partial<YangChoiceStmt> = {}) {
     super(init);
+    this.keyword = "choice";
     this.mandatory = init.mandatory ?? false;
     this.cases = init.cases ?? [];
   }
@@ -452,6 +473,11 @@ export class YangChoiceStmt extends YangStatementWithWhen {
 }
 
 export class YangCaseStmt extends YangStatementWithWhen {
+  constructor(init: Partial<YangCaseStmt> = {}) {
+    super(init);
+    this.keyword = "case";
+  }
+
   override child_names(_data: Record<string, unknown>): Set<string> {
     return new Set(this.statements.map((s) => s.name).filter((name): name is string => Boolean(name)));
   }

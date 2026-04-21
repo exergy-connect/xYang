@@ -1,8 +1,6 @@
 import {
   YangExtensionInvocationStmt,
   YangExtensionStmt,
-  YangAnydataStmt,
-  YangAnyxmlStmt,
   YangLeafListStmt,
   YangMustStmt,
   YangRefineStmt,
@@ -48,6 +46,13 @@ export type ParseStatementOptions = {
   /** Included in errors, e.g. `under 'case'`. */
   restrictionContext?: string;
 };
+
+function serializedKeywordFromAstStatement(stmt: { keyword?: unknown }): string {
+  if (typeof stmt.keyword === "string" && stmt.keyword.trim().length > 0) {
+    return stmt.keyword;
+  }
+  throw new YangSemanticError("Internal error: cannot serialize AST statement without a keyword");
+}
 
 type TypeShape = {
   name: string;
@@ -415,6 +420,7 @@ export class StatementParsers {
   }
 
   private fromAst(stmt: {
+    keyword?: string;
     name?: string;
     constructor: { name: string };
     statements?: unknown[];
@@ -439,11 +445,7 @@ export class StatementParsers {
     resolved_extension?: { name?: string };
     cases?: unknown[];
   }): SerializedStatement {
-    const keyword = stmt.constructor.name
-      .replace(/^Yang/, "")
-      .replace(/Stmt$/, "")
-      .replace(/([a-z])([A-Z])/g, "$1-$2")
-      .toLowerCase();
+    const keyword = serializedKeywordFromAstStatement(stmt as object);
 
     const children = [
       ...this.serializeAstChildren(stmt.statements ?? []),
