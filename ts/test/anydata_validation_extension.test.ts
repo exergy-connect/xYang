@@ -155,6 +155,31 @@ module example-rfc8343-shape {
     expect(result.isValid).toBe(true);
   });
 
+  it("enable extension with host and payload rejects negative in-octets for uint64", () => {
+    const host = parseYangString(HOST_YANG);
+    const payload = parseYangString(PAYLOAD_YANG);
+    const validator = new YangValidator(host);
+
+    validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, {
+      modules: [host, payload],
+      mode: AnydataValidationMode.COMPLETE
+    });
+
+    const result = validator.validate({
+      notification: {
+        payload: {
+          "example-rfc8343-shape:interfaces-state": {
+            interface: [{ name: "eth0", "in-octets": -42 }]
+          }
+        }
+      }
+    });
+
+    expect(result.isValid).toBe(false);
+    expect(result.errors.length).toBeGreaterThan(0);
+    expect(result.errors.some((e) => e.includes("in-octets") && e.includes("Expected uint64"))).toBe(true);
+  });
+
   it("enable extension rejects duplicate YangModule.name in modules list", () => {
     const host = parseYangString(HOST_YANG);
     const payload = parseYangString(PAYLOAD_YANG);

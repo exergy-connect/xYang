@@ -8,6 +8,7 @@ import { AnydataValidationConfig, AnydataValidationMode } from "./anydata-valida
 import { ValidatorExtension } from "./validator-extension";
 import { unsignedTypeCandidateViolation } from "../types";
 import { TypeChecker } from "./type-checker";
+import { isTypeValidationDebugEnabled, summarizeValue, traceTypeValidation } from "./type-validation-debug";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
 export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
@@ -257,6 +258,17 @@ export class DocumentValidator {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
           const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
+          if (isTypeValidationDebugEnabled()) {
+            traceTypeValidation("DocumentValidator.leaf:full", {
+              path,
+              typeName,
+              leafTypeMode: this.ctx.leafTypeMode,
+              constraintChecks: this.ctx.constraintChecks,
+              ok,
+              reason,
+              value: summarizeValue(value)
+            });
+          }
           if (!ok) {
             errors.push(`${path}: ${reason ?? `invalid value for type ${typeName}`}`);
           }
@@ -266,6 +278,15 @@ export class DocumentValidator {
         const declared = (typeShape.name as string | undefined) ?? "string";
         const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
         const reason = unsignedTypeCandidateViolation(value, resolved);
+        if (isTypeValidationDebugEnabled()) {
+          traceTypeValidation("DocumentValidator.leaf:unsigned_candidate", {
+            path,
+            declared,
+            resolved,
+            violation: reason,
+            value: summarizeValue(value)
+          });
+        }
         if (reason) {
           errors.push(`${path}: ${reason}`);
         }
@@ -295,6 +316,17 @@ export class DocumentValidator {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
             const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
+            if (isTypeValidationDebugEnabled()) {
+              traceTypeValidation("DocumentValidator.leaf-list:full", {
+                path: `${path}[${i}]`,
+                typeName,
+                leafTypeMode: this.ctx.leafTypeMode,
+                constraintChecks: this.ctx.constraintChecks,
+                ok,
+                reason,
+                value: summarizeValue(value[i])
+              });
+            }
             if (!ok) {
               errors.push(`${path}[${i}]: ${reason ?? `invalid value for type ${typeName}`}`);
             }
@@ -307,6 +339,15 @@ export class DocumentValidator {
         const resolved = this.ctx.typeChecker.resolveUnderlyingBuiltinName(declared);
         for (let i = 0; i < value.length; i += 1) {
           const reason = unsignedTypeCandidateViolation(value[i], resolved);
+          if (isTypeValidationDebugEnabled()) {
+            traceTypeValidation("DocumentValidator.leaf-list:unsigned_candidate", {
+              path: `${path}[${i}]`,
+              declared,
+              resolved,
+              violation: reason,
+              value: summarizeValue(value[i])
+            });
+          }
           if (reason) {
             errors.push(`${path}[${i}]: ${reason}`);
           }

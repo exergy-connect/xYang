@@ -1,6 +1,7 @@
 import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem } from "../types";
+import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 
 export class TypeChecker {
   private readonly system = new TypeSystem();
@@ -32,24 +33,48 @@ export class TypeChecker {
   }
 
   validate(value: unknown, typeName: string, constraint?: Record<string, unknown>): [boolean, string | null] {
+    let via: "typedef" | "typedef-union" | "inline-union" | "direct";
+    let result: [boolean, string | null];
+
     const typedef = this.module.typedefs[typeName] as { type?: Record<string, unknown> } | undefined;
     if (typedef?.type && typeof typedef.type.name === "string") {
       const typedefConstraint = new TypeConstraint(typedef.type as Record<string, unknown>);
       if (typedef.type.name === YangTokenType.UNION) {
-        return this.validateUnion(value, typedefConstraint);
+        via = "typedef-union";
+        result = this.validateUnion(value, typedefConstraint);
+      } else {
+        via = "typedef";
+        result = this.system.validate(value, typedef.type.name, typedefConstraint);
       }
-      return this.system.validate(value, typedef.type.name, typedefConstraint);
+    } else {
+      const merged = new TypeConstraint(constraint as Record<string, unknown> | undefined);
+      if (typeName === YangTokenType.UNION && (merged.types?.length ?? 0) > 0) {
+        via = "inline-union";
+        result = this.validateUnion(value, merged);
+      } else {
+        via = "direct";
+        result = this.system.validate(value, typeName, merged);
+      }
     }
 
-    const merged = new TypeConstraint(constraint as Record<string, unknown> | undefined);
-    if (typeName === YangTokenType.UNION && (merged.types?.length ?? 0) > 0) {
-      return this.validateUnion(value, merged);
-    }
-    return this.system.validate(value, typeName, merged);
+    traceTypeValidation("TypeChecker.validate", {
+      module: this.module.name ?? "(anonymous)",
+      typeName,
+      via,
+      ok: result[0],
+      reason: result[1],
+      value: summarizeValue(value)
+    });
+    return result;
   }
 
   /** Union members may name typedefs; validate through this checker so typedefs resolve. */
   private validateUnion(value: unknown, constraint: TypeConstraint): [boolean, string | null] {
+    traceTypeValidation("TypeChecker.validateUnion", {
+      module: this.module.name ?? "(anonymous)",
+      memberCount: constraint.types?.length ?? 0,
+      value: summarizeValue(value)
+    });
     for (const member of constraint.types ?? []) {
       const memberObj = member as Record<string, unknown>;
       const memberName =
