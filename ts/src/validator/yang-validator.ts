@@ -1,6 +1,7 @@
 import { YangModule } from "../core/model";
+import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
 import { DocumentValidator, EnabledFeaturesByModule } from "./document-validator";
-import { ValidatorExtension, ValidatorExtensionConfig } from "./validator-extension";
+import { ValidatorExtension } from "./validator-extension";
 
 export type ValidationResult = {
   isValid: boolean;
@@ -32,11 +33,11 @@ export class YangValidator {
     return this;
   }
 
-  enableExtension(extension: ValidatorExtension, config: ValidatorExtensionConfig): void {
-    this.documentValidator.enableExtension(extension, config as Record<string, unknown>);
+  enableExtension(extension: ValidatorExtension, config: AnydataValidationConfigInput): void {
+    this.documentValidator.enableExtension(extension, config);
   }
 
-  enable_extension(extension: ValidatorExtension, config: ValidatorExtensionConfig): void {
+  enable_extension(extension: ValidatorExtension, config: AnydataValidationConfigInput): void {
     this.enableExtension(extension, config);
   }
 

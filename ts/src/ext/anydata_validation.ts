@@ -17,36 +17,34 @@ export type AnydataValidationConfig = {
   mode: AnydataValidationMode;
 };
 
-function rejectUnknownKeys(kwargs: Record<string, unknown>, allowed: ReadonlySet<string>): void {
-  const unknown = Object.keys(kwargs)
+/** Arguments for the anydata-validation extension (RFC 7951 module set for subtree resolution). */
+export type AnydataValidationConfigInput = {
+  modules: readonly YangModule[];
+  mode?: AnydataValidationMode;
+};
+
+function rejectUnknownKeys(kwargs: object, allowed: ReadonlySet<string>): void {
+  const unexpected = Object.keys(kwargs)
     .filter((k) => !allowed.has(k))
     .sort();
-  if (unknown.length > 0) {
-    throw new TypeError(`unexpected keyword arguments: ${JSON.stringify(unknown)}`);
+  if (unexpected.length > 0) {
+    throw new TypeError(`unexpected keyword arguments: ${JSON.stringify(unexpected)}`);
   }
 }
 
-function parseAnydataValidationConfig(config: Record<string, unknown>): AnydataValidationConfig {
+/**
+ * Validates arguments for the anydata-validation validator extension (parity with
+ * Python `parse_anydata_extension_kwargs`).
+ */
+export function parseAnydataExtensionConfig(config: AnydataValidationConfigInput): AnydataValidationConfig {
   rejectUnknownKeys(config, new Set(["modules", "mode"]));
 
-  const modules = config.modules;
-  if (!Array.isArray(modules)) {
-    throw new TypeError("'modules' must be an array of YangModule");
-  }
-
-  const modeRaw = config.mode;
-  const mode = modeRaw === undefined ? AnydataValidationMode.COMPLETE : modeRaw;
-  if (mode !== AnydataValidationMode.COMPLETE && mode !== AnydataValidationMode.CANDIDATE) {
-    throw new TypeError("'mode' must be an AnydataValidationMode");
-  }
+  const mode = config.mode === undefined ? AnydataValidationMode.COMPLETE : config.mode;
 
   const seenNames = new Set<string>();
-  for (let i = 0; i < modules.length; i += 1) {
-    const value = modules[i];
-    if (!(value instanceof YangModule)) {
-      throw new TypeError(`modules[${i}] must be a YangModule`);
-    }
-    const moduleName = value.name;
+  for (let i = 0; i < config.modules.length; i += 1) {
+    const mod = config.modules[i];
+    const moduleName = mod.name;
     if (!moduleName) {
       throw new TypeError(`modules[${i}] must have a module name`);
     }
@@ -57,15 +55,7 @@ function parseAnydataValidationConfig(config: Record<string, unknown>): AnydataV
   }
 
   return {
-    modules: modules as YangModule[],
+    modules: [...config.modules],
     mode
   };
-}
-
-/**
- * Validates keyword arguments for the anydata-validation validator extension (parity with
- * Python `parse_anydata_extension_kwargs`).
- */
-export function parseAnydataExtensionConfig(config: Record<string, unknown>): AnydataValidationConfig {
-  return parseAnydataValidationConfig(config);
 }

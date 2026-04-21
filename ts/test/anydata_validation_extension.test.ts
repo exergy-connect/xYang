@@ -121,18 +121,6 @@ module example-rfc8343-shape {
     expect(result.errors.some((error) => error.includes("nonexistent"))).toBe(true);
   });
 
-  it("enable extension rejects non-YangModule entries in modules array", () => {
-    const host = parseYangString(HOST_YANG);
-    const validator = new YangValidator(host);
-
-    expect(() =>
-      validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, {
-        modules: [PAYLOAD_YANG],
-        mode: AnydataValidationMode.COMPLETE
-      })
-    ).toThrow(/YangModule|module/i);
-  });
-
   it("enable extension accepts modules list including host and payload", () => {
     const host = parseYangString(HOST_YANG);
     const payload = parseYangString(PAYLOAD_YANG);

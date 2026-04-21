@@ -10,6 +10,7 @@ export {
 } from "./validator/if-feature-eval";
 export type { ModuleData } from "./validator/if-feature-eval";
 export { ValidatorExtension } from "./validator/validator-extension";
+export type { AnydataValidationConfigInput } from "./ext/anydata_validation";
 export { parseAnydataExtensionConfig } from "./ext/anydata_validation";
 export { YangModule, YangStatement } from "./core/model";
 export {

@@ -6,6 +6,7 @@ import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/e
 import { resolveQualifiedTopLevel } from "../encoding";
 import {
   AnydataValidationConfig,
+  AnydataValidationConfigInput,
   AnydataValidationMode,
   parseAnydataExtensionConfig
 } from "../ext/anydata_validation";
@@ -81,7 +82,7 @@ export class DocumentValidator {
     return c;
   }
 
-  enableExtension(extension: ValidatorExtension, config: Record<string, unknown>): void {
+  enableExtension(extension: ValidatorExtension, config: AnydataValidationConfigInput): void {
     if (extension !== ValidatorExtension.ANYDATA_VALIDATION) {
       throw new Error(`unknown validator extension: ${String(extension)}`);
     }
