@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import json
 import re
+from copy import copy
 from pathlib import Path
 from typing import Any
 
@@ -554,8 +555,8 @@ def _choice_to_object_body(
                 JsonSchemaKey.TYPE: "object",
                 JsonSchemaKey.DESCRIPTION: (case_st.description or ""),
                 JsonSchemaKey.PROPERTIES: cp,
-                JsonSchemaKey.REQUIRED: list(keys),
                 JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
+                JsonSchemaKey.REQUIRED: list(keys),
                 JsonSchemaKey.X_YANG: case_xy,
             }
         )
@@ -676,9 +677,9 @@ def _container_stmt_to_property(
     }
     if props:
         out[JsonSchemaKey.PROPERTIES] = props
+    out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     if required:
         out[JsonSchemaKey.REQUIRED] = required
-    out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     return out
 
 
@@ -735,9 +736,9 @@ def _list_items_object_schema(
         JsonSchemaKey.TYPE: "object",
         JsonSchemaKey.PROPERTIES: props,
     }
+    items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     if item_required:
         items[JsonSchemaKey.REQUIRED] = item_required
-    items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     return items, None
 
 
@@ -982,21 +983,28 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
         XYangKey.ORGANIZATION: module.organization or "",
         XYangKey.CONTACT: module.contact or "",
     }
+    # Resolve absolute/relative leafrefs against a uses-expanded view while keeping
+    # CLI/parser behavior (`expand_uses=False`) unchanged for persisted ASTs.
+    schema_module = copy(module)
+    schema_module.statements = _expand_uses_for_json(module.statements, module)
+
     properties: dict[str, Any] = {}
-    for stmt in module.statements:
+    for stmt in schema_module.statements:
         if not getattr(stmt, "name", None):
             continue
-        prop = _statement_to_property(stmt, typedef_names, module, parent=module)
+        prop = _statement_to_property(
+            stmt, typedef_names, schema_module, parent=schema_module
+        )
         if prop is not None:
             properties[stmt.name] = prop
 
     defs: dict[str, Any] = {}
-    for name, typedef in module.typedefs.items():
+    for name, typedef in schema_module.typedefs.items():
         if isinstance(typedef, YangTypedefStmt):
-            defs[name] = _typedef_to_def(name, typedef, module)
-    for name, identity in module.identities.items():
+            defs[name] = _typedef_to_def(name, typedef, schema_module)
+    for name, identity in schema_module.identities.items():
         if isinstance(identity, YangIdentityStmt):
-            defs[name] = _identity_to_def(name, identity, module)
+            defs[name] = _identity_to_def(name, identity, schema_module)
 
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",
