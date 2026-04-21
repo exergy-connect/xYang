@@ -7,6 +7,8 @@ import { describe, expect, it } from "vitest";
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const minifiedBundlePath = resolve(__dirname, "../dist/index.umd.min.global.js");
 
+type XyIndexModule = typeof import("../src/index");
+
 /**
  * Regression: AST serialization used `constructor.name`, which esbuild minify rewrites so YANG
  * `keyword` values became wrong and validation silently broke. The bundle must reject bad data.
@@ -14,9 +16,10 @@ const minifiedBundlePath = resolve(__dirname, "../dist/index.umd.min.global.js")
 describe("minified browser bundle (IIFE)", () => {
   it.skipIf(!existsSync(minifiedBundlePath))("parses schema and validates uint64", () => {
     const code = readFileSync(minifiedBundlePath, "utf8");
-    const sandbox = { console } as { xYang?: import("../src/index"); console: typeof console };
+    const sandbox = { console } as { xYang?: XyIndexModule; console: typeof console };
     runInContext(code, createContext(sandbox));
-    const x = sandbox.xYang as import("../src/index");
+    expect(sandbox.xYang).toBeDefined();
+    const x = sandbox.xYang!;
     const yang = `module a {
   yang-version 1.1;
   namespace "urn:xyang:test:min-bundle";

@@ -11,7 +11,7 @@ export function summarizeValue(value: unknown): string {
   if (t === "undefined") {
     return "undefined";
   }
-  if (t === "string") {
+  if (typeof value === "string") {
     const s = value;
     if (s.length > 100) {
       return `string(len=${s.length}):${JSON.stringify(s.slice(0, 80))}…`;
