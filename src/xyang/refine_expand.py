@@ -7,6 +7,7 @@ from dataclasses import replace
 from typing import List, cast
 
 from .errors import YangRefineTargetNotFoundError
+from .xpath.ast import PathNode
 from .ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
@@ -39,12 +40,12 @@ def statement_children(stmt: YangStatement) -> list[YangStatement]:
 
 
 def find_nodes_by_refine_path(
-    statements: list[YangStatement], target_path: str
+    statements: list[YangStatement], target_path: PathNode
 ) -> list[YangStatement]:
     """Resolve a descendant path (``a/b/c``) from roots; walk through choices/cases."""
-    segments = [p for p in target_path.split("/") if p]
-    if not segments:
+    if not target_path.segments:
         return []
+    segments = [seg.step for seg in target_path.segments]
     out: list[YangStatement] = []
     for root in statements:
         out.extend(_find_from_node(root, segments, 0))
@@ -105,7 +106,9 @@ def apply_refines_list_cardinality(
             continue
         nodes = find_nodes_by_refine_path(statements, r.target_path)
         if not nodes:
-            raise YangRefineTargetNotFoundError(r.target_path)
+            raise YangRefineTargetNotFoundError(
+                r.target_path.to_string()
+            )
         for node in nodes:
             if isinstance(node, (YangListStmt, YangLeafListStmt)):
                 if r.min_elements is not None:
@@ -121,7 +124,9 @@ def apply_refines_by_path(
     for r in refines:
         nodes = find_nodes_by_refine_path(statements, r.target_path)
         if not nodes:
-            raise YangRefineTargetNotFoundError(r.target_path)
+            raise YangRefineTargetNotFoundError(
+                r.target_path.to_string()
+            )
         for node in nodes:
             apply_refine_to_node(node, r)
 

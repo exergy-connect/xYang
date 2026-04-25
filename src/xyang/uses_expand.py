@@ -14,6 +14,7 @@ from .ast import (
 from .errors import YangCircularUsesError, YangRefineTargetNotFoundError
 from .module import YangModule
 from .refine_expand import apply_refine_to_node, copy_yang_statement
+from .xpath.ast import PathNode
 
 logger = logging.getLogger(__name__)
 
@@ -63,18 +64,21 @@ def _merge_uses_when_into_grouping_roots(
                 )
 
 
-def _refine_target_matches_stmt_path(target_path: str, stmt_path: str) -> bool:
+def _refine_target_matches_stmt_path(target_path: PathNode, stmt_path: str) -> bool:
     """True if *target_path* matches *stmt_path* (equality or relative-path suffix).
 
     *stmt_path* uses the enclosing walk's ``refine_path_prefix`` through nested ``uses`` so
     pending refines from an outer ``uses`` (e.g. ``list-composite``) still match after inner
     grouping roots are expanded (suffix match, RFC 7950 refine paths).
     """
-    if not target_path or not stmt_path:
+    if not stmt_path:
         return False
-    if stmt_path == target_path:
+    tp = target_path.to_string()
+    if not tp:
+        return False
+    if stmt_path == tp:
         return True
-    return stmt_path.endswith("/" + target_path)
+    return stmt_path.endswith("/" + tp)
 
 
 def _apply_refines_matching_path(
@@ -87,7 +91,7 @@ def _apply_refines_matching_path(
     while i:
         i -= 1
         r = refines[i]
-        tp = getattr(r, "target_path", None) or ""
+        tp = r.target_path
         if _refine_target_matches_stmt_path(tp, stmt_path):
             apply_refine_to_node(stmt, r)
             del refines[i]
@@ -137,7 +141,10 @@ def _expand_one_uses_stmt(
         inner_prefix,
     )
     if pending_refines:
-        raise YangRefineTargetNotFoundError(pending_refines[0].target_path)
+        r0 = pending_refines[0]
+        raise YangRefineTargetNotFoundError(
+            r0.target_path.to_string()
+        )
     return out
 
 

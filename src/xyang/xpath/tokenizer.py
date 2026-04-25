@@ -133,7 +133,7 @@ class XPathTokenizer:
 
         while self.position < len(self.expression):
             char = self.expression[self.position]
-            if char.isalnum() or char in ('_', '-'):
+            if char.isalnum() or char in ('_', '-', ':'):
                 value.append(char)
                 self.position += 1
             else:

@@ -106,7 +106,69 @@ def test_refine_default_without_uses_expand_preserves_refine_ast():
     assert isinstance(uses, YangUsesStmt)
     assert uses.name == "uses"
     assert len(uses.refines) == 1
-    assert uses.refines[0].target_path == "flag"
+    assert uses.refines[0].target_path.to_string() == "flag"
+    assert uses.refines[0].refined_defaults == ["false"]
+
+
+def test_refine_prefixed_target_without_uses_expand_preserves_prefix():
+    yang = """
+module refine_prefixed_target {
+  yang-version 1.1;
+  namespace "urn:xyang:test:refine-prefixed-target";
+  prefix rd;
+
+  grouping g {
+    leaf flag {
+      type boolean;
+    }
+  }
+
+  container c {
+    uses g {
+      refine rd:flag {
+        default false;
+      }
+    }
+  }
+}
+"""
+    mod = YangParser(expand_uses=False).parse_string(yang)
+    c = mod.statements[0]
+    uses = c.statements[0]
+    assert isinstance(uses, YangUsesStmt)
+    assert len(uses.refines) == 1
+    assert uses.refines[0].target_path.to_string() == "rd:flag"
+    assert uses.refines[0].refined_defaults == ["false"]
+
+
+def test_refine_quoted_target_without_uses_expand_parses_path():
+    yang = """
+module refine_quoted_target {
+  yang-version 1.1;
+  namespace "urn:xyang:test:refine-quoted-target";
+  prefix rq;
+
+  grouping g {
+    leaf flag {
+      type boolean;
+    }
+  }
+
+  container c {
+    uses g {
+      refine "flag" {
+        default false;
+      }
+    }
+  }
+}
+"""
+    mod = YangParser(expand_uses=False).parse_string(yang)
+    c = mod.statements[0]
+    uses = c.statements[0]
+    assert isinstance(uses, YangUsesStmt)
+    assert len(uses.refines) == 1
+    assert uses.refines[0].target_path.to_string() == "flag"
     assert uses.refines[0].refined_defaults == ["false"]
 
 
