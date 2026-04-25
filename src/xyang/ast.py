@@ -14,6 +14,12 @@ if TYPE_CHECKING:
     from .module import YangModule
 
 
+def _empty_path_node():
+    from .xpath.ast import PathNode
+
+    return PathNode([])
+
+
 @dataclass
 class YangStatementList:
     """Base for nodes that contain a list of YANG statements (module body or statement body)."""
@@ -301,7 +307,7 @@ class YangAugmentStmt(YangStatementWithWhen):
 @dataclass
 class YangRefineStmt(YangStatementWithMust):
     """Refine statement - modifies nodes from a grouping when using it."""
-    target_path: str = ""  # Descendant path (e.g. "type", or schema path through choice/case nodes)
+    target_path: "PathNode" = field(default_factory=_empty_path_node)  # Descendant path (parsed; use .to_string() for display)
     type: Optional['YangTypeStmt'] = None  # Refined type when target is a leaf
     min_elements: Optional[int] = None  # Refined min-elements (list / leaf-list)
     max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)

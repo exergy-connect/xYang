@@ -155,8 +155,10 @@ def _normalize_statement(stmt: Any) -> dict[str, Any] | None:
         out["children"] = []
         for c in getattr(stmt, "statements", []) or []:
             if isinstance(c, (YangUsesStmt, YangRefineStmt)):
+                tp = getattr(c, "target_path", "")
+                tp_s = tp.to_string() if tp else ""
                 out.setdefault("uses_refines", []).append(
-                    {"kind": type(c).__name__, "grouping_name": getattr(c, "grouping_name", ""), "target_path": getattr(c, "target_path", "")}
+                    {"kind": type(c).__name__, "grouping_name": getattr(c, "grouping_name", ""), "target_path": tp_s}
                 )
                 continue
             n = _normalize_statement(c)

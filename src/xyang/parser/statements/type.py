@@ -4,11 +4,11 @@ Parsing helpers for ``type`` statements and most type substatements.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, cast
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangTypeStmt
-from ...xpath import XPathParser
+from ...xpath import PathNode, XPathParser
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -195,7 +195,7 @@ class TypeStatementParser:
         """Parse path constraint (for leafref). Path is parsed to XPath PathNode during parsing."""
         tokens.consume_type(YangTokenType.PATH)
         path_str = tokens.consume_type(YangTokenType.STRING)
-        setattr(type_stmt, "path", XPathParser(path_str).parse())
+        type_stmt.path = cast(PathNode, XPathParser(path_str).parse())
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
