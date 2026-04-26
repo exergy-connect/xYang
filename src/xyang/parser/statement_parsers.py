@@ -194,10 +194,7 @@ class StatementParsers:
     ) -> None:
         """One substatement inside ``prefix:extension { ... }`` (after the opening ``{``)."""
         unsupported = f"extension invocation '{inv_name}'"
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            if not self._is_prefixed_extension_start(tokens):
-                if self._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-                    return
+        if self._is_prefixed_extension_start(tokens):
             self._parse_prefixed_extension_statement(tokens, context)
             return
         token_value = tokens.peek()
