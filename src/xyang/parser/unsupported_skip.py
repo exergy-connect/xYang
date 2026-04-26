@@ -8,6 +8,8 @@ rest of the module can parse.
 
 from __future__ import annotations
 
+from . import keywords as kw
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -21,12 +23,12 @@ logger = logging.getLogger(__name__)
 # RFC 7950 / 1.1 statements xYang does not implement — recognize and skip.
 UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
     {
-        YangTokenType.DEVIATION,
-        YangTokenType.RPC,
-        YangTokenType.ACTION,
-        YangTokenType.NOTIFICATION,
-        YangTokenType.INPUT,
-        YangTokenType.OUTPUT,
+        kw.DEVIATION,
+        kw.RPC,
+        kw.ACTION,
+        kw.NOTIFICATION,
+        kw.INPUT,
+        kw.OUTPUT,
     }
 )
 

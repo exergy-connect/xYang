@@ -7,7 +7,7 @@ using YangTokenType enum for token kinds.
 
 from typing import Optional, List
 
-from .parser_context import TokenStream, YangToken, YangTokenType, YANG_KEYWORDS
+from .parser_context import TokenStream, YangToken, YangTokenType
 
 
 class YangTokenizer:
@@ -150,7 +150,7 @@ class YangTokenizer:
                     add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
                 continue
 
-            # Identifier / keyword: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
+            # Identifier: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
             if char.isalpha() or char == "_":
                 token_start = i
                 token_line = current_line
@@ -163,10 +163,13 @@ class YangTokenizer:
                         break
                     advance()
                 lexeme = content[start:i]
-                if lexeme in YANG_KEYWORDS:
-                    add_token(YANG_KEYWORDS[lexeme], lexeme, token_start, token_line, token_line_start)
-                else:
-                    add_token(YangTokenType.IDENTIFIER, lexeme, token_start, token_line, token_line_start)
+                add_token(
+                    YangTokenType.IDENTIFIER,
+                    lexeme,
+                    token_start,
+                    token_line,
+                    token_line_start,
+                )
                 continue
 
             # Punctuation (grammar: { } ; = + /)

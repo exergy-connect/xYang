@@ -4,6 +4,8 @@ Parsing helpers for ``leaf-list`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -19,24 +21,25 @@ class LeafListStatementParser:
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
         self._leaf_list_substatement_dispatch = {
-            YangTokenType.TYPE: self._parsers.parse_type,
-            YangTokenType.MIN_ELEMENTS: self._parsers.parse_min_elements,
-            YangTokenType.MAX_ELEMENTS: self._parsers.parse_max_elements,
-            YangTokenType.ORDERED_BY: self._parsers.parse_ordered_by,
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.MUST: self._parsers.parse_must,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.TYPE: self._parsers.parse_type,
+            kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
+            kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
+            kw.ORDERED_BY: self._parsers.parse_ordered_by,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.MUST: self._parsers.parse_must,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
         }
 
     def _parse_leaf_list_substatement(
         self, tokens: TokenStream, context: ParserContext, leaf_list_name: str
     ) -> None:
         unsupported = f"leaf-list '{leaf_list_name}'"
-        handler = self._leaf_list_substatement_dispatch.get(tokens.peek_type())
+        handler = self._leaf_list_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
@@ -44,7 +47,7 @@ class LeafListStatementParser:
         self, tokens: TokenStream, context: ParserContext
     ) -> YangLeafListStmt:
         """Parse leaf-list statement."""
-        tokens.consume_type(YangTokenType.LEAF_LIST)
+        tokens.consume(kw.LEAF_LIST)
         leaf_list_name = tokens.consume()  # identifier or keyword
         leaf_list_stmt = YangLeafListStmt(name=leaf_list_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):

@@ -4,6 +4,8 @@ Parsing helpers for ``augment`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
@@ -19,30 +21,29 @@ class AugmentStatementParser:
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
         self._augment_body_dispatch = {
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.USES: self._parsers.parse_uses,
-            YangTokenType.LEAF: self._parsers.parse_leaf,
-            YangTokenType.LEAF_LIST: self._parsers.parse_leaf_list,
-            YangTokenType.CONTAINER: self._parsers.parse_container,
-            YangTokenType.LIST: self._parsers.parse_list,
-            YangTokenType.CHOICE: self._parsers.parse_choice,
-            YangTokenType.ANYDATA: self._parsers.parse_anydata,
-            YangTokenType.ANYXML: self._parsers.parse_anyxml,
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.MUST: self._parsers.parse_must,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            kw.USES: self._parsers.parse_uses,
+            kw.LEAF: self._parsers.parse_leaf,
+            kw.LEAF_LIST: self._parsers.parse_leaf_list,
+            kw.CONTAINER: self._parsers.parse_container,
+            kw.LIST: self._parsers.parse_list,
+            kw.CHOICE: self._parsers.parse_choice,
+            kw.ANYDATA: self._parsers.parse_anydata,
+            kw.ANYXML: self._parsers.parse_anyxml,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.MUST: self._parsers.parse_must,
         }
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse augment statement."""
-        tokens.consume_type(YangTokenType.AUGMENT)
+        tokens.consume(kw.AUGMENT)
         path = self._parsers._parse_string_concatenation(tokens)
         aug = YangAugmentStmt(name="augment", augment_path=path)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(aug)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = tokens.peek_type()
+                tt = self._parsers._dispatch_key(tokens)
                 handler = self._augment_body_dispatch.get(tt)
                 if handler:
                     handler(tokens, new_context)

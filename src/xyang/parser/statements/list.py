@@ -4,6 +4,8 @@ Parsing helpers for ``list`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -19,38 +21,39 @@ class ListStatementParser:
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
         self._list_substatement_dispatch = {
-            YangTokenType.KEY: self._parsers.parse_list_key,
-            YangTokenType.MIN_ELEMENTS: self._parsers.parse_min_elements,
-            YangTokenType.MAX_ELEMENTS: self._parsers.parse_max_elements,
-            YangTokenType.ORDERED_BY: self._parsers.parse_ordered_by,
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.LEAF: self._parsers.parse_leaf,
-            YangTokenType.CONTAINER: self._parsers.parse_container,
-            YangTokenType.LIST: self._parsers.parse_list,
-            YangTokenType.LEAF_LIST: self._parsers.parse_leaf_list,
-            YangTokenType.MUST: self._parsers.parse_must,
-            YangTokenType.USES: self._parsers.parse_uses,
-            YangTokenType.CHOICE: self._parsers.parse_choice,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.ANYDATA: self._parsers.parse_anydata,
-            YangTokenType.ANYXML: self._parsers.parse_anyxml,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.KEY: self._parsers.parse_list_key,
+            kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
+            kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
+            kw.ORDERED_BY: self._parsers.parse_ordered_by,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.LEAF: self._parsers.parse_leaf,
+            kw.CONTAINER: self._parsers.parse_container,
+            kw.LIST: self._parsers.parse_list,
+            kw.LEAF_LIST: self._parsers.parse_leaf_list,
+            kw.MUST: self._parsers.parse_must,
+            kw.USES: self._parsers.parse_uses,
+            kw.CHOICE: self._parsers.parse_choice,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            kw.ANYDATA: self._parsers.parse_anydata,
+            kw.ANYXML: self._parsers.parse_anyxml,
         }
 
     def _parse_list_substatement(
         self, tokens: TokenStream, context: ParserContext, list_name: str
     ) -> None:
         unsupported = f"list '{list_name}'"
-        handler = self._list_substatement_dispatch.get(tokens.peek_type())
+        handler = self._list_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         """Parse list statement."""
-        tokens.consume_type(YangTokenType.LIST)
+        tokens.consume(kw.LIST)
         list_name = tokens.consume()  # identifier or keyword
         list_stmt = YangListStmt(name=list_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):

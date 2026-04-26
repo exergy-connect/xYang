@@ -4,6 +4,8 @@ Parsing helpers for ``identity`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
@@ -19,25 +21,26 @@ class IdentityStatementParser:
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
         self._identity_substatement_dispatch = {
-            YangTokenType.BASE: self._parse_identity_base,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.BASE: self._parse_identity_base,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
         }
 
     def _parse_identity_substatement(
         self, tokens: TokenStream, context: ParserContext, identity_name: str
     ) -> None:
         unsupported = f"identity '{identity_name}'"
-        tt = tokens.peek_type()
+        tt = self._parsers._dispatch_key(tokens)
         handler = self._identity_substatement_dispatch.get(tt)
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse identity statement."""
-        tokens.consume_type(YangTokenType.IDENTITY)
+        tokens.consume(kw.IDENTITY)
         identity_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         identity_stmt = YangIdentityStmt(name=identity_name)
         if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
@@ -51,7 +54,7 @@ class IdentityStatementParser:
 
     def _parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse base substatement inside identity."""
-        tokens.consume_type(YangTokenType.BASE)
+        tokens.consume(kw.BASE)
         base_name = self._parsers._consume_qname_from_identifier(tokens)
         parent = context.current_parent
         if isinstance(parent, YangIdentityStmt):

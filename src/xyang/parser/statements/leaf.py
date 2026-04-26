@@ -4,6 +4,8 @@ Parsing helpers for ``leaf`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -19,29 +21,30 @@ class LeafStatementParser:
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
         self._leaf_substatement_dispatch = {
-            YangTokenType.TYPE: self._parsers.parse_type,
-            YangTokenType.MANDATORY: self._parsers.parse_leaf_mandatory,
-            YangTokenType.DEFAULT: self._parsers.parse_leaf_default,
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.MUST: self._parsers.parse_must,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.TYPE: self._parsers.parse_type,
+            kw.MANDATORY: self._parsers.parse_leaf_mandatory,
+            kw.DEFAULT: self._parsers.parse_leaf_default,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.MUST: self._parsers.parse_must,
+            kw.WHEN: self._parsers.parse_when,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
         }
 
     def _parse_leaf_substatement(
         self, tokens: TokenStream, context: ParserContext, leaf_name: str
     ) -> None:
         unsupported = f"leaf '{leaf_name}'"
-        handler = self._leaf_substatement_dispatch.get(tokens.peek_type())
+        handler = self._leaf_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
         """Parse leaf statement."""
-        tokens.consume_type(YangTokenType.LEAF)
+        tokens.consume(kw.LEAF)
         leaf_name = tokens.consume()  # identifier or keyword (e.g. type)
         leaf_stmt = YangLeafStmt(name=leaf_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):

@@ -4,6 +4,8 @@ Parsing for ``revision`` (module history) and ``revision-date`` (RFC 7950).
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -21,7 +23,7 @@ class RevisionStatementParser:
 
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse top-level ``revision`` statement."""
-        tokens.consume_type(YangTokenType.REVISION)
+        tokens.consume(kw.REVISION)
         tt0 = tokens.peek_type()
         if tt0 == YangTokenType.STRING:
             date = tokens.consume_type(YangTokenType.STRING)
@@ -63,7 +65,7 @@ class RevisionStatementParser:
 
     def parse_revision_date_statement(self, tokens: TokenStream) -> str:
         """Parse a full ``revision-date`` substatement (keyword, value, optional ``;``)."""
-        tokens.consume_type(YangTokenType.REVISION_DATE)
+        tokens.consume(kw.REVISION_DATE)
         date = self._parse_revision_date_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return date
