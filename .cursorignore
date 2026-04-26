@@ -1,0 +1,23 @@
+# Add directories or file patterns to ignore during indexing (e.g. foo/ or *.csv)
+# 1. Ignore everything - blocks everything without recourse
+# *
+
+# 2. Allow directories (required so Cursor can "look" inside folders)
+!*/
+
+# Allow Cursor-specific configuration and rules
+!.cursorrules
+!.cursorignore
+!.cursor/
+
+# 3. Specifically allow code files
+!**/*.ts
+!**/*.py
+!pyproject.toml
+
+# 4. Re-ignore common massive folders (optional but safer)
+node_modules/
+.git/
+dist/
+build/
+.venv/

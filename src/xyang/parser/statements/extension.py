@@ -4,6 +4,8 @@ Parsing helpers for ``extension`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
@@ -22,20 +24,20 @@ class ExtensionStatementParser:
 
     def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse extension definition (RFC 7950 §7.17)."""
-        tokens.consume_type(YangTokenType.EXTENSION)
+        tokens.consume(kw.EXTENSION)
         name = tokens.consume_type(YangTokenType.IDENTIFIER)
         ext = YangExtensionStmt(name=name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(ext)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = tokens.peek_type()
-                if tt == YangTokenType.ARGUMENT:
+                tt = self._parsers._dispatch_key(tokens)
+                if tt == kw.ARGUMENT:
                     self._parse_extension_argument_stmt(tokens, new_context)
-                elif tt == YangTokenType.DESCRIPTION:
+                elif tt == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
-                elif tt == YangTokenType.REFERENCE:
+                elif tt == kw.REFERENCE:
                     self._parsers.parse_reference_string_only(tokens, new_context)
-                elif tt == YangTokenType.IF_FEATURE:
+                elif tt == kw.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, new_context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"extension '{name}'"
@@ -58,7 +60,7 @@ class ExtensionStatementParser:
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """Parse ``argument`` substatement inside ``extension``."""
-        tokens.consume_type(YangTokenType.ARGUMENT)
+        tokens.consume(kw.ARGUMENT)
         tt = tokens.peek_type()
         if tt == YangTokenType.STRING:
             arg = tokens.consume_type(YangTokenType.STRING)
@@ -73,7 +75,7 @@ class ExtensionStatementParser:
             parent.argument_name = arg
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek_type() == YangTokenType.YIN_ELEMENT:
+                if tokens.peek() == kw.YIN_ELEMENT:
                     self._parse_extension_argument_yin_element(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "extension argument"
@@ -86,9 +88,9 @@ class ExtensionStatementParser:
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """Parse ``yin-element`` under ``extension argument``."""
-        tokens.consume_type(YangTokenType.YIN_ELEMENT)
-        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+        tokens.consume(kw.YIN_ELEMENT)
+        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
         parent = context.current_parent
         if isinstance(parent, YangExtensionStmt):
-            parent.argument_yin_element = tt == YangTokenType.TRUE
+            parent.argument_yin_element = tt == kw.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)

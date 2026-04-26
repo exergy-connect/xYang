@@ -4,6 +4,8 @@ Parsing helpers for ``when`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -21,7 +23,7 @@ class WhenStatementParser:
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``when`` with optional ``{ description; }`` body."""
-        tokens.consume_type(YangTokenType.WHEN)
+        tokens.consume(kw.WHEN)
         condition = self._parsers._parse_string_concatenation(tokens)
         when_stmt = YangWhenStmt(expression=condition)
         parent_for_when = context.current_parent
@@ -29,8 +31,8 @@ class WhenStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(when_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                token_type = tokens.peek_type()
-                if token_type == YangTokenType.DESCRIPTION:
+                token_type = self._parsers._dispatch_key(tokens)
+                if token_type == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "when"

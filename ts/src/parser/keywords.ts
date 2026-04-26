@@ -1,0 +1,93 @@
+export const MODULE = "module";
+export const YANG_VERSION = "yang-version";
+export const NAMESPACE = "namespace";
+export const PREFIX = "prefix";
+export const ORGANIZATION = "organization";
+export const CONTACT = "contact";
+export const DESCRIPTION = "description";
+export const REVISION = "revision";
+export const TYPEDEF = "typedef";
+export const IDENTITY = "identity";
+export const BASE = "base";
+export const TYPE = "type";
+export const BINARY = "binary";
+export const BITS = "bits";
+export const BOOLEAN = "boolean";
+export const DECIMAL64 = "decimal64";
+export const EMPTY = "empty";
+export const ENUMERATION = "enumeration";
+export const IDENTITYREF = "identityref";
+export const INSTANCE_IDENTIFIER = "instance-identifier";
+export const INT8 = "int8";
+export const INT16 = "int16";
+export const INT32 = "int32";
+export const INT64 = "int64";
+export const LEAFREF = "leafref";
+export const STRING_KW = "string";
+export const UINT8 = "uint8";
+export const UINT16 = "uint16";
+export const UINT32 = "uint32";
+export const UINT64 = "uint64";
+export const UNION = "union";
+export const PATH = "path";
+export const REQUIRE_INSTANCE = "require-instance";
+export const ENUM = "enum";
+export const VALUE = "value";
+export const STATUS = "status";
+export const BIT = "bit";
+export const POSITION = "position";
+export const PATTERN = "pattern";
+export const LENGTH = "length";
+export const FRACTION_DIGITS = "fraction-digits";
+export const RANGE = "range";
+export const GROUPING = "grouping";
+export const USES = "uses";
+export const REFINE = "refine";
+export const CONTAINER = "container";
+export const LIST = "list";
+export const LEAF = "leaf";
+export const LEAF_LIST = "leaf-list";
+export const ANYDATA = "anydata";
+export const ANYXML = "anyxml";
+export const CHOICE = "choice";
+export const CASE = "case";
+export const MUST = "must";
+export const WHEN = "when";
+export const PRESENCE = "presence";
+export const KEY = "key";
+export const MIN_ELEMENTS = "min-elements";
+export const MAX_ELEMENTS = "max-elements";
+export const ORDERED_BY = "ordered-by";
+export const MANDATORY = "mandatory";
+export const DEFAULT = "default";
+export const ERROR_MESSAGE = "error-message";
+export const ERROR_APP_TAG = "error-app-tag";
+export const TRUE = "true";
+export const FALSE = "false";
+export const IMPORT = "import";
+export const INCLUDE = "include";
+export const REVISION_DATE = "revision-date";
+export const FEATURE = "feature";
+export const IF_FEATURE = "if-feature";
+export const AUGMENT = "augment";
+export const SUBMODULE = "submodule";
+export const BELONGS_TO = "belongs-to";
+export const REFERENCE = "reference";
+export const ARGUMENT = "argument";
+export const YIN_ELEMENT = "yin-element";
+export const DEVIATION = "deviation";
+export const EXTENSION = "extension";
+export const RPC = "rpc";
+export const ACTION = "action";
+export const NOTIFICATION = "notification";
+export const INPUT = "input";
+export const OUTPUT = "output";
+
+export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>([
+  DEVIATION,
+  RPC,
+  ACTION,
+  NOTIFICATION,
+  INPUT,
+  OUTPUT
+]);

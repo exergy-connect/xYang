@@ -4,6 +4,8 @@ Parsing helpers for ``choice`` and ``case`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -19,35 +21,35 @@ class ChoiceStatementParser:
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
         self._choice_substatement_dispatch = {
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.CASE: self.parse_case,
-            YangTokenType.MANDATORY: self.parse_choice_mandatory,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            kw.CASE: self.parse_case,
+            kw.MANDATORY: self.parse_choice_mandatory,
         }
         self._case_substatement_dispatch = {
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.USES: self._parsers.parse_uses,
-            YangTokenType.LEAF: self._parsers.parse_leaf,
-            YangTokenType.CONTAINER: self._parsers.parse_container,
-            YangTokenType.LIST: self._parsers.parse_list,
-            YangTokenType.LEAF_LIST: self._parsers.parse_leaf_list,
-            YangTokenType.ANYDATA: self._parsers.parse_anydata,
-            YangTokenType.ANYXML: self._parsers.parse_anyxml,
-            YangTokenType.CHOICE: self.parse_choice,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            kw.USES: self._parsers.parse_uses,
+            kw.LEAF: self._parsers.parse_leaf,
+            kw.CONTAINER: self._parsers.parse_container,
+            kw.LIST: self._parsers.parse_list,
+            kw.LEAF_LIST: self._parsers.parse_leaf_list,
+            kw.ANYDATA: self._parsers.parse_anydata,
+            kw.ANYXML: self._parsers.parse_anyxml,
+            kw.CHOICE: self.parse_choice,
         }
 
     def _parse_choice_substatement(
         self, tokens: TokenStream, context: ParserContext, choice_name: str
     ) -> None:
         unsupported = f"choice '{choice_name}'"
-        handler = self._choice_substatement_dispatch.get(tokens.peek_type())
+        handler = self._choice_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
@@ -55,15 +57,17 @@ class ChoiceStatementParser:
         self, tokens: TokenStream, context: ParserContext, case_name: str
     ) -> None:
         unsupported = f"case '{case_name}'"
-        handler = self._case_substatement_dispatch.get(tokens.peek_type())
+        handler = self._case_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
         """Parse choice statement."""
-        tokens.consume_type(YangTokenType.CHOICE)
+        tokens.consume(kw.CHOICE)
         choice_name = tokens.consume()  # identifier or keyword
         choice_stmt = YangChoiceStmt(name=choice_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
@@ -78,7 +82,7 @@ class ChoiceStatementParser:
 
     def parse_case(self, tokens: TokenStream, context: ParserContext) -> YangCaseStmt:
         """Parse case statement."""
-        tokens.consume_type(YangTokenType.CASE)
+        tokens.consume(kw.CASE)
         case_name = tokens.consume()  # identifier or keyword
         case_stmt = YangCaseStmt(name=case_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
@@ -95,8 +99,8 @@ class ChoiceStatementParser:
 
     def parse_choice_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory statement in choice."""
-        tokens.consume_type(YangTokenType.MANDATORY)
-        _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
+        tokens.consume(kw.MANDATORY)
+        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
-            context.current_parent.mandatory = tt == YangTokenType.TRUE
+            context.current_parent.mandatory = tt == kw.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)

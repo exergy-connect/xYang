@@ -4,6 +4,8 @@ Parsing helpers for ``type bits`` substatements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import TYPE_CHECKING, Optional
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -21,19 +23,19 @@ class BitsStatementParser:
 
     def parse_type_bit(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse ``bit`` substatement under ``type bits { ... }`` (RFC 7950 §9.3.4)."""
-        tokens.consume_type(YangTokenType.BIT)
+        tokens.consume(kw.BIT)
         bit_name = tokens.consume()
         explicit_pos: Optional[int] = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                pt = tokens.peek_type()
-                if pt == YangTokenType.POSITION:
-                    tokens.consume_type(YangTokenType.POSITION)
+                pt = self._parsers._dispatch_key(tokens)
+                if pt == kw.POSITION:
+                    tokens.consume(kw.POSITION)
                     if explicit_pos is not None:
                         raise tokens._make_error("Duplicate position in bit statement")
                     explicit_pos = int(tokens.consume_type(YangTokenType.INTEGER))
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif pt == YangTokenType.DESCRIPTION:
+                elif pt == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "bit"

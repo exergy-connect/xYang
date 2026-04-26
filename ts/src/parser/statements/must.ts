@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangMustStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,14 +7,14 @@ export class MustStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_must(tokens: TokenStream, context: ParserContext): YangMustStmt {
-    tokens.consume_type(YangTokenType.MUST);
+    tokens.consume(kw.MUST);
     const expression = this.parsers.parse_string_concatenation(tokens);
     const stmt = new YangMustStmt({ expression });
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek_type() === YangTokenType.ERROR_MESSAGE) {
+        if (tokens.peek() === kw.ERROR_MESSAGE) {
           this.parse_must_error_message(tokens, child);
         } else {
           this.parsers.parseStatement(tokens, child);
@@ -32,7 +33,7 @@ export class MustStatementParser {
   }
 
   parse_must_error_message(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.ERROR_MESSAGE);
+    tokens.consume(kw.ERROR_MESSAGE);
     const parent = context.current_parent as YangMustStmt;
     if (parent instanceof YangMustStmt) {
       parent.error_message = tokens.consume_type(YangTokenType.STRING);

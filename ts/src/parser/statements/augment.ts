@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangAugmentStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class AugmentStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_augment(tokens: TokenStream, context: ParserContext): YangAugmentStmt {
-    tokens.consume_type(YangTokenType.AUGMENT);
+    tokens.consume(kw.AUGMENT);
     const augment_path = this.parsers.parse_string_concatenation(tokens);
     const stmt = new YangAugmentStmt({ name: "augment", augment_path });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

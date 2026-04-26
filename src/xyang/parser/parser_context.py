@@ -51,127 +51,11 @@ class YangTokenType(Enum):
     # Unquoted \d+(\.\d+)+ — e.g. yang-version 1.1; not an identifier per RFC 7950.
     DOTTED_NUMBER = "DOTTED_NUMBER"
 
-    # Keywords (value in token is the keyword string)
-    MODULE = "module"
-    YANG_VERSION = "yang-version"
-    NAMESPACE = "namespace"
-    PREFIX = "prefix"
-    ORGANIZATION = "organization"
-    CONTACT = "contact"
-    DESCRIPTION = "description"
-    REVISION = "revision"
-    TYPEDEF = "typedef"
-    IDENTITY = "identity"
-    BASE = "base"
-    TYPE = "type"
-    # RFC 7950 built-in types (Section 4.2.4) — lexer keywords, same spelling as YANG source.
-    BINARY = "binary"
-    BITS = "bits"
-    BOOLEAN = "boolean"
-    DECIMAL64 = "decimal64"
-    EMPTY = "empty"
-    ENUMERATION = "enumeration"
-    IDENTITYREF = "identityref"
-    INSTANCE_IDENTIFIER = "instance-identifier"
-    INT8 = "int8"
-    INT16 = "int16"
-    INT32 = "int32"
-    INT64 = "int64"
-    LEAFREF = "leafref"
-    STRING_KW = "string"
-    UINT8 = "uint8"
-    UINT16 = "uint16"
-    UINT32 = "uint32"
-    UINT64 = "uint64"
-    UNION = "union"
-    PATH = "path"
-    REQUIRE_INSTANCE = "require-instance"
-    ENUM = "enum"
-    VALUE = "value"
-    STATUS = "status"
-    BIT = "bit"
-    POSITION = "position"
-    PATTERN = "pattern"
-    LENGTH = "length"
-    FRACTION_DIGITS = "fraction-digits"
-    RANGE = "range"
-
-    GROUPING = "grouping"
-    USES = "uses"
-    REFINE = "refine"
-    CONTAINER = "container"
-    LIST = "list"
-    LEAF = "leaf"
-    LEAF_LIST = "leaf-list"
-    ANYDATA = "anydata"
-    ANYXML = "anyxml"
-    CHOICE = "choice"
-    CASE = "case"
-    MUST = "must"
-    WHEN = "when"
-    PRESENCE = "presence"
-    KEY = "key"
-    MIN_ELEMENTS = "min-elements"
-    MAX_ELEMENTS = "max-elements"
-    ORDERED_BY = "ordered-by"
-    MANDATORY = "mandatory"
-    DEFAULT = "default"
-    ERROR_MESSAGE = "error-message"
-    ERROR_APP_TAG = "error-app-tag"
-    TRUE = "true"
-    FALSE = "false"
-
-    # Cross-module and submodule (RFC 7950 / YANG 1.1)
-    IMPORT = "import"
-    INCLUDE = "include"
-    REVISION_DATE = "revision-date"
-    FEATURE = "feature"
-    IF_FEATURE = "if-feature"
-    AUGMENT = "augment"
-    SUBMODULE = "submodule"
-    BELONGS_TO = "belongs-to"
-    REFERENCE = "reference"
-    ARGUMENT = "argument"
-    YIN_ELEMENT = "yin-element"
-    # Parsed only to skip (see unsupported_skip); not represented in the AST.
-    DEVIATION = "deviation"
-    EXTENSION = "extension"
-    RPC = "rpc"
-    ACTION = "action"
-    NOTIFICATION = "notification"
-    INPUT = "input"
-    OUTPUT = "output"
-
-
 def diagnostic_source_lines(content: str) -> List[str]:
     """Split source on newlines for error snippets (verbatim text, comments included)."""
     if not content:
         return []
     return [segment.rstrip("\r") for segment in content.split("\n")]
-
-
-# Map keyword lexeme -> YangTokenType for tokenizer
-YANG_KEYWORDS = {
-    tt.value: tt
-    for tt in YangTokenType
-    if tt
-    not in (
-        YangTokenType.STRING,
-        YangTokenType.IDENTIFIER,
-        YangTokenType.INTEGER,
-        YangTokenType.DOTTED_NUMBER,
-    )
-    and tt
-    not in (
-        YangTokenType.LBRACE,
-        YangTokenType.RBRACE,
-        YangTokenType.SEMICOLON,
-        YangTokenType.COLON,
-        YangTokenType.EQUALS,
-        YangTokenType.PLUS,
-        YangTokenType.SLASH,
-    )
-}
 
 
 @dataclass
@@ -251,38 +135,53 @@ class TokenStream:
             return self._token_list[i].type
         return None
 
-    def consume_type(self, expected: YangTokenType) -> str:
-        """Consume current token if its type matches expected; raise otherwise. Returns value."""
+    def consume_type(self, expected: Union[YangTokenType, str]) -> str:
+        """Consume current token if token kind matches ``expected``; return value."""
         if self.index >= len(self._token_list):
             raise self._make_error("Unexpected end of input")
         tok = self._token_list[self.index]
-        if tok.type != expected:
-            raise self._make_error(f"Expected {expected.name}, got {tok.type.name} ({tok.value!r})")
+        if isinstance(expected, str):
+            if tok.type != YangTokenType.IDENTIFIER or tok.value != expected:
+                got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
+                raise self._make_error(f"Expected {expected!r}, got {got!r}")
+        elif tok.type != expected:
+            raise self._make_error(
+                f"Expected {expected.name}, got {tok.type.name} ({tok.value!r})"
+            )
         self.index += 1
         return tok.value
 
-    def consume_if_type(self, expected: YangTokenType) -> bool:
-        """Consume token if its type matches expected, return True if consumed."""
+    def consume_if_type(self, expected: Union[YangTokenType, str]) -> bool:
+        """Consume token if it matches ``expected``, return True if consumed."""
         if self.index >= len(self._token_list):
             return False
-        if self._token_list[self.index].type == expected:
-            self.consume_type(expected)
-            return True
-        return False
+        tok = self._token_list[self.index]
+        if isinstance(expected, str):
+            if tok.type != YangTokenType.IDENTIFIER or tok.value != expected:
+                return False
+        elif tok.type != expected:
+            return False
+        self.consume_type(expected)
+        return True
 
-    def consume_oneof(self, allowed_types: List[YangTokenType]) -> Tuple[str, YangTokenType]:
-        """Consume current token if its type is in allowed_types; raise otherwise.
-        Returns (token_value, token_type)."""
+    def consume_oneof(
+        self, allowed_types: List[Union[YangTokenType, str]]
+    ) -> Tuple[str, Union[YangTokenType, str]]:
+        """Consume current token if it matches one of allowed kinds; return (value, matched)."""
         if self.index >= len(self._token_list):
             raise self._make_error("Unexpected end of input")
         tok = self._token_list[self.index]
-        if tok.type not in allowed_types:
-            names = ", ".join(t.name for t in allowed_types)
-            raise self._make_error(
-                f"Expected one of ({names}), got {tok.type.name} ({tok.value!r})"
-            )
-        self.index += 1
-        return (tok.value, tok.type)
+        for allowed in allowed_types:
+            if isinstance(allowed, str):
+                if tok.type == YangTokenType.IDENTIFIER and tok.value == allowed:
+                    self.index += 1
+                    return (tok.value, allowed)
+            elif tok.type == allowed:
+                self.index += 1
+                return (tok.value, allowed)
+        names = ", ".join(t if isinstance(t, str) else t.name for t in allowed_types)
+        got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
+        raise self._make_error(f"Expected one of ({names}), got {got!r}")
 
     def has_more(self) -> bool:
         """Check if there are more tokens."""

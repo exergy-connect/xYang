@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangStatementWithWhen, YangWhenStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class WhenStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_when(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.WHEN);
+    tokens.consume(kw.WHEN);
     const expression = this.parsers.parse_string_concatenation(tokens);
     const whenStmt = new YangWhenStmt({ expression });
 

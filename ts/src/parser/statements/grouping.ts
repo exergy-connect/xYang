@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangGroupingStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class GroupingStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_grouping(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.GROUPING);
+    tokens.consume(kw.GROUPING);
     const name = tokens.consume();
     const stmt = new YangGroupingStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

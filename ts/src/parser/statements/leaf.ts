@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangLeafStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class LeafStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_leaf(tokens: TokenStream, context: ParserContext): YangLeafStmt {
-    tokens.consume_type(YangTokenType.LEAF);
+    tokens.consume(kw.LEAF);
     const name = tokens.consume();
     const stmt = new YangLeafStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

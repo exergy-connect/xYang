@@ -126,6 +126,43 @@ def test_refine_default_without_uses_expand_preserves_refine_ast():
     assert uses.refines[0].refined_defaults == ["false"]
 
 
+_REFINE_KEYWORD_NODE_NAME = """
+module refine_keyword_node_name {
+  yang-version 1.1;
+  namespace "urn:xyang:test:refine-keyword-node-name";
+  prefix rknn;
+
+  grouping g {
+    leaf type {
+      type boolean;
+    }
+  }
+
+  container c {
+    uses g {
+      refine type {
+        default false;
+      }
+    }
+  }
+}
+"""
+
+
+def test_refine_keyword_node_name_parses_and_applies() -> None:
+    mod = parse_yang_string(_REFINE_KEYWORD_NODE_NAME)
+    leaf = _leaf_under_container_c(mod, name="type")
+    assert leaf.default == "false"
+
+    mod_no_expand = YangParser(expand_uses=False).parse_string(_REFINE_KEYWORD_NODE_NAME)
+    c = mod_no_expand.statements[0]
+    uses = c.statements[0]
+    assert isinstance(uses, YangUsesStmt)
+    assert len(uses.refines) == 1
+    assert uses.refines[0].target_path.to_string() == "type"
+    assert uses.refines[0].refined_defaults == ["false"]
+
+
 @pytest.mark.parametrize(
     ("target", "expected"),
     [

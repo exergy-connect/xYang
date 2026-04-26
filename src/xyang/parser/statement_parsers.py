@@ -4,6 +4,8 @@ Statement parsers for YANG statements.
 
 from __future__ import annotations
 
+from . import keywords as kw
+
 from types import SimpleNamespace
 from typing import Optional, TYPE_CHECKING
 from .parser_context import TokenStream, ParserContext, YangTokenType
@@ -83,24 +85,21 @@ class StatementParsers:
         self._leaf_list_parser = LeafListStatementParser(self)
         self._augment_parser = AugmentStatementParser(self)
         self._typedef_parser = TypedefStatementParser(self)
-        self._statement_token_dispatch = {
-            YangTokenType.IDENTIFIER: self._parse_prefixed_extension_statement,
-        }
         ensure_builtin_extensions_loaded()
         # Substatements allowed inside ``prefix:extension { ... }`` (e.g. RFC 8791 ``structure``).
         self._extension_invocation_stmt = {
-            YangTokenType.IF_FEATURE: self.parse_if_feature_stmt,
-            YangTokenType.WHEN: self.parse_when,
-            YangTokenType.MUST: self.parse_must,
-            YangTokenType.DESCRIPTION: self.parse_description,
-            YangTokenType.REFERENCE: self.parse_reference_string_only,
-            YangTokenType.USES: self.parse_uses,
-            YangTokenType.LEAF: self.parse_leaf,
-            YangTokenType.LEAF_LIST: self.parse_leaf_list,
-            YangTokenType.CONTAINER: self.parse_container,
-            YangTokenType.LIST: self.parse_list,
-            YangTokenType.CHOICE: self.parse_choice,
-            YangTokenType.CASE: self.parse_case,
+            kw.IF_FEATURE: self.parse_if_feature_stmt,
+            kw.WHEN: self.parse_when,
+            kw.MUST: self.parse_must,
+            kw.DESCRIPTION: self.parse_description,
+            kw.REFERENCE: self.parse_reference_string_only,
+            kw.USES: self.parse_uses,
+            kw.LEAF: self.parse_leaf,
+            kw.LEAF_LIST: self.parse_leaf_list,
+            kw.CONTAINER: self.parse_container,
+            kw.LIST: self.parse_list,
+            kw.CHOICE: self.parse_choice,
+            kw.CASE: self.parse_case,
         }
 
     # ------------------------------------------------------------------
@@ -125,6 +124,10 @@ class StatementParsers:
             current = []
             setattr(obj, attr, current)
         current.append(value)
+
+    def _dispatch_key(self, tokens: TokenStream) -> object:
+        """Use keyword lexeme for identifiers, raw type for punctuation/literals."""
+        return tokens.peek() if tokens.peek_type() == YangTokenType.IDENTIFIER else tokens.peek_type()
 
     def _skip_unsupported_if_present(self, tokens: TokenStream, context: str) -> bool:
         """If the next token starts deviation/extension/rpc/..., skip it and warn. Returns True if skipped."""
@@ -177,9 +180,9 @@ class StatementParsers:
             YangTokenType.IDENTIFIER,
             YangTokenType.INTEGER,
             YangTokenType.DOTTED_NUMBER,
-            YangTokenType.TRUE,
-            YangTokenType.FALSE,
         ):
+            return tokens.consume()
+        if tokens.peek() in (kw.TRUE, kw.FALSE):
             return tokens.consume()
         return None
 
@@ -191,23 +194,30 @@ class StatementParsers:
     ) -> None:
         """One substatement inside ``prefix:extension { ... }`` (after the opening ``{``)."""
         unsupported = f"extension invocation '{inv_name}'"
-        token_handler = self._statement_token_dispatch.get(tokens.peek_type())
-        if token_handler:
-            token_handler(tokens, context)
+        if self._is_prefixed_extension_start(tokens):
+            self._parse_prefixed_extension_statement(tokens, context)
             return
-        token_type = tokens.peek_type()
-        if token_type == YangTokenType.ANYDATA:
+        token_value = tokens.peek()
+        if token_value == kw.ANYDATA:
             self.parse_anydata(tokens, context)
             return
-        if token_type == YangTokenType.ANYXML:
+        if token_value == kw.ANYXML:
             self.parse_anyxml(tokens, context)
             return
-        handler = self._extension_invocation_stmt.get(token_type)
+        handler = self._extension_invocation_stmt.get(token_value)
         if handler:
             handler(tokens, context)
             return
         if self._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
+
+    def _is_prefixed_extension_start(self, tokens: TokenStream) -> bool:
+        """Return True only for ``IDENTIFIER ':' IDENTIFIER`` starts."""
+        return (
+            tokens.peek_type_at(0) == YangTokenType.IDENTIFIER
+            and tokens.peek_type_at(1) == YangTokenType.COLON
+            and tokens.peek_type_at(2) == YangTokenType.IDENTIFIER
+        )
 
     def _parse_prefixed_extension_statement(
         self, tokens: TokenStream, context: ParserContext
@@ -217,15 +227,12 @@ class StatementParsers:
         The prefix is consumed, then ``:`` and the extension name. No handler lookup is
         used for the prefix token (only ``identifier`` … ``:`` commits to an extension).
         """
+        if not self._is_prefixed_extension_start(tokens):
+            raise tokens._make_error(
+                "Expected prefixed extension invocation 'prefix:name'"
+            )
         prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
-        if not tokens.consume_if_type(YangTokenType.COLON):
-            raise tokens._make_error(
-                f"Expected ':' after extension prefix {prefix!r}"
-            )
-        if tokens.peek_type() != YangTokenType.IDENTIFIER:
-            raise tokens._make_error(
-                f"Expected extension name after prefix {prefix!r} and ':'"
-            )
+        tokens.consume_type(YangTokenType.COLON)
         ext_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         resolved_module = context.module.resolve_prefixed_module(prefix)
         if resolved_module is None:
@@ -263,7 +270,7 @@ class StatementParsers:
         self._revision_parser.parse_revision_date_statement(tokens)
 
     def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.REFERENCE)
+        tokens.consume(kw.REFERENCE)
         tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -286,7 +293,7 @@ class StatementParsers:
     
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement (optional braced extension substatements are skipped)."""
-        tokens.consume_type(YangTokenType.DESCRIPTION)
+        tokens.consume(kw.DESCRIPTION)
         desc = tokens.consume_type(YangTokenType.STRING)
         if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             _consume_balanced_braces(tokens)
@@ -299,7 +306,7 @@ class StatementParsers:
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
         """If the next token is ``description``, parse it into ``current_parent.description``."""
-        if not tokens.has_more() or tokens.peek_type() != YangTokenType.DESCRIPTION:
+        if not tokens.has_more() or tokens.peek() != kw.DESCRIPTION:
             return
         self.parse_description(tokens, context)
 
@@ -364,7 +371,7 @@ class StatementParsers:
 
     def parse_list_key(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse key in list statement."""
-        tokens.consume_type(YangTokenType.KEY)
+        tokens.consume(kw.KEY)
         if context.current_parent and isinstance(context.current_parent, YangListStmt):
             value, _ = tokens.consume_oneof([YangTokenType.STRING, YangTokenType.IDENTIFIER])
             context.current_parent.key = value
@@ -372,7 +379,7 @@ class StatementParsers:
 
     def parse_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse min-elements (list, leaf-list, or refine)."""
-        tokens.consume_type(YangTokenType.MIN_ELEMENTS)
+        tokens.consume(kw.MIN_ELEMENTS)
         value = int(tokens.consume_type(YangTokenType.INTEGER))
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
@@ -383,7 +390,7 @@ class StatementParsers:
 
     def parse_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse max-elements (list, leaf-list, or refine)."""
-        tokens.consume_type(YangTokenType.MAX_ELEMENTS)
+        tokens.consume(kw.MAX_ELEMENTS)
         value = int(tokens.consume_type(YangTokenType.INTEGER))
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
@@ -398,7 +405,7 @@ class StatementParsers:
         xYang does not track user vs system ordering in validation; the statement is accepted
         and discarded after syntax check.
         """
-        tokens.consume_type(YangTokenType.ORDERED_BY)
+        tokens.consume(kw.ORDERED_BY)
         arg = tokens.consume()
         if arg not in ("user", "system"):
             raise tokens._make_error(f"ordered-by must be 'user' or 'system', got {arg!r}")
@@ -406,11 +413,11 @@ class StatementParsers:
 
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in leaf / anydata / anyxml."""
-        tokens.consume_type(YangTokenType.MANDATORY)
+        tokens.consume(kw.MANDATORY)
         parent = context.current_parent
         if isinstance(parent, (YangLeafStmt, YangAnydataStmt, YangAnyxmlStmt)):
-            _, tt = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE])
-            parent.mandatory = tt == YangTokenType.TRUE
+            _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
+            parent.mandatory = tt == kw.TRUE
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def _parse_default_value_tokens(self, tokens: TokenStream) -> str | int:
@@ -422,12 +429,6 @@ class StatementParsers:
             return tokens.consume_type(YangTokenType.INTEGER)
         if tt == YangTokenType.IDENTIFIER:
             return tokens.consume_type(YangTokenType.IDENTIFIER)
-        if tt == YangTokenType.TRUE:
-            tokens.consume_type(YangTokenType.TRUE)
-            return "true"
-        if tt == YangTokenType.FALSE:
-            tokens.consume_type(YangTokenType.FALSE)
-            return "false"
         raise tokens._make_error(
             f"Expected default value (string, integer, identifier, or true/false), "
             f"got {tt.name if tt else 'end'}"
@@ -435,14 +436,14 @@ class StatementParsers:
 
     def parse_leaf_default(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse default in leaf statement."""
-        tokens.consume_type(YangTokenType.DEFAULT)
+        tokens.consume(kw.DEFAULT)
         if context.current_parent and isinstance(context.current_parent, YangLeafStmt):
             context.current_parent.default = self._parse_default_value_tokens(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse presence statement for container."""
-        tokens.consume_type(YangTokenType.PRESENCE)
+        tokens.consume(kw.PRESENCE)
         if context.current_parent and isinstance(context.current_parent, YangContainerStmt):
             context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

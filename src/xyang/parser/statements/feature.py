@@ -4,6 +4,8 @@ Parsing helpers for ``feature`` and ``if-feature`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
@@ -20,21 +22,21 @@ class FeatureStatementParser:
         self._parsers = parsers
 
     def parse_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume_type(YangTokenType.FEATURE)
+        tokens.consume(kw.FEATURE)
         name = tokens.consume_type(YangTokenType.IDENTIFIER)
         context.module.features.add(name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             holder = SimpleNamespace(if_features=[])
             feat_ctx = context.push_parent(holder)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = tokens.peek_type()
-                if tt == YangTokenType.DESCRIPTION:
+                tt = self._parsers._dispatch_key(tokens)
+                if tt == kw.DESCRIPTION:
                     self._parsers.parse_optional_description(tokens, feat_ctx)
                     continue
-                if tt == YangTokenType.IF_FEATURE:
+                if tt == kw.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, feat_ctx)
                     continue
-                if tt == YangTokenType.REFERENCE:
+                if tt == kw.REFERENCE:
                     self._parsers.parse_reference_string_only(tokens, feat_ctx)
                     continue
                 if self._parsers._skip_unsupported_or_raise_unknown_stmt(
@@ -52,7 +54,7 @@ class FeatureStatementParser:
 
     def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse if-feature; expression is stored on the parent schema node (not evaluated)."""
-        tokens.consume_type(YangTokenType.IF_FEATURE)
+        tokens.consume(kw.IF_FEATURE)
         expression = self._parsers._parse_string_concatenation(tokens)
         parent = context.current_parent
         if parent is not None:
@@ -61,13 +63,13 @@ class FeatureStatementParser:
                 feats.append(expression)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = tokens.peek_type()
-                if tt == YangTokenType.DESCRIPTION:
+                tt = self._parsers._dispatch_key(tokens)
+                if tt == kw.DESCRIPTION:
                     self._parsers.parse_optional_description(
                         tokens, context.push_parent(SimpleNamespace())
                     )
                     continue
-                if tt == YangTokenType.REFERENCE:
+                if tt == kw.REFERENCE:
                     self._parsers.parse_reference_string_only(tokens, context)
                     continue
                 if self._parsers._skip_unsupported_or_raise_unknown_stmt(

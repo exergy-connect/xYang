@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangContainerStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class ContainerStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_container(tokens: TokenStream, context: ParserContext): YangContainerStmt {
-    tokens.consume_type(YangTokenType.CONTAINER);
+    tokens.consume(kw.CONTAINER);
     const name = tokens.consume();
     const stmt = new YangContainerStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

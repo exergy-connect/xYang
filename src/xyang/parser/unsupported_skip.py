@@ -8,6 +8,8 @@ rest of the module can parse.
 
 from __future__ import annotations
 
+from . import keywords as kw
+
 import logging
 from typing import TYPE_CHECKING
 
@@ -21,12 +23,12 @@ logger = logging.getLogger(__name__)
 # RFC 7950 / 1.1 statements xYang does not implement — recognize and skip.
 UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
     {
-        YangTokenType.DEVIATION,
-        YangTokenType.RPC,
-        YangTokenType.ACTION,
-        YangTokenType.NOTIFICATION,
-        YangTokenType.INPUT,
-        YangTokenType.OUTPUT,
+        kw.DEVIATION,
+        kw.RPC,
+        kw.ACTION,
+        kw.NOTIFICATION,
+        kw.INPUT,
+        kw.OUTPUT,
     }
 )
 
@@ -55,20 +57,20 @@ def skip_unsupported_construct(tokens: TokenStream, *, context: str) -> None:
     Handles ``keyword ... ;`` and ``keyword ... { ... }`` (including nested braces).
     """
     tok = tokens.peek_token()
-    if tok is None or tok.type not in UNSUPPORTED_CONSTRUCT_TYPES:
+    if tok is None or tok.value not in UNSUPPORTED_CONSTRUCT_TYPES:
         return
-    kw = tok.value
+    keyword = tok.value
     line_num, char_pos = tokens.position()
     where = tokens.filename or "<string>"
     logger.warning(
         "Ignoring unsupported YANG statement %r (%s) at %s:%s:%s",
-        kw,
+        keyword,
         context,
         where,
         line_num,
         char_pos,
     )
-    tokens.consume_type(tok.type)
+    tokens.consume()
     while tokens.has_more():
         pt = tokens.peek_type()
         if pt == YangTokenType.LBRACE:
@@ -86,4 +88,5 @@ def skip_unsupported_construct(tokens: TokenStream, *, context: str) -> None:
 def is_unsupported_construct_start(tokens: TokenStream) -> bool:
     if not tokens.has_more():
         return False
-    return tokens.peek_type() in UNSUPPORTED_CONSTRUCT_TYPES
+    tok = tokens.peek_token()
+    return tok is not None and tok.value in UNSUPPORTED_CONSTRUCT_TYPES

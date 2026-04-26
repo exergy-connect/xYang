@@ -4,6 +4,8 @@ Parsing helpers for ``uses`` statements.
 
 from __future__ import annotations
 
+from .. import keywords as kw
+
 from typing import Optional, TYPE_CHECKING
 
 from ..parser_context import TokenStream, ParserContext, YangTokenType
@@ -22,11 +24,10 @@ class UsesStatementParser:
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
         self._uses_substatement_dispatch = {
-            YangTokenType.DESCRIPTION: self._parsers.parse_description,
-            YangTokenType.WHEN: self._parsers.parse_when,
-            YangTokenType.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            YangTokenType.REFINE: self._parsers.parse_refine,
-            YangTokenType.IDENTIFIER: self._parsers._parse_prefixed_extension_statement,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.WHEN: self._parsers.parse_when,
+            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            kw.REFINE: self._parsers.parse_refine,
         }
 
     def _parse_uses_substatement(
@@ -34,10 +35,12 @@ class UsesStatementParser:
     ) -> None:
         """One substatement inside ``uses { ... }``."""
         unsupported = f"uses '{grouping_name}'"
-        tt = tokens.peek_type()
+        tt = self._parsers._dispatch_key(tokens)
         handler = self._uses_substatement_dispatch.get(tt)
         if handler:
             handler(tokens, context)
+        elif self._parsers._is_prefixed_extension_start(tokens):
+            self._parsers._parse_prefixed_extension_statement(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
@@ -49,7 +52,7 @@ class UsesStatementParser:
         Uses statements are stored temporarily and expanded after all groupings
         have been parsed. A YangUsesStmt node is created as a placeholder.
         """
-        tokens.consume_type(YangTokenType.USES)
+        tokens.consume(kw.USES)
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
             grouping_name = self._parsers._consume_qname_from_identifier(tokens)
         else:
