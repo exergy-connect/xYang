@@ -1,12 +1,13 @@
+import * as kw from "./keywords";
 import { TokenStream, YangTokenType } from "./parser-context";
 
 export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<YangTokenType>([
-  YangTokenType.DEVIATION,
-  YangTokenType.RPC,
-  YangTokenType.ACTION,
-  YangTokenType.NOTIFICATION,
-  YangTokenType.INPUT,
-  YangTokenType.OUTPUT
+  kw.DEVIATION,
+  kw.RPC,
+  kw.ACTION,
+  kw.NOTIFICATION,
+  kw.INPUT,
+  kw.OUTPUT
 ]);
 
 export function _consume_balanced_braces(tokens: TokenStream): void {

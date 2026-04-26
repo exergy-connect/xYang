@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangBitStmt, YangTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,13 +7,13 @@ export class BitsStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_type_bit(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.BIT);
+    tokens.consume(kw.BIT);
     const name = tokens.consume();
     let position: number | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek_type() === YangTokenType.POSITION) {
-          tokens.consume_type(YangTokenType.POSITION);
+        if (tokens.peek() === kw.POSITION) {
+          tokens.consume(kw.POSITION);
           position = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else {

@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangRefineStmt, YangUsesStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class RefineStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_refine(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.REFINE);
+    tokens.consume(kw.REFINE);
     const parts = [tokens.consume()];
     while (tokens.has_more() && tokens.peek_type() === YangTokenType.SLASH) {
       tokens.consume_type(YangTokenType.SLASH);

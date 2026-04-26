@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { parseXPath } from "../../xpath/parser";
@@ -7,7 +8,7 @@ export class TypeStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_type(tokens: TokenStream, context: ParserContext): YangTypeStmt {
-    tokens.consume_type(YangTokenType.TYPE);
+    tokens.consume(kw.TYPE);
     const name = tokens.peek_type() === YangTokenType.IDENTIFIER
       ? this.parsers.consume_qname_from_identifier(tokens)
       : tokens.consume();
@@ -16,26 +17,26 @@ export class TypeStatementParser {
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(type_stmt);
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = tokens.peek_type();
-        if (tt === YangTokenType.PATTERN) {
+        const tt = this.parsers.dispatch_key(tokens);
+        if (tt === kw.PATTERN) {
           this.parse_type_pattern(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.LENGTH) {
+        } else if (tt === kw.LENGTH) {
           this.parse_type_length(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.RANGE) {
+        } else if (tt === kw.RANGE) {
           this.parse_type_range(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.FRACTION_DIGITS) {
+        } else if (tt === kw.FRACTION_DIGITS) {
           this.parse_type_fraction_digits(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.ENUM) {
+        } else if (tt === kw.ENUM) {
           this.parse_type_enum(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.BIT) {
+        } else if (tt === kw.BIT) {
           this.parsers.bits_parser.parse_type_bit(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.PATH) {
+        } else if (tt === kw.PATH) {
           this.parse_type_path(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.REQUIRE_INSTANCE) {
+        } else if (tt === kw.REQUIRE_INSTANCE) {
           this.parse_type_require_instance(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.BASE) {
+        } else if (tt === kw.BASE) {
           this.parse_type_base(tokens, child, type_stmt);
-        } else if (tt === YangTokenType.TYPE) {
+        } else if (tt === kw.TYPE) {
           const nested = this.parse_type(tokens, child);
           type_stmt.types.push(nested);
         } else {
@@ -43,7 +44,7 @@ export class TypeStatementParser {
         }
       }
       tokens.consume_type(YangTokenType.RBRACE);
-      if (type_stmt.name === YangTokenType.ENUMERATION && type_stmt.enums.length === 0) {
+      if (type_stmt.name === kw.ENUMERATION && type_stmt.enums.length === 0) {
         tokens.syntaxError("enumeration type must contain at least one enum statement");
       }
     }
@@ -58,23 +59,23 @@ export class TypeStatementParser {
   }
 
   parse_type_base(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.BASE);
+    tokens.consume(kw.BASE);
     type_stmt.identityref_bases.push(this.parsers.consume_qname_from_identifier(tokens));
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_pattern(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.PATTERN);
+    tokens.consume(kw.PATTERN);
     type_stmt.pattern = tokens.consume_type(YangTokenType.STRING);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = tokens.peek_type();
-        if (tt === YangTokenType.ERROR_MESSAGE) {
-          tokens.consume_type(YangTokenType.ERROR_MESSAGE);
+        const tt = this.parsers.dispatch_key(tokens);
+        if (tt === kw.ERROR_MESSAGE) {
+          tokens.consume(kw.ERROR_MESSAGE);
           type_stmt.pattern_error_message = tokens.consume_type(YangTokenType.STRING);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (tt === YangTokenType.ERROR_APP_TAG) {
-          tokens.consume_type(YangTokenType.ERROR_APP_TAG);
+        } else if (tt === kw.ERROR_APP_TAG) {
+          tokens.consume(kw.ERROR_APP_TAG);
           type_stmt.pattern_error_app_tag = tokens.consume_type(YangTokenType.STRING);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else {
@@ -87,25 +88,25 @@ export class TypeStatementParser {
   }
 
   parse_type_length(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.LENGTH);
+    tokens.consume(kw.LENGTH);
     type_stmt.length = tokens.consume();
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_range(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.RANGE);
+    tokens.consume(kw.RANGE);
     type_stmt.range = tokens.consume_type(YangTokenType.STRING);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_fraction_digits(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.FRACTION_DIGITS);
+    tokens.consume(kw.FRACTION_DIGITS);
     type_stmt.fraction_digits = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_enum(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.ENUM);
+    tokens.consume(kw.ENUM);
     type_stmt.enums.push(tokens.consume());
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
@@ -117,16 +118,16 @@ export class TypeStatementParser {
   }
 
   parse_type_path(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.PATH);
+    tokens.consume(kw.PATH);
     const path = tokens.consume_type(YangTokenType.STRING);
     type_stmt.path = parseXPath(path);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_require_instance(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    tokens.consume_type(YangTokenType.REQUIRE_INSTANCE);
-    const [, tt] = tokens.consume_oneof([YangTokenType.TRUE, YangTokenType.FALSE]);
-    type_stmt.require_instance = tt === YangTokenType.TRUE;
+    tokens.consume(kw.REQUIRE_INSTANCE);
+    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
+    type_stmt.require_instance = tt === kw.TRUE;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 }

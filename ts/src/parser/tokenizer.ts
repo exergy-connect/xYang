@@ -1,4 +1,4 @@
-import { makeYangToken, TokenStream, YangToken, YangTokenType, YANG_KEYWORDS } from "./parser-context";
+import { makeYangToken, TokenStream, YangToken, YangTokenType } from "./parser-context";
 
 const IDENTIFIER_START = /[A-Za-z_]/;
 const IDENTIFIER_CONT = /[A-Za-z0-9_.-]/;
@@ -151,11 +151,7 @@ export class YangTokenizer {
           advance();
         }
         const lexeme = content.slice(start, i);
-        if (lexeme in YANG_KEYWORDS) {
-          add_token(YANG_KEYWORDS[lexeme], lexeme, token_start, token_line, token_line_start);
-        } else {
-          add_token(YangTokenType.IDENTIFIER, lexeme, token_start, token_line, token_line_start);
-        }
+        add_token(YangTokenType.IDENTIFIER, lexeme, token_start, token_line, token_line_start);
         continue;
       }
 

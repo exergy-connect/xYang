@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangAnyxmlStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class AnyxmlStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_anyxml(tokens: TokenStream, context: ParserContext): YangAnyxmlStmt {
-    tokens.consume_type(YangTokenType.ANYXML);
+    tokens.consume(kw.ANYXML);
     const name = tokens.consume();
     const stmt = new YangAnyxmlStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { YangListStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
@@ -6,7 +7,7 @@ export class ListStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_list(tokens: TokenStream, context: ParserContext): YangListStmt {
-    tokens.consume_type(YangTokenType.LIST);
+    tokens.consume(kw.LIST);
     const name = tokens.consume();
     const stmt = new YangListStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

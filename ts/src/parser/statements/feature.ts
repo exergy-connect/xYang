@@ -1,3 +1,4 @@
+import * as kw from "../keywords";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
@@ -5,7 +6,7 @@ export class FeatureStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_feature_stmt(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.FEATURE);
+    tokens.consume(kw.FEATURE);
     const name = tokens.consume_type(YangTokenType.IDENTIFIER);
     ((context.module as any).features ??= new Set<string>()).add(name);
     const featParent = { if_features: [] as string[] };
@@ -25,7 +26,7 @@ export class FeatureStatementParser {
   }
 
   parse_if_feature_stmt(tokens: TokenStream, context: ParserContext): void {
-    tokens.consume_type(YangTokenType.IF_FEATURE);
+    tokens.consume(kw.IF_FEATURE);
     const expression = this.parsers.parse_string_concatenation(tokens);
     const parent: any = context.current_parent;
     if (parent && Array.isArray(parent.if_features)) {

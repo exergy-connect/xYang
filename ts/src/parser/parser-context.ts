@@ -119,13 +119,6 @@ const LITERAL_TYPES = new Set<YangTokenType>([
   YangTokenType.DOTTED_NUMBER
 ]);
 
-export const YANG_KEYWORDS: Record<string, YangTokenType> = Object.values(YangTokenType)
-  .filter((tt) => !PUNCTUATION.has(tt) && !LITERAL_TYPES.has(tt))
-  .reduce<Record<string, YangTokenType>>((acc, tt) => {
-    acc[tt] = tt;
-    return acc;
-  }, {});
-
 export function diagnosticSourceLines(content: string): string[] {
   if (!content) {
     return [];
@@ -162,6 +155,20 @@ function classifyKind(type: YangTokenType): YangToken["kind"] {
   }
   return "identifier";
 }
+
+const LEXICAL_TOKEN_TYPES = new Set<string>([
+  YangTokenType.LBRACE,
+  YangTokenType.RBRACE,
+  YangTokenType.SEMICOLON,
+  YangTokenType.COLON,
+  YangTokenType.EQUALS,
+  YangTokenType.PLUS,
+  YangTokenType.SLASH,
+  YangTokenType.STRING,
+  YangTokenType.IDENTIFIER,
+  YangTokenType.INTEGER,
+  YangTokenType.DOTTED_NUMBER
+]);
 
 export function makeYangToken(type: YangTokenType, value: string, line_num: number, char_pos: number): YangToken {
   return {
@@ -233,41 +240,62 @@ export class TokenStream {
     return this.token_list[this.index + offset]?.type;
   }
 
-  consume_type(expected: YangTokenType): string {
+  consume_type(expected: YangTokenType | string): string {
     if (this.index >= this.token_list.length) {
       throw this._make_error("Unexpected end of input");
     }
     const tok = this.token_list[this.index];
-    if (tok.type !== expected) {
+    if (typeof expected === "string" && !LEXICAL_TOKEN_TYPES.has(expected)) {
+      if (tok.type !== YangTokenType.IDENTIFIER || tok.value !== expected) {
+        throw this._make_error(`Expected '${expected}', got '${tok.value}'`);
+      }
+    } else if (tok.type !== expected) {
       throw this._make_error(`Expected ${expected}, got ${tok.type} ('${tok.value}')`);
     }
     this.index += 1;
     return tok.value;
   }
 
-  consume_if_type(expected: YangTokenType): boolean {
+  consume_if_type(expected: YangTokenType | string): boolean {
     if (this.index >= this.token_list.length) {
       return false;
     }
-    if (this.token_list[this.index].type === expected) {
+    const tok = this.token_list[this.index];
+    if (typeof expected === "string" && !LEXICAL_TOKEN_TYPES.has(expected)) {
+      if (tok.type !== YangTokenType.IDENTIFIER || tok.value !== expected) {
+        return false;
+      }
+    } else if (tok.type !== expected) {
+      return false;
+    }
       this.consume_type(expected);
       return true;
-    }
-    return false;
   }
 
-  consume_oneof(allowed_types: YangTokenType[]): [string, YangTokenType] {
+  consume_oneof(allowed_types: Array<YangTokenType | string>): [string, YangTokenType | string] {
     if (this.index >= this.token_list.length) {
       throw this._make_error("Unexpected end of input");
     }
     const tok = this.token_list[this.index];
-    if (!allowed_types.includes(tok.type)) {
-      throw this._make_error(
-        `Expected one of (${allowed_types.join(", ")}), got ${tok.type} ('${tok.value}')`
-      );
+    for (const allowed of allowed_types) {
+      if (typeof allowed === "string") {
+        if (!LEXICAL_TOKEN_TYPES.has(allowed)) {
+          if (tok.type === YangTokenType.IDENTIFIER && tok.value === allowed) {
+            this.index += 1;
+            return [tok.value, allowed];
+          }
+        } else if (tok.type === allowed) {
+          this.index += 1;
+          return [tok.value, allowed];
+        }
+      } else if (tok.type === allowed) {
+        this.index += 1;
+        return [tok.value, allowed];
+      }
     }
-    this.index += 1;
-    return [tok.value, tok.type];
+    throw this._make_error(
+      `Expected one of (${allowed_types.join(", ")}), got ${tok.type} ('${tok.value}')`
+    );
   }
 
   has_more(): boolean {
