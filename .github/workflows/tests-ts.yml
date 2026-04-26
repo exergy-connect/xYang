@@ -1,6 +1,7 @@
 # Lint, build, test TypeScript; then ensure docs/xyang.umd.min.js matches the build.
-# On pull requests (or non-default branches), mismatch fails the job.
-# On push or workflow_dispatch to main/master, mismatch is fixed with git add -f and a bot push.
+# On pull requests from same-repo branches, mismatch is fixed with git add -f and a bot push.
+# On fork PRs, mismatch fails the job (no write permission to contributor branches).
+# On push/workflow_dispatch to main/master, mismatch is fixed and pushed.
 
 name: Tests (TypeScript)
 
@@ -32,6 +33,9 @@ jobs:
 
     steps:
       - uses: actions/checkout@v6
+        with:
+          # For PRs, check out the source branch so bot commits can push back.
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
       - name: Set up Node 24
         uses: actions/setup-node@v6
@@ -58,7 +62,7 @@ jobs:
 
       - name: Docs browser bundle — verify or commit
         env:
-          AUTO_COMMIT_BUNDLE: ${{ (github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master') }}
+          AUTO_COMMIT_BUNDLE: ${{ ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
         run: |
           git add -f docs/xyang.umd.min.js
           if git diff --cached --quiet HEAD -- docs/xyang.umd.min.js; then
