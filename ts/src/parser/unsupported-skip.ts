@@ -1,7 +1,7 @@
 import * as kw from "./keywords";
 import { TokenStream, YangTokenType } from "./parser-context";
 
-export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<YangTokenType>([
+export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([
   kw.DEVIATION,
   kw.RPC,
   kw.ACTION,
@@ -31,7 +31,7 @@ export function _consume_balanced_braces(tokens: TokenStream): void {
 
 export function skip_unsupported_construct(tokens: TokenStream, { context }: { context: string }): void {
   const tok = tokens.peek_token();
-  if (!tok || !UNSUPPORTED_CONSTRUCT_TYPES.has(tok.type)) {
+  if (!tok || !UNSUPPORTED_CONSTRUCT_TYPES.has(tok.value)) {
     return;
   }
 
@@ -42,7 +42,7 @@ export function skip_unsupported_construct(tokens: TokenStream, { context }: { c
   // eslint-disable-next-line no-console
   console.warn(`Ignoring unsupported YANG statement '${kw}' (${context}) at ${where}:${line_num}:${char_pos}`);
 
-  tokens.consume_type(tok.type);
+  tokens.consume();
   while (tokens.has_more()) {
     const pt = tokens.peek_type();
     if (pt === YangTokenType.LBRACE) {
@@ -62,5 +62,6 @@ export function skip_unsupported_construct(tokens: TokenStream, { context }: { c
 }
 
 export function is_unsupported_construct_start(tokens: TokenStream): boolean {
-  return tokens.has_more() && UNSUPPORTED_CONSTRUCT_TYPES.has(tokens.peek_type());
+  const tok = tokens.peek_token();
+  return tok !== undefined && UNSUPPORTED_CONSTRUCT_TYPES.has(tok.value);
 }

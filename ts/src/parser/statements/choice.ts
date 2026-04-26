@@ -4,7 +4,7 @@ import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
 /** RFC 7950 `case-stmt` data-def and common metadata substmts (not `mandatory` on the case itself). */
-const CASE_BODY_ALLOWED_STATEMENT_STARTS: readonly YangTokenType[] = [
+const CASE_BODY_ALLOWED_STATEMENT_STARTS: readonly (YangTokenType | string)[] = [
   kw.CONTAINER,
   kw.LIST,
   kw.LEAF,
