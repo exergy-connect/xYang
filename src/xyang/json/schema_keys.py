@@ -15,6 +15,7 @@ class JsonSchemaKey:
     SCHEMA = "$schema"
     ID = "$id"
     ALL_OF = "allOf"
+    NOT = "not"
     ONE_OF = "oneOf"
     PROPERTIES = "properties"
     REQUIRED = "required"
@@ -74,6 +75,8 @@ class XYangKey:
     #: From ``pattern { error-message "..."; }`` (RFC 7950 §9.4.6), echoed on string JSON Schema.
     PATTERN_ERROR_MESSAGE = "pattern-error-message"
     PATTERN_ERROR_APP_TAG = "pattern-error-app-tag"
+    #: List of all YANG pattern entries for round-trip (regex + invert + optional metadata).
+    STRING_PATTERNS = "string-patterns"
 
 
 class XYangTypeValue:

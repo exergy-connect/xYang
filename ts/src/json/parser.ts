@@ -156,6 +156,53 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     }
     shape.pattern = p;
   }
+  const rawPatternEntries = Array.isArray(xy["string-patterns"]) ? xy["string-patterns"] : [];
+  const parsedPatternEntries = rawPatternEntries
+    .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
+    .map((x) => ({
+      pattern: typeof x.pattern === "string" ? x.pattern : "",
+      invert_match: x["invert-match"] === true,
+      error_message:
+        typeof x["pattern-error-message"] === "string" ? (x["pattern-error-message"] as string) : undefined,
+      error_app_tag:
+        typeof x["pattern-error-app-tag"] === "string" ? (x["pattern-error-app-tag"] as string) : undefined
+    }))
+    .filter((x) => x.pattern.length > 0);
+  if (parsedPatternEntries.length > 0) {
+    shape.patterns = parsedPatternEntries;
+    const last = parsedPatternEntries[parsedPatternEntries.length - 1];
+    shape.pattern = last.pattern;
+    if (typeof last.error_message === "string") {
+      shape.pattern_error_message = last.error_message;
+    }
+    if (typeof last.error_app_tag === "string") {
+      shape.pattern_error_app_tag = last.error_app_tag;
+    }
+  } else if (Array.isArray(schema.allOf)) {
+    const fallbackEntries = schema.allOf
+      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
+      .map((entry) => {
+        if (typeof entry.pattern === "string") {
+          return { pattern: entry.pattern, invert_match: false };
+        }
+        const notObj = asRecord(entry.not);
+        if (typeof notObj.pattern === "string") {
+          return { pattern: notObj.pattern, invert_match: true };
+        }
+        return null;
+      })
+      .filter((x): x is { pattern: string; invert_match: boolean } => Boolean(x))
+      .map((x) => {
+        const p = x.pattern.startsWith("^") && x.pattern.endsWith("$")
+          ? x.pattern.slice(1, -1)
+          : x.pattern;
+        return { pattern: p, invert_match: x.invert_match };
+      });
+    if (fallbackEntries.length > 0) {
+      shape.patterns = fallbackEntries;
+      shape.pattern = fallbackEntries[fallbackEntries.length - 1].pattern;
+    }
+  }
   const pem = xy["pattern-error-message"];
   if (typeof pem === "string" && pem.length > 0) {
     shape.pattern_error_message = pem;

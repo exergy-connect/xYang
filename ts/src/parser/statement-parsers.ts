@@ -60,6 +60,12 @@ type TypeShape = {
   pattern?: string;
   pattern_error_message?: string;
   pattern_error_app_tag?: string;
+  patterns?: Array<{
+    pattern: string;
+    invert_match?: boolean;
+    error_message?: string;
+    error_app_tag?: string;
+  }>;
   length?: string;
   range?: string;
   fraction_digits?: number;
@@ -617,6 +623,12 @@ export class StatementParsers {
       pattern: type_stmt.pattern,
       pattern_error_message: type_stmt.pattern_error_message,
       pattern_error_app_tag: type_stmt.pattern_error_app_tag,
+      patterns: type_stmt.patterns.map((p) => ({
+        pattern: p.pattern,
+        invert_match: p.invert_match,
+        error_message: p.error_message,
+        error_app_tag: p.error_app_tag
+      })),
       length: type_stmt.length,
       range: type_stmt.range,
       fraction_digits: type_stmt.fraction_digits,

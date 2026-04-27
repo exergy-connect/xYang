@@ -37,9 +37,56 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
 
   if (typeName === YangTokenType.STRING_KW) {
     const out: Record<string, unknown> = { type: JSON_TYPE_STRING };
-    if (typeof typeShape.pattern === "string") {
-      const p = typeShape.pattern;
-      out.pattern = p.startsWith("^") && p.endsWith("$") ? p : `^${p}$`;
+    const rawPatterns = Array.isArray(typeShape.patterns) ? typeShape.patterns : [];
+    const specs = rawPatterns
+      .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
+      .map((x) => ({
+        pattern: typeof x.pattern === "string" ? x.pattern : "",
+        invert_match: x.invert_match === true,
+        error_message: typeof x.error_message === "string" ? x.error_message : undefined,
+        error_app_tag: typeof x.error_app_tag === "string" ? x.error_app_tag : undefined
+      }))
+      .filter((x) => x.pattern.length > 0);
+    if (specs.length === 0 && typeof typeShape.pattern === "string") {
+      specs.push({
+        pattern: typeShape.pattern,
+        invert_match: false,
+        error_message:
+          typeof typeShape.pattern_error_message === "string"
+            ? typeShape.pattern_error_message
+            : undefined,
+        error_app_tag:
+          typeof typeShape.pattern_error_app_tag === "string"
+            ? typeShape.pattern_error_app_tag
+            : undefined
+      });
+    }
+    const anchored = (p: string): string => (p.startsWith("^") && p.endsWith("$") ? p : `^${p}$`);
+    if (specs.length === 1 && !specs[0].invert_match) {
+      out.pattern = anchored(specs[0].pattern);
+    } else if (specs.length > 0) {
+      out.allOf = specs.map((spec) =>
+        spec.invert_match
+          ? { not: { type: JSON_TYPE_STRING, pattern: anchored(spec.pattern) } }
+          : { pattern: anchored(spec.pattern) }
+      );
+    }
+    if (specs.length > 0) {
+      const entries = specs.map((spec) => ({
+        pattern: spec.pattern,
+        "invert-match": spec.invert_match,
+        ...(spec.error_message ? { "pattern-error-message": spec.error_message } : {}),
+        ...(spec.error_app_tag ? { "pattern-error-app-tag": spec.error_app_tag } : {})
+      }));
+      const xYang: Record<string, unknown> = { "string-patterns": entries };
+      const last = entries[entries.length - 1];
+      if (typeof last["pattern-error-message"] === "string") {
+        xYang["pattern-error-message"] = last["pattern-error-message"];
+      }
+      if (typeof last["pattern-error-app-tag"] === "string") {
+        xYang["pattern-error-app-tag"] = last["pattern-error-app-tag"];
+      }
+      out["x-yang"] = xYang;
     }
     if (typeof typeShape.length === "string") {
       const [rawMin, rawMax] = typeShape.length.split("..");

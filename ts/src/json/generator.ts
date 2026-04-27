@@ -503,10 +503,11 @@ function statementToSchema(
       xYang["require-instance"] = typeShape.require_instance !== false;
     }
 
+    const schemaXy = asRecord(leafSchema[YANG_SCHEMA_KEYS.xYang]);
     const out: Record<string, unknown> = {
       ...leafSchema,
       description: typeof stmt.data.description === "string" ? stmt.data.description : "",
-      [YANG_SCHEMA_KEYS.xYang]: xYang
+      [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy }
     };
     if (stmt.data.default !== undefined) {
       out.default = stmt.data.default;
@@ -541,6 +542,7 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
       ...schema,
       description: typeof entry.description === "string" ? entry.description : ""
     };
+    const schemaXy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
     const typedefXy: Record<string, unknown> = {};
     if (typeof typeShape.pattern_error_message === "string" && typeShape.pattern_error_message.length > 0) {
       typedefXy["pattern-error-message"] = typeShape.pattern_error_message;
@@ -548,8 +550,8 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
     if (typeof typeShape.pattern_error_app_tag === "string" && typeShape.pattern_error_app_tag.length > 0) {
       typedefXy["pattern-error-app-tag"] = typeShape.pattern_error_app_tag;
     }
-    if (Object.keys(typedefXy).length > 0) {
-      def[YANG_SCHEMA_KEYS.xYang] = typedefXy;
+    if (Object.keys(schemaXy).length > 0 || Object.keys(typedefXy).length > 0) {
+      def[YANG_SCHEMA_KEYS.xYang] = { ...schemaXy, ...typedefXy };
     }
     out[name] = def;
   }

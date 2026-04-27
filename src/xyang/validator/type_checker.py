@@ -37,6 +37,23 @@ def _pattern_constraint_violation_message(
     return msg
 
 
+def _pattern_entry_violation_message(
+    entry: Any, fallback_stmt: YangTypeStmt, *, default: str
+) -> str:
+    msg = default
+    em = getattr(entry, "error_message", None)
+    if isinstance(em, str) and em:
+        msg = em
+    elif fallback_stmt.pattern_error_message is not None:
+        msg = fallback_stmt.pattern_error_message
+    tag = getattr(entry, "error_app_tag", None)
+    if isinstance(tag, str) and tag:
+        return f"{msg} (error-app-tag: {tag})"
+    if fallback_stmt.pattern_error_app_tag:
+        return f"{msg} (error-app-tag: {fallback_stmt.pattern_error_app_tag})"
+    return msg
+
+
 class TypeChecker:
     """
     Checks a data value against a YangTypeStmt.
@@ -276,7 +293,26 @@ class TypeChecker:
                 errors.append(f"String length {n} is less than minimum {lo}")
             if hi is not None and n > hi:
                 errors.append(f"String length {n} exceeds maximum {hi}")
-        if type_stmt.pattern:
+        patterns = list(getattr(type_stmt, "patterns", None) or [])
+        if patterns:
+            for p in patterns:
+                patt = getattr(p, "pattern", None)
+                if not isinstance(patt, str) or not patt:
+                    continue
+                matched = re.fullmatch(patt, s) is not None
+                invert = bool(getattr(p, "invert_match", False))
+                if (not invert and not matched) or (invert and matched):
+                    default_msg = (
+                        f"Value {s!r} does not match pattern {patt!r}"
+                        if not invert
+                        else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
+                    )
+                    errors.append(
+                        _pattern_entry_violation_message(
+                            p, type_stmt, default=default_msg
+                        )
+                    )
+        elif type_stmt.pattern:
             if not re.fullmatch(type_stmt.pattern, s):
                 errors.append(
                     _pattern_constraint_violation_message(

@@ -259,12 +259,46 @@ def _type_to_schema(
     out: dict[str, Any]
     if name == "string":
         out = {JsonSchemaKey.TYPE: "string"}
-        if type_stmt.pattern:
-            p = type_stmt.pattern
-            if not (p.startswith("^") and p.endswith("$")):
-                p = f"^{p}$"
-            # Use pattern as-is; json.dumps will escape backslashes for JSON
-            out[JsonSchemaKey.PATTERN] = p
+        specs = list(getattr(type_stmt, "patterns", None) or [])
+        if not specs and type_stmt.pattern:
+            specs = [
+                {
+                    "pattern": type_stmt.pattern,
+                    "invert_match": False,
+                    "error_message": type_stmt.pattern_error_message,
+                    "error_app_tag": type_stmt.pattern_error_app_tag,
+                }
+            ]
+
+        def _anchored(p: str) -> str:
+            return p if (p.startswith("^") and p.endswith("$")) else f"^{p}$"
+
+        if specs:
+            if len(specs) == 1 and not bool(getattr(specs[0], "invert_match", False) if hasattr(specs[0], "invert_match") else specs[0].get("invert_match", False)):
+                p = getattr(specs[0], "pattern", None) if hasattr(specs[0], "pattern") else specs[0].get("pattern")
+                if isinstance(p, str) and p:
+                    out[JsonSchemaKey.PATTERN] = _anchored(p)
+            else:
+                all_of: list[dict[str, Any]] = []
+                for spec in specs:
+                    patt = getattr(spec, "pattern", None) if hasattr(spec, "pattern") else spec.get("pattern")
+                    if not isinstance(patt, str) or not patt:
+                        continue
+                    anchored = _anchored(patt)
+                    inv = bool(getattr(spec, "invert_match", False) if hasattr(spec, "invert_match") else spec.get("invert_match", False))
+                    if inv:
+                        all_of.append(
+                            {
+                                JsonSchemaKey.NOT: {
+                                    JsonSchemaKey.TYPE: "string",
+                                    JsonSchemaKey.PATTERN: anchored,
+                                }
+                            }
+                        )
+                    else:
+                        all_of.append({JsonSchemaKey.PATTERN: anchored})
+                if all_of:
+                    out[JsonSchemaKey.ALL_OF] = all_of
         if type_stmt.length:
             parts = type_stmt.length.split("..")
             min_len = None
@@ -284,11 +318,36 @@ def _type_to_schema(
             if max_len is not None:
                 out[JsonSchemaKey.MAX_LENGTH] = max_len
         xyang_pattern: dict[str, Any] = {}
-        if type_stmt.pattern_error_message is not None:
+        if specs:
+            entries: list[dict[str, Any]] = []
+            for spec in specs:
+                patt = getattr(spec, "pattern", None) if hasattr(spec, "pattern") else spec.get("pattern")
+                if not isinstance(patt, str):
+                    continue
+                e: dict[str, Any] = {
+                    JsonSchemaKey.PATTERN: patt,
+                    "invert-match": bool(getattr(spec, "invert_match", False) if hasattr(spec, "invert_match") else spec.get("invert_match", False)),
+                }
+                em = getattr(spec, "error_message", None) if hasattr(spec, "error_message") else spec.get("error_message")
+                et = getattr(spec, "error_app_tag", None) if hasattr(spec, "error_app_tag") else spec.get("error_app_tag")
+                if isinstance(em, str):
+                    e[XYangKey.PATTERN_ERROR_MESSAGE] = em
+                if isinstance(et, str):
+                    e[XYangKey.PATTERN_ERROR_APP_TAG] = et
+                entries.append(e)
+            if entries:
+                xyang_pattern[XYangKey.STRING_PATTERNS] = entries
+                # Backward compatibility: keep last-pattern metadata on top-level x-yang.
+                last = entries[-1]
+                if XYangKey.PATTERN_ERROR_MESSAGE in last:
+                    xyang_pattern[XYangKey.PATTERN_ERROR_MESSAGE] = last[XYangKey.PATTERN_ERROR_MESSAGE]
+                if XYangKey.PATTERN_ERROR_APP_TAG in last:
+                    xyang_pattern[XYangKey.PATTERN_ERROR_APP_TAG] = last[XYangKey.PATTERN_ERROR_APP_TAG]
+        elif type_stmt.pattern_error_message is not None:
             xyang_pattern[XYangKey.PATTERN_ERROR_MESSAGE] = (
                 type_stmt.pattern_error_message
             )
-        if type_stmt.pattern_error_app_tag is not None:
+        if not specs and type_stmt.pattern_error_app_tag is not None:
             xyang_pattern[XYangKey.PATTERN_ERROR_APP_TAG] = (
                 type_stmt.pattern_error_app_tag
             )

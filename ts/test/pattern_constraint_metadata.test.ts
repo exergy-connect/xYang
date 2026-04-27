@@ -59,4 +59,78 @@ describe("python parity: test_pattern_constraint_metadata", () => {
     expect(td?.type?.pattern_error_message).toBe("Must be decimal digits.");
     expect(td?.type?.pattern_error_app_tag).toBe("t:bad-id");
   });
+
+  it("parse stores pattern modifier and multiple pattern entries", () => {
+    const module = parseYangString(`
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' {
+        modifier invert-match;
+        error-message "digits forbidden";
+        error-app-tag "t:forbidden-digits";
+      }
+    }
+  }
+}
+`);
+    const td = module.typedefs.id as { type?: Record<string, unknown> } | undefined;
+    const patterns = (td?.type?.patterns as Array<Record<string, unknown>> | undefined) ?? [];
+    expect(patterns.length).toBe(2);
+    expect(patterns[0].pattern).toBe("[a-z]+");
+    expect(patterns[0].invert_match).toBe(false);
+    expect(patterns[1].pattern).toBe("[0-9]+");
+    expect(patterns[1].invert_match).toBe(true);
+    expect(patterns[1].error_message).toBe("digits forbidden");
+    expect(patterns[1].error_app_tag).toBe("t:forbidden-digits");
+  });
+
+  it("JSON schema emits allOf and string-patterns for invert-match", () => {
+    const module = parseYangString(`
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' { modifier invert-match; }
+    }
+  }
+}
+`);
+    const schema = generateJsonSchema(module);
+    const idDef = (schema.$defs as Record<string, Record<string, unknown>>).id;
+    expect(Array.isArray(idDef.allOf)).toBe(true);
+    const xy = idDef[YANG_SCHEMA_KEYS.xYang] as Record<string, unknown>;
+    const entries = (xy["string-patterns"] as Array<Record<string, unknown>> | undefined) ?? [];
+    expect(entries.length).toBe(2);
+    expect(entries[1]["invert-match"]).toBe(true);
+  });
+
+  it("JSON roundtrip restores invert-match entries", () => {
+    const module = parseYangString(`
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' { modifier invert-match; }
+    }
+  }
+}
+`);
+    const module2 = parseJsonSchema(generateJsonSchema(module));
+    const td = module2.typedefs.id as { type?: Record<string, unknown> } | undefined;
+    const patterns = (td?.type?.patterns as Array<Record<string, unknown>> | undefined) ?? [];
+    expect(patterns.length).toBe(2);
+    expect(patterns[0].invert_match).toBe(false);
+    expect(patterns[1].invert_match).toBe(true);
+  });
 });

@@ -28,6 +28,7 @@ from ..ast import (
     YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
+    YangPatternSpec,
     YangMustStmt,
     YangWhenStmt,
 )
@@ -66,6 +67,40 @@ def _apply_pattern_constraint_metadata(
     tag = xyang_merged.get(XYangKey.PATTERN_ERROR_APP_TAG)
     if isinstance(tag, str):
         type_stmt.pattern_error_app_tag = tag
+
+
+def _apply_string_pattern_entries(
+    type_stmt: YangTypeStmt, xyang_merged: dict[str, Any]
+) -> None:
+    """Restore full pattern list (including invert-match) from x-yang metadata."""
+    raw = xyang_merged.get(XYangKey.STRING_PATTERNS)
+    if not isinstance(raw, list):
+        return
+    out: list[YangPatternSpec] = []
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        patt = item.get(JsonSchemaKey.PATTERN)
+        if not isinstance(patt, str):
+            continue
+        out.append(
+            YangPatternSpec(
+                pattern=patt,
+                invert_match=bool(item.get("invert-match", False)),
+                error_message=item.get(XYangKey.PATTERN_ERROR_MESSAGE)
+                if isinstance(item.get(XYangKey.PATTERN_ERROR_MESSAGE), str)
+                else None,
+                error_app_tag=item.get(XYangKey.PATTERN_ERROR_APP_TAG)
+                if isinstance(item.get(XYangKey.PATTERN_ERROR_APP_TAG), str)
+                else None,
+            )
+        )
+    if out:
+        type_stmt.patterns = out
+        last = out[-1]
+        type_stmt.pattern = last.pattern
+        type_stmt.pattern_error_message = last.error_message
+        type_stmt.pattern_error_app_tag = last.error_app_tag
 
 
 def _if_features_from_xyang(xyang: dict[str, Any]) -> list[str]:
@@ -226,9 +261,9 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
         if len(enums) == 1 and t == "string" and isinstance(enums[0], str):
             type_stmt = YangTypeStmt(name="string")
             type_stmt.pattern = "\\*" if enums[0] == "*" else enums[0]
-            _apply_pattern_constraint_metadata(
-                type_stmt, _merge_schema_xyang(schema, xyang)
-            )
+            merged_xy = _merge_schema_xyang(schema, xyang)
+            _apply_pattern_constraint_metadata(type_stmt, merged_xy)
+            _apply_string_pattern_entries(type_stmt, merged_xy)
             return type_stmt
     if t == "string":
         type_stmt = YangTypeStmt(name="string")
@@ -245,7 +280,18 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
             type_stmt.length = f"0..{max_len}"
         elif min_len is not None:
             type_stmt.length = f"{min_len}.."
-        _apply_pattern_constraint_metadata(type_stmt, _merge_schema_xyang(schema, xyang))
+        merged_xy = _merge_schema_xyang(schema, xyang)
+        _apply_pattern_constraint_metadata(type_stmt, merged_xy)
+        _apply_string_pattern_entries(type_stmt, merged_xy)
+        if not type_stmt.patterns and type_stmt.pattern:
+            type_stmt.patterns = [
+                YangPatternSpec(
+                    pattern=type_stmt.pattern,
+                    invert_match=False,
+                    error_message=type_stmt.pattern_error_message,
+                    error_app_tag=type_stmt.pattern_error_app_tag,
+                )
+            ]
         return type_stmt
     if t == "integer":
         min_val = schema.get(JsonSchemaKey.MINIMUM)

@@ -4,6 +4,12 @@ export type TypeConstraintInput = {
   pattern?: string;
   pattern_error_message?: string;
   pattern_error_app_tag?: string;
+  patterns?: Array<{
+    pattern: string;
+    invert_match?: boolean;
+    error_message?: string;
+    error_app_tag?: string;
+  }>;
   length?: string;
   range?: string;
   fraction_digits?: number;
@@ -16,6 +22,12 @@ export class TypeConstraint {
   pattern?: string;
   pattern_error_message?: string;
   pattern_error_app_tag?: string;
+  patterns?: Array<{
+    pattern: string;
+    invert_match?: boolean;
+    error_message?: string;
+    error_app_tag?: string;
+  }>;
   length?: string;
   range?: string;
   fraction_digits?: number;
@@ -34,6 +46,19 @@ function patternConstraintViolationMessage(c: TypeConstraint, defaultMsg: string
       ? c.pattern_error_message
       : defaultMsg;
   const tag = typeof c.pattern_error_app_tag === "string" ? c.pattern_error_app_tag.trim() : "";
+  return tag.length > 0 ? `${msg} (error-app-tag: ${tag})` : msg;
+}
+
+function patternEntryViolationMessage(
+  p: { error_message?: string; error_app_tag?: string },
+  fallback: TypeConstraint,
+  defaultMsg: string
+): string {
+  const msg =
+    typeof p.error_message === "string" && p.error_message.trim().length > 0
+      ? p.error_message
+      : patternConstraintViolationMessage(fallback, defaultMsg);
+  const tag = typeof p.error_app_tag === "string" ? p.error_app_tag.trim() : "";
   return tag.length > 0 ? `${msg} (error-app-tag: ${tag})` : msg;
 }
 
@@ -172,11 +197,23 @@ export class TypeSystem {
       if (c.length && !matchesRange(value.length, c.length)) {
         return [false, `String length ${value.length} does not match ${c.length}`];
       }
-      if (c.pattern && !new RegExp(`^(?:${c.pattern})$`).test(value)) {
-        return [
-          false,
-          patternConstraintViolationMessage(c, `String does not match pattern ${c.pattern}`)
-        ];
+      const patterns = Array.isArray(c.patterns) ? c.patterns : [];
+      if (patterns.length > 0) {
+        for (const p of patterns) {
+          if (typeof p?.pattern !== "string" || p.pattern.length === 0) {
+            continue;
+          }
+          const matched = new RegExp(`^(?:${p.pattern})$`).test(value);
+          const invert = p.invert_match === true;
+          if ((!invert && !matched) || (invert && matched)) {
+            const defaultMsg = invert
+              ? `String matches forbidden pattern ${p.pattern} (invert-match)`
+              : `String does not match pattern ${p.pattern}`;
+            return [false, patternEntryViolationMessage(p, c, defaultMsg)];
+          }
+        }
+      } else if (c.pattern && !new RegExp(`^(?:${c.pattern})$`).test(value)) {
+        return [false, patternConstraintViolationMessage(c, `String does not match pattern ${c.pattern}`)];
       }
       if (c.enums && c.enums.length > 0 && !c.enums.includes(value)) {
         return [false, `Value '${value}' is not in enum`];

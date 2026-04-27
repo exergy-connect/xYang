@@ -1,5 +1,5 @@
 import * as kw from "../keywords";
-import { YangTypeStmt } from "../../core/ast";
+import { YangPatternSpec, YangTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { parseXPath } from "../../xpath/parser";
 import type { StatementParsers } from "../statement-parsers";
@@ -66,24 +66,43 @@ export class TypeStatementParser {
 
   parse_type_pattern(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.PATTERN);
-    type_stmt.pattern = tokens.consume_type(YangTokenType.STRING);
+    const pattern = tokens.consume_type(YangTokenType.STRING);
+    let invertMatch = false;
+    let patternErrorMessage: string | undefined;
+    let patternErrorAppTag: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
         const tt = this.parsers.dispatch_key(tokens);
         if (tt === kw.ERROR_MESSAGE) {
           tokens.consume(kw.ERROR_MESSAGE);
-          type_stmt.pattern_error_message = tokens.consume_type(YangTokenType.STRING);
+          patternErrorMessage = tokens.consume_type(YangTokenType.STRING);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else if (tt === kw.ERROR_APP_TAG) {
           tokens.consume(kw.ERROR_APP_TAG);
-          type_stmt.pattern_error_app_tag = tokens.consume_type(YangTokenType.STRING);
+          patternErrorAppTag = tokens.consume_type(YangTokenType.STRING);
+          tokens.consume_if_type(YangTokenType.SEMICOLON);
+        } else if (tt === kw.MODIFIER) {
+          tokens.consume(kw.MODIFIER);
+          invertMatch = tokens.consume() === "invert-match";
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else {
-          tokens.consume();
+          this.parsers.parseStatement(tokens, _context);
         }
       }
       tokens.consume_type(YangTokenType.RBRACE);
     }
+    type_stmt.patterns.push(
+      new YangPatternSpec({
+        pattern,
+        invert_match: invertMatch,
+        error_message: patternErrorMessage,
+        error_app_tag: patternErrorAppTag
+      })
+    );
+    // Backward compatible mirrors: last pattern entry.
+    type_stmt.pattern = pattern;
+    type_stmt.pattern_error_message = patternErrorMessage;
+    type_stmt.pattern_error_app_tag = patternErrorAppTag;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

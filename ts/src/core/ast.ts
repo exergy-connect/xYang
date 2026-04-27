@@ -141,11 +141,26 @@ export class YangBitStmt {
   }
 }
 
+export class YangPatternSpec {
+  pattern: string;
+  invert_match: boolean;
+  error_message?: string;
+  error_app_tag?: string;
+
+  constructor(init: Partial<YangPatternSpec> = {}) {
+    this.pattern = init.pattern ?? "";
+    this.invert_match = init.invert_match ?? false;
+    this.error_message = init.error_message;
+    this.error_app_tag = init.error_app_tag;
+  }
+}
+
 export class YangTypeStmt {
   name: string;
   pattern?: string;
   pattern_error_message?: string;
   pattern_error_app_tag?: string;
+  patterns: YangPatternSpec[];
   length?: string;
   range?: string;
   fraction_digits?: number;
@@ -161,6 +176,7 @@ export class YangTypeStmt {
     this.pattern = init.pattern;
     this.pattern_error_message = init.pattern_error_message;
     this.pattern_error_app_tag = init.pattern_error_app_tag;
+    this.patterns = init.patterns ?? [];
     this.length = init.length;
     this.range = init.range;
     this.fraction_digits = init.fraction_digits;
