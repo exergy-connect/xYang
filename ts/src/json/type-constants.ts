@@ -47,20 +47,6 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
         error_app_tag: typeof x.error_app_tag === "string" ? x.error_app_tag : undefined
       }))
       .filter((x) => x.pattern.length > 0);
-    if (specs.length === 0 && typeof typeShape.pattern === "string") {
-      specs.push({
-        pattern: typeShape.pattern,
-        invert_match: false,
-        error_message:
-          typeof typeShape.pattern_error_message === "string"
-            ? typeShape.pattern_error_message
-            : undefined,
-        error_app_tag:
-          typeof typeShape.pattern_error_app_tag === "string"
-            ? typeShape.pattern_error_app_tag
-            : undefined
-      });
-    }
     const anchored = (p: string): string => (p.startsWith("^") && p.endsWith("$") ? p : `^${p}$`);
     if (specs.length === 1 && !specs[0].invert_match) {
       out.pattern = anchored(specs[0].pattern);

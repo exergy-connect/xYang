@@ -146,10 +146,6 @@ class TypeStatementParser:
             error_app_tag=pattern_error_app_tag,
         )
         type_stmt.patterns.append(spec)
-        # Backward compatibility: mirror the last pattern in flat fields.
-        type_stmt.pattern = pattern
-        type_stmt.pattern_error_message = pattern_error_message
-        type_stmt.pattern_error_app_tag = pattern_error_app_tag
 
     def parse_type_length(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse length constraint."""

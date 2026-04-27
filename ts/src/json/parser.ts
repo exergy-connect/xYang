@@ -149,13 +149,6 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
       shape.range = `${min}..${max}`;
     }
   }
-  if (name === YangTokenType.STRING_KW && typeof schema.pattern === "string") {
-    let p = schema.pattern;
-    if (p.startsWith("^") && p.endsWith("$")) {
-      p = p.slice(1, -1);
-    }
-    shape.pattern = p;
-  }
   const rawPatternEntries = Array.isArray(xy["string-patterns"]) ? xy["string-patterns"] : [];
   const parsedPatternEntries = rawPatternEntries
     .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
@@ -168,16 +161,17 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
         typeof x["pattern-error-app-tag"] === "string" ? (x["pattern-error-app-tag"] as string) : undefined
     }))
     .filter((x) => x.pattern.length > 0);
+
+  type PatternShape = {
+    pattern: string;
+    invert_match: boolean;
+    error_message?: string;
+    error_app_tag?: string;
+  };
+
+  let patternList: PatternShape[] = [];
   if (parsedPatternEntries.length > 0) {
-    shape.patterns = parsedPatternEntries;
-    const last = parsedPatternEntries[parsedPatternEntries.length - 1];
-    shape.pattern = last.pattern;
-    if (typeof last.error_message === "string") {
-      shape.pattern_error_message = last.error_message;
-    }
-    if (typeof last.error_app_tag === "string") {
-      shape.pattern_error_app_tag = last.error_app_tag;
-    }
+    patternList = parsedPatternEntries;
   } else if (Array.isArray(schema.allOf)) {
     const fallbackEntries = schema.allOf
       .filter((x): x is Record<string, unknown> => Boolean(x) && typeof x === "object" && !Array.isArray(x))
@@ -199,17 +193,31 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
         return { pattern: p, invert_match: x.invert_match };
       });
     if (fallbackEntries.length > 0) {
-      shape.patterns = fallbackEntries;
-      shape.pattern = fallbackEntries[fallbackEntries.length - 1].pattern;
+      patternList = fallbackEntries;
     }
+  } else if (name === YangTokenType.STRING_KW && typeof schema.pattern === "string") {
+    let p = schema.pattern;
+    if (p.startsWith("^") && p.endsWith("$")) {
+      p = p.slice(1, -1);
+    }
+    patternList = [{ pattern: p, invert_match: false }];
   }
-  const pem = xy["pattern-error-message"];
-  if (typeof pem === "string" && pem.length > 0) {
-    shape.pattern_error_message = pem;
-  }
-  const pet = xy["pattern-error-app-tag"];
-  if (typeof pet === "string" && pet.length > 0) {
-    shape.pattern_error_app_tag = pet;
+
+  const pem = typeof xy["pattern-error-message"] === "string" && xy["pattern-error-message"].length > 0
+    ? (xy["pattern-error-message"] as string)
+    : undefined;
+  const pet = typeof xy["pattern-error-app-tag"] === "string" && xy["pattern-error-app-tag"].length > 0
+    ? (xy["pattern-error-app-tag"] as string)
+    : undefined;
+  if (patternList.length > 0) {
+    const last = patternList[patternList.length - 1];
+    if (pem !== undefined && last.error_message === undefined) {
+      last.error_message = pem;
+    }
+    if (pet !== undefined && last.error_app_tag === undefined) {
+      last.error_app_tag = pet;
+    }
+    shape.patterns = patternList;
   }
   const unionItems = Array.isArray(schema.oneOf)
     ? schema.oneOf

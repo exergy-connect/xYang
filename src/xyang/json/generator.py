@@ -260,15 +260,6 @@ def _type_to_schema(
     if name == "string":
         out = {JsonSchemaKey.TYPE: "string"}
         specs = list(getattr(type_stmt, "patterns", None) or [])
-        if not specs and type_stmt.pattern:
-            specs = [
-                {
-                    "pattern": type_stmt.pattern,
-                    "invert_match": False,
-                    "error_message": type_stmt.pattern_error_message,
-                    "error_app_tag": type_stmt.pattern_error_app_tag,
-                }
-            ]
 
         def _anchored(p: str) -> str:
             return p if (p.startswith("^") and p.endswith("$")) else f"^{p}$"
@@ -343,14 +334,6 @@ def _type_to_schema(
                     xyang_pattern[XYangKey.PATTERN_ERROR_MESSAGE] = last[XYangKey.PATTERN_ERROR_MESSAGE]
                 if XYangKey.PATTERN_ERROR_APP_TAG in last:
                     xyang_pattern[XYangKey.PATTERN_ERROR_APP_TAG] = last[XYangKey.PATTERN_ERROR_APP_TAG]
-        elif type_stmt.pattern_error_message is not None:
-            xyang_pattern[XYangKey.PATTERN_ERROR_MESSAGE] = (
-                type_stmt.pattern_error_message
-            )
-        if not specs and type_stmt.pattern_error_app_tag is not None:
-            xyang_pattern[XYangKey.PATTERN_ERROR_APP_TAG] = (
-                type_stmt.pattern_error_app_tag
-            )
         if xyang_pattern:
             out[JsonSchemaKey.X_YANG] = xyang_pattern
         return out

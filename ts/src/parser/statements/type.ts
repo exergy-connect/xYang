@@ -99,10 +99,6 @@ export class TypeStatementParser {
         error_app_tag: patternErrorAppTag
       })
     );
-    // Backward compatible mirrors: last pattern entry.
-    type_stmt.pattern = pattern;
-    type_stmt.pattern_error_message = patternErrorMessage;
-    type_stmt.pattern_error_app_tag = patternErrorAppTag;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

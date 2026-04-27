@@ -157,9 +157,6 @@ export class YangPatternSpec {
 
 export class YangTypeStmt {
   name: string;
-  pattern?: string;
-  pattern_error_message?: string;
-  pattern_error_app_tag?: string;
   patterns: YangPatternSpec[];
   length?: string;
   range?: string;
@@ -173,9 +170,6 @@ export class YangTypeStmt {
 
   constructor(init: Partial<YangTypeStmt> = {}) {
     this.name = init.name ?? "";
-    this.pattern = init.pattern;
-    this.pattern_error_message = init.pattern_error_message;
-    this.pattern_error_app_tag = init.pattern_error_app_tag;
     this.patterns = init.patterns ?? [];
     this.length = init.length;
     this.range = init.range;

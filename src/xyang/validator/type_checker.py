@@ -24,33 +24,14 @@ from ..xpath.node import Context, Node
 logger = logging.getLogger("xyang.validator")
 
 
-def _pattern_constraint_violation_message(
-    type_stmt: YangTypeStmt, *, default: str
-) -> str:
-    """RFC 7950 §9.4.6: use ``error-message`` / ``error-app-tag`` when present."""
-    if type_stmt.pattern_error_message is not None:
-        msg = type_stmt.pattern_error_message
-    else:
-        msg = default
-    if type_stmt.pattern_error_app_tag:
-        return f"{msg} (error-app-tag: {type_stmt.pattern_error_app_tag})"
-    return msg
-
-
-def _pattern_entry_violation_message(
-    entry: Any, fallback_stmt: YangTypeStmt, *, default: str
-) -> str:
+def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
     msg = default
     em = getattr(entry, "error_message", None)
     if isinstance(em, str) and em:
         msg = em
-    elif fallback_stmt.pattern_error_message is not None:
-        msg = fallback_stmt.pattern_error_message
     tag = getattr(entry, "error_app_tag", None)
     if isinstance(tag, str) and tag:
         return f"{msg} (error-app-tag: {tag})"
-    if fallback_stmt.pattern_error_app_tag:
-        return f"{msg} (error-app-tag: {fallback_stmt.pattern_error_app_tag})"
     return msg
 
 
@@ -308,20 +289,8 @@ class TypeChecker:
                         else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                     )
                     errors.append(
-                        _pattern_entry_violation_message(
-                            p, type_stmt, default=default_msg
-                        )
+                        _pattern_entry_violation_message(p, default=default_msg)
                     )
-        elif type_stmt.pattern:
-            if not re.fullmatch(type_stmt.pattern, s):
-                errors.append(
-                    _pattern_constraint_violation_message(
-                        type_stmt,
-                        default=(
-                            f"Value {s!r} does not match pattern {type_stmt.pattern!r}"
-                        ),
-                    )
-                )
         if type_stmt.enums:
             if s not in [str(e) for e in type_stmt.enums]:
                 errors.append(
@@ -440,16 +409,20 @@ class TypeChecker:
                 return [
                     f"binary decoded length {n} octets exceeds maximum {int(hi)}"
                 ]
-        if type_stmt.pattern and not re.fullmatch(type_stmt.pattern, s):
-            return [
-                _pattern_constraint_violation_message(
-                    type_stmt,
-                    default=(
-                        f"binary value {s!r} does not match pattern "
-                        f"{type_stmt.pattern!r}"
-                    ),
+        patterns = list(getattr(type_stmt, "patterns", None) or [])
+        for p in patterns:
+            patt = getattr(p, "pattern", None)
+            if not isinstance(patt, str) or not patt:
+                continue
+            matched = re.fullmatch(patt, s) is not None
+            invert = bool(getattr(p, "invert_match", False))
+            if (not invert and not matched) or (invert and matched):
+                default_msg = (
+                    f"binary value {s!r} does not match pattern {patt!r}"
+                    if not invert
+                    else f"binary value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                 )
-            ]
+                return [_pattern_entry_violation_message(p, default=default_msg)]
         return []
 
     def _parse_range(

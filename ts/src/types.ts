@@ -1,9 +1,6 @@
 import { YangTokenType } from "./parser/parser-context";
 
 export type TypeConstraintInput = {
-  pattern?: string;
-  pattern_error_message?: string;
-  pattern_error_app_tag?: string;
   patterns?: Array<{
     pattern: string;
     invert_match?: boolean;
@@ -19,9 +16,6 @@ export type TypeConstraintInput = {
 };
 
 export class TypeConstraint {
-  pattern?: string;
-  pattern_error_message?: string;
-  pattern_error_app_tag?: string;
   patterns?: Array<{
     pattern: string;
     invert_match?: boolean;
@@ -40,24 +34,14 @@ export class TypeConstraint {
   }
 }
 
-function patternConstraintViolationMessage(c: TypeConstraint, defaultMsg: string): string {
-  const msg =
-    typeof c.pattern_error_message === "string" && c.pattern_error_message.trim().length > 0
-      ? c.pattern_error_message
-      : defaultMsg;
-  const tag = typeof c.pattern_error_app_tag === "string" ? c.pattern_error_app_tag.trim() : "";
-  return tag.length > 0 ? `${msg} (error-app-tag: ${tag})` : msg;
-}
-
 function patternEntryViolationMessage(
   p: { error_message?: string; error_app_tag?: string },
-  fallback: TypeConstraint,
   defaultMsg: string
 ): string {
   const msg =
     typeof p.error_message === "string" && p.error_message.trim().length > 0
       ? p.error_message
-      : patternConstraintViolationMessage(fallback, defaultMsg);
+      : defaultMsg;
   const tag = typeof p.error_app_tag === "string" ? p.error_app_tag.trim() : "";
   return tag.length > 0 ? `${msg} (error-app-tag: ${tag})` : msg;
 }
@@ -209,11 +193,9 @@ export class TypeSystem {
             const defaultMsg = invert
               ? `String matches forbidden pattern ${p.pattern} (invert-match)`
               : `String does not match pattern ${p.pattern}`;
-            return [false, patternEntryViolationMessage(p, c, defaultMsg)];
+            return [false, patternEntryViolationMessage(p, defaultMsg)];
           }
         }
-      } else if (c.pattern && !new RegExp(`^(?:${c.pattern})$`).test(value)) {
-        return [false, patternConstraintViolationMessage(c, `String does not match pattern ${c.pattern}`)];
       }
       if (c.enums && c.enums.length > 0 && !c.enums.includes(value)) {
         return [false, `Value '${value}' is not in enum`];

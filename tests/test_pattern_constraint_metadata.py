@@ -33,9 +33,10 @@ module t {
     module = parse_yang_string(yang)
     td = module.typedefs["id"]
     assert td.type is not None
-    assert td.type.pattern == "[0-9]+"
-    assert td.type.pattern_error_message == "Must be decimal digits."
-    assert td.type.pattern_error_app_tag == "t:bad-id"
+    assert len(td.type.patterns) == 1
+    assert td.type.patterns[0].pattern == "[0-9]+"
+    assert td.type.patterns[0].error_message == "Must be decimal digits."
+    assert td.type.patterns[0].error_app_tag == "t:bad-id"
 
 
 def test_validate_uses_pattern_error_message_and_app_tag():
@@ -118,8 +119,9 @@ module t {
     module2 = parse_json_schema(schema)
     td = module2.typedefs["id"]
     assert td.type is not None
-    assert td.type.pattern_error_message == "Must be decimal digits."
-    assert td.type.pattern_error_app_tag == "t:bad-id"
+    assert len(td.type.patterns) == 1
+    assert td.type.patterns[0].error_message == "Must be decimal digits."
+    assert td.type.patterns[0].error_app_tag == "t:bad-id"
 
 
 def test_parse_stores_pattern_modifier_and_multiple_pattern_entries():

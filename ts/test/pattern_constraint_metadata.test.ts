@@ -26,9 +26,11 @@ describe("python parity: test_pattern_constraint_metadata", () => {
     const module = parseYangString(PATTERN_TYPEDEF_MODULE);
     const td = module.typedefs.id as { type?: Record<string, unknown> } | undefined;
     expect(td?.type).toBeDefined();
-    expect(td?.type?.pattern).toBe("[0-9]+");
-    expect(td?.type?.pattern_error_message).toBe("Must be decimal digits.");
-    expect(td?.type?.pattern_error_app_tag).toBe("t:bad-id");
+    const pats = td?.type?.patterns ?? [];
+    expect(pats.length).toBe(1);
+    expect(pats[0]?.pattern).toBe("[0-9]+");
+    expect(pats[0]?.error_message).toBe("Must be decimal digits.");
+    expect(pats[0]?.error_app_tag).toBe("t:bad-id");
   });
 
   it("validate uses pattern error-message and error-app-tag", () => {
@@ -56,8 +58,10 @@ describe("python parity: test_pattern_constraint_metadata", () => {
     const schema = generateJsonSchema(module);
     const module2 = parseJsonSchema(schema);
     const td = module2.typedefs.id as { type?: Record<string, unknown> } | undefined;
-    expect(td?.type?.pattern_error_message).toBe("Must be decimal digits.");
-    expect(td?.type?.pattern_error_app_tag).toBe("t:bad-id");
+    const pats = td?.type?.patterns ?? [];
+    expect(pats.length).toBe(1);
+    expect(pats[0]?.error_message).toBe("Must be decimal digits.");
+    expect(pats[0]?.error_app_tag).toBe("t:bad-id");
   });
 
   it("parse stores pattern modifier and multiple pattern entries", () => {
