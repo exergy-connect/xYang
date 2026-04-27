@@ -104,7 +104,9 @@ module test {
   it("validates pattern and length constraints", () => {
     const typeSystem = new TypeSystem();
 
-    let constraint = new TypeConstraint({ pattern: "[a-z_][a-z0-9_]*" });
+    let constraint = new TypeConstraint({
+      patterns: [{ pattern: "[a-z_][a-z0-9_]*" }],
+    });
     let isValid = typeSystem.validate("valid_name", "string", constraint)[0];
     expect(isValid).toBe(true);
 

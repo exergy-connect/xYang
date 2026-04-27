@@ -1,6 +1,10 @@
 import { describe, expect, it } from "vitest";
+import type { YangPatternSpec } from "../src/core/ast";
 import { generateJsonSchema, parseJsonSchema, parseYangString, YangValidator } from "../src";
 import { YANG_SCHEMA_KEYS } from "../src/json/schema-keys";
+
+/** Parsed typedef shape from `YangModule.typedefs` (values are untyped `unknown`). */
+type TypedefWithPatternType = { type?: { patterns?: YangPatternSpec[] } };
 
 const PATTERN_TYPEDEF_MODULE = `
 module t {
@@ -24,7 +28,7 @@ module t {
 describe("python parity: test_pattern_constraint_metadata", () => {
   it("parse stores pattern and error metadata on typedef type", () => {
     const module = parseYangString(PATTERN_TYPEDEF_MODULE);
-    const td = module.typedefs.id as { type?: Record<string, unknown> } | undefined;
+    const td = module.typedefs.id as TypedefWithPatternType | undefined;
     expect(td?.type).toBeDefined();
     const pats = td?.type?.patterns ?? [];
     expect(pats.length).toBe(1);
@@ -57,7 +61,7 @@ describe("python parity: test_pattern_constraint_metadata", () => {
     const module = parseYangString(PATTERN_TYPEDEF_MODULE);
     const schema = generateJsonSchema(module);
     const module2 = parseJsonSchema(schema);
-    const td = module2.typedefs.id as { type?: Record<string, unknown> } | undefined;
+    const td = module2.typedefs.id as TypedefWithPatternType | undefined;
     const pats = td?.type?.patterns ?? [];
     expect(pats.length).toBe(1);
     expect(pats[0]?.error_message).toBe("Must be decimal digits.");
