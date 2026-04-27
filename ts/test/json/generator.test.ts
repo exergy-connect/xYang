@@ -26,7 +26,9 @@ module v {
     const schema = generateJsonSchema(module);
     const defs = schema.$defs as Record<string, unknown>;
     expect(defs).toBeDefined();
-    expect((defs["version-string"] as Record<string, unknown>)["x-yang"]).toBeUndefined();
+    expect((defs["version-string"] as Record<string, unknown>)["x-yang"]).toEqual({
+      "string-patterns": [{ pattern: "\\\\d+", "invert-match": false }]
+    });
 
     const leaf = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>)["version"] as Record<string, unknown>;

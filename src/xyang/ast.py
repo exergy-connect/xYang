@@ -120,19 +120,27 @@ class YangBitStmt:
 
 
 @dataclass
+class YangPatternSpec:
+    """One ``pattern`` substatement on ``type string`` (RFC 7950 §9.4.6)."""
+
+    pattern: str
+    invert_match: bool = False
+    error_message: Optional[str] = None
+    error_app_tag: Optional[str] = None
+
+
+@dataclass
 class YangTypeStmt:
     """Type statement.
 
-    For ``pattern`` under string-related types (RFC 7950 §9.4.6), optional
-    ``error-message`` / ``error-app-tag`` from the pattern's substatement block
-    are stored on the same node as ``pattern`` (the last ``pattern`` wins if
-    several are present, matching how ``pattern`` overwrites).
+    For ``pattern`` under string and binary types (RFC 7950 §9.4.6 / §9.8.1),
+    ``patterns`` holds every ``pattern`` substatement (including
+    ``modifier invert-match`` in YANG 1.1) with optional per-pattern
+    ``error-message`` / ``error-app-tag``.
     """
 
     name: str
-    pattern: Optional[str] = None
-    pattern_error_message: Optional[str] = None
-    pattern_error_app_tag: Optional[str] = None
+    patterns: List[YangPatternSpec] = field(default_factory=list)
     length: Optional[str] = None
     range: Optional[str] = None
     fraction_digits: Optional[int] = None

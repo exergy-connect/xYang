@@ -37,6 +37,7 @@ export const STATUS = "status";
 export const BIT = "bit";
 export const POSITION = "position";
 export const PATTERN = "pattern";
+export const MODIFIER = "modifier";
 export const LENGTH = "length";
 export const FRACTION_DIGITS = "fraction-digits";
 export const RANGE = "range";

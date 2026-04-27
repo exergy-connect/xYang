@@ -9,7 +9,7 @@ from .. import keywords as kw
 from typing import TYPE_CHECKING, cast
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
-from ...ast import YangTypeStmt
+from ...ast import YangPatternSpec, YangTypeStmt
 from ...xpath import PathNode, XPathParser
 
 if TYPE_CHECKING:
@@ -108,9 +108,9 @@ class TypeStatementParser:
         """Parse ``pattern`` (RFC 7950 §9.4.6): string argument, then ``;`` or substatement block."""
         tokens.consume(kw.PATTERN)
         pattern = tokens.consume_type(YangTokenType.STRING)
-        type_stmt.pattern = pattern
-        type_stmt.pattern_error_message = None
-        type_stmt.pattern_error_app_tag = None
+        invert_match = False
+        pattern_error_message = None
+        pattern_error_app_tag = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 pt = self._parsers._dispatch_key(tokens)
@@ -120,15 +120,16 @@ class TypeStatementParser:
                     self._parsers.parse_reference_string_only(tokens, context)
                 elif pt == kw.ERROR_MESSAGE:
                     tokens.consume(kw.ERROR_MESSAGE)
-                    type_stmt.pattern_error_message = tokens.consume_type(
-                        YangTokenType.STRING
-                    )
+                    pattern_error_message = tokens.consume_type(YangTokenType.STRING)
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == kw.ERROR_APP_TAG:
                     tokens.consume(kw.ERROR_APP_TAG)
-                    type_stmt.pattern_error_app_tag = tokens.consume_type(
-                        YangTokenType.STRING
-                    )
+                    pattern_error_app_tag = tokens.consume_type(YangTokenType.STRING)
+                    tokens.consume_if_type(YangTokenType.SEMICOLON)
+                elif pt == kw.MODIFIER:
+                    tokens.consume(kw.MODIFIER)
+                    modifier = tokens.consume()
+                    invert_match = modifier == "invert-match"
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif self._parsers._is_prefixed_extension_start(tokens):
                     self._parsers._parse_prefixed_extension_statement(tokens, context)
@@ -138,6 +139,13 @@ class TypeStatementParser:
                     pass
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
+        spec = YangPatternSpec(
+            pattern=pattern,
+            invert_match=invert_match,
+            error_message=pattern_error_message,
+            error_app_tag=pattern_error_app_tag,
+        )
+        type_stmt.patterns.append(spec)
 
     def parse_type_length(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse length constraint."""

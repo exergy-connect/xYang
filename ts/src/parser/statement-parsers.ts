@@ -57,9 +57,12 @@ function serializedKeywordFromAstStatement(stmt: { keyword?: unknown }): string 
 
 type TypeShape = {
   name: string;
-  pattern?: string;
-  pattern_error_message?: string;
-  pattern_error_app_tag?: string;
+  patterns?: Array<{
+    pattern: string;
+    invert_match?: boolean;
+    error_message?: string;
+    error_app_tag?: string;
+  }>;
   length?: string;
   range?: string;
   fraction_digits?: number;
@@ -614,9 +617,12 @@ export class StatementParsers {
   private fromTypeShape(type_stmt: YangTypeStmt): TypeShape {
     return {
       name: type_stmt.name,
-      pattern: type_stmt.pattern,
-      pattern_error_message: type_stmt.pattern_error_message,
-      pattern_error_app_tag: type_stmt.pattern_error_app_tag,
+      patterns: type_stmt.patterns.map((p) => ({
+        pattern: p.pattern,
+        invert_match: p.invert_match,
+        error_message: p.error_message,
+        error_app_tag: p.error_app_tag
+      })),
       length: type_stmt.length,
       range: type_stmt.range,
       fraction_digits: type_stmt.fraction_digits,
@@ -633,7 +639,11 @@ export class StatementParsers {
     const name = typeStmt.argument ?? "string";
     const shape: TypeShape = { name };
     for (const child of typeStmt.statements ?? []) {
-      if (child.keyword === "pattern" && child.argument) shape.pattern = child.argument;
+      if (child.keyword === "pattern" && child.argument) {
+        const patterns = shape.patterns ?? [];
+        patterns.push({ pattern: child.argument, invert_match: false });
+        shape.patterns = patterns;
+      }
       if (child.keyword === "length" && child.argument) shape.length = child.argument;
       if (child.keyword === "range" && child.argument) shape.range = child.argument;
       if (child.keyword === "fraction-digits" && child.argument) {

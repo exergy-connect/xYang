@@ -45,6 +45,21 @@ function pathToText(path: unknown): string | null {
   return `${absolute ? "/" : ""}${segments.join("/")}`;
 }
 
+function normalizePatterns(typeStmt: Record<string, unknown>): Array<Record<string, unknown>> {
+  const raw = Array.isArray(typeStmt.patterns) ? typeStmt.patterns : [];
+  const out = raw
+    .filter((p): p is Record<string, unknown> => Boolean(p) && typeof p === "object" && !Array.isArray(p))
+    .map((p) => ({
+      pattern: normalizePattern(p.pattern),
+      invert_match: p.invert_match === true,
+      error_message: typeof p.error_message === "string" ? p.error_message : null,
+      error_app_tag: typeof p.error_app_tag === "string" ? p.error_app_tag : null
+    }))
+    .filter((p) => p.pattern != null)
+    .sort((a, b) => String(a.pattern).localeCompare(String(b.pattern)));
+  return out;
+}
+
 function normalizeType(typeStmt: unknown): Record<string, unknown> | null {
   if (!typeStmt || typeof typeStmt !== "object" || Array.isArray(typeStmt)) {
     return null;
@@ -52,7 +67,7 @@ function normalizeType(typeStmt: unknown): Record<string, unknown> | null {
   const t = typeStmt as Record<string, unknown>;
   return {
     name: typeof t.name === "string" ? t.name : "",
-    pattern: normalizePattern(t.pattern),
+    patterns: normalizePatterns(t),
     length: typeof t.length === "string" ? t.length : null,
     range: typeof t.range === "string" ? t.range : null,
     enums: Array.isArray(t.enums) ? [...(t.enums as string[])].sort() : [],

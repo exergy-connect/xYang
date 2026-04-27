@@ -33,9 +33,10 @@ module t {
     module = parse_yang_string(yang)
     td = module.typedefs["id"]
     assert td.type is not None
-    assert td.type.pattern == "[0-9]+"
-    assert td.type.pattern_error_message == "Must be decimal digits."
-    assert td.type.pattern_error_app_tag == "t:bad-id"
+    assert len(td.type.patterns) == 1
+    assert td.type.patterns[0].pattern == "[0-9]+"
+    assert td.type.patterns[0].error_message == "Must be decimal digits."
+    assert td.type.patterns[0].error_app_tag == "t:bad-id"
 
 
 def test_validate_uses_pattern_error_message_and_app_tag():
@@ -118,5 +119,89 @@ module t {
     module2 = parse_json_schema(schema)
     td = module2.typedefs["id"]
     assert td.type is not None
-    assert td.type.pattern_error_message == "Must be decimal digits."
-    assert td.type.pattern_error_app_tag == "t:bad-id"
+    assert len(td.type.patterns) == 1
+    assert td.type.patterns[0].error_message == "Must be decimal digits."
+    assert td.type.patterns[0].error_app_tag == "t:bad-id"
+
+
+def test_parse_stores_pattern_modifier_and_multiple_pattern_entries():
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' {
+        modifier invert-match;
+        error-message "digits forbidden";
+        error-app-tag "t:forbidden-digits";
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    td = module.typedefs["id"]
+    assert td.type is not None
+    assert len(td.type.patterns) == 2
+    assert td.type.patterns[0].pattern == "[a-z]+"
+    assert td.type.patterns[0].invert_match is False
+    assert td.type.patterns[1].pattern == "[0-9]+"
+    assert td.type.patterns[1].invert_match is True
+    assert td.type.patterns[1].error_message == "digits forbidden"
+    assert td.type.patterns[1].error_app_tag == "t:forbidden-digits"
+
+
+def test_json_schema_emits_allof_and_string_patterns_for_invert_match():
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' {
+        modifier invert-match;
+        error-message "digits forbidden";
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    schema = generate_json_schema(module)
+    id_def = schema["$defs"]["id"]
+    assert "allOf" in id_def
+    xy = id_def[JsonSchemaKey.X_YANG]
+    assert XYangKey.STRING_PATTERNS in xy
+    assert len(xy[XYangKey.STRING_PATTERNS]) == 2
+    assert xy[XYangKey.STRING_PATTERNS][1]["invert-match"] is True
+    assert xy[XYangKey.STRING_PATTERNS][1]["pattern"] == "[0-9]+"
+
+
+def test_json_roundtrip_restores_pattern_modifier_entries():
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef id {
+    type string {
+      pattern '[a-z]+';
+      pattern '[0-9]+' {
+        modifier invert-match;
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    module2 = parse_json_schema(generate_json_schema(module))
+    td = module2.typedefs["id"]
+    assert td.type is not None
+    assert len(td.type.patterns) == 2
+    assert td.type.patterns[0].invert_match is False
+    assert td.type.patterns[1].invert_match is True

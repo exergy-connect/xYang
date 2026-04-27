@@ -71,7 +71,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `key` - List keys (heavily used)
 
 ### Type Constraints
-- ✅ `pattern` - Pattern matching (6 occurrences)
+- ✅ `pattern` - Pattern matching (6 occurrences); **multiple** patterns and **`modifier invert-match`** per RFC 7950, with per-pattern error metadata. JSON Schema: top-level `pattern` when a single non-inverted regex suffices; otherwise `allOf` / `not` plus **`x-yang.string-patterns`** for round-trip (Python and `ts/`).
 - ✅ `length` - Length constraints (3 occurrences)
 - ✅ `range` - Range constraints (2 occurrences)
 - ✅ `fraction-digits` - Decimal fraction digits (3 occurrences)
@@ -220,6 +220,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 |--------|-------------|--------|
 | Structure (object, array, types) | ✅ `type`, `properties`, `items`, `$ref`, `$defs` | — |
 | Simple constraints | ✅ `pattern`, `minLength`, `maxLength`, `minimum`, `maximum`, `enum`, `default`, `multipleOf` (decimal64: `10^-fraction-digits`) | — |
+| String patterns (YANG) | ✅ `allOf` / `not` when multiple or inverted | ✅ `string-patterns`: ordered list with regex + `invert` for full fidelity |
 | Node kind | — | ✅ `type`: container, list, leaf, leaf-list |
 | List key | — | ✅ `key` |
 | Leafref | `type: "string"` (value shape only) | ✅ `type: "leafref"`, `path`, `require-instance` |
@@ -500,6 +501,11 @@ The suite currently has **310 passing tests** (`python3 -m pytest tests/`), incl
 - JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
 
 ## Recent Improvements
+
+### String patterns: modifiers and multiple substatements (2026-04)
+- ✅ **YANG:** Parse several `pattern` lines, optional `modifier invert-match` blocks, and per-pattern `error-message` / `error-app-tag`.
+- ✅ **Validation:** `DocumentValidator` / TS type checker apply every pattern in order, including invert semantics and pattern-specific errors.
+- ✅ **JSON Schema:** Emit `x-yang.string-patterns` and reconstruct the list when parsing `.yang.json` back into an AST.
 
 ### Import, submodule, if-feature, and docs (2026-04)
 - ✅ **`import` / `include` / `submodule`**: Resolve and parse dependent `.yang` files; merge included submodules; `import` prefix map for prefixed types and `if-feature` expressions.
