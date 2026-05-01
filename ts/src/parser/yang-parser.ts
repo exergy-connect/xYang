@@ -7,6 +7,7 @@ import { StatementParsers } from "./statement-parsers";
 import { YangTokenizer } from "./tokenizer";
 import { applyBuiltinExtensionInvocations } from "../ext";
 import { expandUses } from "../transform/uses-expand";
+import { validateSemantics } from "../validator/semantic-validation";
 
 type ParserOptions = {
   expand_uses?: boolean;
@@ -183,6 +184,7 @@ export class YangParser {
     let mod = new YangModule(data, source);
     if (this.expandUses) {
       mod = expandUses(mod);
+      validateSemantics(mod);
     }
     return mod;
   }

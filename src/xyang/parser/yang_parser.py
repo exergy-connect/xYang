@@ -13,6 +13,7 @@ from ..augment_expand import apply_augmentations
 from ..errors import YangSyntaxError
 from ..ext import apply_extension_invocations
 from ..module import YangModule
+from ..semantic_validate import validate_semantics
 from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext, TokenStream
@@ -54,6 +55,7 @@ class YangParser:
             expand_all_uses_in_module(module)
             apply_augmentations(module)
             apply_extension_invocations(module)
+            validate_semantics(module)
 
     def merge_included_submodule(
         self,

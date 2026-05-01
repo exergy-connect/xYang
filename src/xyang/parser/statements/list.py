@@ -9,8 +9,7 @@ from .. import keywords as kw
 from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
-from ...ast import YangLeafStmt, YangListStmt
-from ...errors import YangSemanticError
+from ...ast import YangListStmt
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -52,35 +51,6 @@ class ListStatementParser:
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
-    def _validate_key_leaf_conditions(self, list_stmt: YangListStmt) -> None:
-        """RFC 7950: ``when`` and ``if-feature`` are illegal on list key leaves."""
-        if not list_stmt.key:
-            return
-        key_leaves = {
-            child.name: child
-            for child in list_stmt.statements
-            if isinstance(child, YangLeafStmt)
-        }
-        for key_name in list_stmt.key.split():
-            child = key_leaves.get(key_name)
-            if child is None:
-                raise YangSemanticError(
-                    f"List {list_stmt.name!r}: key leaf {key_name!r} does not exist "
-                    "(RFC 7950: each list key name must refer to a child leaf)."
-                )
-            if child.when is not None:
-                illegal = "when"
-            elif child.if_features:
-                illegal = "if-feature"
-            else:
-                illegal = None
-            if illegal is None:
-                continue
-            raise YangSemanticError(
-                f"List {list_stmt.name!r}: key leaf {child.name!r} must not have "
-                f"{illegal!r} (RFC 7950: 'when' and 'if-feature' are illegal on list keys)."
-            )
-
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         """Parse list statement."""
         tokens.consume(kw.LIST)
@@ -91,7 +61,6 @@ class ListStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_list_substatement(tokens, new_context, list_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._validate_key_leaf_conditions(list_stmt)
         self._parsers._add_to_parent_or_module(context, list_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return list_stmt
