@@ -39,8 +39,7 @@ class RefineStatementParser:
         self, tokens: TokenStream, context: ParserContext, target_path: PathNode
     ) -> None:
         """One substatement inside ``refine { ... }`` (no ``refine:*`` registry keys)."""
-        tt = self._parsers._dispatch_key(tokens)
-        handler = self._refine_substatement_dispatch.get(tt)
+        handler = self._parsers._substatement_handler(tokens, self._refine_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._skip_unsupported_or_raise_unknown_stmt(

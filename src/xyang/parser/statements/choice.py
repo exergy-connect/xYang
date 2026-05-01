@@ -45,7 +45,7 @@ class ChoiceStatementParser:
         self, tokens: TokenStream, context: ParserContext, choice_name: str
     ) -> None:
         unsupported = f"choice '{choice_name}'"
-        handler = self._choice_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
+        handler = self._parsers._substatement_handler(tokens, self._choice_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):
@@ -57,7 +57,7 @@ class ChoiceStatementParser:
         self, tokens: TokenStream, context: ParserContext, case_name: str
     ) -> None:
         unsupported = f"case '{case_name}'"
-        handler = self._case_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
+        handler = self._parsers._substatement_handler(tokens, self._case_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):

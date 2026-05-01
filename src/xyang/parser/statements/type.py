@@ -42,8 +42,7 @@ class TypeStatementParser:
         type_name: str,
     ) -> None:
         """Parse one substatement inside ``type { ... }`` without registry indirection."""
-        token_type = self._parsers._dispatch_key(tokens)
-        handler = self._type_substatement_dispatch.get(token_type)
+        handler = self._parsers._substatement_handler(tokens, self._type_substatement_dispatch)
         if handler:
             handler(tokens, context, type_stmt)
             return

@@ -35,8 +35,7 @@ class UsesStatementParser:
     ) -> None:
         """One substatement inside ``uses { ... }``."""
         unsupported = f"uses '{grouping_name}'"
-        tt = self._parsers._dispatch_key(tokens)
-        handler = self._uses_substatement_dispatch.get(tt)
+        handler = self._parsers._substatement_handler(tokens, self._uses_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):

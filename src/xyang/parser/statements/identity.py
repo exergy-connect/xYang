@@ -29,8 +29,7 @@ class IdentityStatementParser:
         self, tokens: TokenStream, context: ParserContext, identity_name: str
     ) -> None:
         unsupported = f"identity '{identity_name}'"
-        tt = self._parsers._dispatch_key(tokens)
-        handler = self._identity_substatement_dispatch.get(tt)
+        handler = self._parsers._substatement_handler(tokens, self._identity_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):

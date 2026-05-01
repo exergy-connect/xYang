@@ -7,7 +7,7 @@ from __future__ import annotations
 from . import keywords as kw
 
 from types import SimpleNamespace
-from typing import Optional, TYPE_CHECKING
+from typing import Any, Callable, Optional, TYPE_CHECKING, cast
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statements.anydata import AnydataStatementParser
 from .statements.anyxml import AnyxmlStatementParser
@@ -125,9 +125,18 @@ class StatementParsers:
             setattr(obj, attr, current)
         current.append(value)
 
-    def _dispatch_key(self, tokens: TokenStream) -> object:
+    def _dispatch_key(self, tokens: TokenStream) -> str | YangTokenType:
         """Use keyword lexeme for identifiers, raw type for punctuation/literals."""
-        return tokens.peek() if tokens.peek_type() == YangTokenType.IDENTIFIER else tokens.peek_type()
+        if tokens.peek_type() == YangTokenType.IDENTIFIER:
+            return cast(str, tokens.peek())
+        return tokens.peek_type()
+
+    def _substatement_handler(
+        self, tokens: TokenStream, dispatch: dict[str, Callable[..., Any]]
+    ) -> Optional[Callable[..., Any]]:
+        """Resolve a handler from a keyword-keyed map; non-identifier peek types never match."""
+        key = self._dispatch_key(tokens)
+        return dispatch.get(key) if isinstance(key, str) else None
 
     def _skip_unsupported_if_present(self, tokens: TokenStream, context: str) -> bool:
         """If the next token starts deviation/extension/rpc/..., skip it and warn. Returns True if skipped."""
@@ -204,7 +213,11 @@ class StatementParsers:
         if token_value == kw.ANYXML:
             self.parse_anyxml(tokens, context)
             return
-        handler = self._extension_invocation_stmt.get(token_value)
+        handler = (
+            self._extension_invocation_stmt.get(token_value)
+            if token_value is not None
+            else None
+        )
         if handler:
             handler(tokens, context)
             return

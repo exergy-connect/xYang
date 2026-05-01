@@ -58,8 +58,7 @@ class SubmoduleStatementParser:
     def _parse_submodule_statement(
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
-        tt = self._parsers._dispatch_key(tokens)
-        handler = self._submodule_dispatch.get(tt)
+        handler = self._parsers._substatement_handler(tokens, self._submodule_dispatch)
         if handler:
             handler(tokens, context)
             return

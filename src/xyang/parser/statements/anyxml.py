@@ -38,8 +38,7 @@ class AnyxmlStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(anyxml_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers._dispatch_key(tokens)
-                handler = self._anyxml_body_dispatch.get(tt)
+                handler = self._parsers._substatement_handler(tokens, self._anyxml_body_dispatch)
                 if handler:
                     handler(tokens, new_context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(

@@ -40,7 +40,7 @@ class ContainerStatementParser:
         self, tokens: TokenStream, context: ParserContext, container_name: str
     ) -> None:
         unsupported = f"container '{container_name}'"
-        handler = self._container_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
+        handler = self._parsers._substatement_handler(tokens, self._container_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):

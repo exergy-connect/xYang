@@ -66,8 +66,7 @@ class ModuleStatementParser:
 
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse one statement in module body."""
-        tt = self._parsers._dispatch_key(tokens)
-        handler = self._module_dispatch.get(tt)
+        handler = self._parsers._substatement_handler(tokens, self._module_dispatch)
         if handler:
             handler(tokens, context)
             return
@@ -97,8 +96,7 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                     continue
-                tt = self._parsers._dispatch_key(tokens)
-                handler = self._import_body_dispatch.get(tt)
+                handler = self._parsers._substatement_handler(tokens, self._import_body_dispatch)
                 if handler:
                     handler(tokens, context)
                 elif self._parsers._is_prefixed_extension_start(tokens):
@@ -137,8 +135,7 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                 else:
-                    tt = self._parsers._dispatch_key(tokens)
-                    handler = self._include_body_dispatch.get(tt)
+                    handler = self._parsers._substatement_handler(tokens, self._include_body_dispatch)
                     if handler:
                         handler(tokens, context)
                     elif self._parsers._is_prefixed_extension_start(tokens):

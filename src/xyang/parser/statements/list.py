@@ -43,7 +43,7 @@ class ListStatementParser:
         self, tokens: TokenStream, context: ParserContext, list_name: str
     ) -> None:
         unsupported = f"list '{list_name}'"
-        handler = self._list_substatement_dispatch.get(self._parsers._dispatch_key(tokens))
+        handler = self._parsers._substatement_handler(tokens, self._list_substatement_dispatch)
         if handler:
             handler(tokens, context)
         elif self._parsers._is_prefixed_extension_start(tokens):
