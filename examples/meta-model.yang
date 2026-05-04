@@ -7,6 +7,12 @@ module meta-model {
   contact "Exergy.connect@gmail.com";
   description "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys reference the primary key of the referenced entity by default; optional ``field`` names a different target field that must be marked ``unique`` (alternate key).";
 
+  revision "2026-05-05" {
+    description
+      "Leaf default on entity fields may use type/definition for site-specific values (with description and brief); consolidated must allows default at the reference site.
+       When default is set with type/definition, the referenced field_definition must use open primitive or closed enum (not array, composite, or entity).";
+  }
+
   revision "2026-04-14" {
     description
       "Broaden the shared entity-reference pattern for reuse beyond array fields and align its public name with that role.";
@@ -308,9 +314,18 @@ module meta-model {
     description
       "Optional default value for instance data. Allowed on entity fields, field_definitions,
        and composite subcomponents; not combinable with required=true on the same node (see generic-field).
-       Leaf default is conditional: only when the sibling container type uses primitive or enum (open-type branch).";
+       Leaf default is conditional: when the sibling container type uses primitive, enum (open-type branch),
+       or a field_definition reference whose resolved type is open primitive or closed enum (definition leafref).";
     leaf default {
-      when "boolean(../type/primitive) or boolean(../type/enum)";
+      when
+        "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)";
+      must
+        "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)" {
+        error-message
+          "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).";
+        description
+          "Site-specific default at a definition reference is valid only for scalar reusable types.";
+      }
       type union {
         type string;
         type int32;
@@ -320,7 +335,8 @@ module meta-model {
         type boolean;
       }
       description
-        "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.";
+        "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,
+         or type/definition when the referenced field_definition is itself primitive or enum.";
     }
   }
 
@@ -741,9 +757,9 @@ module meta-model {
         key name;
         min-elements 1;
         description "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.";
-        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type/definition]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and count(current()/type/array) = 0 and count(current()/type/composite) = 0)" {
-          error-message "When type references a field_definition, min, max, minDate, maxDate, enum, default, array, composite, and other inline type branches must not be specified (description and brief may be used at the reference site).";
-          description "Inline constraints only when type is a primitive; when type uses the definition leafref they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site.";
+        must "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type/definition]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and count(current()/type/array) = 0 and count(current()/type/composite) = 0)" {
+          error-message "When type references a field_definition, min, max, minDate, maxDate, enum, array, composite, and other inline type branches must not be specified (description, brief, and default may be used at the reference site).";
+          description "Inline type constraints are inherited from the definition; when type uses the definition leafref do not repeat primitive branches at the reference site. Enforced only during consolidated validation (Phase 2). description, brief, and optional default may be specified at the reference site.";
         }
         uses generic-field;
       }

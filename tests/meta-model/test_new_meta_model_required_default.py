@@ -12,8 +12,8 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 META_MODEL_YANG = REPO_ROOT / "examples" / "meta-model.yang"
 
 
-@pytest.fixture
-def meta_model_module():
+@pytest.fixture(name="meta_model_module")
+def _meta_model_module_fixture():
     assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
     return parse_yang_file(str(META_MODEL_YANG))
 
@@ -90,7 +90,7 @@ def test_required_true_with_default_fails_must(meta_model_module):
 
 
 def test_primitive_enum_valid_for_string(meta_model_module):
-    """Closed enumeration: enum-only (no primitive leaf) is valid (primitive-type-and-enum grouping)."""
+    """Enum-only closed list (no primitive leaf); valid primitive-type-and-enum case."""
     dm = _base_data_model()["data-model"]
     ent = dm["entities"][0]
     ent["fields"].append(
@@ -164,6 +164,115 @@ def test_minDate_rejected_for_string_primitive(meta_model_module):
     ok, errors, _warnings = validator.validate({"data-model": dm})
     assert not ok
     assert any("mindate" in e.lower() for e in errors)
+
+
+def test_default_on_entity_field_with_type_definition_accepted(meta_model_module):
+    """``default`` on a field with ``type.definition`` is valid (site-specific override)."""
+    dm = _base_data_model()["data-model"]
+    dm["consolidated"] = True
+    ent = dm["entities"][0]
+    ent["field_definitions"] = [
+        {
+            "name": "priority_level",
+            "description": "Shared priority enum.",
+            "type": {"enum": ["low", "medium", "high"]},
+            "default": "low",
+        }
+    ]
+    ent["fields"].append(
+        {
+            "name": "priority",
+            "description": "Reference site overrides default to medium.",
+            "type": {"definition": "priority_level"},
+            "default": "medium",
+        }
+    )
+    validator = YangValidator(meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert ok, errors
+
+
+def test_default_on_entity_field_primitive_definition_accepted(meta_model_module):
+    """``default`` on a definition reference is valid when the definition is primitive."""
+    dm = _base_data_model()["data-model"]
+    ent = dm["entities"][0]
+    ent["field_definitions"] = [
+        {
+            "name": "count_def",
+            "description": "Reusable non-negative integer.",
+            "type": {"primitive": "integer", "min": 0, "max": 99},
+            "default": 1,
+        }
+    ]
+    ent["fields"].append(
+        {
+            "name": "qty",
+            "description": "Quantity from definition with site default 3.",
+            "type": {"definition": "count_def"},
+            "default": 3,
+        }
+    )
+    validator = YangValidator(meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert ok, errors
+
+
+def test_default_on_entity_field_composite_definition_rejected(meta_model_module):
+    """``default`` on a definition reference fails when the definition is composite."""
+    dm = _base_data_model()["data-model"]
+    ent = dm["entities"][0]
+    ent["field_definitions"] = [
+        {
+            "name": "addr_block",
+            "description": "Reusable address composite.",
+            "type": {
+                "composite": [
+                    {
+                        "name": "city",
+                        "description": "City.",
+                        "type": {"primitive": "string"},
+                    }
+                ]
+            },
+        }
+    ]
+    ent["fields"].append(
+        {
+            "name": "addr",
+            "description": "Invalid: default at reference site for composite definition.",
+            "type": {"definition": "addr_block"},
+            "default": "n/a",
+        }
+    )
+    validator = YangValidator(meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert not ok
+    assert any("open primitive" in e.lower() or "closed enum" in e.lower() for e in errors)
+
+
+def test_default_on_field_definition_valid_for_enum_reuse(meta_model_module):
+    """``default`` on the reusable ``field_definitions`` entry validates for enum reuse."""
+    dm = _base_data_model()["data-model"]
+    dm["consolidated"] = False
+    ent = dm["entities"][0]
+    ent["field_definitions"] = [
+        {
+            "name": "priority_level",
+            "description": "Shared priority enum with default.",
+            "type": {"enum": ["low", "medium", "high"]},
+            "default": "medium",
+        }
+    ]
+    ent["fields"].append(
+        {
+            "name": "priority",
+            "description": "Reference only; inherits default from definition.",
+            "type": {"definition": "priority_level"},
+        }
+    )
+    validator = YangValidator(meta_model_module)
+    ok, errors, _warnings = validator.validate({"data-model": dm})
+    assert ok, errors
 
 
 def test_default_on_composite_subfield_valid(meta_model_module):

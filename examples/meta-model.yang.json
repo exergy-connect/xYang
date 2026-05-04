@@ -308,6 +308,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -323,10 +325,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -340,6 +342,8 @@
                             },
                             "definition": {
                               "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128,
                               "description": "Reference to a reusable field_definition name on this entity.",
                               "x-yang": {
                                 "type": "leafref",
@@ -398,6 +402,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -413,10 +419,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -514,6 +520,7 @@
                                       }
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "primitive",
                                     "min",
@@ -522,7 +529,6 @@
                                     "maxDate",
                                     "outlier"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "open-primitive"
                                   }
@@ -554,10 +560,10 @@
                                       "minItems": 1
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "enum"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "closed-enum"
                                   }
@@ -615,6 +621,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -630,10 +638,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -705,6 +713,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -720,10 +730,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -837,6 +847,7 @@
                                               }
                                             }
                                           },
+                                          "additionalProperties": false,
                                           "required": [
                                             "primitive",
                                             "min",
@@ -845,7 +856,6 @@
                                             "maxDate",
                                             "outlier"
                                           ],
-                                          "additionalProperties": false,
                                           "x-yang": {
                                             "name": "open-primitive"
                                           }
@@ -877,10 +887,10 @@
                                               "minItems": 1
                                             }
                                           },
+                                          "additionalProperties": false,
                                           "required": [
                                             "enum"
                                           ],
-                                          "additionalProperties": false,
                                           "x-yang": {
                                             "name": "closed-enum"
                                           }
@@ -888,10 +898,10 @@
                                       ]
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "primitive-or-enum"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "open-type"
                                   }
@@ -911,10 +921,10 @@
                                       }
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "entity"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "array-element-entity"
                                   }
@@ -1013,6 +1023,8 @@
                                                         },
                                                         "parent_array": {
                                                           "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128,
                                                           "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                           "x-yang": {
                                                             "type": "leafref",
@@ -1028,10 +1040,10 @@
                                                           }
                                                         }
                                                       },
+                                                      "additionalProperties": false,
                                                       "required": [
                                                         "entity"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     },
                                                     "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                                     "x-yang": {
@@ -1129,6 +1141,7 @@
                                                             }
                                                           }
                                                         },
+                                                        "additionalProperties": false,
                                                         "required": [
                                                           "primitive",
                                                           "min",
@@ -1137,7 +1150,6 @@
                                                           "maxDate",
                                                           "outlier"
                                                         ],
-                                                        "additionalProperties": false,
                                                         "x-yang": {
                                                           "name": "open-primitive"
                                                         }
@@ -1169,10 +1181,10 @@
                                                             "minItems": 1
                                                           }
                                                         },
+                                                        "additionalProperties": false,
                                                         "required": [
                                                           "enum"
                                                         ],
-                                                        "additionalProperties": false,
                                                         "x-yang": {
                                                           "name": "closed-enum"
                                                         }
@@ -1230,6 +1242,8 @@
                                                         },
                                                         "parent_array": {
                                                           "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128,
                                                           "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                           "x-yang": {
                                                             "type": "leafref",
@@ -1245,10 +1259,10 @@
                                                           }
                                                         }
                                                       },
+                                                      "additionalProperties": false,
                                                       "required": [
                                                         "entity"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     },
                                                     "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                                     "x-yang": {
@@ -1297,20 +1311,27 @@
                                                 "type": "boolean"
                                               }
                                             ],
-                                            "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                                            "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                             "x-yang": {
                                               "type": "leaf",
+                                              "must": [
+                                                {
+                                                  "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                                                  "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                                                  "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                                                }
+                                              ],
                                               "when": {
-                                                "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                                               }
                                             }
                                           }
                                         },
+                                        "additionalProperties": false,
                                         "required": [
                                           "name",
                                           "description"
-                                        ],
-                                        "additionalProperties": false
+                                        ]
                                       },
                                       "description": "Subfields (recursive generic field).",
                                       "x-yang": {
@@ -1320,10 +1341,10 @@
                                       "minItems": 1
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "composite"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "case-composite"
                                   }
@@ -1380,6 +1401,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -1395,10 +1418,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -1500,6 +1523,8 @@
                                                 },
                                                 "parent_array": {
                                                   "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128,
                                                   "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                   "x-yang": {
                                                     "type": "leafref",
@@ -1515,10 +1540,10 @@
                                                   }
                                                 }
                                               },
+                                              "additionalProperties": false,
                                               "required": [
                                                 "entity"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             },
                                             "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                             "x-yang": {
@@ -1616,6 +1641,7 @@
                                                     }
                                                   }
                                                 },
+                                                "additionalProperties": false,
                                                 "required": [
                                                   "primitive",
                                                   "min",
@@ -1624,7 +1650,6 @@
                                                   "maxDate",
                                                   "outlier"
                                                 ],
-                                                "additionalProperties": false,
                                                 "x-yang": {
                                                   "name": "open-primitive"
                                                 }
@@ -1656,10 +1681,10 @@
                                                     "minItems": 1
                                                   }
                                                 },
+                                                "additionalProperties": false,
                                                 "required": [
                                                   "enum"
                                                 ],
-                                                "additionalProperties": false,
                                                 "x-yang": {
                                                   "name": "closed-enum"
                                                 }
@@ -1717,6 +1742,8 @@
                                                 },
                                                 "parent_array": {
                                                   "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128,
                                                   "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                   "x-yang": {
                                                     "type": "leafref",
@@ -1732,10 +1759,10 @@
                                                   }
                                                 }
                                               },
+                                              "additionalProperties": false,
                                               "required": [
                                                 "entity"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             },
                                             "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                             "x-yang": {
@@ -1784,20 +1811,27 @@
                                         "type": "boolean"
                                       }
                                     ],
-                                    "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                                    "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                     "x-yang": {
                                       "type": "leaf",
+                                      "must": [
+                                        {
+                                          "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                                          "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                                          "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                                        }
+                                      ],
                                       "when": {
-                                        "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                                       }
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "name",
                                   "description"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Subfields (recursive generic field).",
                               "x-yang": {
@@ -1834,11 +1868,18 @@
                           "type": "boolean"
                         }
                       ],
-                      "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                      "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                       "x-yang": {
                         "type": "leaf",
+                        "must": [
+                          {
+                            "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                            "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                            "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                          }
+                        ],
                         "when": {
-                          "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                         }
                       }
                     },
@@ -1935,10 +1976,10 @@
                                 }
                               }
                             },
+                            "additionalProperties": false,
                             "required": [
                               "field"
-                            ],
-                            "additionalProperties": false
+                            ]
                           },
                           "description": "Field references for the computation (same entity or cross-entity with entity leaf).",
                           "x-yang": {
@@ -1956,17 +1997,17 @@
                           "maxItems": 100
                         }
                       },
+                      "additionalProperties": false,
                       "required": [
                         "operation"
-                      ],
-                      "additionalProperties": false
+                      ]
                     }
                   },
+                  "additionalProperties": false,
                   "required": [
                     "name",
                     "description"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "description": "Optional reusable field type and constraint definitions for this entity. Entity fields may reference these by setting type to this name; when type is a definition name, min, max, etc. must not be set inline. Names are unique within this entity only.",
                 "x-yang": {
@@ -2079,6 +2120,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -2094,10 +2137,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -2111,6 +2154,8 @@
                             },
                             "definition": {
                               "type": "string",
+                              "minLength": 1,
+                              "maxLength": 128,
                               "description": "Reference to a reusable field_definition name on this entity.",
                               "x-yang": {
                                 "type": "leafref",
@@ -2169,6 +2214,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -2184,10 +2231,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -2285,6 +2332,7 @@
                                       }
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "primitive",
                                     "min",
@@ -2293,7 +2341,6 @@
                                     "maxDate",
                                     "outlier"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "open-primitive"
                                   }
@@ -2325,10 +2372,10 @@
                                       "minItems": 1
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "enum"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "closed-enum"
                                   }
@@ -2386,6 +2433,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -2401,10 +2450,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -2476,6 +2525,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -2491,10 +2542,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -2608,6 +2659,7 @@
                                               }
                                             }
                                           },
+                                          "additionalProperties": false,
                                           "required": [
                                             "primitive",
                                             "min",
@@ -2616,7 +2668,6 @@
                                             "maxDate",
                                             "outlier"
                                           ],
-                                          "additionalProperties": false,
                                           "x-yang": {
                                             "name": "open-primitive"
                                           }
@@ -2648,10 +2699,10 @@
                                               "minItems": 1
                                             }
                                           },
+                                          "additionalProperties": false,
                                           "required": [
                                             "enum"
                                           ],
-                                          "additionalProperties": false,
                                           "x-yang": {
                                             "name": "closed-enum"
                                           }
@@ -2659,10 +2710,10 @@
                                       ]
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "primitive-or-enum"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "open-type"
                                   }
@@ -2682,10 +2733,10 @@
                                       }
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "entity"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "array-element-entity"
                                   }
@@ -2784,6 +2835,8 @@
                                                         },
                                                         "parent_array": {
                                                           "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128,
                                                           "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                           "x-yang": {
                                                             "type": "leafref",
@@ -2799,10 +2852,10 @@
                                                           }
                                                         }
                                                       },
+                                                      "additionalProperties": false,
                                                       "required": [
                                                         "entity"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     },
                                                     "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                                     "x-yang": {
@@ -2900,6 +2953,7 @@
                                                             }
                                                           }
                                                         },
+                                                        "additionalProperties": false,
                                                         "required": [
                                                           "primitive",
                                                           "min",
@@ -2908,7 +2962,6 @@
                                                           "maxDate",
                                                           "outlier"
                                                         ],
-                                                        "additionalProperties": false,
                                                         "x-yang": {
                                                           "name": "open-primitive"
                                                         }
@@ -2940,10 +2993,10 @@
                                                             "minItems": 1
                                                           }
                                                         },
+                                                        "additionalProperties": false,
                                                         "required": [
                                                           "enum"
                                                         ],
-                                                        "additionalProperties": false,
                                                         "x-yang": {
                                                           "name": "closed-enum"
                                                         }
@@ -3001,6 +3054,8 @@
                                                         },
                                                         "parent_array": {
                                                           "type": "string",
+                                                          "minLength": 1,
+                                                          "maxLength": 128,
                                                           "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                           "x-yang": {
                                                             "type": "leafref",
@@ -3016,10 +3071,10 @@
                                                           }
                                                         }
                                                       },
+                                                      "additionalProperties": false,
                                                       "required": [
                                                         "entity"
-                                                      ],
-                                                      "additionalProperties": false
+                                                      ]
                                                     },
                                                     "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                                     "x-yang": {
@@ -3068,20 +3123,27 @@
                                                 "type": "boolean"
                                               }
                                             ],
-                                            "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                                            "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                             "x-yang": {
                                               "type": "leaf",
+                                              "must": [
+                                                {
+                                                  "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                                                  "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                                                  "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                                                }
+                                              ],
                                               "when": {
-                                                "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                                               }
                                             }
                                           }
                                         },
+                                        "additionalProperties": false,
                                         "required": [
                                           "name",
                                           "description"
-                                        ],
-                                        "additionalProperties": false
+                                        ]
                                       },
                                       "description": "Subfields (recursive generic field).",
                                       "x-yang": {
@@ -3091,10 +3153,10 @@
                                       "minItems": 1
                                     }
                                   },
+                                  "additionalProperties": false,
                                   "required": [
                                     "composite"
                                   ],
-                                  "additionalProperties": false,
                                   "x-yang": {
                                     "name": "case-composite"
                                   }
@@ -3151,6 +3213,8 @@
                                   },
                                   "parent_array": {
                                     "type": "string",
+                                    "minLength": 1,
+                                    "maxLength": 128,
                                     "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                     "x-yang": {
                                       "type": "leafref",
@@ -3166,10 +3230,10 @@
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "entity"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                               "x-yang": {
@@ -3271,6 +3335,8 @@
                                                 },
                                                 "parent_array": {
                                                   "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128,
                                                   "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                   "x-yang": {
                                                     "type": "leafref",
@@ -3286,10 +3352,10 @@
                                                   }
                                                 }
                                               },
+                                              "additionalProperties": false,
                                               "required": [
                                                 "entity"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             },
                                             "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                             "x-yang": {
@@ -3387,6 +3453,7 @@
                                                     }
                                                   }
                                                 },
+                                                "additionalProperties": false,
                                                 "required": [
                                                   "primitive",
                                                   "min",
@@ -3395,7 +3462,6 @@
                                                   "maxDate",
                                                   "outlier"
                                                 ],
-                                                "additionalProperties": false,
                                                 "x-yang": {
                                                   "name": "open-primitive"
                                                 }
@@ -3427,10 +3493,10 @@
                                                     "minItems": 1
                                                   }
                                                 },
+                                                "additionalProperties": false,
                                                 "required": [
                                                   "enum"
                                                 ],
-                                                "additionalProperties": false,
                                                 "x-yang": {
                                                   "name": "closed-enum"
                                                 }
@@ -3488,6 +3554,8 @@
                                                 },
                                                 "parent_array": {
                                                   "type": "string",
+                                                  "minLength": 1,
+                                                  "maxLength": 128,
                                                   "description": "Optional: Parent's array field name where children are nested. When specified, references a field on the referenced entity whose instance type includes a direct array branch (not only a field_definition reference).",
                                                   "x-yang": {
                                                     "type": "leafref",
@@ -3503,10 +3571,10 @@
                                                   }
                                                 }
                                               },
+                                              "additionalProperties": false,
                                               "required": [
                                                 "entity"
-                                              ],
-                                              "additionalProperties": false
+                                              ]
                                             },
                                             "description": "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).",
                                             "x-yang": {
@@ -3555,20 +3623,27 @@
                                         "type": "boolean"
                                       }
                                     ],
-                                    "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                                    "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                     "x-yang": {
                                       "type": "leaf",
+                                      "must": [
+                                        {
+                                          "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                                          "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                                          "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                                        }
+                                      ],
                                       "when": {
-                                        "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                                       }
                                     }
                                   }
                                 },
+                                "additionalProperties": false,
                                 "required": [
                                   "name",
                                   "description"
-                                ],
-                                "additionalProperties": false
+                                ]
                               },
                               "description": "Subfields (recursive generic field).",
                               "x-yang": {
@@ -3605,11 +3680,18 @@
                           "type": "boolean"
                         }
                       ],
-                      "description": "Default value when the field is omitted in instance data. Only valid when type selects open primitive or closed enum.",
+                      "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                       "x-yang": {
                         "type": "leaf",
+                        "must": [
+                          {
+                            "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
+                            "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
+                            "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
+                          }
+                        ],
                         "when": {
-                          "condition": "boolean(../type/primitive) or boolean(../type/enum)"
+                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
                         }
                       }
                     },
@@ -3706,10 +3788,10 @@
                                 }
                               }
                             },
+                            "additionalProperties": false,
                             "required": [
                               "field"
-                            ],
-                            "additionalProperties": false
+                            ]
                           },
                           "description": "Field references for the computation (same entity or cross-entity with entity leaf).",
                           "x-yang": {
@@ -3727,17 +3809,17 @@
                           "maxItems": 100
                         }
                       },
+                      "additionalProperties": false,
                       "required": [
                         "operation"
-                      ],
-                      "additionalProperties": false
+                      ]
                     }
                   },
+                  "additionalProperties": false,
                   "required": [
                     "name",
                     "description"
-                  ],
-                  "additionalProperties": false
+                  ]
                 },
                 "description": "List of field definitions for this entity. Best practice: limit to 7 non-array fields per entity to encourage proper abstraction. Array fields (type: 'array') are excluded from this count as they represent relationships to child entities, not direct attributes. This constraint can be bypassed by setting allow_unlimited_fields (present) on the data model.",
                 "x-yang": {
@@ -3745,9 +3827,9 @@
                   "key": "name",
                   "must": [
                     {
-                      "must": "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type/definition]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and not(current()/default) and count(current()/type/array) = 0 and count(current()/type/composite) = 0)",
-                      "error-message": "When type references a field_definition, min, max, minDate, maxDate, enum, default, array, composite, and other inline type branches must not be specified (description and brief may be used at the reference site).",
-                      "description": "Inline constraints only when type is a primitive; when type uses the definition leafref they are inherited from the definition. Enforced only during consolidated validation (Phase 2). description and brief may be specified at the reference site."
+                      "must": "/data-model/consolidated = false() or count(/data-model/entities/field_definitions[name = current()/type/definition]) = 0 or (not(current()/type/min) and not(current()/type/max) and not(current()/type/minDate) and not(current()/type/maxDate) and count(current()/type/enum) = 0 and count(current()/type/array) = 0 and count(current()/type/composite) = 0)",
+                      "error-message": "When type references a field_definition, min, max, minDate, maxDate, enum, array, composite, and other inline type branches must not be specified (description, brief, and default may be used at the reference site).",
+                      "description": "Inline type constraints are inherited from the definition; when type uses the definition leafref do not repeat primitive branches at the reference site. Enforced only during consolidated validation (Phase 2). description, brief, and optional default may be specified at the reference site."
                     }
                   ]
                 },
@@ -3831,12 +3913,12 @@
                 }
               }
             },
+            "additionalProperties": false,
             "required": [
               "name",
               "description",
               "primary_key"
-            ],
-            "additionalProperties": false
+            ]
           },
           "description": "List of entity definitions",
           "x-yang": {
@@ -3895,11 +3977,11 @@
                 }
               }
             },
+            "additionalProperties": false,
             "required": [
               "id",
               "timestamp"
-            ],
-            "additionalProperties": false
+            ]
           },
           "description": "Change tracking records. NOTE: This list is automatically generated during consolidation and should NOT be included in source YAML files.",
           "x-yang": {
@@ -3908,10 +3990,10 @@
           }
         }
       },
+      "additionalProperties": false,
       "required": [
         "description"
-      ],
-      "additionalProperties": false
+      ]
     }
   },
   "additionalProperties": false,
@@ -3937,11 +4019,27 @@
     "date": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "\\d{4}-\\d{2}-\\d{2}",
+            "invert-match": false
+          }
+        ]
+      },
       "description": "Date in YYYY-MM-DD format"
     },
     "date-and-time": {
       "type": "string",
       "pattern": "^\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})?$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "\\d{4}-\\d{2}-\\d{2}T\\d{2}:\\d{2}:\\d{2}(\\.\\d+)?(Z|[+-]\\d{2}:\\d{2})?",
+            "invert-match": false
+          }
+        ]
+      },
       "description": "ISO 8601 date and time in format YYYY-MM-DDTHH:mm:ss[.sss][Z|±HH:mm]"
     },
     "entity-name": {
@@ -3949,11 +4047,27 @@
       "pattern": "^[a-z_][a-z0-9_]*$",
       "minLength": 1,
       "maxLength": 64,
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "[a-z_][a-z0-9_]*",
+            "invert-match": false
+          }
+        ]
+      },
       "description": "Entity name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2)."
     },
     "version-string": {
       "type": "string",
       "pattern": "^\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+",
+            "invert-match": false
+          }
+        ]
+      },
       "description": "Version string in format YY.MM.DD.N, auto-incremented during consolidation when changes are detected"
     },
     "rate-of-change": {
@@ -3995,7 +4109,15 @@
         },
         {
           "type": "string",
-          "pattern": "^\\*$"
+          "pattern": "^\\*$",
+          "x-yang": {
+            "string-patterns": [
+              {
+                "pattern": "\\*",
+                "invert-match": false
+              }
+            ]
+          }
         }
       ],
       "description": "Change history retention policy. Can be:\n       - An integer N: Keep last N modification change IDs (default: 3)\n       - '*': Keep infinite history\n       - 0: Disabled (no modification history tracked)"
@@ -4005,6 +4127,14 @@
       "pattern": "^[a-z_][a-z0-9_]*$",
       "minLength": 1,
       "maxLength": 128,
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "[a-z_][a-z0-9_]*",
+            "invert-match": false
+          }
+        ]
+      },
       "description": "Field name for computed references and leafrefs (same rules as entity fields)."
     },
     "field-validation-mode": {
