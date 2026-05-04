@@ -3,10 +3,7 @@
 This test validates that invalid enum values are caught during validation.
 """
 
-import sys
 from pathlib import Path
-
-import pytest
 
 import pytest
 
@@ -19,7 +16,7 @@ def test_invalid_enum_value():
     yang_file = Path(__file__).parent.parent / "examples" / "meta-model.yang"
     module = parse_yang_file(str(yang_file))
     validator = YangValidator(module)
-    
+
     # Test with invalid operation enum value
     data = {
         "data-model": {
@@ -51,26 +48,17 @@ def test_invalid_enum_value():
             ],
         }
     }
-    
-    is_valid, errors, warnings = validator.validate(data)
-    
-    # Expected: Invalid enum values should fail validation
-    # TODO: Enum validation is not currently implemented in xYang validator
-    # This test documents the expected behavior - enum validation should catch invalid values
-    # Once enum validation is implemented, this test should pass
-    if is_valid:
-        pytest.skip(
-            "Enum validation not yet implemented in xYang. "
-            "Invalid enum value 'invalid_operation' should fail validation but currently passes. "
-            f"Errors: {errors}, warnings: {warnings}"
-        )
-    
+
+    is_valid, errors, _warnings = validator.validate(data)
+
     assert not is_valid, (
         f"Should fail validation for invalid enum value 'invalid_operation'. "
-        f"Got errors: {errors}, warnings: {warnings}"
+        f"Got errors: {errors}, warnings: {_warnings}"
     )
-    assert any("operation" in error.lower() or "enum" in error.lower() or "invalid" in error.lower() 
-               for error in errors), f"Expected error about invalid enum value, got: {errors}"
+    joined = " ".join(errors).lower()
+    assert "invalid_operation" in joined or "enum" in joined, (
+        f"Expected error mentioning invalid enum value, got: {errors}"
+    )
 
 
 def test_valid_enum_value():
@@ -78,7 +66,7 @@ def test_valid_enum_value():
     yang_file = Path(__file__).parent.parent / "examples" / "meta-model.yang"
     module = parse_yang_file(str(yang_file))
     validator = YangValidator(module)
-    
+
     # Test with valid operation enum value
     data = {
         "data-model": {
@@ -110,9 +98,9 @@ def test_valid_enum_value():
             ],
         }
     }
-    
+
     is_valid, errors, warnings = validator.validate(data)
-    
+
     assert is_valid, f"Should pass validation for valid enum value, got errors: {errors}"
 
 

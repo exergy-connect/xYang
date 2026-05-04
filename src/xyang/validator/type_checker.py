@@ -12,6 +12,7 @@ import sys
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
+from ..errors import XPathSyntaxError
 from ..identity_graph import (
     identityref_value_valid,
     resolve_identity_qname_pair,
@@ -178,18 +179,19 @@ class TypeChecker:
         if not s:
             return ["instance-identifier path must not be empty when require-instance is true"]
         try:
-            ast = XPathParser(s).parse()
-        except Exception as e:
+            parsed = XPathParser(s).parse()
+        except XPathSyntaxError as e:
             return [f"instance-identifier: invalid path expression ({e})"]
-        if not isinstance(ast, PathNode):
+        if not isinstance(parsed, PathNode):
             return [
                 "instance-identifier: value must be a path expression (e.g. /top/leaf)"
             ]
-        if not ast.is_absolute:
+        path: PathNode = parsed
+        if not path.is_absolute:
             return [
                 "instance-identifier: only absolute paths are supported (path must start with '/')"
             ]
-        nodes = evaluator.eval(ast, ctx, ctx.root)
+        nodes = evaluator.eval(path, ctx, ctx.root)
         if not nodes:
             return [
                 f"instance-identifier: no instance at path {value!r} (require-instance is true)"
@@ -348,10 +350,15 @@ class TypeChecker:
     def _check_enum(
         self, value: Any, type_stmt: YangTypeStmt
     ) -> List[str]:
-        if type_stmt.enums and str(value) not in [str(e) for e in type_stmt.enums]:
+        if not type_stmt.enums:
+            return [
+                "enumeration type has no enum definitions in schema; cannot validate instance data"
+            ]
+        allowed = [str(e) for e in type_stmt.enums]
+        if str(value) not in allowed:
             return [
                 f"Value {value!r} is not one of the allowed enum values: "
-                f"{', '.join(str(e) for e in type_stmt.enums)}"
+                f"{', '.join(allowed)}"
             ]
         return []
 

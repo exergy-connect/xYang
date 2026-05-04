@@ -537,11 +537,11 @@ module test {
         }
     }
     is_valid, errors, warnings = validator.validate(invalid_data)
-    # Enum validation should catch this - if it doesn't, it's a bug
-    # This test documents expected behavior
-    if not is_valid:
-        assert len(errors) > 0, "Should have validation errors for invalid enum value"
-    # If it passes, that's a bug that needs to be fixed
+    assert not is_valid, "Invalid enumeration value must fail validation"
+    assert errors, f"Expected validation errors, got: {errors!r}"
+    assert any("enum" in e.lower() or "invalid_type" in e for e in errors), (
+        f"Expected enum-related error, got: {errors!r}"
+    )
 
 
 def test_choice_case_meta_model_primitive():
