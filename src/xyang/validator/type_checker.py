@@ -19,10 +19,40 @@ from ..identity_graph import (
 )
 from ..module import YangModule
 from ..xpath import XPathParser
-from ..xpath.ast import PathNode
+from ..xpath.ast import ASTNode, PathNode
 from ..xpath.node import Context, Node
 
 logger = logging.getLogger("xyang.validator")
+
+
+def _instance_identifier_path_errors(
+    expr: ASTNode,
+    value_repr: str,
+    ctx: Context,
+    evaluator: Any,
+) -> List[str]:
+    """Path shape and require-instance target check for a parsed instance-identifier.
+
+    Kept as a module function so ``isinstance(expr, PathNode)`` and uses of
+    ``PathNode`` (e.g. ``is_absolute``) stay in one scope; some linters do not
+    narrow types across call boundaries or after ``try``/``except`` assignments.
+    """
+    if not isinstance(expr, PathNode):
+        return [
+            "instance-identifier: value must be a path expression (e.g. /top/leaf)"
+        ]
+    if not expr.is_absolute:
+        return [
+            "instance-identifier: only absolute paths are supported "
+            "(path must start with '/')"
+        ]
+    nodes = evaluator.eval(expr, ctx, ctx.root)
+    if not nodes:
+        return [
+            f"instance-identifier: no instance at path {value_repr!r} "
+            "(require-instance is true)"
+        ]
+    return []
 
 
 def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
@@ -81,7 +111,16 @@ class TypeChecker:
             return [f"unknown typedef {local!r} in imported module {pref!r}"]
 
         if name == "union":
-            return self._check_union(value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current)
+            return self._check_union(
+                value,
+                type_stmt,
+                path,
+                root_data,
+                root_schema,
+                ctx=ctx,
+                evaluator=evaluator,
+                leafref_current=leafref_current,
+            )
         if name == "identityref":
             return self._check_identityref(value, type_stmt, root_schema)
         if name == "instance-identifier":
@@ -89,7 +128,14 @@ class TypeChecker:
                 value, type_stmt, ctx, evaluator
             )
         if name == "leafref":
-            return self._check_leafref(value, type_stmt, path, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current)
+            return self._check_leafref(
+                value,
+                type_stmt,
+                path,
+                ctx=ctx,
+                evaluator=evaluator,
+                leafref_current=leafref_current,
+            )
         if name in (
             "string",
             "entity-name",
@@ -182,21 +228,7 @@ class TypeChecker:
             parsed = XPathParser(s).parse()
         except XPathSyntaxError as e:
             return [f"instance-identifier: invalid path expression ({e})"]
-        if not isinstance(parsed, PathNode):
-            return [
-                "instance-identifier: value must be a path expression (e.g. /top/leaf)"
-            ]
-        path: PathNode = parsed
-        if not path.is_absolute:
-            return [
-                "instance-identifier: only absolute paths are supported (path must start with '/')"
-            ]
-        nodes = evaluator.eval(path, ctx, ctx.root)
-        if not nodes:
-            return [
-                f"instance-identifier: no instance at path {value!r} (require-instance is true)"
-            ]
-        return []
+        return _instance_identifier_path_errors(parsed, value, ctx, evaluator)
 
     def _check_union(
         self,
@@ -205,12 +237,22 @@ class TypeChecker:
         path: str,
         root_data: Any,
         root_schema: Any,
+        *,
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
     ) -> List[str]:
         for member in type_stmt.types:
-            if not self.check(value, member, path, root_data, root_schema, ctx=ctx, evaluator=evaluator, leafref_current=leafref_current):
+            if not self.check(
+                value,
+                member,
+                path,
+                root_data,
+                root_schema,
+                ctx=ctx,
+                evaluator=evaluator,
+                leafref_current=leafref_current,
+            ):
                 return []
         names = ", ".join(t.name for t in type_stmt.types)
         return [f"Value {value!r} does not match any union member type ({names})"]
@@ -234,7 +276,7 @@ class TypeChecker:
             value,
             path_str,
         )
-        # For relative paths and current() in predicates, use leafref_current (parent of leaf) when provided
+        # For relative paths and current() in predicates, use leafref_current (parent of leaf)
         current_node = leafref_current if leafref_current is not None else ctx.current
         if leafref_current is not None and leafref_current is not ctx.current:
             leafref_ctx = Context(current=leafref_current, root=ctx.root, path_cache=ctx.path_cache)
@@ -244,7 +286,7 @@ class TypeChecker:
             start_node = ctx.root
         else:
             if current_node is None:
-                logger.debug("_check_leafref FAIL node_path=%s (no context node for relative path)", node_path)
+                logger.debug("_check_leafref FAIL node_path=%s (no ctxt for rel path)", node_path)
                 return [
                     f"Leafref relative path {path_str!r} requires context node"
                 ]
@@ -366,7 +408,7 @@ class TypeChecker:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
         if not isinstance(value, str):
             return [
-                f"bits value must be a string (space-separated bit names), got {type(value).__name__}"
+                f"bits value must be a string (space-sep bit names), got {type(value).__name__}"
             ]
         bits = type_stmt.bits or []
         allowed = {b.name for b in bits}
