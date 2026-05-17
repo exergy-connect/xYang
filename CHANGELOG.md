@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-17
+
 ### Added
 
 - **CLI `--include-path`:** repeatable directory search path for imported modules on `parse`, `validate`, and `convert` (same semantics as `parse_yang_file(..., include_path=...)` / `YangParser(include_path=...)`).
@@ -21,6 +23,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **Packaging:** declare Python **3.14** support (PyPI classifiers, CI matrix, Black `py314` target); bump dev optional dependency `black` to `>=26.5.0`.
 - **CLI:** `validate` / `convert` / `parse` share include-path handling; `validate` applies the same paths when loading `--anydata-module` files. Exception handling uses explicit expected error types instead of bare `Exception`.
 - **`config` substatement:** consumed with a `logging` warning on data definition nodes; not stored on the AST or enforced in validation.
 - **TypeScript:** revision parser accepts `reference` in braced revision bodies (parity with Python).
@@ -69,6 +72,7 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.1...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/exergy-connect/xYang/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/exergy-connect/xYang/releases/tag/v0.1.0

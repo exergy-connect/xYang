@@ -9,7 +9,7 @@ with open("README.md", "r", encoding="utf-8") as fh:
 
 setup(
     name="xyang",
-    version="0.1.1",
+    version="0.1.2",
     author="Exergy LLC",
     description="A Python library implementing a subset of YANG features focused on constraint validation",
     long_description=long_description,
@@ -27,6 +27,7 @@ setup(
         "Programming Language :: Python :: 3.11",
         "Programming Language :: Python :: 3.12",
         "Programming Language :: Python :: 3.13",
+        "Programming Language :: Python :: 3.14",
         "Topic :: Software Development :: Libraries :: Python Modules",
         "Topic :: System :: Networking",
     ],

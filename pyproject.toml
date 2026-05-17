@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "xyang"
-version = "0.1.1"
+version = "0.1.2"
 description = "A Python library implementing a subset of YANG features focused on constraint validation"
 readme = "README.md"
 requires-python = ">=3.9"
@@ -23,6 +23,7 @@ classifiers = [
     "Programming Language :: Python :: 3.11",
     "Programming Language :: Python :: 3.12",
     "Programming Language :: Python :: 3.13",
+    "Programming Language :: Python :: 3.14",
     "Topic :: Software Development :: Libraries :: Python Modules",
     "Topic :: System :: Networking",
 ]
@@ -33,7 +34,7 @@ dependencies = []
 # pytest 9 / black 26 need Python >= 3.10 to run; use pytest 8.x on 3.9 (see CI).
 dev = [
     "pytest>=9.0.3",
-    "black>=26.3.1",
+    "black>=26.5.0",
     "PyYAML>=6.0.3",
 ]
 
@@ -62,4 +63,4 @@ python_functions = ["test_*"]
 
 [tool.black]
 line-length = 120
-target-version = ["py39", "py310", "py311", "py312", "py313"]
+target-version = ["py39", "py310", "py311", "py312", "py313", "py314"]
