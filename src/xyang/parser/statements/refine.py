@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangRefineStmt, YangUsesStmt
 from ...errors import XPathSyntaxError
@@ -23,9 +24,10 @@ class RefineStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._refine_substatement_dispatch = {
+        self._refine_substatement_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
             kw.MUST: self._parsers.parse_must,
-            kw.DESCRIPTION: self._parsers.parse_description,
             kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
             kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
             kw.ORDERED_BY: self._parsers.parse_ordered_by,
@@ -33,7 +35,8 @@ class RefineStatementParser:
             kw.DEFAULT: self._parse_refine_default,
             kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
             kw.TYPE: self._parsers.parse_type,
-        }
+            },
+        )
 
     def _parse_refine_substatement(
         self, tokens: TokenStream, context: ParserContext, target_path: PathNode

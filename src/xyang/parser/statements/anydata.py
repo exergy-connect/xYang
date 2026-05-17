@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangAnydataStmt
 
@@ -20,13 +21,15 @@ class AnydataStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._anydata_body_dispatch = {
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.WHEN: self._parsers.parse_when,
-            kw.MUST: self._parsers.parse_must,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.MANDATORY: self._parsers.parse_leaf_mandatory,
-        }
+        self._anydata_body_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
+                kw.WHEN: self._parsers.parse_when,
+                kw.MUST: self._parsers.parse_must,
+                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+                kw.MANDATORY: self._parsers.parse_leaf_mandatory,
+            },
+        )
 
     def parse_anydata(
         self, tokens: TokenStream, context: ParserContext

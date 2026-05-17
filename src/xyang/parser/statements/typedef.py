@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING, Optional
 
+from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangTypedefStmt
 
@@ -20,10 +21,13 @@ class TypedefStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._typedef_body_dispatch = {
-            kw.TYPE: self._parsers.parse_type,
-            kw.DESCRIPTION: self._parsers.parse_description,
-        }
+        self._typedef_body_dispatch = with_metadata_substatements(
+            self._parsers,
+            {
+                kw.TYPE: self._parsers.parse_type,
+                kw.DEFAULT: self._parsers.parse_typedef_default,
+            },
+        )
 
     def parse_typedef(
         self, tokens: TokenStream, context: ParserContext

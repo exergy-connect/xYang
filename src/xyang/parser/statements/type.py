@@ -106,7 +106,7 @@ class TypeStatementParser:
     def parse_type_pattern(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse ``pattern`` (RFC 7950 §9.4.6): string argument, then ``;`` or substatement block."""
         tokens.consume(kw.PATTERN)
-        pattern = tokens.consume_type(YangTokenType.STRING)
+        pattern = self._parsers._parse_string_concatenation(tokens)
         invert_match = False
         pattern_error_message = None
         pattern_error_app_tag = None
@@ -116,14 +116,14 @@ class TypeStatementParser:
                 if pt == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, context)
                 elif pt == kw.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, context)
+                    self._parsers.parse_reference(tokens, context)
                 elif pt == kw.ERROR_MESSAGE:
                     tokens.consume(kw.ERROR_MESSAGE)
-                    pattern_error_message = tokens.consume_type(YangTokenType.STRING)
+                    pattern_error_message = self._parsers._parse_string_concatenation(tokens)
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == kw.ERROR_APP_TAG:
                     tokens.consume(kw.ERROR_APP_TAG)
-                    pattern_error_app_tag = tokens.consume_type(YangTokenType.STRING)
+                    pattern_error_app_tag = self._parsers._parse_string_concatenation(tokens)
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == kw.MODIFIER:
                     tokens.consume(kw.MODIFIER)
@@ -149,15 +149,13 @@ class TypeStatementParser:
     def parse_type_length(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse length constraint."""
         tokens.consume(kw.LENGTH)
-        length = tokens.consume().strip('"\'')
-        type_stmt.length = length
+        type_stmt.length = self._parsers.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_range(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse range constraint."""
         tokens.consume(kw.RANGE)
-        range_val = tokens.consume_type(YangTokenType.STRING)
-        type_stmt.range = range_val
+        type_stmt.range = self._parsers.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_fraction_digits(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
@@ -177,7 +175,7 @@ class TypeStatementParser:
                 if pt == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, context)
                 elif pt == kw.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, context)
+                    self._parsers.parse_reference(tokens, context)
                 elif pt == kw.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, context)
                 elif pt == kw.VALUE:
@@ -200,8 +198,8 @@ class TypeStatementParser:
     def parse_type_path(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse path constraint (for leafref). Path is parsed to XPath PathNode during parsing."""
         tokens.consume(kw.PATH)
-        path_str = tokens.consume_type(YangTokenType.STRING)
-        type_stmt.path = cast(PathNode, XPathParser(path_str).parse())
+        path_str = self._parsers.parse_string_argument(tokens)
+        type_stmt.path = cast(PathNode, XPathParser(path_str).parse_path())
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:

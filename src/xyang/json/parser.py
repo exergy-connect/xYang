@@ -373,7 +373,13 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
     type_stmt = _type_from_schema(defs, def_schema, xyang)
     if type_stmt is None:
         type_stmt = YangTypeStmt(name="string")
-    stmt = YangTypedefStmt(name=def_name, description=desc, type=type_stmt)
+    default = def_schema.get(JsonSchemaKey.DEFAULT)
+    stmt = YangTypedefStmt(
+        name=def_name,
+        description=desc,
+        type=type_stmt,
+        default=default,
+    )
     return stmt
 
 

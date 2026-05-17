@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import Optional, TYPE_CHECKING
 
+from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangGroupingStmt, YangUsesStmt
 from ...refine_expand import apply_refines_by_path, copy_yang_statement
@@ -23,12 +24,14 @@ class UsesStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._uses_substatement_dispatch = {
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.WHEN: self._parsers.parse_when,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.REFINE: self._parsers.parse_refine,
-        }
+        self._uses_substatement_dispatch = with_metadata_substatements(
+            self._parsers,
+            {
+                kw.WHEN: self._parsers.parse_when,
+                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+                kw.REFINE: self._parsers.parse_refine,
+            },
+        )
 
     def _parse_uses_substatement(
         self, tokens: TokenStream, context: ParserContext, grouping_name: str

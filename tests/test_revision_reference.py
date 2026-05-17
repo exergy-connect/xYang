@@ -24,6 +24,40 @@ def test_revision_reference_parsed() -> None:
     assert rev["reference"] == "RFC 8632: A YANG Data Model for Alarm Management"
 
 
+def test_typedef_default_parsed() -> None:
+    mod = parse_yang_string(
+        """module m {
+  yang-version 1.1;
+  namespace "urn:example:m";
+  prefix m;
+  typedef counter-like {
+    type uint32;
+    default "0";
+    reference "RFC 7950";
+  }
+}"""
+    )
+    td = mod.typedefs["counter-like"]
+    assert td.default == "0"
+    assert td.reference == "RFC 7950"
+
+
+def test_typedef_reference_parsed() -> None:
+    mod = parse_yang_string(
+        """module m {
+  yang-version 1.1;
+  namespace "urn:example:m";
+  prefix m;
+  typedef t {
+    type string;
+    reference "RFC 7950";
+  }
+}"""
+    )
+    td = mod.typedefs["t"]
+    assert td.reference == "RFC 7950"
+
+
 def test_revision_description_only() -> None:
     mod = parse_yang_string(
         """module m {

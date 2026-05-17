@@ -1006,6 +1006,8 @@ def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> 
         leafref_anchor=None,
     )  # no $ref inside typedef def
     schema[JsonSchemaKey.DESCRIPTION] = typedef.description or ""
+    if typedef.default is not None:
+        schema[JsonSchemaKey.DEFAULT] = typedef.default
     return schema
 
 
