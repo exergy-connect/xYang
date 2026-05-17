@@ -36,7 +36,7 @@ class ExtensionStatementParser:
                 elif tt == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
                 elif tt == kw.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, new_context)
+                    self._parsers.parse_reference(tokens, new_context)
                 elif tt == kw.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, new_context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(

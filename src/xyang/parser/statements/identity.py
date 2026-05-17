@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangIdentityStmt
 
@@ -20,10 +21,13 @@ class IdentityStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._identity_substatement_dispatch = {
-            kw.BASE: self._parse_identity_base,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-        }
+        self._identity_substatement_dispatch = with_metadata_substatements(
+            self._parsers,
+            {
+                kw.BASE: self._parse_identity_base,
+                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            },
+        )
 
     def _parse_identity_substatement(
         self, tokens: TokenStream, context: ParserContext, identity_name: str

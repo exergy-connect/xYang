@@ -252,15 +252,26 @@ class XPathParser {
     return node;
   }
 
-  private parsePath(isAbsolute: boolean, firstStep?: string): XPathAstNode {
+  private parsePath(isAbsolute: boolean, firstStep?: string, allowPredicate = true): XPathAstNode {
     const segments: XPathPathNode["segments"] = [];
 
     const pushStep = (step: string): boolean => {
       const segment: XPathPathNode["segments"][number] = { step };
       segments.push(segment);
-      if (this.current().kind === "bracket_open") {
+      while (this.current().kind === "bracket_open") {
+        if (!allowPredicate) {
+          throw new XPathSyntaxError("Predicates are not allowed in this path context", {
+            expression: this.expression,
+            position: this.current().position
+          });
+        }
         this.consume("bracket_open");
-        segment.predicate = this.parseExpression();
+        const pred = this.parseExpression();
+        if (segment.predicate === undefined) {
+          segment.predicate = pred;
+        } else {
+          segment.predicate = { kind: "binary", operator: "and", left: segment.predicate, right: pred };
+        }
         this.consume("bracket_close");
       }
       if (this.current().kind === "slash") {
@@ -284,8 +295,36 @@ class XPathParser {
     const node: XPathPathNode = { kind: "path", segments, isAbsolute };
     return node;
   }
+
+  parsePathExpression(options: { allowPredicate?: boolean } = {}): XPathAstNode {
+    const allowPredicate = options.allowPredicate ?? true;
+    if (this.current().kind === "eof") {
+      throw new XPathSyntaxError("Empty path expression", {
+        expression: this.expression,
+        position: 0
+      });
+    }
+    let isAbsolute = false;
+    if (this.current().kind === "slash") {
+      isAbsolute = true;
+      this.consume("slash");
+    }
+    const node = this.parsePath(isAbsolute, undefined, allowPredicate);
+    const token = this.current();
+    if (token.kind !== "eof") {
+      throw new XPathSyntaxError(`Unexpected token: ${token.value || token.kind}`, {
+        expression: this.expression,
+        position: token.position
+      });
+    }
+    return node;
+  }
 }
 
 export function parseXPath(expression: string): XPathAstNode {
   return new XPathParser(expression).parse();
+}
+
+export function parseXPathPath(expression: string, options: { allowPredicate?: boolean } = {}): XPathAstNode {
+  return new XPathParser(expression).parsePathExpression(options);
 }

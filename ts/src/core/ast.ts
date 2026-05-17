@@ -52,12 +52,14 @@ export class YangStatement extends YangStatementList {
   keyword: string;
   name: string;
   description: string;
+  reference: string;
 
   constructor(init: Partial<YangStatement> = {}) {
     super(init.statements ?? []);
     this.keyword = init.keyword ?? "";
     this.name = init.name ?? "";
     this.description = init.description ?? "";
+    this.reference = init.reference ?? "";
   }
 
   get_schema_node(): string | undefined {
@@ -103,11 +105,13 @@ export class YangStatementWithWhen extends YangStatement {
 
 export class YangTypedefStmt extends YangStatement {
   type?: YangTypeStmt;
+  default?: string;
 
   constructor(init: Partial<YangTypedefStmt> = {}) {
     super(init);
     this.keyword = "typedef";
     this.type = init.type;
+    this.default = init.default;
   }
 
   override get_schema_node(): string | undefined {

@@ -57,15 +57,13 @@ class XPathParser:
             )
         return node
 
-    def parse_path(self) -> PathNode:
+    def parse_path(self, *, allow_predicate: bool = True) -> PathNode:
         """
         Parse the expression *strictly* as a path and return a PathNode.
 
         This uses the internal _parse_path() helper directly instead of the full
-        expression grammar, so only simple path expressions are accepted:
-        - absolute paths starting with '/'
-        - relative paths starting with '.', '..', or an identifier
-        Predicates (e.g. [cond]) are explicitly rejected here.
+        expression grammar. Accepts absolute paths (``/a/b``), relative paths,
+        and predicates on steps (``/a[b=1][c=2]``) when *allow_predicate* is true.
         """
         if not self.tokens or self.tokens[0].type == TokenType.EOF:
             raise XPathSyntaxError("Empty path expression")
@@ -76,7 +74,9 @@ class XPathParser:
         if is_absolute:
             self._consume(TokenType.SLASH)
         # First step parsed by _parse_path (absolute or relative)
-        path, _ = self._parse_path(is_absolute=is_absolute, allow_predicate=False)
+        path, _ = self._parse_path(
+            is_absolute=is_absolute, allow_predicate=allow_predicate
+        )
 
         # Ensure we've consumed the entire input
         if self._current().type != TokenType.EOF:
@@ -303,7 +303,7 @@ class XPathParser:
             nonlocal cacheable
             seg = PathSegment(step, None)
             segments.append(seg)
-            if self._current().type == TokenType.BRACKET_OPEN:
+            while self._current().type == TokenType.BRACKET_OPEN:
                 if not allow_predicate:
                     raise XPathSyntaxError(
                         "Predicates are not allowed in this path context",
@@ -312,7 +312,10 @@ class XPathParser:
                     )
                 self._consume(TokenType.BRACKET_OPEN)
                 pred_node, pred_cacheable = self._parse_expression()
-                seg.predicate = pred_node
+                if seg.predicate is None:
+                    seg.predicate = pred_node
+                else:
+                    seg.predicate = BinaryOpNode(seg.predicate, "and", pred_node)
                 cacheable = cacheable and pred_cacheable
                 self._consume(TokenType.BRACKET_CLOSE)
             if self._current().type == TokenType.SLASH:

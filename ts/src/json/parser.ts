@@ -1,6 +1,6 @@
 import { YangModule, type ModuleSource, type SerializedStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
-import { parseXPath } from "../xpath/parser";
+import { parseXPathPath } from "../xpath/parser";
 import { YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   decimal64FractionDigitsFromSchema,
@@ -91,7 +91,7 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     const path = typeof xy.path === "string" ? xy.path : "";
     if (path) {
       // Validate path syntax early for parity with YANG parsing behavior.
-      parseXPath(path);
+      parseXPathPath(path);
     }
     return {
       name: YangTokenType.LEAFREF,

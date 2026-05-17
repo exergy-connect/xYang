@@ -135,6 +135,31 @@ module test {
     assert "case" in str(exc_info.value).lower() or "mandatory" in str(exc_info.value).lower()
 
 
+def test_choice_inline_leaf_creates_implicit_case():
+    """RFC 7950 §7.9.2: ``leaf`` directly under ``choice`` implies a ``case`` with the same name."""
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test";
+  prefix "t";
+
+  container data {
+    choice sev-spec {
+      leaf below { type string; }
+      leaf is { type string; }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    ch = _first_choice_named(module, "sev-spec")
+    assert [c.name for c in ch.cases] == ["below", "is"]
+    for case in ch.cases:
+        assert len(case.statements) == 1
+        assert isinstance(case.statements[0], YangLeafStmt)
+        assert case.statements[0].name == case.name
+
+
 def test_leaf_mandatory_true_inside_choice_case_parses():
     """RFC 7950 §7.6.5: ``mandatory`` on a ``leaf``; under a case, existence rules use the case ancestor (§7.6.5)."""
     yang_content = """

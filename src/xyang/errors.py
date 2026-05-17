@@ -32,14 +32,7 @@ class YangSyntaxError(SyntaxError):
         self.context_lines = context_lines or []
         self.filename = filename
 
-        # Build detailed error message
-        parts = []
-        if filename:
-            parts.append(f"{filename}:")
-        if line_num:
-            parts.append(f"{line_num}:")
-        parts.append(message)
-        base_msg = " ".join(parts)
+        base_msg = self._format_headline()
 
         # Add context if available
         if self.context_lines:
@@ -52,8 +45,18 @@ class YangSyntaxError(SyntaxError):
 
         super().__init__(base_msg)
 
-    def __str__(self):
-        return self.message
+    def _format_headline(self) -> str:
+        """``filename:line: message`` when location is known."""
+        parts: list[str] = []
+        if self.filename:
+            parts.append(f"{self.filename}:")
+        if self.line_num is not None:
+            parts.append(f"{self.line_num}:")
+        parts.append(self.message)
+        return " ".join(parts)
+
+    def __str__(self) -> str:
+        return self._format_headline()
 
 
 class YangSemanticError(ValueError):

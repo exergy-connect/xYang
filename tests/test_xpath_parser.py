@@ -159,6 +159,31 @@ def test_path_dot_with_predicate_parses():
     assert ast.segments[0].predicate is not None
 
 
+def test_parse_path_multiple_predicates_on_one_step():
+    """Leafref-style path with consecutive predicates on the same step (XPath 1.0)."""
+    path = (
+        "/alarms/alarm-list/alarm[resource=current()/../resource]"
+        "[alarm-type-id=current()/../alarm-type-id]/alarm-type-qualifier"
+    )
+    ast = XPathParser(path).parse_path()
+    assert isinstance(ast, PathNode)
+    assert [s.step for s in ast.segments] == [
+        "alarms",
+        "alarm-list",
+        "alarm",
+        "alarm-type-qualifier",
+    ]
+    alarm_seg = ast.segments[2]
+    assert alarm_seg.predicate is not None
+    assert isinstance(alarm_seg.predicate, BinaryOpNode)
+    assert alarm_seg.predicate.operator == "and"
+
+
+def test_parse_path_rejects_predicates_when_disabled():
+    with pytest.raises(XPathSyntaxError, match="Predicates are not allowed"):
+        XPathParser("/a[b=1]").parse_path(allow_predicate=False)
+
+
 def test_path_identifier_with_predicate_parses():
     """Path step identifier with predicate parses (e.g. a[1], foo[bar=1])."""
     ast = XPathParser("a[ 1 ]").parse()

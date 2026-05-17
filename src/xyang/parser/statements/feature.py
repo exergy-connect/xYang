@@ -26,7 +26,7 @@ class FeatureStatementParser:
         name = tokens.consume_type(YangTokenType.IDENTIFIER)
         context.module.features.add(name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            holder = SimpleNamespace(if_features=[])
+            holder = SimpleNamespace(if_features=[], description="", reference="")
             feat_ctx = context.push_parent(holder)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 tt = self._parsers._dispatch_key(tokens)
@@ -37,7 +37,7 @@ class FeatureStatementParser:
                     self._parsers.parse_if_feature_stmt(tokens, feat_ctx)
                     continue
                 if tt == kw.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, feat_ctx)
+                    self._parsers.parse_reference(tokens, feat_ctx)
                     continue
                 if self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"feature '{name}'"
@@ -70,7 +70,7 @@ class FeatureStatementParser:
                     )
                     continue
                 if tt == kw.REFERENCE:
-                    self._parsers.parse_reference_string_only(tokens, context)
+                    self._parsers.parse_reference(tokens, context)
                     continue
                 if self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "if-feature substatement"

@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangGroupingStmt
 
@@ -20,8 +21,9 @@ class GroupingStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._grouping_substatement_dispatch = {
-            kw.DESCRIPTION: self._parsers.parse_description,
+        self._grouping_substatement_dispatch = with_metadata_substatements(
+            self._parsers,
+            {
             kw.CHOICE: self._parsers.parse_choice,
             kw.CONTAINER: self._parsers.parse_container,
             kw.LIST: self._parsers.parse_list,
@@ -33,7 +35,8 @@ class GroupingStatementParser:
             kw.MUST: self._parsers.parse_must,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
-        }
+            },
+        )
 
     def _parse_grouping_substatement(
         self, tokens: TokenStream, context: ParserContext, grouping_name: str

@@ -60,6 +60,7 @@ export const MIN_ELEMENTS = "min-elements";
 export const MAX_ELEMENTS = "max-elements";
 export const ORDERED_BY = "ordered-by";
 export const MANDATORY = "mandatory";
+export const CONFIG = "config";
 export const DEFAULT = "default";
 export const ERROR_MESSAGE = "error-message";
 export const ERROR_APP_TAG = "error-app-tag";

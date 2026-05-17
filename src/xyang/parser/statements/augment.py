@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangAugmentStmt
 
@@ -20,20 +21,22 @@ class AugmentStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._augment_body_dispatch = {
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.USES: self._parsers.parse_uses,
-            kw.LEAF: self._parsers.parse_leaf,
-            kw.LEAF_LIST: self._parsers.parse_leaf_list,
-            kw.CONTAINER: self._parsers.parse_container,
-            kw.LIST: self._parsers.parse_list,
-            kw.CHOICE: self._parsers.parse_choice,
-            kw.ANYDATA: self._parsers.parse_anydata,
-            kw.ANYXML: self._parsers.parse_anyxml,
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.WHEN: self._parsers.parse_when,
-            kw.MUST: self._parsers.parse_must,
-        }
+        self._augment_body_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
+                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+                kw.USES: self._parsers.parse_uses,
+                kw.LEAF: self._parsers.parse_leaf,
+                kw.LEAF_LIST: self._parsers.parse_leaf_list,
+                kw.CONTAINER: self._parsers.parse_container,
+                kw.LIST: self._parsers.parse_list,
+                kw.CHOICE: self._parsers.parse_choice,
+                kw.ANYDATA: self._parsers.parse_anydata,
+                kw.ANYXML: self._parsers.parse_anyxml,
+                kw.WHEN: self._parsers.parse_when,
+                kw.MUST: self._parsers.parse_must,
+            },
+        )
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse augment statement."""

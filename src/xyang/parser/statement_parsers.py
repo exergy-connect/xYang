@@ -92,7 +92,7 @@ class StatementParsers:
             kw.WHEN: self.parse_when,
             kw.MUST: self.parse_must,
             kw.DESCRIPTION: self.parse_description,
-            kw.REFERENCE: self.parse_reference_string_only,
+            kw.REFERENCE: self.parse_reference,
             kw.USES: self.parse_uses,
             kw.LEAF: self.parse_leaf,
             kw.LEAF_LIST: self.parse_leaf_list,
@@ -151,7 +151,7 @@ class StatementParsers:
         """Skip unsupported constructs when applicable; otherwise raise ``Unknown statement in {context}: …``."""
         if self._skip_unsupported_if_present(tokens, context):
             return True
-        raise tokens._make_error(
+        raise tokens.make_error(
             f"Invalid or unknown statement in {context}: {tokens.peek()!r}"
         )
 
@@ -283,9 +283,8 @@ class StatementParsers:
         self._revision_parser.parse_revision_date_statement(tokens)
 
     def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
-        tokens.consume(kw.REFERENCE)
-        tokens.consume_type(YangTokenType.STRING)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        """Parse ``reference``; store on parent when it has a ``reference`` field."""
+        self.parse_reference(tokens, context)
 
     def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._extension_parser.parse_extension_stmt(tokens, context)
@@ -322,6 +321,15 @@ class StatementParsers:
         if not tokens.has_more() or tokens.peek() != kw.DESCRIPTION:
             return
         self.parse_description(tokens, context)
+
+    def parse_reference(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse reference statement into ``current_parent.reference`` when present."""
+        tokens.consume(kw.REFERENCE)
+        ref = tokens.consume_type(YangTokenType.STRING)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        parent = context.current_parent
+        if parent is not None and hasattr(parent, "reference"):
+            setattr(parent, "reference", ref)
 
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse revision statement."""
@@ -454,6 +462,14 @@ class StatementParsers:
             context.current_parent.default = self._parse_default_value_tokens(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
+    def parse_typedef_default(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse default in typedef statement (RFC 7950 §7.3)."""
+        tokens.consume(kw.DEFAULT)
+        parent = context.current_parent
+        if isinstance(parent, YangTypedefStmt):
+            parent.default = self._parse_default_value_tokens(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse presence statement for container."""
         tokens.consume(kw.PRESENCE)
@@ -461,13 +477,28 @@ class StatementParsers:
             context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
+    def parse_config_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``config`` substatement; log warning and do not store on AST."""
+        from .unsupported_skip import skip_config_substatement
+
+        parent = context.current_parent
+        name = getattr(parent, "name", None) if parent is not None else None
+        ctx = f"{type(parent).__name__}" + (f" '{name}'" if name else "")
+        skip_config_substatement(tokens, context=ctx)
+
     def _parse_string_concatenation(self, tokens: TokenStream) -> str:
         """Consume one or more STRING tokens with optional PLUS between; return concatenated string."""
         parts = [tokens.consume_type(YangTokenType.STRING)]
         while tokens.has_more() and tokens.peek_type() == YangTokenType.PLUS:
             tokens.consume_type(YangTokenType.PLUS)
             parts.append(tokens.consume_type(YangTokenType.STRING))
-        return ''.join(parts)
+        return "".join(parts)
+
+    def parse_string_argument(self, tokens: TokenStream) -> str:
+        """Parse a YANG string argument (quoted concat or a single lexical token)."""
+        if tokens.peek_type() == YangTokenType.STRING:
+            return self._parse_string_concatenation(tokens)
+        return tokens.consume().strip("\"'")
 
     def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
         return self._must_parser.parse_must(tokens, context)

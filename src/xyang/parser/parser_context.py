@@ -201,8 +201,12 @@ class TokenStream:
             self._diagnostic_lines = diagnostic_source_lines(self._source)
         return self._diagnostic_lines
 
-    def _make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
+    def make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
         """Create a syntax error at current position."""
+        return self._make_error(message, context_lines)
+
+    def _make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
+        """Create a syntax error at current position (internal; prefer :meth:`make_error`)."""
         line_num, _ = self.position()
         lines = self._diagnostic_lines_once()
 

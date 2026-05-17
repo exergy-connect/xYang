@@ -1,7 +1,7 @@
 import * as kw from "../keywords";
 import { YangPatternSpec, YangTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
-import { parseXPath } from "../../xpath/parser";
+import { parseXPathPath } from "../../xpath/parser";
 import type { StatementParsers } from "../statement-parsers";
 
 export class TypeStatementParser {
@@ -66,7 +66,7 @@ export class TypeStatementParser {
 
   parse_type_pattern(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.PATTERN);
-    const pattern = tokens.consume_type(YangTokenType.STRING);
+    const pattern = this.parsers.parse_string_concatenation(tokens);
     let invertMatch = false;
     let patternErrorMessage: string | undefined;
     let patternErrorAppTag: string | undefined;
@@ -75,11 +75,11 @@ export class TypeStatementParser {
         const tt = this.parsers.dispatch_key(tokens);
         if (tt === kw.ERROR_MESSAGE) {
           tokens.consume(kw.ERROR_MESSAGE);
-          patternErrorMessage = tokens.consume_type(YangTokenType.STRING);
+          patternErrorMessage = this.parsers.parse_string_concatenation(tokens);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else if (tt === kw.ERROR_APP_TAG) {
           tokens.consume(kw.ERROR_APP_TAG);
-          patternErrorAppTag = tokens.consume_type(YangTokenType.STRING);
+          patternErrorAppTag = this.parsers.parse_string_concatenation(tokens);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else if (tt === kw.MODIFIER) {
           tokens.consume(kw.MODIFIER);
@@ -104,13 +104,13 @@ export class TypeStatementParser {
 
   parse_type_length(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.LENGTH);
-    type_stmt.length = tokens.consume();
+    type_stmt.length = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_range(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.RANGE);
-    type_stmt.range = tokens.consume_type(YangTokenType.STRING);
+    type_stmt.range = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
@@ -134,8 +134,8 @@ export class TypeStatementParser {
 
   parse_type_path(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.PATH);
-    const path = tokens.consume_type(YangTokenType.STRING);
-    type_stmt.path = parseXPath(path);
+    const path = this.parsers.parse_string_argument(tokens);
+    type_stmt.path = parseXPathPath(path);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

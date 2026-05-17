@@ -35,6 +35,8 @@ class MustStatementParser:
                     self.parse_must_error_message(tokens, new_context)
                 elif token_type == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
+                elif token_type == kw.REFERENCE:
+                    self._parsers.parse_reference(tokens, new_context)
                 elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
                     tokens, "must"
                 ):

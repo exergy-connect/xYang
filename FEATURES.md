@@ -109,6 +109,7 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 - ⚠️ **`augment`** — Parsed into `YangAugmentStmt` (including `if-feature`, `when`, `must`, nested data definitions). With `YangParser(expand_uses=True)`, augments are resolved and merged into the target module (same gate as `uses` expansion). With `expand_uses=False`, augments stay as statements for reversible convert. **JSON Schema** emission today still does not walk merged augment semantics end-to-end for every case; validate with an expanded module when you need full augmented-tree checks.
 
 ### Not implemented (skipped when parsing)
+- ⚠️ **`config`** (RFC 7950 §7.21.1) — `config true` / `config false` on data definition statements is **consumed** and **ignored** after a **`logging` warning**; not stored on the AST or enforced during validation (instance validation still assumes configurable data nodes).
 - ⚠️ `deviation`, `rpc`, `action`, `notification`, `input`, `output` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
 
 ### Dynamic extension framework

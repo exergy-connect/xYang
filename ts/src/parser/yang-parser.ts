@@ -11,6 +11,7 @@ import { validateSemantics } from "../validator/semantic-validation";
 
 type ParserOptions = {
   expand_uses?: boolean;
+  include_path?: string[];
 };
 
 function serializeIdentities(
@@ -40,6 +41,8 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
       typedefs[stmt.argument] = {
         name: stmt.argument,
         description: typeof stmt.description === "string" ? stmt.description : "",
+        reference: typeof stmt.reference === "string" ? stmt.reference : "",
+        default: stmt.default,
         type: stmt.type ?? typeStmt?.type,
         statements: stmt.statements ?? []
       };
@@ -78,6 +81,7 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
 
 export class YangParser {
   readonly expandUses: boolean;
+  readonly includePath: string[];
   private readonly moduleCache = new Map<string, YangModule>();
 
   private readonly tokenizer = new YangTokenizer();
@@ -89,6 +93,7 @@ export class YangParser {
 
   constructor(options: ParserOptions = {}) {
     this.expandUses = options.expand_uses ?? true;
+    this.includePath = (options.include_path ?? []).map((p) => resolve(p));
   }
 
   /** Resolve `import` like Python `YangParser._resolve_submodule_path` (revision file, then basename, then last `name@*.yang`). */
@@ -99,24 +104,27 @@ export class YangParser {
       candidates.push(`${moduleBasename}@${trimmedRev}.yang`);
     }
     candidates.push(`${moduleBasename}.yang`);
-    for (const c of candidates) {
-      const p = resolve(sourceDir, c);
-      if (existsSync(p)) {
-        return p;
+    const dirs = [sourceDir, ...this.includePath];
+    for (const dir of dirs) {
+      for (const c of candidates) {
+        const p = resolve(dir, c);
+        if (existsSync(p)) {
+          return p;
+        }
+      }
+      let matches: string[] = [];
+      try {
+        matches = readdirSync(dir).filter((f) => f.startsWith(`${moduleBasename}@`) && f.endsWith(".yang"));
+      } catch {
+        matches = [];
+      }
+      if (matches.length > 0) {
+        matches.sort();
+        return resolve(dir, matches[matches.length - 1]!);
       }
     }
-    let matches: string[] = [];
-    try {
-      matches = readdirSync(sourceDir).filter((f) => f.startsWith(`${moduleBasename}@`) && f.endsWith(".yang"));
-    } catch {
-      matches = [];
-    }
-    if (matches.length > 0) {
-      matches.sort();
-      return resolve(sourceDir, matches[matches.length - 1]!);
-    }
     throw new YangSemanticError(
-      `Could not find imported module '${moduleBasename}' (tried ${candidates.join(", ")}) under ${sourceDir}`
+      `Could not find imported module '${moduleBasename}' (tried ${candidates.join(", ")}) under ${dirs.join(", ")}`
     );
   }
 

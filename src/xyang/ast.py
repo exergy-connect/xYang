@@ -55,6 +55,7 @@ class YangStatement(YangStatementList):
     """Base class for all YANG statements."""
     name: str = ""
     description: str = ""
+    reference: str = ""
 
     def get_schema_node(self) -> Optional[str]:
         """Path segment for this statement in the schema tree, or None if it adds no node.
@@ -91,6 +92,7 @@ class YangStatementWithWhen(YangStatement):
 class YangTypedefStmt(YangStatement):
     """Typedef statement."""
     type: Optional['YangTypeStmt'] = None
+    default: Optional[Any] = None
 
     def get_schema_node(self) -> Optional[str]:
         return self.name or None
@@ -117,6 +119,8 @@ class YangBitStmt:
 
     name: str
     position: Optional[int] = None
+    description: str = ""
+    reference: str = ""
 
 
 @dataclass
@@ -250,6 +254,7 @@ class YangParsedXPathBase:
     """Base class for statements that carry a parsed XPath expression."""
     expression: str
     description: str = ""
+    reference: str = ""
 
     ast: ASTNode | None = None  # Parsed XPath AST for reuse; always set in __post_init__
 

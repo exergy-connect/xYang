@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangLeafStmt
 
@@ -20,15 +21,17 @@ class LeafStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._leaf_substatement_dispatch = {
-            kw.TYPE: self._parsers.parse_type,
-            kw.MANDATORY: self._parsers.parse_leaf_mandatory,
-            kw.DEFAULT: self._parsers.parse_leaf_default,
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.MUST: self._parsers.parse_must,
-            kw.WHEN: self._parsers.parse_when,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-        }
+        self._leaf_substatement_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
+                kw.TYPE: self._parsers.parse_type,
+                kw.MANDATORY: self._parsers.parse_leaf_mandatory,
+                kw.DEFAULT: self._parsers.parse_leaf_default,
+                kw.MUST: self._parsers.parse_must,
+                kw.WHEN: self._parsers.parse_when,
+                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
+            },
+        )
 
     def _parse_leaf_substatement(
         self, tokens: TokenStream, context: ParserContext, leaf_name: str

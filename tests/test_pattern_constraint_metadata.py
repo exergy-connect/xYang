@@ -124,6 +124,31 @@ module t {
     assert td.type.patterns[0].error_app_tag == "t:bad-id"
 
 
+def test_parse_pattern_string_concatenation():
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  typedef oid {
+    type string {
+      pattern '(([0-1](\\.[1-3]?[0-9]))|(2\\.(0|([1-9]\\d*))))'
+            + '(\\.(0|([1-9]\\d*)))*';
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    td = module.typedefs["oid"]
+    assert td.type is not None
+    assert len(td.type.patterns) == 1
+    expected = (
+        "(([0-1](\\.[1-3]?[0-9]))|(2\\.(0|([1-9]\\d*))))"
+        "(\\.(0|([1-9]\\d*)))*"
+    )
+    assert td.type.patterns[0].pattern == expected
+
+
 def test_parse_stores_pattern_modifier_and_multiple_pattern_entries():
     yang = """
 module t {

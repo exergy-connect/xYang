@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangListStmt
 
@@ -20,12 +21,13 @@ class ListStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._list_substatement_dispatch = {
+        self._list_substatement_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
             kw.KEY: self._parsers.parse_list_key,
             kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
             kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
             kw.ORDERED_BY: self._parsers.parse_ordered_by,
-            kw.DESCRIPTION: self._parsers.parse_description,
             kw.WHEN: self._parsers.parse_when,
             kw.LEAF: self._parsers.parse_leaf,
             kw.CONTAINER: self._parsers.parse_container,
@@ -37,7 +39,8 @@ class ListStatementParser:
             kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
-        }
+            },
+        )
 
     def _parse_list_substatement(
         self, tokens: TokenStream, context: ParserContext, list_name: str

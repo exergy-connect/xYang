@@ -8,6 +8,7 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
+from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangContainerStmt
 
@@ -20,8 +21,9 @@ class ContainerStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._container_substatement_dispatch = {
-            kw.DESCRIPTION: self._parsers.parse_description,
+        self._container_substatement_dispatch = with_data_node_substatements(
+            self._parsers,
+            {
             kw.PRESENCE: self._parsers.parse_presence,
             kw.WHEN: self._parsers.parse_when,
             kw.MUST: self._parsers.parse_must,
@@ -34,7 +36,8 @@ class ContainerStatementParser:
             kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
-        }
+            },
+        )
 
     def _parse_container_substatement(
         self, tokens: TokenStream, context: ParserContext, container_name: str
