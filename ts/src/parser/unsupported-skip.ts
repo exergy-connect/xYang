@@ -65,3 +65,18 @@ export function is_unsupported_construct_start(tokens: TokenStream): boolean {
   const tok = tokens.peek_token();
   return tok !== undefined && UNSUPPORTED_CONSTRUCT_TYPES.has(tok.value);
 }
+
+export function skip_config_substatement(tokens: TokenStream, { context }: { context: string }): void {
+  const [line_num, char_pos] = tokens.position();
+  const where = tokens.filename ?? "<string>";
+  tokens.consume(kw.CONFIG);
+  let value: string | undefined;
+  if (tokens.peek() === kw.TRUE || tokens.peek() === kw.FALSE) {
+    value = tokens.consume();
+  }
+  tokens.consume_if_type(YangTokenType.SEMICOLON);
+  // eslint-disable-next-line no-console
+  console.warn(
+    `Ignoring unsupported YANG substatement 'config' (${context}) at ${where}:${line_num}:${char_pos} (value=${JSON.stringify(value)})`
+  );
+}

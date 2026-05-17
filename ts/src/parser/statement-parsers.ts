@@ -5,12 +5,14 @@ import {
   YangLeafListStmt,
   YangMustStmt,
   YangRefineStmt,
+  YangTypedefStmt,
   YangTypeStmt,
   YangUsesStmt
 } from "../core/ast";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { SerializedStatement } from "../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
+import { skip_config_substatement } from "./unsupported-skip";
 import {
   AnydataStatementParser,
   AnyxmlStatementParser,
@@ -83,28 +85,28 @@ export class StatementParsers {
     tokens: TokenStream
   ) => Record<string, unknown>;
 
-  private readonly anydata_parser = new AnydataStatementParser(this);
-  private readonly anyxml_parser = new AnyxmlStatementParser(this);
+  readonly anydata_parser = new AnydataStatementParser(this);
+  readonly anyxml_parser = new AnyxmlStatementParser(this);
   private readonly augment_parser = new AugmentStatementParser(this);
   readonly bits_parser = new BitsStatementParser(this);
   private readonly choice_parser = new ChoiceStatementParser(this);
-  private readonly container_parser = new ContainerStatementParser(this);
+  readonly container_parser = new ContainerStatementParser(this);
   private readonly extension_parser = new ExtensionStatementParser(this);
-  private readonly feature_parser = new FeatureStatementParser(this);
+  readonly feature_parser = new FeatureStatementParser(this);
   private readonly grouping_parser = new GroupingStatementParser(this);
   private readonly identity_parser = new IdentityStatementParser(this);
-  private readonly leaf_parser = new LeafStatementParser(this);
-  private readonly leaf_list_parser = new LeafListStatementParser(this);
-  private readonly list_parser = new ListStatementParser(this);
+  readonly leaf_parser = new LeafStatementParser(this);
+  readonly leaf_list_parser = new LeafListStatementParser(this);
+  readonly list_parser = new ListStatementParser(this);
   private readonly module_parser = new ModuleStatementParser(this);
   private readonly must_parser = new MustStatementParser(this);
   private readonly refine_parser = new RefineStatementParser(this);
   readonly revision_parser = new RevisionStatementParser(this);
   private readonly submodule_parser = new SubmoduleStatementParser(this, this.module_parser);
-  private readonly type_parser = new TypeStatementParser(this);
+  readonly type_parser = new TypeStatementParser(this);
   private readonly typedef_parser = new TypedefStatementParser(this);
-  private readonly uses_parser = new UsesStatementParser(this);
-  private readonly when_parser = new WhenStatementParser(this);
+  readonly uses_parser = new UsesStatementParser(this);
+  readonly when_parser = new WhenStatementParser(this);
 
   private readonly statementKeywordHandlers: Partial<
     Record<string | YangTokenType, (tokens: TokenStream, context: ParserContext) => SerializedStatement>
@@ -190,6 +192,14 @@ export class StatementParsers {
     [kw.PRESENCE]: (tokens, context) => {
       this.parse_presence(tokens, context);
       return { __class__: "YangStatement", keyword: "presence", statements: [] };
+    },
+    [kw.REFERENCE]: (tokens, context) => {
+      this.parse_reference(tokens, context);
+      return { __class__: "YangStatement", keyword: "reference", statements: [] };
+    },
+    [kw.CONFIG]: (tokens, context) => {
+      this.parse_config_ignored(tokens, context);
+      return { __class__: "YangStatement", keyword: "config", statements: [] };
     }
   };
 
@@ -378,6 +388,36 @@ export class StatementParsers {
     return parts.join("");
   }
 
+  parse_string_argument(tokens: TokenStream): string {
+    if (tokens.peek_type() === YangTokenType.STRING) {
+      return this.parse_string_concatenation(tokens);
+    }
+    return tokens.consume().replace(/^['"]|['"]$/g, "");
+  }
+
+  substatement_handler(
+    tokens: TokenStream,
+    dispatch: Record<string, (tokens: TokenStream, context: ParserContext) => void>
+  ): ((tokens: TokenStream, context: ParserContext) => void) | undefined {
+    const key = this.dispatch_key(tokens);
+    if (typeof key === "string") {
+      return dispatch[key];
+    }
+    return undefined;
+  }
+
+  skip_unsupported_or_raise_unknown(tokens: TokenStream, context: string): boolean {
+    if (this.skip_unsupported_if_present(tokens, context)) {
+      return true;
+    }
+    const bad = tokens.peek() ?? "<eof>";
+    tokens.syntaxError(`Invalid or unknown statement '${bad}' in ${context}`);
+  }
+
+  parse_prefixed_extension_statement_public(tokens: TokenStream, context: ParserContext): void {
+    this.parse_prefixed_extension_statement(tokens, context);
+  }
+
   consume_qname_from_identifier(tokens: TokenStream): string {
     const parts = [tokens.consume_type(YangTokenType.IDENTIFIER)];
     while (tokens.consume_if_type(YangTokenType.COLON)) {
@@ -496,6 +536,10 @@ export class StatementParsers {
     }
     if (stmt.description) {
       out.description = stmt.description;
+    }
+    const reference = (stmt as { reference?: string }).reference;
+    if (reference) {
+      out.reference = reference;
     }
     if (Array.isArray(stmt.if_features) && stmt.if_features.length > 0) {
       out.if_features = [...stmt.if_features];
@@ -687,9 +731,34 @@ export class StatementParsers {
     }
   }
 
-  parse_reference_string_only(tokens: TokenStream): void {
+  parse_reference(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.REFERENCE);
-    tokens.consume_type(YangTokenType.STRING);
+    const ref = tokens.consume_type(YangTokenType.STRING);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+    const parent = context.current_parent;
+    if (parent && typeof parent === "object" && "reference" in parent) {
+      (parent as { reference?: string }).reference = ref;
+    }
+  }
+
+  parse_reference_string_only(tokens: TokenStream, context: ParserContext): void {
+    this.parse_reference(tokens, context);
+  }
+
+  parse_config_ignored(tokens: TokenStream, context: ParserContext): void {
+    const parent = context.current_parent as { name?: string; constructor?: { name: string } } | undefined;
+    const name = parent?.name;
+    const typeName = parent?.constructor?.name ?? "node";
+    const ctx = name ? `${typeName} '${name}'` : typeName;
+    skip_config_substatement(tokens, { context: ctx });
+  }
+
+  parse_typedef_default(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.DEFAULT);
+    const parent = context.current_parent;
+    if (parent instanceof YangTypedefStmt) {
+      parent.default = this.parse_default_value_tokens(tokens);
+    }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

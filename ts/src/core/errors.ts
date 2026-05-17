@@ -53,8 +53,20 @@ export class YangSyntaxError extends SyntaxError {
     this.filename = filename;
   }
 
+  private formatHeadline(): string {
+    const parts: string[] = [];
+    if (this.filename) {
+      parts.push(`${this.filename}:`);
+    }
+    if (this.line_num !== undefined) {
+      parts.push(`${this.line_num}:`);
+    }
+    parts.push(this.messageText);
+    return parts.join(" ");
+  }
+
   override toString(): string {
-    return this.messageText;
+    return this.formatHeadline();
   }
 }
 

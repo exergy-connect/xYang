@@ -1,6 +1,6 @@
 import { YangModule, YangStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
-import { parseXPath } from "../xpath/parser";
+import { parseXPath, parseXPathPath } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
 import { resolveQualifiedTopLevel } from "../encoding";
@@ -616,7 +616,7 @@ export class DocumentValidator {
     const rawPath = typeShape.path;
     if (typeof rawPath === "string" && rawPath.trim().length > 0) {
       try {
-        return parseXPath(rawPath.trim());
+        return parseXPathPath(rawPath.trim());
       } catch {
         return null;
       }

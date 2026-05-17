@@ -28,7 +28,7 @@ export class RevisionStatementParser {
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else if (tokens.peek() === kw.REFERENCE) {
           tokens.consume(kw.REFERENCE);
-          rev.reference = tokens.consume_type(YangTokenType.STRING);
+          rev.reference = this.parsers.parse_string_argument(tokens);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else {
           this.parsers.parseStatement(tokens, context);
