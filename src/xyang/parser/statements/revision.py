@@ -4,12 +4,12 @@ Parsing for ``revision`` (module history) and ``revision-date`` (RFC 7950).
 
 from __future__ import annotations
 
-from .. import keywords as kw
-
 from types import SimpleNamespace
 from typing import TYPE_CHECKING
 
+from .. import keywords as kw
 from ..parser_context import TokenStream, ParserContext, YangTokenType
+from ..unsupported_skip import is_unsupported_construct_start, skip_unsupported_construct
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -44,22 +44,29 @@ class RevisionStatementParser:
                     break
             date = "".join(chunks)
             if not date:
-                raise tokens._make_error(
+                raise tokens.make_error(
                     f"Expected revision date, got {tt0.name if tt0 else 'end'}"
                 )
-        revision = {"date": date, "description": ""}
+        revision: dict[str, str] = {"date": date, "description": "", "reference": ""}
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            body = SimpleNamespace(description="")
+            body = SimpleNamespace(description="", reference="")
             body_ctx = context.push_parent(body)
-            self._parsers.parse_optional_description(tokens, body_ctx)
-            if not tokens.has_more():
-                raise tokens._make_error("Unexpected end of input in revision body")
-            if tokens.peek_type() != YangTokenType.RBRACE:
-                raise tokens._make_error(
+            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+                if tokens.peek() == kw.DESCRIPTION:
+                    self._parsers.parse_description(tokens, body_ctx)
+                    continue
+                if tokens.peek() == kw.REFERENCE:
+                    self._parsers.parse_reference(tokens, body_ctx)
+                    continue
+                if is_unsupported_construct_start(tokens):
+                    skip_unsupported_construct(tokens, context="revision")
+                    continue
+                raise tokens.make_error(
                     f"Unknown statement in revision: {tokens.peek()!r}"
                 )
             tokens.consume_type(YangTokenType.RBRACE)
             revision["description"] = body.description
+            revision["reference"] = body.reference
         context.module.revisions.append(revision)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -87,7 +94,7 @@ class RevisionStatementParser:
             else:
                 break
         if not chunks:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Expected revision-date value, got {tt0.name if tt0 else 'end'}"
             )
         return "".join(chunks)

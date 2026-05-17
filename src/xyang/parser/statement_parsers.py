@@ -323,6 +323,15 @@ class StatementParsers:
             return
         self.parse_description(tokens, context)
 
+    def parse_reference(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse reference statement into ``current_parent.reference`` when present."""
+        tokens.consume(kw.REFERENCE)
+        ref = tokens.consume_type(YangTokenType.STRING)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        parent = context.current_parent
+        if parent is not None and hasattr(parent, "reference"):
+            setattr(parent, "reference", ref)
+
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse revision statement."""
         self._revision_parser.parse_revision(tokens, context)

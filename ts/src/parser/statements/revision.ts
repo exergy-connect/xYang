@@ -15,12 +15,20 @@ export class RevisionStatementParser {
         date += tokens.consume();
       }
     }
-    const rev = { date, description: "" };
+    const rev: { date: string; description: string; reference: string } = {
+      date,
+      description: "",
+      reference: "",
+    };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
         if (tokens.peek() === kw.DESCRIPTION) {
           tokens.consume(kw.DESCRIPTION);
           rev.description = tokens.consume_type(YangTokenType.STRING);
+          tokens.consume_if_type(YangTokenType.SEMICOLON);
+        } else if (tokens.peek() === kw.REFERENCE) {
+          tokens.consume(kw.REFERENCE);
+          rev.reference = tokens.consume_type(YangTokenType.STRING);
           tokens.consume_if_type(YangTokenType.SEMICOLON);
         } else {
           this.parsers.parseStatement(tokens, context);
