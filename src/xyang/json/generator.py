@@ -36,6 +36,7 @@ from ..refine_expand import copy_yang_statement
 from ..uses_expand import expand_uses_in_statements
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
+from ..xpath.utils import coerce_default_value
 
 from .schema_keys import (
     JsonSchemaKey,
@@ -58,6 +59,67 @@ _ANY_JSON_INSTANCE_SCHEMA: dict[str, Any] = {
         "string",
     ],
 }
+
+
+def _try_int_literal(default: Any) -> int | None:
+    if isinstance(default, int) and not isinstance(default, bool):
+        return default
+    if isinstance(default, str):
+        if default.isdigit():
+            return int(default)
+        if default.startswith("-") and default[1:].isdigit():
+            return int(default)
+    return None
+
+
+def _json_schema_default_value(
+    default: Any,
+    *,
+    yang_type_name: str | None = None,
+    json_schema_type: str | None = None,
+) -> Any:
+    """Map YANG AST default values to JSON Schema literal types."""
+    if default is None:
+        return None
+    type_name = yang_type_name or json_schema_type
+    if type_name == "boolean" or json_schema_type == "boolean":
+        if default is True or (isinstance(default, str) and default.lower() == "true"):
+            return True
+        if default is False or (isinstance(default, str) and default.lower() == "false"):
+            return False
+    if yang_type_name == "union":
+        numeric = _try_int_literal(default)
+        if numeric is not None:
+            return numeric
+        return default
+    coerce_type = yang_type_name
+    if json_schema_type == "integer" and coerce_type in (None, "integer"):
+        coerce_type = "int32"
+    if json_schema_type == "number" and coerce_type is None:
+        coerce_type = "decimal64"
+    coerced = coerce_default_value(default, coerce_type)
+    if coerced is not default:
+        return coerced
+    if json_schema_type == "integer":
+        numeric = _try_int_literal(default)
+        if numeric is not None:
+            return numeric
+    return default
+
+
+def _leaf_yang_type_name(
+    type_stmt: YangTypeStmt | None,
+    typedef_names: set[str],
+    module: YangModule,
+) -> str | None:
+    if type_stmt is None:
+        return None
+    if type_stmt.name in typedef_names:
+        td = module.typedefs.get(type_stmt.name)
+        if isinstance(td, YangTypedefStmt) and td.type is not None:
+            return td.type.name
+        return None
+    return type_stmt.name
 
 
 def _mandatory_schema_child(stmt: YangStatement) -> bool:
@@ -865,7 +927,13 @@ def _leaf_stmt_to_property(
             JsonSchemaKey.X_YANG: leaf_xyang,
         }
     if stmt.default is not None:
-        out[JsonSchemaKey.DEFAULT] = stmt.default
+        yang_type = _leaf_yang_type_name(type_stmt, typedef_names, module)
+        schema_type = out.get(JsonSchemaKey.TYPE)
+        out[JsonSchemaKey.DEFAULT] = _json_schema_default_value(
+            stmt.default,
+            yang_type_name=yang_type,
+            json_schema_type=schema_type if isinstance(schema_type, str) else None,
+        )
     return out
 
 
@@ -1007,7 +1075,13 @@ def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> 
     )  # no $ref inside typedef def
     schema[JsonSchemaKey.DESCRIPTION] = typedef.description or ""
     if typedef.default is not None:
-        schema[JsonSchemaKey.DEFAULT] = typedef.default
+        yang_type = typedef.type.name if typedef.type else None
+        schema_type = schema.get(JsonSchemaKey.TYPE)
+        schema[JsonSchemaKey.DEFAULT] = _json_schema_default_value(
+            typedef.default,
+            yang_type_name=yang_type,
+            json_schema_type=schema_type if isinstance(schema_type, str) else None,
+        )
     return schema
 
 

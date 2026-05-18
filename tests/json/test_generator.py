@@ -73,6 +73,54 @@ def test_roundtrip_yang_to_json_to_ast():
     assert dm is not None
 
 
+def test_boolean_leaf_default_emits_json_boolean():
+    """YANG ``default false`` / ``default true`` map to JSON booleans, not quoted strings."""
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  container data-model {
+    leaf flag { type boolean; default false; }
+    leaf enabled { type boolean; default true; }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    schema = generate_json_schema(module)
+    props = schema["properties"]["data-model"]["properties"]
+    assert props["flag"]["default"] is False
+    assert props["enabled"]["default"] is True
+
+    module2 = parse_json_schema(schema)
+    dm = module2.statements[0]
+    flag = next(c for c in dm.statements if getattr(c, "name", None) == "flag")
+    assert flag.default == "false"
+
+
+def test_integer_leaf_default_emits_json_number():
+    """YANG numeric defaults map to JSON numbers, not quoted strings."""
+    yang = """
+module t {
+  yang-version 1.1;
+  namespace "urn:t";
+  prefix "t";
+  container data-model {
+    leaf max_name_underscores { type uint8; default 2; }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    schema = generate_json_schema(module)
+    leaf_schema = schema["properties"]["data-model"]["properties"]["max_name_underscores"]
+    assert leaf_schema["default"] == 2
+
+    module2 = parse_json_schema(schema)
+    dm = module2.statements[0]
+    leaf = next(c for c in dm.statements if getattr(c, "name", None) == "max_name_underscores")
+    assert leaf.default == "2"
+
+
 def test_decimal64_emits_multiple_of_and_roundtrip_restores_fraction_digits():
     """decimal64 fraction-digits n maps to multipleOf 10^-n in JSON Schema."""
     yang = """

@@ -106,7 +106,7 @@ def test_refine_default_json_schema_has_default_and_round_trips():
     mod = parse_yang_string(_REFINE_DEFAULT_FALSE)
     schema = generate_json_schema(mod)
     flag_schema = schema["properties"]["c"]["properties"]["flag"]
-    assert flag_schema.get("default") == "false"
+    assert flag_schema.get("default") is False
 
     text = json.dumps(schema)
     mod2 = parse_json_schema(text)

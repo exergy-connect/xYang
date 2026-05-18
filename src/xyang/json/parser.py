@@ -725,8 +725,17 @@ def _convert_leaf(
     else:
         mandatory = name in (schema.get(JsonSchemaKey.REQUIRED) or [])
     default = schema.get(JsonSchemaKey.DEFAULT)
-    if default is not None and schema.get(JsonSchemaKey.TYPE) != "boolean":
-        default = str(default).lower() if isinstance(default, bool) else str(default)
+    if default is not None:
+        schema_type = schema.get(JsonSchemaKey.TYPE)
+        if schema_type == "boolean":
+            if isinstance(default, bool):
+                default = "true" if default else "false"
+            elif isinstance(default, str):
+                default = default.lower()
+        elif schema_type == "integer" and isinstance(default, (int, float)):
+            default = str(int(default))
+        else:
+            default = str(default).lower() if isinstance(default, bool) else str(default)
     leaf = YangLeafStmt(
         name=name,
         description=description,
