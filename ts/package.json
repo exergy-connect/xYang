@@ -42,7 +42,7 @@
     }
   },
   "bin": {
-    "xyang-ts": "./dist/cli.js"
+    "xyang-ts": "dist/cli.js"
   },
   "engines": {
     "node": ">=24"
