@@ -151,6 +151,16 @@ def _ref_to_typedef_name(ref: str) -> str | None:
     return ref.removeprefix(JSON_SCHEMA_DEFS_URI_PREFIX)
 
 
+def _format_decimal64_bound(value: Any, fraction_digits: int | None) -> str:
+    """Format a decimal64 range bound to match YANG lexical form (e.g. 4 -> 4.0)."""
+    if fraction_digits is not None and fraction_digits > 0:
+        try:
+            return f"{float(value):.{fraction_digits}f}"
+        except (TypeError, ValueError):
+            pass
+    return str(value)
+
+
 def _fraction_digits_from_multiple_of(value: Any) -> int | None:
     """If value equals 10^-n for integer n in 1..18, return n; else None."""
     try:
@@ -349,8 +359,17 @@ def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: 
         min_val = schema.get(JsonSchemaKey.MINIMUM)
         max_val = schema.get(JsonSchemaKey.MAXIMUM)
         if min_val is not None or max_val is not None:
-            lo = "min" if min_val is None else str(min_val)
-            hi = "max" if max_val is None else str(max_val)
+            fd = type_stmt.fraction_digits
+            lo = (
+                "min"
+                if min_val is None
+                else _format_decimal64_bound(min_val, fd)
+            )
+            hi = (
+                "max"
+                if max_val is None
+                else _format_decimal64_bound(max_val, fd)
+            )
             type_stmt.range = f"{lo}..{hi}"
         return type_stmt
     if t == "boolean":
