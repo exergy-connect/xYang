@@ -24,6 +24,7 @@ class GroupingStatementParser:
         self._grouping_substatement_dispatch = with_metadata_substatements(
             self._parsers,
             {
+            kw.GROUPING: self._parsers.parse_grouping,
             kw.CHOICE: self._parsers.parse_choice,
             kw.CONTAINER: self._parsers.parse_container,
             kw.LIST: self._parsers.parse_list,

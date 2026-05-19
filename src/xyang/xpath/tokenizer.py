@@ -10,6 +10,33 @@ QUOTE_CHARS: Set[str] = {'"', "'"}
 OPERATOR_CHARS: Set[str] = {'=', '<', '>', '!', '+', '-', '*', '/'}
 
 
+def normalize_yang_escaped_quotes(expression: str) -> str:
+    """Turn YANG-style ``\\"`` / ``\\'`` in must/when text into XPath quote characters.
+
+    YANG string lexing leaves backslash-escaped quotes in the expression passed to
+    the XPath parser (e.g. ``derived-from(../transport, \\"sn:foo\\")``). XPath
+    expects normal quoted literals (``"sn:foo"``).
+    """
+    if "\\" not in expression:
+        return expression
+    out: list[str] = []
+    i = 0
+    length = len(expression)
+    while i < length:
+        ch = expression[i]
+        if (
+            ch == "\\"
+            and i + 1 < length
+            and expression[i + 1] in QUOTE_CHARS
+        ):
+            out.append(expression[i + 1])
+            i += 2
+            continue
+        out.append(ch)
+        i += 1
+    return "".join(out)
+
+
 class XPathTokenizer:
     """Tokenizer for XPath expressions."""
 
@@ -21,7 +48,7 @@ class XPathTokenizer:
     KEYWORDS = ['or', 'and', 'not', 'true', 'false', 'current']
 
     def __init__(self, expression: str):
-        self.expression = expression
+        self.expression = normalize_yang_escaped_quotes(expression)
         self.position = 0
         self.tokens: List[Token] = []
 
@@ -86,6 +113,13 @@ class XPathTokenizer:
         pos = self.position + offset
         return self.expression[pos] if 0 <= pos < len(self.expression) else None
 
+    def _is_escaped_quote(self, quote_char: str) -> bool:
+        return (
+            self.position + 1 < len(self.expression)
+            and self.expression[self.position] == "\\"
+            and self.expression[self.position + 1] == quote_char
+        )
+
     def _tokenize_string(self):
         quote_char = self.expression[self.position]
         start_pos = self.position
@@ -93,13 +127,14 @@ class XPathTokenizer:
 
         value = []
         while self.position < len(self.expression):
+            if self._is_escaped_quote(quote_char):
+                value.append(quote_char)
+                self.position += 2
+                continue
             char = self.expression[self.position]
             if char == quote_char:
-                if self.position > 0 and self.expression[self.position - 1] == '\\':
-                    value[-1] = quote_char
-                else:
-                    self.position += 1
-                    break
+                self.position += 1
+                break
             value.append(char)
             self.position += 1
 

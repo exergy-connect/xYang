@@ -56,6 +56,7 @@ class YangStatement(YangStatementList):
     name: str = ""
     description: str = ""
     reference: str = ""
+    units: str = ""
 
     def get_schema_node(self) -> Optional[str]:
         """Path segment for this statement in the schema tree, or None if it adds no node.
@@ -144,6 +145,7 @@ class YangTypeStmt:
     """
 
     name: str
+    units: str = ""
     patterns: List[YangPatternSpec] = field(default_factory=list)
     length: Optional[str] = None
     range: Optional[str] = None
@@ -160,6 +162,15 @@ class YangTypeStmt:
 class YangContainerStmt(YangStatementWithMust, YangStatementWithWhen):
     """Container statement."""
     presence: Optional[str] = None
+
+
+@dataclass
+class YangNotificationStmt(YangContainerStmt):
+    """Notification statement (RFC 7950 §7.16).
+
+    Instance validation treats the notification body like a container subtree
+    (e.g. JSON under ``anydata`` per RFC 7951 ``module-name:notification``).
+    """
 
 
 @dataclass
@@ -302,6 +313,8 @@ class YangUsesStmt(YangStatementWithWhen):
 
     grouping_name: str = ""
     refines: List['YangRefineStmt'] = field(default_factory=list)
+    # RFC 7950 §7.17: ``augment`` substatements (relative descendant paths).
+    augmentations: List['YangAugmentStmt'] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None

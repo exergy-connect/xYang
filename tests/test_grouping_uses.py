@@ -185,6 +185,32 @@ module test {
     assert not is_valid, "Expected invalid due to missing mandatory id field"
 
 
+def test_grouping_status_and_nested_grouping_parse():
+    """RFC 7950 status on grouping and nested grouping (ietf-yang-library shape)."""
+    yang_content = """
+module test {
+  yang-version 1.1;
+  namespace "urn:test:grouping-status";
+  prefix t;
+
+  grouping outer {
+    status deprecated;
+    grouping inner {
+      leaf name { type string; }
+    }
+    uses inner;
+  }
+
+  container data {
+    uses outer;
+  }
+}
+"""
+    module = parse_yang_string(yang_content)
+    assert "outer" in module.groupings
+    assert "inner" in module.groupings
+
+
 def test_grouping_in_list():
     """Test using grouping in a list."""
     yang_content = """

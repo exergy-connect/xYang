@@ -77,6 +77,8 @@ class XYangKey:
     PATTERN_ERROR_APP_TAG = "pattern-error-app-tag"
     #: List of all YANG pattern entries for round-trip (regex + invert + optional metadata).
     STRING_PATTERNS = "string-patterns"
+    #: RFC 7950 §7.21.4 ``units`` (e.g. ``"kbit/s"``).
+    UNITS = "units"
 
 
 class XYangTypeValue:

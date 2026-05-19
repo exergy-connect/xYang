@@ -7,10 +7,36 @@ is the YANG module name and ``node`` is a top-level data node in that module.
 
 from __future__ import annotations
 
-from typing import Mapping, Optional, Tuple
+from typing import Any, Dict, Mapping, Optional, Tuple
 
 from ..ast import YangStatement
 from ..module import YangModule
+
+_STRUCTURE_INDEX_KEY = "ietf-yang-structure-ext:structure-index"
+
+
+def resolve_structure_instance(
+    data: Dict[str, Any], module: YangModule
+) -> Optional[Tuple[YangStatement, Dict[str, Any]]]:
+    """
+    If *data* is a single RFC 7951 ``module-name:structure`` object for a registered
+    RFC 8791 structure in *module*, return ``(structure_schema, inner_object)``.
+    """
+    if not isinstance(data, dict) or len(data) != 1:
+        return None
+    json_key, inner = next(iter(data.items()))
+    if not isinstance(json_key, str) or ":" not in json_key:
+        return None
+    mod_name, _, struct_name = json_key.partition(":")
+    if mod_name != module.name or not struct_name:
+        return None
+    idx = module.extension_runtime.get(_STRUCTURE_INDEX_KEY) or {}
+    schema = idx.get(struct_name)
+    if schema is None:
+        return None
+    if not isinstance(inner, dict):
+        return None
+    return schema, inner
 
 
 def resolve_qualified_top_level(

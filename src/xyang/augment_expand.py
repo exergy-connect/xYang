@@ -11,6 +11,7 @@ from typing import Callable, List, Optional, Tuple
 
 from .ast import (
     YangAugmentStmt,
+    YangCaseStmt,
     YangChoiceStmt,
     YangStatement,
     YangStatementList,
@@ -146,7 +147,14 @@ def apply_augmentations(root: YangModule) -> None:
         copies = [copy_yang_statement(x) for x in aug.statements]
         _merge_uses_if_features_into_grouping_roots(copies, aug.if_features)
         _merge_uses_when_into_grouping_roots(copies, aug.when)
-        tlist: YangStatementList = target  # type: ignore[assignment]
-        for c in copies:
-            tlist.statements.append(c)
+        if isinstance(target, YangChoiceStmt):
+            for c in copies:
+                if isinstance(c, YangCaseStmt):
+                    target.cases.append(c)
+                else:
+                    target.statements.append(c)
+        else:
+            tlist: YangStatementList = target  # type: ignore[assignment]
+            for c in copies:
+                tlist.statements.append(c)
     root.statements = [s for s in root.statements if not isinstance(s, YangAugmentStmt)]

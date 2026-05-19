@@ -116,6 +116,12 @@ def _set_if_features_from_xyang(stmt: Any, xyang: dict[str, Any]) -> None:
         stmt.if_features = feats
 
 
+def _units_from_xyang(xyang: dict[str, Any]) -> str:
+    """RFC 7950 ``units`` from ``x-yang.units``."""
+    u = xyang.get(XYangKey.UNITS)
+    return u if isinstance(u, str) else ""
+
+
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     """Build YangWhenStmt from x-yang ``when``: object with ``condition`` and optional ``description``."""
     raw = xyang.get(XYangKey.WHEN)
@@ -183,6 +189,16 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
 
 def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     """Build YangTypeStmt from JSON schema (+ $ref) and x-yang (e.g. leafref)."""
+    stmt = _type_from_schema_impl(defs, schema, xyang)
+    if stmt is not None:
+        merged_xy = _merge_schema_xyang(schema, xyang)
+        units = _units_from_xyang(merged_xy)
+        if units:
+            stmt.units = units
+    return stmt
+
+
+def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
         bases = xyang.get(XYangKey.BASES)
         if not isinstance(bases, list):
@@ -380,6 +396,9 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
         type=type_stmt,
         default=default,
     )
+    units = _units_from_xyang(xyang)
+    if units:
+        stmt.units = units
     return stmt
 
 
@@ -748,6 +767,9 @@ def _convert_leaf(
     if when_stmt is not None:
         leaf.when = when_stmt
     _set_if_features_from_xyang(leaf, xyang)
+    units = _units_from_xyang(xyang)
+    if units:
+        leaf.units = units
     return leaf
 
 
@@ -814,6 +836,9 @@ def _convert_leaf_list(
         else:
             ll.defaults = [raw_def]
     _set_if_features_from_xyang(ll, xyang)
+    units = _units_from_xyang(xyang)
+    if units:
+        ll.units = units
     return ll
 
 

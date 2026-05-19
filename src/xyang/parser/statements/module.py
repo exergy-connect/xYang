@@ -24,6 +24,7 @@ class ModuleStatementParser:
             kw.LIST: self._parsers.parse_list,
             kw.LEAF_LIST: self._parsers.parse_leaf_list,
             kw.CONTAINER: self._parsers.parse_container,
+            kw.NOTIFICATION: self._parsers.parse_notification,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
             kw.TYPEDEF: self._parsers.parse_typedef,

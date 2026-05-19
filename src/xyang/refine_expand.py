@@ -11,6 +11,7 @@ from .xpath.ast import PathNode
 from .ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
+    YangAugmentStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -189,6 +190,9 @@ def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
             )
     if refine.if_features and isinstance(stmt, YangStatementWithWhen):
         stmt.if_features.extend(refine.if_features)
+    refined_desc = (refine.description or "").strip()
+    if refined_desc:
+        stmt.description = refined_desc
 
 
 def copy_yang_statement(stmt: YangStatement) -> YangStatement:
@@ -215,10 +219,12 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
         )
     if isinstance(stmt, YangUsesStmt):
         refines = list(stmt.refines) if stmt.refines else []
+        augmentations = [copy_yang_statement(a) for a in stmt.augmentations]
         return replace(
             stmt,
             statements=statements,
             refines=refines,
+            augmentations=augmentations,
             if_features=list(stmt.if_features),
         )
     if isinstance(
@@ -237,6 +243,12 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
             stmt,
             statements=statements,
             must_statements=must,
+            if_features=list(stmt.if_features),
+        )
+    if isinstance(stmt, YangAugmentStmt):
+        return replace(
+            stmt,
+            statements=statements,
             if_features=list(stmt.if_features),
         )
     if isinstance(stmt, YangExtensionInvocationStmt):

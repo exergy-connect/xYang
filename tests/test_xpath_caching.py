@@ -64,13 +64,19 @@ def xpath_caching_module():
     return parse_yang_string(XPATH_CACHING_YANG)
 
 
+def _validate_doc(doc_validator, data):
+    errors = doc_validator.validate(data)
+    return len(errors) == 0, errors
+
+
 @pytest.fixture
 def validator_with_cache_stats(xpath_caching_module):
-    """Validator with cache stats cleared before test and printed after."""
-    validator = YangValidator(xpath_caching_module)
-    validator._doc_validator._evaluator.clear_cache_stats()
-    yield validator
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    """Shared :class:`DocumentValidator` so cache stats match the instance used in ``validate``."""
+    yang_validator = YangValidator(xpath_caching_module)
+    doc_validator = yang_validator._document_validator(xpath_caching_module)
+    doc_validator._evaluator.clear_cache_stats()
+    yield doc_validator
+    stats = doc_validator._evaluator.get_cache_stats()
     print(f"\n  Cache stats: {stats}")
 
 
@@ -89,12 +95,12 @@ def test_absolute_cacheable_two_documents(validator_with_cache_stats):
             "items": [{"id": 1, "ref_abs": "bad"}],
         }
     }
-    valid1, errors1, _ = validator.validate(doc1)
-    valid2, errors2, _ = validator.validate(doc2)
+    valid1, errors1 = _validate_doc(validator, doc1)
+    valid2, errors2 = _validate_doc(validator, doc2)
     assert valid1, errors1
     assert not valid2, errors2
     assert any("ref_abs" in str(e) or "flag" in str(e) for e in errors2)
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     # validate() clears cache stats at start of each run; stats are from last (doc2) run only
     assert stats["lookups"] == 1
     assert stats["hits"] == 0
@@ -115,12 +121,12 @@ def test_absolute_with_predicate_cacheable_two_documents(validator_with_cache_st
             "items": [{"id": 2, "ref_abs_pred": "bad"}],
         }
     }
-    valid1, errors1, _ = validator.validate(doc1)
-    valid2, errors2, _ = validator.validate(doc2)
+    valid1, errors1 = _validate_doc(validator, doc1)
+    valid2, errors2 = _validate_doc(validator, doc2)
     assert valid1, errors1
     assert not valid2, errors2
     assert any("ref_abs_pred" in str(e) for e in errors2)
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     # Path /top/items[id=1] has predicate with relative "id", so is_cacheable=False; no cache use
     assert stats["lookups"] == 0
     assert stats["hits"] == 0
@@ -141,12 +147,12 @@ def test_relative_two_documents(validator_with_cache_stats):
             "items": [{"id": 1, "ref_rel": "bad"}],
         }
     }
-    valid1, errors1, _ = validator.validate(doc1)
-    valid2, errors2, _ = validator.validate(doc2)
+    valid1, errors1 = _validate_doc(validator, doc1)
+    valid2, errors2 = _validate_doc(validator, doc2)
     assert valid1, errors1
     assert not valid2, errors2
     assert any("ref_rel" in str(e) for e in errors2)
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     # Relative paths are never cached
     assert stats["lookups"] == 0
     assert stats["hits"] == 0
@@ -167,12 +173,12 @@ def test_absolute_with_relative_predicate_two_documents(validator_with_cache_sta
             "items": [{"id": 1, "ref_abs_rel_pred": "bad"}],
         }
     }
-    valid1, errors1, _ = validator.validate(doc1)
-    valid2, errors2, _ = validator.validate(doc2)
+    valid1, errors1 = _validate_doc(validator, doc1)
+    valid2, errors2 = _validate_doc(validator, doc2)
     assert valid1, errors1
     assert not valid2, errors2
     assert any("ref_abs_rel_pred" in str(e) for e in errors2)
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     # Absolute path with relative predicate: not cacheable (is_cacheable=False)
     assert stats["lookups"] == 0
     assert stats["hits"] == 0
@@ -193,12 +199,12 @@ def test_absolute_with_current_two_documents(validator_with_cache_stats):
             "items": [{"id": 1, "ref_current": 2}],
         }
     }
-    valid1, errors1, _ = validator.validate(doc1)
-    valid2, errors2, _ = validator.validate(doc2)
+    valid1, errors1 = _validate_doc(validator, doc1)
+    valid2, errors2 = _validate_doc(validator, doc2)
     assert valid1, errors1
     assert not valid2, errors2
     assert any("ref_current" in str(e) for e in errors2)
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     assert stats["lookups"] == 0, "current() does not use path cache"
     assert stats["hits"] == 0
 
@@ -212,9 +218,9 @@ def test_non_cacheable_path_not_cached(validator_with_cache_stats):
             "items": [{"id": 1, "ref_abs_current_pred": "ok"}],
         }
     }
-    valid, errors, _ = validator.validate(doc)
+    valid, errors = _validate_doc(validator, doc)
     assert valid, errors
-    stats = validator._doc_validator._evaluator.get_cache_stats()
+    stats = validator._evaluator.get_cache_stats()
     assert stats["lookups"] == 0
     assert stats["hits"] == 0
 

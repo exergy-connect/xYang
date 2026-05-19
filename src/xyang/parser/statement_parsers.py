@@ -28,6 +28,7 @@ from .statements.when import WhenStatementParser
 from .statements.choice import ChoiceStatementParser
 from .statements.grouping import GroupingStatementParser
 from .statements.container import ContainerStatementParser
+from .statements.notification import NotificationStatementParser
 from .statements.list import ListStatementParser
 from .statements.leaf import LeafStatementParser
 from .statements.leaf_list import LeafListStatementParser
@@ -80,6 +81,7 @@ class StatementParsers:
         self._choice_parser = ChoiceStatementParser(self)
         self._grouping_parser = GroupingStatementParser(self)
         self._container_parser = ContainerStatementParser(self)
+        self._notification_parser = NotificationStatementParser(self)
         self._list_parser = ListStatementParser(self)
         self._leaf_parser = LeafStatementParser(self)
         self._leaf_list_parser = LeafListStatementParser(self)
@@ -100,6 +102,8 @@ class StatementParsers:
             kw.LIST: self.parse_list,
             kw.CHOICE: self.parse_choice,
             kw.CASE: self.parse_case,
+            kw.ANYDATA: self.parse_anydata,
+            kw.ANYXML: self.parse_anyxml,
         }
 
     # ------------------------------------------------------------------
@@ -348,6 +352,9 @@ class StatementParsers:
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
         return self._container_parser.parse_container(tokens, context)
 
+    def parse_notification(self, tokens: TokenStream, context: ParserContext):
+        return self._notification_parser.parse_notification(tokens, context)
+
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         return self._list_parser.parse_list(tokens, context)
 
@@ -485,6 +492,24 @@ class StatementParsers:
         name = getattr(parent, "name", None) if parent is not None else None
         ctx = f"{type(parent).__name__}" + (f" '{name}'" if name else "")
         skip_config_substatement(tokens, context=ctx)
+
+    def parse_status_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``status`` substatement; consume tokens without storing on AST."""
+        from .unsupported_skip import skip_status_substatement
+
+        parent = context.current_parent
+        name = getattr(parent, "name", None) if parent is not None else None
+        ctx = f"{type(parent).__name__}" + (f" '{name}'" if name else "")
+        skip_status_substatement(tokens, context=ctx)
+
+    def parse_units(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``units`` substatement (RFC 7950 §7.21.4) into ``current_parent.units``."""
+        tokens.consume(kw.UNITS)
+        units = self.parse_string_argument(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        parent = context.current_parent
+        if parent is not None and hasattr(parent, "units"):
+            setattr(parent, "units", units)
 
     def _parse_string_concatenation(self, tokens: TokenStream) -> str:
         """Consume one or more STRING tokens with optional PLUS between; return concatenated string."""

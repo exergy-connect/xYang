@@ -7,7 +7,7 @@ from pathlib import Path
 import pytest
 
 from xyang import YangValidator
-from xyang.ast import YangAugmentStmt, YangLeafStmt
+from xyang.ast import YangAugmentStmt, YangCaseStmt, YangChoiceStmt, YangLeafStmt
 from xyang.errors import YangSyntaxError
 from xyang.parser import YangParser
 from xyang.validator.document_validator import DocumentValidator
@@ -111,6 +111,40 @@ module m {
     v = DocumentValidator(mod, enabled_features_by_module={"m": frozenset()})
     errors = v.validate({"a": {"x": "ok", "z": "bad"}})
     assert errors and any("if-feature" in e.message for e in errors)
+
+
+def test_augment_case_merges_into_choice(tmp_path: Path) -> None:
+    path = tmp_path / "m.yang"
+    path.write_text(
+        """
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  container root {
+    choice target {
+      case a { leaf x { type string; } }
+    }
+  }
+  augment "/m:root/m:target" {
+    case b {
+      leaf y { type int32; }
+    }
+  }
+}
+""",
+        encoding="utf-8",
+    )
+    mod = YangParser(expand_uses=True).parse_file(path)
+    root = mod.find_statement("root")
+    assert root is not None
+    ch = root.find_statement("target")
+    assert isinstance(ch, YangChoiceStmt)
+    names = {c.name for c in ch.cases}
+    assert names == {"a", "b"}
+    case_b = next(c for c in ch.cases if c.name == "b")
+    assert isinstance(case_b, YangCaseStmt)
+    assert isinstance(case_b.find_statement("y"), YangLeafStmt)
 
 
 def test_augment_invalid_path_not_absolute_errors(tmp_path: Path) -> None:
