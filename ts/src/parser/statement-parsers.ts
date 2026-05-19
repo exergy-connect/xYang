@@ -762,7 +762,7 @@ export class StatementParsers {
     const parent = context.current_parent;
     if (parent instanceof YangRefineStmt) {
       parent.refined_config = value === kw.TRUE;
-    } else if (parent && "config" in parent) {
+    } else if (parent && typeof parent === "object" && "config" in parent) {
       (parent as { config?: boolean }).config = value === kw.TRUE;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
