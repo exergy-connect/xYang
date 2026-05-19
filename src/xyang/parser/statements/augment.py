@@ -10,7 +10,7 @@ from typing import TYPE_CHECKING
 
 from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
-from ...ast import YangAugmentStmt
+from ...ast import YangAugmentStmt, YangUsesStmt
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -31,6 +31,7 @@ class AugmentStatementParser:
                 kw.CONTAINER: self._parsers.parse_container,
                 kw.LIST: self._parsers.parse_list,
                 kw.CHOICE: self._parsers.parse_choice,
+                kw.CASE: self._parsers.parse_case,
                 kw.ANYDATA: self._parsers.parse_anydata,
                 kw.ANYXML: self._parsers.parse_anyxml,
                 kw.WHEN: self._parsers.parse_when,
@@ -54,5 +55,9 @@ class AugmentStatementParser:
                 ):
                     continue
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, aug)
+        parent = context.current_parent
+        if parent is not None and isinstance(parent, YangUsesStmt):
+            parent.augmentations.append(aug)
+        else:
+            self._parsers._add_to_parent_or_module(context, aug)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

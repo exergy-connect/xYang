@@ -627,6 +627,47 @@ def test_grouping_generic_field_without_case_array_parses_with_expand_disabled()
     assert module.name == "generic_field_no_array"
 
 
+def test_refine_description_on_choice_case():
+    yang = """
+module refine_case_desc {
+  yang-version 1.1;
+  namespace "urn:test:refine-case-desc";
+  prefix rc;
+
+  grouping g {
+    choice target {
+      case stream {
+        choice stream-filter {
+          case within-subscription {
+            leaf x { type string; }
+          }
+        }
+      }
+    }
+  }
+
+  container root {
+    uses g {
+      refine "target/stream/stream-filter/within-subscription" {
+        description "Refined case description.";
+      }
+    }
+  }
+}
+"""
+    mod = parse_yang_string(yang)
+    target = mod.find_statement("root")
+    assert target is not None
+    ch_target = target.find_statement("target")
+    assert isinstance(ch_target, YangChoiceStmt)
+    case_stream = next(c for c in ch_target.cases if c.name == "stream")
+    ch_filter = next(
+        s for s in case_stream.statements if isinstance(s, YangChoiceStmt)
+    )
+    case_within = next(c for c in ch_filter.cases if c.name == "within-subscription")
+    assert case_within.description == "Refined case description."
+
+
 def test_refine_mandatory_false_on_grouping_leaf():
     yang = """
 module t {

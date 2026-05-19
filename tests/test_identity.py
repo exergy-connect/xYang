@@ -128,6 +128,37 @@ def test_parse_minimal_identity_module():
     assert module.identities["dog"].bases == ["mammal"]
 
 
+def test_identityref_base_accepts_prefixed_qname():
+    """``base sn:foo`` inside identityref (ietf-yang-push yang-data pattern)."""
+    from xyang import parse_yang_string
+    from xyang.ast import YangLeafStmt
+
+    yang = """
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  identity error;
+
+  container c {
+    leaf reason {
+      type identityref {
+        base m:error;
+      }
+    }
+  }
+}
+"""
+    module = parse_yang_string(yang)
+    leaf = module.find_statement("c")
+    assert leaf is not None
+    reason = leaf.find_statement("reason")
+    assert isinstance(reason, YangLeafStmt)
+    assert reason.type is not None
+    assert reason.type.identityref_bases == ["m:error"]
+
+
 def test_parse_identity_module_with_must_derived_from():
     """Parse ``must`` using ``derived-from(identityref, identity)`` (RFC 7950)."""
     from xyang import parse_yang_string

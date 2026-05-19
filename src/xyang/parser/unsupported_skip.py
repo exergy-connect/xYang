@@ -25,7 +25,6 @@ UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
         kw.DEVIATION,
         kw.RPC,
         kw.ACTION,
-        kw.NOTIFICATION,
         kw.INPUT,
         kw.OUTPUT,
     }
@@ -89,6 +88,14 @@ def is_unsupported_construct_start(tokens: TokenStream) -> bool:
         return False
     tok = tokens.peek_token()
     return tok is not None and tok.value in UNSUPPORTED_CONSTRUCT_TYPES
+
+
+def skip_status_substatement(tokens: TokenStream, *, context: str) -> None:
+    """Consume ``status current|deprecated|obsolete;`` (RFC 7950 §7.21.2); not stored on the AST."""
+    tokens.consume(kw.STATUS)
+    if tokens.peek_type() == YangTokenType.IDENTIFIER:
+        tokens.consume_type(YangTokenType.IDENTIFIER)
+    tokens.consume_if_type(YangTokenType.SEMICOLON)
 
 
 def skip_config_substatement(tokens: TokenStream, *, context: str) -> None:

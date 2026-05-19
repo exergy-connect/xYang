@@ -6,7 +6,7 @@ import argparse
 import json
 import sys
 from pathlib import Path
-from typing import Any, Dict
+from typing import Any, Dict, Iterable
 
 from xyang.errors import YangSemanticError, YangSyntaxError
 
@@ -47,6 +47,50 @@ def _add_include_path_argument(parser: argparse.ArgumentParser) -> None:
 
 def _include_path_from_args(args: argparse.Namespace) -> tuple[str, ...]:
     return tuple(str(Path(p).resolve()) for p in args.include_path)
+
+
+def _yang_files_in_dirs(dirs: Iterable[Path]) -> list[Path]:
+    """Sorted ``*.yang`` files under each directory (non-recursive)."""
+    seen: set[Path] = set()
+    out: list[Path] = []
+    for directory in dirs:
+        if not directory.is_dir():
+            continue
+        for path in sorted(directory.glob("*.yang")):
+            resolved = path.resolve()
+            if resolved not in seen:
+                seen.add(resolved)
+                out.append(path)
+    return out
+
+
+def _load_anydata_module_map(
+    host_path: Path,
+    host_module: Any,
+    include_path: tuple[str, ...],
+    extra_module_paths: list[Path],
+) -> Dict[str, Any]:
+    """Build ``module-name -> YangModule`` for anydata subtree validation."""
+    from xyang import parse_yang_file
+    from xyang.module import YangModule
+
+    modules: Dict[str, YangModule] = {host_module.name: host_module}
+    if extra_module_paths:
+        paths = extra_module_paths
+    else:
+        search_dirs = [host_path.parent, *[Path(p) for p in include_path]]
+        paths = _yang_files_in_dirs(search_dirs)
+
+    for yang_path in paths:
+        if yang_path.resolve() == host_path.resolve():
+            continue
+        try:
+            mod = parse_yang_file(str(yang_path), include_path=include_path)
+        except _CLI_ERRORS as exc:
+            print(f"Warning: skipping {yang_path}: {exc}", file=sys.stderr)
+            continue
+        modules[mod.name] = mod
+    return modules
 
 
 def _load_instance_data(data_path: Path) -> Any:
@@ -106,7 +150,9 @@ def main() -> int:
         default="off",
         help=(
             "Optional draft-ietf-netmod-yang-anydata-validation: validate JSON under "
-            "anydata using extra modules (RFC 7951 names). Default: off."
+            "anydata using extra modules (RFC 7951 names). Default: off. "
+            "When enabled, modules are taken from --anydata-module and/or every "
+            "*.yang file in --include-path and the host file's directory."
         ),
     )
     validate_parser.add_argument(
@@ -115,7 +161,11 @@ def main() -> int:
         action="append",
         default=[],
         metavar="PATH",
-        help="Additional .yang file to load into the anydata module map (repeatable).",
+        help=(
+            "Additional .yang file for the anydata module map (repeatable). "
+            "If omitted, all *.yang files in --include-path and the host directory "
+            "are loaded (unparseable files are skipped with a warning)."
+        ),
     )
 
     convert_parser = subparsers.add_parser(
@@ -176,19 +226,22 @@ def main() -> int:
             validator = YangValidator(module)
             if args.anydata_validation != "off":
                 extra_paths: list[Path] = list(args.anydata_module)
-                if not extra_paths:
-                    print(
-                        "Error: --anydata-validation requires at least one --anydata-module",
-                        file=sys.stderr,
-                    )
-                    return 1
-                modules: Dict[str, YangModule] = {module.name: module}
                 for ep in extra_paths:
                     if not ep.exists():
                         print(f"Error: file not found: {ep}", file=sys.stderr)
                         return 1
-                    m = parse_yang_file(str(ep), include_path=include_path)
-                    modules[m.name] = m
+                modules = _load_anydata_module_map(
+                    p.resolve(),
+                    module,
+                    include_path,
+                    extra_paths,
+                )
+                if len(modules) < 2 and not extra_paths:
+                    print(
+                        "Warning: --anydata-validation enabled but no extra modules "
+                        "were loaded; use --include-path or --anydata-module",
+                        file=sys.stderr,
+                    )
                 mode = (
                     AnydataValidationMode.COMPLETE
                     if args.anydata_validation == "complete"

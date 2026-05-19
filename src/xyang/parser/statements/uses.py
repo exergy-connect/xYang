@@ -30,6 +30,7 @@ class UsesStatementParser:
                 kw.WHEN: self._parsers.parse_when,
                 kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
                 kw.REFINE: self._parsers.parse_refine,
+                kw.AUGMENT: self._parsers.parse_augment,
             },
         )
 

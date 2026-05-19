@@ -32,6 +32,9 @@ class TypeStatementParser:
             kw.PATH: self.parse_type_path,
             kw.REQUIRE_INSTANCE: self.parse_type_require_instance,
             kw.BASE: self.parse_type_base,
+            kw.UNITS: lambda t, c, _s: self._parsers.parse_units(t, c),
+            kw.DESCRIPTION: lambda t, c, _s: self._parsers.parse_description(t, c),
+            kw.REFERENCE: lambda t, c, _s: self._parsers.parse_reference(t, c),
         }
 
     def _parse_type_substatement(
@@ -97,9 +100,9 @@ class TypeStatementParser:
         return type_stmt
 
     def parse_type_base(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
-        """Parse base substatement inside identityref type."""
+        """Parse base substatement inside identityref type (RFC 7950 §9.10)."""
         tokens.consume(kw.BASE)
-        base_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        base_name = self._parsers._consume_qname_from_identifier(tokens)
         type_stmt.identityref_bases.append(base_name)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

@@ -16,10 +16,13 @@ def with_metadata_substatements(
     parsers: StatementParsers,
     dispatch: dict[str, Callable[..., Any]],
 ) -> dict[str, Callable[..., Any]]:
-    """Return *dispatch* with ``description`` and ``reference`` handlers (if not already set)."""
+    """Return *dispatch* with common RFC 7950 metadata substatement handlers."""
     out = dict(dispatch)
     out.setdefault(kw.DESCRIPTION, parsers.parse_description)
     out.setdefault(kw.REFERENCE, parsers.parse_reference)
+    out.setdefault(kw.UNITS, parsers.parse_units)
+    # RFC 7950 §7.21.2 — allowed on typedef, grouping, feature, data defs, etc.
+    out.setdefault(kw.STATUS, parsers.parse_status_ignored)
     return out
 
 
@@ -30,4 +33,5 @@ def with_data_node_substatements(
     """Like :func:`with_metadata_substatements`, plus ignored ``config`` (warning only)."""
     out = with_metadata_substatements(parsers, dispatch)
     out.setdefault(kw.CONFIG, parsers.parse_config_ignored)
+    out.setdefault(kw.STATUS, parsers.parse_status_ignored)
     return out

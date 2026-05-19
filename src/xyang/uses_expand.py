@@ -5,15 +5,18 @@ from __future__ import annotations
 import logging
 
 from .ast import (
+    YangAugmentStmt,
     YangChoiceStmt,
     YangStatement,
+    YangStatementList,
     YangStatementWithWhen,
     YangUsesStmt,
     YangWhenStmt,
 )
-from .errors import YangCircularUsesError, YangRefineTargetNotFoundError
+from .errors import YangCircularUsesError, YangRefineTargetNotFoundError, YangSyntaxError
 from .module import YangModule
-from .refine_expand import apply_refine_to_node, copy_yang_statement
+from .refine_expand import apply_refine_to_node, copy_yang_statement, find_nodes_by_refine_path
+from .xpath import XPathParser
 from .xpath.ast import PathNode
 
 logger = logging.getLogger(__name__)
@@ -97,6 +100,42 @@ def _apply_refines_matching_path(
             del refines[i]
 
 
+def _apply_uses_augmentations(
+    body: list[YangStatement],
+    uses_stmt: YangUsesStmt,
+    grouping_name: str,
+) -> None:
+    """RFC 7950 §7.17: merge ``augment`` substatements on ``uses`` into the expanded grouping."""
+    for aug in uses_stmt.augmentations:
+        try:
+            path_node = XPathParser(aug.augment_path).parse_path()
+        except Exception as exc:
+            raise YangSyntaxError(
+                f"uses '{grouping_name}' augment: invalid path {aug.augment_path!r}: {exc}"
+            ) from exc
+        targets = find_nodes_by_refine_path(body, path_node)
+        if not targets:
+            raise YangSyntaxError(
+                f"uses '{grouping_name}' augment: no target for path {aug.augment_path!r}"
+            )
+        if len(targets) != 1:
+            raise YangSyntaxError(
+                f"uses '{grouping_name}' augment: path {aug.augment_path!r} "
+                f"matched {len(targets)} nodes, expected one"
+            )
+        target = targets[0]
+        if not hasattr(target, "statements"):
+            raise YangSyntaxError(
+                f"uses '{grouping_name}' augment: target {getattr(target, 'name', '?')!r} "
+                f"cannot contain schema substatements (path {aug.augment_path!r})"
+            )
+        copies = [copy_yang_statement(x) for x in aug.statements]
+        _merge_uses_if_features_into_grouping_roots(copies, aug.if_features)
+        _merge_uses_when_into_grouping_roots(copies, aug.when)
+        tlist: YangStatementList = target  # type: ignore[assignment]
+        tlist.statements.extend(copies)
+
+
 def _expand_one_uses_stmt(
     stmt: YangUsesStmt,
     module: YangModule,
@@ -145,6 +184,8 @@ def _expand_one_uses_stmt(
         raise YangRefineTargetNotFoundError(
             r0.target_path.to_string()
         )
+    if stmt.augmentations:
+        _apply_uses_augmentations(out, stmt, gname)
     return out
 
 
@@ -192,6 +233,7 @@ def expand_uses_in_statements(
         elif isinstance(stmt, YangChoiceStmt):
             for case in stmt.cases:
                 case_prefix = _extend_refine_path(stmt_path, case.name)
+                _apply_refines_matching_path(case, case_prefix, refines)
                 case.statements = expand_uses_in_statements(
                     case.statements,
                     module,

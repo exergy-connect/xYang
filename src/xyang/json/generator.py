@@ -253,6 +253,15 @@ def _resolve_leafref_target_leaf(
     return current if isinstance(current, YangLeafStmt) else None
 
 
+def _merge_units_into_schema(schema: dict[str, Any], units: str) -> None:
+    """Attach RFC 7950 ``units`` to ``x-yang`` on a JSON Schema fragment (in place)."""
+    if not units:
+        return
+    xy = dict(schema.get(JsonSchemaKey.X_YANG) or {})
+    xy[XYangKey.UNITS] = units
+    schema[JsonSchemaKey.X_YANG] = xy
+
+
 def _type_to_schema(
     type_stmt: YangTypeStmt | None,
     typedef_names: set[str],
@@ -262,7 +271,17 @@ def _type_to_schema(
     """Build JSON Schema for a type. Uses $ref for typedef names when in typedef_names."""
     if type_stmt is None:
         return {JsonSchemaKey.TYPE: "string"}
+    out = _type_to_schema_impl(type_stmt, typedef_names, module, leafref_anchor)
+    _merge_units_into_schema(out, type_stmt.units)
+    return out
 
+
+def _type_to_schema_impl(
+    type_stmt: YangTypeStmt,
+    typedef_names: set[str],
+    module: YangModule | None,
+    leafref_anchor: YangStatement | YangModule | None,
+) -> dict[str, Any]:
     name = type_stmt.name
     if name in typedef_names:
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
@@ -517,6 +536,7 @@ def _build_xyang(
     *,
     mandatory: bool | None = None,
     if_features: list[str] | None = None,
+    units: str | None = None,
 ) -> dict[str, Any]:
     """Build x-yang object for a node."""
     xyang: dict[str, Any] = {XYangKey.TYPE: node_type}
@@ -532,6 +552,8 @@ def _build_xyang(
         xyang[XYangKey.MANDATORY] = True
     if if_features:
         xyang[XYangKey.IF_FEATURES] = list(if_features)
+    if units:
+        xyang[XYangKey.UNITS] = units
     return xyang
 
 
@@ -901,6 +923,7 @@ def _leaf_stmt_to_property(
                 when_stmt=when_stmt,
                 mandatory=stmt.mandatory or None,
                 if_features=_if_features_for_xyang(stmt),
+                units=stmt.units or None,
             ),
         }
     else:
@@ -917,6 +940,7 @@ def _leaf_stmt_to_property(
             when_stmt=when_stmt,
             mandatory=stmt.mandatory or None,
             if_features=_if_features_for_xyang(stmt),
+            units=stmt.units or None,
         )
         # Preserve leafref (type, path, require-instance) from type_schema x-yang
         if type_schema.get(JsonSchemaKey.X_YANG):
@@ -983,6 +1007,7 @@ def _leaf_list_stmt_to_property(
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=when_stmt,
             if_features=_if_features_for_xyang(stmt),
+            units=stmt.units or None,
         ),
     }
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
@@ -1074,6 +1099,8 @@ def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> 
         leafref_anchor=None,
     )  # no $ref inside typedef def
     schema[JsonSchemaKey.DESCRIPTION] = typedef.description or ""
+    if typedef.units:
+        _merge_units_into_schema(schema, typedef.units)
     if typedef.default is not None:
         yang_type = typedef.type.name if typedef.type else None
         schema_type = schema.get(JsonSchemaKey.TYPE)

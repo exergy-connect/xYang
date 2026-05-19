@@ -321,7 +321,22 @@ def parse_yang_file(
     return parser.parse_file(Path(file_path))
 
 
-def parse_yang_string(content: str) -> YangModule:
-    """Parse YANG content from a string and return a YangModule."""
-    parser = YangParser()
-    return parser.parse_string(content)
+def parse_yang_string(
+    content: str,
+    *,
+    filename: Optional[str] = None,
+    source_path: str | Path | None = None,
+    include_path: Tuple[str, ...] = (),
+) -> YangModule:
+    """Parse YANG content from a string and return a YangModule.
+
+    Args:
+        content: YANG source text.
+        filename: Optional path for error messages.
+        source_path: If set, its parent directory resolves ``import`` / ``include``.
+        include_path: Extra directories to search for imported or included modules.
+    """
+    extras = tuple(Path(p) for p in include_path)
+    parser = YangParser(include_path=extras)
+    sp = Path(source_path) if source_path is not None else None
+    return parser.parse_string(content, filename=filename, source_path=sp)
