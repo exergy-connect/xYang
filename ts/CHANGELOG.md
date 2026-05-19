@@ -1,4 +1,4 @@
-# Changelog — `@xyang/ts`
+# Changelog — `@exergy-connect/xyang`
 
 All notable changes to the TypeScript implementation in [`ts/`](.) are documented in this file.
 
@@ -24,6 +24,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Changed
 
+- **npm package name:** `@xyang/ts` → **`@exergy-connect/xyang`** (scope matches the GitHub org; install with `npm install @exergy-connect/xyang`).
+
 - **`augment` body parsing:** uses the same data-node substatement dispatch as Python (`choice` / `case`, `uses`, `notification`, `must`, `when`, prefixed extensions, etc.) instead of generic `parseStatement` (which rejected `case` under `augment`).
 - **`config` substatement (RFC 7950 §7.21.1):** stored on data definition AST nodes and in JSON Schema `x-yang.config`; refine `config` applied on uses expansion.
 - **JSON Schema defaults:** leaf `default` values emit as JSON literals (boolean/integer) and round-trip back to YANG string form (`default-values.ts`, Python parity).
@@ -41,7 +43,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [0.1.0] — 2026-05-17
 
-Initial publishable **`@xyang/ts`** package (`xyang-ts` CLI).
+Initial publishable **`@exergy-connect/xyang`** package (`xyang-ts` CLI).
 
 ### Added
 

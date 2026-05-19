@@ -1,8 +1,24 @@
 {
-  "name": "@xyang/ts",
-  "version": "0.1.0",
+  "name": "@exergy-connect/xyang",
+  "version": "0.1.2",
   "description": "TypeScript xYang bridge and compatibility surface",
   "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/exergy-connect/xYang.git",
+    "directory": "ts"
+  },
+  "bugs": {
+    "url": "https://github.com/exergy-connect/xYang/issues"
+  },
+  "homepage": "https://github.com/exergy-connect/xYang#readme",
+  "publishConfig": {
+    "access": "public"
+  },
+  "files": [
+    "dist",
+    "CHANGELOG.md"
+  ],
   "type": "module",
   "main": "./dist/index.js",
   "module": "./dist/index.js",

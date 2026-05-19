@@ -100,7 +100,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
   - `xyang validate <file.yang> [data.json]` — validate JSON (file or stdin) against the module
   - `xyang validate … --anydata-validation complete|candidate` — validate RFC 7951 qualified members under `anydata` using `--anydata-module` paths and/or every `*.yang` in `--include-path` and the host directory ([draft anydata validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation); see `examples/ietf-yang-push/README.md`)
   - `xyang convert <file.yang> [-o path]` — convert .yang to JSON Schema (output path always ends with `.yang.json`)
-- ✅ **CLI** (`xyang-ts`, package `@xyang/ts` under [`ts/`](ts/)): `parse`, `validate`, `convert`
+- ✅ **CLI** (`xyang-ts`, package `@exergy-connect/xyang` under [`ts/`](ts/)): `parse`, `validate`, `convert`
   - Same `--include-path` semantics as Python
   - `xyang-ts validate … --anydata-validation complete|candidate` and repeatable `--anydata-module` (loads import closure; unparseable extra modules skipped with a warning)
   - Unwraps a single top-level `module:local` instance key when it names the host module (e.g. `ietf-yp-notification:envelope`)

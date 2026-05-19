@@ -6,9 +6,9 @@ xYang targets real-world modules and pipelines: agents, CI, and schema tooling t
 
 The same feature set is implemented twice:
 
-| | **Python** (`xyang`) | **TypeScript** (`@xyang/ts`) |
+| | **Python** (`xyang`) | **TypeScript** (`@exergy-connect/xyang`) |
 |---|----------------------|------------------------------|
-| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | npm `@xyang/ts` |
+| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | npm `@exergy-connect/xyang` |
 | **CLI** | `xyang` | `xyang-ts` |
 | **Runtime** | Python ≥ 3.9, zero required deps | Node ≥ 24 |
 | **Source** | [`src/xyang/`](src/xyang/) | [`ts/src/`](ts/src/) |
@@ -35,7 +35,7 @@ Optional: **PyYAML** for `.yaml` / `.yml` instance files on `xyang validate`.
 **TypeScript**
 
 ```bash
-npm install @xyang/ts
+npm install @exergy-connect/xyang
 # from checkout:
 cd ts && npm install && npm run build
 ```
@@ -75,7 +75,7 @@ is_valid, errors, warnings = validator.validate(data)
 ### TypeScript API
 
 ```typescript
-import { parseYangFile, YangValidator } from "@xyang/ts";
+import { parseYangFile, YangValidator } from "@exergy-connect/xyang";
 
 const module = parseYangFile("examples/meta-model.yang");
 const validator = new YangValidator(module);
@@ -151,7 +151,7 @@ Use `candidate` instead of `complete` for structural checks only (no `must` / `w
 ```
 xYang/
 ├── src/xyang/          # Python library + xyang CLI
-├── ts/                 # TypeScript package (@xyang/ts) + xyang-ts CLI
+├── ts/                 # TypeScript package (@exergy-connect/xyang) + xyang-ts CLI
 ├── examples/           # meta-model.yang, ietf-yang-push/, samples
 ├── tests/              # Python tests
 ├── FEATURES.md         # Authoritative feature list
