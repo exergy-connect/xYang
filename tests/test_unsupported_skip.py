@@ -33,16 +33,18 @@ module ex {
     with caplog.at_level(logging.WARNING, logger="xyang.parser.unsupported_skip"):
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
-    # Nested input/output under rpc/action are skipped inside the outer block (no extra warnings).
-    # ``notification`` is parsed (not skipped); top-level ``input`` / ``output`` still warn.
+    # ``rpc`` and nested ``input``/``output`` are parsed; ``action`` and top-level ``input``/``output`` warn.
     for kw in (
         "deviation",
-        "rpc",
         "action",
         "input",
         "output",
     ):
         assert kw in warn_msgs.lower()
+    assert "rpc" not in warn_msgs.lower()
+    reset = mod.find_statement("reset")
+    assert reset is not None
+    assert getattr(reset, "name", None) == "reset"
     done = mod.find_statement("done")
     assert done is not None
     assert getattr(done, "name", None) == "done"
@@ -51,7 +53,7 @@ module ex {
     assert getattr(leaf, "name", None) == "a"
 
 
-def test_container_skips_rpc_warns(caplog: pytest.LogCaptureFixture) -> None:
+def test_container_rejects_rpc() -> None:
     yang = """
 module ex {
   yang-version 1.1;
@@ -63,10 +65,5 @@ module ex {
   }
 }
 """
-    with caplog.at_level(logging.WARNING, logger="xyang.parser.unsupported_skip"):
-        mod = parse_yang_string(yang)
-    assert any("rpc" in r.getMessage().lower() for r in caplog.records)
-    c = mod.find_statement("c")
-    assert c is not None
-    names = {s.name for s in c.statements}
-    assert "x" in names
+    with pytest.raises(Exception, match="rpc"):
+        parse_yang_string(yang)

@@ -23,8 +23,8 @@ logger = logging.getLogger(__name__)
 UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
     {
         kw.DEVIATION,
-        kw.RPC,
         kw.ACTION,
+        # Top-level ``input`` / ``output`` only (valid under ``rpc`` / ``action``).
         kw.INPUT,
         kw.OUTPUT,
     }

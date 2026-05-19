@@ -174,6 +174,21 @@ class YangNotificationStmt(YangContainerStmt):
 
 
 @dataclass
+class YangInputStmt(YangContainerStmt):
+    """RPC/action ``input`` block (RFC 7950 §7.14.2); no statement argument."""
+
+
+@dataclass
+class YangOutputStmt(YangContainerStmt):
+    """RPC/action ``output`` block (RFC 7950 §7.14.3); no statement argument."""
+
+
+@dataclass
+class YangRpcStmt(YangStatementWithMust, YangStatementWithWhen):
+    """RPC statement (RFC 7950 §7.14). Data nodes appear only under ``input`` / ``output``."""
+
+
+@dataclass
 class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     """List statement."""
     key: Optional[str] = None
