@@ -17,7 +17,7 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 - ✅ `include` - Include submodules into the parent module (merged typedefs, identities, groupings, features, top-level statements)
 - ✅ `submodule` / `belongs-to` - Submodule files parsed and merged via `include`
 - ✅ `feature` - Feature declarations; optional braced body with `description`, `reference`, and `if-feature` (per-feature conditions stored on the module)
-- ✅ `notification` - Notification statements (RFC 7950 §7.16); parsed into `YangNotificationStmt` with data-definition substatements (schema / anydata tooling; not full JSON Schema emission yet)
+- ✅ `notification` - Notification statements (RFC 7950 §7.16); parsed into `YangNotificationStmt` at module/submodule level and under `container`, `list`, `grouping`, and `augment` (YANG 1.1 `*notification-stmt` in those bodies)
 - ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **Not yet:** instance validation or JSON Schema for RPC I/O.
 
 ### Type Definitions
@@ -508,7 +508,7 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
 ## Recent Improvements
 
 ### RPC and notification parsing (2026-05)
-- ✅ **`notification`**: Parsed into `YangNotificationStmt` (module-level data definitions).
+- ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
 - ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes; see `tests/test_rpc_input_output.py`.
 
 

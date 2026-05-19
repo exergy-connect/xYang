@@ -36,6 +36,7 @@ class AugmentStatementParser:
                 kw.ANYXML: self._parsers.parse_anyxml,
                 kw.WHEN: self._parsers.parse_when,
                 kw.MUST: self._parsers.parse_must,
+                kw.NOTIFICATION: self._parsers.parse_notification,
             },
         )
 

@@ -36,6 +36,7 @@ class ContainerStatementParser:
             kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
+            kw.NOTIFICATION: self._parsers.parse_notification,
             },
         )
 

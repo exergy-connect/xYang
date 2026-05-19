@@ -4,6 +4,7 @@ import {
   YangExtensionStmt,
   YangLeafListStmt,
   YangMustStmt,
+  YangNotificationStmt,
   YangRefineStmt,
   YangTypedefStmt,
   YangTypeStmt,
@@ -27,6 +28,7 @@ import {
   LeafStatementParser,
   ListStatementParser,
   ModuleStatementParser,
+  NotificationStatementParser,
   MustStatementParser,
   RefineStatementParser,
   RevisionStatementParser,
@@ -98,6 +100,7 @@ export class StatementParsers {
   readonly leaf_list_parser = new LeafListStatementParser(this);
   readonly list_parser = new ListStatementParser(this);
   private readonly module_parser = new ModuleStatementParser(this);
+  private readonly notification_parser = new NotificationStatementParser(this);
   private readonly must_parser = new MustStatementParser(this);
   private readonly refine_parser = new RefineStatementParser(this);
   readonly revision_parser = new RevisionStatementParser(this);
@@ -114,6 +117,8 @@ export class StatementParsers {
     [kw.LEAF_LIST]: (tokens, context) => this.fromAst(this.leaf_list_parser.parse_leaf_list(tokens, context)),
     [kw.CONTAINER]: (tokens, context) => this.fromAst(this.container_parser.parse_container(tokens, context)),
     [kw.LIST]: (tokens, context) => this.fromAst(this.list_parser.parse_list(tokens, context)),
+    [kw.NOTIFICATION]: (tokens, context) =>
+      this.fromAst(this.notification_parser.parse_notification(tokens, context)),
     [kw.ANYDATA]: (tokens, context) => this.fromAst(this.anydata_parser.parse_anydata(tokens, context)),
     [kw.ANYXML]: (tokens, context) => this.fromAst(this.anyxml_parser.parse_anyxml(tokens, context)),
     [kw.CHOICE]: (tokens, context) => this.fromAst(this.choice_parser.parse_choice(tokens, context)),

@@ -37,6 +37,7 @@ class GroupingStatementParser:
             kw.MUST: self._parsers.parse_must,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
+            kw.NOTIFICATION: self._parsers.parse_notification,
             },
         )
 

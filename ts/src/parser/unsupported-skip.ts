@@ -5,7 +5,6 @@ export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([
   kw.DEVIATION,
   kw.RPC,
   kw.ACTION,
-  kw.NOTIFICATION,
   kw.INPUT,
   kw.OUTPUT
 ]);

@@ -27,15 +27,26 @@ xyang validate \
   --include-path examples/ietf-yang-push/modules \
   --anydata-validation complete \
   --anydata-module examples/ietf-yang-push/modules/ietf-yang-push@2019-09-09.yang \
-  --anydata-module examples/ietf-yang-push/modules/ietf-distributed-notif@2024-04-21.yang
+  --anydata-module examples/ietf-yang-push/modules/ietf-distributed-notif@2024-04-21.yang \
+  --anydata-module examples/ietf-yang-push/modules/ietf-yp-observation@2025-02-24.yang \
+  --anydata-module examples/ietf-yang-push/modules/ietf-alarms@2019-09-11.yang \
+  --anydata-module examples/ietf-yang-push/modules/ietf-alarms-x733@2019-09-11.yang
 ```
 
 - **Host module** — `ietf-yp-notification` defines the `envelope` structure
   (`event-time`, `hostname`, `sequence-number`, `contents` anydata).
 - **`--anydata-validation complete`** — checks RFC 7951 qualified members under
   `contents` (here `ietf-yang-push:push-change-update` and augmenting leaves).
-- **`--anydata-module`** — loads only the modules needed for that subtree;
-  omit these flags to load every `*.yang` under `--include-path` (slower, and
+- **`--anydata-module`** — loads only the modules needed for that subtree
+  (imports resolved via `--include-path`):
+  - `ietf-yang-push` — `push-change-update` and `datastore-changes`
+  - `ietf-distributed-notif` — `ietf-distributed-notif:message-publisher-id`
+  - `ietf-yp-observation` — `ietf-yp-observation:timestamp`,
+    `ietf-yp-observation:point-in-time`
+  - `ietf-alarms` — `alarm-notification` in the nested `yang-patch` `edit` `value`
+  - `ietf-alarms-x733` — `ietf-alarms-x733:*` leaves on that notification
+
+  Omit `--anydata-module` to load every `*.yang` under `--include-path` (slower;
   many vendor modules are not required for this file).
 
 Use `candidate` instead of `complete` for structural checks only (no `must` /
@@ -45,8 +56,16 @@ Use `candidate` instead of `complete` for structural checks only (no `must` /
 ### Nested patch payload
 
 The sample `yang-patch` `edit` `value` carries an `ietf-alarms:alarm-notification`
-document. Those alarm modules are not in `modules/`; add their `.yang` files with
-extra `--anydata-module` paths if you want that subtree validated too.
+document. Standard modules `ietf-alarms` and `ietf-alarms-x733` are under
+`modules/` and are included in the command above.
+
+The payload also uses vendor prefixes not shipped in this bundle
+(`huawei-alarm-type-an`, `an-alarm-management`, `hw-alarm-type-an`). Add those
+`.yang` files under `modules/` and pass extra `--anydata-module` paths to validate
+those leaves.
+
+`ietf-alarms` also defines `action` and `notification` under list `alarm` (YANG
+1.1). xYang parses `notification` there; `action` is still skipped with a warning.
 
 ### Parser scope
 

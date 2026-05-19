@@ -202,6 +202,14 @@ export class YangContainerStmt extends YangStatementWithWhen {
   }
 }
 
+/** Notification statement (RFC 7950 §7.16); body parsed like a container subtree. */
+export class YangNotificationStmt extends YangContainerStmt {
+  constructor(init: Partial<YangNotificationStmt> = {}) {
+    super(init);
+    this.keyword = "notification";
+  }
+}
+
 export class YangListStmt extends YangStatementWithWhen {
   must_statements: YangMustStmt[];
   key?: string;

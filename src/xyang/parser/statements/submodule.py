@@ -40,6 +40,7 @@ class SubmoduleStatementParser:
             kw.LEAF_LIST: self._parsers.parse_leaf_list,
             kw.ANYDATA: self._parsers.parse_anydata,
             kw.ANYXML: self._parsers.parse_anyxml,
+            kw.NOTIFICATION: self._parsers.parse_notification,
         }
 
     def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
