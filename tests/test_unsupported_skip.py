@@ -34,15 +34,18 @@ module ex {
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
     # Nested input/output under rpc/action are skipped inside the outer block (no extra warnings).
+    # ``notification`` is parsed (not skipped); top-level ``input`` / ``output`` still warn.
     for kw in (
         "deviation",
         "rpc",
         "action",
-        "notification",
         "input",
         "output",
     ):
         assert kw in warn_msgs.lower()
+    done = mod.find_statement("done")
+    assert done is not None
+    assert getattr(done, "name", None) == "done"
     leaf = mod.find_statement("a")
     assert leaf is not None
     assert getattr(leaf, "name", None) == "a"

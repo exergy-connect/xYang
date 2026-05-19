@@ -27,6 +27,10 @@ class YangValidator:
 
     def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
         """Enable a :class:`DocumentValidator` extension (see ``ValidatorExtension``)."""
+        if extension is ValidatorExtension.ANYDATA_VALIDATION:
+            from ..ext.anydata_validation import parse_anydata_extension_kwargs
+
+            parse_anydata_extension_kwargs(dict(kwargs))
         self._extensions.append((extension, dict(kwargs)))
 
     def _document_validator(self, root_schema: YangStatementList) -> DocumentValidator:

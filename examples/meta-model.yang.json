@@ -1961,7 +1961,7 @@
                               },
                               "entity": {
                                 "$ref": "#/$defs/entity-name",
-                                "description": "Referenced entity name.",
+                                "description": "Entity name for cross-entity field reference (optional).",
                                 "x-yang": {
                                   "type": "leafref",
                                   "must": [
@@ -3773,7 +3773,7 @@
                               },
                               "entity": {
                                 "$ref": "#/$defs/entity-name",
-                                "description": "Referenced entity name.",
+                                "description": "Entity name for cross-entity field reference (optional).",
                                 "x-yang": {
                                   "type": "leafref",
                                   "must": [
