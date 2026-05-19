@@ -17,6 +17,8 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 - ✅ `include` - Include submodules into the parent module (merged typedefs, identities, groupings, features, top-level statements)
 - ✅ `submodule` / `belongs-to` - Submodule files parsed and merged via `include`
 - ✅ `feature` - Feature declarations; optional braced body with `description`, `reference`, and `if-feature` (per-feature conditions stored on the module)
+- ✅ `notification` - Notification statements (RFC 7950 §7.16); parsed into `YangNotificationStmt` with data-definition substatements (schema / anydata tooling; not full JSON Schema emission yet)
+- ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **Not yet:** instance validation or JSON Schema for RPC I/O.
 
 ### Type Definitions
 - ✅ `typedef` - Type definitions (heavily used)
@@ -110,7 +112,8 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 
 ### Not implemented (skipped when parsing)
 - ⚠️ **`config`** (RFC 7950 §7.21.1) — `config true` / `config false` on data definition statements is **consumed** and **ignored** after a **`logging` warning**; not stored on the AST or enforced during validation (instance validation still assumes configurable data nodes).
-- ⚠️ `deviation`, `rpc`, `action`, `notification`, `input`, `output` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
+- ⚠️ `deviation`, `action` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
+- ⚠️ Top-level `input` / `output` — **Skipped** with a warning when not under `rpc` or `action` (RFC 7950: I/O blocks are only valid there).
 
 ### Dynamic extension framework
 - ✅ `extension` definitions are parsed into the AST and tracked on `YangModule.extensions`.
@@ -481,7 +484,7 @@ Counts below are from `examples/meta-model.yang`, using **line-initial** YANG ke
 
 ## Test Coverage
 
-The suite currently has **310 passing tests** (`python3 -m pytest tests/`), including:
+The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), including:
 - Basic YANG parsing and validation
 - Type validation (including enumeration)
 - Constraint validation (must, when, if-feature, mandatory, default)
@@ -500,8 +503,14 @@ The suite currently has **310 passing tests** (`python3 -m pytest tests/`), incl
 - **Import / include / submodule** patterns (`tests/test_yangson_ex3_import.py` and related fixtures under `tests/data/yangson-ex3/`)
 - **If-feature** parsing, evaluation, and validation (`tests/test_if_feature.py`)
 - JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
+- **RPC `input` / `output`** minimal parse coverage (`tests/test_rpc_input_output.py`)
 
 ## Recent Improvements
+
+### RPC and notification parsing (2026-05)
+- ✅ **`notification`**: Parsed into `YangNotificationStmt` (module-level data definitions).
+- ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes; see `tests/test_rpc_input_output.py`.
+
 
 ### String patterns: modifiers and multiple substatements (2026-04)
 - ✅ **YANG:** Parse several `pattern` lines, optional `modifier invert-match` blocks, and per-pattern `error-message` / `error-app-tag`.

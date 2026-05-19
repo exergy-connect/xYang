@@ -29,6 +29,7 @@ from .statements.choice import ChoiceStatementParser
 from .statements.grouping import GroupingStatementParser
 from .statements.container import ContainerStatementParser
 from .statements.notification import NotificationStatementParser
+from .statements.rpc import RpcStatementParser
 from .statements.list import ListStatementParser
 from .statements.leaf import LeafStatementParser
 from .statements.leaf_list import LeafListStatementParser
@@ -82,6 +83,7 @@ class StatementParsers:
         self._grouping_parser = GroupingStatementParser(self)
         self._container_parser = ContainerStatementParser(self)
         self._notification_parser = NotificationStatementParser(self)
+        self._rpc_parser = RpcStatementParser(self)
         self._list_parser = ListStatementParser(self)
         self._leaf_parser = LeafStatementParser(self)
         self._leaf_list_parser = LeafListStatementParser(self)
@@ -354,6 +356,15 @@ class StatementParsers:
 
     def parse_notification(self, tokens: TokenStream, context: ParserContext):
         return self._notification_parser.parse_notification(tokens, context)
+
+    def parse_rpc(self, tokens: TokenStream, context: ParserContext):
+        return self._rpc_parser.parse_rpc(tokens, context)
+
+    def parse_input(self, tokens: TokenStream, context: ParserContext):
+        return self._rpc_parser.parse_input(tokens, context)
+
+    def parse_output(self, tokens: TokenStream, context: ParserContext):
+        return self._rpc_parser.parse_output(tokens, context)
 
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         return self._list_parser.parse_list(tokens, context)
