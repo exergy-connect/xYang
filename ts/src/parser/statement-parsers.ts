@@ -38,7 +38,11 @@ import {
   UsesStatementParser,
   WhenStatementParser
 } from "./statements";
-import { is_unsupported_construct_start, skip_unsupported_construct } from "./unsupported-skip";
+import {
+  is_unsupported_construct_start,
+  skip_status_substatement,
+  skip_unsupported_construct
+} from "./unsupported-skip";
 
 /** Options for {@link StatementParsers.parseStatement} to restrict valid statement starts in nested contexts (e.g. RFC 7950 `case-stmt`). */
 export type ParseStatementOptions = {
@@ -90,7 +94,7 @@ export class StatementParsers {
   readonly anyxml_parser = new AnyxmlStatementParser(this);
   private readonly augment_parser = new AugmentStatementParser(this);
   readonly bits_parser = new BitsStatementParser(this);
-  private readonly choice_parser = new ChoiceStatementParser(this);
+  readonly choice_parser = new ChoiceStatementParser(this);
   readonly container_parser = new ContainerStatementParser(this);
   private readonly extension_parser = new ExtensionStatementParser(this);
   readonly feature_parser = new FeatureStatementParser(this);
@@ -100,8 +104,8 @@ export class StatementParsers {
   readonly leaf_list_parser = new LeafListStatementParser(this);
   readonly list_parser = new ListStatementParser(this);
   private readonly module_parser = new ModuleStatementParser(this);
-  private readonly notification_parser = new NotificationStatementParser(this);
-  private readonly must_parser = new MustStatementParser(this);
+  readonly notification_parser = new NotificationStatementParser(this);
+  readonly must_parser = new MustStatementParser(this);
   private readonly refine_parser = new RefineStatementParser(this);
   readonly revision_parser = new RevisionStatementParser(this);
   private readonly submodule_parser = new SubmoduleStatementParser(this, this.module_parser);
@@ -754,6 +758,10 @@ export class StatementParsers {
 
   parse_reference_string_only(tokens: TokenStream, context: ParserContext): void {
     this.parse_reference(tokens, context);
+  }
+
+  parse_status_ignored(tokens: TokenStream, _context: ParserContext): void {
+    skip_status_substatement(tokens);
   }
 
   parse_config(tokens: TokenStream, context: ParserContext): void {

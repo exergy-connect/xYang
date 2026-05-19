@@ -98,7 +98,13 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ **CLI** (`xyang` or `python -m xyang`): `parse`, `validate`, `convert`
   - `xyang parse <file.yang>` — parse and print module info
   - `xyang validate <file.yang> [data.json]` — validate JSON (file or stdin) against the module
+  - `xyang validate … --anydata-validation complete|candidate` — validate RFC 7951 qualified members under `anydata` using `--anydata-module` paths and/or every `*.yang` in `--include-path` and the host directory ([draft anydata validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation); see `examples/ietf-yang-push/README.md`)
   - `xyang convert <file.yang> [-o path]` — convert .yang to JSON Schema (output path always ends with `.yang.json`)
+- ✅ **CLI** (`xyang-ts`, package `@xyang/ts` under [`ts/`](ts/)): `parse`, `validate`, `convert`
+  - Same `--include-path` semantics as Python
+  - `xyang-ts validate … --anydata-validation complete|candidate` and repeatable `--anydata-module` (loads import closure; unparseable extra modules skipped with a warning)
+  - Unwraps a single top-level `module:local` instance key when it names the host module (e.g. `ietf-yp-notification:envelope`)
+  - **Limitation:** cross-module `augment` merge for the anydata module map is not applied yet (Python runs `apply_augmentations_across_module_map`); large bundles such as `examples/ietf-yang-push` may still require `expandUses: false` until uses/refine expansion matches Python
 - ✅ **JSON Schema generator**: YANG AST → JSON Schema (draft 2020-12) with `x-yang` annotations
   - `generate_json_schema(module)`, `schema_to_yang_json(module, output_path=...)`
   - Parse with `YangParser(expand_uses=False)` so the AST keeps original `uses` and `augment` structure; the generator expands `uses` when emitting. That split keeps **YANG ↔ JSON Schema** conversion reversible where `x-yang` carries the source shape.
@@ -510,6 +516,11 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
 ### RPC and notification parsing (2026-05)
 - ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
 - ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes; see `tests/test_rpc_input_output.py`.
+
+### TypeScript CLI and parser (2026-05)
+- ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).
+- ✅ **`augment` body**: `case`, `notification`, and other data-node substatements under `augment` (and `augment` under `uses` via `YangUsesStmt.augmentations`).
+- ✅ **`status` on typedefs**: Ignored at parse time (RFC 7950 §7.21.2) so standard modules with `status deprecated` parse cleanly.
 
 
 ### String patterns: modifiers and multiple substatements (2026-04)

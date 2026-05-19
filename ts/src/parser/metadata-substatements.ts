@@ -15,6 +15,9 @@ export function withMetadataSubstatements(
   out[kw.REFERENCE] ??= (tokens, context) => {
     parsers.parse_reference(tokens, context);
   };
+  out[kw.STATUS] ??= (tokens, context) => {
+    parsers.parse_status_ignored(tokens, context);
+  };
   return out;
 }
 
@@ -25,6 +28,9 @@ export function withDataNodeSubstatements(
   const out = withMetadataSubstatements(parsers, dispatch);
   out[kw.CONFIG] ??= (tokens, context) => {
     parsers.parse_config(tokens, context);
+  };
+  out[kw.STATUS] ??= (tokens, context) => {
+    parsers.parse_status_ignored(tokens, context);
   };
   return out;
 }

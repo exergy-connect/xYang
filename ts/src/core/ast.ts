@@ -407,12 +407,14 @@ export class YangGroupingStmt extends YangStatement {
 export class YangUsesStmt extends YangStatementWithWhen {
   grouping_name: string;
   refines: YangRefineStmt[];
+  augmentations: YangAugmentStmt[];
 
   constructor(init: Partial<YangUsesStmt> = {}) {
     super(init);
     this.keyword = "uses";
     this.grouping_name = init.grouping_name ?? "";
     this.refines = init.refines ?? [];
+    this.augmentations = init.augmentations ?? [];
   }
 
   override get_schema_node(): string | undefined {
