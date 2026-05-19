@@ -58,14 +58,14 @@ class SubmoduleStatementParser:
     def _parse_submodule_statement(
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
-        handler = self._parsers._substatement_handler(tokens, self._submodule_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._submodule_dispatch)
         if handler:
             handler(tokens, context)
             return
-        if self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
+        if self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
             return
-        if self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, "submodule body"):
+        if self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, "submodule body"):
             return
 
     def _parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -76,7 +76,7 @@ class SubmoduleStatementParser:
         while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
             if tokens.peek() == kw.PREFIX:
                 self._module_parser.parse_prefix_value_stmt(tokens, context)
-            elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+            elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                 tokens, "belongs-to"
             ):
                 continue

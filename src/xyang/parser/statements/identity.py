@@ -33,12 +33,12 @@ class IdentityStatementParser:
         self, tokens: TokenStream, context: ParserContext, identity_name: str
     ) -> None:
         unsupported = f"identity '{identity_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._identity_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._identity_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -58,7 +58,7 @@ class IdentityStatementParser:
     def _parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse base substatement inside identity."""
         tokens.consume(kw.BASE)
-        base_name = self._parsers._consume_qname_from_identifier(tokens)
+        base_name = self._parsers.consume_qname_from_identifier(tokens)
         parent = context.current_parent
         if isinstance(parent, YangIdentityStmt):
             parent.bases.append(base_name)

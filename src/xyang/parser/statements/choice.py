@@ -61,18 +61,18 @@ class ChoiceStatementParser:
         self, tokens: TokenStream, context: ParserContext, choice_name: str
     ) -> None:
         unsupported = f"choice '{choice_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._choice_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._choice_substatement_dispatch)
         if handler:
             handler(tokens, context)
             return
-        key = self._parsers._dispatch_key(tokens)
+        key = self._parsers.dispatch_key(tokens)
         if isinstance(key, str) and key in _INLINE_CHOICE_SCHEMA_KEYS:
             self._parse_choice_implicit_case(tokens, context)
             return
-        if self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
+        if self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
             return
-        self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported)
+        self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported)
 
     def _parse_choice_implicit_case(
         self, tokens: TokenStream, context: ParserContext
@@ -83,7 +83,7 @@ class ChoiceStatementParser:
             raise tokens.make_error("internal: implicit choice case outside choice body")
         case_stmt = YangCaseStmt(name="")
         case_ctx = context.push_parent(case_stmt)
-        handler = self._parsers._substatement_handler(
+        handler = self._parsers.substatement_handler(
             tokens, self._case_substatement_dispatch
         )
         if handler is None:
@@ -108,12 +108,12 @@ class ChoiceStatementParser:
         self, tokens: TokenStream, context: ParserContext, case_name: str
     ) -> None:
         unsupported = f"case '{case_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._case_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._case_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
@@ -127,7 +127,7 @@ class ChoiceStatementParser:
                 self._parse_choice_substatement(tokens, new_context, choice_name)
             tokens.consume_type(YangTokenType.RBRACE)
             choice_stmt.validate_case_unique_child_names()
-        self._parsers._add_to_parent_or_module(context, choice_stmt)
+        self._parsers.add_to_parent_or_module(context, choice_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return choice_stmt
 
@@ -144,7 +144,7 @@ class ChoiceStatementParser:
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.cases.append(case_stmt)
         else:
-            self._parsers._add_to_parent_or_module(context, case_stmt)
+            self._parsers.add_to_parent_or_module(context, case_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return case_stmt
 

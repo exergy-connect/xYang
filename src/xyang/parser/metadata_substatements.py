@@ -34,4 +34,6 @@ def with_data_node_substatements(
     out = with_metadata_substatements(parsers, dispatch)
     out.setdefault(kw.CONFIG, parsers.parse_config_ignored)
     out.setdefault(kw.STATUS, parsers.parse_status_ignored)
+    # RFC 7950 §7.13 — ``typedef`` allowed in container, list, choice, case, augment, …
+    out.setdefault(kw.TYPEDEF, parsers.parse_typedef)
     return out

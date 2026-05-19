@@ -46,12 +46,12 @@ class ListStatementParser:
         self, tokens: TokenStream, context: ParserContext, list_name: str
     ) -> None:
         unsupported = f"list '{list_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._list_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._list_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
@@ -64,6 +64,6 @@ class ListStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_list_substatement(tokens, new_context, list_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, list_stmt)
+        self._parsers.add_to_parent_or_module(context, list_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return list_stmt

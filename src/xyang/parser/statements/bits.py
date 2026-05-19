@@ -30,7 +30,7 @@ class BitsStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             bit_ctx = context.push_parent(bit_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                pt = self._parsers._dispatch_key(tokens)
+                pt = self._parsers.dispatch_key(tokens)
                 if pt == kw.POSITION:
                     tokens.consume(kw.POSITION)
                     if explicit_pos is not None:
@@ -41,7 +41,7 @@ class BitsStatementParser:
                     self._parsers.parse_description(tokens, bit_ctx)
                 elif pt == kw.REFERENCE:
                     self._parsers.parse_reference(tokens, bit_ctx)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "bit"
                 ):
                     pass

@@ -33,7 +33,7 @@ from ..ast import (
 from ..identity_graph import descendant_closure, qualified_identity_name
 from ..module import YangModule
 from ..refine_expand import copy_yang_statement
-from ..uses_expand import expand_uses_in_statements
+from ..uses_expand import ExpandUsesContext, expand_uses_in_statements
 from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 from ..xpath.utils import coerce_default_value
@@ -568,9 +568,7 @@ def _expand_uses_for_json(
     """Expand ``uses`` on a deep-copied subtree so the module AST is not mutated."""
     return expand_uses_in_statements(
         [_copy_statement(s) for s in statements],
-        module,
-        (),
-        [],
+        ctx=ExpandUsesContext(module=module),
     )
 
 

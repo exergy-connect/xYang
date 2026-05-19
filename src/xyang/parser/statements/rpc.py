@@ -4,9 +4,9 @@ Parsing helpers for ``rpc`` statements and ``input`` / ``output`` blocks (RFC 79
 
 from __future__ import annotations
 
-from .. import keywords as kw
-
 from typing import TYPE_CHECKING
+
+from .. import keywords as kw
 
 from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -24,6 +24,7 @@ class RpcStatementParser:
         self._io_substatement_dispatch = with_metadata_substatements(
             self._parsers,
             {
+                kw.TYPEDEF: self._parsers.parse_typedef,
                 kw.WHEN: self._parsers.parse_when,
                 kw.MUST: self._parsers.parse_must,
                 kw.LEAF: self._parsers.parse_leaf,
@@ -52,14 +53,14 @@ class RpcStatementParser:
         self, tokens: TokenStream, context: ParserContext, block_name: str
     ) -> None:
         unsupported = f"{block_name} block"
-        handler = self._parsers._substatement_handler(
+        handler = self._parsers.substatement_handler(
             tokens, self._io_substatement_dispatch
         )
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def _parse_io_block(
@@ -75,7 +76,7 @@ class RpcStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_io_substatement(tokens, new_context, keyword)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, io_stmt)
+        self._parsers.add_to_parent_or_module(context, io_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return io_stmt
 
@@ -99,14 +100,14 @@ class RpcStatementParser:
         self, tokens: TokenStream, context: ParserContext, rpc_name: str
     ) -> None:
         unsupported = f"rpc '{rpc_name}'"
-        handler = self._parsers._substatement_handler(
+        handler = self._parsers.substatement_handler(
             tokens, self._rpc_substatement_dispatch
         )
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_rpc(self, tokens: TokenStream, context: ParserContext) -> YangRpcStmt:
@@ -119,6 +120,6 @@ class RpcStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_rpc_substatement(tokens, new_context, rpc_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, rpc_stmt)
+        self._parsers.add_to_parent_or_module(context, rpc_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return rpc_stmt

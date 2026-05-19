@@ -21,7 +21,7 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 - ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **Not yet:** instance validation or JSON Schema for RPC I/O.
 
 ### Type Definitions
-- ✅ `typedef` - Type definitions (heavily used)
+- ✅ `typedef` - Type definitions at **module** level and **nested** under `container`, `list`, `choice`, `case`, `grouping`, `notification`, and `rpc` `input`/`output` (RFC 7950 §7.3; YANG 1.1). Each name is registered on `module.typedefs` so leaves can reference it (e.g. `type notification-support` inside the same container). Typedefs are **not** copied into the data tree by `uses` expansion. **Limitation:** one flat typedef map per module (duplicate names in different scopes are rejected; scoped shadowing is not modeled).
 - ✅ `type` - Type references
 
 ### Built-in Types
@@ -49,7 +49,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `anydata` / `anyxml` — Parsed; inner JSON unconstrained unless you enable the optional ``xyang.ext`` subtree validator ([draft-ietf-netmod-yang-anydata-validation](https://datatracker.ietf.org/doc/html/draft-ietf-netmod-yang-anydata-validation); uses ``xyang.encoding`` / RFC 7951 qualified names). JSON Schema: open union + `x-yang.type` for round-trip.
 - ✅ `choice` - Choice statements (mutually exclusive alternatives)
 - ✅ `case` - Case statements (choice alternatives)
-- ✅ `grouping` - Grouping statements (defines reusable schema components)
+- ✅ `grouping` - Grouping statements (defines reusable schema components); may contain nested `typedef` and nested `grouping`
 - ✅ `uses` - Uses statements (incorporates groupings)
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
 
@@ -555,6 +555,7 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
   - Validates values against all union member types
   - Properly resolves typedefs with union base types
   - Comprehensive test suite in `tests/test_typedef_union.py` (6 tests)
+- ✅ **Nested typedefs (YANG 1.1)**: `typedef` inside `container`, `list`, `grouping`, etc. (e.g. IETF `ietf-notification-capabilities`); `tests/test_typedef_in_container.py`
 - ✅ **Stricter structure validation**: Validator now rejects unknown fields not defined in schema
   - Field checking is scoped locally to each validation context
   - Properly handles choice/case when collecting valid field names

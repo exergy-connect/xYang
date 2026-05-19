@@ -37,12 +37,12 @@ class LeafStatementParser:
         self, tokens: TokenStream, context: ParserContext, leaf_name: str
     ) -> None:
         unsupported = f"leaf '{leaf_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._leaf_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._leaf_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
@@ -55,6 +55,6 @@ class LeafStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_leaf_substatement(tokens, new_context, leaf_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, leaf_stmt)
+        self._parsers.add_to_parent_or_module(context, leaf_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return leaf_stmt

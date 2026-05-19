@@ -66,7 +66,8 @@ class YangStatement(YangStatementList):
         """
         return None
 
-    def child_names(self, data: dict) -> set[str]:
+    def child_names(self, _data: dict) -> set[str]:
+        """Instance member names contributed by this node (override when none)."""
         return {self.name} if getattr(self, "name", None) else set()
 
 
@@ -85,7 +86,10 @@ class YangStatementWithWhen(YangStatement):
     if_features: List[str] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
-        """Default for data-shaped nodes: instance key is ``name``. Override when not a data node."""
+        """Default for data-shaped nodes: instance key is ``name``.
+
+        Override when not a data node.
+        """
         return self.name or None
 
 
@@ -96,7 +100,11 @@ class YangTypedefStmt(YangStatement):
     default: Optional[Any] = None
 
     def get_schema_node(self) -> Optional[str]:
-        return self.name or None
+        return None
+
+    def child_names(self, _data: dict) -> set[str]:
+        """Typedefs are schema-only; they are not present in instance data."""
+        return set()
 
 
 @dataclass
@@ -319,7 +327,9 @@ class YangLeafrefStmt:
 @dataclass
 class YangGroupingStmt(YangStatement):
     """Grouping statement - defines reusable schema components."""
-    pass
+
+    # Typedef names declared directly in this grouping (for ``uses`` expansion).
+    typedef_names: List[str] = field(default_factory=list)
 
 
 @dataclass
@@ -395,5 +405,5 @@ class YangChoiceStmt(YangStatementWithWhen):
 class YangCaseStmt(YangStatementWithWhen):
     """Case statement - defines one alternative in a choice."""
 
-    def child_names(self, data: dict) -> set[str]:
+    def child_names(self, _data: dict) -> set[str]:
         return {s.name for s in self.statements if getattr(s, "name", None)}

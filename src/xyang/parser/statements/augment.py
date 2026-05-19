@@ -42,15 +42,15 @@ class AugmentStatementParser:
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse augment statement."""
         tokens.consume(kw.AUGMENT)
-        path = self._parsers._parse_string_concatenation(tokens)
+        path = self._parsers.parse_string_concatenation(tokens)
         aug = YangAugmentStmt(name="augment", augment_path=path)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(aug)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self._parsers._substatement_handler(tokens, self._augment_body_dispatch)
+                handler = self._parsers.substatement_handler(tokens, self._augment_body_dispatch)
                 if handler:
                     handler(tokens, new_context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "augment"
                 ):
                     continue
@@ -59,5 +59,5 @@ class AugmentStatementParser:
         if parent is not None and isinstance(parent, YangUsesStmt):
             parent.augmentations.append(aug)
         else:
-            self._parsers._add_to_parent_or_module(context, aug)
+            self._parsers.add_to_parent_or_module(context, aug)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

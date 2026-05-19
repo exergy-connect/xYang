@@ -42,10 +42,10 @@ class RefineStatementParser:
         self, tokens: TokenStream, context: ParserContext, target_path: PathNode
     ) -> None:
         """One substatement inside ``refine { ... }`` (no ``refine:*`` registry keys)."""
-        handler = self._parsers._substatement_handler(tokens, self._refine_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._refine_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
             tokens, f"refine '{target_path.to_string()}'"
         ):
             return
@@ -64,20 +64,20 @@ class RefineStatementParser:
         tokens.consume(kw.DEFAULT)
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
-            parent.refined_defaults.append(self._parsers._parse_default_value_tokens(tokens))
+            parent.refined_defaults.append(self._parsers.parse_default_value_tokens(tokens))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse refine statement (supports descendant paths ``a/b``)."""
         tokens.consume(kw.REFINE)
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            parts = [self._parsers._consume_qname_from_identifier(tokens)]
+            parts = [self._parsers.consume_qname_from_identifier(tokens)]
         else:
             parts = [tokens.consume()]
         while tokens.has_more() and tokens.peek_type() == YangTokenType.SLASH:
             tokens.consume_type(YangTokenType.SLASH)
             if tokens.peek_type() == YangTokenType.IDENTIFIER:
-                parts.append(self._parsers._consume_qname_from_identifier(tokens))
+                parts.append(self._parsers.consume_qname_from_identifier(tokens))
             else:
                 parts.append(tokens.consume())
         path_arg = "/".join(parts)

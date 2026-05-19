@@ -68,14 +68,14 @@ class ModuleStatementParser:
 
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse one statement in module body."""
-        handler = self._parsers._substatement_handler(tokens, self._module_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._module_dispatch)
         if handler:
             handler(tokens, context)
             return
-        if self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
+        if self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
             return
-        if self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, "module body"):
+        if self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, "module body"):
             return
 
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -98,12 +98,12 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                     continue
-                handler = self._parsers._substatement_handler(tokens, self._import_body_dispatch)
+                handler = self._parsers.substatement_handler(tokens, self._import_body_dispatch)
                 if handler:
                     handler(tokens, context)
-                elif self._parsers._is_prefixed_extension_start(tokens):
-                    self._parsers._parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.is_prefixed_extension_start(tokens):
+                    self._parsers.parse_prefixed_extension_statement(tokens, context)
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "import"
                 ):
                     continue
@@ -137,12 +137,12 @@ class ModuleStatementParser:
                         tokens, context.push_parent(SimpleNamespace())
                     )
                 else:
-                    handler = self._parsers._substatement_handler(tokens, self._include_body_dispatch)
+                    handler = self._parsers.substatement_handler(tokens, self._include_body_dispatch)
                     if handler:
                         handler(tokens, context)
-                    elif self._parsers._is_prefixed_extension_start(tokens):
-                        self._parsers._parse_prefixed_extension_statement(tokens, context)
-                    elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                    elif self._parsers.is_prefixed_extension_start(tokens):
+                        self._parsers.parse_prefixed_extension_statement(tokens, context)
+                    elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                         tokens, "include"
                     ):
                         continue

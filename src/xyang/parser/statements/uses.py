@@ -39,12 +39,12 @@ class UsesStatementParser:
     ) -> None:
         """One substatement inside ``uses { ... }``."""
         unsupported = f"uses '{grouping_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._uses_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._uses_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_uses(
@@ -57,7 +57,7 @@ class UsesStatementParser:
         """
         tokens.consume(kw.USES)
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            grouping_name = self._parsers._consume_qname_from_identifier(tokens)
+            grouping_name = self._parsers.consume_qname_from_identifier(tokens)
         else:
             grouping_name = tokens.consume()
         uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
@@ -66,7 +66,7 @@ class UsesStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_uses_substatement(tokens, new_context, grouping_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, uses_stmt)
+        self._parsers.add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return uses_stmt
 
@@ -90,7 +90,7 @@ class UsesStatementParser:
                     )
                     expanded.extend(nested_expanded)
             else:
-                stmt_copy = self._parsers._copy_statement(stmt)
+                stmt_copy = self._parsers.copy_statement(stmt)
                 apply_refines_by_path([stmt_copy], refines)
                 expanded.append(stmt_copy)
 

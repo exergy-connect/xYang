@@ -41,14 +41,14 @@ class AnydataStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(anydata_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self._parsers._substatement_handler(tokens, self._anydata_body_dispatch)
+                handler = self._parsers.substatement_handler(tokens, self._anydata_body_dispatch)
                 if handler:
                     handler(tokens, new_context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"anydata '{anydata_name}'"
                 ):
                     continue
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers._add_to_parent_or_module(context, anydata_stmt)
+        self._parsers.add_to_parent_or_module(context, anydata_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return anydata_stmt

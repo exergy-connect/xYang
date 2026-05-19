@@ -29,7 +29,7 @@ class FeatureStatementParser:
             holder = SimpleNamespace(if_features=[], description="", reference="")
             feat_ctx = context.push_parent(holder)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers._dispatch_key(tokens)
+                tt = self._parsers.dispatch_key(tokens)
                 if tt == kw.DESCRIPTION:
                     self._parsers.parse_optional_description(tokens, feat_ctx)
                     continue
@@ -39,7 +39,7 @@ class FeatureStatementParser:
                 if tt == kw.REFERENCE:
                     self._parsers.parse_reference(tokens, feat_ctx)
                     continue
-                if self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                if self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"feature '{name}'"
                 ):
                     continue
@@ -55,7 +55,7 @@ class FeatureStatementParser:
     def parse_if_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse if-feature; expression is stored on the parent schema node (not evaluated)."""
         tokens.consume(kw.IF_FEATURE)
-        expression = self._parsers._parse_string_concatenation(tokens)
+        expression = self._parsers.parse_string_concatenation(tokens)
         parent = context.current_parent
         if parent is not None:
             feats = getattr(parent, "if_features", None)
@@ -63,7 +63,7 @@ class FeatureStatementParser:
                 feats.append(expression)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers._dispatch_key(tokens)
+                tt = self._parsers.dispatch_key(tokens)
                 if tt == kw.DESCRIPTION:
                     self._parsers.parse_optional_description(
                         tokens, context.push_parent(SimpleNamespace())
@@ -72,7 +72,7 @@ class FeatureStatementParser:
                 if tt == kw.REFERENCE:
                     self._parsers.parse_reference(tokens, context)
                     continue
-                if self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                if self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "if-feature substatement"
                 ):
                     continue

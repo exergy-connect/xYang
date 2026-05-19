@@ -4,7 +4,7 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import List, cast
+from typing import Callable, cast
 
 from .errors import YangRefineTargetNotFoundError
 from .xpath.ast import PathNode
@@ -24,6 +24,7 @@ from .ast import (
     YangStatement,
     YangStatementWithMust,
     YangStatementWithWhen,
+    YangTypedefStmt,
     YangUsesStmt,
 )
 
@@ -132,67 +133,137 @@ def apply_refines_by_path(
             apply_refine_to_node(node, r)
 
 
-def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
+def _apply_refine_type(stmt: YangStatement, refine: YangRefineStmt) -> None:
     if getattr(refine, "type", None) is not None and isinstance(stmt, YangLeafStmt):
         stmt.type = refine.type
         logger.debug("refine applied type: stmt=%r refine=%r", stmt, refine)
+
+
+def _apply_refine_mandatory(stmt: YangStatement, refine: YangRefineStmt) -> None:
     rm = getattr(refine, "refined_mandatory", None)
-    if rm is not None:
-        if isinstance(stmt, YangLeafStmt):
-            stmt.mandatory = rm
-            logger.debug("refine applied mandatory: stmt=%r mandatory=%r", stmt, rm)
-        elif isinstance(stmt, YangChoiceStmt):
-            stmt.mandatory = rm
-            logger.debug("refine applied mandatory: choice=%r mandatory=%r", stmt, rm)
+    if rm is None:
+        return
+    if isinstance(stmt, YangLeafStmt):
+        stmt.mandatory = rm
+        logger.debug("refine applied mandatory: stmt=%r mandatory=%r", stmt, rm)
+    elif isinstance(stmt, YangChoiceStmt):
+        stmt.mandatory = rm
+        logger.debug("refine applied mandatory: choice=%r mandatory=%r", stmt, rm)
+
+
+def _apply_refine_defaults(stmt: YangStatement, refine: YangRefineStmt) -> None:
     rds = getattr(refine, "refined_defaults", None) or []
-    if rds:
-        if isinstance(stmt, YangLeafStmt):
-            stmt.default = rds[0]
-            logger.debug(
-                "refine applied default: stmt=%r default=%r refine=%r",
-                stmt,
-                stmt.default,
-                refine,
-            )
-        elif isinstance(stmt, YangLeafListStmt):
-            stmt.defaults = list(rds)
-            logger.debug(
-                "refine applied defaults: stmt=%r defaults=%r refine=%r",
-                stmt,
-                stmt.defaults,
-                refine,
-            )
-    if isinstance(stmt, YangStatementWithMust):
-        for refine_must in refine.must_statements:
-            stmt.must_statements.append(refine_must)
-            logger.debug(
-                "refine applied must: stmt=%r added_must=%r refine=%r",
-                stmt,
-                refine_must,
-                refine,
-            )
-    if isinstance(stmt, (YangListStmt, YangLeafListStmt)):
-        if refine.min_elements is not None:
-            stmt.min_elements = refine.min_elements
-            logger.debug(
-                "refine applied min-elements: stmt=%r min_elements=%r refine=%r",
-                stmt,
-                stmt.min_elements,
-                refine,
-            )
-        if refine.max_elements is not None:
-            stmt.max_elements = refine.max_elements
-            logger.debug(
-                "refine applied max-elements: stmt=%r max_elements=%r refine=%r",
-                stmt,
-                stmt.max_elements,
-                refine,
-            )
+    if not rds:
+        return
+    if isinstance(stmt, YangLeafStmt):
+        stmt.default = rds[0]
+        logger.debug(
+            "refine applied default: stmt=%r default=%r refine=%r",
+            stmt,
+            stmt.default,
+            refine,
+        )
+    elif isinstance(stmt, YangLeafListStmt):
+        stmt.defaults = list(rds)
+        logger.debug(
+            "refine applied defaults: stmt=%r defaults=%r refine=%r",
+            stmt,
+            stmt.defaults,
+            refine,
+        )
+
+
+def _apply_refine_must(stmt: YangStatement, refine: YangRefineStmt) -> None:
+    if not isinstance(stmt, YangStatementWithMust):
+        return
+    for refine_must in refine.must_statements:
+        stmt.must_statements.append(refine_must)
+        logger.debug(
+            "refine applied must: stmt=%r added_must=%r refine=%r",
+            stmt,
+            refine_must,
+            refine,
+        )
+
+
+def _apply_refine_cardinality(stmt: YangStatement, refine: YangRefineStmt) -> None:
+    if not isinstance(stmt, (YangListStmt, YangLeafListStmt)):
+        return
+    if refine.min_elements is not None:
+        stmt.min_elements = refine.min_elements
+        logger.debug(
+            "refine applied min-elements: stmt=%r min_elements=%r refine=%r",
+            stmt,
+            stmt.min_elements,
+            refine,
+        )
+    if refine.max_elements is not None:
+        stmt.max_elements = refine.max_elements
+        logger.debug(
+            "refine applied max-elements: stmt=%r max_elements=%r refine=%r",
+            stmt,
+            stmt.max_elements,
+            refine,
+        )
+
+
+def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
+    """Apply one ``refine`` statement to a resolved schema node."""
+    _apply_refine_type(stmt, refine)
+    _apply_refine_mandatory(stmt, refine)
+    _apply_refine_defaults(stmt, refine)
+    _apply_refine_must(stmt, refine)
+    _apply_refine_cardinality(stmt, refine)
     if refine.if_features and isinstance(stmt, YangStatementWithWhen):
         stmt.if_features.extend(refine.if_features)
     refined_desc = (refine.description or "").strip()
     if refined_desc:
         stmt.description = refined_desc
+
+
+def _copy_with_if_features(
+    stmt: YangStatement, statements: list[YangStatement], **extra: object
+) -> YangStatement:
+    return replace(
+        stmt,
+        statements=statements,
+        if_features=list(stmt.if_features),
+        **extra,
+    )
+
+
+def _copy_choice(
+    stmt: YangChoiceStmt, statements: list[YangStatement]
+) -> YangStatement:
+    cases = [cast(YangCaseStmt, copy_yang_statement(c)) for c in stmt.cases]
+    return _copy_with_if_features(stmt, statements, cases=cases)
+
+
+def _copy_uses(stmt: YangUsesStmt, statements: list[YangStatement]) -> YangStatement:
+    refines = list(stmt.refines) if stmt.refines else []
+    augmentations = [copy_yang_statement(a) for a in stmt.augmentations]
+    return _copy_with_if_features(
+        stmt, statements, refines=refines, augmentations=augmentations
+    )
+
+
+def _copy_extension_stmt(
+    stmt: YangStatement, statements: list[YangStatement]
+) -> YangStatement:
+    return replace(stmt, statements=statements)
+
+
+def _copy_typedef_stmt(
+    stmt: YangStatement, statements: list[YangStatement]
+) -> YangStatement:
+    return replace(stmt, statements=statements)
+
+
+def _copy_with_must(
+    stmt: YangStatement, statements: list[YangStatement]
+) -> YangStatement:
+    must = list(stmt.must_statements) if stmt.must_statements else []
+    return _copy_with_if_features(stmt, statements, must_statements=must)
 
 
 def copy_yang_statement(stmt: YangStatement) -> YangStatement:
@@ -202,66 +273,22 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
     substitutes containers that must be independent after expansion.
     """
     statements = [copy_yang_statement(s) for s in stmt.statements]
-
-    if isinstance(stmt, YangChoiceStmt):
-        cases = [cast(YangCaseStmt, copy_yang_statement(c)) for c in stmt.cases]
-        return replace(
-            stmt,
-            statements=statements,
-            cases=cases,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(stmt, YangCaseStmt):
-        return replace(
-            stmt,
-            statements=statements,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(stmt, YangUsesStmt):
-        refines = list(stmt.refines) if stmt.refines else []
-        augmentations = [copy_yang_statement(a) for a in stmt.augmentations]
-        return replace(
-            stmt,
-            statements=statements,
-            refines=refines,
-            augmentations=augmentations,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(
-        stmt,
-        (
-            YangContainerStmt,
-            YangListStmt,
-            YangLeafStmt,
-            YangLeafListStmt,
-            YangAnydataStmt,
-            YangAnyxmlStmt,
-        ),
-    ):
-        must = list(stmt.must_statements) if stmt.must_statements else []
-        return replace(
-            stmt,
-            statements=statements,
-            must_statements=must,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(stmt, YangAugmentStmt):
-        return replace(
-            stmt,
-            statements=statements,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(stmt, YangExtensionInvocationStmt):
-        must = list(stmt.must_statements) if stmt.must_statements else []
-        return replace(
-            stmt,
-            statements=statements,
-            must_statements=must,
-            if_features=list(stmt.if_features),
-        )
-    if isinstance(stmt, YangExtensionStmt):
-        return replace(
-            stmt,
-            statements=statements,
-        )
+    copiers: dict[type, Callable[[YangStatement, list[YangStatement]], YangStatement]] = {
+        YangChoiceStmt: _copy_choice,
+        YangCaseStmt: _copy_with_if_features,
+        YangUsesStmt: _copy_uses,
+        YangContainerStmt: _copy_with_must,
+        YangListStmt: _copy_with_must,
+        YangLeafStmt: _copy_with_must,
+        YangLeafListStmt: _copy_with_must,
+        YangAnydataStmt: _copy_with_must,
+        YangAnyxmlStmt: _copy_with_must,
+        YangAugmentStmt: _copy_with_if_features,
+        YangExtensionInvocationStmt: _copy_with_must,
+        YangExtensionStmt: _copy_extension_stmt,
+        YangTypedefStmt: _copy_typedef_stmt,
+    }
+    copier = copiers.get(type(stmt))
+    if copier is not None:
+        return copier(stmt, statements)
     raise TypeError(f"Unsupported statement type for copy: {type(stmt).__name__}")

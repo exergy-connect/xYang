@@ -24,19 +24,19 @@ class WhenStatementParser:
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``when`` with optional ``{ description; }`` body."""
         tokens.consume(kw.WHEN)
-        condition = self._parsers._parse_string_concatenation(tokens)
+        condition = self._parsers.parse_string_concatenation(tokens)
         when_stmt = YangWhenStmt(expression=condition)
         parent_for_when = context.current_parent
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(when_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                token_type = self._parsers._dispatch_key(tokens)
+                token_type = self._parsers.dispatch_key(tokens)
                 if token_type == kw.DESCRIPTION:
                     self._parsers.parse_description(tokens, new_context)
                 elif token_type == kw.REFERENCE:
                     self._parsers.parse_reference(tokens, new_context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "when"
                 ):
                     continue

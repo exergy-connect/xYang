@@ -4,9 +4,9 @@ Parsing helpers for ``grouping`` statements.
 
 from __future__ import annotations
 
-from .. import keywords as kw
-
 from typing import TYPE_CHECKING
+
+from .. import keywords as kw
 
 from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -24,6 +24,7 @@ class GroupingStatementParser:
         self._grouping_substatement_dispatch = with_metadata_substatements(
             self._parsers,
             {
+            kw.TYPEDEF: self._parsers.parse_typedef,
             kw.GROUPING: self._parsers.parse_grouping,
             kw.CHOICE: self._parsers.parse_choice,
             kw.CONTAINER: self._parsers.parse_container,
@@ -43,12 +44,12 @@ class GroupingStatementParser:
         self, tokens: TokenStream, context: ParserContext, grouping_name: str
     ) -> None:
         unsupported = f"grouping '{grouping_name}'"
-        handler = self._parsers._substatement_handler(tokens, self._grouping_substatement_dispatch)
+        handler = self._parsers.substatement_handler(tokens, self._grouping_substatement_dispatch)
         if handler:
             handler(tokens, context)
-        elif self._parsers._is_prefixed_extension_start(tokens):
-            self._parsers._parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers._skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
+        elif self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
             return
 
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:

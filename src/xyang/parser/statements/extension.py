@@ -30,7 +30,7 @@ class ExtensionStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(ext)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers._dispatch_key(tokens)
+                tt = self._parsers.dispatch_key(tokens)
                 if tt == kw.ARGUMENT:
                     self._parse_extension_argument_stmt(tokens, new_context)
                 elif tt == kw.DESCRIPTION:
@@ -39,7 +39,7 @@ class ExtensionStatementParser:
                     self._parsers.parse_reference(tokens, new_context)
                 elif tt == kw.IF_FEATURE:
                     self._parsers.parse_if_feature_stmt(tokens, new_context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, f"extension '{name}'"
                 ):
                     continue
@@ -54,7 +54,7 @@ class ExtensionStatementParser:
         if cb is not None:
             ext.apply_callback = cb
         context.module.extensions[name] = ext
-        self._parsers._add_to_parent_or_module(context, ext)
+        self._parsers.add_to_parent_or_module(context, ext)
 
     def _parse_extension_argument_stmt(
         self, tokens: TokenStream, context: ParserContext
@@ -77,7 +77,7 @@ class ExtensionStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.peek() == kw.YIN_ELEMENT:
                     self._parse_extension_argument_yin_element(tokens, context)
-                elif self._parsers._skip_unsupported_or_raise_unknown_stmt(
+                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
                     tokens, "extension argument"
                 ):
                     continue
