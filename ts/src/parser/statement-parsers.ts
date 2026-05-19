@@ -633,6 +633,9 @@ export class StatementParsers {
     if (Array.isArray(r.if_features) && r.if_features.length > 0) {
       out.if_features = [...r.if_features];
     }
+    if (typeof r.description === "string" && r.description.length > 0) {
+      out.description = r.description;
+    }
     if (Array.isArray(r.must_statements) && r.must_statements.length > 0) {
       out.statements = r.must_statements.map((m) => this.fromMust(m));
     }

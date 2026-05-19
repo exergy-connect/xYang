@@ -110,6 +110,10 @@ function applyRefinesFromUses(usesStmt: SerializedStatement, expanded: Serialize
       const cur = Array.isArray(target.if_features) ? target.if_features : [];
       target.if_features = [...rif, ...cur];
     }
+    const refinedDesc = typeof rf.description === "string" ? rf.description.trim() : "";
+    if (refinedDesc) {
+      target.description = refinedDesc;
+    }
     const extra = rf.statements ?? [];
     if (extra.length > 0) {
       target.statements = [...(target.statements ?? []), ...deepClone(extra)];

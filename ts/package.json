@@ -56,11 +56,11 @@
     "pack:check": "npm pack --dry-run"
   },
   "devDependencies": {
-    "@types/node": "^24.0.0",
-    "esbuild": "^0.27.7",
-    "tsup": "^8.0.0",
-    "typescript": "^5.9.0",
-    "vitest": "^3.2.0",
-    "yaml": "^2.8.3"
+    "@types/node": "^25.9.1",
+    "esbuild": "^0.28.0",
+    "tsup": "^8.5.1",
+    "typescript": "^6.0.3",
+    "vitest": "^4.1.6",
+    "yaml": "^2.9.0"
   }
 }

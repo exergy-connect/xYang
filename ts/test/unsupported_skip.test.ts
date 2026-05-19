@@ -34,7 +34,7 @@ module ex {
 }
 `;
     const mod = parseYangString(yang);
-    const joined = warnSpy.mock.calls.map((c) => String(c[0])).join(" ").toLowerCase();
+    const joined = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(" ").toLowerCase();
     // rpc and nested input/output are skipped in TS (Python parses rpc); action and top-level input/output warn.
     for (const kw of ["deviation", "rpc", "action", "input", "output"]) {
       expect(joined).toContain(kw);
@@ -59,7 +59,7 @@ module ex {
 }
 `;
     const mod = parseYangString(yang);
-    expect(warnSpy.mock.calls.some((c) => String(c[0]).toLowerCase().includes("rpc"))).toBe(true);
+    expect(warnSpy.mock.calls.some((c: unknown[]) => String(c[0]).toLowerCase().includes("rpc"))).toBe(true);
     const c = mod.findStatement("c");
     expect(c).toBeDefined();
     const names = new Set(c?.statements.map((s) => s.name).filter(Boolean));
