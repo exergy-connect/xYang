@@ -1,13 +1,10 @@
-# Lint, build, test TypeScript; then ensure docs/xyang.umd.min.js matches the build.
-# On pull requests from same-repo branches, mismatch is fixed with git add -f and a bot push.
-# On fork PRs, mismatch fails the job (no write permission to contributor branches).
-# On push/workflow_dispatch to main/master, mismatch is fixed and pushed.
+# Lint, build, and test TypeScript.
 
 name: Tests (TypeScript)
 
 on:
   push:
-    branches: [main, master]
+    branches: [main]
     paths:
       - "ts/**"
       - "docs/**"
@@ -20,7 +17,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: write
+  contents: read
 
 concurrency:
   group: tests-ts-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
@@ -34,7 +31,6 @@ jobs:
     steps:
       - uses: actions/checkout@v6
         with:
-          # For PRs, check out the source branch so bot commits can push back.
           ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
 
       - name: Set up Node 24
@@ -59,24 +55,3 @@ jobs:
       - name: Test
         working-directory: ts
         run: npm test
-
-      - name: Docs browser bundle — verify or commit
-        env:
-          AUTO_COMMIT_BUNDLE: ${{ ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
-        run: |
-          git add -f docs/xyang.umd.min.js
-          if git diff --cached --quiet HEAD -- docs/xyang.umd.min.js; then
-            echo "docs/xyang.umd.min.js matches build."
-            exit 0
-          fi
-          if [ "$AUTO_COMMIT_BUNDLE" = "true" ]; then
-            git config user.name "github-actions[bot]"
-            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-            git commit -m "chore(docs): sync xyang.umd.min.js"
-            git push
-            exit 0
-          fi
-          echo "::error::docs/xyang.umd.min.js is missing or out of date with the TypeScript build."
-          echo "From the repo root: (cd ts && npm run build:check) then git add -f docs/xyang.umd.min.js and commit."
-          git diff --cached HEAD -- docs/xyang.umd.min.js | head -n 60
-          exit 1

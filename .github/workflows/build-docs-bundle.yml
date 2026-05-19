@@ -1,0 +1,74 @@
+# Build docs/xyang.umd.min.js from the TypeScript browser bundle when ts/ changes.
+# On main/master pushes and same-repo PRs, out-of-date bundles are committed by the bot.
+# Fork PRs fail if the bundle is stale (no write access to contributor branches).
+
+name: Build docs browser bundle
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ts/**"
+      - ".github/workflows/build-docs-bundle.yml"
+  pull_request:
+    paths:
+      - "ts/**"
+      - ".github/workflows/build-docs-bundle.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-docs-bundle-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: xyang.umd.min.js
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Build browser bundle
+        working-directory: ts
+        run: npm run build
+
+      - name: Sync to docs/
+        working-directory: ts
+        run: node ./scripts/sync-docs-browser-bundle.mjs
+
+      - name: Commit updated bundle
+        env:
+          AUTO_COMMIT_BUNDLE: ${{ ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: |
+          git add -f docs/xyang.umd.min.js
+          if git diff --cached --quiet HEAD -- docs/xyang.umd.min.js; then
+            echo "docs/xyang.umd.min.js is up to date."
+            exit 0
+          fi
+          if [ "$AUTO_COMMIT_BUNDLE" = "true" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(docs): sync xyang.umd.min.js"
+            git push
+            exit 0
+          fi
+          echo "::error::docs/xyang.umd.min.js is out of date with the TypeScript build."
+          echo "From the repo root: (cd ts && npm run build:check) then git add -f docs/xyang.umd.min.js and commit."
+          git diff --cached HEAD -- docs/xyang.umd.min.js | head -n 60
+          exit 1
