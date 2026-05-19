@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.2] — 2026-05-19
+
+First npm publish as **`@exergy-connect/xyang`** (renamed from `@xyang/ts`).
+
 ### Added
 
 - **CLI `--anydata-validation` / `--anydata-module`:** `xyang-ts validate` supports `off` | `complete` | `candidate` and repeatable `--anydata-module` paths (parity with Python `xyang validate`); loads the host import closure plus extra modules, enables `ValidatorExtension.ANYDATA_VALIDATION`, and unwraps a single RFC 7951 qualified top-level key (`module:node` → `{ node: … }`). See `src/cli/args.ts`, `src/cli/load-anydata-modules.ts`, `test/cli-validate-args.test.ts`, `test/cli-validate-anydata.test.ts`.
@@ -25,7 +29,6 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 ### Changed
 
 - **npm package name:** `@xyang/ts` → **`@exergy-connect/xyang`** (scope matches the GitHub org; install with `npm install @exergy-connect/xyang`).
-
 - **`augment` body parsing:** uses the same data-node substatement dispatch as Python (`choice` / `case`, `uses`, `notification`, `must`, `when`, prefixed extensions, etc.) instead of generic `parseStatement` (which rejected `case` under `augment`).
 - **`config` substatement (RFC 7950 §7.21.1):** stored on data definition AST nodes and in JSON Schema `x-yang.config`; refine `config` applied on uses expansion.
 - **JSON Schema defaults:** leaf `default` values emit as JSON literals (boolean/integer) and round-trip back to YANG string form (`default-values.ts`, Python parity).
@@ -36,6 +39,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 - **`status` substatement (RFC 7950 §7.21.2):** consumed without storing on the AST in typedef and other metadata contexts (e.g. `ietf-interfaces` `interface-state-ref`); avoids parse failures on standard IETF modules.
 - **`YangUsesStmt.augmentations`:** augment statements under `uses` attach to the uses node (parity with Python).
+- **`uses` expansion:** apply `refine` `description` onto expanded targets (parity with Python).
 - **`parse_config`:** narrow `current_parent` with `typeof … === "object"` before `"config" in parent` (TypeScript TS2638).
 - **RFC 7950 quoted strings:** tokenizer decodes `\\`, `\"`, `\'`, `\n`, `\t`, and line continuation so double-quoted patterns (e.g. `ietf-yang-types` `date-and-time`) match RFC 3339 timestamps (`yang-strings.ts`, `test/yang-string-unescape.test.ts`).
 - **`YangSyntaxError`:** `String(error)` / `toString()` returns `filename:line: message` when location is known (parity with Python).
@@ -43,7 +47,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [0.1.0] — 2026-05-17
 
-Initial publishable **`@exergy-connect/xyang`** package (`xyang-ts` CLI).
+Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under this version.
 
 ### Added
 
@@ -55,5 +59,6 @@ Initial publishable **`@exergy-connect/xyang`** package (`xyang-ts` CLI).
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.1...HEAD
-[0.1.0]: https://github.com/exergy-connect/xYang/tree/v0.1.1/ts
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
+[0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
+[0.1.0]: https://github.com/exergy-connect/xYang/tree/v0.1.2/ts
