@@ -1,0 +1,303 @@
+submodule huawei-software-base {
+  yang-version 1.1;
+  belongs-to huawei-software-management {
+    prefix hw-sm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     supporting software management.";
+
+  revision 2025-12-18 {
+    description
+      "Delete system-data-info.
+       Add enumeration type active-mode.
+       Modify the description of active-configuration.
+       Modify the software-info model.";
+    reference
+      "";
+  }
+  revision 2025-03-10 {
+    description
+      "Modify model version.";
+    reference
+      "";
+  }
+  revision 2020-12-23 {
+    description
+      "Modify the description of policy.
+       Modify the description of software-info.
+       Modify the description of software-area.
+       Modify the description of data-area.
+       Modify the description of system-data-info.";
+    reference
+      "Huawei private.";
+  }
+  revision 2018-04-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef area-status {
+    type enumeration {
+      enum "active" {
+        value 0;
+        description
+          "Indicates the area is activate.";
+      }
+      enum "standby" {
+        value 1;
+        description
+          "Indicates the area is standby.";
+      }
+    }
+    description
+      "This attribute depicts software status.";
+  }
+
+  typedef board-role {
+    type enumeration {
+      enum "master" {
+        value 0;
+        description
+          "Indicates the board role is master board.";
+      }
+      enum "slave" {
+        value 1;
+        description
+          "Indicates the board role is slave board.";
+      }
+    }
+    description
+      "This attribute depicts software board-role.";
+  }
+
+  typedef auto-save-switch-status {
+    type enumeration {
+      enum "on" {
+        value 0;
+        description
+          "Indicates the automatic save is enabled.";
+      }
+      enum "off" {
+        value 1;
+        description
+          "Indicates the automatic save is disable.";
+      }
+    }
+    description
+      "This attribute depicts automatic save status.";
+  }
+
+  typedef data-status {
+    type enumeration {
+      enum "blank" {
+        value 1;
+        description
+          "Indicates the data is blank.";
+      }
+      enum "modified" {
+        value 2;
+        description
+          "Indicates the data is modified.";
+      }
+    }
+    description
+      "This attribute depicts data status.";
+  }
+
+  typedef save-type {
+    type enumeration {
+      enum "database" {
+        value 0;
+        description
+          "Save database.";
+      }
+      enum "configuration" {
+        value 1;
+        description
+          "Save configuration.";
+      }
+      enum "all" {
+        value 2;
+        description
+          "Save database and configuration.";
+      }
+    }
+    description
+      "Indicates the type of save rpc.";
+  }
+
+  typedef active-mode {
+    type enumeration {
+      enum "configuration" {
+        value 0;
+        description
+          "The system will start from the configuration file corresponding to the current configuration mode.
+           If it is the NETCONF configuration mode, it will start from the YANG configuration file;
+           if it is the CLI configuration mode, it will start from the CLI configuration file.";
+      }
+      enum "yang-configuration" {
+        value 1;
+        description
+          "The system will start from the YANG configuration file, and after startup,
+           the system's service configuration mode will be NETCONF.";
+      }
+      enum "cli-configuration" {
+        value 2;
+        description
+          "The system will start from the CLI configuration file, and after startup,
+           the system's service configuration mode will be CLI.";
+      }
+    }
+    description
+      "The system adopts the upgrade option of using configuration file updates.";
+  }
+
+  container software-base {
+    description
+      "Software base.";
+    container auto-save-policy {
+      description
+        "Configure automatic save policy.";
+      container policy {
+        description
+          "Configure automatic save policy.";
+        leaf type {
+          type save-type;
+          description
+            "Save type.";
+        }
+        leaf switch {
+          type auto-save-switch-status;
+          description
+            "Automatic save switch.";
+        }
+        leaf interval {
+          type uint32;
+          description
+            "Automatic save interval.";
+        }
+        leaf time {
+          type string {
+            length "8";
+          }
+          description
+            "Automatic save absolute time.";
+        }
+        leaf change-switch {
+          type auto-save-switch-status;
+          description
+            "Data changes of automatic save switch.";
+        }
+        leaf change-interval {
+          type uint32;
+          description
+            "The data change interval is automatically saved.";
+        }
+      }
+    }
+    container software-info {
+      config false;
+      description
+        "Software information statistics.";
+      list software-area {
+        key "role area-id";
+        description
+          "The configured cards statistics.";
+        leaf role {
+          type board-role;
+          description
+            "The role of software information boards.";
+        }
+        leaf area-id {
+          type uint32;
+          description
+            "Software storage area.";
+        }
+        leaf version {
+          type string {
+            length "0..32";
+          }
+          description
+            "Software image version.";
+        }
+        leaf status {
+          type area-status;
+          description
+            "Software image status.";
+        }
+      }
+      list data-area {
+        key "role area-id";
+        description
+          "The configured cards statistics.";
+        leaf role {
+          type board-role;
+          description
+            "The role of data information boards.";
+        }
+        leaf area-id {
+          type uint32;
+          description
+            "Data storage area.";
+        }
+        leaf version {
+          type string {
+            length "0..32";
+          }
+          description
+            "Data image version.";
+        }
+        leaf status {
+          type area-status;
+          description
+            "Data image status.";
+        }
+      }
+    }
+  }
+
+  rpc save {
+    description
+      "Save data and configuration operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf type {
+        type save-type;
+        mandatory true;
+        description
+          "Save the type.";
+      }
+    }
+  }
+  rpc active-configuration {
+    description
+      "The system will restart from the specified configuration file.";
+
+    input {
+      leaf type {
+        type active-mode;
+        description
+          "Configuration file type.";
+      }
+    }
+  }
+}

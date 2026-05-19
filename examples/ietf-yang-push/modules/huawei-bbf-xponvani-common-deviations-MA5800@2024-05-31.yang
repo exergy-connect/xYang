@@ -1,0 +1,82 @@
+module huawei-bbf-xponvani-common-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-xponvani-common-deviations-MA5800";
+  prefix bbf-xponvani-common-devs-MA5800;
+
+  import bbf-xponvani {
+    prefix bbf-xponvani;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xponvani module.";
+
+  revision 2024-05-31 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef onu-registration-id-deviations {
+    type string {
+      length "0..72";
+    }
+    description
+      "The registration ID of an Optical Network Unit (ONU) with each
+       octet represented as two hexadecimal characters.
+
+       For ITU-T G.984.3, the leaf can only be up to 20 characters
+       long (refer to 'password' 10 bytes long).
+
+       For ITU-T G.987.3, ITU-T G.9807.3 and ITU-T G.989.3 the
+       leaf can be up to 72 characters long (refer to
+       'registration id' 36 bytes long).";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:onu-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:upstream-fec" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:management-gemport-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:management-gemport-aes-indicator" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:in-service-onu-tune-request" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponvani:v-ani/bbf-xponvani:management-tcont-alloc-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponvani:v-ani/bbf-xponvani:management-gemport-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponvani:v-ani/bbf-xponvani:onu-wl-protected" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:expected-registration-id" {
+    deviate replace {
+      type bbf-xponvani-common-devs-MA5800:onu-registration-id-deviations;
+    }
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponvani:v-ani/bbf-xponvani:onu-presence-state" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponvani:v-ani/bbf-xponvani:active-defects" {
+    deviate not-supported;
+  }
+}

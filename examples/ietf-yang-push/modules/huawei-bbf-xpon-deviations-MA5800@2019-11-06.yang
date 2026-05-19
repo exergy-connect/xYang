@@ -1,0 +1,151 @@
+module huawei-bbf-xpon-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-xpon-deviations-MA5800";
+  prefix bbf-xpon-devs-MA5800;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpon-onu-authentication {
+    prefix bbf-xpon-onu-auth;
+  }
+  import bbf-xpon-onu-state {
+    prefix bbf-xpon-onu-s;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xpon module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-xpon:xpon/bbf-xpon:wavelength-profiles/bbf-xpon:wavelength-profile/bbf-xpon:upstream-channel-id" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:wavelength-profiles/bbf-xpon:wavelength-profile/bbf-xpon:downstream-channel-id" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:wavelength-profiles/bbf-xpon:wavelength-profile/bbf-xpon:downstream-wavelength" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:multicast-gemports/bbf-xpon:multicast-gemport/bbf-xpon:gemport-id" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:multicast-gemports/bbf-xpon:multicast-gemport/bbf-xpon:interface" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:multicast-gemports/bbf-xpon:multicast-gemport/bbf-xpon:traffic-class" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:multicast-gemports/bbf-xpon:multicast-gemport/bbf-xpon:is-broadcast" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xpon:xpon/bbf-xpon:multicast-distribution-set/bbf-xpon:multicast-set" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-group/bbf-xpon:raman-mitigation" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-group/bbf-xpon:system-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-group/bbf-xpon:pon-pools" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-group/bbf-xpon:allocated-upstream-channel-ids" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-group/bbf-xpon:allocated-downstream-channel-ids" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-group/bbf-xpon:allocated-downstream-wavelengths" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-group/bbf-xpon:pon-pools" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-partition/bbf-xpon:authentication-method" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-pair/bbf-xpon:wavelength-prof-ref" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-pair/bbf-xpon:channel-pair-line-rate" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-pair/bbf-xpon:fiftyg-channel-pair-line-rate" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-pair/bbf-xpon:twentyfivegs-channel-pair-line-rate" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-pair/bbf-xpon:gpon-pon-id-interval" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-pair/bbf-xpon:actual-downstream-wavelength" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-pair/bbf-xpon:primary-ct-assigned" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-pair/bbf-xpon:secondary-ct-assigned" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:meant-for-type-b-primary-role" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:ngpon2-twdm-admin-label" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:twentyfivegs-pon-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:ngpon2-ptp-admin-label" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:notifiable-defect" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:pon-tag" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:ber-calc-period" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:onu-phase-drift-monitoring-control" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon:type-b-state" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon:location" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon:active-defects" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon:sufi-affected-onus" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-auth:report-onu-authentication-results" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:onu-name-from-v-ani-config" {
+    deviate not-supported;
+  }
+}

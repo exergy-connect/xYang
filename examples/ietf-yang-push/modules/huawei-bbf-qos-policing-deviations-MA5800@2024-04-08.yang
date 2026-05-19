@@ -1,0 +1,159 @@
+module huawei-bbf-qos-policing-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-policing-deviations-MA5800";
+  prefix bbf-qos-plc-devs-MA5800;
+
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import bbf-qos-policing {
+    prefix bbf-qos-plc;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-qos-policies {
+    prefix bbf-qos-pol;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-policing module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-color-promotion-type" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:hierarchical-policing" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-action-profile" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-plc:policing-action-profiles" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-plc:flow-color" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-plc:bac-color" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-plc:discard" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:single-rate-two-color-marker-type/bbf-qos-plc:single-rate-two-color-marker/bbf-qos-plc:cir" {
+    deviate replace {
+      type uint64 {
+        range "0..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:single-rate-two-color-marker-type/bbf-qos-plc:single-rate-two-color-marker/bbf-qos-plc:cbs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:single-rate-three-color-marker-type/bbf-qos-plc:single-rate-three-color-marker/bbf-qos-plc:cir" {
+    deviate replace {
+      type uint64 {
+        range "0..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:single-rate-three-color-marker-type/bbf-qos-plc:single-rate-three-color-marker/bbf-qos-plc:cbs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:single-rate-three-color-marker-type/bbf-qos-plc:single-rate-three-color-marker/bbf-qos-plc:ebs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-type/bbf-qos-plc:two-rate-three-color-marker/bbf-qos-plc:cir" {
+    deviate replace {
+      type uint64 {
+        range "0..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-type/bbf-qos-plc:two-rate-three-color-marker/bbf-qos-plc:cbs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-type/bbf-qos-plc:two-rate-three-color-marker/bbf-qos-plc:pir" {
+    deviate replace {
+      type uint64 {
+        range "64..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-type/bbf-qos-plc:two-rate-three-color-marker/bbf-qos-plc:pbs" {
+    deviate replace {
+      type uint64 {
+        range "2000..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-mef-type/bbf-qos-plc:two-rate-three-color-marker-mef/bbf-qos-plc:cir" {
+    deviate replace {
+      type uint64 {
+        range "0..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-mef-type/bbf-qos-plc:two-rate-three-color-marker-mef/bbf-qos-plc:cbs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-mef-type/bbf-qos-plc:two-rate-three-color-marker-mef/bbf-qos-plc:eir" {
+    deviate replace {
+      type uint64 {
+        range "0..102400000";
+      }
+    }
+  }
+  deviation "/bbf-qos-plc:policing-profiles/bbf-qos-plc:policing-profile/bbf-qos-plc:policing-type/bbf-qos-plc:two-rate-three-color-marker-mef-type/bbf-qos-plc:two-rate-three-color-marker-mef/bbf-qos-plc:ebs" {
+    deviate replace {
+      type uint64 {
+        range "0..1024000000";
+      }
+    }
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-pol:qos-policies/bbf-qos-plc:policing" {
+    deviate not-supported;
+  }
+}

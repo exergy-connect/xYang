@@ -1,0 +1,2210 @@
+module huawei-ietf-system-ext {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-ietf-system-ext";
+  prefix system-ext;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import ietf-system {
+    prefix sys;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import huawei-pub-type {
+    prefix pub-type;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "This module contains a collection of YANG definitions for the
+     configuration and identification of some common system
+     properties within a device containing a NETCONF server.";
+
+  revision 2025-10-17 {
+    description
+      "Add nodes for self-healing.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-10-14 {
+    description
+      "Add node for sysman-firewall.
+       Add node for firewall-ip-tables.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-10-11 {
+    description
+      "Delete network node must constraint.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-08-13 {
+    description
+      "Add leaf node duration-time to system-state clock.
+       Add leaf node description for system.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-03-20 {
+    description
+      "Add leaf node failed-num to configuration-result-info.
+       Modify the specification of leaf-list failed-configuration from 50 to 1000.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-02-22 {
+    description
+      "Modify the description of configuration-result-info.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-01-02 {
+    description
+      "Add node for network service.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-14 {
+    description
+      "Initial revision.";
+    reference
+      "A YANG Data Model for managing sysman network.";
+  }
+  revision 2024-06-21 {
+    description
+      "Add node for full yang revision.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-01 {
+    description
+      "Add mqtt in network-service-name.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-07-25 {
+    description
+      "Add capwap in network-service-name.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-07-08 {
+    description
+      "Add a container named management-modes.
+       Add a list named management-mode.
+       Add a leaf node named configuration-type.
+       Add a leaf node named mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-12-26 {
+    description
+      "Modify the description of ancp-proxy.
+       Modify the description of web-proxy.
+       Modify the description of source-interface.
+       Modify the description of service-type.
+       Add a leaf node named authentication-type.
+       Add a leaf node named reenter-num.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-06 {
+    description
+      "Modify dst-configuration.";
+    reference
+      "Modify dst-configuration.";
+  }
+  revision 2020-01-03 {
+    description
+      "This module contains a collection of YANG definitions for the configuration and identification
+       of some common system properties within a device containing a NETCONF server. This includes
+       data node definitions for user management, and system service source management.";
+    reference
+      "Network server source list is added for implementing the management of the NETCONF users.";
+  }
+  revision 2019-09-22 {
+    description
+      "The modifications by adding dst configuration.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-02-20 {
+    description
+      "Initial revision.";
+    reference
+      "A YANG Data Model for managing the NETCONF users.";
+  }
+
+ 
+
+  identity configuration-type {
+    description
+      "Base identity for configuration type. Vendors can define the type. For example: service provisioning, initial configuration.";
+  }
+
+  identity service-provisioning {
+    base configuration-type;
+    description
+      "Configurations related to user service provisioning.";
+  }
+
+  identity sys-service-type {
+    description
+      "base identity of protocl service type.";
+  }
+
+  identity netconf {
+    base sys-service-type;
+    description
+      "Support config portvalue service type.";
+  }
+
+  identity telnet {
+    base sys-service-type;
+    description
+      "Support config portvalue service type.";
+  }
+
+  identity telnetv6 {
+    base sys-service-type;
+    description
+      "Support config portvalue service.";
+  }
+
+  identity trap {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity syslog {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity tftp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ftp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity sftp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ping {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity tracert {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity stelnet {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ipdr {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity dns {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity dhcp-relay {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity dhcpv6-relay {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ntp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ntp6 {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity portal {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity radius {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity snmp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity snmpv6 {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ssh {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity sshv6 {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity trace {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity twamp {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity web-proxy {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity mqtt {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity ftp-client {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity sftp-client {
+    base sys-service-type;
+    description
+      "Support config service.";
+  }
+
+  identity threshold-type {
+    description
+      "Threshold settings types.";
+  }
+
+  identity cpu-threshold-type {
+    base threshold-type;
+    description
+      "CPU Usage threshold setting.";
+  }
+
+  identity mem-threshold-type {
+    base threshold-type;
+    description
+      "Mem Usage threshold setting.";
+  }
+
+  identity storage-threshold-type {
+    base threshold-type;
+    description
+      "Storage Usage threshold setting.";
+  }
+
+  typedef service-type {
+    type enumeration {
+      enum "cli" {
+        value 0;
+        description
+          "Indicates the service type is cli.";
+      }
+      enum "netconf" {
+        value 1;
+        description
+          "Indicates the service type is netconf.";
+      }
+    }
+    description
+      "This attribute depicts service state.";
+  }
+
+  typedef tm-dst-type {
+    type enumeration {
+      enum "one-year" {
+        value 1;
+        description
+          "Indicate that the DST type is one-year. It specifies the summer time for a certain year.";
+      }
+      enum "repeat-date" {
+        value 2;
+        description
+          "Indicate that the DST type is repeat-date. It specifies the summer time for several years.";
+      }
+      enum "repeat-week" {
+        value 3;
+        description
+          "Indicate that the DST type is repeat-week. It specifies the summer time for several years.";
+      }
+    }
+    description
+      "The type of Dst.";
+  }
+
+  typedef tm-weeknum {
+    type enumeration {
+      enum "first" {
+        value 1;
+        description
+          "Indicate that the week number is first.";
+      }
+      enum "second" {
+        value 2;
+        description
+          "Indicate that the week number is second.";
+      }
+      enum "third" {
+        value 3;
+        description
+          "Indicate that the week number is third.";
+      }
+      enum "fourth" {
+        value 4;
+        description
+          "Indicate that the week number is fourth.";
+      }
+      enum "last" {
+        value 5;
+        description
+          "Indicate that the week number is last.";
+      }
+    }
+    description
+      "The number of week.";
+  }
+
+  typedef tm-weekday {
+    type enumeration {
+      enum "Sun" {
+        value 0;
+        description
+          "Indicate that the weekday is Sunday.";
+      }
+      enum "Mon" {
+        value 1;
+        description
+          "Indicate that the weekday is Monday.";
+      }
+      enum "Tue" {
+        value 2;
+        description
+          "Indicate that the weekday is Tuesday.";
+      }
+      enum "Wed" {
+        value 3;
+        description
+          "Indicate that the weekday is Wednesday.";
+      }
+      enum "Thu" {
+        value 4;
+        description
+          "Indicate that the weekday is Thursday.";
+      }
+      enum "Fri" {
+        value 5;
+        description
+          "Indicate that the weekday is Friday.";
+      }
+      enum "Sat" {
+        value 6;
+        description
+          "Indicate that the weekday is Saturday.";
+      }
+    }
+    description
+      "The week day of Dst.";
+  }
+
+  typedef tm-month {
+    type enumeration {
+      enum "Jan" {
+        value 1;
+        description
+          "Indicate that the month is January.";
+      }
+      enum "Feb" {
+        value 2;
+        description
+          "Indicate that the month is February.";
+      }
+      enum "Mar" {
+        value 3;
+        description
+          "Indicate that the month is March.";
+      }
+      enum "Apr" {
+        value 4;
+        description
+          "Indicate that the month is April.";
+      }
+      enum "May" {
+        value 5;
+        description
+          "Indicate that the month is May.";
+      }
+      enum "Jun" {
+        value 6;
+        description
+          "Indicate that the month is June.";
+      }
+      enum "Jul" {
+        value 7;
+        description
+          "Indicate that the month is July.";
+      }
+      enum "Aug" {
+        value 8;
+        description
+          "Indicate that the month is August.";
+      }
+      enum "Sep" {
+        value 9;
+        description
+          "Indicate that the month is September.";
+      }
+      enum "Oct" {
+        value 10;
+        description
+          "Indicate that the month is October.";
+      }
+      enum "Nov" {
+        value 11;
+        description
+          "Indicate that the month is November.";
+      }
+      enum "Dec" {
+        value 12;
+        description
+          "Indicate that the month is December.";
+      }
+    }
+    description
+      "The month of Dst.";
+  }
+
+  typedef tm-date {
+    type enumeration {
+      enum "1st" {
+        value 1;
+        description
+          "Indicate that it is the 1st day of the month.";
+      }
+      enum "2nd" {
+        value 2;
+        description
+          "Indicate that it is the 2nd day of the month.";
+      }
+      enum "3rd" {
+        value 3;
+        description
+          "Indicate that it is the 3rd day of the month.";
+      }
+      enum "4th" {
+        value 4;
+        description
+          "Indicate that it is the 4th day of the month.";
+      }
+      enum "5th" {
+        value 5;
+        description
+          "Indicate that it is the 5th day of the month.";
+      }
+      enum "6th" {
+        value 6;
+        description
+          "Indicate that it is the 6th day of the month.";
+      }
+      enum "7th" {
+        value 7;
+        description
+          "Indicate that it is the 7th day of the month.";
+      }
+      enum "8th" {
+        value 8;
+        description
+          "Indicate that it is the 8th day of the month.";
+      }
+      enum "9th" {
+        value 9;
+        description
+          "Indicate that it is the 9th day of the month.";
+      }
+      enum "10th" {
+        value 10;
+        description
+          "Indicate that it is the 10th day of the month.";
+      }
+      enum "11st" {
+        value 11;
+        description
+          "Indicate that it is the 11st day of the month.";
+      }
+      enum "12nd" {
+        value 12;
+        description
+          "Indicate that it is the 12nd day of the month.";
+      }
+      enum "13rd" {
+        value 13;
+        description
+          "Indicate that it is the 13rd day of the month.";
+      }
+      enum "14th" {
+        value 14;
+        description
+          "Indicate that it is the 14th day of the month.";
+      }
+      enum "15th" {
+        value 15;
+        description
+          "Indicate that it is the 15th day of the month.";
+      }
+      enum "16th" {
+        value 16;
+        description
+          "Indicate that it is the 16th day of the month.";
+      }
+      enum "17th" {
+        value 17;
+        description
+          "Indicate that it is the 17th day of the month.";
+      }
+      enum "18th" {
+        value 18;
+        description
+          "Indicate that it is the 18th day of the month.";
+      }
+      enum "19th" {
+        value 19;
+        description
+          "Indicate that it is the 19th day of the month.";
+      }
+      enum "20th" {
+        value 20;
+        description
+          "Indicate that it is the 20th day of the month.";
+      }
+      enum "21st" {
+        value 21;
+        description
+          "Indicate that it is the 21st day of the month.";
+      }
+      enum "22nd" {
+        value 22;
+        description
+          "Indicate that it is the 22nd day of the month.";
+      }
+      enum "23rd" {
+        value 23;
+        description
+          "Indicate that it is the 23rd day of the month.";
+      }
+      enum "24th" {
+        value 24;
+        description
+          "Indicate that it is the 24th day of the month.";
+      }
+      enum "25th" {
+        value 25;
+        description
+          "Indicate that it is the 25th day of the month.";
+      }
+      enum "26th" {
+        value 26;
+        description
+          "Indicate that it is the 26th day of the month.";
+      }
+      enum "27th" {
+        value 27;
+        description
+          "Indicate that it is the 27th day of the month.";
+      }
+      enum "28th" {
+        value 28;
+        description
+          "Indicate that it is the 28th day of the month.";
+      }
+      enum "29th" {
+        value 29;
+        description
+          "Indicate that it is the 29th day of the month.";
+      }
+      enum "30th" {
+        value 30;
+        description
+          "Indicate that it is the 30th day of the month.";
+      }
+      enum "31st" {
+        value 31;
+        description
+          "Indicate that it is the 31st day of the month.";
+      }
+    }
+    description
+      "The date enum.";
+  }
+
+  typedef network-service-name {
+    type enumeration {
+      enum "ssh" {
+        value 1;
+        description
+          "SSH service.";
+      }
+      enum "snmp" {
+        value 2;
+        description
+          "SNMP service.";
+      }
+      enum "netconf" {
+        value 3;
+        description
+          "NETCONF service.";
+      }
+      enum "telnet-proxy" {
+        value 4;
+        description
+          "TELNET proxy service.";
+      }
+      enum "trace" {
+        value 5;
+        description
+          "TRACE service.";
+      }
+      enum "telnet" {
+        value 6;
+        description
+          "TELNET service.";
+      }
+      enum "twamp" {
+        value 7;
+        description
+          "TWAMP service.";
+      }
+      enum "ancp-proxy" {
+        value 8;
+        description
+          "ANCP proxy service.";
+      }
+      enum "web-proxy" {
+        value 9;
+        description
+          "WEB proxy service.";
+      }
+      enum "ipdr" {
+        value 10;
+        description
+          "IPDR service.";
+      }
+      enum "dhcp-relay" {
+        value 11;
+        description
+          "DHCP-relay service.";
+      }
+      enum "portal" {
+        value 12;
+        description
+          "PORTAL service.";
+      }
+      enum "capwap" {
+        value 13;
+        description
+          "CAPWAP service.";
+      }
+      enum "mqtt" {
+        value 14;
+        description
+          "MQTT service.";
+      }
+    }
+    description
+      "The network service name enum.";
+  }
+
+  typedef authentication-type {
+    type enumeration {
+      enum "password" {
+        value 1;
+        description
+          "Indicates the authentication type is password.";
+      }
+      enum "x509v3-rsa" {
+        value 11;
+        description
+          "Indicates the authentication type is x509v3-rsa.";
+      }
+      enum "password-x509v3-rsa" {
+        value 12;
+        description
+          "Indicates the authentication type is password-x509v3-rsa.";
+      }
+      enum "rsa" {
+        value 2;
+        description
+          "Indicates the authentication type is rsa.";
+      }
+      enum "sm2" {
+        value 9;
+        description
+          "Indicates the authentication type is sm2.";
+      }
+      enum "ed25519" {
+        value 15;
+        description
+          "Indicates the authentication type is ed25519.";
+      }
+    }
+    description
+      "This attribute depicts authentication type.";
+  }
+
+  typedef mode {
+    type enumeration {
+      enum "default" {
+        value 0;
+        description
+          "Indicates that the system service-provisioning config-mode is default.";
+      }
+      enum "netconf" {
+        value 1;
+        description
+          "Indicates that the system service-provisioning config-mode is netconf.";
+      }
+    }
+    description
+      "System service-provisioning config-mode.";
+  }
+
+  typedef auto-save-switch-status {
+    type enumeration {
+      enum "on" {
+        value 1;
+        description
+          "Indicates the automatic save is enabled.";
+      }
+      enum "off" {
+        value 2;
+        description
+          "Indicates the automatic save is disable.";
+      }
+    }
+    description
+      "This attribute depicts automatic save status.";
+  }
+
+  typedef data-state {
+    type enumeration {
+      enum "synccompleteness" {
+        value 1;
+        description
+          "indicates that synchronization complete.";
+      }
+      enum "flashsyncincompleteness" {
+        value 2;
+        description
+          "indicates that operation (loading/backuping/ duplicating/saving/...) is being performed.";
+      }
+      enum "configbasicdatasyncincompleteness" {
+        value 3;
+        description
+          "indicates that configuration data or basic operation data synchronized incompletely.";
+      }
+      enum "syncswitchoff" {
+        value 4;
+        description
+          "indicates that the synchronization switch off.";
+      }
+      enum "peerboardfailure" {
+        value 5;
+        description
+          "indicates that the standby board fail.";
+      }
+      enum "dynamicdatasyncincompleteness" {
+        value 6;
+        description
+          "indicates that dynamic service data synchronization is incomplete.";
+      }
+      enum "patchinconsistent" {
+        value 7;
+        description
+          "indicates that patch files of active board and standby board are inconsistent.";
+      }
+      enum "patchinconsistentdynamicdatasyncincompleteness" {
+        value 8;
+        description
+          "indicates that patch files of active board and standby board are inconsistent and
+             dynamic service data synchronization is incomplete.";
+      }
+      enum "peerboardoffline" {
+        value 9;
+        description
+          "indicates that the standby board doesn't exist.";
+      }
+    }
+    description
+      "The data synchronization between the active and standby boards status";
+  }
+
+  typedef switch-status {
+    type enumeration {
+      enum "on" {
+        value 1;
+        description
+          "indicates that the active/standby switchover is enabled.";
+      }
+      enum "off" {
+        value 2;
+        description
+          "indicates that the active/standby switchover is disabled.";
+      }
+    }
+    description
+      "The switch of the active/standby switchover.";
+  }
+
+  typedef switch-period {
+    type enumeration {
+      enum "day" {
+        value 1;
+        description
+          "indicates that the switchover is performed once a day.";
+      }
+      enum "week" {
+        value 2;
+        description
+          "indicates that the switchover is performed once a week.";
+      }
+      enum "month" {
+        value 3;
+        description
+          "indicates that the switchover is performed once a month.";
+      }
+    }
+    description
+      "The period of the active/standby switchover.";
+  }
+
+  typedef auto-status {
+    type enumeration {
+      enum "on" {
+        value 1;
+        description
+          "indicates that the automatic switchover is enabled.";
+      }
+      enum "off" {
+        value 2;
+        description
+          "indicates that the automatic switchover is disabled.";
+      }
+    }
+    description
+      "Status of auto switchover function.";
+  }
+
+  typedef data-status {
+    type enumeration {
+      enum "blank" {
+        value 1;
+        description
+          "Indicates the data is blank.";
+      }
+      enum "modified" {
+        value 2;
+        description
+          "Indicates the data is modified.";
+      }
+    }
+    description
+      "This attribute depicts data status.";
+  }
+
+  typedef save-type {
+    type enumeration {
+      enum "database" {
+        value 1;
+        description
+          "Save database.";
+      }
+      enum "configuration" {
+        value 2;
+        description
+          "Save configuration.";
+      }
+    }
+    description
+      "Indicates the type of save rpc.";
+  }
+
+  typedef date-format-type {
+    type enumeration {
+      enum "YYYY-MM-DD" {
+        value 1;
+        description
+          "Identifies the date format, for example, 1990-12-31.";
+      }
+      enum "DD-MM-YYYY" {
+        value 2;
+        description
+          "Identifies the date format, for example, 31-12-1990.";
+      }
+      enum "MM-DD-YYYY" {
+        value 3;
+        description
+          "Identifies the date format, for example, 12-31-1990.";
+      }
+      enum "YYYY.MM.DD" {
+        value 4;
+        description
+          "Identifies the date format, for example, 1990.12.31.";
+      }
+      enum "DD.MM.YYYY" {
+        value 5;
+        description
+          "Identifies the date format, for example, 31.12.1990.";
+      }
+      enum "MM.DD.YYYY" {
+        value 6;
+        description
+          "Identifies the date format, for example, 12.31.1990.";
+      }
+      enum "YYYY/MM/DD" {
+        value 7;
+        description
+          "Identifies the date format, for example, 1990/12/31.";
+      }
+      enum "DD/MM/YYYY" {
+        value 8;
+        description
+          "Identifies the date format, for example, 31/12/1990.";
+      }
+      enum "MM/DD/YYYY" {
+        value 9;
+        description
+          "Identifies the date format, for example, 12/31/1990.";
+      }
+    }
+    description
+      "Format of the system date.";
+  }
+
+  typedef user-level {
+    type enumeration {
+      enum "common" {
+        value 1;
+        description
+          "Indicates the common user.";
+      }
+      enum "operator" {
+        value 2;
+        description
+          "Indicates the operator.";
+      }
+      enum "administrator" {
+        value 3;
+        description
+          "Indicates the administrator.";
+      }
+      enum "super" {
+        value 4;
+        description
+          "Indicates the super administrator.";
+      }
+    }
+    description
+      "The type of CLI users levels.";
+  }
+
+  typedef client-type {
+    type enumeration {
+      enum "serial" {
+        value 1;
+        description
+          "Indicates serial port.";
+      }
+      enum "telnet" {
+        value 2;
+        description
+          "Indicates telnet.";
+      }
+      enum "proxy" {
+        value 3;
+        description
+          "Indicates proxy.";
+      }
+      enum "ssh" {
+        value 4;
+        description
+          "Indicates ssh.";
+      }
+      enum "omci" {
+        value 5;
+        description
+          "Indicates omci.";
+      }
+      enum "ethoam" {
+        value 6;
+        description
+          "Indicates ethoam.";
+      }
+      enum "adminVs" {
+        value 7;
+        description
+          "Indicates adminVs.";
+      }
+    }
+    description
+      "Definition of the client type";
+  }
+
+  typedef com-status-type {
+    type enumeration {
+      enum "disable" {
+        value 0;
+        description
+          "Close service.";
+      }
+      enum "enable" {
+        value 1;
+        description
+          "Open service.";
+      }
+    }
+    description
+      "Status enum.";
+  }
+
+  typedef firewall-protocol-type {
+    type enumeration {
+      enum "telnet" {
+        value 1;
+        description
+          "Indicates telnet service.";
+      }
+      enum "ssh" {
+        value 2;
+        description
+          "Indicates ssh service.";
+      }
+      enum "snmp" {
+        value 3;
+        description
+          "Indicates snmp service.";
+      }
+    }
+    description
+      "Definition firewall protocol type.";
+  }
+
+  grouping network-server-source-interface-list {
+    description
+      "A collection of YANG definitions for setting the source interface bound to the system services.";
+    list network-server-source-interface {
+      key "protocol-type source-interface";
+      description
+        "Configure the server protocol type and source-interface related to sockets.";
+      leaf protocol-type {
+        type network-service-name;
+        description
+          "Network protocol name.";
+      }
+      leaf source-interface {
+        type string {
+          length "1..63";
+        }
+        description
+          "Specify the ifName which is bound to the service, 'any-interface' means bound to all interface.";
+      }
+    }
+  }
+
+  grouping network-server-source-ip-list {
+    description
+      "A collection of YANG definitions for setting the source ip-address bound to the system services.";
+    list network-server-source-ip {
+      key "protocol-type source-ip";
+      description
+        "Configure the server protocol type and source ip-address related to sockets.";
+      leaf protocol-type {
+        type network-service-name;
+        description
+          "Network protocol name.";
+      }
+      leaf source-ip {
+        type inet:ip-address;
+        description
+          "Specific ip address.";
+      }
+      leaf vrf-name {
+        type string {
+          length "1..31";
+        }
+        description
+          "VRF name on a server. When the ip-address is all zeros, the vrf-name cannot be configured.";
+      }
+    }
+  }
+
+  grouping network-source-interface-list {
+    description
+      "A collection of YANG definitions for setting the source interface bound to the system services.";
+    list network-source-interface {
+      key "source-protocol-type";
+      description
+        "Configure the server protocol type and source-interface related to sockets.";
+      leaf source-protocol-type {
+        type identityref {
+          base sys-service-type;
+        }
+        description
+          "Source protocol name.";
+      }
+      leaf source-interface {
+        type string {
+          length "1..63";
+        }
+        mandatory true;
+        description
+          "Specify the ifName which is bound to the service, support 'meth' 'loopback' 'vlanif'";
+      }
+      leaf source-interface-index {
+        type uint32;
+        mandatory true;
+        description
+          "Specify the ifName which is bound to the service, support 'meth 0' 'loopback 1-31' 'vlanif 1-4093'";
+      }
+    }
+  }
+
+  grouping network-source-ip-list {
+    description
+      "A collection of YANG definitions for setting the source ip-address bound to the system services.";
+    list network-source-ip {
+      key "source-protocol-type";
+      description
+        "Configure the server protocol type and source ip-address related to sockets.";
+      leaf source-protocol-type {
+        type identityref {
+          base sys-service-type;
+        }
+        description
+          "Source protocol name.";
+      }
+      leaf source-ipv6 {
+        type inet:ipv6-address;
+        mandatory true;
+        description
+          "Specific ipv6 address.";
+      }
+    }
+  }
+
+  grouping network-service-interface-list {
+    description
+      "A collection of YANG definitions for setting the source interface bound to the system services.";
+    list network-service-interface {
+      key "service-protocol-type";
+      description
+        "Configure the service protocol type";
+      leaf service-protocol-type {
+        type identityref {
+          base sys-service-type;
+        }
+        description
+          "Service support dhcp-relay,dhcpv6-relay,ipdr,ntp,ntp6,portal,radius,snmp,snmpv6,ssh,sshv6,telnet,telnetv6,trace,twamp,netconf,mqtt,web-proxy.";
+      }
+      leaf service-state {
+        type com-status-type;
+        mandatory true;
+        description
+          "Service status";
+      }
+    }
+  }
+
+  grouping network-service-port-interface-list {
+    description
+      "A collection of YANG definitions for setting the source interface bound to the system services.";
+    list network-service-port-interface {
+      key "service-port-protocol-type";
+      description
+        "Configure the service protocol type";
+      leaf service-port-protocol-type {
+        type identityref {
+          base sys-service-type;
+        }
+        description
+          "Service support set telnet,telnetv6,netconf,ssh,sshv6, query all.";
+      }
+      leaf service-port {
+        type uint32;
+        mandatory true;
+        description
+          "Service port value";
+      }
+    }
+  }
+
+  grouping network-service-port-client-list {
+    description
+      "A collection of YANG definitions for querry the system services ftp and sftp.";
+    list network-service-port-client {
+      key "client-type";
+      config false;
+      description
+        "Configure the service client type";
+      leaf client-type {
+        type identityref {
+          base sys-service-type;
+        }
+        must "((.='system-ext:ftp-client') or (.='system-ext:sftp-client') or (.='system-ext:radius'))";
+        description
+          "Service ftp/sftp client.";
+      }
+      leaf-list port-value {
+        type uint32;
+        description
+          "Service port value";
+      }
+    }
+  }
+
+  augment "/sys:system/sys:authentication/sys:user" {
+    description
+      "For the user's attribute operation, indicates the service type, authentication type, repeated logins of a user.";
+    leaf service-type {
+      type service-type;
+      default "netconf";
+      description
+        "The service type for this entry.";
+    }
+    leaf authentication-type {
+      type authentication-type;
+      default "password";
+      description
+        "The authentication type for this entry.";
+    }
+    leaf reenter-num {
+      type uint32 {
+        range "0..20";
+      }
+      default "1";
+      description
+        "The number of repeated logins allowed.";
+    }
+    leaf level {
+      type user-level;
+      default "common";
+      description
+        "The levels of CLI users.
+         The higher the user level is, the more rights the user has.
+         The user level must be bound to the user when the user is added.
+         The super administrator cannot be added.";
+    }
+    leaf description {
+      type string {
+        length "1..100";
+      }
+      default "-----";
+      description
+        "Description of CLI user.
+         You can add the basic information about the user,
+         such as the email box, telephone number, or other contact information.";
+    }
+    leaf profile {
+      type string {
+        length "1..15";
+      }
+      default "root";
+      description
+        "The name of user profile that CLI user belongs to.";
+    }
+    leaf name-validity-period {
+      type int32;
+      units "d";
+      config false;
+      description
+        "Remaining validity days of user name.
+         The value of -1 indicates the username expired.";
+    }
+    leaf password-validity-period {
+      type int32;
+      units "d";
+      config false;
+      description
+        "Remaining validity days of user password.
+         The value of -1 indicates the user password expired.";
+    }
+    leaf is-emergency-account {
+      type boolean;
+      must "../is-emergency-account='false' or (../is-emergency-account='true' and ../service-type='cli')" {
+        error-message
+          "Netconf users cannot be configured as emergency accounts.";
+      }
+      default "false";
+      description
+        "Enable/disable [This object indicates the type of the terminal user is a general user or an emergency user].";
+    }
+  }
+  augment "/sys:system/sys:authentication" {
+    description
+      "Augment is sys:authentication.";
+    container user-clients {
+      description
+        "List of the user-clients.";
+      list user-client {
+        key "id";
+        description
+          "Configure the cli online user information table, which can be used to force an online user to go offline.";
+        leaf id {
+          type int32 {
+            range "1..255";
+          }
+          description
+            "This ID is allocated by device.
+             Value 255 indicates that the device does not allocate client IDs.";
+        }
+        leaf username {
+          type string {
+            length "1..34";
+          }
+          config false;
+          description
+            "User name of client.";
+        }
+        leaf type {
+          type client-type;
+          config false;
+          description
+            "Type of client.";
+        }
+        leaf login-datetime {
+          type yang:date-and-time;
+          config false;
+          description
+            "The login time of client.";
+        }
+        leaf ip-type {
+          type inet:ip-version;
+          config false;
+          description
+            "The type of client address.";
+        }
+        leaf client-ip {
+          type inet:ip-address;
+          config false;
+          description
+            "The object specifies the IP address of client.";
+        }
+        action disconnect {
+          description
+            "Force a online user to go offline.";
+
+          output {
+            leaf result {
+              type string {
+                length "1..2048";
+              }
+              description
+                "The result of forcing a user to disconnect.";
+            }
+          }
+        }
+      }
+    }
+  }
+  augment "/sys:system/sys:clock/sys:timezone/sys:timezone-utc-offset" {
+    description
+      "For the user-define time zone name.";
+    leaf timezone-name {
+      type string {
+        length "1..32";
+      }
+      default "DefaultZoneName";
+      description
+        "Specify the name of a time zone. The length of string is from 1 to 32 characters.";
+    }
+  }
+  augment "/sys:system/sys:clock" {
+    description
+      "For the user-define dst.";
+    container dst-configuration {
+      must
+        "((type='one-year' and start-year and start-month and start-day and start-time and end-year and end-month and end-day and end-time and dst-offset)
+         or(type='repeat-date' and start-month and start-day and start-time and end-month and end-day and end-time and dst-offset)
+         or(type='repeat-week' and start-month and start-weeknum and start-weekday and start-time and end-month and end-weeknum and end-weekday and end-time and dst-offset))";
+      presence "Enable dst";
+      description
+        "Enable/disable daylight saving time (DST).
+         The start date and start week cannot be configurated at the save time.
+         The end date and end week can not be configurated at the save time either.
+         The dst-offset must be less than the time difference between the end time and the start time.";
+      leaf dst-name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Specify a DST name. The length of string is from 1 to 32 characters.";
+      }
+      leaf type {
+        type tm-dst-type;
+        description
+          "Specify whether this setting is for one year or repeating.";
+      }
+      leaf start-year {
+        type uint16 {
+          range "2000..2037";
+        }
+        description
+          "Specify the daylight saving start year. It is in the format of YYYY. The value of YYYY ranges from 2000 to 2037.";
+      }
+      leaf start-month {
+        type tm-month;
+        description
+          "Specify the daylight saving start month. The value can be January, February, March, April, May, June, July, August, September, October, November, or December.";
+      }
+      leaf start-day {
+        type tm-date;
+        description
+          "Specify the daylight saving start date. It is in the format of DD. The value of DD ranges from 1 to 31.";
+      }
+      leaf start-weeknum {
+        type tm-weeknum;
+        description
+          "Specify the start week number in the specified month. The value can be first, second, third, fourth, or last.";
+      }
+      leaf start-weekday {
+        type tm-weekday;
+        description
+          "Specify the start weekday. The value can be Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, or Sunday.";
+      }
+      leaf start-time {
+        type pub-type:time;
+        description
+          "Specify the daylight saving start time. The value of HH ranges from 0 to 23, and the values of MM and SS range from 0 to 59.";
+      }
+      leaf end-year {
+        type uint16 {
+          range "2000..2037";
+        }
+        description
+          "Specify the daylight saving end year. It is in the format of YYYY. The value of YYYY ranges from 2000 to 2037.";
+      }
+      leaf end-month {
+        type tm-month;
+        description
+          "Specify the daylight saving end month. The value can be January, February, March, April, May, June, July, August, September, October, November, or December.";
+      }
+      leaf end-day {
+        type tm-date;
+        description
+          "Specify the daylight saving end date. It is in the format of DD. The value of DD ranges from 1 to 31.";
+      }
+      leaf end-weeknum {
+        type tm-weeknum;
+        description
+          "Specify the end week number in the specified month. The value can be first, second, third, fourth, or last.";
+      }
+      leaf end-weekday {
+        type tm-weekday;
+        description
+          "Specify the end weekday. The value can be Monday, Tuesday, Wednesday, Thursday, Friday, Saturday, or Sunday.";
+      }
+      leaf end-time {
+        type pub-type:time;
+        description
+          "Specify the daylight saving end time. The value of HH ranges from 0 to 23, and the values of MM and SS range from 0 to 59.";
+      }
+      leaf dst-offset {
+        type pub-type:time-hhmm;
+        description
+          "Specify the time added to the summer time. It is in the format of HH:MM.";
+      }
+    }
+    leaf time-stamp {
+      type enumeration {
+        enum "local" {
+          value 1;
+          description
+            "Indicates that the time stamp uses the local time of the node.";
+        }
+        enum "utc" {
+          value 2;
+          description
+            "Indicates that the time stamp uses the UTC(Universal Time Coordinated) time.";
+        }
+      }
+      default "utc";
+      description
+        "The time information in the trap and syslog uses the formats of the time stamp.";
+    }
+    leaf date-format {
+      type date-format-type;
+      default "YYYY-MM-DD";
+      description
+        "Configuring the system date format. After the configuration takes effect,
+         all contents related to date display in the system are displayed in the specified format.";
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Network server.";
+    container network-server {
+      description
+        "Configure the source interface or source ip-address bound to the system services.";
+      container network-server-source-interfaces {
+        description
+          "Configure the source interface bound to the system services.";
+        uses network-server-source-interface-list;
+      }
+      container network-server-source-ips {
+        description
+          "Configure the source ip-address bound to the system services.";
+        uses network-server-source-ip-list;
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Config network source.";
+    container network-source {
+      description
+        "Contain network source.";
+      container network-source-interfaces {
+        description
+          "Configure the source interface bound to the system services.";
+        uses network-source-interface-list;
+      }
+      container network-source-ips {
+        description
+          "Configure the ipv6 address bound to the system services.";
+        uses network-source-ip-list;
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Configure network service.";
+    container network-service {
+      description
+        "Contain network service.";
+      container network-service-interfaces {
+        description
+          "Configure the source interface bound to the system services.";
+        uses network-service-interface-list;
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Config network service port.";
+    container network-service-port {
+      description
+        "Contain network service port.";
+      container network-service-port-interfaces {
+        description
+          "Configure the source interface port bound to the system services.";
+        uses network-service-port-interface-list;
+      }
+      container network-service-port-clients {
+        description
+          "source interface ftp and sftp config.";
+        uses network-service-port-client-list;
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Configure network console.";
+    container network-console {
+      description
+        "Contain network console.";
+      leaf console-state {
+        type com-status-type;
+        description
+          "Configure the sysman console.";
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Configure network vpn-instance.";
+    container network-vpn-instance {
+      description
+        "Contain network vpn-instance.";
+      leaf ipv6-vpn-instance-name {
+        type string {
+          length "1..31";
+        }
+        description
+          "Configure the vpn instance name.";
+      }
+      leaf vpn-instance-name {
+        type string {
+          length "1..31";
+        }
+        description
+          "Configure the vpn instance name.";
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "For the system config.";
+    container management-modes {
+      description
+        "List of system management-modes.";
+      list management-mode {
+        key "configuration-type";
+        description
+          "Configure the management-modes to the system services.";
+        leaf configuration-type {
+          type identityref {
+            base configuration-type;
+          }
+          description
+            "The system configuration-type.";
+        }
+        leaf mode {
+          type mode;
+          mandatory true;
+          description
+            "The system service-provisioning config-mode.";
+        }
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "For the system config.";
+    container auto-save-policys {
+      description
+        "List of configure automatic save policy.";
+      list auto-save-policy {
+        key "auto-save-type";
+        description
+          "Configure automatic save configuration for type.";
+        leaf auto-save-type {
+          type save-type;
+          description
+            "The type of automatic saving.";
+        }
+        leaf auto-save-interval-switch {
+          type auto-save-switch-status;
+          default "off";
+          description
+            "Automatic save switch.";
+        }
+        leaf auto-save-interval {
+          type uint32 {
+            range "60000..60480000";
+          }
+          description
+            "The period of automatic data saving. The period is in the unit of 10 ms,
+              with a value range of 60000-60480000 (10 minutes to one week).
+              If the data saving is enabled, the data default value of this object is 8640000 (one day),
+              which indicates that the data saving is performed automatically once a day, the Configuration files
+              default value of this object is 8460000.";
+        }
+        leaf auto-save-time-switch {
+          type auto-save-switch-status;
+          default "on";
+          description
+            "Automatic save absolute switch.";
+        }
+        leaf auto-save-time {
+          type uint32;
+          description
+            "The time of automatic data saving. This value can be converted into the hexadecimal
+              number 0x00hhmmss (hh representing hour, mm representing minute,
+              and ss representing second), and then can be converted into the value of
+              the object through a decimal conversion. If the time of automatic data saving
+              needs to be set to 22:30:00 the corresponding value is 0x00161E00=1449472,
+              with 1449472 being the set value.";
+        }
+        leaf auto-save-change-interval {
+          type uint32 {
+            range "12000..8640000";
+          }
+          default "180000";
+          description
+            "Automatic saving of configuration changed. The time is in the unit of 10 ms,with
+             a value range of 12000-8640000 (two minutes to one day). If the value of the object
+             hwAutoSaveType is configuration(2), it is 180000 (30 minutes) by default, which indicates that the
+             configuration files or database are saved automatically each 30 minutes.";
+        }
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "For the system config.";
+    container system-switchover {
+      description
+        "Configure the operation of system switch-over.";
+      leaf system-switch-status {
+        type switch-status;
+        default "on";
+        description
+          "The switch of the active/standby switchover.
+           Options:
+           1. on(1) -shows that the active/standby switchover is enabled.
+           2. off(2) -shows that the active/standby switchover is disabled.
+           If the active/standby switchover is disabled, the system cannot
+           perform data synchronization between the active and standby control
+           boards, manual active/standby switchover,
+           and automatic active/standby switchover.
+           Default:on(1).";
+      }
+      action switchover {
+        description
+          "Manual active/standby switchover.";
+
+        input {
+          leaf retry-time {
+            type uint32 {
+              range "0..180";
+            }
+            units "seconds";
+            default "0";
+            description
+              "Timeout for retry after switchover failure, default is 0.";
+          }
+        }
+      }
+    }
+    container auto-switchover-control {
+      description
+        "Configure control the active/standby auto switchover.";
+      leaf period {
+        type switch-period;
+        description
+          "The period of the active/standby switchover.
+           Options:
+           1. day(1) -indicates that the switchover is performed once a day.
+           2. week(2) -indicates that the switchover is performed once a week.
+           3. month(3) -indicates that the switchover is performed once a month.
+           Default { day }";
+      }
+      leaf day-of-period {
+        type uint32;
+        description
+          "Days since the periodic switchover has been started. Its value
+           range depends on the value of object period.
+           When period is set to day(1), the default value of this object is 1;
+           When period is set to week(2), the value range of this object is 1-7
+           When period is set to month(3), the value range of this object is 1-31.
+           Default:1.";
+      }
+      leaf time {
+        type string {
+          length "8";
+        }
+        description
+          "Time when switchover will happen. Time is set by a string in the format of hh:mm:ss.
+           The value range of hh is from 00 to 23. The value range of mm is from 00 to 59.
+           The value range of ss is from 00 to 59.
+           Default:03:00:00.";
+      }
+      leaf auto-switch-status {
+        type auto-status;
+        description
+          "Status of auto switchover function. If the value of system-switch-status
+           is off(2), the system cannot perform the active/standby switchover.
+           Options:
+           1.on(1) -shows that the auto switchover is enabled. In this case,
+                  if the values of the period, day-of-period,
+                  and time are set, the system performs the auto switchover periodically;
+                  if the values of the period, day-of-period, and time
+                  are not set or only partially set, the objects that are not set with values use the default
+                  value, and the system also performs the auto switchover periodically.
+           2.off(2) -shows that the auto switchover is disabled. If this object is not set with a value,
+                  the system does not perform the auto switchover.
+           Default { off }.";
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "For the system config.";
+    container alarm-thresholds {
+      description
+        "List of overload resource threshold. When the resource usage exceeds this value, an alarm is reported.";
+      list alarm-threshold {
+        key "type one-level";
+        description
+          "Configure an overload threshold for a specific resource. When the resource usage exceeds this value, an alarm is reported.";
+        leaf type {
+          type identityref {
+            base threshold-type;
+          }
+          description
+            "The type of the specific threshold.";
+        }
+        leaf one-level {
+          type union {
+            type uint32;
+            type enumeration {
+              enum "alarm" {
+                value 1;
+                description
+                  "Respond by alarm that the system resource uses when it exceeds the threshold.";
+              }
+            }
+          }
+          description
+            "The response that the system resource uses when it exceeds the threshold. The actions that can be taken in the future include: alarm, reboot, switch-over.";
+        }
+        leaf threshold {
+          type union {
+            type uint32;
+          }
+          description
+            "The value of the specific for severity level alarm.";
+        }
+      }
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Augment the description information for system.";
+    leaf description {
+      type string {
+        length "1..200";
+      }
+      description
+        "The description of the device.";
+    }
+  }
+  augment "/sys:system" {
+    description
+      "For the system config.";
+    container self-healing {
+      description
+        "Configure for system self-healing features including reboot, switch-over, and application restart.";
+      container reboot {
+        description
+          "Configure for system reboot self-healing strategy.";
+        container type {
+          description
+            "Configure for type of reboot strategy: scheduled, memory-based, or forward-path.";
+          leaf enabled {
+            type boolean;
+            description
+              "Enable/disable reboot strategy.";
+          }
+          container scheduled {
+            description
+              "Configure for scheduled reboot strategy.";
+            leaf start-time {
+              type pub-type:time;
+              description
+                "Start time for the scheduled reboot.";
+            }
+            leaf end-time {
+              type pub-type:time;
+              description
+                "End time for the scheduled reboot.";
+            }
+          }
+          container memory {
+            description
+              "Configure for memory-based reboot strategy.";
+            leaf graceful {
+              type boolean;
+              description
+                "Enable/disable graceful reboot based on memory usage.";
+            }
+            leaf enabled {
+              type boolean;
+              description
+                "Enable/disable memory-based reboot strategy.";
+            }
+          }
+          container forward-path {
+            description
+              "Configure for forward-path reboot strategy.";
+            leaf enabled {
+              type boolean;
+              description
+                "Enable/disable forward-path reboot strategy.";
+            }
+          }
+        }
+      }
+      container switch-over {
+        description
+          "Configure for system switch-over self-healing strategy.";
+        leaf enabled {
+          type boolean;
+          description
+            "Enable/disable switch-over strategy.";
+        }
+        leaf forward-path {
+          type boolean;
+          description
+            "Enable/disable forward-path for switch-over strategy.";
+        }
+      }
+      container app-restart {
+        description
+          "Configure for application restart self-healing strategy.";
+        leaf enabled {
+          type boolean;
+          description
+            "Enable/disable application restart strategy.";
+        }
+      }
+    }
+  }
+  augment "/sys:system-state" {
+    description
+      "System status information.";
+    container configuration-result-info {
+      config false;
+      description
+        "Statistics of configuration restoration result.";
+      leaf configuration-result {
+        type enumeration {
+          enum "success" {
+            value 0;
+            description
+              "Indicates all configurations are successfully restored.";
+          }
+          enum "failure" {
+            value 1;
+            description
+              "Indicates that some configurations fail to be restored.";
+          }
+        }
+        description
+          "Indicates the result of configuration restoration.";
+      }
+      leaf failed-num {
+        type uint32;
+        description
+          "Indicates the number of configurations that fail to be restored.";
+      }
+      leaf-list failed-configuration {
+        type string {
+          length "1..1024";
+        }
+        max-elements 1000;
+        description
+          "Operational data of fails to be restored.
+           When the configuration result is success, the information is NULL.
+           If there are too many configuration failures, only the first 1000 records are displayed.";
+      }
+    }
+    container system-data-state {
+      config false;
+      description
+        "Operational state of the info about system switchover or the status of data synchronization.";
+      leaf data-sync-state {
+        type data-state;
+        config false;
+        description
+          "Operational state of the query of the status of data synchronization between
+           the active and standby control boards.
+           Options:
+           1. synccompleteness(1)
+             -shows that synchronization complete.
+           2. flashsyncincompleteness(2)
+             -shows that operation (loading/backuping/duplicating/saving/...) is being performed.
+           3. configbasicdatasyncincompleteness(3)
+             -shows that configuration data or basic operation data synchronized incompletely.
+           4. syncswitchoff(4)
+             -shows that the synchronization switch off.
+           5. peerboardfailure(5)
+             -shows that the standby board fail.
+           6. dynamicdatasyncincompleteness(6)
+             -shows that dynamic service data synchronization is incomplete.
+           7. patchinconsistent(7)
+             -shows that patch files of active board and standby board are inconsistent.
+           8. patchinconsistentdynamicdatasyncincompleteness(8)
+             -shows that patch files of active board and standby board are inconsistent and
+             dynamic service data synchronization is incomplete.
+           9. peerboardoffline(9)
+             -shows that the standby board doesn't exist.";
+      }
+    }
+    container system-data-info {
+      config false;
+      description
+        "System data information statistics.";
+      leaf data-init-state {
+        type data-status;
+        description
+          "Querying database state when system init.";
+      }
+      leaf data-persistence-id {
+        type uint32;
+        description
+          "Save the database and generate an ID information to verify the data consistency of the controller and device.";
+      }
+      leaf data-changes {
+        type uint32;
+        description
+          "Querying whether the system configuration (database and configuration files) changes.";
+      }
+      leaf data-state {
+        type data-status;
+        description
+          "Querying whether the current database is null. A null database refers to the database
+           with no configuration data.";
+      }
+    }
+  }
+  augment "/sys:system-state/sys:clock" {
+    description
+      "Augment the clock of system state to provide additional.";
+    leaf duration-time {
+      type string;
+      config false;
+      description
+        "The total time the system has been running since startup.";
+    }
+  }
+  augment "/sys:system" {
+    description
+      "Information of sysman-firewall and firewall-ip-tables data.";
+    container sysman-firewall {
+      description
+        "Configure sysman firewall switch and ip rule.";
+      container firewall-switch-tables {
+        description
+          "List of sysman firewall configure.";
+        list firewall-switch-table {
+          key "ip-version protocol-type";
+          description
+            "Configure firewall protocol switch.";
+          leaf ip-version {
+            type inet:ip-version;
+            description
+              "Configure the ip version IPv4/IPv6.";
+          }
+          leaf protocol-type {
+            type firewall-protocol-type;
+            description
+              "Configure protocol type.";
+          }
+          leaf firewall-switch {
+            type com-status-type;
+            mandatory true;
+            description
+              "Configure firewall switch.";
+          }
+        }
+      }
+      container firewall-ip-tables {
+        description
+          "List of contain firewall ip rules.";
+        list firewall-ip-table {
+          key "ip-rule protocol-type ip-start";
+          description
+            "Configure ip rules.";
+          leaf ip-rule {
+            type enumeration {
+              enum "refuse" {
+                value 0;
+                description
+                  "Indicates firewall ip blacklist.";
+              }
+              enum "access" {
+                value 1;
+                description
+                  "Indicates firewall ip whitelist.";
+              }
+            }
+            description
+              "Configure the ip rules access or refuse.";
+          }
+          leaf protocol-type {
+            type firewall-protocol-type;
+            description
+              "Configure protocol type.";
+          }
+          leaf ip-start {
+            type inet:ip-address;
+            description
+              "Configure ip range start.";
+          }
+          leaf ip-end {
+            type inet:ip-address;
+            mandatory true;
+            description
+              "Configure ip range end.";
+          }
+          leaf ip-version {
+            type inet:ip-version;
+            mandatory true;
+            description
+              "Configure the ip version IPv4/IPv6.";
+          }
+        }
+      }
+    }
+  }
+}

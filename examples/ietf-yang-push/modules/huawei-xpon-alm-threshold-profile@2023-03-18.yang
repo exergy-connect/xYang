@@ -1,0 +1,454 @@
+submodule huawei-xpon-alm-threshold-profile {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import huawei-xpon-types {
+    prefix xpon-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains optical alarm profile data.";
+
+  revision 2023-03-18 {
+    description
+      "Add 50G config data of optical alarm threshold profile.";
+    reference
+      "";
+  }
+  revision 2023-03-17 {
+    description
+      "Add config data of optical alarm threshold profile.";
+    reference
+      "";
+  }
+  revision 2019-07-19 {
+    description
+      "Adjust the unit for temperature and bias.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472,SFF 8077i";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472,SFF 8077i";
+  }
+
+  grouping optic-alm-threshold-prof-data {
+    description
+      "All config data for optical alarm threshold profile.";
+    reference
+      "ITU-T SFF 8472";
+    list optic-alm-threshold-prof {
+      key "name";
+      description
+        "Configure a list of optical alarm threshold profiles.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "The optical alarm profile name.";
+      }
+      leaf local-used-type {
+        type xpon-types:used-type;
+        description
+          "Indicates the used type of the transceiver.";
+      }
+      leaf local-module-grade {
+        type xpon-types:module-grade;
+        description
+          "Indicates the grade of the transceiver.";
+      }
+      leaf local-module-type {
+        type xpon-types:module-type;
+        description
+          "Indicates the module type of the transceiver.";
+      }
+      leaf local-module-sub-type {
+        type xpon-types:module-sub-type;
+        description
+          "Indicates the module sub type of the transceiver.";
+      }
+      leaf tx-warning-upper-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the TX power.";
+      }
+      leaf tx-warning-lower-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the TX power.";
+      }
+      leaf tx-alarm-upper-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the TX power.";
+      }
+      leaf tx-alarm-lower-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the TX power.";
+      }
+      leaf rx-warning-upper-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the RX power.";
+      }
+      leaf rx-warning-lower-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the RX power.";
+      }
+      leaf rx-alarm-upper-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the RX power.";
+      }
+      leaf rx-alarm-lower-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the RX power.";
+      }
+      leaf bias-current-warning-upper-threshold {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper warning threshold of the bias current.";
+      }
+      leaf bias-current-warning-lower-threshold {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower warning threshold of the bias current.";
+      }
+      leaf bias-current-alarm-upper-threshold {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper alarm threshold of the bias current.";
+      }
+      leaf bias-current-alarm-lower-threshold {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower alarm threshold of the bias current.";
+      }
+      leaf voltage-warning-upper-threshold {
+        type int32 {
+          range "0..10000";
+        }
+        units "0.01 V";
+        description
+          "The upper warning threshold of the voltage.";
+      }
+      leaf voltage-warning-lower-threshold {
+        type int32 {
+          range "0..10000";
+        }
+        units "0.01 V";
+        description
+          "The lower warning threshold of the voltage.";
+      }
+      leaf voltage-alarm-upper-threshold {
+        type int32 {
+          range "0..10000";
+        }
+        units "0.01 V";
+        description
+          "The upper alarm threshold of the voltage.";
+      }
+      leaf voltage-alarm-lower-threshold {
+        type int32 {
+          range "0..10000";
+        }
+        units "0.01 V";
+        description
+          "The lower alarm threshold of the voltage.";
+      }
+      leaf temp-warning-upper-threshold {
+        type int32 {
+          range "-9900..30000";
+        }
+        units "0.01 °C";
+        description
+          "The upper warning threshold of the temperature.";
+      }
+      leaf temp-warning-lower-threshold {
+        type int32 {
+          range "-9900..30000";
+        }
+        units "0.01 °C";
+        description
+          "The lower warning threshold of the temperature.";
+      }
+      leaf temp-alarm-upper-threshold {
+        type int32 {
+          range "-9900..30000";
+        }
+        units "0.01 °C";
+        description
+          "The upper alarm threshold of the temperature.";
+      }
+      leaf temp-alarm-lower-threshold {
+        type int32 {
+          range "-9900..30000";
+        }
+        units "0.01 °C";
+        description
+          "The lower alarm threshold of the temperature.";
+      }
+      leaf tx-warning-upper-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the 10G channel TX power.";
+      }
+      leaf tx-warning-lower-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the 10G channel TX power.";
+      }
+      leaf tx-alarm-upper-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the 10G channel TX power.";
+      }
+      leaf tx-alarm-lower-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the 10G channel TX power.";
+      }
+      leaf bias-current-warning-upper-threshold-10g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper warning threshold of the 10G channel bias current.";
+      }
+      leaf bias-current-warning-lower-threshold-10g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower warning threshold of the 10G channel bias current.";
+      }
+      leaf bias-current-alarm-upper-threshold-10g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper alarm threshold of the 10G channel bias current.";
+      }
+      leaf bias-current-alarm-lower-threshold-10g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower alarm threshold of the 10G channel bias current.";
+      }
+      leaf ont-catv-rx-alarm-upper-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the ONT CATV RX power.";
+      }
+      leaf ont-catv-rx-alarm-lower-threshold {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the ONT CATV RX power.";
+      }
+      leaf rx-warning-upper-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the RX power for 10G channel.";
+      }
+      leaf rx-warning-lower-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the RX power for 10G channel.";
+      }
+      leaf rx-alarm-upper-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the RX power for 10G channel.";
+      }
+      leaf rx-alarm-lower-threshold-10g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the RX power for 10G channel.";
+      }
+      leaf tx-warning-upper-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the 50G channel TX power.";
+      }
+      leaf tx-warning-lower-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the 50G channel TX power.";
+      }
+      leaf tx-alarm-upper-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the 50G channel TX power.";
+      }
+      leaf tx-alarm-lower-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the 50G channel TX power.";
+      }
+      leaf bias-current-warning-upper-threshold-50g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper warning threshold of the 50G channel bias current.";
+      }
+      leaf bias-current-warning-lower-threshold-50g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower warning threshold of the 50G channel bias current.";
+      }
+      leaf bias-current-alarm-upper-threshold-50g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The upper alarm threshold of the 50G channel bias current.";
+      }
+      leaf bias-current-alarm-lower-threshold-50g {
+        type int32 {
+          range "0..1000000";
+        }
+        units "0.01 mA";
+        description
+          "The lower alarm threshold of the 50G channel bias current.";
+      }
+      leaf rx-warning-upper-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper warning threshold of the RX power for 50G channel.";
+      }
+      leaf rx-warning-lower-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower warning threshold of the RX power for 50G channel.";
+      }
+      leaf rx-alarm-upper-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The upper alarm threshold of the RX power for 50G channel.";
+      }
+      leaf rx-alarm-lower-threshold-50g {
+        type int32 {
+          range "-9900..10000";
+        }
+        units "0.01 dBm";
+        description
+          "The lower alarm threshold of the RX power for 50G channel.";
+      }
+    }
+  }
+}

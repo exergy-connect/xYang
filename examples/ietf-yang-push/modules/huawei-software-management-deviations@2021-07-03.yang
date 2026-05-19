@@ -1,0 +1,31 @@
+module huawei-software-management-deviations {
+  namespace "urn:huawei:yang:huawei-software-management-deviations";
+  prefix hw-sm-devs;
+
+  import huawei-software-management {
+    prefix hw-sm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for huawei-software-management module.";
+
+  revision 2021-07-03 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/hw-sm:software-base/hw-sm:auto-save-policy" {
+    deviate not-supported;
+  }
+}

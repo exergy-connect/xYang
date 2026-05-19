@@ -1,0 +1,83 @@
+module bbf-app-flow-qoe {
+  namespace "urn:bbf:yang:bbf-app-flow-qoe";
+  prefix bbf-app-flow-qoe;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-qos-policies {
+    prefix bbf-qos-pol;
+  }
+  import bbf-app-flow {
+    prefix bbf-app-flow;
+  }
+  import bbf-application-policy-profile {
+    prefix bbf-app-profile;
+  }
+  import bbf-application {
+    prefix bbf-app;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Lin Kangwen, Huawei
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains Quality of Experience(QoE) policy
+     definitions for the application flow.";
+
+  revision 2025-03-28 {
+    description
+      "Add leaf application-profile in container app-qoe-profiles ";
+  }
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  augment "/if:interfaces/if:interface/bbf-app-flow:app-flow/bbf-app-flow:qoe-profiles" {
+    description
+      "Describes the QoE policy configuration of the application
+       flow.";
+    container app-qoe-profiles {
+      description
+        "Configure a QoE policy for the inbound and outbound
+         interfaces of the application flow.";
+      leaf ingress-qoe-profile {
+        type bbf-qos-pol:qos-policy-profile-ref;
+        description
+          "A reference to a QoS policy profile.
+           The profile is to be applied to incoming packets.";
+      }
+      leaf egress-qoe-profile {
+        type bbf-qos-pol:qos-policy-profile-ref;
+        description
+          "A reference to a QoS policy profile.
+           The profile is to be applied to outgoing packets.";
+      }
+      leaf application-profile {
+        type leafref {
+          path "/bbf-app:applications/bbf-app-profile:application-profile/bbf-app-profile:name";
+        }
+        description
+          "A reference to a Application policy profile";
+      }
+    }
+  }
+}

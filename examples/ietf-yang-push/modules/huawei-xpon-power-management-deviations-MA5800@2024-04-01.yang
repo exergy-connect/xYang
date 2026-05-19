@@ -1,0 +1,66 @@
+module huawei-xpon-power-management-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-xpon-power-management-deviations-MA5800";
+  prefix hwxpon-power-management-deviations;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+  import bbf-xponani-power-management {
+    prefix bbf-xponani-pwr;
+  }
+  import bbf-xpon-power-management {
+    prefix bbf-xpon-pwr;
+  }
+  import bbf-xpon-onu-power-management {
+    prefix bbf-xpon-onu-pwr;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xpon-power-management.";
+
+  revision 2024-04-01 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile/bbf-xponani-pwr:irxoff" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile/bbf-xponani-pwr:ihold" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile/bbf-xponani-pwr:mode" {
+    deviate add {
+      max-elements 1;
+    }
+  }
+  deviation "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile/bbf-xponani-pwr:idoze" {
+    deviate not-supported;
+  }
+  deviation "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile/bbf-xponani-pwr:icyclic-sleep" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani-pwr:power-management/bbf-xponani-pwr:capability" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani-pwr:power-management/bbf-xponani-pwr:itransinit" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani-pwr:power-management/bbf-xponani-pwr:itxinit" {
+    deviate not-supported;
+  }
+}

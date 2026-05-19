@@ -1,0 +1,40 @@
+module huawei-bb-raio-profiles-deviations {
+  namespace "urn:huawei:yang:huawei-bb-raio-profiles-deviations";
+  prefix hw-bb-raio-prof-devs;
+
+  import huawei-bb-raio-profiles {
+    prefix hw-bb-raio-prof;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This is a deviation for huawei-bb-raio-profiles module.";
+
+  revision 2020-11-18 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  deviation "/hw-bb-raio-prof:bb-raio-profiles/hw-bb-raio-prof:raio-profile/hw-bb-raio-prof:dhcp-option82/hw-bb-raio-prof:format-string/hw-bb-raio-prof:docsis" {
+    deviate not-supported;
+  }
+  deviation "/hw-bb-raio-prof:bb-raio-profiles/hw-bb-raio-prof:raio-profile/hw-bb-raio-prof:dhcpv6-option/hw-bb-raio-prof:format-string/hw-bb-raio-prof:docsis" {
+    deviate not-supported;
+  }
+  deviation "/hw-bb-raio-prof:bb-raio-profiles/hw-bb-raio-prof:raio-profile/hw-bb-raio-prof:pitp-pmode/hw-bb-raio-prof:format-string/hw-bb-raio-prof:docsis" {
+    deviate not-supported;
+  }
+  deviation "/hw-bb-raio-prof:bb-raio-profiles/hw-bb-raio-prof:raio-profile/hw-bb-raio-prof:pitp-vmode/hw-bb-raio-prof:format-string/hw-bb-raio-prof:docsis" {
+    deviate not-supported;
+  }
+}

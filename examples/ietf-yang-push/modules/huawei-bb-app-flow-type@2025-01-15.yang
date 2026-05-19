@@ -1,0 +1,53 @@
+module huawei-bb-app-flow-type {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bb-app-flow-type";
+  prefix hw-bb-app-flow-type;
+
+  import bbf-application {
+    prefix bbf-app;
+  }
+  import bbf-application-policy-profile {
+    prefix bbf-app-profile;
+  }
+  import huawei-bb-nsi {
+    prefix hw-bb-nsi;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private Yang module describes the slice information
+     configuration of the application.";
+
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  augment "/bbf-app:applications/bbf-app-profile:application-profile" {
+    description
+      "Describes the slice information of the application flow
+       configuration.";
+    container slice-info {
+      description
+        "Configure the slice information of the application.";
+      leaf slice-instance {
+        type leafref {
+          path "/hw-bb-nsi:bb-nsi/hw-bb-nsi:slice-instances/hw-bb-nsi:slice-instance/hw-bb-nsi:slice-name";
+        }
+        description
+          "Describes the slice instance of the application flow
+           configuration.";
+      }
+    }
+  }
+}

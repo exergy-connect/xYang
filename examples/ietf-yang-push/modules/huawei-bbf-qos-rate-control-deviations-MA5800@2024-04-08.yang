@@ -1,0 +1,37 @@
+module huawei-bbf-qos-rate-control-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-rate-control-deviations-MA5800";
+  prefix bbf-qos-rc-devs-MA5800;
+
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import bbf-qos-rate-control {
+    prefix bbf-qos-rc;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-rate-control module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-rc:rate-limit-frames" {
+    deviate not-supported;
+  }
+}

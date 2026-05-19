@@ -1,0 +1,1025 @@
+module bbf-uni-profile {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-uni-profile";
+  prefix bbf-uni-profile;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import bbf-qos-policies {
+    prefix bbf-qos-pol;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area.";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:info@broadband-forum.org>.
+
+     Editor: XinWen Yao, Huawei";
+  description
+    "This module contains channel config data.";
+
+  revision 2025-09-04 {
+    description
+      "Add native-vlan and user-vlan.";
+    reference
+      "";
+  }
+  revision 2024-07-03 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472,SFF 8077";
+  }
+
+  identity packet-type {
+    description
+      "Indicates the packet type.";
+  }
+
+  identity multicast {
+    base packet-type;
+    description
+      "Indicates the multicast packet.";
+  }
+
+  identity igmp {
+    base packet-type;
+    description
+      "Indicates the igmp packet.";
+  }
+
+  identity pots {
+    base ianaift:iana-interface-type;
+    description
+      "Plain old telephone service (POTS).";
+  }
+
+  identity catv {
+    base ianaift:iana-interface-type;
+    description
+      "cable TV.";
+  }
+
+  identity wifi {
+    base ianaift:iana-interface-type;
+    description
+      "WiFi.";
+  }
+
+  identity e1 {
+    base ianaift:iana-interface-type;
+    description
+      "E1 TDM interface type.";
+  }
+
+  identity t1 {
+    base ianaift:iana-interface-type;
+    description
+      "T1 TDM interface type.";
+  }
+
+  identity iphost {
+    base ianaift:iana-interface-type;
+    description
+      "Plain old telephone service (IPHOST).";
+  }
+
+  identity packet-encapsulation {
+    description
+      "Indicates the encapsulation type of the packet on the user side.";
+  }
+
+  identity ipoe-encapsulation {
+    base packet-encapsulation;
+    description
+      "Indicates the encapsulation type of the packet on the user side is IPoE, IPoE is IPv4-IPoE.";
+  }
+
+  identity pppoe-encapsulation {
+    base packet-encapsulation;
+    description
+      "Indicates the encapsulation type of the packet on the user side is PPPoE.";
+  }
+
+  identity ipv6-ipoe-encapsulation {
+    base packet-encapsulation;
+    description
+      "Indicates the encapsulation type of the packet on the user side is IPv6-IPoE.";
+  }
+
+  typedef qos-policy-profile-ref {
+    type union {
+      type bbf-qos-pol:qos-policy-profile-ref;
+      type empty;
+    }
+    description
+      "Bind or unbind OQS policy profile.
+       Empty string indicates unbind operation.";
+  }
+
+  typedef color-policy-type {
+    type enumeration {
+      enum "no-marking" {
+        value 0;
+        description
+          "Indicates that the priority-queue color policy is no marking.";
+      }
+      enum "dei" {
+        value 1;
+        description
+          "Indicates that the priority-queue color policy is DEI.";
+      }
+      enum "unconcern" {
+        value 2;
+        description
+          "Indicates that the priority-queue color policy is unconcern.";
+      }
+    }
+    description
+      "Type of color policy.";
+  }
+
+  typedef traffic-suppress-type {
+    type union {
+      type uint32 {
+        range "0..10000000";
+      }
+      type enumeration {
+        enum "unlimited" {
+          description
+            "Indicates that the value of unknown packet
+              traffic suppression on an ONU PON port is unlimited.";
+        }
+        enum "unconcern" {
+          description
+            "Indicates that the value of unknown packet
+              traffic suppression on an ONU PON port is unconcern.";
+        }
+      }
+    }
+    description
+      "Indicates the value of unknown packet traffic suppression on an ONU PON port.";
+  }
+
+  typedef q-in-q-type {
+    type enumeration {
+      enum "unconcern" {
+        value 0;
+        description
+          "Indicates that the QinQ attribute of a port is not concerned.
+           That is, the OLT does not specify the QinQ attribute for a port,
+           and the default action is determined by an ONT.
+           For an ONT that does not support the QinQ attribute, set this parameter to unconcern.";
+      }
+      enum "enable" {
+        value 1;
+        description
+          "Enables the QinQ attribute of the port.
+           When the packet needs to be identified on the OLT side, use this parameter.
+           The upstream priority source information about an Ethernet port or a VDSL port of the ONT
+           can be set by port priority-policy only after the QinQ attribute of the ONT
+           Ethernet port or the VDSL port is enabled";
+      }
+      enum "disable" {
+        value 2;
+        description
+          "Disables the QinQ attribute of the port.
+           When the packet does not need to be identified on the OLT side, use this parameter.
+           the QinQ attribute of an ONT port is determined by the ONT.";
+      }
+    }
+    default "unconcern";
+    description
+      "Indicates the QinQ attribute of an ONT port in a profile.
+       After the QinQ attribute of a port is enabled successfully,
+       the transparent LAN service (TLS) traffic stream is transmitted transparently.";
+  }
+
+  typedef priority-policy-type {
+    type enumeration {
+      enum "unconcern" {
+        value 0;
+        description
+          "Indicates that the upstream priority source of a port is not concerned.
+           That is, the OLT does not specify the upstream priority source for a port,
+           and the default action is determined by the ONT.
+           For an ONT that does not support the setting of the upstream priority source for a port,
+           the upstream priority source of an ONT port is determined by the ONT.";
+      }
+      enum "assigned" {
+        value 1;
+        description
+          "Enables the QinQ attribute of the port.
+           When the packet needs to be identified on the OLT side, use this parameter.
+           The upstream priority source information about an Ethernet port or a VDSL port of the ONT
+           can be set by port priority-policy only after the QinQ attribute of the ONT
+           Ethernet port or the VDSL port is enabled";
+      }
+      enum "copy-cos" {
+        value 2;
+        description
+          "Copies the priority.
+           It is used to copy the priority from C-TAG.
+           When you do not need to specify the priority of packets through
+           the OLT but directly use the priority copied in the CoS field
+           in user packets, use this parameter.";
+      }
+    }
+    default "unconcern";
+    description
+      "Indicates the upstream priority source of an ONT port in a profile.";
+  }
+
+  typedef l2-isolate-type {
+    type enumeration {
+      enum "unconcern" {
+        value 0;
+        description
+          "Indicates that the Layer 2 isolation function not concerned.
+            That is, the OLT does not specify the Layer 2 isolation function
+            for an ONU-level, and the default action is determined by the ONT.
+            For an ONU that does not support the Layer 2 isolation function,
+            set this parameter to unconcern.";
+      }
+      enum "enable" {
+        value 1;
+        description
+          "Indicates enables the Layer 2 isolation function.";
+      }
+      enum "disable" {
+        value 2;
+        description
+          "Indicates disables the Layer 2 isolation function.";
+      }
+    }
+    default "unconcern";
+    description
+      "Indicates the Layer 2 isolation function of an ONU or ONU port.";
+  }
+
+  typedef max-learned-mac-count-type {
+    type union {
+      type uint16 {
+        range "1..255";
+      }
+      type enumeration {
+        enum "unlimited" {
+          description
+            "Indicates that the maximum number of MAC addresses that can be
+              learned by the ONT is not limited.
+              That is, the ONT can learn MAC addresses as many as possible.";
+        }
+      }
+    }
+    default "unlimited";
+    description
+      "Indicates the value of unknown packet traffic suppression on an ONU PON port.
+       When the number of the learned MAC addresses reaches this value,
+       the port will no longer learn any new MAC addresses.";
+  }
+
+  grouping traffic-suppress {
+    container traffic-suppress {
+      description
+        "Indicates the unknown packet traffic suppression.";
+      leaf broadcast {
+        type traffic-suppress-type;
+        units "kbit/s";
+        default "unconcern";
+        description
+          "Indicates the value of unknown broadcast packet traffic suppression.";
+      }
+      leaf multicast {
+        type traffic-suppress-type;
+        units "kbit/s";
+        default "unconcern";
+        description
+          "Indicates the value of unknown multicast packet traffic suppression.";
+      }
+      leaf unicast {
+        type traffic-suppress-type;
+        units "kbit/s";
+        default "unconcern";
+        description
+          "Indicates the value of unknown unicast packet traffic suppression.";
+      }
+    }
+  }
+
+  grouping qos-policy-profile {
+    leaf upstream {
+      type qos-policy-profile-ref;
+      description
+        "The upstream car profile name of the ONU port.";
+    }
+    leaf downstream {
+      type qos-policy-profile-ref;
+      description
+        "The downstream car profile name of the ONU port.";
+    }
+  }
+
+  grouping common-config-data {
+    description
+      "The configuration data for ANI profile.";
+    leaf mac-learning {
+      type boolean;
+      default "true";
+      description
+        "Enable/disable the ONT mac address learning function.";
+    }
+    leaf transparent-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT transparent transmission function.";
+    }
+    leaf isolate-enable {
+      type l2-isolate-type;
+      default "unconcern";
+      description
+        "Indicates the Layer 2 isolation function of an ONU.";
+    }
+    leaf monitor-link-enable {
+      type enumeration {
+        enum "unconcern" {
+          value 0;
+          description
+            "Indicates that the link status association function of an ONU is not concerned.
+             That is, the OLT does not specify the link status association function of an ONU,
+             and the default action is determined by the ONU. For an ONU that does not support
+             the link status association function, set this parameter to unconcern.";
+        }
+        enum "enable" {
+          value 1;
+          description
+            "Indicates that the function is enabled.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Indicates that the function is disabled.";
+        }
+      }
+      default "unconcern";
+      description
+        "Indicates the ONU link status association function.
+         To automatically disable a user-to-network interface (UNI) of an ONU when a
+         GPON port fault is detected by the ONU, run this command to enable this function.";
+    }
+    leaf multicast-mode {
+      type enumeration {
+        enum "unconcern" {
+          value 0;
+          description
+            "Indicates that the OLT does not specify the multicast mode for an ONU.
+             1.If an ONU supports the configuration of the multicast mode,
+             the multicast mode on the ONU is the default mode of the ONU
+             or the latest multicast mode configured on the ONU.
+             2.If an ONU does not support the multicast mode or the OLT does not
+             specify the multicast mode of the ONU, select unconcern.
+             3.no OMCI message is sent from an OLT.";
+        }
+        enum "olt-control" {
+          value 1;
+          description
+            "Indicates the dynamic controllable multicast.
+             1.In this mode, the Report packet sent from the user is authenticated on the OLT.
+             After the authentication succeeds, the OLT issues the multicast configurations to the ONU.
+             Then, the user can watch the multicast programs.
+             The OLT fully controls the multicast program rights.
+             2.If the OLT maintains the ONU multicast forwarding table, select the olt-control mode.
+             3.The Huawei proprietary OMCI message
+             (the ONT is required to support this OMCI message) is sent from an OLT.";
+        }
+        enum "igmp-snooping" {
+          value 2;
+          description
+            "Indicates the uncontrollable multicast.
+             In this mode, a user reports Report packets to the OLT
+             and then can watch multicast programs without the need
+             of receiving multicast configurations issued from the OLT.
+             1.An ONU detects IGMP packets independently,
+             obtains related information, and maintains the multicast forwarding entries on the ONU.
+             The encryption system of the IPTV platform is used to manage
+             permission on multicast programs, and OLT authentication is not required.
+             A third-party device (such as an STB) is added on the user side
+             to control the permission of the users to watch programs.
+             2.If the ONU maintains the multicast forwarding table, select the igmp-snooping mode.
+             3.The standard OMCI message is sent from an OLT.";
+        }
+      }
+      default "unconcern";
+      description
+        "Indicates the multicast mode of an ONU.
+         In different multicast modes, multicast program streams are
+         processed in different ways and the multicast users are authenticated in different ways.
+         If the multicast mode is enabled, it is not recommended to switch the multicast mode in profile";
+    }
+    leaf mtu {
+      type union {
+        type uint16 {
+          range "1519..9280";
+        }
+        type enumeration {
+          enum "unconcern" {
+            description
+              "The ONU MTU value is not concerned.
+               That is, the OLT does not specify the MTU value of an ONU,
+               and the default action is determined by the ONU.
+               For an ONU that does not support the MTU value setting,
+               set this parameter to unconcern.";
+          }
+        }
+      }
+      units "byte";
+      default "unconcern";
+      description
+        "Indicates an MTU value.
+         When this parameter is specified,
+         the configuration data issued by the OLT takes effect on the ONU.";
+    }
+    leaf native-vlan {
+      type enumeration {
+        enum "unconcern" {
+          value 0;
+          description
+            "Indicates that the ONU native vlan function of an ONU is not concerned.
+             The untagged packets on the user side will not be tagged with the native vlan.";
+        }
+        enum "concern" {
+          value 1;
+          description
+            "Indicates that the link status association function of an ONU is concerned.
+             The untagged packets on the user side will be tagged with the native vlan.";
+        }
+      }
+      default "concern";
+      description
+        "Indicates the ONU native vlan function.";
+    }
+    container ring-check {
+      description
+        "ONU UNI ring check.";
+      leaf switch {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the ONU ring check function.";
+      }
+      leaf auto-shutdown {
+        type boolean;
+        default "true";
+        description
+          "Enables or disables the automatic shutdown function of a ring network port.";
+      }
+      leaf detect-frequency {
+        type uint8 {
+          range "1..20";
+        }
+        units "pps";
+        default "8";
+        description
+          "Indicates the frequency at which the ring check message is sent.";
+      }
+      leaf resume-interval {
+        type uint32 {
+          range "0..65535";
+        }
+        units "s";
+        default "300";
+        description
+          "Indicates the interval at which the ring check fault is recovery.";
+      }
+      leaf detect-period {
+        type uint32 {
+          range "0..65535";
+        }
+        units "s";
+        default "0";
+        description
+          "Indicates the interval at which ring detection packets are sent.";
+      }
+    }
+    uses packet-forward-config-data;
+    uses traffic-suppress;
+    container color-policy {
+      description
+        "Indicates the stream priority-queue color policy.";
+      leaf upstream {
+        type color-policy-type;
+        default "unconcern";
+        description
+          "Indicates the GPON service profile upstream priority-queue color policy.";
+      }
+      leaf downstream {
+        type color-policy-type;
+        default "unconcern";
+        description
+          "Indicates the GPON service profile downstream priority-queue color policy.";
+      }
+    }
+    container tpids {
+      description
+        "Configure the tag protocol ID (TPID) value of GPON ONT.";
+      list tpid {
+        key "name";
+        description
+          "The tag protocol ID (TPID) value of GPON ONT list.";
+        leaf name {
+          type string;
+          description
+            "Indicates the name of the TPID.";
+        }
+        leaf val {
+          type uint16 {
+            range "1536..65535";
+          }
+          description
+            "Indicates the value of the TPID.";
+        }
+      }
+    }
+  }
+
+  grouping packet-forward-config-data {
+    container packet-forwards {
+      list packet-forward {
+        key "packet-type";
+        description
+          "The packet-forward config list.";
+        leaf packet-type {
+          type identityref {
+            base packet-type;
+          }
+          description
+            "The packet type.";
+        }
+        choice forward {
+          default "unconcern";
+          description
+            " Configure the packet forwarding of the ONU.";
+          case transparent {
+            description
+              "Indicates the packet forwarding mode is transparent.
+               All packets (such as broadcast packets and multicast packets)
+               sent from the user side or network side to an ONT are directly
+               forwarded to the other side and the ONT does not process these packets.";
+            leaf transparent {
+              type empty;
+              description
+                "Indicates the packet forwarding mode is transparent.";
+            }
+          }
+          case untagged {
+            description
+              "Specifies the multicast forwarding mode as untag,
+               that is, the downstream multicast packets from an ONU to an
+               Ethernet port do not carry the VLAN tag.
+               If the ONU is directly connected to the set-top box (STB) or PC, use this parameter.";
+            leaf untagged {
+              when "../packet-type = 'multicast'";
+              type empty;
+              description
+                "Specifies the multicast forwarding mode as untag.";
+            }
+          }
+          case vlan-tagged {
+            description
+              "Indicates the forwarding mode of the IGMP packets.";
+            leaf tagged-mode {
+              when "../packet-type = 'igmp'";
+              type enumeration {
+                enum "default" {
+                  value 0;
+                  description
+                    "Indicates the forwarding mode of the IGMP packets is default tag,
+                     the ONT adds a new VLAN tag to the user-side packets and
+                     then forwards the packets upstream to the OLT.";
+                }
+                enum "translation" {
+                  value 1;
+                  description
+                    "Indicates the forwarding mode of IGMP packets is VLAN translation.
+                     Only 1:1 VLAN translation is supported. N:1 VLAN translation is not supported.
+                     In network application, the VLAN tags carried by user-side packets
+                     are different and the VLANs need to be planned on the optical line terminal (OLT).
+                     In translation mode, the ONT translates the VLAN tags of user-side IGMP packets
+                     to new VLAN tags and then forwards the packets upstream to the OLT.
+                     If the VLAN tags carried by user-side IGMP packets have been planned,
+                     the ONT does not need to translate the VLAN tags of IGMP packets by translation parameter again.";
+                }
+              }
+            }
+            leaf priority {
+              when "../packet-type = 'igmp'";
+              type uint16 {
+                range "0..7";
+              }
+              description
+                "Indicates the priority of the IGMP packets sent upstream to the OLT.
+                 If you do not specify this parameter, user packets are
+                 transmitted upstream to the OLT using the original priority.
+                 A greater value indicates a higher priority.";
+            }
+            choice vlan-type {
+              case vlan-id {
+                description
+                  "Specifies the VLAN tag used after the VLAN translation.";
+                leaf vlan-id {
+                  type uint16 {
+                    range "0..4095";
+                  }
+                  description
+                    "Specifies the VLAN tag used after the VLAN translation
+                     if the multicast forwarding mode is set to translation.
+                     The multicast-packet vlan-id range is 1-4095.";
+                }
+              }
+              case igmp-user-vlan {
+                description
+                  "Specifies the VLAN in the VLAN tag (used after the VLAN translation)
+                   to the user VLAN of IGMP packets.";
+                leaf igmp-user-vlan {
+                  when "../packet-type = 'multicast'";
+                  type empty;
+                  description
+                    "Specifies the VLAN in the VLAN tag (used after the VLAN translation)
+                     to the user VLAN of IGMP packets if the multicast forwarding mode is set to translation.
+                     This parameter can be used only after the IGMP packet forwarding mode
+                     based on the user VLAN is configured on the ONU.";
+                }
+              }
+            }
+          }
+          case unconcern {
+            description
+              "Indicates the IGMP forwarding mode is unconcern.";
+            leaf unconcern {
+              type empty;
+              description
+                "The OLT does not specify the IGMP forwarding mode of an
+                 ONU and the IGMP forwarding of ONU is determined based on the ONU condition.";
+            }
+          }
+          case user-vlan {
+            description
+              "The IGMP packet forwarding mode based on the user VLAN on the ONT.";
+            leaf-list user-vlan {
+              when "../packet-type = 'igmp'";
+              type uint16 {
+                range "0..4095";
+              }
+              max-elements 2;
+              description
+                "The IGMP packet forwarding mode based on the user VLAN on the ONT.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping ont-port-config-data {
+    container ont-ports {
+      list ont-port {
+        key "name";
+        leaf name {
+          type string {
+            length "1..63";
+          }
+          description
+            "ONU port name.";
+        }
+        leaf type {
+          type identityref {
+            base ianaift:iana-interface-type;
+          }
+          mandatory true;
+          description
+            "ONU port type.";
+        }
+        leaf max-learned-mac-count {
+          when "../type = 'ianaift:iphost' or ../type = 'ianaift:ethernetCsmacd'";
+          type bbf-uni-profile:max-learned-mac-count-type;
+          description
+            "The maximum number of MAC addresses that can be learned by an ONT port .";
+        }
+        leaf dscp-mapping-table {
+          when "../type = 'ianaift:iphost' or ../type = 'ianaift:ethernetCsmacd'";
+          type uint16;
+          default "0";
+          description
+            "Indicates the the DSCP-to-802.1p priority mapping profile.
+             The ONT port uses the new mapping and sets different 802.1p priorities
+             for the received packets according to the DSCP fields in the packets.
+             The system then carries out packet scheduling according to the 802.1p priorities.
+             The GPON ONT port is bound to the new DSCP-to-802.1p priority mapping profile";
+        }
+        container qos-policy-profile {
+          when "../type = 'ianaift:iphost' or ../type = 'ianaift:ethernetCsmacd'";
+          description
+            "The car profile name of the ONU port.
+              To configure Ethernet port rate limit for ONTs on the OLT.";
+          uses qos-policy-profile;
+        }
+        container ethernet {
+          when "../type = 'ianaift:ethernetCsmacd'";
+          leaf q-in-q {
+            type q-in-q-type;
+            description
+              "Indicates the QinQ attribute of an VDSL port.";
+          }
+          leaf priority-policy {
+            type priority-policy-type;
+            default "unconcern";
+            description
+              "Indicates the upstream priority source of an ONT port in a profile.";
+          }
+          leaf reverse-multicast {
+            type boolean;
+            default "false";
+            description
+              "Indicates the reverse multicast function of an ONT Ethernet port in profile.
+               When the user-side GPON ONT needs to be directly connected to a multicast source";
+          }
+          leaf isolate-enable {
+            type l2-isolate-type;
+            default "unconcern";
+            description
+              "Indicates the Layer 2 isolation function of an ONU port.";
+          }
+          leaf dhcp-snooping {
+            type enumeration {
+              enum "unconcern" {
+                value 0;
+                description
+                  "Indicates that the DHCP snooping function not concerned.
+                   That is, the OLT does not specify the DHCP snooping function for an ONT,
+                   and the default action is determined by the ONT.
+                   For an ONT that does not support the DHCP snooping function,
+                   set this parameter to unconcern.";
+              }
+              enum "enable" {
+                value 1;
+                description
+                  "Enables the DHCP snooping function.";
+              }
+              enum "disable" {
+                value 2;
+                description
+                  "Disables the DHCP snooping function.";
+              }
+            }
+            default "unconcern";
+            description
+              "Indicates the DHCP snooping function on an ONT Ethernet port.";
+          }
+          leaf downstream-processing-mode {
+            type enumeration {
+              enum "no-operation" {
+                value 0;
+                description
+                  "Indicates not to process the VLAN tag of the downstram packets.";
+              }
+              enum "forward" {
+                value 1;
+                description
+                  "Indicates to process the VLAN tag of the downstream packets
+                   and forward the packets with mismatched VLAN tag.";
+              }
+              enum "discard" {
+                value 2;
+                description
+                  "Indicates to process the VLAN tag of the downstream packets
+                   and discard the packets with mismatched VLAN tag.";
+              }
+            }
+            default "discard";
+            description
+              "Indicates the processing of downstream service packets on the ONT Ethernet port.";
+          }
+          uses traffic-suppress;
+        }
+        uses frame-processing;
+      }
+    }
+  }
+
+  grouping access-tag-match {
+    leaf vlan-id {
+      type union {
+        type uint32 {
+          range "0..4095";
+        }
+        type enumeration {
+          enum "any" {
+            description
+              "Matches any VLAN-ID in the range 1 to 4094, or
+               matches priority tagged frames.";
+          }
+        }
+      }
+      description
+        "Allowed VLAN-IDs.";
+    }
+    leaf pbit {
+      type union {
+        type bbf-dot1qt:pbit;
+        type enumeration {
+          enum "any" {
+            description
+              "Matches any pbit value in the range of 0 to 7.";
+          }
+        }
+      }
+      description
+        "Allowed PBIT values.";
+    }
+  }
+
+  grouping access-vlan-tag-match {
+    description
+      "Flexible match on the VLAN tags of Ethernet frames.";
+    leaf packet-encapsulation {
+      type identityref {
+        base packet-encapsulation;
+      }
+      description
+        "Indicates the encapsulation type of the packet on the user side.
+         When the system is required to identify users according to the
+         encapsulation type of the packet on the user side.";
+    }
+    choice vlan-tag-match-type {
+      mandatory true;
+      description
+        "Provides a choice of how the frames are to be matched.";
+      case match-all {
+        leaf match-all {
+          type empty;
+          description
+            "Matches all traffic, Matches all traffic being tagged or untagged.";
+        }
+      }
+      case vlan-tagged {
+        container tag {
+          description
+            "The tags to match, with the outermost tag to match
+             assigned index 0.";
+          uses access-tag-match;
+        }
+      }
+    }
+  }
+
+  grouping access-tag-rewrite {
+    leaf vlan-id {
+      type uint32 {
+        range "0..4095";
+      }
+      description
+        "Allowed VLAN-IDs.";
+    }
+    choice pbit {
+      description
+        "Indicates the pbit(VLAN on the service side).";
+      case write-pbit {
+        leaf write-pbit-value {
+          type bbf-dot1qt:pbit;
+          description
+            "Matches pbit value in the range of 0 to 7.";
+        }
+      }
+      case copy-pbit-form-vlan-tagged {
+        leaf copy-pbit {
+          type empty;
+          description
+            "Sets the pbit policy of the service-side VLAN packet to copying from the user-side VLAN.
+             When the OLT trusts the user-side original pbit or the user-side original pbit complies
+             with the VLAN plan of the OLT, the pbit of the service-side VLAN packet is copied from
+             the user-side VLAN.";
+        }
+      }
+      case dscp-mapping-pbit {
+        leaf dscp-mapping-pbit {
+          type bbf-dot1qt:pbit;
+          description
+            "Sets the pbit policy of the user-side VLAN packet to mapping from the
+             DSCP field of the user-side packet, which is implemented in the mapping
+             profile between the DSCP field value list and the 802.1p pbit.";
+        }
+      }
+    }
+  }
+
+  grouping access-vlan-tag-rewrite {
+    description
+      "Flexible match on the VLAN tags of Ethernet frames.";
+    leaf pop-tags {
+      type uint8 {
+        range "0..2";
+      }
+      default "0";
+      description
+        "The number of tags to pop.";
+    }
+    leaf tls {
+      type boolean;
+      default "false";
+      description
+        "Sets the attribute of the VLAN switching pair to transparent transmission.
+         Users are distinguished by transparent LAN service (TLS).
+         If both the TLS and the VLAN (or untagged) tag of a specified user are configured,
+         the user packets are matched by VLAN tag (or untagged) of the user.
+         When failing to be matched by VLAN tag (or untagged),
+         the packets are considered to be matched by TLS and are
+         transmitted to the upper-layer network over the TLS channel.";
+    }
+    uses access-tag-rewrite;
+  }
+
+  grouping tpid {
+    description
+      "Configure the tag protocol identifier (TPID) information on both the user side and network side of an ONT.";
+    container tpid {
+      leaf uni-tpid-name {
+        type leafref {
+          path "../../../../../../../bbf-uni-profile:tpids/bbf-uni-profile:tpid/bbf-uni-profile:name";
+        }
+        description
+          "Indicates the name of UNI TPID.";
+      }
+      leaf nni-tpid-name {
+        type leafref {
+          path "../../../../../../../bbf-uni-profile:tpids/bbf-uni-profile:tpid/bbf-uni-profile:name";
+        }
+        description
+          "Indicates the name of NNI TPID.";
+      }
+    }
+  }
+
+  grouping frame-processing {
+    description
+      "Configure the data node of frame-processing.";
+    container frame-processing {
+      list rule {
+        key "name";
+        description
+          "Configure the data node of ONU ANI profile.";
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Rule name.";
+        }
+        container match-criteria {
+          description
+            "This container collects match criteria for various frame fields.";
+          uses access-vlan-tag-match;
+        }
+        container ingress-rewrite {
+          description
+            "Ingress rewrite refers to the supported tag manipulations
+             before the frame is offered to a higher layer interface or
+             to a forwarder or to a destination termination-point.";
+          uses access-vlan-tag-rewrite;
+          uses tpid;
+        }
+      }
+    }
+  }
+
+  augment "/bbf-xpon:xpon" {
+    description
+      "Augment xPON ONU UNI profile configuration.";
+    container uni-profiles {
+      description
+        "Configure the data node of ONU UNI profile.";
+      list uni-profile {
+        key "name";
+        description
+          "Configure the data node of ONU UNI profile.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Profile name.";
+        }
+        uses common-config-data;
+        uses ont-port-config-data;
+      }
+    }
+  }
+}

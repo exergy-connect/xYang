@@ -1,0 +1,34 @@
+module huawei-ieee802-ethernet-link-oam-deviations {
+  namespace "urn:huawei:yang:huawei-ieee802-ethernet-link-oam-deviations";
+  prefix hw-oam-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ieee802-ethernet-link-oam {
+    prefix ieee802-link-oam;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ieee802-ethernet-link-oam module.";
+
+  revision 2025-05-26 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/ieee802-link-oam:link-oam" {
+    deviate not-supported;
+  }
+}

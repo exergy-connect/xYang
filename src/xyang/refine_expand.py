@@ -139,6 +139,15 @@ def _apply_refine_type(stmt: YangStatement, refine: YangRefineStmt) -> None:
         logger.debug("refine applied type: stmt=%r refine=%r", stmt, refine)
 
 
+def _apply_refine_config(stmt: YangStatement, refine: YangRefineStmt) -> None:
+    rc = getattr(refine, "refined_config", None)
+    if rc is None:
+        return
+    if isinstance(stmt, (YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt)):
+        stmt.config = rc
+        logger.debug("refine applied config: stmt=%r config=%r", stmt, rc)
+
+
 def _apply_refine_mandatory(stmt: YangStatement, refine: YangRefineStmt) -> None:
     rm = getattr(refine, "refined_mandatory", None)
     if rm is None:
@@ -210,6 +219,7 @@ def _apply_refine_cardinality(stmt: YangStatement, refine: YangRefineStmt) -> No
 def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
     """Apply one ``refine`` statement to a resolved schema node."""
     _apply_refine_type(stmt, refine)
+    _apply_refine_config(stmt, refine)
     _apply_refine_mandatory(stmt, refine)
     _apply_refine_defaults(stmt, refine)
     _apply_refine_must(stmt, refine)

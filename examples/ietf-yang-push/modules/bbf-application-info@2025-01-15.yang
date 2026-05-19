@@ -1,0 +1,103 @@
+module bbf-application-info {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-application-info";
+  prefix bbf-app-info;
+
+  import bbf-yang-types {
+    prefix bbf-yang;
+  }
+  import bbf-application-type {
+    prefix bbf-app-type;
+  }
+  import bbf-application {
+    prefix bbf-app;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains APP(application) information.";
+
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity application-name-type {
+    description
+      "Indicates the language type of the name of the application.";
+  }
+
+  identity application-name-eng {
+    base application-name-type;
+    description
+      "Indicates the English name of an application.
+       UTF-8 encoding format";
+  }
+
+  augment "/bbf-app:applications" {
+    description
+      "Indicates the list of applications that support application
+       flow configuration.";
+    list application-information {
+      key "maintype subtype";
+      config false;
+      description
+        "Indicates the application information that supports the
+         application flow configuration.";
+      leaf maintype {
+        type uint16;
+        description
+          "Indicates the maintype of the application.";
+      }
+      leaf subtype {
+        type uint16;
+        description
+          "Indicates the subtype of the application.";
+      }
+      list names {
+        key "name-type";
+        description
+          "Indicates the name of the application in various
+           languages.";
+        leaf name-type {
+          type identityref {
+            base application-name-type;
+          }
+          description
+            "Indicates the language type of the name of the
+             application.";
+        }
+        leaf name {
+          type bbf-yang:name-string;
+          description
+            "Indicates the name of the application.";
+        }
+      }
+      leaf tuple-mode {
+        type identityref {
+          base bbf-app-type:app-tuple-mode-type;
+        }
+        description
+          "Indicates the 5-tuple matching mode required by the
+           application.";
+      }
+    }
+  }
+}

@@ -1,0 +1,78 @@
+module huawei-ietf-system-ext-deviations-ias {
+  namespace "urn:huawei:yang:huawei-ietf-system-ext-deviations-ias";
+  prefix system-ext-devs-ias;
+
+  import huawei-ietf-system-ext {
+    prefix system-ext;
+  }
+  import ietf-system {
+    prefix sys;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for huawei-ietf-system-ext module.";
+
+  revision 2019-11-06 {
+    description
+      "Init revision";
+    reference
+      "Huawei private.";
+  }
+
+  typedef time-hhmm-deviations {
+    type string {
+      length "3..5";
+      pattern "(([0-1][0-9])|(2[0-3])|[0-9]):([0-5][0-9]|[0-9])";
+    }
+    description
+      "time-hhmm is like string with format 'hh:mm', and hh is hour, mm is minute, range is 00:00~23:59.";
+  }
+
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration" {
+    deviate delete {
+      must
+        "((type='one-year' and start-year and start-month and start-day and start-time and end-year and end-month and end-day and end-time and dst-offset)
+         or(type='repeat-date' and start-month and start-day and start-time and end-month and end-day and end-time and dst-offset)
+         or(type='repeat-week' and start-month and start-weeknum and start-weekday and start-time and end-month and end-weeknum and end-weekday and end-time and dst-offset))";
+    }
+    deviate add {
+      must
+        "((start-month and start-day and end-month and end-day and dst-offset and not(start-weeknum) and not(start-weekday) and not(end-weeknum) and not(end-weekday))
+         or(start-month and start-day and end-month and end-weeknum and end-weekday and dst-offset and not(start-weeknum) and not(start-weekday) and not(end-day))
+         or(start-month and start-weeknum and start-weekday and end-month and end-day and dst-offset and not(start-day) and not(end-weeknum) and not(end-weekday))
+         or(start-month and start-weeknum and start-weekday and end-month and end-weeknum and end-weekday and dst-offset and not(start-day) and not(end-day))
+         or(not(start-month) and not(start-day) and not(start-weeknum) and not(start-weekday) and not(end-month) and not(end-day) and not(end-weeknum) and not(end-weekday) and not(dst-offset)))";
+    }
+  }
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration/system-ext:dst-name" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration/system-ext:type" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration/system-ext:start-year" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration/system-ext:end-year" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:clock/system-ext:dst-configuration/system-ext:dst-offset" {
+    deviate replace {
+      type system-ext-devs-ias:time-hhmm-deviations {
+        pattern "((([0][0-2]):([0-5][0-9]|[0-9]))|([0]3:0[0]))";
+      }
+    }
+  }
+  deviation "/sys:system/sys:clock/sys:timezone/sys:timezone-utc-offset/system-ext:timezone-name" {
+    deviate not-supported;
+  }
+}

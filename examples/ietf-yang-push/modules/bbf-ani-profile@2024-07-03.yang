@@ -1,0 +1,669 @@
+module bbf-ani-profile {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-ani-profile";
+  prefix bbf-ani-profile;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+  import bbf-yang-types {
+    prefix bbf-yang;
+  }
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import bbf-qos-policies {
+    prefix bbf-qos-pol;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area.";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:info@broadband-forum.org>.
+
+     Editor: XinWen Yao, Huawei";
+  description
+    "This module contains channel config data.";
+
+  revision 2024-07-03 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472,SFF 8077";
+  }
+
+  identity encrypt-algorithm {
+    description
+      "This identity is used to define encrypt algorithm.";
+  }
+
+  identity aes-128 {
+    base encrypt-algorithm;
+    description
+      "This identity is used to define aes-128 encrypt algorithm.";
+  }
+
+  identity aes-256 {
+    base encrypt-algorithm;
+    description
+      "This identity is used to define aes-256 encrypt algorithm.";
+  }
+
+  identity sm4-128 {
+    base encrypt-algorithm;
+    description
+      "This identity is used to define sm4-128 encrypt algorithm.";
+  }
+
+  typedef qos-policy-profile-ref {
+    type union {
+      type bbf-qos-pol:qos-policy-profile-ref;
+      type empty;
+    }
+    description
+      "Bind or unbind OQS policy profile.
+       Empty string indicates unbind operation.";
+  }
+
+  grouping tconts-config-data {
+    description
+      "The configuration data for all Transmission Containers
+       (T-CONT).";
+    container tconts {
+      description
+        "The configuration data for all Transmission Containers
+         (T-CONT).";
+      list tcont {
+        key "name";
+        description
+          "List of Transmission Containers (T-CONT).";
+        leaf name {
+          type bbf-yang:string-ascii64;
+          description
+            "Name of the Transmission Container (T-CONT).";
+        }
+        leaf traffic-descriptor-profile-ref {
+          type leafref {
+            path "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:traffic-descriptor-profiles/bbf-xpongemtcont:traffic-descriptor-profile/bbf-xpongemtcont:name";
+          }
+          description
+            "References an existing traffic descriptor profile.";
+        }
+      }
+    }
+  }
+
+  grouping gemports-config-data {
+    description
+      "The configuration data for all G-PON Encapsulation Method (GEM)
+       ports.";
+    container gemports {
+      description
+        "The configuration data for all G-PON Encapsulation Method (GEM)
+         ports.";
+      list gemport {
+        key "name";
+        description
+          "List of G-PON Encapsulation Method (GEM) ports.";
+        leaf name {
+          type bbf-yang:string-ascii64;
+          description
+            "Name of G-PON Encapsulation Method (GEM) port.";
+        }
+        leaf upstream-traffic-class {
+          type uint8 {
+            range "0..7";
+          }
+          must "../../../bbf-ani-profile:qos-mode = 'priority-queue'" {
+            error-message
+              "The qos-mode must be priority-queue.
+               The maximum traffic is determined by the
+               traffic profile that is bound to the GEM port.";
+          }
+          description
+            "Configures the upstream Traffic Class value for a specified GEM port in a T-CONT.
+             This parameter must match the ONT capability.
+             If the ONT supports only four queues, values 0-3 are valid and values 4-7 are invalid.";
+        }
+        choice downstream-traffic-class {
+          description
+            "Configures the downstream traffic class value
+             for a GEM port used by an ETH port..";
+          case traffic-class {
+            leaf traffic-class {
+              type uint8 {
+                range "0..7";
+              }
+              must "(../../../mapping-mode = 'port') or(../../../mapping-mode = 'port-vlan') or(../../../mapping-mode = 'port-priority') or(../../../mapping-mode = 'port-vlan-priority')" {
+                error-message
+                  "The mapping-mode must be matched.";
+              }
+              description
+                "When the traffic class value is configured,
+                 users specify the queue for sending the downstream
+                 data of the GEM port used by the ETH port.
+                 Data needs to be sent strictly based on the traffic class value.";
+            }
+          }
+          case adaptive {
+            leaf adaptive {
+              type empty;
+              description
+                "Configures the downstream traffic class value for a GEM port
+                 used by an ETH port as the adapt mode.
+                 It indicates that the OLT does not specify the queue sending
+                 the downstream data of the GEM port.
+                 The traffic class value is determined by the ONT.";
+            }
+          }
+        }
+        leaf downstream-aes-indicator {
+          type boolean;
+          default "false";
+          description
+            "Used to designate whether Advanced Encryption Standard
+             (AES) should be enabled/disabled for this G-PON
+             Encapsulation Method (GEM) port for the downstream
+             direction.";
+          reference
+            "ITU-T G.984.3 clause 12.1
+             ITU-T G.987.3 clause 15.5.1
+             ITU-T G.9807.1 clause C.15.5.1
+             ITU-T G.989.3 clause 15.5.1";
+        }
+        leaf upstream-aes-indicator {
+          type boolean;
+          default "false";
+          description
+            "Used to designate whether Advanced Encryption Standard
+             (AES) should be enabled/disabled for this G-PON
+             Encapsulation Method (GEM) port for the upstream direction.
+
+             This is not applicable for G-PON. Any configured value
+             will be ignored.";
+          reference
+            "ITU-T G.987.3 clause 15.5.1
+             ITU-T G.9807.1 clause C.15.5.1
+             ITU-T G.989.3 clause 15.5.1";
+        }
+        leaf tcont-ref {
+          type leafref {
+            path "../../../bbf-ani-profile:tconts/bbf-ani-profile:tcont/bbf-ani-profile:name";
+          }
+          description
+            "For the purpose of upstream scheduling in the Optical
+             Network Unit (ONU), a G-PON Encapsulation Method (GEM) port
+             needs to refer to the Transmission Container (T-CONT) into
+             which it feeds upstream traffic.";
+        }
+        leaf cascade-property {
+          type boolean;
+          default "false";
+          description
+            "Configures the cascading attribute for a specified GEM port.
+              When you need to enable or disable the cascading services
+              of a specified GEM port, use this parameter.
+              In FTTB scenario, if an OLT only needs to aggregate ONU traffic,
+              the OLT can enable the cascading function of the GEM index
+              connecting to the ONU.
+              After the cascading function of the GEM index is enabled:
+              1.When the OLT uses the stacking or common VLAN,
+              it cannot translate the VLAN ID of upstream packets
+              sent by an ONU. When the OLT uses the QinQ VLAN,
+              it can translate the VLAN ID of upstream packets sent by an ONU.
+              2.The OLT cannot process protocol packets sent from an ONU
+              (except ARP, IGMP, and DHCP packets which are not limited by
+              the cascade parameter).
+              3.Enabling the function reduces the packet processing workload on the OLT.";
+        }
+        leaf gem-car-traffic {
+          type qos-policy-profile-ref;
+          must "../../../bbf-ani-profile:qos-mode = 'gem-car'" {
+            error-message
+              "The qos-mode must be gem-car.
+               The maximum traffic is determined by the
+               traffic profile that is bound to the GEM port.";
+          }
+          description
+            "Assigns a traffic table to a GEM port.
+             The maximum traffic is determined by the
+             traffic profile bound to the GEM port";
+        }
+        uses frame-processing;
+      }
+    }
+  }
+
+  grouping common-config-data {
+    description
+      "The configuration data for ANI profile.";
+    leaf qos-mode {
+      type enumeration {
+        enum "priority-queue" {
+          value 1;
+          description
+            "In this mode, the user specifies the transmit queue of the GEM port packets in a T-CONT.
+             When transmitting the upstream data, the T-CONT transmits the data strictly according
+             to the priority of the queue.";
+        }
+        enum "gem-car" {
+          value 2;
+          description
+            "In this mode, the ONT controls the traffic rate based on the GEM port.
+              When multiple service flows exist at the GEM port, the scheduling mode
+              of the service flows is determined by the configured scheduling mode of the ONT.";
+        }
+        enum "flow-car" {
+          value 3;
+          description
+            "In this mode, the ONT controls the traffic rate based on the traffic stream of the GEM port.
+             After flow control is completed, the service flows are scheduled in the T-CONT queue.
+             The scheduling mode of the service flows is determined by the configured scheduling mode
+             of the ONT.";
+        }
+      }
+      default "priority-queue";
+      description
+        "The QoS mode of the ONT.";
+    }
+    leaf mapping-mode {
+      type enumeration {
+        enum "vlan" {
+          value 1;
+          description
+            "Indicates the VLAN mapping.";
+        }
+        enum "priority" {
+          value 2;
+          description
+            "Indicates the 802.1p priority mapping.";
+        }
+        enum "vlan-priority" {
+          value 3;
+          description
+            "Indicates the VLAN + 802.1p priority mapping.";
+        }
+        enum "port" {
+          value 4;
+          description
+            "Indicates the port ID mapping.";
+        }
+        enum "port-vlan" {
+          value 5;
+          description
+            "Indicates the port ID+VLAN mapping.";
+        }
+        enum "port-priority" {
+          value 6;
+          description
+            "Indicates the port ID+802.1p priority mapping.";
+        }
+        enum "port-vlan-priority" {
+          value 7;
+          description
+            "Indicates the port ID+VLAN+802.1p priority mapping.";
+        }
+      }
+      default "vlan";
+      description
+        "Indicates the ONT mapping mode.";
+    }
+    leaf gem-encrypt-mode {
+      type identityref {
+        base encrypt-algorithm;
+      }
+      default "aes-128";
+      description
+        "Indicates the gem encrypt mode.";
+    }
+    leaf tr069-mngt-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT tr069 management.";
+    }
+    leaf tr069-ip-index {
+      type uint8 {
+        range "0..3";
+      }
+      default "0";
+      description
+        "Indicates the IP Index of an ONT TR069 management channel.
+         If you do not want to use the port with default IP index 0
+         as the WAN port of the TR069 management channel,
+         you need to set the IP index of the ONT TR069 management channel,
+         and then enable the TR069 management channel to avoid
+         repeatedly configuring the ONT.";
+    }
+    leaf omcc-encrypt {
+      type boolean;
+      default "true";
+      description
+        "Configure the encryption function of the
+         ONT management and control channel (OMCC).
+         When OMCC encryption is enabled,
+         OMCI packets are encrypted. Otherwise, no encryption is performed.";
+    }
+    leaf upstream-fec {
+      type boolean;
+      default "false";
+      description
+        "Used to Enable/Disable use of FEC in Upstream
+         direction for this specific ONU.";
+      reference
+        "ITU-T G.984.3 clause 13.3.1.1
+         ITU-T G.987.3 clause 10.2
+         ITU-T G.9807.1 clause C.10.1.3.2.4
+         ITU-T G.989.3 clause 10.1.3.2.4";
+    }
+    container multicast-gemport {
+      choice multicast-gemport-attr {
+        default "unconcern";
+        description
+          "Indicates the attributes for ONT multicast GEM ports,
+           to ensure that multicast GEM ports can carry services.";
+        case multicast-gemport {
+          leaf tcont-ref {
+            type leafref {
+              path "../../bbf-ani-profile:tconts/bbf-ani-profile:tcont/bbf-ani-profile:name";
+            }
+            description
+              "For the purpose of upstream scheduling in the Optical
+               Network Unit (ONU), a G-PON Encapsulation Method (GEM) port
+               needs to refer to the Transmission Container (T-CONT) into
+               which it feeds upstream traffic.";
+          }
+          choice port-mode {
+            description
+              "Indicates the T-CONT binding and port mapping attributes
+               for ONT multicast GEM ports, to ensure that multicast
+               GEM ports can carry services.";
+            case eth-port {
+              leaf eth-port-name {
+                type string;
+                description
+                  "Indicates the name of an ONT ETH port.";
+              }
+            }
+            case eth-port-bundle {
+              leaf bundle-name {
+                type leafref {
+                  path "../../bbf-ani-profile:port-bundles/bbf-ani-profile:port-bundle/bbf-ani-profile:name";
+                }
+                description
+                  "Indicates the name of a bundle group.";
+              }
+            }
+          }
+        }
+        case unconcern {
+          leaf unconcern {
+            type empty;
+            description
+              "Indicates cancel the T-CONT binding and port mapping attributes of ONT multicast GEM ports.";
+          }
+        }
+      }
+    }
+  }
+
+  grouping access-tag {
+    leaf vlan-id {
+      type union {
+        type uint32 {
+          range "0..4095";
+        }
+        type enumeration {
+          enum "any" {
+            description
+              "Matches any VLAN-ID in the range 1 to 4094, or
+               matches priority tagged frames.";
+          }
+        }
+      }
+      description
+        "Allowed VLAN-IDs.";
+    }
+    leaf pbit {
+      type union {
+        type bbf-dot1qt:pbit;
+        type enumeration {
+          enum "any" {
+            description
+              "Matches any pbit value in the range of 0 to 7.";
+          }
+        }
+      }
+      description
+        "Allowed PBIT values.";
+    }
+  }
+
+  grouping access-vlan-tag-match {
+    description
+      "Flexible match on the VLAN tags of Ethernet frames.";
+    leaf flow-car-traffic {
+      type bbf-qos-pol:qos-policy-profile-ref;
+      must "../../../../../bbf-ani-profile:qos-mode = 'flow-car'" {
+        error-message
+          "The qos-mode must be flow-car.
+           The maximum traffic is determined by the
+           traffic profile that is bound to the service stream.";
+      }
+      description
+        "Assigns a traffic table to a flow.";
+    }
+    leaf transparent {
+      type boolean;
+      description
+        "Indicates all the services  are transparently transmitted to the OLT and
+         the ONT does not capture or process the services";
+    }
+    choice vlan-tag-match-type {
+      mandatory true;
+      description
+        "Provides a choice of how the frames are to be matched.";
+      case untagged {
+        leaf untagged {
+          type empty;
+          description
+            "Untagged match. Matches all untagged traffic.";
+        }
+      }
+      case vlan-tagged {
+        container tag {
+          description
+            "The tags to match.";
+          uses access-tag;
+          choice ont-port-mapping {
+            description
+              "Indicates the value of the maximum transmission unit (MTU) of an ONU.";
+            case port-mapping {
+              leaf name {
+                type string;
+                description
+                  "Indicates the mapping mode of an Ethernet port.
+                   To map the service stream of an Ethernet port
+                   on the ONT to a specified GEM port, use this parameter.";
+              }
+            }
+            case eth-bundle-mapping {
+              leaf eth-bundle-name {
+                type leafref {
+                  path "../../../../../../bbf-ani-profile:port-bundles/bbf-ani-profile:port-bundle/bbf-ani-profile:name";
+                }
+                description
+                  "Indicates the mapping mode of multiple Ethernet ports.
+                   To map the service streams of multiple Ethernet ports
+                   to a specified GEM port to manage the same type of
+                   users at the same level on the Ethernet ports in a
+                   unified manner, use this parameter";
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping frame-processing {
+    description
+      "Configure the data node of frame-processing.";
+    container frame-processing {
+      list rule {
+        key "name";
+        description
+          "Configure the data node of ONU ANI profile.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Rule name.";
+        }
+        uses access-vlan-tag-match;
+      }
+    }
+  }
+
+  grouping gem-bundle-config-data {
+    description
+      "Config data for huawei GEM port bundle.";
+    container gem-bundles {
+      list gem-bundle {
+        key "main-gem";
+        description
+          "Configure a list of the GEM port bundles.";
+        leaf main-gem {
+          type leafref {
+            path "../../../bbf-ani-profile:gemports/bbf-ani-profile:gemport/bbf-ani-profile:name";
+          }
+          description
+            "Indicates the main GEM port of bundle.";
+        }
+        leaf-list sub-gem {
+          type leafref {
+            path "../../../bbf-ani-profile:gemports/bbf-ani-profile:gemport/bbf-ani-profile:name";
+          }
+          max-elements 7;
+          description
+            "Configure a list of sub GEM port.";
+        }
+      }
+    }
+  }
+
+  grouping eth-bundle-config-data {
+    container port-bundles {
+      when "(../mapping-mode = 'port') or (../mapping-mode = 'port-vlan') or(../mapping-mode = 'port-priority') or (../mapping-mode = 'port-vlan-priority')";
+      description
+        "Configure the binding function of an ONT ETH port.";
+      list port-bundle {
+        key "name";
+        max-elements 8;
+        description
+          "Configure the binding function of ONT ETH port.";
+        leaf name {
+          type string;
+          description
+            "Indicates the name of a binding group.";
+        }
+        leaf-list port-list {
+          type string;
+          description
+            "Configure the name of ONT ETH interface.";
+        }
+        leaf main-port {
+          type string;
+          description
+            "Configure the main port of a binding group.
+             Otherwise, the value in port-list indicates that the port is main port.";
+        }
+      }
+    }
+  }
+
+  grouping link-aggregation-config-data {
+    description
+      "Config data for link aggregation groups.";
+    container link-aggregations {
+      description
+        "Config data for link aggregation groups.";
+      list link-aggregation {
+        key "main-port";
+        description
+          "Config data for link aggregation group.";
+        leaf main-port {
+          type string;
+          description
+            "Indicates the main port of link aggregation group.";
+        }
+        leaf-list sub-port {
+          type string;
+          max-elements 7;
+          description
+            "Configure a list of sub port.";
+        }
+        leaf mode-type {
+          type enumeration {
+            enum "ingress" {
+              description
+                "Indicates that member ports in a link aggregation group distribute packets
+                  according to the source MAC address.";
+            }
+            enum "egress-ingress" {
+              description
+                "Indicates that member ports in a link aggregation group distribute packets
+                  according to the source and destination MAC addresses.";
+            }
+            enum "ip-enhance" {
+              description
+                "Indicates that member ports in a link aggregation group distribute packets
+                  according to the information such as the IP address and protocol number.";
+            }
+            enum "src-dst-ip" {
+              description
+                "Indicates that member ports in a link aggregation group distribute packets
+                  according to the source and destination IP addresses.";
+            }
+          }
+          mandatory true;
+          description
+            "Indicates the mode of link aggregation group.";
+        }
+      }
+    }
+  }
+
+  augment "/bbf-xpon:xpon" {
+    description
+      "Augment xPON ONU ANI profile configuration.";
+    container ani-profiles {
+      description
+        "Configure the data node of ONU ANI profile.";
+      list ani-profile {
+        key "name";
+        description
+          "Configure the data node of ONU ANI profile.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Profile name.";
+        }
+        uses common-config-data;
+        uses tconts-config-data;
+        uses gemports-config-data;
+        uses gem-bundle-config-data;
+        uses eth-bundle-config-data;
+        uses link-aggregation-config-data;
+      }
+    }
+  }
+}

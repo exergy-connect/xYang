@@ -1,0 +1,222 @@
+module huawei-xpon {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-xpon";
+  prefix hwxpon;
+
+
+  include "huawei-xpon-base";
+
+  include "huawei-xpon-alm-policy-profile";
+
+  include "huawei-xpon-alm-threshold-profile";
+
+  include "huawei-xpon-global";
+
+  include "huawei-xpon-port";
+
+  include "huawei-gpon-gemport";
+
+  include "huawei-xpon-ont";
+
+  include "huawei-xpon-ont-cfg-file";
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide XPON management.";
+
+  revision 2025-03-20 {
+    description
+      "Add new container: ont-rssi-difference.";
+    reference
+      "";
+  }
+  revision 2025-03-17 {
+    description
+      "Add enum value of work-mode in line-configs, modify the when condition of the hspon-pon-id leaf.";
+    reference
+      "";
+  }
+  revision 2025-03-04 {
+    description
+      "Change the description of list channel, leaf laser-switch and list tcont-group.";
+    reference
+      "";
+  }
+  revision 2024-09-21 {
+    description
+      "Add new leafnodes: channel-rogue-alarm-switch, rogueont-rssi-variation-threshold.";
+    reference
+      "";
+  }
+  revision 2024-04-24 {
+    description
+      "Add ip-packet-ttl-detect-period leaf to ex-ontani-config-data;
+       Add container ont-ip-packect-ttl-detect-result.";
+    reference
+      "";
+  }
+  revision 2024-03-11 {
+    description
+      "YANG 2.0 Extension, Adding New Nodes and Containers;
+       Add new leafnodes and containers: distance-time, conflict-check-switch, additional-notice-switch,
+       additional-notice-times, additional-notice-distance-times and so on.";
+    reference
+      "";
+  }
+  revision 2024-01-01 {
+    description
+      "Add enum value of work-mode.";
+    reference
+      "";
+  }
+  revision 2023-11-30 {
+    description
+      "Add leaf for ex-combopon-diagnostics and ex-combopon-thresholds.";
+    reference
+      "";
+  }
+  revision 2023-11-18 {
+    description
+      "Add hspon-pon-id leaf node;
+       Add identity 50g-pon.";
+    reference
+      "";
+  }
+  revision 2023-11-10 {
+    description
+      "Add new leafnode: frequency-type.";
+    reference
+      "";
+  }
+  revision 2023-10-11 {
+    description
+      "Add tcont-groups container to line-configs grouping;
+       change line-configs/channels/channel/index range to 0~2.";
+    reference
+      "";
+  }
+  revision 2023-05-04 {
+    description
+      "Add the node of gem-encrypt-mode to ex-v-ontani-config-data.";
+    reference
+      "";
+  }
+  revision 2023-04-17 {
+    description
+      "Modified the description of leaf node no-online-reason.";
+    reference
+      "";
+  }
+  revision 2023-03-18 {
+    description
+      "Add 50G config data of optical alarm threshold profile.";
+    reference
+      "";
+  }
+  revision 2023-03-17 {
+    description
+      "Add 10G Rx config data of optical alarm threshold profile.";
+    reference
+      "";
+  }
+  revision 2022-11-25 {
+    description
+      "Add config data of optical alarm threshold profile.";
+    reference
+      "";
+  }
+  revision 2022-09-29 {
+    description
+      "Add new leafnodes: multi-channel-low-latency-switch in huawei-xpon-port.";
+    reference
+      "";
+  }
+  revision 2022-09-06 {
+    description
+      "Add the container of TpId.";
+    reference
+      "";
+  }
+  revision 2022-03-01 {
+    description
+      "Add leaf optical-alarm-profile.";
+    reference
+      "";
+  }
+  revision 2022-01-18 {
+    description
+      "Add new leafnode: xpon-olt-rx-power-mode.";
+    reference
+      "";
+  }
+  revision 2021-12-16 {
+    description
+      "Add the enumerate bandwidth-insufficient of the leaf node last-down-cause.";
+    reference
+      "";
+  }
+  revision 2021-08-17 {
+    description
+      "Modified the description of leaf node no-online-reason.
+       Add the node of device-type to ex-ontani-oper-data.";
+    reference
+      "";
+  }
+  revision 2021-07-08 {
+    description
+      "Add new leafnodes: xpon-rogueont-detect-rssi-threshold, xpon-rogueont-clear-rssi-threshold.
+       Add the enumerate mode7 of the leaf node interop-standard.
+       Add container xpon-ont-port in huawei-xpon-base.
+       Modify the description of leaf load-xml-state and load-app-state in huawei-xpon-ont.
+       Add new leafnode: rogue-ont-status, available-bandwidth, available-bandwidth-2p5g, available-bandwidth-10g,
+          ont-num, last-up-time, last-down-time, last-down-cause, energy-saving-state, signal-detect-state,
+          actual-multicast-encrypt, mac-chipset-state and container channels.";
+    reference
+      "";
+  }
+  revision 2021-01-13 {
+    description
+      "Modify the range from 1..16 to 1..40 for the leaf user-name in huawei-xpon-ont-cfg-file.";
+    reference
+      "";
+  }
+  revision 2020-11-07 {
+    description
+      "Add new leafnodes: ont-default-fec-switch.";
+    reference
+      "";
+  }
+  revision 2020-09-27 {
+    description
+      "Add new leafnodes: channel-index, channel-type, sd, rssi in huawei-xpon-port.";
+    reference
+      "";
+  }
+  revision 2019-11-07 {
+    description
+      "Clean Errors.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+  revision 2019-09-19 {
+    description
+      "Add new leafnodes: anti-weak-light-switch, timeout, tcont-pq-priority-reverse in huawei-xpon-global.";
+    reference
+      "";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+}

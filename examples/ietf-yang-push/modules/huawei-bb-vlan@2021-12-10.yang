@@ -1,0 +1,382 @@
+module huawei-bb-vlan {
+  namespace "urn:huawei:params:xml:ns:yang:huawei-vlan";
+  prefix huawei-vlan;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     managing vlans.";
+
+  revision 2021-12-10 {
+    description
+      "Change type for default-vlan, trunk-vlan.";
+    reference
+      "";
+  }
+  revision 2021-09-01 {
+    description
+      "Add a new type named vlan-forwarder for vlan.";
+    reference
+      "";
+  }
+  revision 2021-03-06 {
+    description
+      "Add reserve-vlan config";
+    reference
+      "";
+  }
+  revision 2020-05-20 {
+    description
+      "Change module from huawei-vlan to huawei-bb-vlan.";
+    reference
+      "";
+  }
+  revision 2017-12-07 {
+    description
+      "This revision adds the following data : vlans/vlan/forwarding-type,
+       vlans/vlan/tag-attribute and the enumeration value for port-link-type.";
+    reference
+      "";
+  }
+  revision 2017-07-27 {
+    description
+      "This revision adds back the following data for compatibility : vlans/vlan/reserved,
+       Obsolete unused node : vlans/vlan/enabled.";
+    reference
+      "";
+  }
+  revision 2017-07-11 {
+    description
+      "This revision update the following data : vlans/management-vlan,
+       vlans/lan-vlan.";
+    reference
+      "";
+  }
+  revision 2016-10-21 {
+    description
+      "This revision adds vlan-range type.";
+    reference
+      "";
+  }
+  revision 2016-08-16 {
+    description
+      "This revision cancel leafref of the following data : vlans/management-vlan,
+       vlans/lan-vlan.";
+    reference
+      "";
+  }
+  revision 2016-07-30 {
+    description
+      "This revision adds the following new data : vlans/lan-vlan,
+       vlans/vlan/enabled.
+       Obsolete node : vlans/vlan/reserved.
+       Obsolete default value : port-link-type, default-vlan.";
+    reference
+      "";
+  }
+  revision 2016-03-03 {
+    description
+      "This revision adds the following new data : management-vlan.";
+    reference
+      "";
+  }
+  revision 2014-08-18 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  feature management-vlan {
+    description
+      "Defines the feature of management-vlan.";
+  }
+
+  feature lan-vlan {
+    description
+      "Defines the feature of lan-vlan.";
+  }
+
+  typedef vlan-id {
+    type uint16 {
+      range "1..4094";
+    }
+    description
+      "Type definition representing a VLAN ID.";
+  }
+
+  typedef vlan-forwarder {
+    type string {
+      length "13..64";
+      pattern "forwarder\\.(\\S+)\\.(\\d{1,4})";
+    }
+    description
+      "Indicates the VLAN forwarding domain.";
+  }
+
+  typedef l2-forwarder {
+    type union {
+      type vlan-id;
+      type vlan-forwarder;
+    }
+    description
+      "Indicates the Layer 2 VLAN forwarding domain.";
+  }
+
+  typedef vlan-range {
+    type string {
+      pattern "(409[0-4]|40[0-8][0-9]|[1-3][0-9]{3}|[1-9][0-9]{1,2}|[1-9])..(409[0-4]|40[0-8][0-9]|[1-3][0-9]{3}|[1-9][0-9]{1,2}|[1-9])";
+    }
+    description
+      "Type definition representing a range of single-tagged
+       VLANs. A range is specified as x..y where x and y are
+       valid VLAN IDs (1 <= vlan-id <= 4094). The range is
+       assumed to be inclusive, such that any VLAN-ID matching
+       x <= VLAN-ID <= y falls within the range.";
+  }
+
+  container vlans {
+    description
+      "The vlan's configurations.";
+    list vlan {
+      key "id";
+      description
+        "A list of VLANs.";
+      leaf id {
+        type l2-forwarder;
+        description
+          "Specifies the VLAN ID.";
+      }
+      leaf name {
+        type string {
+          length "1..31";
+        }
+        description
+          "Specifies the VLAN name.";
+      }
+      leaf description {
+        type string {
+          length "1..255";
+        }
+        description
+          "Specifies the description of a VLAN.";
+      }
+      leaf reserved {
+        type boolean;
+        default "false";
+        description
+          "Specifies the reserved VLAN ID.";
+      }
+      leaf forwarding-type {
+        type enumeration {
+          enum "mux" {
+            value 0;
+            description
+              "Indicates the MUX VLAN. A MUX VLAN can contain multiple
+               upstream ports, but only one service port. The service ports of
+               different VLANs are isolated from each other. The system maps the
+               VLAN to the user. Therefore, users can be differentiated by the VLANs.";
+          }
+          enum "standard" {
+            value 1;
+            description
+              "Indicates the standard VLAN. A standard VLAN contains
+               multiple upstream ports. Ethernet ports in a standard VLAN can
+               communicate with each other. Ethernet ports of different VLANs
+               are isolated from each other.";
+          }
+          enum "smart" {
+            value 2;
+            description
+              "Indicates the smart VLAN. A smart VLAN can contain
+               multiple upstream ports and service ports. The service ports in
+               a same smart VLAN are isolated from each other. The service ports
+               of different VLANs are isolated from each other. One VLAN supports
+               multiple users, which saves the VLAN resources.";
+          }
+        }
+        default "smart";
+        description
+          "The forwarding type of the VLAN.";
+      }
+      leaf tag-attribute {
+        type enumeration {
+          enum "common" {
+            value 0;
+            description
+              "Indicates the common VLAN. A common VLAN can be used
+               as a Layer 2 VLAN or Layer 3 virtual interface.";
+          }
+          enum "qinq" {
+            value 1;
+            description
+              "Indicates the QinQ VLAN. The VLAN packet with the QinQ
+               attribute contains two VLAN tags, that is, the inner VLAN tag of the
+               private network and the outer VLAN tag allocated by the device. A
+               Layer 2 VPN tunnel can be set up between private networks, so that
+               the service can be transmitted transparently between these private
+               networks.";
+          }
+          enum "stacking" {
+            value 2;
+            description
+              "Indicates the stacking VLAN. The VLAN packet with the
+               stacking attribute contains two VLAN tags, that is, the inner and
+               outer VLAN tags allocated by the device. These tags are applicable
+               to the dual-VLAN-tag authentication on the upper-layer BRAS to
+               increase the number of access users. In the upper-layer network
+               that works in the Layer 2 mode, packets can be forwarded directly
+               by VLAN+MAC to provide the wholesale service for ISPs.";
+          }
+        }
+        default "common";
+        description
+          "The tag attribute of the VLAN.";
+      }
+    }
+    container management-vlan {
+      if-feature "management-vlan";
+      description
+        "Configures a VLAN as a management VLAN.";
+      leaf vlanid {
+        type uint16 {
+          range "1..4094";
+        }
+        description
+          "Specifies the VLAN ID for management VLAN.";
+      }
+    }
+    container lan-vlan {
+      if-feature "lan-vlan";
+      description
+        "Configures a VLAN as a lan VLAN.";
+      leaf vlanid {
+        type uint16 {
+          range "1..4094";
+        }
+        description
+          "Specifies the VLAN ID for lan VLAN.";
+      }
+    }
+    container start-reserved-vlan {
+      description
+        "Configure the start VLAN ID of the reserved VLANs configured in the system. Describes the start VLAN ID of the reserved VLANs currently used by the system.";
+      leaf current-value {
+        type uint16 {
+          range "2..4079";
+        }
+        config false;
+        description
+          "Describes the start VLAN ID of the reserved VLANs currently used by the system.";
+      }
+      leaf configured-value {
+        type uint16 {
+          range "2..4079";
+        }
+        default "4079";
+        description
+          "Describes the start VLAN ID of the reserved VLANs configured in the system. The configuration takes effect after system restart.";
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface" {
+    description
+      "Describes the VLANs configuration of the interface.";
+    container vlan {
+      presence "disable default cfg for layer3 interface";
+      description
+        "The VLAN information.";
+      leaf port-link-type {
+        type enumeration {
+          enum "access" {
+            value 0;
+            description
+              "Access port.";
+          }
+          enum "hybrid" {
+            value 1;
+            description
+              "Hybrid port.";
+          }
+          enum "trunk" {
+            value 2;
+            description
+              "Trunk port.";
+          }
+          enum "dot1q" {
+            value 3;
+            description
+              "QinQ port.";
+          }
+        }
+        description
+          "The link type of an interface.";
+      }
+      leaf default-vlan {
+        type l2-forwarder;
+        description
+          "pvid";
+      }
+      choice link-type {
+        description
+          "The link type of an interface.";
+        container hybrid {
+          when "../port-link-type = 'hybrid'";
+          description
+            "The link type of an interface is hybrid.";
+          leaf-list tagged-vlan {
+            type union {
+              type vlan-id;
+              type vlan-range;
+            }
+            description
+              "Adds a hybrid interface to the specified VLANs. Frames of
+               the VLANs then pass through the hybrid interface in tagged mode.";
+          }
+          leaf-list untagged-vlan {
+            type union {
+              type vlan-id;
+              type vlan-range;
+            }
+            description
+              "Adds a hybrid interface to the specified VLANs. Frames of
+               the VLANs then pass through the hybrid interface in untagged mode.";
+          }
+        }
+        container trunk {
+          when "../port-link-type = 'trunk'";
+          description
+            "The link type of an interface is trunk.";
+          leaf-list trunk-vlan {
+            type l2-forwarder;
+            description
+              "Adds a trunk interface to the specified VLANs.";
+          }
+        }
+        container dot1q {
+          when "../port-link-type = 'dot1q'";
+          description
+            "The link type of an interface is QinQ.";
+          leaf dot1q-vlan {
+            type vlan-id;
+            description
+              "Adds a QinQ interface to the specified VLAN.";
+          }
+        }
+      }
+    }
+  }
+}

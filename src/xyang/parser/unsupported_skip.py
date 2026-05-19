@@ -1,8 +1,8 @@
 """
 Skip unsupported YANG constructs after emitting a warning.
 
-Top-level statements (deviation, rpc, …) and substatements such as ``config`` are not
-modeled in the AST; tokens are consumed so the rest of the module can parse.
+Top-level statements (deviation, rpc, …) that are not modeled in the AST have their
+tokens consumed so the rest of the module can parse.
 """
 
 from __future__ import annotations
@@ -97,21 +97,3 @@ def skip_status_substatement(tokens: TokenStream, *, context: str) -> None:
         tokens.consume_type(YangTokenType.IDENTIFIER)
     tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-
-def skip_config_substatement(tokens: TokenStream, *, context: str) -> None:
-    """Consume ``config true|false;`` (RFC 7950 §7.21.1); not stored on the AST."""
-    line_num, char_pos = tokens.position()
-    where = tokens.filename or "<string>"
-    tokens.consume(kw.CONFIG)
-    value: str | None = None
-    if tokens.peek() in (kw.TRUE, kw.FALSE):
-        value = tokens.consume()
-    tokens.consume_if_type(YangTokenType.SEMICOLON)
-    logger.warning(
-        "Ignoring unsupported YANG substatement 'config' (%s) at %s:%s:%s (value=%r)",
-        context,
-        where,
-        line_num,
-        char_pos,
-        value,
-    )

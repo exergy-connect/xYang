@@ -1,0 +1,559 @@
+module huawei-ethernet-types-an {
+  namespace "urn:huawei:yang:huawei-ethernet-types-an";
+  prefix ethernet-types;
+
+  import huawei-extension {
+    prefix ext;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "An experimental YANG module supporting ethernet.";
+
+  revision 2021-05-14 {
+    description
+      "Add ethernet optic modeule data type.";
+    reference
+      "";
+  }
+  revision 2021-01-26 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+ 
+
+  typedef sff8636-version {
+    type enumeration {
+      enum "undefined" {
+        value 1;
+        description
+          "Not included or undefined.";
+      }
+      enum "sff8436-v480" {
+        value 2;
+        description
+          "Includes functionality described in SFF-8436 Rev 4.8 or earlier.";
+      }
+      enum "sff8436-v480-ex" {
+        value 3;
+        description
+          "Includes functionality described in SFF-8436 Rev 4.8 or earlier with exception.";
+      }
+      enum "sff8636-v130" {
+        value 4;
+        description
+          "Includes functionality described in SFF-8636 Rev 1.3 or earlier.";
+      }
+      enum "sff8636-v14" {
+        value 5;
+        description
+          "Includes functionality described in SFF-8636 Rev 1.4.";
+      }
+      enum "sff8636-v15" {
+        value 6;
+        description
+          "Includes functionality described in SFF-8636 Rev 1.5.";
+      }
+      enum "sff8636-v20" {
+        value 7;
+        description
+          "Includes functionality described in SFF-8636 Rev 2.0.";
+      }
+      enum "sff8636-v25-to-27" {
+        value 8;
+        description
+          "Includes functionality described in SFF-8636 Rev 2.5, 2.6 and 2.7.";
+      }
+      enum "sff8636-v28-or-later" {
+        value 9;
+        description
+          "Includes functionality described in SFF-8636 Rev 2.8 or later.";
+      }
+    }
+    description
+      "Indicate the SFF-8636 standard.";
+  }
+
+  typedef connector-type {
+    type enumeration {
+      enum "unknown" {
+        value 1;
+        description
+          "Unknown the type of optical module connector.";
+      }
+      enum "sc" {
+        value 2;
+        description
+          "The type of optical module connector is sc.";
+      }
+      enum "copper-connector1" {
+        value 3;
+        description
+          "The type of optical module connector is copper connector 1.";
+      }
+      enum "copper-connector2" {
+        value 4;
+        description
+          "The type of optical module connector is copper connector 2.";
+      }
+      enum "bnc-tnc" {
+        value 5;
+        description
+          "The type of optical module connector is bnctnc.";
+      }
+      enum "coaxial-headers" {
+        value 6;
+        description
+          "The type of optical module connector is coaxial headers.";
+      }
+      enum "fiber-jack" {
+        value 7;
+        description
+          "The type of optical module connector is fiberJack.";
+      }
+      enum "lc" {
+        value 8;
+        description
+          "The type of optical module connector is lc.";
+      }
+      enum "mtrj" {
+        value 9;
+        description
+          "The type of optical module connector is mtrj.";
+      }
+      enum "mu" {
+        value 10;
+        description
+          "The type of optical module connector is mu.";
+      }
+      enum "sg" {
+        value 11;
+        description
+          "The type of optical module connector is sg.";
+      }
+      enum "optical-pigtail" {
+        value 12;
+        description
+          "The type of optical module connector is optical pigtail.";
+      }
+      enum "hssdc-ii" {
+        value 13;
+        description
+          "The type of optical module connector is hssdcii.";
+      }
+      enum "copper-pigtail" {
+        value 14;
+        description
+          "The type of optical module connector is copper pigtail.";
+      }
+      enum "vender-specific" {
+        value 15;
+        description
+          "The type of optical module connector is specified by the vendor.";
+      }
+      enum "mpo-parallel-optic" {
+        value 16;
+        description
+          "The type of optical module connector is mpo parallel optic.";
+      }
+      enum "rj45" {
+        value 17;
+        description
+          "The type of optical module connector is RJ45.";
+      }
+      enum "mpo2-parallel-optic" {
+        value 18;
+        description
+          "The type of optical module connector is mpo2 parallel optic.";
+      }
+    }
+    description
+      "Indicate the type of optical module connector.";
+  }
+
+  typedef optical-module-identifier {
+    type enumeration {
+      enum "unknown" {
+        value 0;
+        description
+          "Unknown the identifier of optical module.";
+      }
+      enum "gbic" {
+        value 1;
+        description
+          "The identifier of optical module is gbic.";
+      }
+      enum "module-connector" {
+        value 2;
+        description
+          "The identifier of optical module is module connector.";
+      }
+      enum "sfp" {
+        value 3;
+        description
+          "The identifier of optical module is sfp.";
+      }
+      enum "pin-300-xbi" {
+        value 4;
+        description
+          "The identifier of optical module is pin300XBI.";
+      }
+      enum "xenpak" {
+        value 5;
+        description
+          "The identifier of optical module is xenpak.";
+      }
+      enum "xfp" {
+        value 6;
+        description
+          "The identifier of optical module is xfp.";
+      }
+      enum "xff" {
+        value 7;
+        description
+          "The identifier of optical module is xff.";
+      }
+      enum "xfpe" {
+        value 8;
+        description
+          "The identifier of optical module is xfpe.";
+      }
+      enum "xpak" {
+        value 9;
+        description
+          "The identifier of optical module is xpak.";
+      }
+      enum "x2" {
+        value 10;
+        description
+          "The identifier of optical module is x2.";
+      }
+      enum "dwdm-sfp" {
+        value 11;
+        description
+          "The identifier of optical module is DWDM-SFP.";
+      }
+      enum "qsfp" {
+        value 12;
+        description
+          "The identifier of optical module is QSFP.";
+      }
+      enum "qsfp-plus" {
+        value 13;
+        description
+          "The identifier of optical module is QSFP+.";
+      }
+      enum "qsfp28" {
+        value 17;
+        description
+          "The identifier of optical module is QSFP28.";
+      }
+    }
+    description
+      "Indicate the identifier of optical module.";
+  }
+
+  typedef fibre-compliance-data {
+    type enumeration {
+      enum "inter-1300-fp" {
+        value 16;
+        description
+          "Intermediate Reach 1300 nm FP.";
+      }
+      enum "extended-1550" {
+        value 32;
+        description
+          "Extended reach 1550 nm.";
+      }
+      enum "sm-1200" {
+        value 64;
+        description
+          "Indicate the 1200-SM-LL-L.";
+      }
+      enum "mx-1200" {
+        value 128;
+        description
+          "Indicate the 1200-mx-LL-L.";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate 10 Gigabit Fibre Channel Compliance type.";
+  }
+
+  typedef lower-speed-link-data {
+    type enumeration {
+      enum "oc-48-lr" {
+        value 2;
+        description
+          "Indicate lower speed links type is OC48LR.";
+      }
+      enum "oc-48-ir" {
+        value 4;
+        description
+          "Indicate lower speed links type is OC48IR.";
+      }
+      enum "oc-48-sr" {
+        value 8;
+        description
+          "Indicate lower speed links type is OC48SR.";
+      }
+      enum "fcsmf" {
+        value 16;
+        description
+          "Indicate lower speed links type is fcsmf.";
+      }
+      enum "fcmmf" {
+        value 32;
+        description
+          "Indicate lower speed links type is fcmmf.";
+      }
+      enum "lxsmf" {
+        value 64;
+        description
+          "Indicate lower speed links type is lxsmf.";
+      }
+      enum "sxmmf" {
+        value 128;
+        description
+          "Indicate lower speed links type is sxmmf.";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate Lower Speed Links type.";
+  }
+
+  typedef options-data {
+    type enumeration {
+      enum "rate-select" {
+        value 1;
+        description
+          "RATE_SELECT is implemented.";
+      }
+      enum "tx-disable-and-serial-output-disabled" {
+        value 2;
+        description
+          "TX_DISABLE is implemented and disables the serial output.";
+      }
+      enum "tx-fault" {
+        value 3;
+        description
+          "TX_FAULT signal implemented.";
+      }
+      enum "signal-loss-and-invertedfromstandard" {
+        value 4;
+        description
+          "Loss of Signal implemented, signal inverted from standard definition in SFP MSA.";
+      }
+      enum "signal-loss-and-as-defined" {
+        value 5;
+        description
+          "Loss of Signal implemented, signal as defined in SFP MSA.";
+      }
+      enum "tunable-transmitter-technology" {
+        value 6;
+        description
+          "Tunable transmitter technology,a value of 1 indicates that the transmitter wavelength/frequency
+            is tunable in accordance with SFF-8690.";
+      }
+      enum "rdt" {
+        value 7;
+        description
+          "Receiver decision threshold implemented,a value of 1 indicates that RDT is implemented.";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate options data type.";
+  }
+
+  typedef enhanced-options-data {
+    type enumeration {
+      enum "for-all-monitored-quantities" {
+        value 1;
+        description
+          "Optional Alarm/warning flags implemented for all monitored quantities.";
+      }
+      enum "tx-disabled" {
+        value 2;
+        description
+          "Optional Soft TX_DISABLE control and monitoring implemented.";
+      }
+      enum "tx-fault" {
+        value 3;
+        description
+          "Optional Soft TX_FAULT monitoring implemented.";
+      }
+      enum "rx-los" {
+        value 4;
+        description
+          "Optional Soft RX_LOS monitoring implemented.";
+      }
+      enum "rate-select" {
+        value 5;
+        description
+          "Optional Soft RATE_SELECT control and monitoring implemented.";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate enhanced options data type.";
+  }
+
+  typedef encoding-data {
+    type enumeration {
+      enum "unspecified" {
+        value 1;
+        description
+          "The encoding mechanism is unspecified.";
+      }
+      enum "encoding-method-8b10b" {
+        value 2;
+        description
+          "The encoding mechanism is encodingMethod8B10B.";
+      }
+      enum "encoding-method-4b5b" {
+        value 3;
+        description
+          "The encoding mechanism is encodingMethod4B5B.";
+      }
+      enum "nrz" {
+        value 4;
+        description
+          "The encoding mechanism is nrz.";
+      }
+      enum "manchester" {
+        value 5;
+        description
+          "The encoding mechanism is manchester.";
+      }
+      enum "encoding-method-64b66b" {
+        value 6;
+        description
+          "The encoding mechanism is encodingMethod64B66B.";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate encoding data type.";
+  }
+
+  typedef extid-data {
+    type enumeration {
+      enum "not-specified-or-notcompliant" {
+        value 1;
+        description
+          "The extended type of optical module is notSpecifiedOrNotCompliant.";
+      }
+      enum "moddef1" {
+        value 2;
+        description
+          "The extended type of optical module is moddef1.";
+      }
+      enum "moddef2" {
+        value 3;
+        description
+          "The extended type of optical module is moddef2.";
+      }
+      enum "moddef3" {
+        value 4;
+        description
+          "The extended type of optical module is moddef3.";
+      }
+      enum "serial-idonly" {
+        value 5;
+        description
+          "The extended type of optical module is bySerialIDOnly.";
+      }
+      enum "moddef5" {
+        value 6;
+        description
+          "The extended type of optical module is moddef5.";
+      }
+      enum "moddef6" {
+        value 7;
+        description
+          "The extended type of optical module is moddef6.";
+      }
+      enum "moddef7" {
+        value 8;
+        description
+          "The extended type of optical module is moddef7.";
+      }
+      enum "power-class1" {
+        value 9;
+        description
+          "The extended type of optical module is Power Class 1 (1.5 W max.)";
+      }
+      enum "power-class2" {
+        value 10;
+        description
+          "The extended type of optical module is Power Class 2 (1.5 W max.)";
+      }
+      enum "power-class3" {
+        value 11;
+        description
+          "The extended type of optical module is Power Class 3 (1.5 W max.)";
+      }
+      enum "power-class4" {
+        value 12;
+        description
+          "The extended type of optical module is Power Class 4 (2.0 W max.)";
+      }
+      enum "power-class5" {
+        value 13;
+        description
+          "The extended type of optical module is Power Class 5 (2.5 W max.)";
+      }
+      enum "power-class6" {
+        value 14;
+        description
+          "The extended type of optical module is Power Class 6 (3.5 W max.)";
+      }
+      enum "power-class7" {
+        value 15;
+        description
+          "The extended type of optical module is Power Class 7 (4.0 W max.)";
+      }
+      enum "invalid" {
+        value -1;
+        description
+          "Indicate the invalid value.";
+      }
+    }
+    description
+      "Indicate the extended type of optical module data type.";
+  }
+}

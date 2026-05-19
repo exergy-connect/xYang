@@ -1,0 +1,38 @@
+module huawei-ietf-udp-notif-transport-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-udp-notif-transport-deviations";
+  prefix hw-unt-devs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-subscribed-notif-receivers {
+    prefix snr;
+  }
+  import ietf-udp-notif-transport {
+    prefix unt;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-udp-notif-transport data
+     model set for Huawei devices.";
+
+  revision 2025-01-03 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sn:subscriptions/snr:receiver-instances/snr:receiver-instance/snr:transport-type/unt:udp-notif/unt:udp-notif-receiver/unt:dtls" {
+    deviate not-supported;
+  }
+}

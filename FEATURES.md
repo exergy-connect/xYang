@@ -92,6 +92,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 
 ### Container Features
 - ✅ `presence` - Container presence (1 occurrence)
+- ✅ `config` (RFC 7950 §7.21.1) — explicit `config true` / `config false` on container, leaf, leaf-list, list, choice, and case; stored on the AST (`config: Optional[bool]`, `None` = inherit) and echoed in `x-yang` JSON Schema; `refine` may set `config` on container, leaf, list, and leaf-list targets
 
 ### CLI and JSON Schema Export
 - ✅ **CLI** (`xyang` or `python -m xyang`): `parse`, `validate`, `convert`
@@ -108,10 +109,9 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built-in Types** above), even when validation or JSON Schema support is incomplete.
 
 ### Partial / syntax only
-- ⚠️ **`augment`** — Parsed into `YangAugmentStmt` (including `if-feature`, `when`, `must`, nested data definitions). With `YangParser(expand_uses=True)`, augments are resolved and merged into the target module (same gate as `uses` expansion). With `expand_uses=False`, augments stay as statements for reversible convert. **JSON Schema** emission today still does not walk merged augment semantics end-to-end for every case; validate with an expanded module when you need full augmented-tree checks.
+- ✅ **`augment`** — Parsed into `YangAugmentStmt` and, with `YangParser(expand_uses=True)`, merged into the target schema (including cross-file targets via `import`). Augmented nodes record `defining_module` for RFC 7951 JSON (`module:identifier` when the defining module differs from the parent). CLI `--anydata-validation` loads extra modules through one parser cache and registers the import closure so augments apply to the same `YangModule` instances used for validation. With `expand_uses=False`, augments stay as explicit statements for reversible convert.
 
 ### Not implemented (skipped when parsing)
-- ⚠️ **`config`** (RFC 7950 §7.21.1) — `config true` / `config false` on data definition statements is **consumed** and **ignored** after a **`logging` warning**; not stored on the AST or enforced during validation (instance validation still assumes configurable data nodes).
 - ⚠️ `deviation`, `action` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
 - ⚠️ Top-level `input` / `output` — **Skipped** with a warning when not under `rpc` or `action` (RFC 7950: I/O blocks are only valid there).
 
@@ -187,7 +187,7 @@ container data {
 ```
 
 ### Refine Statement
-The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties. Supported substatements include **`default`** (for `leaf` and `leaf-list` targets). Multiple `default` lines under one `refine` build the leaf-list default set; the merged values are emitted in JSON Schema as **`default`** (scalar for a leaf, **array** for a leaf-list, matching draft 2020-12). Refine may add **`if-feature`** expressions, which are appended to the target node’s `if_features` (AND with any existing conditions).
+The `refine` statement allows modifying nodes from a grouping when using it. This is particularly useful for adding constraints or changing properties. Supported substatements include **`default`** (for `leaf` and `leaf-list` targets), **`config`** (for container, leaf, list, and leaf-list targets), and **`mandatory`** (for leaf and choice targets). Multiple `default` lines under one `refine` build the leaf-list default set; the merged values are emitted in JSON Schema as **`default`** (scalar for a leaf, **array** for a leaf-list, matching draft 2020-12). Refine may add **`if-feature`** expressions, which are appended to the target node’s `if_features` (AND with any existing conditions).
 
 Example:
 ```yang

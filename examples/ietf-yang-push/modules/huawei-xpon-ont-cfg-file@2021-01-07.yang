@@ -1,0 +1,207 @@
+submodule huawei-xpon-ont-cfg-file {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import huawei-pub-type {
+    prefix hw;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide XPON ONT configuration file management.";
+
+  revision 2021-01-07 {
+    description
+      "Modify the range from 1..16 to 1..40 for the leaf user-name.";
+    reference
+      "";
+  }
+  revision 2018-07-05 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  rpc start-load-ont-xml {
+    description
+      "Start loading XML file to ONT.";
+
+    input {
+      leaf v-ani-if-name {
+        type if:interface-ref;
+        description
+          "The name of ONT virtual ANI interface.";
+      }
+      leaf file-server-ip-addr {
+        type inet:ipv4-address-no-zone;
+        description
+          "The IP address of file server.";
+      }
+      leaf file-transfer-protocol {
+        type enumeration {
+          enum "tftp" {
+            value 0;
+            description
+              "TFTP file transfer protocol.";
+          }
+          enum "ftp" {
+            value 1;
+            description
+              "FTP file transfer protocol.";
+          }
+          enum "sftp" {
+            value 2;
+            description
+              "SFTP file transfer protocol.";
+          }
+        }
+        description
+          "This object indicates the transfer protocol.";
+      }
+      leaf file-name {
+        type string {
+          length "1..80";
+        }
+        description
+          "This object indicates the file name.";
+      }
+      leaf user-name {
+        when "../file-transfer-protocol='ftp' or ../file-transfer-protocol='sftp'";
+        type string {
+          length "1..40";
+        }
+        description
+          "This object indicates the user name.";
+      }
+      leaf password {
+        when "../file-transfer-protocol='ftp' or ../file-transfer-protocol='sftp'";
+        type hw:password-extend;
+        description
+          "This object indicates the password.";
+      }
+      leaf aes128-key {
+        type string {
+          length "0..16";
+        }
+        description
+          "This object indicates the AES-128 cryptographic key for the ONT XML file.";
+      }
+    }
+  }
+  rpc stop-load-ont-xml {
+    description
+      "Stop loading XML file to ONT.";
+
+    input {
+      leaf v-ani-if-name {
+        type if:interface-ref;
+        description
+          "The name of ONT v-ani interface.";
+      }
+    }
+  }
+
+  notification load-ont-xml-notify {
+    description
+      "This notification is sent when the ONT loading XML.";
+    leaf v-ani-if-name {
+      type if:interface-ref;
+      description
+        "The name of ONT virtual ANI interface.";
+    }
+    leaf oper-type {
+      type int32;
+      description
+        "This object indicates the operation type of the ONT XML load.
+         The value 1 indicates loading the configuration file
+         the value 2 indicates the checked result of the configuration file.";
+    }
+    leaf result {
+      type enumeration {
+        enum "success" {
+          value 0;
+          description
+            "Indicates that the load result is success.";
+        }
+        enum "fail" {
+          value 1;
+          description
+            "Indicates that the load result is fail.";
+        }
+        enum "loaded-20-percent" {
+          value 2;
+          description
+            "Indicates that the load result is loaded 20 percent.";
+        }
+        enum "file-too-big" {
+          value 3;
+          description
+            "Indicates that the result file is too big.";
+        }
+        enum "file-check-error" {
+          value 4;
+          description
+            "Indicates that it is fail to check the file.";
+        }
+        enum "packet-file-error" {
+          value 5;
+          description
+            "Indicates that it is fail to check the packet.";
+        }
+        enum "ont-reply-timeout" {
+          value 6;
+          description
+            "Indicates that the reply of the ONT is time out.";
+        }
+      }
+      description
+        "This leaf indicates the load result.";
+    }
+    leaf crc-support {
+      when "../oper-type='2'";
+      type enumeration {
+        enum "not-support" {
+          value 0;
+          description
+            "Not support.";
+        }
+        enum "support" {
+          value 1;
+          description
+            "Support.";
+        }
+        enum "unconcern" {
+          value 255;
+          description
+            "Indicates that the query fails or no information is detected.";
+        }
+      }
+      description
+        "This object indicates whether the ONT load supports the CRC.";
+    }
+    leaf crc-value {
+      when "../oper-type='2'";
+      type int32;
+      description
+        "This object indicates the CRC value of the loaded ONT configuration file.";
+    }
+  }
+}

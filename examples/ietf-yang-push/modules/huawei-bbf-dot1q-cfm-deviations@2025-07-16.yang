@@ -1,0 +1,34 @@
+module huawei-bbf-dot1q-cfm-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-dot1q-cfm-deviations";
+  prefix hw-bbf-cfm-devs;
+
+  import ieee802-dot1q-cfm {
+    prefix dot1q-cfm;
+  }
+  import bbf-dot1q-cfm {
+    prefix bbf-cfm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ieee802-dot1q-cfm module.";
+
+  revision 2025-07-16 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/dot1q-cfm:cfm/dot1q-cfm:maintenance-domain/dot1q-cfm:maintenance-association/bbf-cfm:discard-ingressing-ltm" {
+    deviate not-supported;
+  }
+}

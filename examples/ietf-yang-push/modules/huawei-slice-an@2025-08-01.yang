@@ -1,0 +1,545 @@
+module huawei-slice-an {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-slice-an";
+  prefix slice-an;
+
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-tc-an {
+    prefix tc-an;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "Config slice.";
+
+  revision 2025-08-01 {
+    description
+      "Add the dedicated-network onts container.";
+    reference
+      "";
+  }
+  revision 2025-06-17 {
+    description
+      "Delete the dedicated-network onts container.";
+    reference
+      "";
+  }
+  revision 2025-02-26 {
+    description
+      "Add the dedicated-network onts container.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-22 {
+    description
+      "Add the up-traffic-rate leaf and down-traffic-rate leaf.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-12-26 {
+    description
+      "Add the dedicated-network statistics container.
+       Add the dedicated network 50gpon management port or channel.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-18 {
+    description
+      "Add the leaf queue-buffer to list dedicated-network of container dedicated-networks.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-07 {
+    description
+      "Add a dedicated network management port and channel traffice table.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-09 {
+    description
+      "Add an dedicated network management model.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-01-25 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef slice-mode {
+    type enumeration {
+      enum "van" {
+        value 0;
+        description
+          "The access node creates a virtual system to implement slicing.";
+      }
+      enum "fans" {
+        value 1;
+        description
+          "The access node creates channelized sub-interfaces to implement slicing.";
+      }
+    }
+    description
+      "This attribute depicts slice mode.";
+  }
+
+  typedef dedicated-network-if-ref {
+    type leafref {
+      path "/slice-an:slice-an/slice-an:dedicated-networks/slice-an:dedicated-network/slice-an:ports/slice-an:port/slice-an:ifname";
+    }
+    description
+      "A reference to the dedicated network interface.";
+  }
+
+  grouping statistic-operate {
+    description
+      "Indicates the statistic oprate of a slice port or channel.";
+    container operates {
+      description
+        "Configure the statistic action of a slice port or channel.";
+      action reset-statistic {
+        description
+          "Clear slice interface statistics.";
+      }
+      action start-peak-bandwidth-collection {
+        description
+          "Start slice interface extended statistics.
+           To collect statistics on the peak bandwidth in a measurement period, start the collection first.";
+
+        input {
+          leaf time {
+            type uint32 {
+              range "1..1440";
+            }
+            units "min";
+            default "15";
+            description
+              "Indicated the dedicated network interface extended statistics timeout.";
+          }
+        }
+      }
+      action stop-peak-bandwidth-collection {
+        description
+          "Stop slice interface extended peak bandwidth collection.";
+      }
+    }
+  }
+
+  grouping statistic-item {
+    description
+      "Indicates the statistic item of a slice port or channel.";
+    container sla {
+      config false;
+      description
+        "Statistics of a slice port or channel.";
+      leaf upstream-bytes {
+        type uint64;
+        description
+          "Indicates the number of upstream bytes of a slice interface.";
+      }
+      leaf downstream-bytes {
+        type uint64;
+        description
+          "Indicates the number of downstream bytes of a slice interface.";
+      }
+      leaf upstream-packets {
+        type uint64;
+        description
+          "Indicates the number of upstream packets of a slice interface.";
+      }
+      leaf downstream-packets {
+        type uint64;
+        description
+          "Indicates the number of downstream packets of a slice interface.";
+      }
+      leaf upstream-discard-packets {
+        type uint64;
+        description
+          "Indicates the number of upstream discard packets of a slice interface.";
+      }
+      leaf downstream-discard-packets {
+        type uint64;
+        description
+          "Indicates the number of downstream discard packets of a slice interface.";
+      }
+      leaf upstream-peak-bandwidth {
+        type uint32;
+        units "kbit/s";
+        description
+          "Indicates the upstream peak bandwidth of a slice interface at the interval of two queries.";
+      }
+      leaf downstream-peak-bandwidth {
+        type uint32;
+        units "kbit/s";
+        description
+          "Indicates the downstream peak bandwidth of a slice interface at the interval of two queries.";
+      }
+      leaf up-traffic-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "Indicates the receiving packet traffic rate of a slice instance.";
+      }
+      leaf down-traffic-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "Indicates the transmitting packet traffic rate of a slice instance.";
+      }
+    }
+  }
+
+  grouping slice-statistics {
+    description
+      "Indicates the statistics of a slice interface.";
+    container statistics {
+      description
+        "List of Slice statistics.";
+      list statistic {
+        key "ifname";
+        description
+          "Configure the interface for querying slice statistics.";
+        leaf ifname {
+          type dedicated-network-if-ref;
+          description
+            "Name of a slice interface.";
+        }
+        choice slice-port-type {
+          description
+            "Indicates the port type of a slice.";
+          case port {
+            description
+              "Indicates a interface statistic of the slice.";
+            uses statistic-operate;
+            uses statistic-item;
+          }
+          case port-channel {
+            description
+              "Indicates a combo pon port channel statistic of the slice.";
+            container channels {
+              description
+                "List of channels in a combo pon port.";
+              list channel {
+                key "channel-index";
+                description
+                  "Configure combo pon port channel to a slice.";
+                leaf channel-index {
+                  type uint8 {
+                    range "0..2";
+                  }
+                  description
+                    "The channel ID of a combo pon port.";
+                }
+                uses statistic-operate;
+                uses statistic-item;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  container slice-an {
+    description
+      "Configure the system slice mode.";
+    leaf mode {
+      type slice-mode;
+      default "fans";
+      description
+        "Configure slice mode. The value can be van, fans.";
+    }
+    container dedicated-networks {
+      description
+        "List of dedicated-networks.";
+      list dedicated-network {
+        key "name";
+        description
+          "Configure a dedicated-network.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Indicates the name of a dedicated-network. Names with only one or more space characters are not supported. DNet-0 exists by default.";
+        }
+        leaf id {
+          type uint32 {
+            range "0..8";
+          }
+          config false;
+          description
+            "Indicates the dedicated network ID. The value is automatically allocated by the system when the dedicated network is created. The value ranges from 0 to 8.";
+        }
+        leaf description {
+          type string {
+            length "1..64";
+          }
+          description
+            "Indicates the description of a dedicated-network. Descriptions with only one or more space characters are not supported.";
+        }
+        leaf queue-buffer {
+          type uint8 {
+            range "1..64";
+          }
+          default "6";
+          description
+            "Configure a queue cache level for a dedicated network.";
+        }
+        container ports {
+          description
+            "List of ports in a network dedicated-network.";
+          list port {
+            key "ifname";
+            description
+              "Configure ethernetCsmacd ports, gpon ports, epon ports or otn vport to a dedicated-network.";
+            leaf ifname {
+              type if:interface-ref;
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd' or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:gpon' or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:aluEpon' or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='tc-an:vport'" {
+                error-message
+                  "must reference an ethernetCsmacd interface, vport interface, epon interface or gpon interface.";
+              }
+              description
+                "Name of an ethernet port, epon port, otn vport or gpon port.";
+            }
+            choice slice-port-type {
+              description
+                "Indicates the port type of a dedicated-network.";
+              case port {
+                description
+                  "Indicates an ethernet port, epon port, otn vport or gpon port add to dedicated-network.";
+                container port-bandwidth {
+                  description
+                    "Configure the port bandwidth. Four types of bandwidth can be configured: unlimited or assured bandwidth.";
+                  choice port-bandwidth-type {
+                    description
+                      "Indicates the bandwidth configured for a port. The bandwidth can be set to unlimited or assured bandwidth.";
+                    case unlimited {
+                      description
+                        "Indicates that the bandwidth is not limited.";
+                      leaf unlimited-bandwidth {
+                        type empty;
+                        description
+                          "Indicates that the bandwidth of the slice port is not limited.";
+                      }
+                    }
+                    case port-bandwidth {
+                      description
+                        "Indicates that the port bandwidth can be configured.";
+                      leaf assured-bandwidth {
+                        type uint32 {
+                          range "1..100000";
+                        }
+                        units "Mbit/s";
+                        description
+                          "Indicates the assured bandwidth allocated to a port.";
+                      }
+                    }
+                    case port-traffic {
+                      description
+                        "Indicates that the port traffic table can be configured.";
+                      leaf ingress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the ingress traffic table bound to the port.";
+                      }
+                      leaf egress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the egress traffic table bound to the port.";
+                      }
+                    }
+                  }
+                }
+              }
+              case port-channel {
+                description
+                  "Indicates a combo pon port channel add to dedicated-network.";
+                container channel-bandwidth {
+                  description
+                    "Configure the port channel bandwidth. Four types of bandwidth can be configured: unlimited or assured bandwidth.";
+                  choice channel-bandwidth-type {
+                    description
+                      "Indicates the bandwidth configured for a combo pon port channel. The bandwidth can be set to unlimited or assured bandwidth.";
+                    case unlimited {
+                      description
+                        "Indicates that the bandwidth is not limited.";
+                      leaf unlimited-bandwidth {
+                        type empty;
+                        description
+                          "Indicates that the bandwidth of the combo pon port channel is not limited.";
+                      }
+                    }
+                    case channel-bandwidth {
+                      description
+                        "Indicates that the combo pon port channel bandwidth can be configured.";
+                      leaf channel-0-assured-bandwidth {
+                        type uint32 {
+                          range "0..100000";
+                        }
+                        units "Mbit/s";
+                        description
+                          "Indicates the assured bandwidth allocated to the channel 0.";
+                      }
+                      leaf channel-1-assured-bandwidth {
+                        type uint32 {
+                          range "0..100000";
+                        }
+                        units "Mbit/s";
+                        description
+                          "Indicates the assured bandwidth allocated to the channel 1.";
+                      }
+                      leaf channel-2-assured-bandwidth {
+                        type uint32 {
+                          range "0..100000";
+                        }
+                        units "Mbit/s";
+                        description
+                          "Indicates the assured bandwidth allocated to the channel 2.";
+                      }
+                    }
+                    case channel-traffic {
+                      description
+                        "Indicates that the combo pon port channel traffic table can be configured.";
+                      leaf channel-0-ingress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the ingress traffic table bound to the channel 0.";
+                      }
+                      leaf channel-0-egress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the egress traffic table bound to the channel 0.";
+                      }
+                      leaf channel-1-ingress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the ingress traffic table bound to the channel 1.";
+                      }
+                      leaf channel-1-egress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the egress traffic table bound to the channel 1.";
+                      }
+                      leaf channel-2-ingress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the ingress traffic table bound to the channel 2.";
+                      }
+                      leaf channel-2-egress {
+                        type string {
+                          length "1..32";
+                        }
+                        description
+                          "Indicates the egress traffic table bound to the channel 2.";
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+        }
+        container packet-forwardings {
+          description
+            "List of dedicated-network packet forwarding numbers.";
+          list packet-forwarding {
+            key "board-name";
+            description
+              "Configure a dedicated-network packet forwarding numbers.";
+            leaf board-name {
+              type string {
+                length "0..20";
+              }
+              description
+                "Indicates the name of a board.";
+            }
+            leaf number {
+              type uint32 {
+                range "1..72";
+              }
+              units "Mpps";
+              mandatory true;
+              description
+                "Indicates the packet forwarding number of a board.";
+            }
+          }
+        }
+        container onts {
+          config false;
+          description
+            "List of ont(s) in a dedicated network.";
+          list ont {
+            key "ifname";
+            description
+              "Indicates the ont configuration of the interface.";
+            leaf ifname {
+              type if:interface-ref;
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:ani' or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+                error-message
+                  "must reference an ani interface.";
+              }
+              description
+                "The name of the interface.";
+            }
+            leaf run-state {
+              type enumeration {
+                enum "up" {
+                  value 1;
+                  description
+                    "Indicates that the run state is up.";
+                }
+                enum "down" {
+                  value 2;
+                  description
+                    "Indicates that the run state is down.";
+                }
+              }
+              description
+                "Indicates run state of the ont.";
+            }
+          }
+        }
+        uses slice-statistics;
+      }
+    }
+  }
+}

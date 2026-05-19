@@ -1,0 +1,1521 @@
+module huawei-bb-multicast {
+  namespace "urn:huawei:yang:huawei-bb-multicast";
+  prefix hw-bb-multicast;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import huawei-bb-service-flow {
+    prefix hw-bb-srv-flow;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for configuring
+     multicast for the broadband services.";
+
+  revision 2025-03-10 {
+    description
+      "Modify the range of leaf 'max-channel-number'.";
+    reference
+      "";
+  }
+  revision 2021-11-27 {
+    description
+      "Add program node dnet-id.";
+    reference
+      "";
+  }
+  revision 2021-07-01 {
+    description
+      "Modify node type of leaf 'grade' to enum.";
+    reference
+      "";
+  }
+  revision 2021-03-06 {
+    description
+      "Add queue-priority config. Add unknown-multicast config.";
+    reference
+      "";
+  }
+  revision 2020-11-27 {
+    description
+      "Add new leafnodes 'bandwidthCAC', 'encapsulation' and 'upstream-mode'.
+       Add containers for VLAN, user and global statistics.
+       Add a container for data of active-channels.
+       Add igmp-bandwidth para config.";
+    reference
+      "";
+  }
+  revision 2020-09-08 {
+    description
+      "Modify the name of enum v3-forced to v2-special of leaf 'mld-version'.";
+    reference
+      "";
+  }
+  revision 2020-04-07 {
+    description
+      "Modify the range of leaf 'max-channel-number'.";
+    reference
+      "";
+  }
+  revision 2019-10-30 {
+    description
+      "Add the default value of source-ip.
+       Add the range of program-ip.
+       Add the default value and modify the description of program-name.
+       Modify the description of host-ip.";
+    reference
+      "";
+  }
+  revision 2019-10-23 {
+    description
+      "Add program para config.
+       Add right profile para config.
+       Add user-bind-profile para config.";
+    reference
+      "";
+  }
+  revision 2019-08-16 {
+    description
+      "Modify the name of enum v3Forced to v3-forced.
+       Modify the name of enum v2WithQuery to v2-with-query.";
+    reference
+      "";
+  }
+  revision 2018-12-24 {
+    description
+      "Add multicat protocol para config.";
+    reference
+      "";
+  }
+  revision 2018-05-27 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+ 
+
+  container multicast {
+    description
+      "Multicast configuration.";
+    grouping igmp-statistics-basic {
+      description
+        "Statistics of igmp messages.";
+      leaf rcv-gen-query-count {
+        type uint32;
+        description
+          "Number of received IGMPv2 and IGMPv3 General Query messages.";
+      }
+      leaf rcv-sp-query-count {
+        type uint32;
+        description
+          "Number of received IGMPv2 and IGMPv3 Specific Query messages.";
+      }
+      leaf rcv-v2-report-count {
+        type uint32;
+        description
+          "Number of received IGMPv2 Report messages.";
+      }
+      leaf rcv-v3-report-count {
+        type uint32;
+        description
+          "Number of received IGMPv3 Report messages.";
+      }
+      leaf rcv-leave-count {
+        type uint32;
+        description
+          "Number of received IGMPv2 Leave messages.";
+      }
+      leaf snd-gen-query-count {
+        type uint32;
+        description
+          "Number of IGMPv2 and IGMPv3 sent General Query messages.";
+      }
+      leaf snd-sp-query-count {
+        type uint32;
+        description
+          "Number of IGMPv2 and IGMPv3 sent Specific Query messages.";
+      }
+      leaf snd-v2-report-count {
+        type uint32;
+        description
+          "Number of sent IGMPv2 Report messages.";
+      }
+      leaf snd-v3-report-count {
+        type uint32;
+        description
+          "Number of sent IGMPv3 Report messages.";
+      }
+      leaf snd-leave-count {
+        type uint32;
+        description
+          "Number of sent IGMPv2 Leave messages.";
+      }
+      leaf rcv-invalid-count {
+        type uint32;
+        description
+          "Number of received IGMP invalid messages.";
+      }
+    }
+    grouping igmp-statistics-program {
+      description
+        "Statistics of program join or leave information for multicase users.";
+      leaf join-succ-program-count {
+        type uint32;
+        description
+          "Number of received join successful programs.";
+      }
+      leaf leave-program-count {
+        type uint32;
+        description
+          "Number of received leave programs.";
+      }
+    }
+    container global {
+      description
+        "Configure the parameters of global multicast.";
+      leaf querier {
+        type inet:ipv4-address;
+        default "192.168.1.1";
+        description
+          "Indicates the source IP address of IGMP packets sent to the user side.";
+      }
+      leaf user-action-report {
+        type enumeration {
+          enum "enabled" {
+            value 1;
+            description
+              "When user action report is enabled, the user's behaviour statistic log will be report.";
+          }
+          enum "disabled" {
+            value 2;
+            description
+              "When user action report is disabled, the user's behaviour statistic log will not be report.";
+          }
+        }
+        default "disabled";
+        description
+          "Indicates the user action report switch.";
+      }
+      leaf query-interval {
+        type uint32 {
+          range "30..5000";
+        }
+        units "s";
+        default "125";
+        description
+          "The interval at which MGMD General Query messages (GMQs) are sent on interfaces.";
+      }
+      leaf v2-query-max-response-time {
+        type uint32 {
+          range "1..255";
+        }
+        units "0.1 s";
+        default "100";
+        description
+          "Indicates the maximum response time for general query message in multicast VLAN, whose version is IGMP v2.";
+      }
+      leaf v3-query-max-response-time {
+        type uint32 {
+          range "1..31744";
+        }
+        units "0.1 s";
+        must "current() < ../query-interval * 10" {
+          error-message
+            "The maximum response time for general query must be smaller than the interval for general query.";
+        }
+        default "100";
+        description
+          "Indicates the maximum response time for general query message in multicast VLAN,whose version is IGMP v3.
+           This value for the maximum response time of the IGMP V3 general query is larger than 128 and therefore will be automatically rounded
+           down to the value which is a multiple of 8.";
+      }
+      leaf robustness {
+        type uint32 {
+          range "1..10";
+        }
+        default "2";
+        description
+          "Indicates the robustness for query message in multicast VLAN.";
+      }
+      leaf last-member-query-interval {
+        type uint32 {
+          range "1..50000";
+        }
+        units "0.1 s";
+        default "10";
+        description
+          "Indicates the special query interval of query message in multicast VLAN.";
+      }
+      leaf v2-last-member-query-max-response-time {
+        type uint32 {
+          range "1..255";
+        }
+        units "0.1 s";
+        must "current() < ../last-member-query-interval" {
+          error-message
+            "The maximum response time for group-specific query must be smaller than the interval for group-specific query.";
+        }
+        default "8";
+        description
+          "Indicates the maximum response time for special query message in multicast VLAN,whose version is IGMP v2.";
+      }
+      leaf v3-last-member-query-max-response-time {
+        type uint32 {
+          range "1..31744";
+        }
+        units "0.1 s";
+        must "current() < ../last-member-query-interval" {
+          error-message
+            "The maximum response time for group-specific query must be smaller than the interval for group-specific query.";
+        }
+        default "8";
+        description
+          "Indicates the maximum response time for special query message in multicast VLAN,whose version is IGMP v3.
+           This value for the maximum response time of the IGMP V3 specific query is larger than 128 and therefore will be automatically rounded
+           down to the vlaue which is a multiple of 8.";
+      }
+      leaf last-member-query-count {
+        type uint32 {
+          range "1..10";
+        }
+        default "2";
+        description
+          "Indicates the special query times of query message in multicast VLAN.";
+      }
+      leaf v2-router-timerout {
+        type uint32 {
+          range "1..5000";
+        }
+        units "s";
+        default "400";
+        description
+          "Sets/Queries the timeout time of router V2.";
+      }
+      leaf initial-unsolicited-report-interval {
+        type int32 {
+          range "1..10";
+        }
+        units "s";
+        default "1";
+        description
+          "Indicates the initial unsolicited report interval of user.";
+      }
+      leaf bandwidth-cac {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable the bandwidth cac. The CAC will take effect if the user demands the next program when it's enabled.
+           When user action report is disabled, the CAC won't take effect on the multicast user or the PON port.";
+      }
+      leaf encapsulation {
+        type enumeration {
+          enum "all" {
+            value 1;
+            description
+              "Sets the encapsulation format of the IGMP packets that are allowed to be transmitted to PPPoE,
+               IPoA, and IPoE.";
+          }
+          enum "ppp" {
+            value 2;
+            description
+              "Sets the encapsulation format of the IGMP packets that are allowed to be transmitted to PPPoE.
+               In this case, the system discards IPoA and IPoE packets.";
+          }
+          enum "ip" {
+            value 3;
+            description
+              "Sets the encapsulation format of the IGMP packets that are allowed to be transmitted to IPoA
+               and IPoE. In this case, the system transparently transmits PPPoE packets.";
+          }
+        }
+        default "all";
+        description
+          "Indicates the permitted IGMP packet encapsulation format.";
+      }
+      leaf upstream-mode {
+        type enumeration {
+          enum "igmp" {
+            value 1;
+            description
+              "Indicates that the intercommunication mode of the multicast upstream interface is IGMP mode.";
+          }
+          enum "pim-ssm" {
+            value 2;
+            description
+              "Indicates that the intercommunication mode of the multicast upstream interface is PIM-SSM mode.";
+          }
+          enum "pim-sm" {
+            value 3;
+            description
+              "Indicates that the intercommunication mode of the multicast upstream interface is PIM-SM mode.";
+          }
+        }
+        default "igmp";
+        description
+          "Configure the intercommunication mode of the multicast upstream interface.";
+      }
+      container statistics {
+        config false;
+        description
+          "Global statistics.";
+        container igmp {
+          description
+            "Statistics of IGMP for global.";
+          uses igmp-statistics-basic;
+          leaf rcv-invalid-ttl-count {
+            type uint32;
+            description
+              "Number of received IGMP invalid TTL messages.";
+          }
+          leaf active-program-count {
+            type uint32;
+            description
+              "Number of IGMP active programs.";
+          }
+          leaf active-user-count {
+            type uint32;
+            description
+              "Number of IGMP active users.";
+          }
+        }
+      }
+    }
+    container queue-priority {
+      description
+        "Configure multicast queue priority.";
+      leaf priority {
+        type uint8 {
+          range "3..7";
+        }
+        default "5";
+        description
+          "Configure multicast queue priority value.";
+      }
+    }
+    container unknown-multicast {
+      description
+        "Configure unknown-multicast-policy of service-port.";
+      leaf default-policy {
+        type enumeration {
+          enum "transparent" {
+            value 0;
+            description
+              "Supporting tranparent configurations for the default unknown multicast policy of service-port.";
+          }
+          enum "discard" {
+            value 1;
+            description
+              "Supporting discard configurations for the default unknown multicast policy of service-port.";
+          }
+        }
+        default "discard";
+        description
+          "Indicates the configuration for default unknown multicast policy of service-port.";
+      }
+    }
+    container right-profiles {
+      description
+        "List of configurations for multicast authority profiles.";
+      list right-profile {
+        key "index";
+        description
+          "Configure the multicast authority profile.";
+        leaf index {
+          type uint32;
+          description
+            "Indicates the index of an authority profile in the profile mode.";
+        }
+        leaf profile-name {
+          type string {
+            length "1..16";
+            pattern "[^\"?][^?]*";
+          }
+          description
+            "Indicates the profile name. Range: 1-16.";
+        }
+        container program-rights {
+          description
+            "List of right profile configurations.";
+          list program-right {
+            key "index";
+            description
+              "Configure the right profile parameters.";
+            leaf index {
+              type leafref {
+                path "/hw-bb-multicast:multicast/hw-bb-multicast:programs/hw-bb-multicast:program/hw-bb-multicast:index";
+              }
+              description
+                "Indicates the program index.";
+            }
+            leaf right {
+              type enumeration {
+                enum "watch" {
+                  value 1;
+                  description
+                    "Watch right.";
+                }
+                enum "preview" {
+                  value 2;
+                  description
+                    "Preview right.";
+                }
+                enum "forbidden" {
+                  value 3;
+                  description
+                    "Forbidden right.";
+                }
+              }
+              mandatory true;
+              description
+                "Indicate the program right.";
+            }
+          }
+        }
+      }
+    }
+    container users {
+      description
+        "List of configuration for multicast users.";
+      list user {
+        key "index";
+        description
+          "Configure the multicast user parameters.";
+        leaf index {
+          type uint32;
+          description
+            "The multicast user index, a unique value to identify a multicast user.";
+        }
+        leaf service-flow-index {
+          type leafref {
+            path "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow/hw-bb-srv-flow:index";
+          }
+          mandatory true;
+          description
+            "Indicates the service-flow on a multicast user.";
+        }
+        leaf authentication-required {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable authorization-required for the full list of multicast programs.
+             If it is false, then the full list of multicast programs is authorized.";
+        }
+        leaf quick-leave {
+          type enumeration {
+            enum "immediate" {
+              value 1;
+              description
+                "Quick leave controls the function by which a service-flow
+                 that receives a leave group message for a certain group might
+                 immediately delete the corresponding group record. When immediate is enabled,
+                 the device tracks hosts based on multicast users instead of MACs. Different MACs
+                 on the service-flow will be recognized as a same host.";
+            }
+            enum "mac-based" {
+              value 2;
+              description
+                "When mac-based is enabled, the device tracks hosts based on MACs.
+                 Different MACs will be recognized as different hosts.";
+            }
+            enum "disabled" {
+              value 3;
+              description
+                "When quick leave is disabled, the device no longer tracks
+                 hosts. Instead, whenever it receives a leave group from a
+                 host on a service-flow, it sends out a group-specific query to
+                 all hosts on that service-flow. If it does not receive any
+                 membership reports on the service-flow in response to the
+                 group-specific query within a set interval, it stops
+                 forwarding multicast traffic to the service-flow.";
+            }
+          }
+          default "mac-based";
+          description
+            "Indicates the quick leave attribute of a user.";
+        }
+        leaf log {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "When log is enabled, the user's behaviour logs will be created.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "When log is disabled, the user's behaviour logs will not be created.";
+            }
+          }
+          default "enabled";
+          description
+            "Indicates the log switch.";
+        }
+        leaf max-channel-number {
+          type uint32 {
+            range "1..256";
+          }
+          default "8";
+          description
+            "Indicates the maximum number of concurrent channels that can be watched by a user.";
+        }
+        leaf max-bandwidth {
+          type union {
+            type enumeration {
+              enum "no-limit" {
+                value 1;
+                description
+                  "No limit is applied.";
+              }
+            }
+            type uint32 {
+              range "0..4294967294";
+            }
+          }
+          units "kbit/s";
+          default "no-limit";
+          description
+            "Indicates the maximum multicast bandwidth.";
+        }
+        leaf global-leave {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "Receive any user-initiated IGMP leave messages for group '0.0.0.0'.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "Drop any user-initiated IGMP leave messages for group '0.0.0.0'.";
+            }
+          }
+          default "disabled";
+          description
+            "Indicates how to process user-initiated IGMP leave messages for group '0.0.0.0'.";
+        }
+        leaf igmp-version {
+          type enumeration {
+            enum "v2" {
+              value 1;
+              description
+                "IGMP v2.";
+            }
+            enum "v3" {
+              value 2;
+              description
+                "Initial version is IGMP v3. If IGMP v2 messages from the user are received,
+                 the IGMP version of its querier will be changed to lower IGMP version.";
+            }
+            enum "v3-forced" {
+              value 3;
+              description
+                "IGMP v3. The IGMP version of user's querier will be kept the same
+                 whenever any version messages are received.";
+            }
+            enum "v2-with-query" {
+              value 4;
+              description
+                "Querier will send a IGMP v2 general query message immediately after receiving a v3 report.";
+            }
+          }
+          default "v3";
+          description
+            "Indicates the IGMP version of user's querier.";
+        }
+        leaf mld-version {
+          type enumeration {
+            enum "v2" {
+              value 1;
+              description
+                "MLD v2.";
+            }
+            enum "v2-special" {
+              value 2;
+              description
+                "Initial version is MLD v2. However, it will be changed according to the version of reports from hosts.";
+            }
+          }
+          default "v2";
+          description
+            "Indicates the MLD version of user's querier.";
+        }
+        container right-profiles {
+          description
+            "Configure the right profiles of the user.";
+          leaf-list right-profile {
+            type leafref {
+              path "/hw-bb-multicast:multicast/hw-bb-multicast:right-profiles/hw-bb-multicast:right-profile/hw-bb-multicast:index";
+            }
+            description
+              "Configure the right profiles of the user.";
+          }
+        }
+        container statistics {
+          config false;
+          description
+            "User statistics.";
+          container igmp {
+            description
+              "Statistics of IGMP for multicast users.";
+            uses igmp-statistics-basic;
+            uses igmp-statistics-program;
+            leaf join-unsucc-program-count {
+              type uint32;
+              description
+                "Number of received join unsuccessful programs number.";
+            }
+          }
+        }
+      }
+    }
+    container cascade-ports {
+      description
+        "List of the configuration for multicast cascade ports.";
+      list cascade-port {
+        key "index";
+        description
+          "Configure the parameters of multicast cascade port.";
+        leaf index {
+          type uint32;
+          description
+            "The multicast cascade port index, a unique value to identify a multicast cascade port.";
+        }
+        choice type {
+          mandatory true;
+          description
+            "Cascade port type.";
+          case ethernet-port {
+            description
+              "Indicates the multicast cascade port type is Ethernet.";
+            leaf interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              mandatory true;
+              description
+                "Indicates the ethernet or ethernet-like interface which can carry ethernet frames.";
+            }
+          }
+          case vxlan-peer {
+            description
+              "Indicates the multicast cascade port type is VXLAN.";
+            leaf vni-id {
+              type uint32 {
+                range "1..16777215";
+              }
+              mandatory true;
+              description
+                "Indicates a VXLAN network identifier (VNI) ID.";
+            }
+            leaf peer-address {
+              type inet:ip-address;
+              mandatory true;
+              description
+                "Indicates the IP address of a remote virtual tunnel end point (VTEP).";
+            }
+          }
+        }
+        leaf quick-leave {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "Quick leave controls the function by which a cascade port
+                 that receives a leave group message for a certain group might
+                 immediately delete the corresponding group record.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "When quick leave is disabled, the device no longer tracks
+                 hosts. Instead, whenever it receives a leave group from a
+                 host on a cascade port, it sends out a group-specific query to
+                 all hosts on that cascade port. If it does not receive any
+                 membership reports on the cascade port in response to the
+                 group-specific query within a set interval, it stops
+                 forwarding multicast traffic to the cascade port.";
+            }
+          }
+          description
+            "Indicates the quick-leave attribute.";
+        }
+      }
+    }
+    container multicast-vlans {
+      description
+        "List of the configuration for multicast VLANs.";
+      list multicast-vlan {
+        key "vlan-id";
+        description
+          "Configure the parameters of multicast VLAN.";
+        leaf vlan-id {
+          type union {
+            type uint16 {
+              range "1..4093";
+            }
+            type string {
+              length "4..32";
+            }
+          }
+          description
+            "VLAN ID.";
+        }
+        container igmp {
+          description
+            "Configure the IGMP parameters.";
+          leaf mode {
+            type enumeration {
+              enum "proxy" {
+                value 1;
+                description
+                  "Indicates IGMP mode is proxy.";
+              }
+              enum "snooping" {
+                value 2;
+                description
+                  "Indicates IGMP mode is snooping.";
+              }
+              enum "off" {
+                value 3;
+                description
+                  "Disables IGMP function of this multicast VLAN.";
+              }
+            }
+            default "off";
+            description
+              "Indicates the IGMP mode applied for this multicast VLAN.";
+          }
+          leaf report-proxy {
+            type enumeration {
+              enum "enabled" {
+                value 1;
+                description
+                  "A snooper with report-proxy capability will perform report summarization
+                   in order to reduce the load on the upstream multicast router.";
+              }
+              enum "disabled" {
+                value 2;
+                description
+                  "When report-proxy is disabled, a snooper will transparently forward report
+                   messages to the upstream multicast router.";
+              }
+            }
+            default "disabled";
+            description
+              "Indicates how to process report messages in the IGMP snooping mode.";
+          }
+          leaf leave-proxy {
+            type enumeration {
+              enum "enabled" {
+                value 1;
+                description
+                  "A snooper with leave-proxy capability will perform leave summarization
+                   in order to reduce the load on the upstream multicast router.";
+              }
+              enum "disabled" {
+                value 2;
+                description
+                  "When leave-proxy is disabled, a snooper will transparently forward leave
+                   messages to the upstream multicast router.";
+              }
+            }
+            default "disabled";
+            description
+              "Indicates how to process leave messages in the IGMP snooping mode.";
+          }
+          leaf query-proxy {
+            type enumeration {
+              enum "enabled" {
+                value 1;
+                description
+                  "A snooper with query-proxy capability will act as a querier and absorb query
+                   messages from the upstream multicast router.";
+              }
+              enum "disabled" {
+                value 2;
+                description
+                  "When query-proxy is disabled, a snooper will transparently forward query
+                   messages received from the upstream multicast router.";
+              }
+            }
+            default "enabled";
+            description
+              "Indicates how to process query messages in the IGMP snooping mode.";
+          }
+          leaf match-mode {
+            type enumeration {
+              enum "enabled" {
+                value 1;
+                description
+                  "Groups are created according to the configuration of programs.";
+              }
+              enum "disabled" {
+                value 2;
+                description
+                  "Groups are created according to the configuration of programs or ranges of groups.";
+              }
+            }
+            default "enabled";
+            description
+              "Indicates how to match groups.";
+          }
+          leaf version {
+            type enumeration {
+              enum "v2" {
+                value 1;
+                description
+                  "IGMP v2.";
+              }
+              enum "v3" {
+                value 2;
+                description
+                  "IGMP v3.";
+              }
+            }
+            default "v3";
+            description
+              "Indicates the protocol version supported.";
+          }
+          leaf priority {
+            type bbf-dot1qt:pbit;
+            default "6";
+            description
+              "Indicates the ethernet priority bits for IGMP messages in the upstream direction.";
+          }
+          leaf global-leave {
+            type enumeration {
+              enum "enabled" {
+                value 1;
+                description
+                  "Receive any user-initiated IGMP leave messages for group '0.0.0.0'.";
+              }
+              enum "disabled" {
+                value 2;
+                description
+                  "Drop any user-initiated IGMP leave messages for group '0.0.0.0'.";
+              }
+            }
+            default "disabled";
+            description
+              "Indicates how to process user-initiated IGMP leave messages for group '0.0.0.0'.";
+          }
+          leaf initial-unsolicited-report-interval {
+            type int32 {
+              range "-1 | 1..10";
+            }
+            units "s";
+            default "-1";
+            description
+              "Indicates the initial unsolicited report interval of user.
+               When the value is -1, the max timeout will be the global configuration.";
+          }
+          leaf unsolicited-report-interval {
+            type uint32 {
+              range "10..5000";
+            }
+            units "s";
+            default "10";
+            description
+              "Indicates the initial unsolicited report interval of user.";
+          }
+          leaf query-interval {
+            type int32 {
+              range "-1 | 30..5000";
+            }
+            units "s";
+            default "-1";
+            description
+              "The interval at which MGMD General Query messages (GMQs) are sent on interfaces. When the value is -1,
+               the query interval will be the global configuration. If the MVLAN general query interval is not configured,
+               the returned value for query-interval is -1.";
+          }
+          leaf v2-query-max-response-time {
+            type int32 {
+              range "-1 | 1..255";
+            }
+            units "0.1 s";
+            default "-1";
+            description
+              "Indicates the maximum response time for general query message in multicast VLAN, whose version is IGMP v2.
+               When the value is -1, the max response time will be the global configuration.";
+          }
+          leaf v3-query-max-response-time {
+            type int32 {
+              range "-1 | 1..31744";
+            }
+            units "0.1 s";
+            must "current() < ../query-interval * 10" {
+              error-message
+                "The maximum response time for general query must be smaller than the interval for general query.";
+            }
+            default "-1";
+            description
+              "Indicates the maximum response time for general query message in multicast VLAN,whose version is IGMP v3.
+               When the value is -1, the max response time will be the global configuration.
+               This value for the maximum response time of the IGMP V3 general query is larger than 128 and therefore will be automatically rounded
+               down to the value which is a multiple of 8.";
+          }
+          leaf robustness {
+            type int32 {
+              range "-1 | 1..10";
+            }
+            default "-1";
+            description
+              "Indicates the robustness for query message in multicast VLAN.
+               When the value is -1, the robustness will be the global configuration.";
+          }
+          leaf last-member-query-interval {
+            type int32 {
+              range "-1 | 1..50000";
+            }
+            units "0.1 s";
+            default "-1";
+            description
+              "Indicates the special query interval of query message in multicast VLAN.
+               When the value is -1, the query interval will be the global configuration.";
+          }
+          leaf v2-last-member-query-max-response-time {
+            type int32 {
+              range "-1 | 1..255";
+            }
+            units "0.1 s";
+            must "current() < ../last-member-query-interval" {
+              error-message
+                "The maximum response time for group-specific query must be smaller than the interval for group-specific query.";
+            }
+            default "-1";
+            description
+              "Indicates the maximum response time for special query message in multicast VLAN,whose version is IGMP v2.
+               When the value is -1, the max response time will be the global configuration.";
+          }
+          leaf v3-last-member-query-max-response-time {
+            type int32 {
+              range "-1 | 1..31744";
+            }
+            units "0.1 s";
+            must "current() < ../last-member-query-interval" {
+              error-message
+                "The maximum response time for group-specific query must be smaller than the interval for group-specific query.";
+            }
+            default "-1";
+            description
+              "Indicates the maximum response time for special query message in multicast VLAN,whose version is IGMP v3.
+               When the value is -1, the max response time will be the global configuration.
+               This value for the maximum response time of the IGMP V3 specific query is larger than 128 and therefore will be automatically rounded
+               down to the vlaue which is a multiple of 8.";
+          }
+          leaf last-member-query-count {
+            type int32 {
+              range "-1 | 1..10";
+            }
+            default "-1";
+            description
+              "Indicates the special query times of query message in multicast VLAN.
+               When the value is -1, the query times will be the global configuration.";
+          }
+          leaf v2-router-timerout {
+            type int32 {
+              range "-1 | 1..5000";
+            }
+            units "s";
+            default "-1";
+            description
+              "Sets/Queries the timeout time of router V2.
+               When the value is -1, the max timeout will be the global configuration.";
+          }
+          container group-ranges {
+            description
+              "List of the configuration for group ranges.";
+            list group-range {
+              key "index";
+              description
+                "Configure the group range parameters.";
+              leaf index {
+                type uint32;
+                description
+                  "The group range index, a unique value to identify a non overlapping group range.";
+              }
+              leaf group-ip-start {
+                type inet:ipv4-address;
+                mandatory true;
+                description
+                  "Indicates the start IP address of the programs.";
+              }
+              leaf group-ip-end {
+                type inet:ipv4-address;
+                mandatory true;
+                description
+                  "Indicates the end IP address of the programs.
+                   The group range is between group-ip-start and group-ip-end.
+                   And the group-ip-end must be greater than or eaqual to the group-ip-start.";
+              }
+              leaf source-ip {
+                type inet:ipv4-address;
+                default "255.255.255.255";
+                description
+                  "The source IP address of the group. A value '255.255.255.255' indicates the source IP
+                   of the use's requests for the group is trusted in the ASMSSM mode. A value '0.0.0.0' indicates
+                   the source IP of the user's requests for the group can be ignored in the ASMSSM or ASM-only mode.
+                   A value different of '0.0.0.0' or '255.255.255.255' is to be compared with the source IP of a use's
+                   requests for the group in the ASMSSM or SSM-ony mode.";
+              }
+              leaf host-ip {
+                type inet:ipv4-address;
+                default "0.0.0.0";
+                description
+                  "Indicates the source IP of IGMP messages requesting for this range of group.";
+              }
+              choice priority {
+                default "copy-pbit-from-outer-tag";
+                description
+                  "Indicates what pbits must be marked in the output multicast frames.";
+                case copy-pbit-from-outer-tag {
+                  description
+                    "Copy from the outer input tag.";
+                  leaf copy-pbit-from-outer-tag {
+                    type empty;
+                    description
+                      "Copy from the outer input tag.";
+                  }
+                }
+                case write-pbit {
+                  description
+                    "Indicates a pbit value to write into the tag.";
+                  leaf pbit-value {
+                    type bbf-dot1qt:pbit;
+                    description
+                      "Indicates a pbit value to write into the tag.";
+                  }
+                }
+              }
+            }
+          }
+        }
+        container uplink-ports {
+          description
+            "Configure the parameters of multicast uplink ports.";
+          choice type {
+            description
+              "Uplink port type.";
+            case ethernet-port {
+              description
+                "Indicates the multicast uplink port type is Ethernet.";
+              container ethernet-ports {
+                description
+                  "List of parameters for multicast uplink ports.";
+                list ethernet-port {
+                  key "interface";
+                  description
+                    "Configure the parameters of ethernet link.";
+                  leaf interface {
+                    type leafref {
+                      path "/if:interfaces/if:interface/if:name";
+                    }
+                    description
+                      "Indicates the interface or virtual interface which can carry ethernet frames.";
+                  }
+                }
+              }
+            }
+            case vxlan-peer {
+              description
+                "Indicates the multicast uplink port type is VXLAN.";
+              container vxlan-peers {
+                description
+                  "List of configurations for VXLAN network.";
+                list vxlan-peer {
+                  key "vni-id peer-address";
+                  description
+                    "Configure the parameters of VXLAN peer link.";
+                  leaf vni-id {
+                    type uint32 {
+                      range "1..16777215";
+                    }
+                    description
+                      "Indicates a VXLAN network identifier (VNI) ID.";
+                  }
+                  leaf peer-address {
+                    type inet:ip-address;
+                    description
+                      "Indicates the IP address of a remote virtual tunnel end point (VTEP).";
+                  }
+                }
+              }
+            }
+          }
+        }
+        container users {
+          description
+            "Configure the parameters of MVLAN members.";
+          leaf-list user {
+            type leafref {
+              path "/hw-bb-multicast:multicast/hw-bb-multicast:users/hw-bb-multicast:user/hw-bb-multicast:index";
+            }
+            description
+              "Configure the user parameters for this multicast VLAN.";
+          }
+        }
+        container statistics {
+          config false;
+          description
+            "VLAN statistics.";
+          container igmp {
+            description
+              "Statistics of IGMP for multicast VLANs.";
+            uses igmp-statistics-basic;
+            leaf active-program-count {
+              type uint32;
+              description
+                "Number of IGMP active programs.";
+            }
+            leaf active-user-count {
+              type uint32;
+              description
+                "Number of IGMP active users.";
+            }
+            uses igmp-statistics-program;
+          }
+        }
+      }
+    }
+    container programs {
+      description
+        "List of configurations for multicast programs.";
+      list program {
+        key "index";
+        description
+          "Configure the parameters of multicast programs.";
+        leaf index {
+          type uint32;
+          description
+            "The multicast program index, a unique value to identify a multicast program.";
+        }
+        leaf program-ip {
+          type inet:ip-address;
+          mandatory true;
+          description
+            "Indicates the IP address of a program, the multicast address.
+             Range: 224.0.1.0-239.255.255.255.";
+        }
+        leaf program-name {
+          type string {
+            length "1..16";
+            pattern "[^\"?][^?]*";
+          }
+          default "PROGRAM-N";
+          description
+            "Indicates the program name. Range: 1-16. N is the index of the program.
+             When creating or modifying the program, input as PROGRAM-M is not allowed, where M
+             is in the range from 0 to 65535.";
+        }
+        leaf vlan-id {
+          type uint32;
+          description
+            "Indicates the VLAN where the program resides.";
+        }
+        leaf dnet-id {
+          type uint32;
+          description
+            "Indicates the dedicated-net id where the program resides.";
+        }
+        leaf prejoin {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "When the prejoin function is enabled, the report packet is sent when the user adds
+                 a program. Then, the program stream is delivered to the upstream port so that the program can be
+                 ordered quickly.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "When the prejoin function is disabled, the report packet isnot sent when the user adds
+                 a program.";
+            }
+          }
+          default "disabled";
+          description
+            "Indicates the pre-join function of a program.";
+        }
+        leaf source-ip {
+          type inet:ip-address;
+          default "255.255.255.255";
+          description
+            "Indicates the IP address of the program source.";
+        }
+        leaf log {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "The log of ordering a program can be recorded when log is enabled.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "The log of ordering a program cannot be recorded when log is disabled.";
+            }
+          }
+          default "enabled";
+          description
+            "Indicates the log attribute of the program, that is, whether to collect the log statistics
+             about the program.";
+        }
+        leaf unsolicited {
+          type enumeration {
+            enum "enabled" {
+              value 1;
+              description
+                "The program can report actively.";
+            }
+            enum "disabled" {
+              value 2;
+              description
+                "The program cannot report actively.";
+            }
+          }
+          default "disabled";
+          description
+            "Indicates the active report attribute of a program.";
+        }
+        leaf bandwidth {
+          type uint32 {
+            range "0..65534";
+          }
+          units "kbit/s";
+          default "5000";
+          description
+            "Indicates the program bandwidth, it is used for bandwidth calculation during bandwidth
+             allocation and management.";
+        }
+        leaf priority {
+          type bbf-dot1qt:pbit;
+          default "7";
+          description
+            "Indicates the program priority. It is the 802.1p priority marked to the multicast data
+             packets.";
+        }
+        leaf host-ip {
+          type inet:ipv4-address;
+          default "0.0.0.0";
+          description
+            "Indicates the IP address of the program host. The host-ip cannot be multicast ip.";
+        }
+        leaf grade {
+          type enumeration {
+            enum "HDTV" {
+              value 0;
+              description
+                "The program grade is HDTV.";
+            }
+            enum "SDTV" {
+              value 1;
+              description
+                "The program grade is SDTV.";
+            }
+            enum "streaming-video" {
+              value 2;
+              description
+                "The program grade is streaming-video.";
+            }
+            enum "no-grade" {
+              value 255;
+              description
+                "The program is no grade.";
+            }
+          }
+          default "no-grade";
+          description
+            "Indicates the program grade that is divided based on the definition.";
+        }
+        leaf videomode {
+          type enumeration {
+            enum "multicast" {
+              value 1;
+              description
+                "The duplication mode is multicast.";
+            }
+            enum "unicast" {
+              value 2;
+              description
+                "The duplication mode is unicast.";
+            }
+            enum "notconfig" {
+              value 3;
+              description
+                "The duplication mode configed in the MVLAN for the program is used.";
+            }
+          }
+          default "notconfig";
+          description
+            "Indicates the duplication mode of a program.";
+        }
+      }
+    }
+    container active-channels {
+      config false;
+      description
+        "List of active multicast channels state data.";
+      list active-channel {
+        key "channel-id";
+        description
+          "Operational state of the active multicast channel.";
+        leaf channel-id {
+          type leafref {
+            path "/hw-bb-multicast:multicast/hw-bb-multicast:programs/hw-bb-multicast:program/hw-bb-multicast:index";
+          }
+          description
+            "Indicates the program index.";
+        }
+        leaf last-reporter-ip {
+          type inet:ipv4-address;
+          description
+            "Indicates the IP address of the host that reports the last IGMP report packet.";
+        }
+        leaf found-elapse {
+          type string {
+            length "1..16";
+          }
+          description
+            "Indicates the elapse time since the creation of a multicast group, displayed
+             in ASCII. When it is shorter than a day, its precession is second in the form
+             of HH:MM:SS. If it is longer than a day, its precision is day, in the form of n days,
+             where, n indicates the number of days.";
+        }
+        leaf expire-time {
+          type string {
+            length "1..16";
+          }
+          description
+            "Indicates the expiration time of the multicast group, displayed in ASCII.
+             When it is shorter than a day, its precession is second in the form of HH:MM:SS.
+             If it is longer than a day, its precision is day, in the form of n days,
+             where, n indicates the number of days.";
+        }
+        leaf-list watching-user {
+          type leafref {
+            path "/hw-bb-multicast:multicast/hw-bb-multicast:users/hw-bb-multicast:user/hw-bb-multicast:index";
+          }
+          description
+            "Operational state of users that are watching this program.";
+        }
+        leaf-list watching-cascade {
+          type leafref {
+            path "/hw-bb-multicast:multicast/hw-bb-multicast:cascade-ports/hw-bb-multicast:cascade-port/hw-bb-multicast:index";
+          }
+          description
+            "Operational state of cascades that are watching this program.";
+        }
+      }
+    }
+  }
+
+  augment "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow" {
+    description
+      "Indicates the parameters applying to the service flow.";
+    container multicast-policy {
+      description
+        "Configure the multicast policy.";
+      container igmp {
+        description
+          "Configure the IGMP policy.";
+        leaf frame-forwarding {
+          type enumeration {
+            enum "process" {
+              value 1;
+              description
+                "IGMP messages are processed by IGMP proxy or snooping function.";
+            }
+            enum "forward" {
+              value 2;
+              description
+                "IGMP messages are forwarded as regular traffic.";
+            }
+            enum "discard" {
+              value 3;
+              description
+                "IGMP messages are discarded.";
+            }
+          }
+          default "process";
+          description
+            "Indicates the action to be performed on IGMP messages received on the service-flow.";
+        }
+      }
+      container unknown-multicast {
+        description
+          "Configure the unknown multicast policy.";
+        leaf frame-forwarding {
+          type enumeration {
+            enum "forward" {
+              value 1;
+              description
+                "Unknown multicast shall be forwarded.";
+            }
+            enum "discard" {
+              value 2;
+              description
+                "Unknown multicast shall be discarded.";
+            }
+          }
+          description
+            "The default value is discard for switching-oriented service port.
+             The default policy for suppressing the unknown multicast traffic stream
+             is forward for connection-oriented service port, and cannot be modified.";
+        }
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface" {
+    when "if:type = 'ianaift:gpon'";
+    description
+      "Multicast configuration of the interface.";
+    container multicast {
+      description
+        "Configure the maximum bandwidth for multicast services carried on PON port.";
+      leaf igmp-max-bandwidth {
+        type union {
+          type enumeration {
+            enum "no-limit" {
+              value 1;
+              description
+                "No limit is applied.";
+            }
+          }
+          type uint32 {
+            range "512..10435428";
+          }
+        }
+        units "kbit/s";
+        default "716800";
+        description
+          "Indicates the maximum multicast bandwidth on the interface.";
+      }
+    }
+  }
+}

@@ -8,6 +8,7 @@ using YangTokenType enum for token kinds.
 from typing import Optional, List
 
 from .parser_context import TokenStream, YangToken, YangTokenType
+from .yang_strings import unescape_yang_quoted_string
 
 
 class YangTokenizer:
@@ -99,7 +100,7 @@ class YangTokenizer:
                         advance()
                 add_token(
                     YangTokenType.STRING,
-                    content[start:i],
+                    unescape_yang_quoted_string(content[start:i], quote),
                     token_start,
                     token_line,
                     token_line_start,

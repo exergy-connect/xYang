@@ -1,0 +1,42 @@
+module huawei-bbf-qos-policies-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-policies-deviations-MA5800";
+  prefix bbf-qos-plc-devs-MA5800;
+
+  import bbf-qos-policies {
+    prefix bbf-qos-pol;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-policies module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-pol:qos-policy-profiles/bbf-qos-pol:policy-profile/bbf-qos-pol:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/bbf-qos-pol:policies/bbf-qos-pol:policy/bbf-qos-pol:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+}

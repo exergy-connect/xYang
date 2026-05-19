@@ -39,6 +39,49 @@ def resolve_structure_instance(
     return schema, inner
 
 
+def defining_module_name(stmt: YangStatement, parent_module_name: str) -> str:
+    """YANG module that defines *stmt* for RFC 7951 encoding under *parent_module_name*."""
+    explicit = getattr(stmt, "defining_module", None)
+    if explicit:
+        return explicit
+    return parent_module_name
+
+
+def instance_member_keys(stmt: YangStatement, parent_module_name: str) -> set[str]:
+    """
+    JSON object keys for *stmt* under a parent data node in *parent_module_name*.
+
+    Same-module children use the local identifier; nodes from another module use
+    ``module-name:identifier`` (RFC 7951).
+    """
+    local = stmt.name
+    if not local:
+        return set()
+    def_mod = defining_module_name(stmt, parent_module_name)
+    if def_mod == parent_module_name:
+        return {local}
+    return {f"{def_mod}:{local}"}
+
+
+def instance_member_present(data: Mapping[str, Any], stmt: YangStatement, parent_module_name: str) -> bool:
+    return bool(instance_member_keys(stmt, parent_module_name) & data.keys())
+
+
+def instance_member_lookup(
+    data: Mapping[str, Any], stmt: YangStatement, parent_module_name: str
+) -> tuple[Any, Optional[str]]:
+    """
+    Return ``(value, json_key)`` for *stmt* in *data*.
+
+  ``json_key`` is the key found in *data*, or ``None`` when the value comes from a
+    schema default and is not present in *data*.
+    """
+    for key in instance_member_keys(stmt, parent_module_name):
+        if key in data:
+            return data[key], key
+    return None, None
+
+
 def resolve_qualified_top_level(
     member_key: str, modules: Mapping[str, YangModule]
 ) -> Tuple[Optional[YangStatement], Optional[YangModule]]:
@@ -59,4 +102,11 @@ def resolve_qualified_top_level(
     return stmt, mod
 
 
-__all__ = ["resolve_qualified_top_level"]
+__all__ = [
+    "defining_module_name",
+    "instance_member_keys",
+    "instance_member_lookup",
+    "instance_member_present",
+    "resolve_qualified_top_level",
+    "resolve_structure_instance",
+]

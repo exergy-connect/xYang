@@ -1,0 +1,247 @@
+module huawei-ietf-hardware-deviations {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-ietf-hardware-deviations";
+  prefix hw-itefdevs;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     managing hardware.";
+
+  revision 2025-12-20 {
+    description
+      "Add enumeration for the node /hw:hardware/hw:component/hw:state/hw:oper-state.
+       Modify the node admin-state configuration to false.
+       Cancel deviation of nodes as below:
+       /hw:hardware/hw:component/hw:contains-child
+       /hw:hardware/hw:component/hw:state/hw:state-last-changed
+       /hw:hardware/hw:component/hw:state/hw:alarm-state
+       /hw:hardware-state-oper-enabled/hw:admin-state
+       /hw:hardware-state-oper-enabled/hw:alarm-state
+       /hw:hardware-state-oper-disabled/hw:admin-state
+       /hw:hardware-state-oper-disabled/hw:alarm-state
+       /hw:hardware/hw:component/hw:state/hw:usage-state
+       /hw:hardware/hw:component/hw:state/hw:standby-state.";
+    reference
+      "Huawei private.";
+  }
+  revision 2017-10-16 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/hw:hardware/hw:last-change" {
+    deviate not-supported;
+  }
+  deviation "/hw:hardware/hw:component/hw:uuid" {
+    deviate not-supported;
+  }
+  deviation "/hw:hardware/hw:component/hw:state/hw:admin-state" {
+    deviate replace {
+      config false;
+    }
+  }
+  deviation "/hw:hardware/hw:component/hw:state/hw:oper-state" {
+    deviate replace {
+      type enumeration {
+        enum "unknown" {
+          value 1;
+          description
+            "The resource is unable to report its operational state.";
+        }
+        enum "disabled" {
+          value 2;
+          description
+            "The resource is totally inoperable.";
+        }
+        enum "enabled" {
+          value 3;
+          description
+            "The resource is partially or fully operable.";
+        }
+        enum "testing" {
+          value 4;
+          description
+            "The resource is currently being tested and cannot
+             therefore report whether or not it is operational.";
+        }
+        enum "normal" {
+          value 101;
+          description
+            "Indicates that the board or port is running normally.";
+        }
+        enum "fault" {
+          value 102;
+          description
+            "Indicates that the board or port is faulty.";
+        }
+        enum "autofind" {
+          value 103;
+          description
+            "Indicates that the board is in the autofind state. If a board is inserted in an idle slot,
+             after the report of automatic registration, the board is also in the autofind state.";
+        }
+        enum "config" {
+          value 104;
+          description
+            "Indicates that the board is in the configuration state.";
+        }
+        enum "abnormal" {
+          value 105;
+          description
+            "The resource is abnormal state.";
+        }
+        enum "version-err" {
+          value 106;
+          description
+            "Indicates that the board version is error.";
+        }
+        enum "out-of-service" {
+          value 107;
+          description
+            "Indicates that the board is out of service.";
+        }
+        enum "graceful" {
+          value 108;
+          description
+            "Indicates that the board running state is graceful.";
+        }
+        enum "mismatch" {
+          value 109;
+          description
+            "When a board inserted in a slot is inconsistent with the configuration saved in the system,
+             the board is in the mismatch state.";
+        }
+        enum "disappear" {
+          value 110;
+          description
+            "Indicates that the board disappear.";
+        }
+        enum "local-loopback" {
+          value 203;
+          description
+            "Indicates that normal local loopback.";
+        }
+        enum "forbidden" {
+          value 204;
+          description
+            "Indicates that the port is disabled.";
+        }
+        enum "test" {
+          value 205;
+          description
+            "Indicates test start.";
+        }
+        enum "remote-loopback" {
+          value 206;
+          description
+            "Indicates normal remote loopback.";
+        }
+        enum "activated" {
+          value 210;
+          description
+            "Indicates that the port is being activated.";
+        }
+        enum "deactivated" {
+          value 211;
+          description
+            "Indicates that the link is down or deactivated.";
+        }
+        enum "block" {
+          value 212;
+          description
+            "Indicates port blocking.";
+        }
+        enum "no-light" {
+          value 213;
+          description
+            "Indicates no signal in ATM port.";
+        }
+        enum "inner-local-loopback" {
+          value 214;
+          description
+            "Indicates that inner local loopback toward inner system chipset (it's UTOPIA loopback for ADSL port).";
+        }
+        enum "inner-remote-loopback" {
+          value 215;
+          description
+            "Indicates that inner remote loopback toward inner system chipset.";
+        }
+        enum "locked" {
+          value 216;
+          description
+            "Indicates locked.";
+        }
+        enum "busy" {
+          value 217;
+          description
+            "Indicates busy.";
+        }
+        enum "maintain" {
+          value 218;
+          description
+            "Indicates maintenance.";
+        }
+        enum "standby-normal" {
+          value 219;
+          description
+            "Indicates that the port on the standby control board is activated.";
+        }
+        enum "standby-fault" {
+          value 220;
+          description
+            "Indicates that the port on the standby control board is faulty.";
+        }
+        enum "adsl-loopback-afe" {
+          value 221;
+          description
+            "Indicates that AFE loopback.";
+        }
+        enum "adsl-loopback-hybrid" {
+          value 222;
+          description
+            "Indicates that HYBRID loopback.";
+        }
+        enum "rtu-local-loopback" {
+          value 223;
+          description
+            "Indicates that RTU local loopback.";
+        }
+        enum "rtu-remote-loopback" {
+          value 224;
+          description
+            "Indicates that RTU remote loopback.";
+        }
+        enum "link-up" {
+          value 225;
+          description
+            "Indicates eth port online.";
+        }
+        enum "link-down" {
+          value 226;
+          description
+            "Indicates eth port offline.";
+        }
+        enum "power-denied" {
+          value 250;
+          description
+            "Indicates port operation state is power denied.";
+        }
+      }
+    }
+  }
+}

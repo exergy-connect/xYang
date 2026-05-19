@@ -1,0 +1,479 @@
+module huawei-xpon-types {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-xpon-types";
+  prefix xpon-types;
+
+  import bbf-xpon-types {
+    prefix bbf-xpon-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "An experimental YANG module supporting xPON.";
+
+  revision 2024-03-28 {
+    description
+      "Add the enum value of the module-type.";
+    reference
+      "";
+  }
+  revision 2024-01-11 {
+    description
+      "Add the enum value of the module-type.";
+    reference
+      "";
+  }
+  revision 2023-12-07 {
+    description
+      "Add the enum value of the ont-nni-type, module-type, module-sub-type and port-channel-type.";
+    reference
+      "";
+  }
+  revision 2023-11-18 {
+    description
+      "Add identity hspon.";
+    reference
+      "";
+  }
+  revision 2023-08-24 {
+    description
+      "Add the enum value of the module-type.";
+    reference
+      "";
+  }
+  revision 2023-06-19 {
+    description
+      "Add the enum value of the port-channel-type.";
+    reference
+      "";
+  }
+  revision 2022-02-22 {
+    description
+      "Add the enum value of the leaf used-type.";
+    reference
+      "";
+  }
+  revision 2021-12-03 {
+    description
+      "Add the enum value of the leaf module-sub-type.";
+    reference
+      "";
+  }
+  revision 2021-08-19 {
+    description
+      "Add the types of classdplus and onu-dq.";
+    reference
+      "";
+  }
+  revision 2020-11-25 {
+    description
+      "Add the type of ont-nni-type.";
+    reference
+      "";
+  }
+  revision 2020-09-27 {
+    description
+      "Add the type of port-channel-type.";
+    reference
+      "";
+  }
+  revision 2019-02-20 {
+    description
+      "Add the enum value of the leaf module-sub-type.";
+    reference
+      "";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  identity hspon {
+    base bbf-xpon-types:channel-pair-type-base;
+    description
+      "This identity is used to denote a 50G-PON channel-pair.";
+  }
+
+  typedef module-type {
+    type enumeration {
+      enum "gpon" {
+        value 1;
+        description
+          "Transceiver module type:gpon.";
+      }
+      enum "epon" {
+        value 2;
+        description
+          "Transceiver module type:epon.";
+      }
+      enum "10g-epon" {
+        value 3;
+        description
+          "Transceiver module type:10g-epon.";
+      }
+      enum "xg-pon" {
+        value 4;
+        description
+          "Transceiver module type:xg-pon.";
+      }
+      enum "xgs-pon" {
+        value 9;
+        description
+          "Transceiver module type:xgs-pon.";
+      }
+      enum "gpon-and-xgpon" {
+        value 10;
+        description
+          "Transceiver module type:gpon and xg-pon.";
+      }
+      enum "gpon-and-xgspon" {
+        value 11;
+        description
+          "Transceiver module type:gpon and xgs-pon.";
+      }
+      enum "xgspon-and-50gspon" {
+        value 12;
+        description
+          "Transceiver module type:xgs-pon and 50gs-pon.";
+      }
+      enum "50gs-pon" {
+        value 13;
+        description
+          "Transceiver module type:50gs-pon.";
+      }
+      enum "50g-25g-pon" {
+        value 14;
+        description
+          "Transceiver module type:50g-25g-pon.";
+      }
+      enum "50g-12dot5g-pon" {
+        value 15;
+        description
+          "Transceiver module type:50g-12.5g-pon.";
+      }
+      enum "50g-xgs-g-pon" {
+        value 16;
+        description
+          "Transceiver module type:50g-pon and xgs-pon and gpon.";
+      }
+      enum "gpon-and-xgtpon" {
+        value 23;
+        description
+          "Transceiver module type:gpon and xgt-pon.";
+      }
+      enum "xgt-pon" {
+        value 24;
+        description
+          "Transceiver module type:xgt-pon.";
+      }
+      enum "50gs-xgs-g-pon" {
+        value 26;
+        description
+          "Transceiver module type:50gs-pon and xgs-pon and gpon.";
+      }
+      enum "xgt-or-xgs-combo-pon" {
+        value 28;
+        description
+          "Transceiver module type:xgt-or-xgs-combo-pon.";
+      }
+    }
+    description
+      "Transceiver module type.";
+  }
+
+  typedef module-sub-type {
+    type enumeration {
+      enum "classbplus" {
+        value 1;
+        description
+          "Transceiver module sub type:classbplus.";
+      }
+      enum "classcplus" {
+        value 2;
+        description
+          "Transceiver module sub type:classcplus.";
+      }
+      enum "classb" {
+        value 3;
+        description
+          "Transceiver module sub type:classb.";
+      }
+      enum "classcplusplus" {
+        value 4;
+        description
+          "Transceiver module sub type:classcplusplus.";
+      }
+      enum "classd" {
+        value 5;
+        description
+          "Transceiver module sub type:classd.";
+      }
+      enum "classbpluscplus" {
+        value 7;
+        description
+          "Transceiver module sub type:class b+/class c+.";
+      }
+      enum "classb1" {
+        value 8;
+        description
+          "Transceiver module sub type:class b1.";
+      }
+      enum "n2a" {
+        value 33;
+        description
+          "Transceiver module sub type:n2a.";
+      }
+      enum "n2b" {
+        value 34;
+        description
+          "Transceiver module sub type:n2b.";
+      }
+      enum "n1" {
+        value 35;
+        description
+          "Transceiver module sub type:n1.";
+      }
+      enum "e1" {
+        value 36;
+        description
+          "Transceiver module sub type:e1.";
+      }
+      enum "e2a" {
+        value 37;
+        description
+          "Transceiver module sub type:e2a.";
+      }
+      enum "e2b" {
+        value 38;
+        description
+          "Transceiver module sub type:e2b.";
+      }
+      enum "n1/n2a/e1/e2a" {
+        value 39;
+        description
+          "Transceiver module sub type:n1/n2a/e1/e2a.";
+      }
+      enum "d1" {
+        value 40;
+        description
+          "Transceiver module sub type:d1.";
+      }
+      enum "d2" {
+        value 41;
+        description
+          "Transceiver module sub type:d2.";
+      }
+      enum "n2" {
+        value 42;
+        description
+          "Transceiver module sub type:n2.";
+      }
+      enum "e2" {
+        value 43;
+        description
+          "Transceiver module sub type:e2.";
+      }
+      enum "classdplus" {
+        value 44;
+        description
+          "Transceiver module sub type:classdplus.";
+      }
+      enum "n2be2b" {
+        value 49;
+        description
+          "Transceiver module sub type:n2b/e2b.";
+      }
+      enum "n1n2e1" {
+        value 50;
+        description
+          "Transceiver module sub type:n1/n2/e1.";
+      }
+      enum "px20plus" {
+        value 66;
+        description
+          "Transceiver module sub type:px20plus.";
+      }
+      enum "px20plusplus" {
+        value 67;
+        description
+          "Transceiver module sub type:px20plusplus.";
+      }
+      enum "pr30" {
+        value 97;
+        description
+          "Transceiver module sub type:pr30.";
+      }
+      enum "prx30" {
+        value 99;
+        description
+          "Transceiver module sub type:prx30.";
+      }
+      enum "pr30plus" {
+        value 103;
+        description
+          "Transceiver module sub type:pr30plus.";
+      }
+      enum "pr40" {
+        value 101;
+        description
+          "Transceiver module sub type:pr40.";
+      }
+      enum "prx40" {
+        value 102;
+        description
+          "Transceiver module sub type:prx40.";
+      }
+      enum "bpluspx20p" {
+        value 129;
+        description
+          "Transceiver module sub type:bpluspx20p.";
+      }
+      enum "bpx20" {
+        value 130;
+        description
+          "Transceiver module sub type:bpx20.";
+      }
+    }
+    description
+      "Transceiver module sub type.";
+  }
+
+  typedef used-type {
+    type enumeration {
+      enum "olt" {
+        value 1;
+        description
+          "Transceiver used-type:olt.";
+      }
+      enum "ont" {
+        value 2;
+        description
+          "Transceiver used-type:ont.";
+      }
+      enum "onu" {
+        value 3;
+        description
+          "Transceiver used-type:onu.";
+      }
+      enum "onu-dq" {
+        value 6;
+        description
+          "Transceiver used-type:onu with dq.";
+      }
+      enum "onu-eth" {
+        value 7;
+        description
+          "Transceiver used-type:onu eth port.";
+      }
+    }
+    description
+      "Transceiver used-type.";
+  }
+
+  typedef module-grade {
+    type enumeration {
+      enum "commercial" {
+        value 1;
+        description
+          "Transceiver module-grade:commercial.";
+      }
+      enum "industrial" {
+        value 2;
+        description
+          "Transceiver module-grade:industrial.";
+      }
+      enum "enhanced-commercial" {
+        value 3;
+        description
+          "Transceiver module-grade:enhanced commercial.";
+      }
+    }
+    description
+      "Transceiver module-grade.";
+  }
+
+  typedef port-channel-type {
+    type enumeration {
+      enum "gpon" {
+        value 1;
+        description
+          "Indicates that the channel type of the PON port is GPON.";
+      }
+      enum "xgpon" {
+        value 2;
+        description
+          "Indicates that the channel type of the PON port is XG-PON.";
+      }
+      enum "xgspon" {
+        value 3;
+        description
+          "Indicates that the channel type of the PON port is XGS-PON.";
+      }
+      enum "50gspon" {
+        value 4;
+        description
+          "Indicates that the channel type of the PON port is 50GS-PON.";
+      }
+      enum "xgtpon" {
+        value 5;
+        description
+          "Indicates that the channel type of the PON port is XGT-PON.";
+      }
+    }
+    description
+      "Channel type of the PON port.";
+  }
+
+  typedef ont-nni-type {
+    type enumeration {
+      enum "rate2p5g1p25g" {
+        value 1;
+        description
+          "Downstream rate 2.5Gbps, upstream rate 1.25Gbps.";
+      }
+      enum "rate10g2p5g" {
+        value 2;
+        description
+          "Downstream rate 10Gbps, upstream rate 2.5Gbps.";
+      }
+      enum "rate10g10g" {
+        value 3;
+        description
+          "Downstream rate 10Gbps, upstream rate 10Gbps.";
+      }
+      enum "rate50g12p5g" {
+        value 6;
+        description
+          "Downstream rate 50Gbps, upstream rate 12.5Gbps.";
+      }
+      enum "rate50g25g" {
+        value 7;
+        description
+          "Downstream rate 50Gbps, upstream rate 25Gbps.";
+      }
+      enum "rate50g50g" {
+        value 8;
+        description
+          "Downstream rate 50Gbps, upstream rate 50Gbps.";
+      }
+      enum "rate12p5g12p5g" {
+        value 9;
+        description
+          "Downstream rate 12.5Gbps, upstream rate 12.5Gbps.";
+      }
+    }
+    description
+      "Indicates the NNI type of the ONT.";
+  }
+}

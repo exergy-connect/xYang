@@ -1,0 +1,6153 @@
+module huawei-srpolicy {
+  namespace "urn:huawei:yang:huawei-srpolicy";
+  prefix srpolicy;
+
+  import huawei-extension {
+    prefix ext;
+  }
+  import huawei-segment-routing {
+    prefix sr;
+  }
+  import huawei-network-instance {
+    prefix ni;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import huawei-srv6 {
+    prefix srv6;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import huawei-pub-type {
+    prefix pub-type;
+  }
+  import huawei-te {
+    prefix te;
+  }
+  import huawei-routing-policy {
+    prefix rtp;
+  }
+  import huawei-isis {
+    prefix isis;
+  }
+  import huawei-ifm {
+    prefix ifm;
+  }
+
+
+  include "huawei-srpolicy-type";
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "Segment Routing Policy.";
+
+  revision 2025-11-18 {
+    description
+      "Added the function of specifying SBFD parameters for the backup path of an SR-MPLS TE Policy and the SBFD source interface from which an IP address can be borrowed by the Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-08-01 {
+    description
+      "Added the must condition for PCC-initiated SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-05-28 {
+    description
+      "Added the function of reporting compensated SRv6 TE Policy traffic statistic, the function of SRv6 TE Policy ODN, and the function of reporting SR-MPLS TE Policy group statistic.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-12-06 {
+    description
+      "Added the functions of path MTU detection, local path computation, the SRv6 TE Policy Reduce mode, the binding SID endpoint behavior, and Service Class-based traffic steering in an SR-MPLS TE Policy group.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-09-01 {
+    description
+      "Added the function of forwarding SBFD return packets over a tunnel for SR-MPLS TE Policy, the function of PCC-Initiated SRv6 TE Policy, and the function of XSID.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-21 {
+    description
+      "Change must condition of bfd-enable.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-18 {
+    description
+      "Add the MBB function for the binding SIDs in segment lists.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-01 {
+    description
+      "Add the function of reporting traffic statistics by bit for SR Policies and segment lists.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-03 {
+    description
+      "Add the function of BFD address.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-20 {
+    description
+      "Add the function of association-groups for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-08 {
+    description
+      "Add the function of SRv6 TE Policy inherit metric.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-01 {
+    description
+      "Add the SID algorithm for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-30 {
+    description
+      "Add the function of association-groups for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-21 {
+    description
+      "Add the function of bfd delay up for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-09-05 {
+    description
+      "Add the function of network slice inheritance matching mode of BFD detection packets for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-10 {
+    description
+      "Modify must condition of binding-sids.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-05-19 {
+    description
+      "Add the function of GSRv6 smooth evolution for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-04-21 {
+    description
+      "Add the function of bfd delay up for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-04-17 {
+    description
+      "The must condition is added to describe that the configuration cannot be specified when the endpoint is ::.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-03-28 {
+    description
+      "Add the function of parallel-link load balancing for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-03-15 {
+    description
+      "Add the function of igp shortcut for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-03-08 {
+    description
+      "Add the function of SR Policy report LSP identifiers to PCEP.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-25 {
+    description
+      "Add the function of SID selection for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-14 {
+    description
+      "Increate leaf loop-detection-state for segment-lists.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-13 {
+    description
+      "Add automatic bandwidth adjustment parameters to the grouping auto-bandwidth-adjustment.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-01-31 {
+    description
+      "Add the function of On Demand Next-Hop for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-12-23 {
+    description
+      "Modify the exclude-affinity-name.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-21 {
+    description
+      "Add the function of automatic bandwidth adjustment for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-08 {
+    description
+      "Add the function of GSRv6-2.0 for SRv6 TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-27 {
+    description
+      "Add a locator node under the policys container node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-24 {
+    description
+      "Add the grouping auto-bandwidth-adjustment-info for querying automatic bandwidth adjustment information.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-12 {
+    description
+      "Add the function of pcc-initial for SR-MPLS TE Policy.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-08 {
+    description
+      "Add the function of IGP cost inheritance for SR-MPLS.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-07-15 {
+    description
+      "Increate leaf weight for list-down-reason.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-07-02 {
+    description
+      "Increate leaf path-id for segment list traffic statistics.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-17 {
+    description
+      "Increate leaf ifit-latest-update-time.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-18 {
+    description
+      "Increate state for SR Policy group mapping.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-06 {
+    description
+      "Modify the type of node-address.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-27 {
+    description
+      "Add leaf bsid-encapsulation-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-15 {
+    description
+      "Add ifit-measure-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-08 {
+    description
+      "Increate the function to specify the return tunnel of seamless BFD packets based on a specified binding SID.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-23 {
+    description
+      "Increate leaf for list policy-info, such as ifit-one-way-delay.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-01-27 {
+    description
+      "Increate container policy-down-reasons and container binding-sid-allocations.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-09-14 {
+    description
+      "Increate the weight and BFD bypass and attribute template.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-08-14 {
+    description
+      "Increate sid compress.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-06-28 {
+    description
+      "Modify description information.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-06-20 {
+    description
+      "Modify the type of template info.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-06-01 {
+    description
+      "Increate the path verification.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-05-28 {
+    description
+      "Increate the policy-template.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-05-25 {
+    description
+      "Increate the policy-maps.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-05-20 {
+    description
+      "Modify the srpolicy, admin-state.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-26 {
+    description
+      "Modify description information by new rules.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-24 {
+    description
+      "Modify the policy-attributes.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-16 {
+    description
+      "Modify description information by new rules.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-02-28 {
+    description
+      "Modify description information.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-02-17 {
+    description
+      "Increate the path-mtu.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-01-03 {
+    description
+      "Modify description information.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-11-18 {
+    description
+      "Increate the SR-MPLS TE Policy group.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-04-04 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  grouping auto-bandwidth-adjustment-info {
+    description
+      "SR Policy automatic bandwidth adjustment information.";
+    container auto-bandwidth {
+      description
+        "Statistics of auto-bandwidth adjustment in an SR-MPLS TE Policy.";
+      leaf auto-bandwidth-enable {
+        type boolean;
+        description
+          "Whether automatic bandwidth adjustment is enabled for SR-MPLS TE Policy.";
+      }
+      leaf current-bandwidth {
+        type uint64;
+        units "kbit/s";
+        description
+          "Bandwidth allocated to the current SR-MPLS TE Policy.";
+      }
+      leaf sample-interval {
+        type uint32;
+        units "s";
+        description
+          "Interval at which the traffic rate of an SR-MPLS TE Policy's outbound interface is sampled.";
+      }
+      leaf adjust-launch-timer-remain {
+        type uint32;
+        units "s";
+        description
+          "Remaining time in the discretization timer set for the automatic bandwidth adjustment timer.";
+      }
+      leaf sample-launch-timer-remain {
+        type uint32;
+        units "s";
+        description
+          "Remaining time in the discretization timer set for the automatic bandwidth sampling timer.";
+      }
+      leaf min-bandwidth {
+        type uint64;
+        units "kbit/s";
+        description
+          "Minimum bandwidth supported by automatic bandwidth adjustment.";
+      }
+      leaf max-bandwidth {
+        type uint64;
+        units "kbit/s";
+        description
+          "Maximum bandwidth supported by automatic bandwidth adjustment.";
+      }
+      leaf up-threshold-percent {
+        type uint8;
+        description
+          "Relative bandwidth change threshold for triggering upward bandwidth adjustment.";
+      }
+      leaf up-threshold-percent-min-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for upward bandwidth adjustment to take effect.";
+      }
+      leaf up-threshold-absolute-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering upward bandwidth adjustment.";
+      }
+      leaf down-threshold-percent {
+        type uint8;
+        description
+          "Relative bandwidth change threshold for triggering downward bandwidth adjustment.";
+      }
+      leaf down-threshold-percent-min-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for downward bandwidth adjustment to take effect.";
+      }
+      leaf down-threshold-absolute-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering downward bandwidth adjustment.";
+      }
+      leaf up-adjustment-frequency {
+        type uint32;
+        units "s";
+        description
+          "Interval at which upward automatic bandwidth adjustment is performed.";
+      }
+      leaf up-adjustment-timer-remain {
+        type uint32;
+        units "s";
+        description
+          "Remaining time for the next upward automatic bandwidth adjustment.";
+      }
+      leaf up-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampled value is greater than the currently allocated bandwidth.";
+      }
+      leaf up-collect-max-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Maximum bandwidth of upward bandwidth adjustment collected in the previous bandwidth sampling period.";
+      }
+      leaf down-adjustment-frequency {
+        type uint32;
+        units "s";
+        description
+          "Interval at which downward automatic bandwidth adjustment is performed.";
+      }
+      leaf down-adjustment-timer-remain {
+        type uint32;
+        units "s";
+        description
+          "Remaining time for the next downward automatic bandwidth adjustment.";
+      }
+      leaf down-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampled value is less than the currently allocated bandwidth.";
+      }
+      leaf down-collect-max-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Maximum bandwidth of downward bandwidth adjustment collected in the previous bandwidth sampling period.";
+      }
+      leaf overflow-limit {
+        type uint8;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast upward bandwidth adjustment meets the absolute bandwidth change threshold.";
+      }
+      leaf overflow-threshold-absolute-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering fast upward bandwidth adjustment.";
+      }
+      leaf overflow-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampling value meets the absolute threshold change within the fast upward bandwidth adjustment period.";
+      }
+      leaf overflow-percent-limit {
+        type uint8;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast upward bandwidth adjustment meets the relative bandwidth change threshold.";
+      }
+      leaf overflow-threshold-percent {
+        type uint8;
+        description
+          "Relative bandwidth change threshold for triggering fast upward bandwidth adjustment.";
+      }
+      leaf overflow-percent-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampling value meets the relative threshold change within the fast upward bandwidth adjustment period.";
+      }
+      leaf overflow-threshold-percent-min-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for fast upward bandwidth adjustment to take effect.";
+      }
+      leaf overflow-collect-max-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Maximum bandwidth that meets the change threshold and is collected in the fast upward bandwidth adjustment period.";
+      }
+      leaf underflow-limit {
+        type uint8;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast downward bandwidth adjustment meets the absolute bandwidth change threshold.";
+      }
+      leaf underflow-threshold-absolute-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering fast downward bandwidth adjustment.";
+      }
+      leaf underflow-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampling value meets the absolute threshold change within the fast downward bandwidth adjustment period.";
+      }
+      leaf underflow-percent-limit {
+        type uint8;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast downward bandwidth adjustment meets the relative bandwidth change threshold.";
+      }
+      leaf underflow-threshold-percent {
+        type uint8;
+        description
+          "Relative bandwidth change threshold for triggering fast downward bandwidth adjustment.";
+      }
+      leaf underflow-percent-sample-count {
+        type uint8;
+        description
+          "Number of sampling times that the sampling value meets the relative threshold change within the fast downward bandwidth adjustment period.";
+      }
+      leaf underflow-threshold-percent-min-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for fast downward bandwidth adjustment to take effect.";
+      }
+      leaf underflow-collect-max-bw {
+        type uint64;
+        units "kbit/s";
+        description
+          "Maximum bandwidth that meets the change threshold and is collected in the fast downward bandwidth adjustment period.";
+      }
+    }
+  }
+
+  grouping auto-bandwidth-adjustment {
+    description
+      "SR Policy automatic bandwidth adjustment configuration.";
+    container auto-bandwidth-adjustment {
+      presence "Enable auto-bandwidth adjustment.";
+      description
+        "Configure auto-bandwidth adjustment parameters.";
+      leaf adjustment-interval {
+        type uint32 {
+          range "300..604800";
+        }
+        units "s";
+        default "86400";
+        description
+          "Interval of automatic bandwidth adjustment.";
+      }
+      leaf down-adjustment-interval {
+        type uint32 {
+          range "300..604800";
+        }
+        units "s";
+        description
+          "Downward adjustment for the interval of automatic bandwidth adjustment.";
+      }
+      leaf min-bandwidth {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        must "(../max-bandwidth>=../min-bandwidth)";
+        description
+          "Minimum bandwidth supported by automatic bandwidth adjustment.";
+      }
+      leaf max-bandwidth {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Maximum bandwidth supported by automatic bandwidth adjustment.";
+      }
+      leaf threshold-percent {
+        type uint8 {
+          range "1..100";
+        }
+        default "5";
+        description
+          "Relative bandwidth change threshold for triggering upward bandwidth adjustment.";
+      }
+      leaf threshold-percent-min-bw {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for upward bandwidth adjustment to take effect.";
+      }
+      leaf threshold-absolute-bw {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering upward bandwidth adjustment.";
+      }
+      leaf down-threshold-percent {
+        type uint8 {
+          range "1..100";
+        }
+        description
+          "Relative bandwidth change threshold for triggering downward bandwidth adjustment.";
+      }
+      leaf down-threshold-percent-min-bw {
+        when "../down-threshold-percent";
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for downward bandwidth adjustment to take effect.";
+      }
+      leaf down-threshold-absolute-bw {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering downward bandwidth adjustment.";
+      }
+      leaf overflow-threshold-absolute-bw {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering fast upward bandwidth adjustment.";
+      }
+      leaf overflow-count {
+        when "../overflow-threshold-absolute-bw";
+        type uint8 {
+          range "1..31";
+        }
+        mandatory true;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast upward bandwidth adjustment meets the absolute bandwidth change threshold.";
+      }
+      leaf overflow-threshold-percent {
+        type uint8 {
+          range "1..100";
+        }
+        description
+          "Relative bandwidth change threshold for triggering fast upward bandwidth adjustment.";
+      }
+      leaf overflow-percent-count {
+        when "../overflow-threshold-percent";
+        type uint8 {
+          range "1..31";
+        }
+        mandatory true;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast upward bandwidth adjustment meets the relative bandwidth change threshold.";
+      }
+      leaf overflow-threshold-percent-min-bw {
+        when "../overflow-threshold-percent";
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for fast upward bandwidth adjustment to take effect.";
+      }
+      leaf underflow-threshold-absolute-bw {
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold for triggering fast downward bandwidth adjustment.";
+      }
+      leaf underflow-count {
+        when "../underflow-threshold-absolute-bw";
+        type uint8 {
+          range "1..31";
+        }
+        mandatory true;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast downward bandwidth adjustment meets the absolute bandwidth change threshold.";
+      }
+      leaf underflow-threshold-percent {
+        type uint8 {
+          range "1..100";
+        }
+        description
+          "Relative bandwidth change threshold for triggering fast downward bandwidth adjustment.";
+      }
+      leaf underflow-percent-count {
+        when "../underflow-threshold-percent";
+        type uint8 {
+          range "1..31";
+        }
+        mandatory true;
+        description
+          "Number of consecutive sampling times that the sampling value required for triggering fast downward bandwidth adjustment meets the relative bandwidth change threshold.";
+      }
+      leaf underflow-threshold-percent-min-bw {
+        when "../underflow-threshold-percent";
+        type uint64 {
+          range "1..6400000000";
+        }
+        units "kbit/s";
+        description
+          "Absolute bandwidth change threshold that enables the relative threshold for fast downward bandwidth adjustment to take effect.";
+      }
+    }
+  }
+
+  grouping bfd {
+    description
+      "SR Policy BFD configuration.";
+    container bfd {
+      description
+        "Configure SR Policy BFD.";
+      leaf enable {
+        type bfd-enable-type;
+        default "disable";
+        description
+          "Enable seamless-bfd for all SR Policies.";
+      }
+      leaf bypass {
+        type bfd-bypass-type;
+        default "bypass";
+        description
+          "Enable BFD bypass for all SR policies.";
+      }
+      leaf min-tx {
+        type uint32 {
+          range "1..4294967295";
+        }
+        units "ms";
+        default "10";
+        description
+          "Minimum interval for sending seamless-bfd packets to the peer end.";
+      }
+      leaf min-rx {
+        type uint32 {
+          range "1..4294967295";
+        }
+        units "ms";
+        default "10";
+        description
+          "Minimum interval for receiving seamless-bfd packets from the peer end.";
+      }
+      leaf multi-num {
+        type uint32 {
+          range "3..50";
+        }
+        default "3";
+        description
+          "Local detection multiplier.";
+      }
+      leaf backup-min-tx {
+        type uint32 {
+          range "1..4294967295";
+        }
+        units "ms";
+        description
+          "Minimum interval for sending seamless-bfd packets to the peer end over the backup candidate path.";
+      }
+      leaf backup-multi-num {
+        type uint32 {
+          range "3..50";
+        }
+        description
+          "Local detection multiplier over the backup candidate path.";
+      }
+      leaf switch-delay {
+        type uint32 {
+          range "1..2592000";
+        }
+        units "s";
+        description
+          "The BFD switching delay.";
+      }
+      leaf slice-inherit-match {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the inheritance type (for the network slice's match mode) of BFD detection packets configured for the global configuration.";
+      }
+      leaf backup-initial-up-delay {
+        type uint32 {
+          range "1..600000";
+        }
+        units "ms";
+        description
+          "Delay after which BFD goes up for the backup path.";
+      }
+    }
+  }
+
+  grouping global-attributes {
+    description
+      "SR Policy global configuration.";
+    leaf switch-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "5000";
+      description
+        "MBB switch delay time.";
+    }
+    leaf delete-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "20000";
+      description
+        "MBB delete delay time.";
+    }
+    leaf hsb-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable hot standby.";
+    }
+    leaf traffic-statistics-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable traffic statistics collection.";
+    }
+    leaf bgp-ls-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable BGP-LS.";
+    }
+    leaf path-mtu-detect {
+      type path-mtu-detect-type;
+      default "disable";
+      description
+        "Path MTU detection.";
+    }
+    leaf path-mtu-period-detect {
+      type boolean;
+      default "true";
+      description
+        "Enable/disable periodic path MTU detection.";
+    }
+    leaf path-mtu-period-detect-interval {
+      when "(../path-mtu-period-detect='true')";
+      type uint32 {
+        range "60..1296000";
+      }
+      units "s";
+      default "300";
+      description
+        "Interval of periodic path MTU detection.";
+    }
+    leaf path-verification {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable path verification.";
+    }
+    leaf path-verification-specified-sid {
+      when "(../path-verification='true')";
+      type boolean;
+      default "false";
+      description
+        "Enable/disable path verification for specified-sid.";
+    }
+    leaf suppress-flapping {
+      type boolean;
+      default "true";
+      description
+        "Enable/disable suppress flapping.";
+    }
+    leaf policy-threshold-upper {
+      type uint32 {
+        range "2..100";
+      }
+      must "(../policy-threshold-upper>../policy-threshold-lower)";
+      default "80";
+      description
+        "SR Policy threshold upper limit.";
+    }
+    leaf policy-threshold-lower {
+      type uint32 {
+        range "1..99";
+      }
+      default "75";
+      description
+        "SR Policy threshold lower limit.";
+    }
+    leaf list-threshold-upper {
+      type uint32 {
+        range "2..100";
+      }
+      must "(../list-threshold-upper>../list-threshold-lower)";
+      default "80";
+      description
+        "Segment List threshold upper limit.";
+    }
+    leaf list-threshold-lower {
+      type uint32 {
+        range "1..99";
+      }
+      default "75";
+      description
+        "Segment List threshold lower limit.";
+    }
+    leaf auto-bandwidth-sample-interval {
+      type uint32 {
+        range "60..604800";
+      }
+      units "s";
+      description
+        "Traffic rate sampling interval.";
+    }
+    leaf auto-bandwidth-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable automatic bandwidth adjustment for SR Policy.";
+    }
+    leaf pcep-lsp-identifiers-report {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable SR Policy report LSP identifiers to PCEP.";
+    }
+    leaf metric-inherit-type {
+      type global-inherit-mode;
+      description
+        "Metric type inherited by SR Policy.";
+    }
+    leaf list-reverse-bsid-switch-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "5000";
+      description
+        "Switching delay for the reverse binding SIDs in segment lists.";
+    }
+    leaf list-bsid-delete-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "20000";
+      description
+        "Deletion delay for the binding SIDs in segment lists.";
+    }
+    leaf list-reverse-xsid-switch-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "5000";
+      description
+        "Switching delay for the reverse XSIDs in segment lists.";
+    }
+    leaf list-xsid-delete-delay {
+      type uint32 {
+        range "0..600000";
+      }
+      units "ms";
+      default "20000";
+      description
+        "Deletion delay for the XSIDs in segment lists.";
+    }
+    leaf segment-list-delete-hold {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the function to hold the deleted segment lists when new segment lists are all down.";
+    }
+    leaf dual-fed {
+      type dual-fed-type;
+      default "disable";
+      description
+        "Enable/Disable the dual-fed function for an SR Policy.";
+    }
+    leaf bsid-dynamic-specified-encaps-mode {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the dynamic specification of a binding SID encapsulation mode.";
+    }
+    uses bfd;
+    container compute-types {
+      description
+        "List of different types of computation sources.";
+      list compute-type {
+        key "type";
+        ordered-by user;
+        description
+          "Configure a computation source type.";
+        leaf type {
+          type global-compute-type;
+          description
+            "Computation source type.";
+        }
+      }
+    }
+  }
+
+  grouping srv4-segment-lists {
+    description
+      "Global segment lists.";
+    container segment-lists {
+      description
+        "List of global segment lists.";
+      list segment-list {
+        key "name";
+        description
+          "Configure a global segment list.";
+        leaf name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Global segment list name.";
+        }
+        container segments {
+          description
+            "List of segments in a global segment list.";
+          list segment {
+            key "index";
+            max-elements 10;
+            description
+              "Configure a segment in a global segment list.";
+            leaf index {
+              type uint32 {
+                range "0..4294967295";
+              }
+              description
+                "The segment index.";
+            }
+            choice type {
+              mandatory true;
+              description
+                "The segment type.";
+              case segment-type-1 {
+                description
+                  "The segment is declared by MPLS label.";
+                leaf sid-value-1 {
+                  type uint32 {
+                    range "16..1048575";
+                  }
+                  description
+                    "MPLS label value.";
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv6-segment-lists {
+    description
+      "Global segment lists.";
+    container segment-lists {
+      description
+        "List of global segment lists.";
+      list segment-list {
+        key "name";
+        description
+          "Configure a global segment list.";
+        leaf name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Global segment list name.";
+        }
+        container segments {
+          description
+            "List of segments in a global segment list.";
+          list segment {
+            key "index";
+            max-elements 10;
+            description
+              "Configure a segment in a global segment list.";
+            leaf index {
+              type uint32 {
+                range "0..4294967295";
+              }
+              description
+                "The segment index.";
+            }
+            choice type {
+              mandatory true;
+              description
+                "The segment type.";
+              case segment-type-2 {
+                description
+                  "The segment is declared by SRv6 SID value.";
+                leaf sid-value-2 {
+                  type inet:ipv6-address-no-zone;
+                  mandatory true;
+                  description
+                    "IPv6 value.";
+                }
+                choice compress-type {
+                  description
+                    "Type of a compressed SID of SRv6 TE Policy.";
+                  case compress-32 {
+                    description
+                      "32-bit compressed SID of SRv6 TE Policy.";
+                    leaf block-length {
+                      type uint32 {
+                        range "4..88";
+                      }
+                      must "((../block-length) mod 4 = 0)";
+                      description
+                        "Block length of a 32-bit compressed SID.";
+                    }
+                  }
+                  case compress-16 {
+                    description
+                      "16-bit compressed SID of SRv6 TE Policy.";
+                    leaf compress-16-block-length {
+                      type uint32 {
+                        range "16..76";
+                      }
+                      must "((../compress-16-block-length) mod 4 = 0)";
+                      description
+                        "Block length of a 16-bit compressed SID.";
+                    }
+                    leaf node-length {
+                      when "../compress-16-block-length";
+                      type uint32 {
+                        range "0..16";
+                      }
+                      must "((../node-length) mod 16 = 0 and not((../node-length = 0) and (../verification = 'true')))";
+                      mandatory true;
+                      description
+                        "Length of the Node ID field.";
+                    }
+                    leaf function-length {
+                      when "../compress-16-block-length";
+                      type uint32 {
+                        range "0..16";
+                      }
+                      must "((../function-length) mod 16 = 0) and ((../node-length) + (../function-length) = 16)";
+                      mandatory true;
+                      description
+                        "Length of the Function ID field.";
+                    }
+                    leaf compress-sid-flavor {
+                      when "../compress-16-block-length";
+                      type compress-flavor-type;
+                      description
+                        "Flavor of a 16-bit compressed SID.";
+                    }
+                  }
+                }
+                leaf verification {
+                  type boolean;
+                  default "false";
+                  description
+                    "Enable/disable verification of SID.";
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv6-policy-attributes {
+    description
+      "Grouping containing attributes applicable to all SR policies.";
+    container policy-attributes {
+      description
+        "Configure attributes for all SR policies.";
+      uses global-attributes;
+      leaf locator {
+       
+       
+        type leafref {
+          path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+        }
+        status deprecated;
+        description
+          "Locator Name. The node locator is deprecated. You are advised to use the node locators.";
+      }
+      container locators {
+        description
+          "List of locators.";
+        list locator {
+          key "name";
+          max-elements 2;
+          description
+            "Configure a locator.";
+          leaf name {
+            type leafref {
+              path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+            }
+            description
+              "Locator Name.";
+          }
+        }
+      }
+      uses srv6-segment-lists;
+      container policy-association-groups {
+        description
+          "List of policy association groups.";
+        list policy-association-group {
+          key "group-id source-ip";
+          description
+            "Configure a policy association group.";
+          leaf group-id {
+            type uint16 {
+              range "1..65534";
+            }
+            description
+              "ID of a policy association group.";
+          }
+          leaf source-ip {
+            type inet:ip-address;
+            description
+              "Source IP address of a policy association group.";
+          }
+          leaf attribute-template-id {
+            type leafref {
+              path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+            }
+            description
+              "Attribute template ID.";
+          }
+        }
+      }
+      container srv6-odn-templates {
+        description
+          "List of SRv6 TE Policy ODN templates.";
+        list srv6-odn-template {
+          key "color";
+          description
+            "Configure an SRv6 TE Policy ODN template.";
+          leaf color {
+            type uint32 {
+              range "1..4294967295";
+            }
+            description
+              "SRv6 TE Policy ODN color.";
+          }
+          container compute-types {
+            description
+              "List of different types of computation sources.";
+            list compute-type {
+              key "type";
+              ordered-by user;
+              description
+                "Configure a computation source type for an SRv6 TE policy ODN template.";
+              leaf type {
+                type global-compute-type;
+                description
+                  "Computation source type.";
+              }
+            }
+          }
+          leaf constraint-template-name {
+            type leafref {
+              path "/srpolicy:srpolicy/srpolicy:constraint-templates/srpolicy:constraint-template/srpolicy:name";
+            }
+            description
+              "Name of a constraint template.";
+          }
+          leaf attribute-template-id {
+            type leafref {
+              path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+            }
+            description
+              "Attribute template ID.";
+          }
+          leaf restrict-ipv6-prefix {
+            type leafref {
+              path "/rtp:routing-policy/rtp:ipv6-prefix-filters/rtp:ipv6-prefix-filter/rtp:name";
+            }
+            description
+              "Specifies the IPv6 filtering policy to be applied to the SRv6 TE Policy ODN template. By default, no such policy is specified.";
+          }
+          container candidate-paths {
+            description
+              "List of candidate paths in an SRv6 TE Policy ODN template.";
+            list candidate-path {
+              key "preference";
+              max-elements 64;
+              description
+                "Configure a candidate path.";
+              leaf preference {
+                type uint32 {
+                  range "1..65535";
+                }
+                description
+                  "Candidate path preference.";
+              }
+              uses constraints {
+                refine "constraint-path-name" {
+                  must "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path[srpolicy:name = current()]/srpolicy:hop-type = 'ipv6'";
+                }
+              }
+              uses disjoint-association-group;
+              uses policy-association-group;
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping odn-templates {
+    description
+      "Grouping containing ODN templates.";
+    container odn-templates {
+      description
+        "List of SR Policy ODN templates.";
+      list odn-template {
+        key "color";
+        description
+          "Configure an SR Policy ODN template.";
+        leaf color {
+          type uint32 {
+            range "1..4294967295";
+          }
+          description
+            "ODN color.";
+        }
+        container compute-types {
+          description
+            "List of different types of computation sources.";
+          list compute-type {
+            key "type";
+            ordered-by user;
+            description
+              "Configure a computation source type.";
+            leaf type {
+              type global-compute-type;
+              description
+                "Computation source type.";
+            }
+          }
+        }
+        leaf constraint-template-name {
+          type leafref {
+            path "/srpolicy:srpolicy/srpolicy:constraint-templates/srpolicy:constraint-template/srpolicy:name";
+          }
+          description
+            "Name of a constraint template.";
+        }
+        leaf attribute-template-id {
+          type leafref {
+            path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+          }
+          must "((/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-bypass = 'not-configured') and (/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'not-configured' or /srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'sbfd-enable' or /srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'disable') and (/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:path-verification-enable = 'not-configured') and not(/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-slice-inherit-match))";
+          must "not(/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:path-mtu-detect)";
+          description
+            "Attribute template ID.";
+        }
+        leaf restrict-ip-prefix {
+          type leafref {
+            path "/rtp:routing-policy/rtp:ipv4-prefix-filters/rtp:ipv4-prefix-filter/rtp:name";
+          }
+          description
+            "Specify the IPv4 filtering policy applied to the ODN template. By default, no such policy is specified.";
+        }
+        container candidate-paths {
+          description
+            "List of candidate paths in an ODN template.";
+          list candidate-path {
+            key "preference";
+            max-elements 64;
+            description
+              "Configure a candidate path.";
+            leaf preference {
+              type uint32 {
+                range "1..65535";
+              }
+              description
+                "Candidate path preference.";
+            }
+            uses constraints {
+              refine "constraint-path-name" {
+                must "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path[srpolicy:name = current()]/srpolicy:hop-type = 'ipv4'";
+              }
+            }
+            uses disjoint-association-group;
+            uses policy-association-group;
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv4-policy-attributes {
+    description
+      "Grouping containing attributes applicable to all SR policies.";
+    container policy-attributes {
+      description
+        "Configure attributes for all SR policies.";
+      uses global-attributes;
+      uses srv4-segment-lists;
+      uses odn-templates;
+      container policy-association-groups {
+        description
+          "List of policy association groups.";
+        list policy-association-group {
+          key "group-id source-ip";
+          description
+            "Configure a policy association group.";
+          leaf group-id {
+            type uint16 {
+              range "1..65534";
+            }
+            description
+              "ID of a policy association group.";
+          }
+          leaf source-ip {
+            type inet:ip-address;
+            description
+              "Source IP address of a policy association group.";
+          }
+          leaf attribute-template-id {
+            type leafref {
+              path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+            }
+            must "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-bypass = 'not-configured'";
+            must "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'not-configured' or /srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'sbfd-enable' or /srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-enable = 'disable'";
+            must "not(/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:bfd-slice-inherit-match)";
+            must "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:path-verification-enable = 'not-configured'";
+            must "not(/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template[srpolicy:id=current()]/srpolicy:path-mtu-detect)";
+            description
+              "Attribute template ID.";
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv4-policys {
+    description
+      "SR policy grouping.";
+    container policys {
+      description
+        "List of SR Policies.";
+      list policy {
+        key "endpoint color";
+        unique "name";
+        unique "binding-sid/value";
+        description
+          "Configure an SR Policy.";
+        leaf endpoint {
+          type inet:ip-address;
+          description
+            "SR Policy endpoint address.";
+        }
+        leaf color {
+          type uint32 {
+            range "0..4294967295";
+          }
+          description
+            "SR Policy color.";
+        }
+        leaf name {
+          type string {
+            length "1..127";
+          }
+          mandatory true;
+          description
+            "SR Policy name.";
+        }
+        leaf metric-inherit-igp {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable IGP cost inheritance.";
+        }
+        choice metric-type {
+          description
+            "IGP metric type. The absolute type is supported.";
+          case absolute {
+            description
+              "Absolute type.";
+            leaf absolute {
+              type int32 {
+                range "1..65535";
+              }
+              description
+                "Cost of the IGP metric of the absolute type.";
+            }
+          }
+        }
+        container binding-sid {
+          description
+            "Configure a binding SID.";
+          leaf dataplane {
+            type dataplane-type;
+            must "(../dataplane='mpls')";
+            description
+              "Binding sid dataplane type.";
+          }
+          leaf value {
+            when "(../dataplane='mpls')";
+            type sid-value-type;
+            mandatory true;
+            description
+              "Binding sid value.";
+          }
+        }
+        leaf admin-state {
+          type admin-state-type;
+          default "up";
+          description
+            "Close the function of SR Policy.";
+        }
+        leaf mtu {
+          type uint32 {
+            range "512..9600";
+          }
+          description
+            "SR Policy mtu value.";
+        }
+        leaf hsb-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "SR Policy hot standby.";
+        }
+        leaf bfd-enable {
+          type policy-bfd-enable-type;
+          default "not-configured";
+          description
+            "SR Policy BFD.";
+        }
+        container bfd-address {
+          description
+            "Configure the source addresses and destination addresses for BFD sessions.";
+          choice source {
+            description
+              "Configure the SBFD source address.";
+            case address {
+              description
+                "Source address of the BFD session.";
+              leaf source-address {
+                type inet:ip-address;
+                description
+                  "Source address of the BFD session.";
+              }
+            }
+            case interface {
+              description
+                "Source interface mode.";
+              leaf source-interface {
+                type leafref {
+                  path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+                }
+                must "/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type='LoopBack'";
+                description
+                  "Source interface of the BFD session.";
+              }
+            }
+          }
+          leaf destination-address {
+            type inet:ip-address;
+            description
+              "Destination address of the BFD session.";
+          }
+        }
+        leaf traffic-statistics-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "SR Policy traffic statistics.";
+        }
+        container diffserv-mode {
+          description
+            "Configure the DiffServ mode in an SR Policy.";
+          leaf pipe-mode {
+            type pipe-mode-type;
+            description
+              "Specifies the pipe mode of SR Policy.";
+          }
+          leaf service-class {
+            when "../pipe-mode='pipe'";
+            type serv-class-types;
+            mandatory true;
+            description
+              "Service class of SR Policy.";
+          }
+          leaf service-color {
+            when "../pipe-mode='pipe'";
+            type serv-color-types;
+            mandatory true;
+            description
+              "Service color of SR Policy.";
+          }
+        }
+        leaf constraint-template-name {
+          type leafref {
+            path "/srpolicy:srpolicy/srpolicy:constraint-templates/srpolicy:constraint-template/srpolicy:name";
+          }
+          description
+            "Name of a constraint template.";
+        }
+        leaf bfd-min-tx {
+          type uint32 {
+            range "1..4294967295";
+          }
+          units "ms";
+          description
+            "Minimum interval for sending seamless-bfd packets to the peer end over the candidate path.";
+        }
+        leaf bfd-multi-num {
+          type uint32 {
+            range "3..50";
+          }
+          description
+            "Local detection multiplier over the candidate path.";
+        }
+        leaf bfd-backup-min-tx {
+          type uint32 {
+            range "1..4294967295";
+          }
+          units "ms";
+          description
+            "Minimum interval for sending seamless-bfd packets to the peer end over the backup candidate path.";
+        }
+        leaf bfd-backup-multi-num {
+          type uint32 {
+            range "3..50";
+          }
+          description
+            "Local detection multiplier over the backup candidate path.";
+        }
+        container compute-types {
+          description
+            "List of different types of computation sources.";
+          list compute-type {
+            key "type";
+            ordered-by user;
+            description
+              "Configure a computation source type for an SR policy.";
+            leaf type {
+              type policy-compute-type;
+              must "../type = 'none' and count(../../compute-type/type[.!=current()]) < 1 or ../type != 'none'";
+              description
+                "Computation source type.";
+            }
+          }
+        }
+        uses auto-bandwidth-adjustment;
+        container candidate-paths {
+          description
+            "List of candidate paths in an SR Policy.";
+          list candidate-path {
+            must "(discriminator=preference)";
+            key "protocol-origin originator discriminator";
+            max-elements 64;
+            description
+              "Configure a candidate path.";
+            leaf protocol-origin {
+              type protocol-origin-type;
+              must "(../protocol-origin='configuration')";
+              description
+                "Candidate path protocol origin.";
+            }
+            leaf originator {
+              type string {
+                length "1..60";
+              }
+              must "(../originator='0,0.0.0.0')";
+              description
+                "Candidate path originator.";
+            }
+            leaf discriminator {
+              type uint32 {
+                range "1..65535";
+              }
+              description
+                "Candidate path discriminator.";
+            }
+            leaf preference {
+              type uint32 {
+                range "1..65535";
+              }
+              mandatory true;
+              description
+                "Candidate path preference.";
+            }
+            choice type {
+              description
+                "Type of candidate paths.";
+              case explicit {
+                description
+                  "Candidate path with explicitly defined set/s of segment-lists.";
+                container segment-lists {
+                  description
+                    "List of segment lists in a candidate path.";
+                  list segment-list {
+                    key "name";
+                    max-elements 64;
+                    description
+                      "Configure a segment list for a candidate path.";
+                    leaf name {
+                      type leafref {
+                        path "../../../../../../../policy-attributes/segment-lists/segment-list/name";
+                      }
+                      description
+                        "Segment list name.";
+                    }
+                    leaf weight {
+                      type uint32 {
+                       
+                        range "0..4294967295";
+                      }
+                      default "1";
+                      description
+                        "Segment-list weighted loadshare.";
+                    }
+                    leaf path-mtu {
+                      type uint32 {
+                        range "1280..9600";
+                      }
+                      description
+                        "Segment-list path-mtu.";
+                    }
+                    container binding-sids {
+                      description
+                        "List of a segment list's binding SIDs.";
+                      list binding-sid {
+                        key "dataplane value";
+                        max-elements 1;
+                        description
+                          "Configure a binding SID.";
+                        leaf dataplane {
+                          type dataplane-type;
+                          must "(../dataplane='mpls')";
+                          description
+                            "Binding SID dataplane type.";
+                        }
+                        leaf value {
+                          type sid-value-type;
+                          description
+                            "Binding SID value.";
+                        }
+                      }
+                    }
+                    container reverse-binding-sid {
+                      description
+                        "Configure a reverse binding SID for a segment list.";
+                      leaf dataplane {
+                        type dataplane-type;
+                        must "(../dataplane='mpls')";
+                        description
+                          "Reverse binding SID dataplane type.";
+                      }
+                      leaf value {
+                        when "(../dataplane='mpls')";
+                        type sid-value-type;
+                        mandatory true;
+                        description
+                          "Reverse binding SID value of a segment list.";
+                      }
+                    }
+                    choice bfd-source {
+                      description
+                        "Configure the SBFD source address.";
+                      case address {
+                        description
+                          "Source address of the BFD session.";
+                        leaf bfd-source-address {
+                          type inet:ip-address;
+                          description
+                            "Source address of the BFD session.";
+                        }
+                      }
+                      case interface {
+                        description
+                          "Source interface mode.";
+                        leaf bfd-source-interface {
+                          type leafref {
+                            path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+                          }
+                          must "/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type='LoopBack'";
+                          description
+                            "Source interface of the BFD session.";
+                        }
+                      }
+                    }
+                    leaf bfd-destination-address {
+                      type inet:ip-address;
+                      description
+                        "Destination address of the BFD session.";
+                    }
+                  }
+                }
+              }
+              case dynamic {
+                description
+                  "Candidate path with an optimization objective and a set of constraints.";
+                container constraints {
+                  presence "Create a set of constraints.";
+                  description
+                    "Configure a set of constraints contained in a dynamic candidate path.";
+                  uses constraints {
+                    refine "constraint-path-name" {
+                      must "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path[srpolicy:name = current()]/srpolicy:hop-type = 'ipv4'";
+                    }
+                  }
+                  uses disjoint-association-group;
+                  uses policy-association-group;
+                  uses bidirectional-association-group;
+                }
+              }
+            }
+            leaf template-id {
+              type leafref {
+                path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+              }
+              description
+                "Attribute template ID.";
+            }
+            leaf network-slice-id {
+              type uint32 {
+                range "1..4294967295";
+              }
+              description
+                "Network slice ID of a candidate path.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping segment-list-constraint-path-group {
+    description
+      "Segment list-specific path constraint grouping.";
+    container segment-list-constraint-paths {
+      description
+        "List of segment list-specific path constraints.";
+      list segment-list-constraint-path {
+        key "constraint-path-name";
+        max-elements 8;
+        description
+          "Configure a segment list-specific path constraint.";
+        leaf constraint-path-name {
+          type leafref {
+            path "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path/srpolicy:name";
+          }
+          must "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path[srpolicy:name = current()]/srpolicy:hop-type = 'ipv6'";
+          description
+            "Path constraint name.";
+        }
+      }
+    }
+  }
+
+  grouping srv6-policys {
+    description
+      "SR policy grouping.";
+    container policys {
+      description
+        "List of SR Policies.";
+      list policy {
+        key "endpoint color";
+        unique "name";
+        description
+          "Configure an SR Policy.";
+        leaf endpoint {
+          type inet:ip-address;
+          description
+            "SR Policy endpoint address.";
+        }
+        leaf color {
+          type uint32 {
+            range "0..4294967295";
+          }
+          description
+            "SR Policy color.";
+        }
+        leaf name {
+          type string {
+            length "1..127";
+          }
+          mandatory true;
+          description
+            "SR Policy name.";
+        }
+        leaf locator {
+         
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+          }
+          description
+            "Locator Name.";
+        }
+        container binding-sid {
+         
+          must "not(../binding-sid/value) or (../binding-sid/value and count(../../../policy-attributes/locators/locator)>0)";
+          status deprecated;
+          description
+            "Configure a binding SID. The node binding-sid is deprecated. You are advised to use the node binding-sids.";
+          leaf dataplane {
+            type dataplane-type;
+            must "(../dataplane='srv6')";
+            status deprecated;
+            description
+              "Binding sid dataplane type.";
+          }
+          leaf value {
+            when "(../dataplane='srv6')";
+            type sid-value-type;
+            mandatory true;
+            status deprecated;
+            description
+              "Binding sid value.";
+          }
+        }
+        container binding-sids {
+          description
+            "List of SR Policy binding SIDs.";
+          list binding-sid {
+            must "count(../../../../policy-attributes/locators/locator)>0";
+            key "dataplane value";
+            max-elements 2;
+            description
+              "Configure a binding SID.";
+            leaf dataplane {
+              type dataplane-type;
+              must "(../dataplane='srv6')";
+              description
+                "Binding sid dataplane type.";
+            }
+            leaf value {
+              type sid-value-type;
+              description
+                "Binding sid value.";
+            }
+          }
+        }
+        leaf admin-state {
+          type admin-state-type;
+          default "up";
+          description
+            "Close the function of SR Policy.";
+        }
+        leaf mtu {
+          type uint32 {
+            range "1280..9600";
+          }
+          description
+            "SRv6 TE Policy MTU value.";
+        }
+        leaf hsb-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "SR Policy hot standby.";
+        }
+        leaf bfd-enable {
+          type policy-bfd-enable-type;
+          must "((../bfd-enable='not-configured') or (../bfd-enable='disable') or (../bfd-enable='ubfd-enable')) and (../endpoint='::') or (../endpoint!='::')";
+          default "not-configured";
+          description
+            "SR Policy BFD.";
+        }
+        leaf bfd-bypass {
+          type policy-bfd-bypass-type;
+          default "not-configured";
+          description
+            "SR policy BFD bypass.";
+        }
+        leaf bfd-min-tx {
+          type uint32 {
+            range "1..4294967295";
+          }
+          units "ms";
+          description
+            "Minimum interval for sending BFD packets to the peer end.";
+        }
+        leaf bfd-multi-num {
+          type uint32 {
+            range "3..50";
+          }
+          description
+            "Local detection multiplier.";
+        }
+        leaf bfd-backup-min-tx {
+          type uint32 {
+            range "1..4294967295";
+          }
+          units "ms";
+          description
+            "Minimum interval for sending BFD packets to the peer end over the backup candidate path.";
+        }
+        leaf bfd-backup-multi-num {
+          type uint32 {
+            range "3..50";
+          }
+          description
+            "Local detection multiplier over the backup candidate path.";
+        }
+        container bfd-address {
+          presence "Configure bfd-address.";
+          description
+            "Configure the source addresses and destination addresses for BFD packets.";
+          leaf source-address {
+            type inet:ip-address;
+            mandatory true;
+            description
+              "Source address of the BFD session.";
+          }
+          leaf destination-address {
+            type inet:ip-address;
+            description
+              "Destination address of the BFD session.";
+          }
+        }
+        leaf traffic-statistics-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "SR Policy traffic statistics.";
+        }
+        leaf path-mtu-detect {
+          when "(../endpoint!='::')";
+          type path-mtu-detect-type;
+          description
+            "SR Policy path MTU detection.";
+        }
+        leaf path-verification {
+          type path-verification-type;
+          default "not-configured";
+          description
+            "SR Policy path verification.";
+        }
+        leaf encapsulation-mode {
+          type encapsulation-cfg-type;
+          description
+            "SR Policy encapsulation mode.";
+        }
+        leaf forward-no-bypass {
+          type policy-fwd-no-bypass-type;
+          description
+            "Traffic is not forwarded over the local protection path.";
+        }
+        container diffserv-mode {
+          description
+            "Configure the DiffServ mode in an SR Policy.";
+          leaf pipe-mode {
+            type pipe-mode-type;
+            description
+              "Specifies the pipe mode of SR Policy.";
+          }
+          leaf service-class {
+            when "../pipe-mode='pipe'";
+            type serv-class-types;
+            mandatory true;
+            description
+              "Service class of SR Policy.";
+          }
+          leaf service-color {
+            when "../pipe-mode='pipe'";
+            type serv-color-types;
+            mandatory true;
+            description
+              "Service color of SR Policy.";
+          }
+        }
+        leaf ifit-delay-enable {
+          when "(../endpoint!='::')";
+          type enable-type;
+          default "disable";
+          description
+            "SR Policy IFIT delay enabling.";
+        }
+        leaf ifit-loss-rate-enable {
+          when "(../endpoint!='::')";
+          type enable-type;
+          default "disable";
+          description
+            "SR Policy IFIT loss-rate enabling.";
+        }
+        leaf ifit-interval {
+          when "(../endpoint!='::')";
+          type uint32 {
+            range "2|10|30|60|300";
+          }
+          units "s";
+          default "30";
+          description
+            "SR Policy IFIT interval.";
+        }
+        leaf ifit-measure-mode {
+          when "(../endpoint!='::')";
+          type ifit-measure-mode-type;
+          default "e2e";
+          description
+            "SR Policy IFIT measure mode.";
+        }
+        leaf shortcut-type {
+          when "(../endpoint!='::')";
+          type shortcut-mode;
+          default "disable";
+          description
+            "SR Policy shortcut type.";
+        }
+        leaf route-policy-name {
+          when "(../shortcut-type='isis') and (../endpoint!='::')";
+          type leafref {
+            path "/rtp:routing-policy/rtp:policy-definitions/rtp:policy-definition/rtp:name";
+          }
+          description
+            "Route policy name.";
+        }
+        choice metric-type {
+          default "relative";
+          description
+            "IGP metric type. The absolute type is supported.";
+          case absolute {
+            description
+              "Absolute type.";
+            leaf absolute {
+              type int32 {
+                range "1..65535";
+              }
+              description
+                "Cost of the IGP metric of the absolute type.";
+            }
+          }
+          case relative {
+            description
+              "Relative type.";
+            leaf relative {
+              when "(../endpoint!='::')";
+              type int32 {
+                range "-10..10";
+              }
+              default "-1";
+              description
+                "Cost of the IGP metric of the relative type.";
+            }
+          }
+        }
+        leaf process-id {
+          when "(../shortcut-type='isis') and (../endpoint!='::')";
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/isis:isis/isis:sites/isis:site/isis:id";
+          }
+          must "/ni:network-instance/ni:instances/ni:instance/isis:isis/isis:sites/isis:site[isis:id=current()]/isis:afs/isis:af[isis:type='afipv6']";
+          description
+            "ISIS process id.";
+        }
+        leaf bfd-slice-inherit-match {
+          type bfd-slice-inherit-match-type;
+          description
+            "Inheritance type (for the network slice's match mode) of BFD detection packets configured for the SRv6 TE Policy.";
+        }
+        leaf metric-inherit-type {
+          type metric-inherit-mode;
+          description
+            "Metric type inherited by SRv6 TE Policy.";
+        }
+        leaf constraint-template-name {
+          type leafref {
+            path "/srpolicy:srpolicy/srpolicy:constraint-templates/srpolicy:constraint-template/srpolicy:name";
+          }
+          must "(../endpoint != '::') and (../color != 0)";
+          description
+            "Name of a constraint template.";
+        }
+        leaf segment-list-delete-hold {
+          type delete-hold-type;
+          description
+            "Hold the deleted segment lists when new segment lists all down.";
+        }
+        container metric-values {
+          description
+            "List of metric values configured for SRv6 TE Policy.";
+          list metric-value {
+            key "type";
+            description
+              "Configure a metric value.";
+            leaf type {
+              type metric-value-type;
+              description
+                "Metric value type.";
+            }
+            choice value {
+              mandatory true;
+              description
+                "SRv6 TE Policy metric value.";
+              case absolute {
+                description
+                  "Absolute value type.";
+                leaf absolute {
+                  type uint32 {
+                    range "1..4261412863";
+                  }
+                  description
+                    "Absolute metric value.";
+                }
+              }
+            }
+          }
+        }
+        container compute-types {
+          description
+            "List of different types of computation sources.";
+          list compute-type {
+            must "(../../endpoint != '::') and (../../color != 0)";
+            key "type";
+            ordered-by user;
+            description
+              "Configure a computation source type for an SRv6 TE policy.";
+            leaf type {
+              type policy-compute-type;
+              must "../type = 'none' and count(../../compute-type/type[.!=current()]) < 1 or ../type != 'none'";
+              description
+                "Computation source type.";
+            }
+          }
+        }
+        leaf reduce {
+          type enable-type;
+          description
+            "Enable/Disable the Reduce function for an SRv6 TE Policy.";
+        }
+        leaf bsid-endpoint-behavior {
+          type bsid-endpoint-behavior-type;
+          description
+            "Endpoint behavior of binding SIDs.";
+        }
+        leaf afr {
+          type afr-type;
+          description
+            "Adaptive flow repathing.";
+        }
+        leaf dual-fed {
+          type dual-fed-type;
+          description
+            "Enable/Disable the dual-fed function for an SRv6 TE Policy.";
+        }
+        container candidate-paths {
+          description
+            "List of candidate paths in an SR Policy.";
+          list candidate-path {
+            must "(discriminator=preference)";
+            key "protocol-origin originator discriminator";
+            max-elements 64;
+            description
+              "Configure a candidate path.";
+            leaf protocol-origin {
+              type protocol-origin-type;
+              must "(../protocol-origin='configuration')";
+              description
+                "Candidate path protocol origin.";
+            }
+            leaf originator {
+              type string {
+                length "1..60";
+              }
+              must "(../originator='0,0.0.0.0')";
+              description
+                "Candidate path originator.";
+            }
+            leaf discriminator {
+              type uint32 {
+                range "1..65535";
+              }
+              description
+                "Candidate path discriminator.";
+            }
+            leaf preference {
+              type uint32 {
+                range "1..65535";
+              }
+              mandatory true;
+              description
+                "Candidate path preference.";
+            }
+            choice type {
+              description
+                "Type of candidate paths.";
+              case explicit {
+                description
+                  "Candidate path with explicitly defined set/s of segment-lists.";
+                container segment-lists {
+                  description
+                    "List of segment lists in a candidate path.";
+                  list segment-list {
+                    key "name";
+                    max-elements 64;
+                    description
+                      "Configure a segment list for a candidate path.";
+                    leaf name {
+                      type leafref {
+                        path "../../../../../../../policy-attributes/segment-lists/segment-list/name";
+                      }
+                      description
+                        "Segment list name.";
+                    }
+                    choice co-routed-path-type {
+                      description
+                        "Type of co-routed path.";
+                      case bsid {
+                        description
+                          "Binding SIDs.";
+                        container binding-sid {
+                         
+                          must "not(../binding-sid/value) or (../binding-sid/value and count(../../../../../../../policy-attributes/locators/locator)>0)";
+                          status deprecated;
+                          description
+                            "Configure a binding SID. The node binding-sid is deprecated. You are advised to use the node binding-sids.";
+                          leaf dataplane {
+                            type dataplane-type;
+                            must "(../dataplane='srv6')";
+                            status deprecated;
+                            description
+                              "Binding SID dataplane type.";
+                          }
+                          leaf value {
+                            when "(../dataplane='srv6')";
+                            type sid-value-type;
+                            mandatory true;
+                            status deprecated;
+                            description
+                              "Binding SID value of segment list.";
+                          }
+                        }
+                        container binding-sids {
+                          description
+                            "List of segment list binding SIDs.";
+                          list binding-sid {
+                            must "count(../../../../../../../../policy-attributes/locators/locator)>0";
+                            key "dataplane value";
+                            max-elements 2;
+                            description
+                              "Configure a binding SID.";
+                            leaf dataplane {
+                              type dataplane-type;
+                              must "(../dataplane='srv6')";
+                              description
+                                "Binding sid dataplane type.";
+                            }
+                            leaf value {
+                              type sid-value-type;
+                              description
+                                "Binding sid value.";
+                            }
+                          }
+                        }
+                        container reverse-binding-sid {
+                          description
+                            "Configure a reverse binding SID of segment list.";
+                          leaf dataplane {
+                            type dataplane-type;
+                            must "(../dataplane='srv6')";
+                            description
+                              "Reverse binding SID dataplane type.";
+                          }
+                          leaf value {
+                            when "(../dataplane='srv6')";
+                            type sid-value-type;
+                            mandatory true;
+                            description
+                              "Reverse binding SID value of segment list.";
+                          }
+                        }
+                      }
+                      case xsid {
+                        description
+                          "XSIDs.";
+                        container xsids {
+                          description
+                            "List of segment list XSIDs.";
+                          list xsid {
+                            must "count(../../../../../../../../policy-attributes/locators/locator)>0";
+                            key "dataplane value";
+                            max-elements 2;
+                            description
+                              "Configure an XSID.";
+                            leaf dataplane {
+                              type dataplane-type;
+                              must "(../dataplane='srv6')";
+                              description
+                                "XSID data plane type.";
+                            }
+                            leaf value {
+                              type sid-value-type;
+                              description
+                                "XSID value.";
+                            }
+                            leaf encapsulation-mode {
+                              type xsid-encapsulation-type;
+                              mandatory true;
+                              description
+                                "XSID encapsulation mode.";
+                            }
+                          }
+                        }
+                        container reverse-xsid {
+                          description
+                            "Configure a reverse XSID in a segment list.";
+                          leaf dataplane {
+                            type dataplane-type;
+                            must "(../dataplane='srv6')";
+                            description
+                              "Reverse XSID data plane type.";
+                          }
+                          leaf value {
+                            when "(../dataplane='srv6')";
+                            type sid-value-type;
+                            mandatory true;
+                            description
+                              "Reverse XSID value in a segment list.";
+                          }
+                        }
+                      }
+                    }
+                    leaf weight {
+                      type uint32 {
+                       
+                        range "0..4294967295";
+                      }
+                      default "1";
+                      description
+                        "Segment-list weighted loadshare.";
+                    }
+                    leaf path-mtu {
+                      type uint32 {
+                        range "1280..9600";
+                      }
+                      description
+                        "Segment-list path-mtu.";
+                    }
+                  }
+                }
+              }
+              case dynamic {
+                description
+                  "Candidate path with an optimization objective and a set of constraints.";
+                container constraints {
+                  must "not (../template-id)";
+                  must "(../../../endpoint != '::') and (../../../color != 0)";
+                  presence "Create a set of constraints.";
+                  description
+                    "Configure a set of constraints contained in a dynamic candidate path.";
+                  uses constraints {
+                    refine "constraint-path-name" {
+                      must "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path[srpolicy:name = current()]/srpolicy:hop-type = 'ipv6'";
+                    }
+                  }
+                  uses disjoint-association-group;
+                  uses policy-association-group;
+                  uses segment-list-constraint-path-group;
+                }
+              }
+            }
+            leaf template-id {
+              type leafref {
+                path "/srpolicy:srpolicy/srpolicy:attribute-templates/srpolicy:attribute-template/srpolicy:id";
+              }
+              description
+                "Attribute template ID.";
+            }
+            leaf network-slice-id {
+              type uint32 {
+                range "1..4294967295";
+              }
+              description
+                "Network slice ID of a candidate path.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping policy-groups {
+    description
+      "SR-MPLS TE Policy group grouping.";
+    container policy-groups {
+      description
+        "List of SR-MPLS TE Policy groups.";
+      list policy-group {
+        key "index";
+        description
+          "Configure an SR-MPLS TE Policy group.";
+        leaf index {
+          type uint32 {
+            range "1..4294967295";
+          }
+          description
+            "SR-MPLS TE Policy group id.";
+        }
+        leaf endpoint {
+          type inet:ip-address;
+          description
+            "SR-MPLS TE Policy IPv4 endPoint address.";
+        }
+        leaf description {
+          type string {
+            length "1..242";
+          }
+          description
+            "SR-MPLS TE Policy group description.";
+        }
+        leaf match-type {
+          type group-match-type;
+          must "(../match-type='service-class') or (../match-type='dscp')";
+          default "dscp";
+          description
+            "Match type of an SR-MPLS TE Policy group.";
+        }
+        leaf state {
+          type state-type;
+          config false;
+          description
+            "SR-MPLS TE Policy group state.";
+        }
+        leaf delay-timer-remain {
+          type uint32;
+          units "ms";
+          config false;
+          description
+            "Remaining delay.";
+        }
+        leaf state-change-time {
+          type yang:date-and-time;
+          config false;
+          description
+            "Date and time when the state of a group changed.";
+        }
+        leaf tunnel-id {
+          type uint32;
+          config false;
+          description
+            "SR-MPLS TE Policy group tunnel id.";
+        }
+        leaf tunnel-type {
+          type tunnel-type;
+          config false;
+          description
+            "SR-MPLS TE Policy group tunnel type.";
+        }
+        leaf match-count {
+          type uint32;
+          config false;
+          description
+            "SR-MPLS TE Policy group match count.";
+        }
+        leaf up-match-count {
+          type uint32;
+          config false;
+          description
+            "SR-MPLS TE Policy group up match count.";
+        }
+        container color-dscp-matchs {
+          when "contains(../match-type, 'dscp')";
+          description
+            "List of color-address family-DSCP mappings for an SR-MPLS TE Policy.";
+          list color-dscp-match {
+            key "color af-type";
+            max-elements 128;
+            description
+              "Configure a color-address family-DSCP mapping for an SR-MPLS TE Policy.";
+            leaf color {
+              type uint32 {
+                range "0..4294967295";
+              }
+              description
+                "SR-MPLS TE Policy color.";
+            }
+            leaf af-type {
+              type address-family-type;
+              description
+                "Address family.";
+            }
+            leaf default {
+              type boolean;
+              default "false";
+              description
+                "Enable/disable the default SR-MPLS TE Policy.";
+            }
+            leaf dscp-value {
+              when "not(../default='true')";
+              type pub-type:id-range {
+               
+              }
+              mandatory true;
+              description
+                "DSCP Value.";
+            }
+            leaf policy-tunnel-id {
+              type uint32;
+              config false;
+              description
+                "SR-MPLS TE Policy tunnel ID.";
+            }
+            leaf state {
+              type state-type;
+              config false;
+              description
+                "SR-MPLS TE Policy group mapping state.";
+            }
+          }
+        }
+        container service-class-maps {
+          when "contains(../match-type, 'service-class')";
+          description
+            "List of Service Class-based mappings.";
+          list service-class-map {
+            key "index";
+            description
+              "Configure a Service Class-based mapping.";
+            leaf index {
+              type uint32 {
+                range "1..4294967295";
+              }
+              description
+                "Index.";
+            }
+            leaf service-class {
+              when "../index != 4294967295";
+              type service-class-type;
+              mandatory true;
+              description
+                "Service Class type.";
+            }
+            choice match-tunnel {
+              mandatory true;
+              description
+                "Match tunnel.";
+              case sr-policy {
+                description
+                  "Flow match SR Policy.";
+                leaf color {
+                  type uint32 {
+                    range "1..4294967295";
+                  }
+                  must "not(../../service-class-map[color=current()][index!=current()/../index])";
+                  description
+                    "Color of an SR Policy.";
+                }
+              }
+            }
+            leaf policy-tunnel-id {
+              type uint32;
+              config false;
+              description
+                "SR-MPLS TE Policy tunnel ID.";
+            }
+            leaf state {
+              type state-type;
+              config false;
+              description
+                "Mapping state of an SR-MPLS TE Policy group.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv6-policy-infos {
+    description
+      "SRv6 Policy infos grouping.";
+    container policy-infos {
+      config false;
+      description
+        "List of SRv6 TE Policies.";
+      list policy-info {
+        key "endpoint color";
+        description
+          "Operational state of an SRv6 TE Policy.";
+        leaf endpoint {
+          type inet:ipv6-address-no-zone;
+          description
+            "SR Policy endpoint address.";
+        }
+        leaf color {
+          type uint32;
+          description
+            "SR Policy color.";
+        }
+        leaf name {
+         
+          type string {
+            length "1..255";
+          }
+          description
+            "SR Policy name.";
+        }
+        leaf state {
+          type string {
+            length "1..31";
+          }
+          description
+            "SR Policy states.";
+        }
+        leaf state-change-time {
+          type yang:date-and-time;
+          description
+            "SR Policy state change time.";
+        }
+        leaf admin-state {
+          type admin-state-type;
+          description
+            "SR Policy admin states.";
+        }
+        leaf binding-sid {
+         
+          type inet:ipv6-address-no-zone;
+          description
+            "SR Policy preferred binding SID.";
+        }
+        leaf bsid-encapsulation-mode {
+          type encapsulation-disp-type;
+          description
+            "SR Policy binding SID encapsulation mode.";
+        }
+        container binding-sids {
+          description
+            "List of SR Policy's binding SIDs.";
+          list binding-sid {
+            key "sid-value";
+            max-elements 2;
+            description
+              "Operational data of an SR Policy's binding SID.";
+            leaf sid-value {
+              type inet:ipv6-address-no-zone;
+              description
+                "Binding SID value.";
+            }
+            leaf encapsulation-mode {
+              type encapsulation-disp-type;
+              description
+                "Binding SID encapsulation mode.";
+            }
+            leaf reduce {
+              type enable-type;
+              description
+                "Whether the Reduce function is enabled for a binding SID.";
+            }
+          }
+        }
+        leaf tunnel-id {
+          type uint32;
+          description
+            "SR Policy tunnel ID.";
+        }
+        leaf tunnel-type {
+          type tunnel-type;
+          description
+            "SR Policy tunnel type.";
+        }
+        leaf bfd-enable {
+          type bfd-enable-type;
+          description
+            "SR Policy BFD enable flag.";
+        }
+        leaf bfd-bypass {
+          type bfd-bypass-type;
+          description
+            "SR policy BFD bypass enable flag.";
+        }
+        leaf bfd-slice-inherit-match {
+          type bfd-slice-inherit-match-disp-type;
+          description
+            "Display the active inheritance type for the SRv6 TE Policy.";
+        }
+        leaf hsb-enable {
+          type enable-type;
+          description
+            "SR Policy HSB enable flag.";
+        }
+        leaf encapsulation-mode {
+          type encapsulation-disp-type;
+          description
+            "SR Policy encapsulation mode.";
+        }
+        leaf traffic-statistics-enable {
+          type enable-type;
+          description
+            "SR Policy traffic statistics enable flag.";
+        }
+        leaf ifit-loss-rate-enable {
+          type enable-type;
+          description
+            "SR Policy IFIT loss-rate enable flag.";
+        }
+        leaf ifit-delay-enable {
+          type enable-type;
+          description
+            "SR Policy IFIT delay enable flag.";
+        }
+        leaf ifit-interval {
+          type uint32;
+          units "s";
+          description
+            "SR Policy IFIT interval.";
+        }
+        leaf ifit-measure-mode {
+          type ifit-measure-mode-type;
+          description
+            "SR Policy IFIT measure mode.";
+        }
+        leaf ifit-one-way-delay {
+          type uint32;
+          units "ms";
+          description
+            "SR Policy IFIT one-way delay.";
+        }
+        leaf ifit-one-way-jitter {
+          type uint32;
+          units "ms";
+          description
+            "SR Policy IFIT one-way jitter.";
+        }
+        leaf ifit-one-way-loss {
+          type uint32;
+          units "s";
+          description
+            "SR Policy IFIT one-way loss.";
+        }
+        leaf ifit-two-way-delay {
+          type uint32;
+          units "ms";
+          description
+            "SR Policy IFIT two-way delay.";
+        }
+        leaf ifit-two-way-jitter {
+          type uint32;
+          units "ms";
+          description
+            "SR Policy IFIT two-way jitter.";
+        }
+        leaf ifit-two-way-loss {
+          type uint32;
+          units "s";
+          description
+            "SR Policy IFIT two-way loss.";
+        }
+        leaf candidate-path-count {
+          type uint32;
+          description
+            "SR Policy candidate path count.";
+        }
+        leaf interface-name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Interface name of an SR Policy.";
+        }
+        leaf interface-index {
+          type uint32;
+          description
+            "Interface index of an SR Policy.";
+        }
+        leaf interface-state {
+          type string {
+            length "1..31";
+          }
+          description
+            "Interface state of an SR Policy.";
+        }
+        leaf active-metric-value {
+          type uint32;
+          description
+            "Active metric value of an SR Policy.";
+        }
+        leaf active-metric-type {
+          type metric-inherit-mode;
+          description
+            "Active metric type of an SR Policy.";
+        }
+        leaf active-metric-source {
+          type metric-source-mode;
+          description
+            "Active metric source of an SR Policy.";
+        }
+        leaf segment-list-delete-hold-enable {
+          type delete-hold-type;
+          description
+            "SR Policy Segment List Delete Hold flag.";
+        }
+        leaf reduce {
+          type enable-type;
+          description
+            "Whether the Reduce function is enabled for an SRv6 TE Policy.";
+        }
+        leaf path-mtu-detect {
+          type path-mtu-detect-type;
+          description
+            "SR Policy path MTU detection enabling flag.";
+        }
+        leaf dual-fed {
+          type dual-fed-type;
+          description
+            "Whether the dual-fed function is enabled for an SRv6 TE Policy.";
+        }
+        container candidate-paths {
+          description
+            "List of candidate paths in an SRv6 TE Policy.";
+          list candidate-path {
+            key "protocol-origin asn node-address discriminator preference";
+            max-elements 64;
+            description
+              "Operational state of a candidate path in an SRv6 TE Policy.";
+            leaf protocol-origin {
+              type protocol-origin-type;
+              description
+                "Candidate path protocol origin.";
+            }
+            leaf asn {
+              type uint32;
+              description
+                "Candidate path AS No.";
+            }
+            leaf node-address {
+              type inet:ip-address-no-zone;
+              description
+                "Candidate path nodeAddress.";
+            }
+            leaf discriminator {
+              type uint32;
+              description
+                "Candidate path discriminator.";
+            }
+            leaf preference {
+              type uint32;
+              description
+                "Candidate path preference.";
+            }
+            leaf network-slice-id {
+              type uint32;
+              description
+                "Network slice ID of a candidate path.";
+            }
+            leaf path-state {
+              type string {
+                length "1..31";
+              }
+              description
+                "Candidate path state.";
+            }
+            leaf path-type {
+              type path-type;
+              description
+                "Candidate path type.";
+            }
+            leaf binding-sid {
+              type inet:ipv6-address-no-zone;
+              description
+                "Candidate path binding SID.";
+            }
+            leaf group-id {
+              type uint32;
+              description
+                "Candidate path groupId.";
+            }
+            leaf policy-name {
+              type string {
+                length "1..255";
+              }
+              description
+                "Candidate path policy name.";
+            }
+            leaf name {
+              type string {
+                length "1..255";
+              }
+              description
+                "Candidate path name.";
+            }
+            leaf path-verification {
+              type global-path-verification-type;
+              description
+                "SR Policy path verification enable flag.";
+            }
+            leaf delay-timer-remain {
+              type uint32;
+              units "ms";
+              description
+                "Delay Timer Remain.";
+            }
+            leaf template-id {
+              type uint32;
+              description
+                "Candidate path template ID.";
+            }
+            leaf compute-source {
+              type delegate-protocol-type;
+              description
+                "Computation source.";
+            }
+            leaf delegate-congestion {
+              type boolean;
+              description
+                "Whether the delegation status is congested.";
+            }
+            leaf ct0-bandwidth {
+              type uint64;
+              description
+                "Actual CT0 bandwidth of a candidate path.";
+            }
+            leaf odn-color {
+              type uint32;
+              description
+                "ODN color.";
+            }
+            leaf segment-list-count {
+              type uint32;
+              description
+                "Candidate path segment list count.";
+            }
+            leaf active-metric-value {
+              type uint32;
+              description
+                "Active metric value of a candidate path.";
+            }
+            leaf active-metric-type {
+              type metric-inherit-mode;
+              description
+                "Active metric type of a candidate path.";
+            }
+            leaf igp-metric {
+              type uint32;
+              description
+                "IGP metric of a candidate path.";
+            }
+            leaf te-metric {
+              type uint32;
+              description
+                "TE metric of a candidate path.";
+            }
+            leaf delay-metric {
+              type uint32;
+              description
+                "Delay metric of a candidate path.";
+            }
+            leaf hop-counts {
+              type uint32;
+              description
+                "Hop counts of a candidate path.";
+            }
+            container segment-lists {
+              description
+                "List of segment list information in a candidate path.";
+              list segment-list {
+                key "id";
+                max-elements 64;
+                description
+                  "Operational state of a segment list in a candidate path.";
+                leaf id {
+                  type uint32;
+                  description
+                    "Segment list ID.";
+                }
+                leaf name {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list name.";
+                }
+                leaf xc-index {
+                  type uint32;
+                  description
+                    "XC index.";
+                }
+                leaf network-slice-id {
+                  type uint32;
+                  description
+                    "Network slice ID of a segment list.";
+                }
+                leaf delay-timer-remain {
+                  type uint32;
+                  units "ms";
+                  description
+                    "Delay timer remain.";
+                }
+                leaf state {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list state.";
+                }
+                leaf weight {
+                  type uint32 {
+                   
+                  }
+                  description
+                    "Segment-list weighted loadshare.";
+                }
+                leaf verification-state {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list state after enable path verification.";
+                }
+                leaf suppress-time-remain {
+                  type uint32;
+                  description
+                    "The delay up time of segment list after enable path verification.";
+                }
+                leaf path-mtu {
+                  type uint32;
+                  description
+                    "Segment-list path mtu.";
+                }
+                leaf active-path-mtu {
+                  type uint32;
+                  description
+                    "Segment-list active path mtu.";
+                }
+                leaf bfd-state {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list BFD state.";
+                }
+                leaf bfd-switch-delay-remain {
+                  type uint32;
+                  units "ms";
+                  description
+                    "Remaining time of BFD switching delay.";
+                }
+                leaf initial-up-delay-remain {
+                  type uint32;
+                  units "ms";
+                  description
+                    "Remaining time of the delay after which BFD goes up for the backup path.";
+                }
+                leaf binding-sid {
+                  type inet:ipv6-address-no-zone;
+                  description
+                    "Preferred binding SID of segment list.";
+                }
+                container binding-sids {
+                  description
+                    "List of segment list's binding SIDs.";
+                  list binding-sid {
+                    key "sid-value";
+                    max-elements 2;
+                    description
+                      "Operational data of an segment list's binding SID.";
+                    leaf sid-value {
+                      type inet:ipv6-address-no-zone;
+                      description
+                        "Binding SID value.";
+                    }
+                    leaf encapsulation-mode {
+                      type encapsulation-disp-type;
+                      description
+                        "Encapsulation mode of a binding SID.";
+                    }
+                    leaf reduce {
+                      type enable-type;
+                      description
+                        "Whether the Reduce function is enabled for a binding SID.";
+                    }
+                  }
+                }
+                leaf reverse-binding-sid {
+                  type inet:ipv6-address-no-zone;
+                  description
+                    "Reverse binding SID of segment list.";
+                }
+                container xsids {
+                  description
+                    "List of segment list's XSIDs.";
+                  list xsid {
+                    key "sid-value";
+                    description
+                      "Operational data of an segment list's XSID.";
+                    leaf sid-value {
+                      type inet:ipv6-address-no-zone;
+                      description
+                        "XSID value.";
+                    }
+                  }
+                }
+                leaf reverse-xsid {
+                  type inet:ipv6-address-no-zone;
+                  description
+                    "Reverse XSID of segment list.";
+                }
+                leaf loop-detection-state {
+                  type string {
+                    length "1..63";
+                  }
+                  description
+                    "Loop detection state of segment list.";
+                }
+                container sids {
+                  description
+                    "List of SIDs.";
+                  list sid {
+                    key "index";
+                    max-elements 10;
+                    description
+                      "Operational data of SID.";
+                    leaf index {
+                      type uint32;
+                      description
+                        "Id.";
+                    }
+                    leaf value {
+                      type inet:ipv6-address-no-zone;
+                      description
+                        "Val.";
+                    }
+                    leaf block-length {
+                      type uint32;
+                      description
+                        "Block length.";
+                    }
+                    leaf node-length {
+                      type uint32;
+                      description
+                        "Length of the Node ID field.";
+                    }
+                    leaf function-length {
+                      type uint32;
+                      description
+                        "Length of the Function ID field.";
+                    }
+                    leaf compress-length {
+                      type uint32;
+                      description
+                        "Compress SID length.";
+                    }
+                    leaf flavor {
+                      type compress-flavor-type;
+                      description
+                        "Flavor of a 16-bit compressed SID.";
+                    }
+                    leaf verification {
+                      type boolean;
+                      description
+                        "Verification flag.";
+                    }
+                  }
+                }
+                container sla-infos {
+                  description
+                    "List of SLA information.";
+                  list sla-info {
+                    key "type index";
+                    description
+                      "Operational data of SLA information.";
+                    leaf type {
+                      type sla-type;
+                      description
+                        "SLA type.";
+                    }
+                    leaf index {
+                      type uint32;
+                      description
+                        "SLA information index.";
+                    }
+                    leaf value {
+                      type uint32;
+                      description
+                        "SLA value.";
+                    }
+                  }
+                }
+                leaf ifit-latest-update-time {
+                  type yang:date-and-time;
+                  description
+                    "Latest receive time of IFIT update message.";
+                }
+                leaf ifit-latest-period {
+                  type uint64;
+                  description
+                    "Latest period of IFIT update message.";
+                }
+                leaf igp-metric {
+                  type uint32;
+                  description
+                    "IGP metric of segment list.";
+                }
+                leaf te-metric {
+                  type uint32;
+                  description
+                    "TE metric of segment list.";
+                }
+                leaf delay-metric {
+                  type uint32;
+                  description
+                    "Delay metric of segment list.";
+                }
+                leaf hop-counts {
+                  type uint32;
+                  description
+                    "Hop counts of segment list.";
+                }
+                leaf path-mtu-detected-min-mtu {
+                  type uint16;
+                  description
+                    "Minimum MTU detected by path MTU detection.";
+                }
+                leaf path-mtu-detected-reply-node-address {
+                  type inet:ipv6-address-no-zone;
+                  description
+                    "Reply node address detected by path MTU detection.";
+                }
+                container path-mtu-detected-records {
+                  description
+                    "List of path MTU detection records.";
+                  list path-mtu-detected-record {
+                    key "index";
+                    description
+                      "Operational data of path MTU records.";
+                    leaf index {
+                      type uint32;
+                      description
+                        "Path MTU detection index.";
+                    }
+                    leaf time {
+                      type yang:date-and-time;
+                      description
+                        "Path MTU detection time.";
+                    }
+                    leaf state {
+                      type path-mtu-detected-state-type;
+                      description
+                        "Path MTU detection state.";
+                    }
+                    leaf min-mtu {
+                      type uint16;
+                      description
+                        "Minimum MTU detected by path MTU detection.";
+                    }
+                    leaf reply-node-address {
+                      type inet:ipv6-address-no-zone;
+                      description
+                        "Reply node address detected by path MTU detection.";
+                    }
+                  }
+                }
+              }
+            }
+            container policy-association-groups {
+              description
+                "List of policy association groups in a candidate path.";
+              list policy-association-group {
+                key "group-id source-ip";
+                max-elements 1;
+                description
+                  "Operational state of a policy association group in the candidate path.";
+                leaf group-id {
+                  type uint16;
+                  description
+                    "ID of a policy association group.";
+                }
+                leaf source-ip {
+                  type inet:ip-address;
+                  description
+                    "Source IP address of a policy association group.";
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv4-policy-infos {
+    description
+      "SR-MPLS TE Policy infos grouping.";
+    container policy-infos {
+      config false;
+      description
+        "List of SR-MPLS TE Policies.";
+      list policy-info {
+        key "endpoint color";
+        description
+          "Operational state of an SR-MPLS TE Policy.";
+        leaf endpoint {
+          type inet:ipv4-address-no-zone;
+          description
+            "SR Policy endpoint address.";
+        }
+        leaf color {
+          type uint32;
+          description
+            "SR Policy color.";
+        }
+        leaf name {
+         
+          type string {
+            length "1..255";
+          }
+          description
+            "SR Policy name.";
+        }
+        leaf state {
+          type string {
+            length "1..31";
+          }
+          description
+            "SR Policy state.";
+        }
+        leaf admin-state {
+          type admin-state-type;
+          description
+            "SR Policy admin state.";
+        }
+        leaf binding-sid {
+         
+          type uint32;
+          description
+            "SR Policy binding SID.";
+        }
+        leaf mtu {
+          type uint32;
+          description
+            "SR Policy mtu value.";
+        }
+        leaf tunnel-id {
+          type uint32;
+          description
+            "SR Policy tunnel ID.";
+        }
+        leaf tunnel-type {
+          type tunnel-type;
+          description
+            "SR Policy tunnel type.";
+        }
+        leaf pipe-mode {
+          type pipe-mode-type;
+          description
+            "Pipe mode of SR Policy.";
+        }
+        leaf service-class {
+          type serv-class-disp-types;
+          description
+            "Service class of SR Policy.";
+        }
+        leaf service-color {
+          type serv-color-disp-types;
+          description
+            "Service color of SR Policy.";
+        }
+        leaf bfd-enable {
+          type bfd-enable-type;
+          description
+            "SR Policy BFD enable flag.";
+        }
+        leaf hsb-enable {
+          type enable-type;
+          description
+            "SR Policy HSB enable flag.";
+        }
+        leaf traffic-statistics-enable {
+          type enable-type;
+          description
+            "SR Policy traffic statistics enable flag.";
+        }
+        leaf metric-inherit-igp {
+          type enable-type;
+          description
+            "Enable IGP cost inheritance.";
+        }
+        leaf active-igp-metric {
+          type uint32;
+          description
+            "Cost of the active metric.";
+        }
+        leaf state-change-time {
+          type yang:date-and-time;
+          description
+            "SR Policy state change time.";
+        }
+        leaf candidate-path-count {
+          type uint32;
+          description
+            "SR Policy candidate path count.";
+        }
+        uses auto-bandwidth-adjustment-info;
+        container candidate-paths {
+          description
+            "List of candidate paths in an SR-MPLS TE Policy.";
+          list candidate-path {
+            key "protocol-origin asn node-address discriminator preference";
+            max-elements 64;
+            description
+              "Operational state of a candidate path in an SR-MPLS TE Policy.";
+            leaf protocol-origin {
+              type protocol-origin-type;
+              description
+                "Candidate path protocol origin.";
+            }
+            leaf asn {
+              type uint32;
+              description
+                "Candidate path AS No.";
+            }
+            leaf node-address {
+              type inet:ip-address-no-zone;
+              description
+                "Candidate path nodeAddress.";
+            }
+            leaf discriminator {
+              type uint32;
+              description
+                "Candidate path discriminator.";
+            }
+            leaf preference {
+              type uint32;
+              description
+                "Candidate path preference.";
+            }
+            leaf path-state {
+              type string {
+                length "1..31";
+              }
+              description
+                "Candidate path state.";
+            }
+            leaf path-type {
+              type path-type;
+              description
+                "Candidate path type.";
+            }
+            leaf binding-sid {
+              type uint32;
+              description
+                "Candidate path binding SID.";
+            }
+            leaf group-id {
+              type uint32;
+              description
+                "Candidate path groupId.";
+            }
+            leaf policy-name {
+              type string {
+                length "1..255";
+              }
+              description
+                "Candidate path policy name.";
+            }
+            leaf name {
+              type string {
+                length "1..255";
+              }
+              description
+                "Candidate path name.";
+            }
+            leaf template-id {
+              type uint32;
+              description
+                "Candidate path template Id.";
+            }
+            leaf compute-source {
+              type delegate-protocol-type;
+              description
+                "Computation source.";
+            }
+            leaf delegate-congestion {
+              type boolean;
+              description
+                "Whether the delegation status is congested.";
+            }
+            leaf ct0-bandwidth {
+              type uint64;
+              description
+                "Actual CT0 bandwidth of a candidate path.";
+            }
+            leaf odn-color {
+              type uint32;
+              description
+                "ODN color.";
+            }
+            leaf igp-metric {
+              type uint32;
+              description
+                "Actual IGP metric of a candidate path.";
+            }
+            leaf te-metric {
+              type uint32;
+              description
+                "Actual TE metric of a candidate path.";
+            }
+            leaf delay-metric {
+              type uint32;
+              description
+                "Actual delay metric of a candidate path.";
+            }
+            leaf hop-count {
+              type uint32;
+              description
+                "Actual number of hops on a candidate path.";
+            }
+            leaf active-igp-metric {
+              type uint32;
+              description
+                "Cost of the active metric.";
+            }
+            leaf segment-list-count {
+              type uint32;
+              description
+                "Candidate path segment list count.";
+            }
+            container segment-lists {
+              description
+                "List of segment list information in a candidate path.";
+              list segment-list {
+                key "id";
+                max-elements 64;
+                description
+                  "Operational state of a segment list in a candidate path.";
+                leaf id {
+                  type uint32;
+                  description
+                    "Segment list ID.";
+                }
+                leaf name {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list name.";
+                }
+                leaf xc-index {
+                  type uint32;
+                  description
+                    "XC index.";
+                }
+                leaf delay-time-remain {
+                  type uint32;
+                  units "ms";
+                  description
+                    "Delay delete timer remain.";
+                }
+                leaf state {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list state.";
+                }
+                leaf weight {
+                  type uint32 {
+                   
+                  }
+                  description
+                    "Segment-list weighted loadshare.";
+                }
+                leaf bfd-state {
+                  type string {
+                    length "1..31";
+                  }
+                  description
+                    "Segment list BFD state.";
+                }
+                leaf bfd-switch-delay-remain {
+                  type uint32;
+                  units "ms";
+                  description
+                    "Remaining time of BFD switching delay.";
+                }
+                leaf exp-value {
+                  type uint32;
+                  description
+                    "EXP value.";
+                }
+                leaf ttl-value {
+                  type uint32;
+                  description
+                    "TTL value.";
+                }
+                leaf igp-metric {
+                  type uint32;
+                  description
+                    "Actual IGP metric of a segment list.";
+                }
+                leaf te-metric {
+                  type uint32;
+                  description
+                    "Actual TE metric of a segment list.";
+                }
+                leaf delay-metric {
+                  type uint32;
+                  description
+                    "Actual delay metric of a segment list.";
+                }
+                leaf hop-count {
+                  type uint32;
+                  description
+                    "Actual number of hops involved in a segment list.";
+                }
+                container sids {
+                  description
+                    "List of SIDs.";
+                  list sid {
+                    key "index";
+                    max-elements 10;
+                    description
+                      "Operational data of SID.";
+                    leaf index {
+                      type uint32;
+                      description
+                        "Index.";
+                    }
+                    leaf value {
+                      type uint32;
+                      description
+                        "Value.";
+                    }
+                  }
+                }
+                container binding-sids {
+                  description
+                    "List of a segment list's binding SIDs.";
+                  list binding-sid {
+                    key "sid-value";
+                    description
+                      "Operational data of a segment list's binding SID.";
+                    leaf sid-value {
+                      type uint32;
+                      description
+                        "Binding SID value.";
+                    }
+                  }
+                }
+                leaf reverse-binding-sid {
+                  type uint32;
+                  description
+                    "Reverse binding SID of a segment list.";
+                }
+                leaf bfd-source-address {
+                  type inet:ip-address;
+                  description
+                    "Source address of the BFD session.";
+                }
+                leaf bfd-destination-address {
+                  type inet:ip-address;
+                  description
+                    "Destination address of the BFD session.";
+                }
+              }
+            }
+            container policy-association-groups {
+              description
+                "List of policy association groups in a candidate path.";
+              list policy-association-group {
+                key "group-id source-ip";
+                max-elements 1;
+                description
+                  "Operational state of a policy association group in the candidate path.";
+                leaf group-id {
+                  type uint16;
+                  description
+                    "ID of a policy association group.";
+                }
+                leaf source-ip {
+                  type inet:ip-address;
+                  description
+                    "Source IP address of a policy association group.";
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv6-source-sids {
+    description
+      "SRv6 TE Policy SID informations.";
+    container source-sids {
+      config false;
+      description
+        "List of SRv6 TE Policy SID informations.";
+      list source-sid {
+        key "sid-value topology";
+        description
+          "Operational state of SRv6 TE Policy SID information.";
+        leaf sid-value {
+          type inet:ipv6-address-no-zone;
+          description
+            "The SRv6 TE Policy SID value.";
+        }
+        leaf topology {
+          type uint32;
+          description
+            "The SRv6 TE Policy SID topology.";
+        }
+        leaf func-type {
+         
+          type function-type;
+          description
+            "The SRv6 TE Policy SID type.";
+        }
+        leaf overload {
+          type boolean;
+          description
+            "The SRv6 TE Policy SID overload flag.";
+        }
+        leaf s-flag {
+          type boolean;
+          description
+            "The SRv6 TE Policy SID set flag.";
+        }
+        leaf b-flag {
+          type boolean;
+          description
+            "SRv6 TE Policy SID backup flag.";
+        }
+        container sources {
+          description
+            "List of SRv6 TE Policy SID source informations.";
+          list source {
+            key "protocol process sub-process node local peer";
+            description
+              "Operational state of SRv6 TE Policy SID source information.";
+            leaf protocol {
+              type protocol-type;
+              description
+                "The origin protocol.";
+            }
+            leaf process {
+              type uint32;
+              description
+                "The origin protocol process.";
+            }
+            leaf sub-process {
+              type sub-process-type;
+              description
+                "The origin protocol sub process.";
+            }
+            leaf node {
+              type string {
+                length "0..48";
+              }
+              description
+                "Node information.";
+            }
+            leaf local {
+              type string {
+                length "0..48";
+              }
+              description
+                "Local information.";
+            }
+            leaf peer {
+              type string {
+                length "0..48";
+              }
+              description
+                "Peer information.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping srv6-sid-statistics {
+    description
+      "SRv6 Policy SID statistics infos.";
+    container sid-statistics {
+      config false;
+      description
+        "Operational state of SRv6 Policy SID statistics infos.";
+      leaf endx-total-num {
+        type uint32;
+        description
+          "SRv6 Policy End.X SID statistics.";
+      }
+      leaf end-total-num {
+        type uint32;
+        description
+          "SRv6 Policy End SID statistics.";
+      }
+      container sid-nums {
+        description
+          "List of SRv6 Policy SID num.";
+        list sid-num {
+          key "protocol process sub-process";
+          description
+            "Operational state of SRv6 Policy SID num.";
+          leaf protocol {
+            type protocol-type;
+            description
+              "The origin protocol.";
+          }
+          leaf process {
+            type uint32;
+            description
+              "The origin protocol process.";
+          }
+          leaf sub-process {
+            type sub-process-type;
+            description
+              "The origin protocol sub process.";
+          }
+          leaf endx-num {
+            type uint32;
+            description
+              "The End.X SID num.";
+          }
+          leaf end-num {
+            type uint32;
+            description
+              "The End SID num.";
+          }
+        }
+      }
+    }
+  }
+
+  grouping binding-sid-allocation {
+    description
+      "Binding SID allocation information.";
+    container binding-sid-allocations {
+      config false;
+      description
+        "List of allocation information of binding SIDs.";
+      list binding-sid-allocation {
+        key "binding-sid";
+        description
+          "Operational state of binding SID allocation.";
+        leaf binding-sid {
+          type sid-value-type;
+          description
+            "Binding SID value.";
+        }
+        leaf endpoint {
+          type inet:ip-address-no-zone;
+          description
+            "SR Policy endpoint.";
+        }
+        leaf color {
+          type uint32;
+          description
+            "SR Policy color.";
+        }
+        leaf allocation-success {
+          type boolean;
+          description
+            "Whether binding SID allocation succeeds.";
+        }
+        leaf is-configured {
+          type boolean;
+          description
+            "Whether the binding SID is a locally configured one.";
+        }
+        leaf dynamic-path-count {
+          type uint32;
+          description
+            "Number of dynamically delivered candidate paths with the binding SID.";
+        }
+        container dynamic-candidate-paths {
+          description
+            "List of dynamic candidate paths.";
+          list dynamic-candidate-path {
+            key "distinguisher preference protocol-origin asn node-address";
+            description
+              "Statistics of dynamic candidate path.";
+            leaf distinguisher {
+              type uint32;
+              description
+                "Candidate path distinguisher.";
+            }
+            leaf preference {
+              type uint32;
+              description
+                "Candidate path preference.";
+            }
+            leaf protocol-origin {
+              type protocol-origin-type;
+              description
+                "Candidate path protocol origin.";
+            }
+            leaf asn {
+              type uint32;
+              description
+                "Candidate path AS No.";
+            }
+            leaf node-address {
+              type inet:ip-address-no-zone;
+              description
+                "Node address of a candidate path.";
+            }
+          }
+        }
+        container segment-list {
+          description
+            "Statistics of the segment list for the binding SID allocated within the SRLB range.";
+          leaf distinguisher {
+            type uint32;
+            description
+              "Candidate path distinguisher.";
+          }
+          leaf preference {
+            type uint32;
+            description
+              "Candidate path preference.";
+          }
+          leaf protocol-origin {
+            type protocol-origin-type;
+            description
+              "Candidate path protocol origin.";
+          }
+          leaf asn {
+            type uint32;
+            description
+              "Candidate path AS No.";
+          }
+          leaf node-address {
+            type inet:ip-address-no-zone;
+            description
+              "Candidate path node address.";
+          }
+          leaf segment-list-id {
+            type uint32;
+            description
+              "Segment list ID.";
+          }
+        }
+      }
+    }
+  }
+
+  grouping constraints {
+    description
+      "List of SR Policy constraints.";
+    leaf link-bandwidth-utilization {
+      type uint8 {
+        range "0..100";
+      }
+      description
+        "Link bandwidth usage.";
+    }
+    leaf metric-type {
+      type metric-type;
+      description
+        "Metric type.";
+    }
+    leaf max-igp-cumulation {
+      type uint32 {
+        range "1..4294967295";
+      }
+      description
+        "Maximum IGP cost of all hops on a path.";
+    }
+    leaf max-te-cumulation {
+      type uint32 {
+        range "1..4294967295";
+      }
+      description
+        "Maximum TE cost of all hops on a path.";
+    }
+    leaf max-hopcount-cumulation {
+      type uint16 {
+        range "1..32";
+      }
+      description
+        "Maximum number of hops on a path.";
+    }
+    leaf max-delay-cumulation {
+      type uint32 {
+        range "1..60000000";
+      }
+      description
+        "Maximum delay of all hops on a path.";
+    }
+    choice type {
+      description
+        "Administrative group constraint type.";
+      case include-any {
+        description
+          "Include any specified administrative group.";
+        leaf-list include-any-affinity-name {
+          type leafref {
+            path "/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping/te:attribute-name";
+          }
+          must "((/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence>=0) and (/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence<=31))";
+          max-elements 32;
+          description
+            "Configure the include-any affinity.";
+        }
+      }
+      case include-all {
+        description
+          "Include all specified administrative groups.";
+        leaf-list include-all-affinity-name {
+          type leafref {
+            path "/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping/te:attribute-name";
+          }
+          must "((/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence>=0) and (/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence<=31))";
+          max-elements 32;
+          description
+            "Configure the include-all affinity.";
+        }
+      }
+    }
+    leaf-list exclude-affinity-name {
+      type leafref {
+        path "/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping/te:attribute-name";
+      }
+      must "((/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence>=0) and (/te:te/te:affinity-define/te:affinity-mappings/te:affinity-mapping[te:attribute-name=current()]/te:bit-sequence<=31)) and not ((../include-any-affinity-name = current()) or (../include-all-affinity-name = current()))";
+      max-elements 32;
+      description
+        "Configure the exclude affinity.";
+    }
+    leaf constraint-path-name {
+      type leafref {
+        path "/srpolicy:srpolicy/srpolicy:constraint-paths/srpolicy:constraint-path/srpolicy:name";
+      }
+      description
+        "Name of a path constraint.";
+    }
+    leaf sid-selection {
+      type sid-selection-type;
+      description
+        "SID selection criteria.";
+    }
+    container sid-algorithm {
+      description
+        "Configure SID algorithm.";
+      leaf sid-algorithm-id {
+        type uint8 {
+          range "0 | 128..255";
+        }
+        description
+          "Configure SID algorithm ID.";
+      }
+      leaf strict {
+        when "../sid-algorithm-id";
+        type boolean;
+        default "false";
+        description
+          "Enable/disable strict mode.";
+      }
+      leaf path-computation-mode {
+        when "../sid-algorithm-id";
+        type path-computation-mode-type;
+        must "((../path-computation-mode='flex-algo' and ../sid-algorithm-id >= 128 and ../sid-algorithm-id <= 255 and not (../../exclude-affinity-name or ../../include-any-affinity-name or ../../include-all-affinity-name)) or (../path-computation-mode='sid-filter'))";
+        default "sid-filter";
+        description
+          "Configure path computation mode.";
+      }
+    }
+  }
+
+  grouping disjoint-association-group {
+    description
+      "Disjoint association groups for PCE path computation.";
+    container disjoint-paths {
+      description
+        "List of disjoint paths.";
+      list disjoint-path {
+        key "group-id source-ip";
+        max-elements 1;
+        description
+          "Configure a disjoint path.";
+        leaf group-id {
+          type uint16 {
+            range "1..65534";
+          }
+          description
+            "ID of a disjoint association group.";
+        }
+        leaf source-ip {
+          type inet:ip-address;
+          description
+            "Source IP address of a disjoint association group.";
+        }
+        leaf type {
+          type disjointness-type;
+          mandatory true;
+          description
+            "Type of a disjoint association group.";
+        }
+        leaf shortest {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable preferential computation of the shortest path.";
+        }
+        leaf strict {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the function of calculating strictly disjoint paths.";
+        }
+        leaf of-code {
+          type of-code;
+          must "(../strict='false')";
+          description
+            "Objective function code.";
+        }
+      }
+    }
+  }
+
+  grouping policy-association-group {
+    description
+      "Policy association groups for PCE path computation.";
+    container policy-association-groups {
+      description
+        "List of policy association groups.";
+      list policy-association-group {
+        key "group-id source-ip";
+        max-elements 1;
+        description
+          "Configure a policy association group.";
+        leaf group-id {
+          type uint16 {
+            range "1..65534";
+          }
+          description
+            "ID of a policy association group.";
+        }
+        leaf source-ip {
+          type inet:ip-address;
+          description
+            "Source IP address of a policy association group.";
+        }
+        leaf policy-parameters {
+          type string {
+            length "1..255";
+          }
+          description
+            "Policy association group parameters.";
+        }
+      }
+    }
+  }
+
+  grouping bidirectional-association-group {
+    description
+      "Bidirectional association group for PCE path computation.";
+    container bidirectional-association-group {
+      presence "Bidirectional association group.";
+      description
+        "Configure a bidirectional association group.";
+      leaf group-id {
+        type uint16 {
+          range "1..65534";
+        }
+        mandatory true;
+        description
+          "ID of a bidirectional association group.";
+      }
+      leaf source-ip {
+        type inet:ip-address;
+        mandatory true;
+        description
+          "Source IP address of a bidirectional association group.";
+      }
+      leaf co-routed {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable co-routed bidirectional path.";
+      }
+    }
+  }
+
+  container srpolicy {
+    description
+      "Configure SR Policy parameters.";
+    container global {
+      description
+        "Configure SR Policy global parameters.";
+      leaf cpu-overload-control {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable CPU overload control.";
+      }
+    }
+    container attribute-templates {
+      description
+        "List of SR Policy template attribute.";
+      list attribute-template {
+        key "id";
+        description
+          "Configure SR Policy template attribute.";
+        leaf id {
+          type uint32 {
+            range "1..4294967269";
+          }
+          description
+            "The template ID.";
+        }
+        leaf description {
+          type string {
+            length "1..242";
+          }
+          description
+            "The template description.";
+        }
+        leaf bfd-enable {
+          type policy-bfd-enable-type;
+          default "not-configured";
+          description
+            "The template BFD flag.";
+        }
+        leaf bfd-bypass {
+          type policy-bfd-bypass-type;
+          default "not-configured";
+          description
+            "The template BFD bypass flag.";
+        }
+        leaf bfd-slice-inherit-match {
+          type template-bfd-slice-inherit-type;
+          description
+            "Inheritance type (for the network slice's match mode) of BFD detection packets configured for the SR Policy template.";
+        }
+        leaf hsb-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "The template hot standby flag.";
+        }
+        leaf traffic-statistics-enable {
+          type enable-3types;
+          default "not-configured";
+          description
+            "The template traffic statistics flag.";
+        }
+        leaf path-mtu-detect {
+          type path-mtu-detect-type;
+          description
+            "Template path MTU detection flag.";
+        }
+        leaf path-verification-enable {
+          type path-verification-type;
+          default "not-configured";
+          description
+            "The template path verification flag.";
+        }
+      }
+    }
+    container attribute-template-infos {
+      config false;
+      description
+        "List of SR Policy attribute template informations.";
+      list attribute-template-info {
+        key "id";
+        description
+          "Operational state of SR Policy attribute template.";
+        leaf id {
+          type uint32;
+          description
+            "The template ID.";
+        }
+        leaf description {
+          type string {
+            length "1..242";
+          }
+          description
+            "The template description.";
+        }
+        leaf bfd-enable {
+          type policy-bfd-enable-type;
+          description
+            "Enable/disable BFD.";
+        }
+        leaf bfd-bypass {
+          type policy-bfd-bypass-type;
+          description
+            "Enable/disable BFD bypass.";
+        }
+        leaf bfd-slice-inherit-match {
+          type template-bfd-slice-inherit-type;
+          description
+            "Inheritance type (for the network slice's match mode) of BFD detection packets configured for the SR Policy template.";
+        }
+        leaf hsb-enable {
+          type enable-3types;
+          description
+            "Enable/disable hot standby.";
+        }
+        leaf path-mtu-detect {
+          type path-mtu-detect-type;
+          description
+            "Enable/disable path MTU detection.";
+        }
+        leaf path-verification-enable {
+          type path-verification-type;
+          description
+            "Enable/disable path verification.";
+        }
+        leaf traffic-statistics-enable {
+          type enable-3types;
+          description
+            "Enable/disable traffic statistics.";
+        }
+        leaf configuratin-path-refcnt {
+          type uint32;
+          description
+            "The configuration path reference count.";
+        }
+        leaf sr-configuration-path-refcnt {
+          type uint32;
+          description
+            "The SR-MPLS TE Policy configuration path reference count.";
+        }
+        leaf srv6-configuration-path-refcnt {
+          type uint32;
+          description
+            "The SRv6 TE Policy configuration path reference count.";
+        }
+        leaf bgp-path-refcnt {
+          type uint32;
+          description
+            "The BGP path reference count.";
+        }
+        leaf sr-bgp-path-refcnt {
+          type uint32;
+          description
+            "The SR-MPLS TE Policy BGP path reference count.";
+        }
+        leaf srv6-bgp-path-refcnt {
+          type uint32;
+          description
+            "The SRv6 TE Policy BGP path reference count.";
+        }
+        leaf odn-template-refcnt {
+          type uint32;
+          description
+            "The ODN template reference count.";
+        }
+        leaf sr-odn-template-refcnt {
+          type uint32;
+          description
+            "The SR-MPLS TE Policy ODN template reference count.";
+        }
+        leaf srv6-odn-template-refcnt {
+          type uint32;
+          description
+            "The SRv6 TE Policy ODN template reference count.";
+        }
+        leaf sr-pag-refcnt {
+          type uint32;
+          description
+            "The SR-MPLS TE Policy policy association group reference count.";
+        }
+        leaf srv6-pag-refcnt {
+          type uint32;
+          description
+            "The SRv6 TE Policy policy association group reference count.";
+        }
+      }
+    }
+    container constraint-paths {
+      description
+        "List of SR Policy path constraints.";
+      list constraint-path {
+        key "name";
+        description
+          "Configure an SR Policy path constraint.";
+        leaf name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Name of a path constraint.";
+        }
+        leaf hop-type {
+          type constraint-path-hop-type;
+          default "ipv4";
+          description
+            "Constraint path type.";
+        }
+        container hops {
+          description
+            "List of per-hop information in a path constraint.";
+          list hop {
+            must "../../hop-type = 'ipv4'";
+            key "index";
+            unique "ipv4-address";
+            max-elements 32;
+            description
+              "Configure a hop in a path constraint.";
+            leaf index {
+              type uint32 {
+                range "1..4294967295";
+              }
+              description
+                "Hop index.";
+            }
+            leaf ipv4-address {
+              type inet:ipv4-address-no-zone;
+              mandatory true;
+              description
+                "IPv4 address.";
+            }
+            leaf ipv4-constraint-type {
+              type constraint-type;
+              default "include-strict";
+              description
+                "Type of the path constraint of the IPv4 address type.";
+            }
+          }
+        }
+        container ipv6-hops {
+          description
+            "List of per-hop information in a path constraint.";
+          list ipv6-hop {
+            must "../../hop-type = 'ipv6'";
+            key "index";
+            unique "ipv6-address";
+            max-elements 32;
+            description
+              "Configure a hop in a path constraint.";
+            leaf index {
+              type uint32 {
+                range "1..4294967295";
+              }
+              description
+                "Hop index.";
+            }
+            leaf ipv6-address {
+              type inet:ipv6-address-no-zone;
+              mandatory true;
+              description
+                "IPv6 address.";
+            }
+            leaf ipv6-constraint-type {
+              type constraint-type;
+              default "include-strict";
+              description
+                "Type of the path constraint of the IPv6 address type.";
+            }
+          }
+        }
+      }
+    }
+    container constraint-templates {
+      description
+        "List of SR Policy constraint templates.";
+      list constraint-template {
+        must "(setup-priority>=hold-priority)";
+        key "name";
+        description
+          "Configure an SR Policy constraint template.";
+        leaf name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Name of a constraint template.";
+        }
+        leaf ct0-bandwidth {
+          type uint64 {
+            range "1..6400000000";
+          }
+          units "kbit/s";
+          description
+            "CT0 bandwidth.";
+        }
+        leaf setup-priority {
+          type uint8 {
+            range "0..7";
+          }
+          default "7";
+          description
+            "SR Policy setup priority.";
+        }
+        leaf hold-priority {
+          type uint8 {
+            range "0..7";
+          }
+          default "7";
+          description
+            "SR Policy holding priority.";
+        }
+        uses constraints {
+          refine "metric-type" {
+            default "te";
+          }
+          refine "sid-selection" {
+            default "unprotected-preferred";
+          }
+        }
+        uses disjoint-association-group;
+        uses policy-association-group;
+      }
+    }
+  }
+
+  augment "/ni:network-instance/ni:instances/ni:instance/srv6:srv6" {
+    description
+      "Augment for Segment Routing Policy.";
+    container srpolicy {
+      when "../srv6:enable='true'";
+      description
+        "Configure SR Policy parameters.";
+      uses srv6-policy-attributes;
+      uses srv6-policys;
+      container policy-traffic-statistics {
+        config false;
+        description
+          "List of traffic statistics for SR Policies.";
+        list policy-traffic-statistic {
+          key "endpoint color";
+          description
+            "Traffic statistics for an SR Policy.";
+          leaf endpoint {
+            type inet:ip-address-no-zone;
+            description
+              "Destination address of an SR Policy.";
+          }
+          leaf color {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Color of an SR Policy.";
+          }
+          leaf name {
+           
+            type string {
+              length "1..255";
+            }
+            description
+              "Policy name.";
+          }
+          leaf binding-sid {
+           
+            type sid-value-type;
+            description
+              "Preferred binding SID of an SR Policy.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf flow-period {
+            type uint32 {
+              range "0..4294967295";
+            }
+            units "s";
+            description
+              "Traffic statistics collection period.";
+          }
+          leaf last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate in the latest period.";
+          }
+          leaf last-period-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate in the latest period.";
+          }
+          leaf last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate in the latest period.";
+          }
+          leaf display-interval {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "s";
+            description
+              "Interval between two queries.";
+          }
+          leaf interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate between two queries.";
+          }
+          leaf interval-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate between two queries.";
+          }
+          leaf interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate between two queries.";
+          }
+          leaf total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Total number of transmitted bytes.";
+          }
+          leaf total-packet {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "packet";
+            description
+              "Total number of transmitted packets.";
+          }
+          leaf compensated-last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Compensated byte rate in the latest period.";
+          }
+          leaf compensated-last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Compensated bit rate in the latest period.";
+          }
+          leaf compensated-interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Compensated byte rate between two queries.";
+          }
+          leaf compensated-interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Compensated bit rate between two queries.";
+          }
+          leaf compensated-total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Compensated total number of transmitted bytes.";
+          }
+        }
+      }
+      container list-traffic-statistics {
+        config false;
+        description
+          "List of traffic statistics for segment lists.";
+        list list-traffic-statistic {
+          key "segment-list-id";
+          description
+            "Traffic statistics for a segment list.";
+          leaf segment-list-id {
+            type uint32 {
+              range "1..4294967295";
+            }
+            description
+              "Segment list ID.";
+          }
+          leaf xc-index {
+            type uint32;
+            description
+              "XC index.";
+          }
+          leaf path-id {
+            type uint32;
+            description
+              "The path id uniquely identifies a segment list within the context of a candidate path, but only used for PCEP delivered segment lists, the value will be set to 0 when a segment list is delivered by BGP or configuration.";
+          }
+          leaf policy-name {
+           
+            type string {
+              length "1..255";
+            }
+            description
+              "Policy name.";
+          }
+          leaf endpoint {
+           
+            type inet:ip-address-no-zone;
+            description
+              "Destination address of an SR Policy.";
+          }
+          leaf color {
+           
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Color of an SR Policy.";
+          }
+          leaf binding-sid {
+           
+            type sid-value-type;
+            description
+              "Preferred binding SID of an SR Policy.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf preference {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Preference of a candidate path.";
+          }
+          leaf protocol-origin {
+            type protocol-origin-type;
+            description
+              "Protocol origin of a candidate path.";
+          }
+          leaf asn {
+            type uint32;
+            description
+              "AS number.";
+          }
+          leaf node-address {
+            type inet:ip-address-no-zone;
+            description
+              "Node address.";
+          }
+          leaf discriminator {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Discriminator of a candidate path.";
+          }
+          leaf path-type {
+            type path-type;
+            description
+              "Type of a candidate path.";
+          }
+          container sids {
+            description
+              "List of SIDs.";
+            list sid {
+              key "index";
+              max-elements 10;
+              description
+                "Operational data of SID.";
+              leaf index {
+                type uint32 {
+                  range "0..4294967295";
+                }
+                description
+                  "SID index.";
+              }
+              leaf value {
+                type sid-value-type;
+                description
+                  "SID value.";
+              }
+            }
+          }
+          leaf flow-period {
+            type uint32 {
+              range "0..4294967295";
+            }
+            units "s";
+            description
+              "Traffic statistics collection period.";
+          }
+          leaf last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate in the latest period.";
+          }
+          leaf last-period-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate in the latest period.";
+          }
+          leaf last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate in the latest period.";
+          }
+          leaf display-interval {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "s";
+            description
+              "Interval between two queries.";
+          }
+          leaf interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate between two queries.";
+          }
+          leaf interval-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate between two queries.";
+          }
+          leaf interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate between two queries.";
+          }
+          leaf total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Total number of transmitted bytes.";
+          }
+          leaf total-packet {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "packet";
+            description
+              "Total number of transmitted packets.";
+          }
+          leaf no-resource-flag {
+            type boolean;
+            default "false";
+            description
+              "Flag indicating that no statistical resource exists.";
+          }
+          leaf compensated-last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Compensated byte rate in the latest period.";
+          }
+          leaf compensated-last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Compensated bit rate in the latest period.";
+          }
+          leaf compensated-interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Compensated byte rate between two queries.";
+          }
+          leaf compensated-interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Compensated bit rate between two queries.";
+          }
+          leaf compensated-total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Compensated total number of transmitted bytes.";
+          }
+        }
+      }
+      uses srv6-policy-infos;
+      uses srv6-source-sids;
+      uses srv6-sid-statistics;
+      container policy-down-reasons {
+        config false;
+        description
+          "List of down records of SR Policies.";
+        list policy-down-reason {
+          key "endpoint color up-time up-millisecond";
+          description
+            "Operational data of down record of an SR Policy.";
+          leaf endpoint {
+            type inet:ip-address-no-zone;
+            description
+              "SR Policy endpoint.";
+          }
+          leaf color {
+            type uint32;
+            description
+              "SR Policy color.";
+          }
+          leaf up-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR Policy went up.";
+          }
+          leaf up-millisecond {
+            type uint32;
+            description
+              "Millisecond value of the time when an SR Policy went up.";
+          }
+          leaf name {
+            type string {
+              length "1..255";
+            }
+            description
+              "SR Policy name.";
+          }
+          leaf binding-sid {
+            type sid-value-type;
+            description
+              "SR Policy binding SID.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf down-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR Policy went down.";
+          }
+          leaf down-reason {
+            type string {
+              length "1..128";
+            }
+            description
+              "Reason why an SR Policy went down.";
+          }
+          container list-down-reasons {
+            description
+              "List of down records of segment lists.";
+            list list-down-reason {
+              key "id up-time up-millisecond";
+              description
+                "Operational data of down record of a segment list.";
+              leaf id {
+                type uint32;
+                description
+                  "Segment list ID.";
+              }
+              leaf up-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when a segment list went up.";
+              }
+              leaf up-millisecond {
+                type uint32;
+                description
+                  "Millisecond value of the time when a segment list went up.";
+              }
+              leaf name {
+                type string {
+                  length "1..31";
+                }
+                description
+                  "Segment list name.";
+              }
+              leaf preference {
+                type uint32;
+                description
+                  "Candidate path preference.";
+              }
+              leaf discriminator {
+                type uint32;
+                description
+                  "Candidate path discriminator.";
+              }
+              leaf odn-created {
+                type boolean;
+                description
+                  "Whether the candidate path to which the segment list that goes down in the SRv6 TE Policy belongs is created by the ODN.";
+              }
+              leaf network-slice-id {
+                type uint32;
+                description
+                  "Network slice ID of a segment list.";
+              }
+              leaf path-mtu {
+                type uint32;
+                description
+                  "Path mtu of a segment list.";
+              }
+              leaf weight {
+                type uint32;
+                description
+                  "Weight value of a segment list.";
+              }
+              leaf down-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when a segment list went down.";
+              }
+              leaf down-reason {
+                type string {
+                  length "1..128";
+                }
+                description
+                  "Reason why a segment list went down.";
+              }
+              leaf algorithm {
+                type uint16;
+                description
+                  "Algorithm value of a segment list.";
+              }
+              container sids {
+                description
+                  "List of SIDs.";
+                list sid {
+                  key "index";
+                  max-elements 10;
+                  description
+                    "Operational data of SID.";
+                  leaf index {
+                    type uint32;
+                    description
+                      "SID index.";
+                  }
+                  leaf value {
+                    type sid-value-type;
+                    description
+                      "SID value.";
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  augment "/ni:network-instance/ni:instances/ni:instance/sr:segment-routing" {
+    description
+      "Augment for SR Policy.";
+    container srpolicy {
+      when "../sr:enable='true'";
+      description
+        "Configure SR Policy parameters.";
+      uses srv4-policy-attributes;
+      uses srv4-policys;
+      uses srv4-policy-infos;
+      uses policy-groups;
+      container policy-traffic-statistics {
+        config false;
+        description
+          "List of traffic statistics for SR Policies.";
+        list policy-traffic-statistic {
+          key "endpoint color";
+          description
+            "Traffic statistics for an SR Policy.";
+          leaf endpoint {
+            type inet:ip-address-no-zone;
+            description
+              "Destination address of an SR Policy.";
+          }
+          leaf color {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Color of an SR Policy.";
+          }
+          leaf name {
+           
+            type string {
+              length "1..255";
+            }
+            description
+              "Policy name.";
+          }
+          leaf binding-sid {
+           
+            type sid-value-type;
+            description
+              "Binding SID of an SR Policy.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf flow-period {
+            type uint32 {
+              range "0..4294967295";
+            }
+            units "s";
+            description
+              "Traffic statistics collection period.";
+          }
+          leaf last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate in the latest period.";
+          }
+          leaf last-period-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate in the latest period.";
+          }
+          leaf last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate in the latest period.";
+          }
+          leaf display-interval {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "s";
+            description
+              "Interval between two queries.";
+          }
+          leaf interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate between two queries.";
+          }
+          leaf interval-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate between two queries.";
+          }
+          leaf interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate between two queries.";
+          }
+          leaf total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Total number of transmitted bytes.";
+          }
+          leaf total-packet {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "packet";
+            description
+              "Total number of transmitted packets.";
+          }
+        }
+      }
+      container list-traffic-statistics {
+        config false;
+        description
+          "List of traffic statistics for segment lists.";
+        list list-traffic-statistic {
+          key "segment-list-id";
+          description
+            "Traffic statistics for a segment list.";
+          leaf segment-list-id {
+            type uint32 {
+              range "1..4294967295";
+            }
+            description
+              "Segment list ID.";
+          }
+          leaf xc-index {
+            type uint32;
+            description
+              "XC index.";
+          }
+          leaf path-id {
+            type uint32;
+            description
+              "The path id uniquely identifies a segment list within the context of a candidate path, but only used for PCEP delivered segment lists, the value will be set to 0 when a segment list is delivered by BGP or configuration.";
+          }
+          leaf policy-name {
+           
+            type string {
+              length "1..255";
+            }
+            description
+              "Policy name.";
+          }
+          leaf endpoint {
+           
+            type inet:ip-address-no-zone;
+            description
+              "Destination address of an SR Policy.";
+          }
+          leaf color {
+           
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Color of an SR Policy.";
+          }
+          leaf binding-sid {
+           
+            type sid-value-type;
+            description
+              "Binding SID of an SR Policy.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf preference {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Preference of a candidate path.";
+          }
+          leaf protocol-origin {
+            type protocol-origin-type;
+            description
+              "Protocol origin of a candidate path.";
+          }
+          leaf asn {
+            type uint32;
+            description
+              "AS number.";
+          }
+          leaf node-address {
+            type inet:ip-address-no-zone;
+            description
+              "Node address.";
+          }
+          leaf discriminator {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Discriminator of a candidate path.";
+          }
+          leaf path-type {
+            type path-type;
+            description
+              "Type of a candidate path.";
+          }
+          container sids {
+            description
+              "List of SIDs.";
+            list sid {
+              key "index";
+              max-elements 10;
+              description
+                "Operational data of SID.";
+              leaf index {
+                type uint32 {
+                  range "0..4294967295";
+                }
+                description
+                  "SID index.";
+              }
+              leaf value {
+                type sid-value-type;
+                description
+                  "SID value.";
+              }
+            }
+          }
+          leaf flow-period {
+            type uint32 {
+              range "0..4294967295";
+            }
+            units "s";
+            description
+              "Traffic statistics collection period.";
+          }
+          leaf last-period-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate in the latest period.";
+          }
+          leaf last-period-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate in the latest period.";
+          }
+          leaf last-period-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate in the latest period.";
+          }
+          leaf display-interval {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "s";
+            description
+              "Interval between two queries.";
+          }
+          leaf interval-byte-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte/s";
+            description
+              "Byte rate between two queries.";
+          }
+          leaf interval-pkt-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "pps";
+            description
+              "Packet rate between two queries.";
+          }
+          leaf interval-bit-rate {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "bit/s";
+            description
+              "Bit rate between two queries.";
+          }
+          leaf total-byte {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "Byte";
+            description
+              "Total number of transmitted bytes.";
+          }
+          leaf total-packet {
+            type uint64 {
+              range "0..18446744073709551615";
+            }
+            units "packet";
+            description
+              "Total number of transmitted packets.";
+          }
+          leaf no-resource-flag {
+            type boolean;
+            default "false";
+            description
+              "Flag indicating that no statistical resource exists.";
+          }
+        }
+      }
+      container policy-down-reasons {
+        config false;
+        description
+          "List of down records of SR Policies.";
+        list policy-down-reason {
+          key "endpoint color up-time up-millisecond";
+          description
+            "Operational data of down record of an SR Policy.";
+          leaf endpoint {
+            type inet:ip-address-no-zone;
+            description
+              "SR Policy endpoint.";
+          }
+          leaf color {
+            type uint32;
+            description
+              "SR Policy color.";
+          }
+          leaf up-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR Policy went up.";
+          }
+          leaf up-millisecond {
+            type uint32;
+            description
+              "Millisecond value of the time when an SR Policy went up.";
+          }
+          leaf name {
+            type string {
+              length "1..255";
+            }
+            description
+              "SR Policy name.";
+          }
+          leaf binding-sid {
+            type sid-value-type;
+            description
+              "SR Policy binding SID.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID of an SR Policy.";
+          }
+          leaf down-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR Policy went down.";
+          }
+          leaf down-reason {
+            type string {
+              length "1..128";
+            }
+            description
+              "Reason why an SR Policy went down.";
+          }
+          container list-down-reasons {
+            description
+              "List of down records of segment lists.";
+            list list-down-reason {
+              key "id up-time up-millisecond";
+              description
+                "Operational data of down record of a segment list.";
+              leaf id {
+                type uint32;
+                description
+                  "Segment list ID.";
+              }
+              leaf up-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when a segment list went up.";
+              }
+              leaf up-millisecond {
+                type uint32;
+                description
+                  "Millisecond value of the time when a segment list went up.";
+              }
+              leaf name {
+                type string {
+                  length "1..31";
+                }
+                description
+                  "Segment list name.";
+              }
+              leaf preference {
+                type uint32;
+                description
+                  "Candidate path preference.";
+              }
+              leaf discriminator {
+                type uint32;
+                description
+                  "Candidate path discriminator.";
+              }
+              leaf odn-created {
+                type boolean;
+                description
+                  "Whether the candidate path to which the segment list that goes Down in the SR-MPLS TE Policy belongs is created by the ODN.";
+              }
+              leaf network-slice-id {
+                type uint32;
+                description
+                  "Network slice ID of a segment list.";
+              }
+              leaf path-mtu {
+                type uint32;
+                description
+                  "Path mtu of a segment list.";
+              }
+              leaf weight {
+                type uint32;
+                description
+                  "Weight value of a segment list.";
+              }
+              leaf down-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when a segment list went down.";
+              }
+              leaf down-reason {
+                type string {
+                  length "1..128";
+                }
+                description
+                  "Reason why a segment list went down.";
+              }
+              leaf algorithm {
+                type uint16;
+                description
+                  "Algorithm value of a segment list.";
+              }
+              leaf up-list-count {
+                type uint8;
+                description
+                  "Number of segment lists that were still up when a segment list in the same candidate path went down.";
+              }
+              container sids {
+                description
+                  "List of SIDs.";
+                list sid {
+                  key "index";
+                  max-elements 10;
+                  description
+                    "Operational data of SID.";
+                  leaf index {
+                    type uint32;
+                    description
+                      "SID index.";
+                  }
+                  leaf value {
+                    type sid-value-type;
+                    description
+                      "SID value.";
+                  }
+                }
+              }
+              container up-lists {
+                description
+                  "List of segment lists that were still up when a segment list in the same candidate path went down.";
+                list up-list {
+                  key "id";
+                  description
+                    "Statistics of a segment list that was still up when a segment list in the same candidate path went down.";
+                  leaf id {
+                    type uint32;
+                    description
+                      "Segment list ID.";
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+      uses binding-sid-allocation;
+      container policy-group-down-reasons {
+        config false;
+        description
+          "List of down records of SR-MPLS TE Policy groups.";
+        list policy-group-down-reason {
+          key "endpoint color group-id up-time up-millisecond";
+          description
+            "Operational state of the down record of an SR-MPLS TE Policy group.";
+          leaf endpoint {
+            type inet:ip-address-no-zone;
+            description
+              "Endpoint of an SR-MPLS TE Policy group.";
+          }
+          leaf color {
+            type uint32;
+            description
+              "Color of an SR-MPLS TE Policy group.";
+          }
+          leaf group-id {
+            type uint32;
+            description
+              "SR-MPLS TE Policy group ID.";
+          }
+          leaf up-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR-MPLS TE Policy group went up.";
+          }
+          leaf up-millisecond {
+            type uint32;
+            units "ms";
+            description
+              "Millisecond value in the time when an SR-MPLS TE Policy group went up.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "Tunnel ID.";
+          }
+          leaf tunnel-type {
+            type tunnel-type;
+            description
+              "Tunnel type.";
+          }
+          leaf create-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR-MPLS TE Policy group was created.";
+          }
+          leaf down-time {
+            type yang:date-and-time;
+            description
+              "Date and time when an SR-MPLS TE Policy group went down.";
+          }
+          leaf down-reason {
+            type policy-group-down-reason-type;
+            description
+              "Reason why an SR-MPLS TE Policy group went down.";
+          }
+          container group-maps {
+            description
+              "List of down records of SR-MPLS TE Policy group mappings.";
+            list group-map {
+              key "match-type default index af-type up-time up-millisecond";
+              description
+                "Operational state of the down record of an SR-MPLS TE Policy group mapping.";
+              leaf match-type {
+                type map-match-type;
+                description
+                  "Match type.";
+              }
+              leaf default {
+                type boolean;
+                description
+                  "Default.";
+              }
+              leaf index {
+                type uint32;
+                description
+                  "Index.";
+              }
+              leaf af-type {
+                type address-family-display-type;
+                description
+                  "Address family type.";
+              }
+              leaf up-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when an SR-MPLS TE Policy group mapping went up.";
+              }
+              leaf up-millisecond {
+                type uint32;
+                units "ms";
+                description
+                  "Millisecond value in the time when an SR-MPLS TE Policy group mapping went up.";
+              }
+              leaf policy-color {
+                type uint32;
+                description
+                  "Color of an SR Policy.";
+              }
+              leaf down-time {
+                type yang:date-and-time;
+                description
+                  "Date and time when an SR-MPLS TE Policy group mapping went down.";
+              }
+              leaf down-reason {
+                type map-down-reason-type;
+                description
+                  "Reason why an SR-MPLS TE Policy group mapping went down.";
+              }
+            }
+          }
+        }
+      }
+      container policy-group-statistic {
+        config false;
+        description
+          "Statistics of SR-MPLS TE Policy groups.";
+        leaf group-count {
+          type uint32;
+          description
+            "Number of SR-MPLS TE Policy groups.";
+        }
+        leaf group-up-count {
+          type uint32;
+          description
+            "Number of SR-MPLS TE Policy groups that are up.";
+        }
+        leaf dscp-map-count {
+          type uint32;
+          description
+            "Number of DSCP-based mappings.";
+        }
+        leaf dscp-map-up-count {
+          type uint32;
+          description
+            "Number of DSCP-based mappings that are up.";
+        }
+        leaf service-class-map-count {
+          type uint32;
+          description
+            "Number of Service Class-based mappings.";
+        }
+        leaf service-class-map-up-count {
+          type uint32;
+          description
+            "Number of Service Class-based mappings that are up.";
+        }
+      }
+      container running-policy-groups {
+        config false;
+        description
+          "List of SR-MPLS TE Policy groups.";
+        list running-policy-group {
+          key "group-id endpoint color";
+          description
+            "Operational state of an SR-MPLS TE Policy group.";
+          leaf group-id {
+            type uint32;
+            description
+              "SR-MPLS TE Policy group ID.";
+          }
+          leaf endpoint {
+            type inet:ip-address;
+            description
+              "SR-MPLS TE Policy IPv4 endPoint address.";
+          }
+          leaf color {
+            type uint32;
+            description
+              "Color of an SR-MPLS TE Policy group.";
+          }
+          leaf type {
+            type group-create-type;
+            description
+              "Type of an SR-MPLS TE Policy group, static or dynamic.";
+          }
+          leaf state {
+            type group-state-type;
+            description
+              "SR-MPLS TE Policy group state.";
+          }
+          leaf delay-timer-remain {
+            type uint32;
+            units "ms";
+            description
+              "Remaining delay.";
+          }
+          leaf state-change-time {
+            type yang:date-and-time;
+            description
+              "Date and time when the state of a group changed.";
+          }
+          leaf tunnel-id {
+            type uint32;
+            description
+              "SR-MPLS TE Policy group tunnel ID.";
+          }
+          leaf tunnel-type {
+            type tunnel-type;
+            description
+              "SR-MPLS TE Policy group tunnel type.";
+          }
+          leaf map-count {
+            type uint32;
+            description
+              "Number of mappings in an SR-MPLS TE Policy group.";
+          }
+          leaf up-map-count {
+            type uint32;
+            description
+              "Number of mappings that are up in an SR-MPLS TE Policy group.";
+          }
+          container group-maps {
+            description
+              "List of SR-MPLS TE Policy group maps.";
+            list group-map {
+              key "index match-type default af-type";
+              description
+                "Operational state of an SR-MPLS TE Policy group map.";
+              leaf index {
+                type uint32;
+                description
+                  "Index.";
+              }
+              leaf match-type {
+                type map-match-type;
+                description
+                  "Match type of an SR-MPLS TE Policy group.";
+              }
+              leaf default {
+                type boolean;
+                description
+                  "Enable/disable the default SR-MPLS TE Policy group.";
+              }
+              leaf af-type {
+                type address-family-type;
+                description
+                  "Address family.";
+              }
+              leaf dscp-value {
+                type pub-type:id-range {
+                 
+                }
+                description
+                  "DSCP Value.";
+              }
+              leaf service-class {
+                type service-class-type;
+                description
+                  "Service Class type.";
+              }
+              leaf color {
+                type uint32;
+                description
+                  "SR-MPLS TE Policy color.";
+              }
+              leaf policy-tunnel-id {
+                type uint32;
+                description
+                  "SR-MPLS TE Policy tunnel ID.";
+              }
+              leaf state {
+                type state-type;
+                description
+                  "Mapping state of an SR-MPLS TE Policy group.";
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  rpc reset-srv6-te-policy-traffic-statistics {
+   
+   
+    description
+      "Reset SRv6 TE Policy traffic statistics.";
+
+    input {
+      leaf name {
+        type string {
+          length "1..255";
+        }
+        description
+          "SR Policy name.";
+      }
+      leaf endpoint {
+        type inet:ip-address;
+        description
+          "SR Policy endpoint address.";
+      }
+      leaf color {
+        type uint32 {
+          range "0..4294967295";
+        }
+        description
+          "SR Policy color.";
+      }
+      leaf binding-sid {
+        type sid-value-type;
+        description
+          "SR Policy binding sid.";
+      }
+    }
+  }
+  rpc reset-sr-mpls-te-policy-traffic-statistics {
+   
+   
+    description
+      "Reset SR-MPLS TE Policy traffic statistics.";
+
+    input {
+      leaf name {
+        type string {
+          length "1..255";
+        }
+        description
+          "SR Policy name.";
+      }
+      leaf endpoint {
+        type inet:ip-address;
+        description
+          "SR Policy endpoint address.";
+      }
+      leaf color {
+        type uint32 {
+          range "0..4294967295";
+        }
+        description
+          "SR Policy color.";
+      }
+      leaf binding-sid {
+        type sid-value-type;
+        description
+          "SR Policy binding sid.";
+      }
+    }
+  }
+  rpc detect-srv6-te-policy-path-mtu {
+    description
+      "Path MTU detection for SRv6 TE Policy.";
+
+    input {
+      leaf name {
+        type string {
+          length "1..255";
+        }
+        description
+          "SR Policy name.";
+      }
+      leaf endpoint {
+        type inet:ip-address;
+        description
+          "SR Policy endpoint.";
+      }
+      leaf color {
+        type uint32 {
+          range "0..4294967295";
+        }
+        description
+          "SR Policy color.";
+      }
+      leaf binding-sid {
+        type sid-value-type;
+        description
+          "SR Policy binding SID.";
+      }
+    }
+  }
+}

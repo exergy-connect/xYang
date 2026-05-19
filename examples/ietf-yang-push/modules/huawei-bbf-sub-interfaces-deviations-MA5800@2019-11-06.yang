@@ -1,0 +1,34 @@
+module huawei-bbf-sub-interfaces-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-sub-interfaces-deviations-MA5800";
+  prefix bbf-subif-devs-MA5800;
+
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-sub-interfaces module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:egress-rewrite" {
+    deviate not-supported;
+  }
+}

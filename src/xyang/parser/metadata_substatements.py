@@ -30,9 +30,9 @@ def with_data_node_substatements(
     parsers: StatementParsers,
     dispatch: dict[str, Callable[..., Any]],
 ) -> dict[str, Callable[..., Any]]:
-    """Like :func:`with_metadata_substatements`, plus ignored ``config`` (warning only)."""
+    """Like :func:`with_metadata_substatements`, plus ``config`` (RFC 7950 §7.21.1)."""
     out = with_metadata_substatements(parsers, dispatch)
-    out.setdefault(kw.CONFIG, parsers.parse_config_ignored)
+    out.setdefault(kw.CONFIG, parsers.parse_config)
     out.setdefault(kw.STATUS, parsers.parse_status_ignored)
     # RFC 7950 §7.13 — ``typedef`` allowed in container, list, choice, case, augment, …
     out.setdefault(kw.TYPEDEF, parsers.parse_typedef)

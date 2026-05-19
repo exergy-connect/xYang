@@ -1,0 +1,883 @@
+module huawei-bb-service-flow {
+  namespace "urn:huawei:yang:huawei-bb-service-flow";
+  prefix hw-bb-srv-flow;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-tc-an {
+    prefix tc-an;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+  import huawei-slice-an {
+    prefix slice-an;
+  }
+  import huawei-bb-nerg {
+    prefix hw-bb-nerg;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for configuring
+     service flows for the broadband services.";
+
+  revision 2025-03-01 {
+    description
+      "Add svlan checker.";
+    reference
+      "";
+  }
+  revision 2024-05-23 {
+    description
+      "Modified the constraint of container switch-oriented.";
+    reference
+      "";
+  }
+  revision 2022-03-12 {
+    description
+      "Add leaf dedicated-network-name to connection-oriented flow.";
+    reference
+      "";
+  }
+  revision 2020-05-20 {
+    description
+      "Import huawei-bb-VLAN.";
+    reference
+      "";
+  }
+  revision 2020-04-22 {
+    description
+      "Modified the constraint of pbit-match and ethertype-match.";
+    reference
+      "";
+  }
+  revision 2019-11-06 {
+    description
+      "Import the bbf-xpon-if-type.";
+    reference
+      "";
+  }
+  revision 2019-09-16 {
+    description
+      "Added the manegement of flow bundle.";
+    reference
+      "MA5800 V100R20C00 NETCONF/YANG features.";
+  }
+  revision 2019-03-01 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef user-vlan-id {
+    type uint16 {
+      range "1..4095";
+    }
+    description
+      "Type definition representing a user VLAN ID.";
+  }
+
+  grouping vlan-match-group {
+    description
+      "VLAN match grouping.";
+    choice vlan-match {
+      mandatory true;
+      description
+        "Indicates traffic classification by VLAN.";
+      case user-vlan {
+        description
+          "Indicates traffic classification by C-VLAN.";
+        leaf user-vlan {
+          type user-vlan-id;
+          description
+            "User VLAN ID.";
+        }
+      }
+      case double-vlan {
+        description
+          "Indicates that the mode of VLAN-match is based on the
+           specified double VLAN.";
+        container double-vlan {
+          description
+            "Configure traffic classification by S-VLAN and C-VLAN.";
+          leaf outer-vlan {
+            type user-vlan-id;
+            mandatory true;
+            description
+              "Outer VLAN ID.";
+          }
+          leaf second-vlan {
+            type user-vlan-id;
+            mandatory true;
+            description
+              "Second VLAN ID.";
+          }
+        }
+      }
+      case untagged {
+        description
+          "Indicates that the mode of VLAN-match is not specified.";
+        leaf untagged {
+          type empty;
+          description
+            "Indicates traffic classification is not specified.";
+        }
+      }
+      case other-all {
+        description
+          "Indicates that the mode of VLAN-match is based on
+           TLS (Transparent LAN Service).";
+        leaf other-all {
+          type empty;
+          description
+            "Indicates traffic classification by TLS (Transparent LAN Service).";
+        }
+      }
+      case any-vlan {
+        description
+          "Indicates that the mode of VLAN-match is based on
+           port or logical port.";
+        leaf any-vlan {
+          type empty;
+          description
+            "Indicates traffic classification by port or logical port.";
+        }
+      }
+    }
+  }
+
+  grouping flow-bundle {
+    description
+      "Indicates the flow bundle.";
+    leaf bundle-index {
+      type leafref {
+        path "/hw-bb-srv-flow:flow-bundles/flow-bundle/bundle-index";
+      }
+      description
+        "Indicates the flow bundle index.";
+    }
+    leaf member-sort-para {
+      type int32;
+      must "(../bundle-index)" {
+        error-message
+          "If the member-sort-para is specified, bundle-index
+           must also be specified.";
+        description
+          "If the member-sort-para is specified, bundle-index
+           must also be specified.";
+      }
+      description
+        "Indicates the corresponding key value of a service flow in service flow bundle.
+         A service flow bundle is an entity including certain service flows from
+         one L3 access user such as residential gateway device. Traffic associated
+         with different service flows sharing the same bundle follows the same
+         forwarding path across the access node. And the service flows are
+         classified for 802.1Q CoS purpose.
+         If a service flow is not belong to any flow bundle when creating, this leaf can not be set, and
+         the invalid value -1 will be returned.";
+    }
+  }
+
+  container service-flows {
+    description
+      "Indicates the configuration for service flows.";
+    list service-flow {
+      key "index";
+      description
+        "Configure the service flow.";
+      leaf index {
+        type uint32;
+        description
+          "The service flow index, a unique value to identify a service flow.";
+      }
+      leaf admin-status {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicate the admin-status is enabled.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicate the admin-status is disabled.";
+          }
+        }
+        default "enable";
+        description
+          "Service port admin status, when disabled all up/down packets are forbidden.";
+      }
+      leaf state {
+        type enumeration {
+          enum "up" {
+            value 1;
+            description
+              "Indicate the service-port status is up.";
+          }
+          enum "down" {
+            value 2;
+            description
+              "Indicate the service-port status is down.";
+          }
+        }
+        config false;
+        description
+          "Indicate port status related to the service flow. This node is read only.";
+      }
+      leaf desc {
+        type string {
+          length "0..64";
+          pattern "(([^\"?][^?]*[^\"?])|([^\"?]*)|)";
+          pattern "((.*\"[^ ].*)|([^\"]*)|)";
+        }
+        description
+          "Service flow description. Empty string indicates delete operation.";
+      }
+      leaf remote-desc {
+        type string {
+          length "0..64";
+          pattern "(([^\"?][^?]*[^\"?])|([^\"?]*)|)";
+          pattern "((.*\"[^ ].*)|([^\"]*)|)";
+        }
+        description
+          "Service flow user side description. Empty string indicates delete operation.";
+      }
+      choice forwarding-mode {
+        mandatory true;
+        description
+          "The forwarding mode of service flow.";
+        case switch-oriented {
+          description
+            "The forwarding mode of service flow is switch-oriented.";
+          container switch-oriented {
+            description
+              "Configure the switch-oriented flow (mac-learning flow or VLAN-connect flow).";
+            leaf uplink-interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              must "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'";
+              description
+                "The name of the uplink interface of VLAN-connect Service-Flow.";
+            }
+            leaf interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ptm'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:olt-v-enet'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='hw-bb-nerg:nerg-group-port'";
+              mandatory true;
+              description
+                "The name of the interface.";
+            }
+            leaf forwarder {
+              type leafref {
+                path "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id";
+              }
+              mandatory true;
+              description
+                "Service VLAN ID, identifying the global VLAN for
+                 switch-oriented service flow.";
+            }
+            container classification {
+              description
+                "Configure the traffic classification criteria.";
+              choice vlan-match {
+                mandatory true;
+                description
+                  "Indicates traffic classification by VLAN.";
+                case user-vlan {
+                  description
+                    "Indicates traffic classification by C-VLAN.";
+                  leaf user-vlan {
+                    type user-vlan-id;
+                    description
+                      "User VLAN ID.";
+                  }
+                }
+                case vlan-range {
+                  description
+                    "Indicates that the mode of VLAN-match is based on
+                     the specified VLAN range.";
+                  container vlan-range {
+                    when "((../pbit-match='any') and (../ethertype-match='any')) or
+                     (../ethertype-match!='any')";
+                    description
+                      "Configure the specified VLAN range.";
+                    leaf start-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Start VLAN ID.";
+                    }
+                    leaf end-vlan {
+                      type user-vlan-id;
+                      must ". >= ../start-vlan";
+                      mandatory true;
+                      description
+                        "End VLAN ID.";
+                    }
+                  }
+                }
+                case double-vlan {
+                  description
+                    "Indicates that the mode of VLAN-match is based on the
+                     specified double VLAN.";
+                  container double-vlan {
+                    when "((../pbit-match='any') and (../ethertype-match='any'))";
+                    description
+                      "Configure traffic classification by S-VLAN and C-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+                case priority-tagged {
+                  description
+                    "Indicates that the mode of VLAN-match is based on the user
+                     priority-tagged.";
+                  leaf priority-tagged {
+                    when "((../pbit-match='any') and (../ethertype-match='any')) or
+                     (../ethertype-match!='any')";
+                    type empty;
+                    description
+                      "Indicates traffic classification by user priority-tagged.";
+                  }
+                }
+                case untagged {
+                  description
+                    "Indicates that the mode of VLAN-match is not specified.";
+                  leaf untagged {
+                    when "((../pbit-match='any') and (../ethertype-match='any')) or
+                     (../ethertype-match!='any')";
+                    type empty;
+                    description
+                      "Indicates traffic classification is not specified.";
+                  }
+                }
+                case other-all {
+                  description
+                    "Indicates that the mode of VLAN-match is based on
+                     TLS (Transparent LAN Service).";
+                  leaf other-all {
+                    when "((../pbit-match='any') and (../ethertype-match='any'))";
+                    type empty;
+                    description
+                      "Indicates traffic classification by TLS (Transparent LAN Service).";
+                  }
+                }
+                case any-vlan {
+                  description
+                    "Indicates that the mode of VLAN-match is based on
+                     port or logical port.";
+                  leaf any-vlan {
+                    type empty;
+                    description
+                      "Indicates traffic classification by port or logical port.";
+                  }
+                }
+              }
+              leaf pbit-match {
+                type union {
+                  type uint8 {
+                    range "0..7";
+                  }
+                  type enumeration {
+                    enum "any" {
+                      value 0;
+                      description
+                        "Matches any pbit value in the range of 0 to 7.";
+                    }
+                  }
+                }
+                default "any";
+                description
+                  "Indicates traffic classification by C-VLAN and 802.1p.";
+              }
+              leaf ethertype-match {
+                type enumeration {
+                  enum "ipoe" {
+                    value 0;
+                    description
+                      "Matches the Ethertype value except for 0x8863 or 0x8864.";
+                  }
+                  enum "pppoe" {
+                    value 1;
+                    description
+                      "Matches the Ethertype value 0x8863 or 0x8864.";
+                  }
+                  enum "ipv6oe" {
+                    value 2;
+                    description
+                      "Matches the Ethertype value 0x86dd.";
+                  }
+                  enum "ipv4oe" {
+                    value 3;
+                    description
+                      "Matches the Ethertype value except for 0x8863 or 0x8864 or 0x86dd.";
+                  }
+                  enum "any" {
+                    value 255;
+                    description
+                      "Matches any Ethertype value.";
+                  }
+                }
+                default "any";
+                description
+                  "Indicates traffic classification by EtherType.";
+              }
+            }
+            container translation {
+              description
+                "Configure the VLAN tag transforming mode of the service flow.";
+              choice type {
+                mandatory true;
+                description
+                  "Indicates the type of VLAN tag transforming mode for service flow.";
+                case add {
+                  description
+                    "Indicates that the transforming mode is added.";
+                  container add-tag {
+                    description
+                      "Configure adding one VLAN tag to the traffic in the upstream
+                       direction.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      description
+                        "Outer VLAN ID.";
+                    }
+                  }
+                }
+                case transparent {
+                  when "not(../classification/any-vlan and ../classification/pbit-match='any'
+                   and ../classification/ethertype-match='any')";
+                  description
+                    "Indicates that the transforming mode is transparent.";
+                  leaf transparent-tag {
+                    type empty;
+                    description
+                      "Indicates retaining the VLAN tag of the traffic in the upstream
+                       direction. The S-VLAN ID allocated must be the same as the
+                       C-VLAN (user VLAN) ID.";
+                  }
+                }
+                case translate {
+                  description
+                    "Indicates that the transforming mode is translated.";
+                  container translate-tag {
+                    when "not(../../classification/any-vlan and ../../classification/pbit-match='any'
+                     and ../../classification/ethertype-match='any')";
+                    description
+                      "Configure translating the C-VLAN to the S-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      description
+                        "Outer VLAN ID.";
+                    }
+                  }
+                }
+                case add-double {
+                  description
+                    "Indicates that the transforming mode is adding two VLAN tags.";
+                  container add-double-tag {
+                    description
+                      "Configure adding two VLAN tags to the traffic.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+                case translate-and-add {
+                  description
+                    "Indicates that the transforming mode is translated and added.";
+                  container translate-and-add-tag {
+                    when "not(../../classification/any-vlan and ../../classification/pbit-match='any'
+                     and ../../classification/ethertype-match='any')";
+                    description
+                      "Configure translating the C-VLAN to the S-VLAN and adding one
+                       VLAN tag as a new C-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+                case translate-double {
+                  description
+                    "Indicates that the transforming mode is translating double VLAN tags.";
+                  container translate-double-tag {
+                    when "(../../classification/double-vlan)";
+                    description
+                      "Configure translating the S-VLAN and C-VLAN to the new S-VLAN
+                       and the new C-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+                case translate-and-remove {
+                  description
+                    "Indicates that the transforming mode is translated and removed.";
+                  container translate-and-remove-tag {
+                    when "(../../classification/double-vlan)";
+                    description
+                      "Configure translating the S-VLAN and C-VLAN to a new S-VLAN
+                       and no C-VLAN for the input traffic with double VLANs.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      must ". = ../../../forwarder";
+                      description
+                        "Outer VLAN ID.";
+                    }
+                  }
+                }
+              }
+            }
+            uses flow-bundle;
+          }
+        }
+        case connection-oriented {
+          description
+            "The forwarding mode of service flow is connection-oriented.";
+          container connection-oriented {
+            description
+              "Configure the connection-oriented flow.";
+            leaf source-interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='tc-an:vport'";
+              mandatory true;
+              description
+                "The name of the source endpoint interface.";
+            }
+            container source-classification {
+              description
+                "Configure the source endpoint traffic classification criteria.";
+              uses vlan-match-group;
+            }
+            leaf destination-interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ptm'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:olt-v-enet'";
+              mandatory true;
+              description
+                "The name of the destination endpoint interface.";
+            }
+            container destination-classification {
+              description
+                "Configure the destination endpoint traffic classification criteria.";
+              uses vlan-match-group;
+            }
+            leaf dedicated-network-name {
+              type leafref {
+                path "/slice-an:slice-an/slice-an:dedicated-networks/slice-an:dedicated-network/slice-an:name";
+              }
+              description
+                "Indicates the name of a dedicated-network.";
+            }
+          }
+        }
+        case vxlan {
+          description
+            "The service flow is used for VXLAN forwarding.";
+          container vxlan {
+            description
+              "Configure VXLAN forwarding related configurations.";
+            container source-classification {
+              description
+                "Configure the source endpoint traffic classification criteria.";
+              choice vlan-match {
+                mandatory true;
+                description
+                  "Indicates traffic classification by VLAN.";
+                case double-vlan {
+                  description
+                    "Indicates that the mode of VLAN-match is based on the
+                     specified double VLAN.";
+                  container double-vlan {
+                    description
+                      "Configure traffic classification by S-VLAN and C-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+              }
+            }
+            leaf destination-interface {
+              type leafref {
+                path "/if:interfaces/if:interface/if:name";
+              }
+              must
+                "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ptm'
+                 or
+                 /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:olt-v-enet'";
+              mandatory true;
+              description
+                "The name of the destination endpoint interface.";
+            }
+            container destination-classification {
+              description
+                "Configure the destination endpoint traffic classification criteria.";
+              choice vlan-match {
+                mandatory true;
+                description
+                  "Indicates traffic classification by VLAN.";
+                case user-vlan {
+                  description
+                    "Indicates traffic classification by C-VLAN.";
+                  leaf user-vlan {
+                    type user-vlan-id;
+                    description
+                      "User VLAN ID.";
+                  }
+                }
+                case double-vlan {
+                  description
+                    "Indicates that the mode of VLAN-match is based on the
+                     specified double VLAN.";
+                  container double-vlan {
+                    description
+                      "Configure traffic classification by S-VLAN and C-VLAN.";
+                    leaf outer-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Outer VLAN ID.";
+                    }
+                    leaf second-vlan {
+                      type user-vlan-id;
+                      mandatory true;
+                      description
+                        "Second VLAN ID.";
+                    }
+                  }
+                }
+                case untagged {
+                  description
+                    "Indicates that the mode of VLAN-match is not specified.";
+                  leaf untagged {
+                    type empty;
+                    description
+                      "Indicates traffic classification is not specified.";
+                  }
+                }
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+  container service-configuration-types {
+    description
+      "Indicates the configuration for service-configuration-type.";
+    list service-configuration-type {
+      key "board-name";
+      description
+        "Configure the service-configuration-type list.";
+      leaf board-name {
+        type string {
+          length "3..16";
+        }
+        description
+          "Match the board name format of 'frame-id.slot-id'.";
+      }
+      leaf cfg-type {
+        type enumeration {
+          enum "port-vlan" {
+            value 1;
+            description
+              "Supporting port-VLAN configurations for the board.";
+          }
+          enum "service-port" {
+            value 2;
+            description
+              "Supporting service-port configurations for the board.";
+          }
+        }
+        description
+          "The configuration type for the board.";
+      }
+    }
+  }
+  container flow-bundles {
+    description
+      "Indicates the configuration for service flow bundles.";
+    list flow-bundle {
+      key "bundle-index";
+      description
+        "Configure the flow bundle list.";
+      leaf bundle-index {
+        type uint32;
+        description
+          "The service flow bundle index, a unique value to identify a flow bundle.";
+      }
+      leaf type {
+        type enumeration {
+          enum "cos" {
+            value 1;
+            description
+              "Indicates that the service flow bundle is for L3 access,
+                and that the service flows are classified for 802.1Q (PCP) CoS purpose.";
+          }
+        }
+        default "cos";
+        description
+          "Indicates the type of a service flow bundle. Currently, only one type is supported, that is, byCoS.";
+      }
+      list service-flow-index {
+        key "flow-index";
+        config false;
+        description
+          "Operational state of the service flow bundle query. It is used to query service flow bundles.";
+        leaf flow-index {
+          type leafref {
+            path "/hw-bb-srv-flow:service-flows/service-flow/index";
+          }
+          description
+            "Indicates the service flow index, a unique value to identify a service flow.";
+        }
+        leaf member-sort-para {
+          type uint32;
+          description
+            "Indicates the corresponding key value of a service flow in service flow bundle.
+             Currently, the service flow bundle type must be byPCP, and member-sort-para indicates the CoS value.
+             If the high 16 bits of the value is 0,it is in cos mode.the low 8 bits of it represents the value of cos.
+             If the high 16 bits of the value is 1,it is in cos-list mode.the low 8 bits of it represents the bitmap of cos-list.";
+        }
+      }
+    }
+  }
+  container available-indexs {
+    config false;
+    description
+      "Indicate the next available service flow index.";
+    leaf available-index {
+      type uint32;
+      config false;
+      description
+        "Indicate the next available service flow index, a unique value to identify a service flow.";
+    }
+  }
+
+  rpc svlan-move-check-function {
+    description
+      "Indicate the function of checking whether the configuration and bandwidth of service flow migration meet the migration requirements.";
+
+    input {
+      leaf service-port {
+        type leafref {
+          path "/hw-bb-srv-flow:service-flows/service-flow/index";
+        }
+        mandatory true;
+        description
+          "Indicates the service flow index, a unique value to identify a service flow.";
+      }
+      leaf vlan {
+        type leafref {
+          path "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id";
+        }
+        mandatory true;
+        description
+          "Service VLAN ID, identifying the global VLAN for switch-oriented service flow.";
+      }
+    }
+    output {
+      leaf svlan-move-check-result {
+        type boolean;
+        description
+          "Indicate the succeeded/failed result of checking function.";
+      }
+      leaf error-msg {
+        type string;
+        description
+          "Indicate the error message.";
+      }
+    }
+  }
+}

@@ -1,0 +1,134 @@
+module bbf-xpon-traffic-alarm-profile {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-xpon-traffic-alarm-profile";
+  prefix traffic-alarm-profile;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area.";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:info@broadband-forum.org>.
+
+     Editor: XinWen Yao, Huawei";
+  description
+    "The YANG module defines YANG objects which provide traffic alarm management.";
+
+  revision 2024-03-19 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  grouping traffic-alarm-profiles-data {
+    description
+      "All Optical Line Termination (OLT)-side configuration data for
+       traffic alarm management.";
+    list traffic-alarm-profile {
+      key "name";
+      description
+        "Traffic alarm management configuration parameters.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "OLT traffic alarm management profile name.";
+      }
+      leaf detect-interval {
+        type uint32 {
+          range "1..300";
+        }
+        units "second";
+        default "60";
+        description
+          "Indicates the congestion detection interval.";
+      }
+      leaf detect-times {
+        type uint32 {
+          range "1..900";
+        }
+        default "5";
+        description
+          "Indicates the number of congestion detections in a detection period.";
+      }
+      leaf alarm-detect-times-threshold {
+        type uint32 {
+          range "0..900";
+        }
+        must ". <= ../detect-times" {
+          error-message
+            "The value of this alarm-detect-times-threshold
+             must not exceed that of parameter detect-times.";
+          description
+            "The value of this alarm-detect-times-threshold
+             must not exceed that of parameter detect-times.";
+        }
+        default "0";
+        description
+          "Indicates the times threshold for the congestion alarm. If the number of
+            detected congestions crosses this threshold, a congestion alarm is reported.
+            The value of this parameter must not exceed that of parameter detect-times.
+            The value 0 indicates that no detection is performed.";
+      }
+      leaf warning-detect-times-threshold {
+        type uint32 {
+          range "0..900";
+        }
+        must "(current() = 0) or (((../alarm-detect-times-threshold = 0) or (. < ../alarm-detect-times-threshold)) and (. <= ../detect-times))" {
+          error-message
+            "The value of this warning-detect-timeswarning-detect-times must be smaller than that of
+             parameter alarm-detect-times-threshold.";
+          description
+            "The value of this warning-detect-timeswarning-detect-times must be smaller than that of
+             parameter alarm-detect-times-threshold.";
+        }
+        default "0";
+        description
+          "Indicates the times threshold for the congestion warning. If the number of detected
+           congestions crosses this threshold, a congestion warning is reported. The value of
+           this parameter must be smaller than that of parameter alarm-detect-times.
+           The value 0 indicates that no detection is performed.";
+      }
+      leaf up-ratio-threshold {
+        type uint32 {
+          range "1..100";
+        }
+        units "percent";
+        default "90";
+        description
+          "Indicates the threshold for the proportion of the upstream traffic
+           to the maximum bandwidth. If the proportion of the upstream traffic
+           to the maximum bandwidth crosses this threshold, the system determines
+           that a congestion is detected.";
+      }
+      leaf down-ratio-threshold {
+        type uint32 {
+          range "1..100";
+        }
+        units "percent";
+        default "90";
+        description
+          "Indicates the threshold for the proportion of the downstream traffic
+           to the maximum bandwidth. If the proportion of the downstream traffic
+           to the maximum bandwidth crosses this threshold, the system determines
+           that a congestion is detected.";
+      }
+    }
+  }
+
+  augment "/bbf-xpon:xpon" {
+    description
+      "Augment xPON traffic alarm profile configuration.";
+    container traffic-alarm-profiles {
+      description
+        "Configure the data node of traffic alarm profile.";
+      uses traffic-alarm-profiles-data;
+    }
+  }
+}

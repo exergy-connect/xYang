@@ -12,7 +12,6 @@ import {
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { SerializedStatement } from "../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
-import { skip_config_substatement } from "./unsupported-skip";
 import {
   AnydataStatementParser,
   AnyxmlStatementParser,
@@ -198,7 +197,7 @@ export class StatementParsers {
       return { __class__: "YangStatement", keyword: "reference", statements: [] };
     },
     [kw.CONFIG]: (tokens, context) => {
-      this.parse_config_ignored(tokens, context);
+      this.parse_config(tokens, context);
       return { __class__: "YangStatement", keyword: "config", statements: [] };
     }
   };
@@ -517,6 +516,10 @@ export class StatementParsers {
     if (stmt.default !== undefined) {
       out.default = stmt.default;
     }
+    const config = (stmt as { config?: boolean }).config;
+    if (typeof config === "boolean") {
+      out.config = config;
+    }
     if (keyword === "leaf-list") {
       const llDefaults = (stmt as { defaults?: unknown[] }).defaults;
       if (Array.isArray(llDefaults) && llDefaults.length > 0) {
@@ -614,6 +617,9 @@ export class StatementParsers {
     }
     if (Array.isArray(r.refined_defaults) && r.refined_defaults.length > 0) {
       out.refined_defaults = [...r.refined_defaults];
+    }
+    if (typeof r.refined_config === "boolean") {
+      out.refined_config = r.refined_config;
     }
     if (Array.isArray(r.if_features) && r.if_features.length > 0) {
       out.if_features = [...r.if_features];
@@ -745,12 +751,16 @@ export class StatementParsers {
     this.parse_reference(tokens, context);
   }
 
-  parse_config_ignored(tokens: TokenStream, context: ParserContext): void {
-    const parent = context.current_parent as { name?: string; constructor?: { name: string } } | undefined;
-    const name = parent?.name;
-    const typeName = parent?.constructor?.name ?? "node";
-    const ctx = name ? `${typeName} '${name}'` : typeName;
-    skip_config_substatement(tokens, { context: ctx });
+  parse_config(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.CONFIG);
+    const value = tokens.consume_oneof([kw.TRUE, kw.FALSE])[1];
+    const parent = context.current_parent;
+    if (parent instanceof YangRefineStmt) {
+      parent.refined_config = value === kw.TRUE;
+    } else if (parent && "config" in parent) {
+      (parent as { config?: boolean }).config = value === kw.TRUE;
+    }
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_typedef_default(tokens: TokenStream, context: ParserContext): void {

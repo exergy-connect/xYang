@@ -1,0 +1,34 @@
+module huawei-bbf-xpongemtcont-qos-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-xpongemtcont-qos-deviations-MA5800";
+  prefix bbf-xpongemtcont-qos-devs-MA5800;
+
+  import bbf-xpongemtcont-qos {
+    prefix bbf-xpongemtcont-qos;
+  }
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xpongemtcont-qos module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:tconts/bbf-xpongemtcont:tcont/bbf-xpongemtcont-qos:tm-root" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,589 @@
+module huawei-board {
+  namespace "urn:huawei:params:xml:ns:yang:huawei-board";
+  prefix board;
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for the
+     configuration of huawei board properties.";
+
+  revision 2024-04-20 {
+    description
+      "Add board-oper-status enum insufficient-rtu.";
+    reference
+      "";
+  }
+  revision 2022-09-23 {
+    description
+      "Deprecated network-role.";
+    reference
+      "";
+  }
+  revision 2021-11-24 {
+    description
+      "Add board-oper-status enum isolated.";
+    reference
+      "";
+  }
+  revision 2021-07-25 {
+    description
+      "Add leaf clei-code.";
+    reference
+      "";
+  }
+  revision 2021-06-22 {
+    description
+      "Re-archive the huawei-board module file, delete all deviation nodes. Fix huawei check problems,
+       Add element descriptions. Change description format; Move grouping physical-common-data after typedef.";
+    reference
+      "";
+  }
+  revision 2020-01-22 {
+    description
+      "Modify leaf role-in-system description.";
+    reference
+      "";
+  }
+  revision 2020-01-21 {
+    description
+      "Add leaf role-in-system description.";
+    reference
+      "";
+  }
+  revision 2020-01-08 {
+    description
+      "Edited by switch: add leaf port-config-mode to boards-state
+       and notification board-state-event, port-config-mode-change.";
+    reference
+      "";
+  }
+  revision 2019-09-23 {
+    description
+      "Edited by switch: add leaf uplink-speed to boards, boards-state and board-state-event.";
+    reference
+      "";
+  }
+  revision 2019-07-23 {
+    description
+      "Edited by switch: rename leaf device-type-oid to vendor-type-oid.";
+    reference
+      "";
+  }
+  revision 2019-07-18 {
+    description
+      "Edited by switch: Add leaf physical-index, parent-physical-index, parent-relpos, device-type-oid.";
+    reference
+      "";
+  }
+  revision 2018-12-05 {
+    description
+      "Edited by switch: add leaf role-in-system to boards-state and board-role-event.";
+    reference
+      "";
+  }
+  revision 2018-11-15 {
+    description
+      "Edited by switch: add leaf support-boardtype to container boards, add unknown enum to leaf status,
+       and container detail-event to notification board-state-event.";
+    reference
+      "";
+  }
+  revision 2018-09-27 {
+    description
+      "Add leaf network-role to container boards.";
+    reference
+      "";
+  }
+  revision 2018-05-31 {
+    description
+      "Add leaf esn/model/mac-address to board-state-event notification.";
+    reference
+      "";
+  }
+  revision 2018-03-12 {
+    description
+      "Add access network device.";
+    reference
+      "";
+  }
+  revision 2018-01-10 {
+    description
+      "Add unknown enumeration to leaf role.";
+    reference
+      "";
+  }
+  revision 2017-11-29 {
+    description
+      "Modified by Switch: add boardtype/boardname and some state leaf nodes.";
+    reference
+      "";
+  }
+  revision 2017-03-02 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef uplink-speed-mode {
+    type enumeration {
+      enum "unknown" {
+        value 0;
+        description
+          "The mode of the uplink speed is unknown.";
+      }
+      enum "40GE" {
+        value 1;
+        description
+          "The mode of the uplink speed is 40GE.";
+      }
+      enum "100GE" {
+        value 2;
+        description
+          "The mode of the uplink speed is 100GE.";
+      }
+      enum "40GEand100GE" {
+        value 3;
+        description
+          "The mode of the uplink speed is 40GE and 100GE.";
+      }
+    }
+    description
+      "Uplink speed mode.";
+  }
+
+  grouping physical-common-data {
+    description
+      "Common data for physical entity.";
+    leaf physical-index {
+      type int32;
+      description
+        "Physical index of entity object.";
+    }
+    leaf parent-physical-index {
+      type int32;
+      description
+        "Physical index of parent entity object.";
+    }
+    leaf parent-relpos {
+      type int32;
+      description
+        "The relative position in parent's child entities.";
+    }
+    leaf vendor-type-oid {
+      type string {
+        length "0..39";
+      }
+      description
+        "Vendor type oid value.";
+    }
+  }
+
+  container boards {
+    description
+      "Board configuration parameters.";
+    list board {
+      key "name";
+      description
+        "Configure board parameters.";
+      leaf name {
+        type string {
+          length "0..20";
+        }
+        description
+          "
+           Box and stack:0-9
+           CSS:frame-id/boardtype0-10
+           frame:boardtype0-10.";
+      }
+      leaf description {
+        type string {
+          length "0..32";
+        }
+        description
+          "A textual description of the board.";
+      }
+      leaf type {
+        type string {
+          length "0..32";
+        }
+        description
+          "The type of the board, which can be obtained from huawei-tc.yang.";
+      }
+      leaf support-boardtype {
+        type string {
+          length "1..64";
+        }
+        description
+          "The type of board which can be supported in device, such as ES1D2G48TX5E for ethernet switch S7700, etc.";
+      }
+      leaf enabled {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable : the state of the board.";
+      }
+      leaf network-role {
+        type enumeration {
+          enum "cascade" {
+            value 1;
+            description
+              "Indicates the subtending side, which is used for subtending and capturing certain protocol packets.";
+          }
+          enum "network" {
+            value 2;
+            description
+              "Indicates the network side, which is used for upstream transmission.";
+          }
+          enum "user" {
+            value 3;
+            description
+              "Indicates the user side, which is used for creating the service port.";
+          }
+          enum "extend" {
+            value 4;
+            description
+              "Indicates the extend side, which is used for connecting to the extended frame.";
+          }
+        }
+        status deprecated;
+        description
+          "Indicates the network role of the board. The node network-role is deprecated. You are advised to use
+           the node 'ietf-interfaces:interfaces/interface/bbf-interface-usage:interface-usage/interface-usage'.";
+      }
+      leaf serial-number {
+        type string {
+          length "0..32";
+        }
+        config false;
+        description
+          "Serial-number of the board.";
+      }
+      leaf oper-status {
+        type enumeration {
+          enum "null" {
+            value 1;
+            description
+              "Indicates that the board is null.";
+          }
+          enum "normal" {
+            value 2;
+            description
+              "Indicates that the board is running normally.";
+          }
+          enum "fault" {
+            value 3;
+            description
+              "Indicates that the board is faulty but in position.";
+          }
+          enum "forbidden" {
+            value 4;
+            description
+              "Indicates that the board is in position but disabled.";
+          }
+          enum "autofind" {
+            value 5;
+            description
+              "Indicates that the board is in the autofind state. If a board is inserted in an idle slot,
+               after the report of automatic registration, the board is also in the autofind state.";
+          }
+          enum "config" {
+            value 6;
+            description
+              "Indicates that the board is in the configuration state.";
+          }
+          enum "offline" {
+            value 7;
+            description
+              "Indicates that the board is faulty and is not in position.";
+          }
+          enum "versionerr" {
+            value 8;
+            description
+              "Indicates that the board version is error.";
+          }
+          enum "autoload" {
+            value 9;
+            description
+              "Indicates that the board is in the auto loading state. If detecting a software update,
+               the board automatically loads the update. If a board is in the auto loading state,
+               resetting or disabling the board may fail.";
+          }
+          enum "outofservice" {
+            value 10;
+            description
+              "Indicates that the board is out of service.";
+          }
+          enum "graceful" {
+            value 11;
+            description
+              "Indicates that the board running state is graceful.";
+          }
+          enum "shutdown" {
+            value 12;
+            description
+              "Indicates that the board is in the shutdown state.";
+          }
+          enum "energysavingshutdown" {
+            value 13;
+            description
+              "Used for system energy saving.";
+          }
+          enum "hightempshutdown" {
+            value 14;
+            description
+              "When the temperature of a board exceeds the high temperature threshold,
+               the board is powered off in order to protect the board.";
+          }
+          enum "manualshutdown" {
+            value 15;
+            description
+              "Services on certain boards can be recovered only after restart of the board.
+               You can manually power off the board.
+               Then, the board is in the manual shutdown state.";
+          }
+          enum "mismatch" {
+            value 16;
+            description
+              "When a board inserted in a slot is inconsistent with the configuration saved in the system,
+               the board is in the mismatch state.";
+          }
+          enum "acoffshutdown" {
+            value 17;
+            description
+              "Used to protect system when there is no AC Power.";
+          }
+          enum "isolated" {
+            value 19;
+            description
+              "Indicates that the board is in the isolated state.";
+          }
+          enum "insufficient-rtu" {
+            value 20;
+            description
+              "When the RTU of a board is insufficient, the board is shut down and restricted to go online.";
+          }
+        }
+        config false;
+        description
+          "The operation status of the board.";
+      }
+      leaf role {
+        type enumeration {
+          enum "unknown" {
+            value 0;
+            description
+              "Unknown.";
+          }
+          enum "master" {
+            value 1;
+            description
+              "Master role.";
+          }
+          enum "standby" {
+            value 2;
+            description
+              "Standby role.";
+          }
+          enum "slave" {
+            value 3;
+            description
+              "Slave role in cluster.";
+          }
+        }
+        config false;
+        description
+          "The role of the board.";
+      }
+      leaf cpu-occupancy {
+        type uint32;
+        config false;
+        description
+          "The CPU usage of the board.";
+      }
+      leaf mem-occupancy {
+        type uint32;
+        config false;
+        description
+          "The mem usage of the board.";
+      }
+      leaf temperature {
+        type int32;
+        units "C";
+        config false;
+        description
+          "The temperature of the board.";
+      }
+      leaf power {
+        type uint32;
+        config false;
+        description
+          "The power of the board.";
+      }
+      leaf last-reset-time {
+        type yang:date-and-time;
+        config false;
+        description
+          "The latest reset time of the board.";
+      }
+      leaf last-reset-reason {
+        type string {
+          length "0..128";
+        }
+        config false;
+        description
+          "The latest reset cause of the board.";
+      }
+      leaf reset-counter {
+        type uint32;
+        config false;
+        description
+          "The counter of board restart is cleared during board initialization, deletion.";
+      }
+      leaf uplink-speed {
+        type uplink-speed-mode;
+        description
+          "Current uplink speed mode.";
+      }
+      leaf clei-code {
+        type string {
+          length "0..640";
+        }
+        config false;
+        description
+          "The cleiCode of the board.
+           Frame CLEI Code (COMMON LANGUAGE Location Identifier Code):
+           Used to identify the location and the type of a telecommunication device.
+           For the definition of the CLEI Code, refer to the GR-485.";
+      }
+    }
+  }
+
+  notification board-discover {
+    description
+      "Automatic discovery of board.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+  }
+  notification board-disappear {
+    description
+      "Automatic discovery of board disappearing.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+  }
+  notification board-add {
+    description
+      "A board is added.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+  }
+  notification board-remove {
+    description
+      "A board is removed.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+  }
+  notification board-modify {
+    description
+      "A board configuration is modify.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+  }
+  notification board-status-change {
+    description
+      "A board status change has been detected.";
+    leaf name {
+      type leafref {
+        path "/boards/board/name";
+      }
+      description
+        "Board name.";
+    }
+    leaf type {
+      type leafref {
+        path "/boards/board/type";
+      }
+      description
+        "Board type.";
+    }
+    leaf oper-status {
+      type leafref {
+        path "/boards/board/oper-status";
+      }
+      description
+        "Board status.";
+    }
+  }
+}

@@ -1,0 +1,248 @@
+module huawei-xpon-sub-interfaces {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-xpon-sub-interfaces";
+  prefix hwxpon-subif;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-if-type {
+    prefix bbfift;
+  }
+  import bbf-sub-interface-tagging {
+    prefix bbf-subif-tag;
+  }
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import bbf-frame-classification {
+    prefix bbf-classif;
+  }
+  import huawei-xpon {
+    prefix hwxpon;
+  }
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     managing huawei-sub-interfaces.";
+
+  revision 2022-09-06 {
+    description
+      "Add the node of tpid-index to support the configuration of uni-tpid and nni-tpid.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-08 {
+    description
+      "Add the node of ont-port to configure a mapping mode of the ONT port.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-01-24 {
+    description
+      "Add a new leaf named flow-car-traffic to support the mapping mode of flow car.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-09-30 {
+    description
+      "Add the node of eth-bundle to support the mapping mode of multiple Ethernet ports.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-08-15 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  grouping ont-push-tag {
+    description
+      "Huawei extend push tag.";
+    container ont-push-tag {
+      description
+        "Configure the number of tags to push (or translate if used in conjunction with pop-tags).";
+      leaf index {
+        type bbf-classif:tag-index;
+        must "count(../../ont-push-tag[index = 0]) > 0" {
+          error-message
+            "An inner tag can only be matched on when also
+                   matching on an outer tag.";
+          description
+            "Only allow matching on an inner tag, if also
+                   matching on the outer tags at the same time.";
+        }
+        description
+          "The index into the tag stack, outermost tag first.";
+      }
+      uses bbf-subif-tag:dot1q-tag;
+    }
+    container tpid-index {
+      description
+        "Configure the indexes for the TPID on the UNI and NNI sides.";
+      leaf uni-tpid-index {
+        type uint8 {
+          range "0..3 | 255";
+        }
+        default "255";
+        description
+          "Indicates the index of UNI TPID.";
+      }
+      leaf nni-tpid-index {
+        type uint8 {
+          range "0..3 | 255";
+        }
+        default "255";
+        description
+          "Indicates the index of NNI TPID.";
+      }
+    }
+  }
+
+  grouping ex-flow-car {
+    description
+      "Config data for huawei extend flow car. The default value is the name with traffic table index 6.";
+    leaf flow-car-traffic {
+      type string {
+        length "1..64";
+      }
+      description
+        "Assigns a traffic table to a flow.";
+    }
+  }
+
+  grouping ont-multiple-vlan-tag-match {
+    description
+      "Flexible match on the VLAN tags of Ethernet frames.";
+    choice ont-vlan-tag-match-type {
+      default "match-all";
+      description
+        "Provides a choice of how the frames may be matched.";
+      case match-all {
+        description
+          "Matches all traffic, i.e; irrespective of the frame being
+           tagged or untagged.";
+        leaf match-all {
+          type empty;
+          description
+            "Matches all traffic, i.e; irrespective of the frame being
+             tagged or untagged.";
+        }
+      }
+      case untagged {
+        description
+          "Untagged match. Matches all untagged traffic.";
+        leaf untagged {
+          type empty;
+          description
+            "Untagged match. Matches all untagged traffic.";
+        }
+        container untag-flow-car {
+          description
+            "Configure a huawei extended traffic table for untag flows.";
+          uses ex-flow-car;
+        }
+      }
+      case vlan-tagged {
+        description
+          "The tags to match, with the outermost tag to match
+           assigned index 0.";
+        container tag {
+          description
+            "Configure the tags to match, with the outermost tag to match
+             assigned index 0.";
+          leaf index {
+            type bbf-classif:tag-index;
+            must "count(../../tag[index = 0]) > 0" {
+              error-message
+                "An inner tag can only be matched on when also
+                 matching on an outer tag.";
+              description
+                "Only allow matching on an inner tag, if also
+                 matching on the outer tags at the same time.";
+            }
+            description
+              "The index into the tag stack, outermost tag first.";
+          }
+          uses bbf-classif:dot1q-tag-ranges-or-any;
+        }
+        container tag-flow-car {
+          description
+            "Configure a huawei extended traffic table for tag flows.";
+          uses ex-flow-car;
+        }
+        container ont-port {
+          description
+            "Configure a mapping mode of the ONT port.";
+          leaf type {
+            type enumeration {
+              enum "eth" {
+                value 47;
+                description
+                  "The value (47) indicates that the port type is ETH.";
+              }
+            }
+            description
+              "This object indicates the port type of the ONT.";
+          }
+          leaf index {
+            type uint8 {
+              range "1..28";
+            }
+            description
+              "This object indicates the port id of the ONT.";
+          }
+        }
+        container eth-bundle {
+          description
+            "Configure the mapping mode of multiple Ethernet ports.";
+          leaf bundle-index {
+            type leafref {
+              path "/if:interfaces/if:interface/bbf-xponani:ani/hwxpon:ont-port-bundle/hwxpon:eth-bundle/hwxpon:bundle-index";
+            }
+            description
+              "Indicates the mapping mode of multiple Ethernet ports.";
+          }
+        }
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria" {
+    when "derived-from-or-self(../../../../../if:type,
+     'bbfift:vlan-sub-interface')" {
+      description
+        "This container collects match criteria for various packet
+         fields.";
+    }
+    description
+      "This container collects match criteria for various packet
+       fields.";
+    uses ont-multiple-vlan-tag-match;
+  }
+  augment "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite" {
+    when "derived-from-or-self(../../../../if:type,
+     'bbfift:vlan-sub-interface')" {
+      description
+        "Augments the general ingress-rewrite container with specific
+         VLAN rewrite actions.";
+    }
+    description
+      "Augments the general ingress-rewrite container with specific
+       VLAN rewrite actions.";
+    uses ont-push-tag;
+  }
+}

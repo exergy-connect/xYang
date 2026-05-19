@@ -1,0 +1,31 @@
+module huawei-ietf-trust-anchors-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-trust-anchors-deviations";
+  prefix ta-devs;
+
+  import ietf-trust-anchors {
+    prefix ta;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ietf-trust-anchors module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/ta:trust-anchors" {
+    deviate not-supported;
+  }
+}

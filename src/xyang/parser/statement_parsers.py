@@ -495,14 +495,18 @@ class StatementParsers:
             context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_config_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse ``config`` substatement; log warning and do not store on AST."""
-        from .unsupported_skip import skip_config_substatement
+    def parse_config(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``config true|false`` (RFC 7950 §7.21.1) into the current parent."""
+        from ..ast import YangRefineStmt, YangStatementWithWhen
 
+        tokens.consume(kw.CONFIG)
+        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
         parent = context.current_parent
-        name = getattr(parent, "name", None) if parent is not None else None
-        ctx = f"{type(parent).__name__}" + (f" '{name}'" if name else "")
-        skip_config_substatement(tokens, context=ctx)
+        if isinstance(parent, YangRefineStmt):
+            parent.refined_config = tt == kw.TRUE
+        elif isinstance(parent, YangStatementWithWhen):
+            parent.config = tt == kw.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_status_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``status`` substatement; consume tokens without storing on AST."""

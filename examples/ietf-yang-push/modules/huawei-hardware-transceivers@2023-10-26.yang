@@ -1,0 +1,651 @@
+module huawei-hardware-transceivers {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-hardware-transceivers";
+  prefix hw-xcvr;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-hardware-transceivers {
+    prefix bbf-hw-xcvr;
+  }
+  import iana-if-type {
+    prefix iana;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains transceivers data.";
+
+  revision 2023-10-26 {
+    description
+      "Modifying SFF8472-version.";
+    reference
+      "";
+  }
+  revision 2023-02-21 {
+    description
+      "Modifying Alarms.";
+    reference
+      "";
+  }
+  revision 2022-06-27 {
+    description
+      "Modifying Alarms.";
+    reference
+      "";
+  }
+  revision 2022-06-15 {
+    description
+      "Add optic module status.";
+    reference
+      "";
+  }
+  revision 2019-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472";
+  }
+
+ 
+
+  feature ex-optic-info {
+    description
+      "Indicates the huawei extended optical modular information.";
+  }
+
+  feature tx-auto-off-config {
+    description
+      "Indicates the huawei extended ethernet optical modular information.";
+  }
+
+  typedef rate-identifier-type {
+    type enumeration {
+      enum "unspecified" {
+        value 0;
+        description
+          "Unspecified.";
+      }
+      enum "rate-id-4g2g1g-as0as1" {
+        value 1;
+        description
+          "4/2/1G Rate_Select & AS0/AS1.";
+      }
+      enum "rate-id-8g4g2g-rx" {
+        value 2;
+        description
+          "8/4/2G Rx Rate_Select only.";
+      }
+      enum "rate-id-8g4g2g-tx" {
+        value 3;
+        description
+          "8/4/2G Tx Rate_Select only.";
+      }
+      enum "rate-id-8g4g2g-rx-tx" {
+        value 4;
+        description
+          "8/4/2G Independent Rx & Tx Rate_select.";
+      }
+      enum "rate-id-16g8g4g-rx" {
+        value 5;
+        description
+          "16/8/4G Rx Rate_select only.";
+      }
+      enum "rate-id-16g8g4g-rx-tx" {
+        value 6;
+        description
+          "16/8/4G Independent Rx, Tx Rate_select.";
+      }
+    }
+    description
+      "The type of rate select functionality.";
+  }
+
+  typedef ext-identifier-type {
+    type enumeration {
+      enum "not-specified-or-not-compliant" {
+        value 0;
+        description
+          "The extend identifier of the optical module is not specified or not compliant with a defined MOD_DEF.";
+      }
+      enum "moddef1" {
+        value 1;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 1.";
+      }
+      enum "moddef2" {
+        value 2;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 2.";
+      }
+      enum "moddef3" {
+        value 3;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 3.";
+      }
+      enum "by-two-wire-only" {
+        value 4;
+        description
+          "The extend identifier of the optical module is compliant with two-wire interface ID only.";
+      }
+      enum "moddef5" {
+        value 5;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 5.";
+      }
+      enum "moddef6" {
+        value 6;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 6.";
+      }
+      enum "moddef7" {
+        value 7;
+        description
+          "The extend identifier of the optical module is compliant with MOD_DEF 7.";
+      }
+      enum "by-serial-id-only" {
+        value 8;
+        description
+          "The extended identifier of optical module is by serial ID only.";
+      }
+      enum "power-class1" {
+        value 9;
+        description
+          "The extended identifier of optical module is power class 1 (1.5 W max.).";
+      }
+      enum "power-class2" {
+        value 10;
+        description
+          "The extended identifier of optical module is Power Class 2 (2.0 W max.).";
+      }
+      enum "power-class3" {
+        value 11;
+        description
+          "The extended identifier of optical module is Power Class 3 (2.5 W max.).";
+      }
+      enum "power-class4" {
+        value 12;
+        description
+          "The extended identifier of optical module is Power Class 4 (3.5 W max.).";
+      }
+      enum "power-class5" {
+        value 13;
+        description
+          "The extended identifier of optical module is Power Class 5 (4.0 W max.).";
+      }
+      enum "power-class6" {
+        value 14;
+        description
+          "The extended identifier of optical module is Power Class 6 (4.5 W max.).";
+      }
+      enum "power-class7" {
+        value 15;
+        description
+          "The extended identifier of optical module is Power Class 7 (5.0 W max.).";
+      }
+    }
+    description
+      "Indicates the extended identifier of optical module.";
+  }
+
+  typedef sff8472-version {
+    type enumeration {
+      enum "sff8472-v93" {
+        value 0;
+        description
+          "Includes functionality described in SFF-8472 Rev 9.3.";
+      }
+      enum "sff8472-v95" {
+        value 1;
+        description
+          "Includes functionality described in SFF-8472 Rev 9.5.";
+      }
+      enum "sff8472-v102" {
+        value 2;
+        description
+          "Includes functionality described in SFF-8472 Rev 10.2.";
+      }
+      enum "sff8472-v104" {
+        value 3;
+        description
+          "Includes functionality described in SFF-8472 Rev 10.4.";
+      }
+      enum "sff8472-v110" {
+        value 4;
+        description
+          "Includes functionality described in SFF-8472 Rev 11.0.";
+      }
+      enum "undefined" {
+        value 5;
+        description
+          "Not included or undefined.";
+      }
+      enum "sff8472-v113" {
+        value 6;
+        description
+          "Includes functionality described in SFF-8472 Rev 11.3.";
+      }
+      enum "sff8472-v114" {
+        value 7;
+        description
+          "Includes functionality described in SFF-8472 Rev 11.4.";
+      }
+      enum "sff8472-v123" {
+        value 8;
+        description
+          "Includes functionality described in SFF-8472 Rev 12.3.";
+      }
+      enum "sff8472-v124" {
+        value 9;
+        description
+          "Includes functionality described in SFF-8472 Rev 12.4.";
+      }
+    }
+    description
+      "Indicates the SFF-8472 standard.";
+  }
+
+  typedef encoding-type {
+    type enumeration {
+      enum "unspecified" {
+        value 0;
+        description
+          "Unspecified.";
+      }
+      enum "encoding-8b10b" {
+        value 1;
+        description
+          "8B/10B encoding.";
+      }
+      enum "encoding-4b5b" {
+        value 2;
+        description
+          "4B/5B encoding.";
+      }
+      enum "encoding-nrz" {
+        value 3;
+        description
+          "NRZ encoding.";
+      }
+      enum "encoding-manchester" {
+        value 4;
+        description
+          "Manchester encoding.";
+      }
+      enum "encoding-sonet-scrambled" {
+        value 5;
+        description
+          "SONET Scrambled encoding.";
+      }
+      enum "encoding-64b66b" {
+        value 6;
+        description
+          "64B/66B encoding.";
+      }
+    }
+    description
+      "Indicates the code for serial encoding algorithm.";
+  }
+
+  grouping ex-transceiver {
+    description
+      "Huawei extend optical transceiver data.";
+    leaf vendor-name {
+      type string {
+        length "0..17";
+      }
+      config false;
+      description
+        "Indicates the vendor name. SFF 8472:Vendor name.";
+    }
+    leaf vendor-rev {
+      type string {
+        length "0..5";
+      }
+      config false;
+      description
+        "Indicates the vendor rev. SFF 8472:Vendor rev.";
+    }
+    leaf vendor-oui {
+      type binary {
+        length "3";
+      }
+      config false;
+      description
+        "Indicates the vendor OUI. SFF 8472:Vendor OUI.";
+    }
+    leaf vendor-pn {
+      type string {
+        length "0..17";
+      }
+      config false;
+      description
+        "Indicates the vendor PN. SFF 8472:Vendor PN.";
+    }
+    leaf vendor-sn {
+      type string {
+        length "0..17";
+      }
+      config false;
+      description
+        "Indicates the vendor SN. SFF 8472:Vendor SN.";
+    }
+    leaf date-code {
+      type string {
+        length "0..9";
+      }
+      config false;
+      description
+        "Indicates the date code. SFF 8472 :Date code.";
+    }
+    leaf vendor-specific {
+      type binary {
+        length "32";
+      }
+      config false;
+      description
+        "Indicates the vendor specific. SFF 8472:Vendor Specific.";
+    }
+    leaf sff8472-compliance {
+      type sff8472-version;
+      config false;
+      description
+        "Indicates the SFF-8472 standard version. SFF 8472:SFF-8472 Compliance.";
+    }
+    leaf rate-identifier {
+      type rate-identifier-type;
+      config false;
+      description
+        "The type of rate select functionality. SFF 8472:Rate Identifier.";
+    }
+    leaf ext-identifier {
+      type ext-identifier-type;
+      config false;
+      description
+        "The extend identifier of the optical module. SFF 8472:Extension Identifier.";
+    }
+    leaf encoding {
+      type encoding-type;
+      config false;
+      description
+        "The code for serial encoding algorithm. SFF 8472:Extension Encoding.";
+    }
+    leaf length-50um {
+      type uint32;
+      units "1 m";
+      config false;
+      description
+        "Link length supported for 50/125 um fiber. SFF 8472:Extension Length (50um).";
+    }
+    leaf length-62p5um {
+      type uint32;
+      units "1 m";
+      config false;
+      description
+        "Link length supported for 62.5/125 um fiber. SFF 8472:Length (62.5um).";
+    }
+    leaf length-copper {
+      type uint32;
+      units "1 m";
+      config false;
+      description
+        "Link length supported for copper. SFF 8472:Length (OM4 or copper cable).";
+    }
+    leaf length-50um-om3 {
+      type uint32;
+      units "10 m";
+      config false;
+      description
+        "Link length supported for 50 um OM3 fiber. SFF 8472:Length (OM3).";
+    }
+    leaf br-max {
+      type uint32;
+      units "100 Mbit/s";
+      config false;
+      description
+        "Maximum bit rate. SFF 8472:BR, maxn.";
+    }
+    leaf br-min {
+      type uint32;
+      units "100 Mbit/s";
+      config false;
+      description
+        "Minimum bit rate. SFF 8472:BR, min.";
+    }
+    leaf options {
+      type bits {
+        bit cooled-laser-temp {
+          description
+            "Value of zero identifies a conventional uncooled (or unspecified) laser implementation.
+             Value of one identifies a cooled laser transmitter implementation [A0=64, bit 2].";
+        }
+        bit power-level-req {
+          description
+            "Value of zero identifies Power Level 1 (or unspecified) requirements.
+             Value of one identifies Power Level 2 requirement. [A0=64, bit 1].";
+        }
+        bit liner-rcv-output {
+          description
+            "Value of zero identifies a conventional limiting (or unspecified) receiver output.
+             Value of one identifies a linear receiver output. [A0=64, bit 0].";
+        }
+        bit rate-select {
+          description
+            "Value of one indicates RATE_SELECT functionality is implemented.[A0=65, bit 5].";
+        }
+        bit tx-disable {
+          description
+            "Value of one indicates TX_DISABLE is implemented and disables the high speed serial output. [A0=65, bit 4].";
+        }
+        bit tx-fault {
+          description
+            "Value of one indicates TX_FAULT signal implemented.[A0=65, bit 3].";
+        }
+        bit signal-detect {
+          description
+            "Value of one indicates Loss of Signal implemented, signal inverted from standard definition in SFP MSA. [A0=65, bit 2].";
+        }
+        bit rx-los {
+          description
+            "Value of one indicates Loss of Signal implemented, signal as defined in SFP MSA.[A0=65, bit 1].";
+        }
+      }
+      config false;
+      description
+        "Transceiver options.";
+    }
+    leaf enhance-options {
+      type bits {
+        bit alarm-flag {
+          description
+            "Value of one indicates optional Alarm/warning flags implemented for all monitored quantities [A0=93, bit 7].";
+        }
+        bit soft-tx-disable-ind {
+          description
+            "Value of one indicates optional soft TX_DISABLE control and monitoring implemented [A0=93, bit 6].";
+        }
+        bit soft-tx-fault-ind {
+          description
+            "Value of one indicates optional soft TX_FAULT monitoring implemented [A0=93, bit 5].";
+        }
+        bit soft-rx-los-ind {
+          description
+            "Value of one indicates optional soft RX_LOS monitoring implemented [A0=93, bit 4].";
+        }
+        bit soft-rate-select-ind {
+          description
+            "Value of one indicates optional soft RATE_SELECT control and monitoring implemented.[A0=65, bit 3].";
+        }
+        bit app-sel-8079-ind {
+          description
+            "Value of one indicates optional Application Select control implemented per SFF-8079. [A0=65, bit 2].";
+        }
+        bit rate-sel-8431-ind {
+          description
+            "Value of one indicates optional soft Rate Select control implemented per SFF-8431. [A0=65, bit 1].";
+        }
+        bit vps {
+          description
+            " Module Supports Optional VPS.";
+        }
+        bit soft-p-down-ind {
+          description
+            " Optional Soft P_down implemented.";
+        }
+        bit vps-lv {
+          description
+            " Supports VPS LV regulator mode.";
+        }
+        bit vps-by-pass {
+          description
+            " Supports VPS bypassed regulator Mode.";
+        }
+        bit fec-ind {
+          description
+            " Active FEC control functions implemented.";
+        }
+        bit wti-ind {
+          description
+            " Wavelength tunability implemented.";
+        }
+        bit cmu {
+          description
+            " Optional CMU Support Mode.";
+        }
+      }
+      config false;
+      description
+        "Enhanced options.";
+    }
+  }
+
+  grouping tx-auto-off-config-data {
+    description
+      "The tx power auto off configuration of the interface.";
+    container tx-auto-off-config {
+      description
+        "Configure the tx power auto off of the interface.";
+      leaf switch {
+        type enumeration {
+          enum "enable" {
+            value 0;
+            description
+              "Enable tx auto power off.";
+          }
+          enum "disable" {
+            value 1;
+            description
+              "Disable tx auto power off.";
+          }
+        }
+        default "disable";
+        description
+          "Tx auto power off switch.";
+      }
+      leaf detect-time {
+        type int32 {
+          range "1..60";
+        }
+        units "min";
+        default "10";
+        description
+          "If the port cannot receive any optical signal in a period time, the port will stop transmitting optical signals.";
+      }
+      leaf resume-detect {
+        type enumeration {
+          enum "manual" {
+            value 0;
+            description
+              "Tx power resume detection manually.";
+          }
+          enum "auto" {
+            value 1;
+            description
+              "Tx power resume detection automatically.";
+          }
+        }
+        default "manual";
+        description
+          "Indicates the switch of Tx auto power resume detection.";
+      }
+      leaf resume-detect-interval {
+        type int32 {
+          range "100..300";
+        }
+        units "s";
+        default "100";
+        description
+          "Indicates the interval at which the port automatically transmits optical signals.";
+      }
+      leaf resume-detect-duration {
+        type int32 {
+          range "100..3000";
+        }
+        units "ms";
+        default "2000";
+        description
+          "Indicates the pulse width of the optical signal.";
+      }
+    }
+  }
+
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    if-feature "ex-optic-info";
+    description
+      "Huawei extend transceiver information.";
+    uses ex-transceiver;
+    container optical-module-status {
+      config false;
+      description
+        "Operational state of the optic module status.";
+      leaf optic-status {
+        type enumeration {
+          enum "normal" {
+            value 1;
+            description
+              "The optical module working status is normal.";
+          }
+          enum "abnormal" {
+            value 2;
+            description
+              "The optical module working status is abnormal.";
+          }
+          enum "absence" {
+            value 3;
+            description
+              "Indicates the status of the optical module is offline.";
+          }
+          enum "mismatch" {
+            value 4;
+            description
+              "Indicates the status of the optical module is mismatch.";
+          }
+        }
+        description
+          "Configure the state of optic module status.";
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface" {
+    when "if:type = 'iana:ethernetCsmacd'";
+    if-feature "tx-auto-off-config";
+    description
+      "ETH optic tx auto shutdown configuration data.";
+    uses tx-auto-off-config-data;
+  }
+}

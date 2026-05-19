@@ -1,0 +1,163 @@
+module bbf-application-policy-profile {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-application-policy-profile";
+  prefix bbf-app-profile;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import bbf-application {
+    prefix bbf-app;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     Editor:      He Wenzhong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module defines the configuration of the application policy
+     profile.";
+
+  revision 2025-05-15 {
+    description
+      "Refined the node definitions by specifying its range and uints;
+       renamed upstream-priority to upstream-vlan-priority; add a new
+       container 'downstream-rate' in list application-profile.";
+  }
+  revision 2025-01-31 {
+    description
+      "Initial revision.";
+  }
+
+  augment "/bbf-app:applications" {
+    description
+      "Describes the application configuration.";
+    list application-profile {
+      key "name";
+      description
+        "Indicates the configuration of the application policy
+         profile.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Indicates the name of the application policy profile.";
+      }
+      leaf upstream-vlan-priority {
+        type uint8 {
+          range "0..7";
+        }
+        description
+          "Indicates the upstream QoS priority of the uplink port.";
+      }
+      leaf upstream-dscp-remark {
+        type inet:dscp;
+        description
+          "Indicates the upstream DSCP value that needs to be
+           re-marked.";
+      }
+      leaf downstream-dscp-remark {
+        type inet:dscp;
+        description
+          "Indicates the downstream DSCP value that needs to be
+           re-marked.";
+      }
+      leaf extra-dba-bandwidth {
+        type uint32 {
+          range "128..50000000";
+        }
+        units "kbps";
+        description
+          "Used to add additional DBA bandwidth";
+      }
+      container downstream-rate {
+        description
+          "Configure the rate parameters.";
+        choice rate {
+          mandatory true;
+          description
+            "Cir OFF or ON can be chosen.";
+          case off {
+            description
+              "Rate limit is disable.";
+            leaf cir-off {
+              type empty;
+              description
+                "Indicates CIR is off.";
+            }
+          }
+          case on {
+            description
+              "Rate limit is on.";
+            leaf cir {
+              type uint32 {
+                range "64..102400000";
+              }
+              units "kbps";
+              mandatory true;
+              description
+                "Committed Information Rate.";
+            }
+            leaf pir {
+              type uint32 {
+                range "64..102400000";
+              }
+              units "kbps";
+              must ". >= ../cir" {
+                error-message
+                  "PIR must be greater than or equal to CIR.";
+              }
+              description
+                "Peak Information Rate.";
+            }
+          }
+        }
+      }
+      container onu-qoe {
+        description
+          "Indicates the application flow configuration of the ONT.";
+        leaf station-upstream-bandwidth {
+          type uint32 {
+            range "1..100";
+          }
+          units "Mbps";
+          description
+            "Indicates the upstream bandwidth of the ONT for the
+             traffic of the application program used by the station.";
+        }
+        leaf station-downstream-bandwidth {
+          type uint32 {
+            range "1..100";
+          }
+          units "Mbps";
+          description
+            "Indicates the downstream bandwidth of the ONT for the
+             traffic of the application program used by the station.";
+        }
+        leaf target-latency {
+          type uint32 {
+            range "1..200";
+          }
+          units "ms";
+          description
+            "Indicates the target delay of an application.";
+        }
+      }
+    }
+  }
+}

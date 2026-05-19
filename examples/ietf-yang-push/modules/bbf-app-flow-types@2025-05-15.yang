@@ -1,0 +1,74 @@
+module bbf-app-flow-types {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-app-flow-types";
+  prefix bbf-app-flow-types;
+
+  import bbf-if-type {
+    prefix bbfift;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Lin Kangwen, Huawei
+
+     Editor:      Cao Qizheng, Huawei
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     Editor:      He Wenzhong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains APP(application) flow types.";
+
+  revision 2025-05-15 {
+    description
+      "Modify app-identify-traffic-optimize to
+       app-identify-traffic-assure.";
+  }
+  revision 2025-03-28 {
+    description
+      "Add identifiers app-identify-policy, app-identify-traffic-limit
+       , and app-identify-traffic-optimize.";
+  }
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity app-flow {
+    base bbfift:bbf-interface-type;
+    description
+      "Application flow type.";
+  }
+
+  identity app-identify-policy {
+    description
+      "Application Identification Traffic Policy";
+  }
+
+  identity app-identify-traffic-limit {
+    base app-identify-policy;
+    description
+      "Application identification traffic limit";
+  }
+
+  identity app-identify-traffic-assure {
+    base app-identify-policy;
+    description
+      "Application identification traffic assurance";
+  }
+}

@@ -1,0 +1,54 @@
+module huawei-bbf-l2-dhcpv4-relay-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-l2-dhcpv4-relay-deviations";
+  prefix bbf-l2-d4r-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-l2-dhcpv4-relay {
+    prefix bbf-l2-d4r;
+  }
+  import bbf-l2-forwarding {
+    prefix bbf-l2-fwd;
+  }
+  import bbf-l2-dhcpv4-relay-forwarding {
+    prefix bbf-l2-d4r-fwd;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This is a deviation for bbf-l2-dhcpv4-relay module.";
+
+  revision 2024-06-03 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-l2-d4r:l2-dhcpv4-relay/bbf-l2-d4r:enable" {
+    deviate replace {
+      default "true";
+    }
+  }
+  deviation "/bbf-l2-d4r:l2-dhcpv4-relay-profiles" {
+    deviate not-supported;
+  }
+  deviation "/bbf-l2-fwd:forwarding/bbf-l2-fwd:forwarders/bbf-l2-fwd:forwarder/bbf-l2-d4r-fwd:l2-dhcpv4-relay/bbf-l2-d4r-fwd:downstream-broadcast-flooding" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-l2-d4r:l2-dhcpv4-relay/bbf-l2-d4r:profile-ref" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:statistics/bbf-l2-d4r:dhcpv4" {
+    deviate not-supported;
+  }
+}

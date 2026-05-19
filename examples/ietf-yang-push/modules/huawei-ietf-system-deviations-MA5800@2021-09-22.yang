@@ -1,0 +1,80 @@
+module huawei-ietf-system-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-ietf-system-deviations-MA5800";
+  prefix sys-devs-MA5800;
+
+  import ietf-system {
+    prefix sys;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ietf-system module.";
+
+  revision 2021-09-22 {
+    description
+      "Init revision";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sys:system/sys:authentication/sys:user-authentication-order" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:authentication/sys:user/sys:authorized-key/sys:key-data" {
+    deviate replace {
+      type string {
+        length "1..4096";
+      }
+    }
+  }
+  deviation "/sys:set-current-datetime" {
+    deviate not-supported;
+  }
+  deviation "/sys:system/sys:clock/sys:timezone/sys:timezone-utc-offset/sys:timezone-utc-offset" {
+    deviate replace {
+      type int16 {
+        range "-1080..1080";
+      }
+    }
+  }
+  deviation "/sys:system/sys:clock/sys:timezone/sys:timezone-utc-offset/sys:timezone-utc-offset" {
+    deviate add {
+      default "480";
+    }
+  }
+  deviation "/sys:system/sys:clock/sys:timezone" {
+    deviate add {
+      default "timezone-utc-offset";
+    }
+  }
+  deviation "/sys:system/sys:authentication/sys:user" {
+    deviate add {
+      max-elements 128;
+    }
+  }
+  deviation "/sys:system/sys:authentication/sys:user/sys:password" {
+    deviate replace {
+      type string {
+        pattern "$0$.*|$1$[a-zA-Z0-9./]{1,8}$[a-zA-Z0-9./]{22}|$5$(rounds=\\d+$)?[a-zA-Z0-9./]{1,16}$[a-zA-Z0-9./]{43}|$6$(rounds=\\d+$)?[a-zA-Z0-9./]{1,16}$[a-zA-Z0-9./]{86}|$3b$.*";
+      }
+    }
+  }
+  deviation "/sys:system/sys:hostname" {
+    deviate replace {
+      type string {
+        length "1..50";
+      }
+    }
+  }
+  deviation "/sys:system/sys:clock/sys:timezone/sys:timezone-name" {
+    deviate not-supported;
+  }
+}

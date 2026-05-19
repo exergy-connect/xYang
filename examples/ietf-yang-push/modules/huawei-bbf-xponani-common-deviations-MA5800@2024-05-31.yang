@@ -1,0 +1,60 @@
+module huawei-bbf-xponani-common-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-xponani-common-deviations-MA5800";
+  prefix bbf-xponani-common-devs-MA5800;
+
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xponani-power-management {
+    prefix bbf-xponani-pwr;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xponani module.";
+
+  revision 2024-05-31 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-xponani:ani/bbf-xponani:management-gemport-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponani:ani/bbf-xponani:onu-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponani:ani/bbf-xponani:management-gemport-aes-indicator" {
+    deviate replace {
+      default "true";
+    }
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponani:onu-v-vrefpoint/bbf-xponani:related-onu" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani:onu-serial-number" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani:management-tcont-alloc-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani:management-gemport-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xponani:ani/bbf-xponani:active-defects" {
+    deviate not-supported;
+  }
+}

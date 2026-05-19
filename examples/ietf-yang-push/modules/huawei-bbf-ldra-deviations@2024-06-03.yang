@@ -1,0 +1,50 @@
+module huawei-bbf-ldra-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-ldra-deviations";
+  prefix bbf-ldra-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-ldra {
+    prefix bbf-ldra;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This is a deviation for bbf-ldra module.";
+
+  revision 2024-06-03 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-ldra:dhcpv6-ldra/bbf-ldra:enable" {
+    deviate replace {
+      default "true";
+    }
+  }
+  deviation "/if:interfaces/if:interface/bbf-ldra:dhcpv6-ldra/bbf-ldra:trusted-port" {
+    deviate replace {
+      default "true";
+    }
+  }
+  deviation "/if:interfaces/if:interface/bbf-ldra:dhcpv6-ldra/bbf-ldra:profile-ref" {
+    deviate not-supported;
+  }
+  deviation "/bbf-ldra:dhcpv6-ldra-profiles" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:statistics/bbf-ldra:dhcpv6-ldra" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,74 @@
+module huawei-ietf-subscribed-notifications-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-subscribed-notifications-deviations";
+  prefix sn-devs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-subscribed-notifications data
+     model set for Huawei devices.";
+
+  revision 2024-10-16 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sn:streams/sn:stream/sn:name" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+  deviation "/sn:filters/sn:stream-filter/sn:name" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+  deviation "/sn:filters/sn:stream-filter/sn:filter-spec/sn:stream-xpath-filter/sn:stream-xpath-filter" {
+    deviate replace {
+      type yang:xpath1.0 {
+        length "0..2560";
+      }
+    }
+  }
+  deviation "/sn:subscriptions/sn:subscription/sn:target/sn:stream/sn:stream-filter/sn:within-subscription/sn:filter-spec/sn:stream-xpath-filter/sn:stream-xpath-filter" {
+    deviate replace {
+      type yang:xpath1.0 {
+        length "0..2560";
+      }
+    }
+  }
+  deviation "/sn:subscriptions/sn:subscription/sn:purpose" {
+    deviate replace {
+      type string {
+        length "0..254";
+      }
+    }
+  }
+  deviation "/sn:subscriptions/sn:subscription/sn:receivers/sn:receiver/sn:name" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+}

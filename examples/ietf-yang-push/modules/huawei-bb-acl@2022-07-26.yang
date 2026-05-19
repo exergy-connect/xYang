@@ -1,0 +1,281 @@
+module huawei-bb-acl {
+  namespace "urn:huawei:yang:huawei-bb-acl";
+  prefix hw-bb-acl;
+
+  import huawei-acl {
+    prefix acl;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private YANG module is a supplement to the huawei-acl.yang, describing
+     the configuration and operational model for user rule.";
+
+  revision 2022-07-26 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef rule-action {
+    type enumeration {
+      enum "permit" {
+        value 0;
+        description
+          "Permit packets.";
+      }
+      enum "deny" {
+        value 1;
+        description
+          "Deny packets.";
+      }
+    }
+    description
+      "Matching mode of basic ACL rules. The available options are permit and deny.";
+  }
+
+  augment "/acl:acl/acl:groups/acl:group" {
+    when "(acl:type = 'user')";
+    description
+      "Extend ACL number or name attribute to the OLT product. An ACL number ranges from 1000 to 10999 or 23000 to 23999. An ACL name must start with a letter or a digital, spaces not supported, and can not be a number. The number of an interface-based ACL ranges from 1000 to 1999. The number of a basic ACL ranges from 2000 to 2999. The number of an advanced ACL ranges from 3000 to 3999, and an advanced ACL can start with a letter. The number of an Ethernet frame header-based ACL ranges from 4000 to 4999. The number of a user-defined ACL ranges from 5000 to 5999. The number of an UCL ranges from 6000 to 9999. The number of an MPLS-based ACL ranges from 10000 to 10999. The number of an ARP-based ACL ranges from 23000 to 23999.";
+    container bb-acl {
+      description
+        "Configure attributes specific to the OLT product.";
+      container rule-users {
+        when "(../../acl:type = 'user')";
+        description
+          "List of user ACL rules. The USER ACL rule group where these rules reside is of the numeric type, with the value ranging from 5000 to 5999.";
+        list rule-user {
+          key "name";
+          unique "id";
+          description
+            "Configure user ACL rule, used to permit or deny packets. Other features can use the ACL control by referring to the rule group.";
+          leaf name {
+            type string {
+              length "1..32";
+              pattern "[^\\s\\?]*";
+            }
+            description
+              "Name of a user ACL rule. The rule name can be a number or character string without spaces, but cannot start with an underscore (_).";
+          }
+          leaf id {
+            when "../../../../acl:match-order = 'config'";
+            type uint32 {
+              range "0..4294967294";
+            }
+            mandatory true;
+            description
+              "ID of an user ACL rule in configuration mode.";
+          }
+          leaf action {
+            type rule-action;
+            mandatory true;
+            description
+              "Matching mode of ACL rules. The available options are permit and deny.";
+          }
+          leaf rule-string1 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the first bytes of packets.";
+          }
+          leaf rule-string1-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset1 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The first offset of the user-defined ACL rule.";
+          }
+          leaf rule-string2 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the second bytes of packets.";
+          }
+          leaf rule-string2-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset2 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The second offset of the user-defined ACL rule.";
+          }
+          leaf rule-string3 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the third bytes of packets.";
+          }
+          leaf rule-string3-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset3 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The third offset of the user-defined ACL rule.";
+          }
+          leaf rule-string4 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the forth bytes of packets.";
+          }
+          leaf rule-string4-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset4 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The forth offset of the user-defined ACL rule.";
+          }
+          leaf rule-string5 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the fifth bytes of packets.";
+          }
+          leaf rule-string5-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset5 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The fifth offset of the user-defined ACL rule.";
+          }
+          leaf rule-string6 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the sixth bytes of packets.";
+          }
+          leaf rule-string6-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset6 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The sixth offset of the user-defined ACL rule.";
+          }
+          leaf rule-string7 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the seventh bytes of packets.";
+          }
+          leaf rule-string7-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset7 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The seventh offset of the user-defined ACL rule.";
+          }
+          leaf rule-string8 {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The character string of a user-defined ACL rule. It is used to match the eighth bytes of packets.";
+          }
+          leaf rule-string8-mask {
+            type string {
+              length "2..8";
+              pattern "[a-fA-F0-9]{2,8}";
+            }
+            description
+              "The mask of the user-defined ACL rule. It is a positive mask.";
+          }
+          leaf offset8 {
+            type uint32 {
+              range "0..79";
+            }
+            description
+              "The eighth offset of the user-defined ACL rule.";
+          }
+          leaf priority {
+            type uint32 {
+              range "0..9";
+            }
+            default "0";
+            description
+              "Priority of a user ACL rule.";
+          }
+        }
+      }
+    }
+  }
+}

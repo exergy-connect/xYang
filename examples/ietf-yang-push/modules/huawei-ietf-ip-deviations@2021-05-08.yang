@@ -1,0 +1,55 @@
+module huawei-ietf-ip-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-ip-deviations";
+  prefix hw-ietf-ip-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-ip {
+    prefix ip;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for managing network interfaces.";
+
+  revision 2021-05-08 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/ip:ipv4/ip:enabled" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ip:ipv4/ip:forwarding" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ip:ipv4/ip:mtu" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ip:ipv4/ip:neighbor" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ip:ipv6" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/ip:ipv4" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/ip:ipv6" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ip:ipv4/ip:address/ip:subnet/ip:prefix-length" {
+    deviate not-supported;
+  }
+}

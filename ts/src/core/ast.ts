@@ -91,11 +91,14 @@ export class YangStatementWithMust extends YangStatement {
 export class YangStatementWithWhen extends YangStatement {
   when?: YangWhenStmt;
   if_features: string[];
+  /** RFC 7950 §7.21.1; undefined means inherit from parent. */
+  config?: boolean;
 
   constructor(init: Partial<YangStatementWithWhen> = {}) {
     super(init);
     this.when = init.when;
     this.if_features = init.if_features ?? [];
+    this.config = init.config;
   }
 
   override get_schema_node(): string | undefined {
@@ -430,6 +433,7 @@ export class YangRefineStmt extends YangStatementWithMust {
   max_elements?: number;
   refined_defaults: unknown[];
   refined_mandatory?: boolean;
+  refined_config?: boolean;
   if_features: string[];
 
   constructor(init: Partial<YangRefineStmt> = {}) {
@@ -441,6 +445,7 @@ export class YangRefineStmt extends YangStatementWithMust {
     this.max_elements = init.max_elements;
     this.refined_defaults = init.refined_defaults ?? [];
     this.refined_mandatory = init.refined_mandatory;
+    this.refined_config = init.refined_config;
     this.if_features = init.if_features ?? [];
   }
 }

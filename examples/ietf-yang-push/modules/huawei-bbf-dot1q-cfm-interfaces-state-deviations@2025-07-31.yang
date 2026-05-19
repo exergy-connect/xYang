@@ -1,0 +1,34 @@
+module huawei-bbf-dot1q-cfm-interfaces-state-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-dot1q-cfm-interfaces-state-deviations";
+  prefix hw-cfm-ifstat-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-dot1q-cfm-interfaces-state {
+    prefix bbf-cfm-if-s;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-dot1q-cfm-interfaces-state module.";
+
+  revision 2025-07-31 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces-state/if:interface/bbf-cfm-if-s:cfm-stack" {
+    deviate not-supported;
+  }
+}

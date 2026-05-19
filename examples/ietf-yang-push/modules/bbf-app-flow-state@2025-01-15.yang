@@ -1,0 +1,83 @@
+module bbf-app-flow-state {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-app-flow-state";
+  prefix bbf-app-flow-state;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-app-flow-types {
+    prefix bbf-app-flow-types;
+  }
+  import bbf-yang-types {
+    prefix bbf-yang;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Lin Kangwen, Huawei
+
+     Editor:      Cao Qizheng, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains states of application flow.";
+
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  augment "/if:interfaces-state/if:interface" {
+    description
+      "Indicates the state of a application flow.";
+    container app-flow-statistics {
+      when "derived-from-or-self(../if:type, 'bbf-app-flow-types:app-flow')";
+      description
+        "Indicates the statistics of the application flow.";
+      container app-flow-traffic {
+        description
+          "Indicates the traffic statistics of the application flow.";
+        leaf in-pkts {
+          type bbf-yang:performance-counter64;
+          units "frames";
+          description
+            "The total number of frames received on the application
+             flow.";
+        }
+        leaf out-pkts {
+          type bbf-yang:performance-counter64;
+          units "frames";
+          description
+            "The total number of frames transmitted out of the
+             application flow.";
+        }
+        leaf in-octets {
+          type bbf-yang:performance-counter64;
+          description
+            "The total number of octets received on the application
+             flow, including framing characters.";
+        }
+        leaf out-octets {
+          type bbf-yang:performance-counter64;
+          description
+            "The total number of octets transmitted out of the
+             application flow, including framing characters.";
+        }
+      }
+    }
+  }
+}

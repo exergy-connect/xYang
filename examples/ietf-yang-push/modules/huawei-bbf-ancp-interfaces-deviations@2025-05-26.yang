@@ -1,0 +1,40 @@
+module huawei-bbf-ancp-interfaces-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-ancp-interfaces-deviations";
+  prefix hw-bbf-ancp-if-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-ancp {
+    prefix bbf-ancp;
+  }
+  import bbf-ancp-interfaces {
+    prefix bbf-ancp-if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-ancp-interfaces module.";
+
+  revision 2025-05-26 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-ancp-if:ancp" {
+    deviate not-supported;
+  }
+  deviation "/bbf-ancp:ancp/bbf-ancp:partitions/bbf-ancp:partition/bbf-ancp:sessions/bbf-ancp:session/bbf-ancp:statistics/bbf-ancp-if:access-lines" {
+    deviate not-supported;
+  }
+}

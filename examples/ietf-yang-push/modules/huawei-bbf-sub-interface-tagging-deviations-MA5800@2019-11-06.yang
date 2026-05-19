@@ -1,0 +1,52 @@
+module huawei-bbf-sub-interface-tagging-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-sub-interface-tagging-deviations-MA5800";
+  prefix bbf-subif-tag-devs-MA5800;
+
+  import bbf-sub-interface-tagging {
+    prefix bbf-subif-tag;
+  }
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-sub-interface-tagging module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/bbf-subif-tag:frame-filter/bbf-subif-tag:destination-mac-address" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/bbf-subif-tag:frame-filter/bbf-subif-tag:destination-ipv4-address" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/bbf-subif-tag:frame-filter/bbf-subif-tag:destination-ipv6-address" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/bbf-subif-tag:vlan-tag-match-type" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/bbf-subif-tag:ethernet-frame-type" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/bbf-subif-tag:push-tag" {
+    deviate not-supported;
+  }
+}

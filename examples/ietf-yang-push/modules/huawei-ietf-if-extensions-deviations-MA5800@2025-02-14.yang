@@ -1,0 +1,61 @@
+module huawei-ietf-if-extensions-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-ietf-if-extensions-deviations-MA5800";
+  prefix if-ext-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-if-extensions {
+    prefix if-ext;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ietf-if-extensions module.";
+
+  revision 2025-02-14 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/if-ext:link-flap-suppression" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:dampening" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:encapsulation" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:loopback" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:max-frame-size" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:forwarding-mode" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:peer-interface" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if-ext:parent-interface" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if:statistics/if-ext:in-discard-overflows" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if:statistics/if-ext:in-discard-unknown-encaps" {
+    deviate not-supported;
+  }
+}

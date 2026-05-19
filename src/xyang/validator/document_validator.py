@@ -39,6 +39,11 @@ from ..ast import (
     YangStatementWithMust,
     YangStatementWithWhen,
 )
+from ..encoding.rfc7951 import (
+    instance_member_keys,
+    instance_member_lookup,
+    instance_member_present,
+)
 from ..module import YangModule
 from ..xpath.evaluator import XPathEvaluator
 from ..xpath.node import Context, Node
@@ -150,17 +155,24 @@ class DocumentValidator:
         feats = getattr(stmt, "if_features", None) or []
         return stmt_if_features_satisfied(feats, self._if_feature_module, self._enabled_features)
 
-    def _effective_value(self, data: Dict[str, Any], name: str, stmt: YangStatement) -> Any:
+    def _encoding_parent_module(self) -> str:
+        """Module name for RFC 7951 member encoding of children under the current subtree."""
+        if isinstance(self._root_schema, YangModule):
+            return self._root_schema.name
+        return ""
+
+    def _effective_value(self, data: Dict[str, Any], stmt: YangStatement) -> Any:
         """
         Return the effective value for a node:
-        - data[name] if present
+        - instance JSON value if present (local or ``module:`` qualified)
         - SchemaNav.default(stmt) if absent and a default exists
         - None if truly absent
 
         Does not modify data.
         """
-        if name in data:
-            return data[name]
+        val, _key = instance_member_lookup(data, stmt, self._encoding_parent_module())
+        if _key is not None:
+            return val
         return SchemaNav.default(stmt)
 
     def _child_enforce_mandatory_choice(self, owner: YangStatementList, parent_enforce: bool) -> bool:
@@ -185,16 +197,19 @@ class DocumentValidator:
 
     def _statement_has_matching_data(self, stmt: YangStatement, data: dict[str, Any]) -> bool:
         """True if this statement (or a nested choice branch) has a key in ``data``."""
-        if isinstance(stmt, YangLeafStmt):
-            return stmt.name in data
-        if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
-            return stmt.name in data
-        if isinstance(stmt, YangLeafListStmt):
-            return stmt.name in data
-        if isinstance(stmt, YangContainerStmt):
-            return stmt.name in data
-        if isinstance(stmt, YangListStmt):
-            return stmt.name in data
+        parent_mod = self._encoding_parent_module()
+        if isinstance(
+            stmt,
+            (
+                YangLeafStmt,
+                YangAnydataStmt,
+                YangAnyxmlStmt,
+                YangLeafListStmt,
+                YangContainerStmt,
+                YangListStmt,
+            ),
+        ):
+            return instance_member_present(data, stmt, parent_mod)
         if isinstance(stmt, YangChoiceStmt):
             for case in stmt.cases:
                 for ch in case.statements:
@@ -272,12 +287,13 @@ class DocumentValidator:
         if not isinstance(data, dict):
             return
         child_enforce = self._child_enforce_mandatory_choice(schema, enforce_mandatory_choice)
+        parent_mod = self._encoding_parent_module()
         visited_names: set[str] = set()
         for stmt in schema.statements:
             if isinstance(stmt, YangChoiceStmt):
                 visited_names.update(self._choice_instance_keys(stmt, data))
             else:
-                visited_names.update(stmt.child_names(data))
+                visited_names.update(instance_member_keys(stmt, parent_mod))
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
         for key in data:
             if key not in visited_names:
@@ -313,8 +329,10 @@ class DocumentValidator:
             return
 
         name = stmt.name
-        present = name in data
-        child_path = path.child(name)
+        parent_mod = self._encoding_parent_module()
+        present = instance_member_present(data, stmt, parent_mod)
+        _val, json_key = instance_member_lookup(data, stmt, parent_mod)
+        child_path = path.child(json_key if json_key is not None else name)
         parent_ctx_obj, parent_node = parent_ctx
 
         # -- 0. if-feature (before when; inactive nodes are not in the effective schema) --
@@ -332,7 +350,7 @@ class DocumentValidator:
             return
 
         # Need val and (curr_node, curr_ctx) for when, must, and type checks
-        val = self._effective_value(data, name, stmt)
+        val = self._effective_value(data, stmt)
         curr_node = parent_node.step(val, stmt)
         curr_ctx = parent_ctx_obj.child(curr_node)
 
@@ -464,19 +482,13 @@ class DocumentValidator:
 
     def _stmt_instance_keys_from_data(self, stmt: YangStatement, data: dict[str, Any]) -> set[str]:
         """Instance keys under ``data`` claimed by this statement (same nesting level)."""
-        if isinstance(stmt, YangLeafStmt):
-            return {stmt.name} if stmt.name in data else set()
-        if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
-            return {stmt.name} if stmt.name in data else set()
-        if isinstance(stmt, YangLeafListStmt):
-            return {stmt.name} if stmt.name in data else set()
-        if isinstance(stmt, YangContainerStmt):
-            return {stmt.name} if stmt.name in data else set()
-        if isinstance(stmt, YangListStmt):
-            return {stmt.name} if stmt.name in data else set()
+        parent_mod = self._encoding_parent_module()
+        keys = instance_member_keys(stmt, parent_mod)
         if isinstance(stmt, YangChoiceStmt):
+            if keys & data.keys():
+                return keys & data.keys()
             return self._choice_instance_keys(stmt, data)
-        return set()
+        return keys & data.keys()
 
     def _choice_instance_keys(self, choice: YangChoiceStmt, data: dict[str, Any]) -> set[str]:
         """Keys in ``data`` consumed by this choice (nested choices: leaves stay at this level)."""
@@ -624,8 +636,9 @@ class DocumentValidator:
         path: str,
         enforce_mandatory_choice: bool,
     ) -> bool:
-        present = name in data
-        effective = self._effective_value(data, name, stmt)
+        parent_mod = self._encoding_parent_module()
+        present = instance_member_present(data, stmt, parent_mod)
+        effective = self._effective_value(data, stmt)
 
         if isinstance(stmt, YangLeafStmt):
             # YANG type empty: leaf has no value, only presence; treat as present when key is in data

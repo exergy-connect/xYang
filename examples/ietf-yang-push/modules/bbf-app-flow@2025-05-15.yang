@@ -1,0 +1,130 @@
+module bbf-app-flow {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-app-flow";
+  prefix bbf-app-flow;
+
+  import bbf-app-flow-types {
+    prefix bbf-app-flow-types;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-application {
+    prefix bbf-app;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Lin Kangwen, Huawei
+
+     Editor:      Cao Qizheng, Huawei
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     Editor:      He Wenzhong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains application(APP) flow configuration.";
+
+  revision 2025-05-15 {
+    description
+      "Add a read-only leaf remaining-time in container app-flow.";
+  }
+  revision 2025-03-28 {
+    description
+      "Add leaf identify-traffic-policy and leaf application-ref in
+       container app-flow.";
+  }
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  augment "/if:interfaces/if:interface" {
+    description
+      "Describes the application flow configuration.";
+    container app-flow {
+      when "derived-from-or-self(../if:type, 'bbf-app-flow-types:app-flow')";
+      description
+        "Configure application flow.";
+      container app-flow-interface {
+        description
+          "The application flow is applied to a interface";
+      }
+      container qoe-profiles {
+        description
+          "Configure the QoE policy for the application flow.";
+      }
+      leaf identify-traffic-policy {
+        type identityref {
+          base bbf-app-flow-types:app-identify-policy;
+        }
+        description
+          "Identifying traffic policies";
+      }
+      leaf effect-time {
+        type union {
+          type enumeration {
+            enum "no-limit" {
+              description
+                "When the effect-time is configured as no-limit,
+                 the application flow configuration will remain
+                 effective until the configuration is deleted.";
+            }
+          }
+          type uint32 {
+            range "1..3600";
+          }
+        }
+        units "min";
+        default "no-limit";
+        description
+          "Indicates the effective time of the application flow
+           configuration. If the running time exceeds the configured
+           effective time, the application flow configuration will
+           become ineffective.";
+      }
+      leaf remaining-time {
+        type union {
+          type enumeration {
+            enum "no-limit" {
+              description
+                "When the effect-time is configured as no-limit,
+                 the application flow configuration will remain
+                 effective until the configuration is deleted.";
+            }
+          }
+          type uint32 {
+            range "0..3600";
+          }
+        }
+        units "min";
+        config false;
+        description
+          "This is a read-only node that indicates the remaining
+           effective time of the application flow.";
+      }
+      leaf application-ref {
+        type leafref {
+          path "/bbf-app:applications/bbf-app:application/bbf-app:name";
+        }
+        description
+          "Application configuration information";
+      }
+    }
+  }
+}

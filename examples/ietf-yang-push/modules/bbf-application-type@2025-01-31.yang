@@ -1,0 +1,133 @@
+module bbf-application-type {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-application-type";
+  prefix bbf-app-type;
+
+  import ietf-inet-types {
+    prefix inet;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains type of application configurations.";
+
+  revision 2025-01-31 {
+    description
+      "Initial revision.";
+  }
+
+  identity app-tuple-mode-type {
+    description
+      "Indicates the matching rule of the application.";
+  }
+
+  identity client-ip-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by client IP address.";
+  }
+
+  identity client-ip-server-ip-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by client and server IP addresses.";
+  }
+
+  identity client-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by client IP address, protocol port ID, and
+       protocol type.";
+  }
+
+  identity full-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by server IP address, protocol port ID,
+       client IP address, protocol port ID, and protocol type.";
+  }
+
+  identity server-ip-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by server IP address.";
+  }
+
+  identity server-match-mode {
+    base app-tuple-mode-type;
+    description
+      "Indicates matching by server IP address, protocol port ID, and
+       protocol type.";
+  }
+
+  grouping app-ip-tuple {
+    description
+      "Indicates a five-tuple information about the application.";
+    leaf server-ip-address {
+      type union {
+        type inet:ip-address-no-zone;
+        type empty;
+      }
+      description
+        "Indicates the server ip address of app-ip-tuple.";
+    }
+    leaf client-ip-address {
+      type union {
+        type inet:ip-address-no-zone;
+        type empty;
+      }
+      description
+        "Indicates the client ip address of app-ip-tuple.";
+    }
+    leaf server-port {
+      type union {
+        type inet:port-number;
+        type empty;
+      }
+      description
+        "Indicates server protocol port of app-ip-tuple.";
+    }
+    leaf client-port {
+      type union {
+        type inet:port-number;
+        type empty;
+      }
+      description
+        "Indicates client protocol port of app-ip-tuple.";
+    }
+    leaf protocol-type {
+      type union {
+        type enumeration {
+          enum "tcp" {
+            value 0;
+            description
+              "Transmission Control Protocol";
+          }
+          enum "udp" {
+            value 1;
+            description
+              "User Datagram Protocol";
+          }
+        }
+        type empty;
+      }
+      description
+        "Indicates protocol type of app-ip-tuple.";
+    }
+  }
+}

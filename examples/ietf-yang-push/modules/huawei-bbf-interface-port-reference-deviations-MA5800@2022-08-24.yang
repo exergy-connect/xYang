@@ -1,0 +1,60 @@
+module huawei-bbf-interface-port-reference-deviations-MA5800 {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bbf-interface-port-reference-deviations-MA5800";
+  prefix bbf-if-port-ref-devs-MA5800;
+
+  import bbf-interface-port-reference {
+    prefix bbf-if-port-ref;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-hardware {
+    prefix hw;
+  }
+  import iana-hardware {
+    prefix ianahw;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-interface-port-reference module.";
+
+  revision 2022-08-24 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-if-port-ref:port-layer-if" {
+    deviate delete {
+      must
+        "derived-from-or-self (/hw:hardware
+         /hw:component[hw:name=current()]/hw:class,
+         'ianahw:port')" {
+        error-message
+          "Referenced component is or is derived from class 'port'.";
+      }
+    }
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-if-port-ref:port-layer-if" {
+    deviate delete {
+      must
+        "derived-from-or-self (/hw:hardware
+         /hw:component[hw:name=current()]/hw:class,
+         'ianahw:port')" {
+        error-message
+          "Referenced component is or is derived from class 'port'.";
+      }
+    }
+  }
+}

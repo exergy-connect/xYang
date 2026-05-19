@@ -122,6 +122,12 @@ def _units_from_xyang(xyang: dict[str, Any]) -> str:
     return u if isinstance(u, str) else ""
 
 
+def _set_config_from_xyang(stmt: Any, xyang: dict[str, Any]) -> None:
+    """RFC 7950 §7.21.1 ``config`` from ``x-yang.config`` when explicitly set."""
+    if XYangKey.CONFIG in xyang and isinstance(xyang[XYangKey.CONFIG], bool):
+        stmt.config = xyang[XYangKey.CONFIG]
+
+
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     """Build YangWhenStmt from x-yang ``when``: object with ``condition`` and optional ``description``."""
     raw = xyang.get(XYangKey.WHEN)
@@ -657,6 +663,7 @@ def _convert_container(
     if xyang.get(XYangKey.PRESENCE) is not None:
         c.presence = xyang.get(XYangKey.PRESENCE)
     _set_if_features_from_xyang(c, xyang)
+    _set_config_from_xyang(c, xyang)
     return c
 
 
@@ -713,6 +720,7 @@ def _convert_list(
     if JsonSchemaKey.MAX_ITEMS in schema and schema[JsonSchemaKey.MAX_ITEMS] is not None:
         lst.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
     _set_if_features_from_xyang(lst, xyang)
+    _set_config_from_xyang(lst, xyang)
     return lst
 
 
@@ -770,6 +778,7 @@ def _convert_leaf(
     units = _units_from_xyang(xyang)
     if units:
         leaf.units = units
+    _set_config_from_xyang(leaf, xyang)
     return leaf
 
 
@@ -839,6 +848,7 @@ def _convert_leaf_list(
     units = _units_from_xyang(xyang)
     if units:
         ll.units = units
+    _set_config_from_xyang(ll, xyang)
     return ll
 
 
@@ -892,6 +902,7 @@ def _convert_choice(
         name=name, description=description, mandatory=mandatory, cases=cases
     )
     _set_if_features_from_xyang(choice_stmt, xyang)
+    _set_config_from_xyang(choice_stmt, xyang)
     choice_stmt.validate_case_unique_child_names()
     return choice_stmt
 

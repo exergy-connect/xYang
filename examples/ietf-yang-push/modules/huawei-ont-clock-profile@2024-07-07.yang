@@ -1,0 +1,99 @@
+module huawei-ont-clock-profile {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-ont-clock-profile";
+  prefix hw-ont-clk-prof;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This YANG module defines a data model for the configuration and management of ont clock profile.";
+
+  revision 2024-07-07 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef profile-type {
+    type enumeration {
+      enum "bc" {
+        value 1;
+        description
+          "The profile config base on IEEE Std 1588.";
+      }
+      enum "t-bc" {
+        value 2;
+        description
+          "The profile config base on ITU G.8275.1.";
+      }
+    }
+    description
+      "The enum for type of ont clock profile.";
+    reference
+      "IEEE Std 1588-2008: 8.2.5.3.1, 9.2.5";
+  }
+
+  container ont-clock-profile {
+    description
+      "The ont clock profile contains all attributes of huawei ont.";
+    container profiles {
+      description
+        "List of ont clock profile.";
+      list profile {
+        key "name";
+        description
+          "Configure profile of the ont.";
+        leaf name {
+          type string {
+            length "0..32";
+          }
+          description
+            "The name of the current profile.";
+        }
+        leaf profile-type {
+          type profile-type;
+          mandatory true;
+          description
+            "The ont profile type, bc or t-bc.";
+        }
+        leaf domain-number {
+          type uint8;
+          mandatory true;
+          description
+            "The domain number of the current syntonization domain.";
+        }
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface/bbf-xponani:ani" {
+    description
+      "Augment the Huawei ONT clock and ptp configuration data.";
+    container clock {
+      description
+        "The ont clock and ptp configuration data.";
+      leaf profile-ref {
+        type leafref {
+          path "/hw-ont-clk-prof:ont-clock-profile/hw-ont-clk-prof:profiles/hw-ont-clk-prof:profile/hw-ont-clk-prof:name";
+        }
+        description
+          "References an existing ont clock profile.";
+      }
+    }
+  }
+}

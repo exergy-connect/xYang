@@ -1,0 +1,411 @@
+submodule huawei-srv6-type {
+  belongs-to huawei-srv6 {
+    prefix srv6;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "SRv6 type defined file.";
+
+  revision 2024-12-07 {
+    description
+      "Modify behavior-type.
+       Add new typedef.
+       Modify typedef.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-04 {
+    description
+      "Add new typedef.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-17 {
+    description
+      "Add new type for 16-bit compression.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-04-27 {
+    description
+      "Add GSRv6 function.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-03 {
+    description
+      "Modify the description.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-02-24 {
+    description
+      "Modify the description.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-02-04 {
+    description
+      "Add new type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-04-04 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef protocol-type {
+    type enumeration {
+      enum "l3vpn" {
+        value 0;
+        description
+          "L3VPN.";
+      }
+      enum "evpn" {
+        value 1;
+        description
+          "EVPN.";
+      }
+      enum "evpn-l3vpn" {
+        value 2;
+        description
+          "EVPN L3VPN.";
+      }
+    }
+    description
+      "Protocol Type.";
+  }
+
+  typedef protocol-type-dx4 {
+    type enumeration {
+      enum "l3vpn" {
+        value 0;
+        description
+          "L3VPN.";
+      }
+      enum "evpn" {
+        value 1;
+        description
+          "EVPN.";
+      }
+    }
+    description
+      "Protocol Type.";
+  }
+
+  typedef protocol-type-dx6 {
+    type enumeration {
+      enum "evpn" {
+        value 1;
+        description
+          "EVPN.";
+      }
+    }
+    description
+      "Protocol Type.";
+  }
+
+  typedef mode-type {
+    type enumeration {
+      enum "uniform" {
+        value 1;
+        description
+          "Uniform mode.";
+      }
+      enum "pipe" {
+        value 2;
+        description
+          "Pipe mode.";
+      }
+    }
+    description
+      "Pipe mode types.";
+  }
+
+  typedef service-class {
+    type enumeration {
+      enum "be" {
+        value 0;
+        description
+          "Service name is BE.";
+      }
+      enum "af1" {
+        value 1;
+        description
+          "Service name is AF1.";
+      }
+      enum "af2" {
+        value 2;
+        description
+          "Service name is AF2.";
+      }
+      enum "af3" {
+        value 3;
+        description
+          "Service name is AF3.";
+      }
+      enum "af4" {
+        value 4;
+        description
+          "Service name is AF4.";
+      }
+      enum "ef" {
+        value 5;
+        description
+          "Service name is EF.";
+      }
+      enum "cs6" {
+        value 6;
+        description
+          "Service name is CS6.";
+      }
+      enum "cs7" {
+        value 7;
+        description
+          "Service name is CS7.";
+      }
+    }
+    description
+      "Service type for the packet.";
+  }
+
+  typedef color {
+    type enumeration {
+      enum "green" {
+        value 0;
+        description
+          "Green Color.";
+      }
+      enum "yellow" {
+        value 1;
+        description
+          "Yellow Color.";
+      }
+      enum "red" {
+        value 2;
+        description
+          "Red Color.";
+      }
+    }
+    description
+      "Color type for the packet.";
+  }
+
+  typedef inner-type {
+    type enumeration {
+      enum "null" {
+        value 0;
+        description
+          "Indicates that the inner type is not configured.";
+      }
+      enum "ipv4" {
+        value 1;
+        description
+          "The inner type is IPv4.";
+      }
+    }
+    description
+      "Indicates the type of the original packet sent from the SFF to the SF.";
+  }
+
+  typedef match-type {
+    type enumeration {
+      enum "none" {
+        value 0;
+        description
+          "The mapping policy type is none.";
+      }
+      enum "sr-policy-dscp" {
+        value 1;
+        description
+          "SR Policy DSCP.";
+      }
+    }
+    description
+      "Mapping policy type.";
+  }
+
+  typedef frr-mode {
+    type enumeration {
+      enum "normal" {
+        value 1;
+        description
+          "SR te-frr normal mode,use the next valid sid.";
+      }
+      enum "best-effort" {
+        value 2;
+        description
+          "SR te-frr best-effort mode,use the innermost sid.";
+      }
+    }
+    description
+      "SR te-frr mode.";
+  }
+
+  typedef encapsulation-type {
+    type enumeration {
+      enum "invalid" {
+        value 0;
+        description
+          "Invalid encapsulation mode.";
+      }
+      enum "insert" {
+        value 1;
+        description
+          "Insert encapsulation mode.";
+      }
+      enum "encaps" {
+        value 2;
+        description
+          "Encaps encapsulation mode.";
+      }
+      enum "insert-encaps" {
+        value 3;
+        description
+          "Insert and encaps encapsulation mode.";
+      }
+      enum "none" {
+        value 4;
+        description
+          "None encapsulation mode.";
+      }
+    }
+    description
+      "Encapsulation modes.";
+  }
+
+  typedef behavior-type {
+    type enumeration {
+      enum "no-flavor" {
+        value 0;
+        description
+          "Cancel flavor.";
+      }
+      enum "psp" {
+        value 1;
+        description
+          "PSP flavor.";
+      }
+      enum "usp-usd" {
+        value 6;
+        description
+          "USP, USD flavor.";
+      }
+      enum "psp-usp-usd" {
+        value 7;
+        description
+          "PSP, USP, USD flavor.";
+      }
+      enum "coc" {
+        value 8;
+        description
+          "COC flavor.";
+      }
+      enum "psp-coc" {
+        value 9;
+        description
+          "PSP, COC flavor.";
+      }
+      enum "psp-usp-usd-coc" {
+        value 15;
+        description
+          "PSP, USP, USD, COC flavor.";
+      }
+      enum "next" {
+        value 16;
+        description
+          "NEXT flavor.";
+      }
+      enum "psp-usd-next" {
+        value 21;
+        description
+          "PSP, USD, NEXT flavor.";
+      }
+      enum "coc-next" {
+        value 24;
+        description
+          "COS, NEXT flavor.";
+      }
+      enum "psp-usp-usd-coc-next" {
+        value 31;
+        description
+          "PSP, USP, USD, COC, NEXT flavor.";
+      }
+    }
+    description
+      "Behavior type for 16-bit compression.";
+  }
+
+  typedef compress-16-mode-type {
+    type enumeration {
+      enum "default" {
+        value 1;
+        description
+          "The 16-bit compression mode is default mode.";
+      }
+      enum "next" {
+        value 2;
+        description
+          "The 16-bit compression mode is next mode.";
+      }
+    }
+    description
+      "Srv6 16-bit compression modes.";
+  }
+
+  typedef sid-compress-type {
+    type enumeration {
+      enum "uncompress" {
+        value 0;
+        description
+          "Uncompress SID.";
+      }
+      enum "compress" {
+        value 1;
+        description
+          "Compress SID.";
+      }
+      enum "uncompress-downgrade" {
+        value 2;
+        description
+          "Uncompress-Downgrade SID.";
+      }
+    }
+    description
+      "Srv6 SID compress types.";
+  }
+
+  typedef sid-stack-compress-type {
+    type enumeration {
+      enum "uncompress" {
+        value 0;
+        description
+          "Uncompress SID stack.";
+      }
+      enum "32-bit-compress" {
+        value 1;
+        description
+          "32-bit compress SID stack.";
+      }
+      enum "16-bit-compress" {
+        value 2;
+        description
+          "16-bit compress SID stack.";
+      }
+    }
+    description
+      "Srv6 SID stack compress types.";
+  }
+}

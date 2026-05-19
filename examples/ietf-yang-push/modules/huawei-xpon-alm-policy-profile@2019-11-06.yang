@@ -1,0 +1,153 @@
+submodule huawei-xpon-alm-policy-profile {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "This module contains ONT alarm policy data.";
+
+  revision 2019-11-06 {
+    description
+      "Modify description.";
+    reference
+      "system alarm list";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "system alarm list";
+  }
+
+  grouping alarm-data {
+    description
+      "All config data for ONT alarm.";
+    leaf alarm-id {
+      type int32;
+      description
+        "Indicates the ID of an ONT alarm.";
+    }
+    leaf is-filter {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT alarm needs to be filtered.
+         Options:
+         1.true - The ONT alarm needs to be filtered.
+         2.false - The ONT alarm does not needs to be filtered.";
+    }
+    leaf alarm-level {
+      type enumeration {
+        enum "critical" {
+          value 0;
+          description
+            "The alarm level is critical.";
+        }
+        enum "major" {
+          value 1;
+          description
+            "The alarm level is major.";
+        }
+        enum "minor" {
+          value 2;
+          description
+            "The alarm level is minor.";
+        }
+        enum "warning" {
+          value 3;
+          description
+            "The alarm level is warning.";
+        }
+        enum "unconcern" {
+          value 4;
+          description
+            "The alarm level is unconcern.";
+        }
+      }
+      default "unconcern";
+      description
+        "Alarm level.";
+    }
+  }
+
+  grouping ont-alm-policy-data {
+    description
+      "All config data for ONT alarm policy profile.";
+    reference
+      "system alarm list";
+    list ont-alm-policy-prof {
+      key "name";
+      description
+        "Configure a list of ONT alarm policy profiles.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "ONT alarm policy profile name.";
+      }
+      list alarm-lists {
+        key "alarm-id";
+        description
+          "Configure a list of the filtered alarm.";
+        uses alarm-data;
+      }
+      leaf append-policy-name {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable the ONT alarm appends ONT alarm policy profile name.
+           Options:
+           1.true - The ONT alarm appends ONT alarm policy profile name.
+           2.false - The ONT alarm does not append ONT alarm policy profile name.";
+      }
+      leaf append-ipaddr {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the ONT alarm appends IP address.
+           Options:
+           1.true - The ONT alarm appends IP address.
+           2.false - The ONT alarm does not append IP address.";
+      }
+      leaf append-mac {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the ONT alarm appends MAC address.
+           Options:
+           1.true - The ONT alarm appends MAC address.
+           2.false - The ONT alarm does not append MAC address.";
+      }
+      leaf append-sn {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the ONT alarm appends sn.
+           Options:
+           1.true - The ONT alarm appends sn.
+           2.false - The ONT alarm does not append sn.";
+      }
+      leaf append-loid {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the ONT alarm appends loid.
+           Options:
+           1.true - The ONT alarm appends loid.
+           2.false - The ONT alarm does not append loid.";
+      }
+    }
+  }
+}

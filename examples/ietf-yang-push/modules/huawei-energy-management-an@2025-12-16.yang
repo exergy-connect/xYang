@@ -1,0 +1,533 @@
+module huawei-energy-management-an {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-energy-management-an";
+  prefix hw-energy-mgnt-an;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import iana-hardware {
+    prefix ianahw;
+  }
+  import bbf-hardware-types {
+    prefix bbf-hwt;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for power and energy management of devices.";
+
+  revision 2025-12-16 {
+    description
+      "Remove non-UTF-8 encoded characters.";
+    reference
+      "";
+  }
+  revision 2025-04-19 {
+    description
+      "Modify the when condition of the enabled leaf node limited to boards and ports.";
+    reference
+      "";
+  }
+  revision 2025-01-03 {
+    description
+      "Modify the when condition for the enabled leaf node of the energy-saving service.";
+    reference
+      "";
+  }
+  revision 2024-04-18 {
+    description
+      "Add new enum: unused-board-shutdown-alarm.";
+    reference
+      "";
+  }
+  revision 2023-09-07 {
+    description
+      "Add new leafnode: temperature.";
+    reference
+      "";
+  }
+  revision 2023-08-08 {
+    description
+      "Modified description of enum actived, enum energy-saving-running.";
+    reference
+      "";
+  }
+  revision 2023-06-05 {
+    description
+      "Add new energy-saving-method-name: intelligent-board-scheduling.";
+    reference
+      "";
+  }
+  revision 2023-06-01 {
+    description
+      "Add new leafnode: capability, configured.";
+    reference
+      "";
+  }
+  revision 2023-05-25 {
+    description
+      "Add new identity: channel. Add new energy-saving-method-name: unused-channel-shutdown,
+       high-speed-interface-smart-shutdown.";
+    reference
+      "";
+  }
+  revision 2023-03-23 {
+    description
+      "Add new energy-saving mode: custom. Add new leafnode: enabled.";
+    reference
+      "";
+  }
+  revision 2023-03-04 {
+    description
+      "Modified total-energy-consumption leafnode unit is changed from kWh to Wh.";
+    reference
+      "";
+  }
+  revision 2023-02-28 {
+    description
+      "Modified saved-energy-consumption leafnode to saved-power and the unit is changed from watt to milliwatt.";
+    reference
+      "";
+  }
+  revision 2023-02-13 {
+    description
+      "Add new leafnode: ont-auto-find-check-free.";
+    reference
+      "";
+  }
+  revision 2022-09-30 {
+    description
+      "Support for energy saving mode, energy saving method, energy saving parameter.";
+    reference
+      "";
+  }
+  revision 2022-04-16 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity channel {
+    base ianahw:hardware-class;
+    description
+      "This identity is applicable if the hardware class is some sort
+       of networking channel capable of receiving and/or transmitting
+       networking traffic.";
+  }
+
+  typedef energy-saving-mode-name {
+    type enumeration {
+      enum "basic" {
+        value 1;
+        description
+          "Basic energy saving mode.";
+      }
+      enum "deep" {
+        value 2;
+        description
+          "Enhanced energy saving mode.";
+      }
+      enum "optimal" {
+        value 3;
+        description
+          "Optional energy saving mode.";
+      }
+      enum "standard" {
+        value 4;
+        description
+          "Standard energy saving mode.";
+      }
+      enum "custom" {
+        value 5;
+        description
+          "Custom energy saving mode.";
+      }
+    }
+    description
+      "Energy saving mode.";
+  }
+
+  typedef energy-saving-method-name {
+    type enumeration {
+      enum "zone-based-fan-speed-adjustment" {
+        value 1;
+        description
+          "The system will collect information about the temperatures of the service boards in the chassis
+           and the zones where the service boards reside.
+           According to the current temperature and target temperature of each board,
+           the system implements stepless speed adjustment in different zones.";
+      }
+      enum "unused-high-speed-interface-shutdown" {
+        value 2;
+        description
+          "When detecting an unused high-speed interface, the system automatically or manually shuts down
+           the interface to reduce power consumption of the interface circuits.
+           When the interface needs to run service, the system will automatically wake up the interface
+           and restore the interface to the normal working state.";
+      }
+      enum "unused-port-shutdown" {
+        value 3;
+        description
+          "When detecting an unused user port, the system automatically or manually shuts down the interface circuits
+           and optical module of the port to reduce port power consumption.
+           When detecting that the port needs to run service, the system automatically enables the port
+           and restores the port to the normal running state, without affecting application of the board.";
+      }
+      enum "unused-board-shutdown" {
+        value 4;
+        description
+          "When detecting an unused board, the system automatically shuts down the power supply of the board,
+           ensuring zero power consumption of an unused board. When detecting that the board needs to run service,
+           the system automatically powers on the board and restores the board to the normal running state,
+           without affecting application of the whole product.";
+      }
+      enum "dynamic-frequency-adjustment" {
+        value 5;
+        description
+          "When detecting that a service board is carrying a small service load,
+           the system automatically reduces the working frequency of the service processing module of the board
+           while maintaining the service quality. In this way, power consumption of the service processing
+           module is reduced. When the service load of the board increases, the system automatically increases
+           the working frequency of the service processing module to meet service needs.";
+      }
+      enum "unused-channel-shutdown" {
+        value 6;
+        description
+          "When an unused channel is detected, the unused channel is closed.
+           Dynamically open the channel when detecting that there are services on the channel.";
+      }
+      enum "high-speed-interface-smart-shutdown" {
+        value 7;
+        description
+          "When detecting that the traffic on high-speed interfaces decreases, some high-speed interfaces are
+           dynamically shut down to save power.
+           Dynamically recovers the high-speed interface when detecting that the traffic on the high-speed
+           interface increases.";
+      }
+      enum "intelligent-board-scheduling" {
+        value 8;
+        description
+          "Boards intelligently schedule internal forwarding resources based on the service load.
+           When the service load decreases, some forwarding resources are automatically disabled or
+           the working frequency of the forwarding resources is reduced. When the service load increases,
+           the disabled forwarding resources are enabled again or the working frequency of forwarding
+           resources is improved.
+           Information: In the case of burst traffic, packet forwarding may be delayed,
+           but packets will not be lost.";
+      }
+    }
+    description
+      "Energy saving methods.";
+  }
+
+  typedef energy-saving-parameter-name {
+    type enumeration {
+      enum "unused-board-shutdown-type" {
+        value 1;
+        description
+          "When the power-saving method is to shutdown unused boards,
+           you can configure the power-off type of unused boards.
+           The power-off type can be auto or manual.";
+      }
+      enum "unused-port-shutdown-type" {
+        value 2;
+        description
+          "When the power-saving method is to disable unused ports,
+           you can configure the power-off type of unused ports.
+           The power-off type can be auto or manual.";
+      }
+      enum "unused-board-shutdown-alarm" {
+        value 3;
+        description
+          "When the power-saving method is to disable unused boards,
+           you can configure the switch of the energy-saving shutdown alarm of unused boards.
+           The alarm switch can be disable or enable.";
+      }
+    }
+    description
+      "Energy saving parameter names.";
+  }
+
+  typedef energy-saving-oper-state {
+    type enumeration {
+      enum "actived" {
+        value 1;
+        description
+          "Indicates that the device in no energy-saving status.";
+      }
+      enum "deactived" {
+        value 2;
+        description
+          "Indicates that the device in energy-saving deactivated status.";
+      }
+      enum "energy-saving-running" {
+        value 3;
+        description
+          "Indicates that the device in partial energy-saving status.";
+      }
+      enum "shutdown" {
+        value 4;
+        description
+          "Indicates that the device in shutdown status.";
+      }
+      enum "energy-saving-shutdown" {
+        value 5;
+        description
+          "Indicates that the device in energy-saving shutdown status.";
+      }
+      enum "can-energy-saving-shutdown" {
+        value 6;
+        description
+          "Indicates that the device has no business, it can perform an energy-saving shutdown.";
+      }
+    }
+    description
+      "The device energy saving operator state.";
+  }
+
+  typedef energy-saving-operator {
+    type enumeration {
+      enum "power-on" {
+        value 1;
+        description
+          "Power-on for energy saving.";
+      }
+      enum "power-off" {
+        value 2;
+        description
+          "Power-off for energy saving.";
+      }
+    }
+    description
+      "Energy saving operator.";
+  }
+
+  grouping energy-saving-parameters {
+    description
+      "The energy saving parameters.";
+    container parameters {
+      description
+        "List of the energy saving parameter.";
+      list parameter {
+        key "name";
+        description
+          "Configure the energy saving parameter.";
+        leaf name {
+          type energy-saving-parameter-name;
+          description
+            "Name of the energy saving parameter contained in the energy-saving method.";
+        }
+        leaf value {
+          type string {
+            length "0..255";
+          }
+          description
+            "Value of the energy saving parameter contained in the energy-saving method.";
+        }
+      }
+    }
+  }
+
+  grouping energy-consumption-data {
+    description
+      "Statistics of the energy monitoring.";
+    leaf total-energy-consumption {
+      type uint32;
+      units "Wh";
+      description
+        "Accumulated energy consumption of equipment.";
+    }
+    leaf average-power {
+      type int32;
+      units "mW";
+      description
+        "The average power of monitoring class.";
+    }
+    leaf max-power {
+      type int32;
+      units "mW";
+      description
+        "The max power of monitoring class.";
+    }
+    leaf min-power {
+      type int32;
+      units "mW";
+      description
+        "The min power of monitoring class.";
+    }
+    leaf average-voltage {
+      type int32;
+      units "mV";
+      description
+        "The average voltage of monitoring class.";
+    }
+    leaf max-voltage {
+      type int32;
+      units "mV";
+      description
+        "The max voltage of monitoring class.";
+    }
+    leaf min-voltage {
+      type int32;
+      units "mV";
+      description
+        "The min voltage of monitoring class.";
+    }
+    leaf average-current {
+      type int32;
+      units "mA";
+      description
+        "The average current of monitoring class.";
+    }
+    leaf max-current {
+      type int32;
+      units "mA";
+      description
+        "The max current of monitoring class.";
+    }
+    leaf min-current {
+      type int32;
+      units "mA";
+      description
+        "The min current of monitoring class.";
+    }
+    leaf saved-power {
+      type int32;
+      units "mW";
+      description
+        "The saved power of monitoring class.";
+    }
+    leaf temperature {
+      type int32;
+      units "0.01 Celsius";
+      description
+        "The temperature of the component. The invalid temperature value is 0x7fffffff.";
+    }
+  }
+
+  container energy-management-an {
+    description
+      "Statistics of the energy management.";
+    container energy-monitoring {
+      config false;
+      description
+        "Statistics of the energy monitoring.";
+      leaf capability {
+        type boolean;
+        description
+          "Indicates whether monitoring can be performed.";
+      }
+    }
+    container energy-saving {
+      description
+        "Configure the device energy saving mode.";
+      leaf mode {
+        type energy-saving-mode-name;
+        description
+          "The device energy saving mode.";
+      }
+      leaf ont-auto-find-check-free {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Enable the ont auto-find check-free for energy-saving.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Disable the ont auto-find check-free for energy-saving.";
+          }
+        }
+        default "disable";
+        description
+          "Indicates whether to check-free the ONT automatic discovery configuration for energy saving.";
+      }
+    }
+    container energy-saving-modes {
+      description
+        "List of the energy saving mode.";
+      list energy-saving-mode {
+        key "mode";
+        description
+          "Configure the energy saving mode.";
+        leaf mode {
+          type energy-saving-mode-name;
+          description
+            "The energy saving mode.";
+        }
+        container methods {
+          description
+            "List of the energy saving method.";
+          list method {
+            key "method-name";
+            description
+              "Configure the energy saving method.";
+            leaf method-name {
+              type energy-saving-method-name;
+              description
+                "The energy saving method name.";
+            }
+            leaf capability {
+              type boolean;
+              config false;
+              description
+                "Indicates that Whether the method supports configuration in the mode.";
+            }
+            leaf enabled {
+              when "../../../mode = 'custom'";
+              type boolean;
+              description
+                "Enable/disable : Whether the energy-saving method is enabled.";
+            }
+            uses energy-saving-parameters;
+          }
+        }
+      }
+    }
+  }
+
+  augment "/hw:hardware/hw:component" {
+    description
+      "Energy monitoring data for components.";
+    container energy-consumption {
+      config false;
+      description
+        "Statistics of component about energy monitoring.";
+      uses energy-consumption-data;
+    }
+    container energy-saving {
+      description
+        "Configure : Statistics of component about energy monitoring.";
+      leaf enabled {
+        when "../../hw:class = 'bbf-hwt:board' or
+         ../../hw:class = 'ianahw:port'";
+        type boolean;
+        description
+          "Enable/disable : the energy-saving state of the component.";
+      }
+      leaf configured {
+        type boolean;
+        config false;
+        description
+          "Indicates that Whether the configuration exists on the device.";
+      }
+      leaf oper-state {
+        type energy-saving-oper-state;
+        config false;
+        description
+          "The device energy saving operator state.";
+      }
+    }
+  }
+}

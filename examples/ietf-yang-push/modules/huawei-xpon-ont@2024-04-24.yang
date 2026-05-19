@@ -1,0 +1,1752 @@
+submodule huawei-xpon-ont {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import bbf-yang-types {
+    prefix bbf-yang;
+  }
+  import huawei-xpon-types {
+    prefix xpon-types;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import ieee802-ethernet-interface {
+    prefix ieee802-eth-if;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import bbf-xponvani {
+    prefix bbf-xponvani;
+  }
+  import bbf-xpon-common-types {
+    prefix xpon-common-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide XPON ONT global data management.";
+
+  revision 2024-04-24 {
+    description
+      "Add ip-packet-ttl-detect-period leaf to ex-ontani-config-data.";
+    reference
+      "";
+  }
+  revision 2024-01-23 {
+    description
+      "Add active-fec-mode leaf to ont-ethernet-port-data;
+       Add fec-mode container to ieee802-eth-if:ethernet.";
+    reference
+      "";
+  }
+  revision 2023-11-30 {
+    description
+      "Modify nni-physical-up-rate and nni-physical-down-rate leafs description.";
+    reference
+      "";
+  }
+  revision 2023-11-07 {
+    description
+      "Add the enumerate value of the leaf node gem-encrypt-mode.";
+    reference
+      "";
+  }
+  revision 2023-10-11 {
+    description
+      "Add the node of tcont-group-index-ref to ex-v-ontani-config-data.";
+    reference
+      "";
+  }
+  revision 2023-09-05 {
+    description
+      "Add the node master-port to ex-port-bundle.";
+    reference
+      "";
+  }
+  revision 2023-05-04 {
+    description
+      "Add the node of gem-encrypt-mode to ex-v-ontani-config-data.";
+    reference
+      "";
+  }
+  revision 2023-04-17 {
+    description
+      "Modified the description of leaf node no-online-reason.";
+    reference
+      "";
+  }
+  revision 2022-09-06 {
+    description
+      "Add the container of TpId.";
+    reference
+      "";
+  }
+  revision 2022-08-20 {
+    description
+      "Fix syntax warning.";
+    reference
+      "";
+  }
+  revision 2022-03-01 {
+    description
+      "Add leaf optical-alarm-profile.";
+    reference
+      "";
+  }
+  revision 2022-01-18 {
+    description
+      "Revision syntax warning.";
+    reference
+      "";
+  }
+  revision 2021-12-16 {
+    description
+      "Add the enumerate bandwidth-insufficient of the leaf node last-down-cause.";
+    reference
+      "";
+  }
+  revision 2021-09-30 {
+    description
+      "Add the grouping of ex-port-bundle.
+       Add the node of mapping-mode to ex-v-ontani-config-data.";
+    reference
+      "";
+  }
+  revision 2021-08-17 {
+    description
+      "Modified the description of leaf node no-online-reason.
+           Add the node of device-type to ex-ontani-oper-data.";
+    reference
+      "";
+  }
+  revision 2021-03-27 {
+    description
+      "Add the enumerate mode7 of the leaf node interop-standard.";
+    reference
+      "";
+  }
+  revision 2021-03-22 {
+    description
+      "Modify the description of leaf load-xml-state and load-app-state.";
+    reference
+      "";
+  }
+  revision 2021-03-11 {
+    description
+      "Add the node of loid and checkcode to support the LOID and checkcode authentication modes of the ONT.
+       Modify the enum values of the leaf node qos-mode.
+       Add ONT version container and a node that indicates app load state.
+       Add new group ont-ethernet-port-data.
+       ex-ontani-oper-data Add new leafnodes: memory-occupation, cpu-occupation, temperature, used-mutual-auth,
+       power-reduction-status, nni-physical-up-rate, nni-physical-down-rate, actual-nni-type, last-actual-nni-type,
+       power-type, actual-serial-number, system-up-duration.";
+    reference
+      "";
+  }
+  revision 2019-05-19 {
+    description
+      "Added multicast forward function.";
+    reference
+      "";
+  }
+  revision 2018-08-28 {
+    description
+      "Corrected formatting issue.";
+    reference
+      "";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  typedef fec-mode-type {
+    type enumeration {
+      enum "unconcern" {
+        value 0;
+        description
+          "Indicates that the FEC mode is unconcern.";
+      }
+      enum "off" {
+        value 1;
+        description
+          "Indicates that the FEC mode is disable.";
+      }
+      enum "base-r" {
+        value 2;
+        description
+          "Indicates that the FEC mode is Base-R FEC.";
+      }
+      enum "rs" {
+        value 3;
+        description
+          "Indicates that the FEC mode is RS-FEC.";
+      }
+    }
+    description
+      "Type of fec mode.";
+  }
+
+  typedef access-scenario-type {
+    type enumeration {
+      enum "auto-negotiation" {
+        value 0;
+        description
+          "Indicates that the ONT access scenario type is auto negotiation.";
+      }
+      enum "p2mp" {
+        value 1;
+        description
+          "Indicates that the ONT access scenario type is p2mp.";
+      }
+      enum "common" {
+        value 2;
+        description
+          "Indicates that the ONT access scenario type is common.";
+      }
+    }
+    description
+      "Type of access scenario.";
+  }
+
+  grouping ex-ontani-config-data {
+    description
+      "ONT ANI config data.";
+    leaf isolate-switch {
+      type enumeration {
+        enum "isolate" {
+          value 1;
+          description
+            "Isolate the ONT.";
+        }
+        enum "unisolate" {
+          value 2;
+          description
+            "Revoke isolate the ONT.";
+        }
+      }
+      description
+        "Isolate or revoke isolate the ONT.";
+    }
+    leaf tr069-mngt-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT tr069 management.";
+    }
+    leaf transparent-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT transparent transmission function.";
+    }
+    leaf multicast-mode {
+      type enumeration {
+        enum "igmp-snooping" {
+          value 1;
+          description
+            "Indicates the uncontrollable multicast.";
+        }
+        enum "olt-control" {
+          value 2;
+          description
+            "Indicates the dynamic controllable multicast.";
+        }
+        enum "unconcern" {
+          value 3;
+          description
+            "Indicates that the multicast mode is not concerned.";
+        }
+      }
+      default "unconcern";
+      description
+        "The ONT multicast mode.";
+    }
+    choice multicast-forward {
+      default "unconcern";
+      description
+        " Configure the multicast forwarding of the ONT.";
+      case untag {
+        description
+          "Specifies the multicast forwarding mode as untag.";
+        leaf untag {
+          type empty;
+          description
+            "Specifies the multicast forwarding mode as untag.";
+        }
+      }
+      case tag {
+        description
+          "Specifies the multicast forwarding mode as tag.";
+        choice tag {
+          description
+            "Specifies the multicast forwarding mode as tag.";
+          case translation {
+            description
+              "Specifies the multicast forwarding mode as translation.";
+            choice translation {
+              description
+                "Specifies the multicast forwarding mode as translation.";
+              case vlan-id {
+                description
+                  "Specifies the VLAN tag used after the VLAN translation.";
+                leaf vlan-id {
+                  type uint16;
+                  description
+                    "Specifies the VLAN tag used after the VLAN translation.";
+                }
+              }
+              case igmp-user-vlan {
+                description
+                  "Specifies the VLAN in the VLAN tag (used after the VLAN translation) to the user VLAN of IGMP packets.";
+                leaf igmp-user-vlan {
+                  type empty;
+                  description
+                    "Specifies the VLAN in the VLAN tag (used after the VLAN translation) to the user VLAN of IGMP packets.";
+                }
+              }
+            }
+          }
+          case transparent {
+            description
+              "Specifies the multicast forwarding mode as tag transparent transmission.";
+            leaf transparent {
+              type empty;
+              description
+                "Specifies the multicast forwarding mode as tag transparent transmission.";
+            }
+          }
+        }
+      }
+      case unconcern {
+        description
+          "Specifies the multicast forwarding mode as unconcern.";
+        leaf unconcern {
+          type empty;
+          description
+            "The OLT does not specify the multicast forwarding mode of an ONT and the multicast forwarding of ONT is determined based on the ONT condition.";
+        }
+      }
+    }
+    leaf mac-learning-enable {
+      type boolean;
+      default "true";
+      description
+        "Enable/disable the ONT mac address learning function.";
+    }
+    container snmp-route {
+      description
+        "Configure SNMP route data for Optical Network Unit (ONU) management.";
+      uses onu-snmp-route;
+    }
+    leaf ip-packet-ttl-detect-period {
+      type uint16 {
+        range "0 | 30..180";
+      }
+      default "0";
+      description
+        "ONT TTL detection period.";
+    }
+    leaf ani-profile-ref {
+      type string {
+        length "1..32";
+      }
+      description
+        "Bind or unbind ANI profile to an ONU. Empty string indicates unbind operation.";
+    }
+    leaf uni-profile-ref {
+      type string {
+        length "1..32";
+      }
+      description
+        "Bind or unbind UNI profile to an ONU. Empty string indicates unbind operation.";
+    }
+  }
+
+  grouping ex-ontani-oper-data {
+    description
+      "ONT ANI state.";
+    leaf online-duration {
+      type uint32;
+      units "s";
+      description
+        "The time duration of the ONT online.";
+    }
+    leaf product-description {
+      type string {
+        length "0..256";
+      }
+      description
+        "The product description of the ONT.";
+    }
+    leaf last-distance {
+      type uint32;
+      units "m";
+      description
+        "The last ranging value of the ONT.";
+    }
+    leaf no-online-reason {
+      type int32 {
+        range "-1..15";
+      }
+      description
+        "This object indicates the reason why the ONT goes offline.
+         1. value (1) -Indicates that there is no third-party ONT interoperability certification.
+         2. value (2) -Indicates that the ONT interoperability mode mismatches with the OLT's.
+         3. value (3) -Indicates that the ONT basic information fails to be obtained.
+         4. value (5) -Indicates that the ONT interoperability file mismatches with the OLT's.
+         5. value (8) -Indicates that the ONT is incompatible with the OLT.
+         6. value (9) -Indicates that the actual ONT optical power is lower than the threshold for the optical power of the ONT going online.
+         7. value (10) -Indicates that the ONT is not in the white list.
+         8. value (11) -Indicates that the ONT optical power received by the OLT is too low.
+         9. value (12) -Indicates that there is no Huawei ONT license authorization.
+         10. value (13) -Indicates that the OLT PON port RTU is insufficient.
+         11. value (14) -Indicates that the ONT access scenario is mismatched.
+         12. value (15) -Indicates that the work mode of ONU mismatches the PON mode.
+         13. value (-1) -Indicates that the ONT has interoperability access license.";
+    }
+    leaf interop-standard {
+      type enumeration {
+        enum "itut" {
+          value 1;
+          description
+            "Indicates that the interoperability standard of the ONT is ITU-T.";
+        }
+        enum "ctc" {
+          value 2;
+          description
+            "Indicates that the interoperability standard of the ONT is CTC.";
+        }
+        enum "ericv1" {
+          value 3;
+          description
+            "Indicates that the interoperability standard of the ONT is Eric V1.";
+        }
+        enum "ericv2" {
+          value 4;
+          description
+            "Indicates that the interoperability standard of the ONT is Eric V2.";
+        }
+        enum "itutg984" {
+          value 5;
+          description
+            "Indicates that the interoperability standard of the ONT is ITU-T G984.";
+        }
+        enum "itutg988" {
+          value 6;
+          description
+            "Indicates that the interoperability standard of the ONT is ITU-T G988.";
+        }
+        enum "cuc" {
+          value 7;
+          description
+            "Indicates that the interoperability standard of the ONT is CUC.";
+        }
+        enum "cmcc" {
+          value 8;
+          description
+            "Indicates that the interoperability standard of the ONT is CMCC.";
+        }
+        enum "eci" {
+          value 9;
+          description
+            "Indicates that the interoperability standard of the ONT is ECI.";
+        }
+        enum "mode1" {
+          value 10;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode1.";
+        }
+        enum "mode2" {
+          value 11;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode2.";
+        }
+        enum "mode2v2" {
+          value 12;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode2 V2.";
+        }
+        enum "mode3" {
+          value 13;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode3.";
+        }
+        enum "mode4" {
+          value 14;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode4.";
+        }
+        enum "mode2v3" {
+          value 15;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode2 V3.";
+        }
+        enum "mode2v4" {
+          value 16;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode2 V4.";
+        }
+        enum "mode5" {
+          value 17;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode5.";
+        }
+        enum "eciv2" {
+          value 18;
+          description
+            "Indicates that the interoperability standard of the ONT is ECI V2.";
+        }
+        enum "mode1v2" {
+          value 19;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode1 V2.";
+        }
+        enum "mode2v5" {
+          value 20;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode2 V5.";
+        }
+        enum "ericv3" {
+          value 21;
+          description
+            "Indicates that the interoperability standard of the ONT is Eric V3.";
+        }
+        enum "ericv4" {
+          value 22;
+          description
+            "Indicates that the interoperability standard of the ONT is Eric V4.";
+        }
+        enum "mode6" {
+          value 23;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode6.";
+        }
+        enum "ericv5" {
+          value 24;
+          description
+            "Indicates that the interoperability standard of the ONT is Eric V5.";
+        }
+        enum "mode7" {
+          value 25;
+          description
+            "Indicates that the interoperability standard of the ONT is Mode7.";
+        }
+      }
+      description
+        "The ONT interopablity standard.";
+    }
+    leaf run-state {
+      type enumeration {
+        enum "up" {
+          value 1;
+          description
+            "Indicates that the run state is up.";
+        }
+        enum "down" {
+          value 2;
+          description
+            "Indicates that the run state is down.";
+        }
+      }
+      description
+        "ONT run state.";
+    }
+    leaf config-status {
+      type enumeration {
+        enum "initialization" {
+          value 1;
+          description
+            "Indicates that the config status is initialization.";
+        }
+        enum "normal" {
+          value 2;
+          description
+            "Indicates that the config status is normal.";
+        }
+        enum "failed" {
+          value 3;
+          description
+            "Indicates that the config status is failed.";
+        }
+        enum "noresume" {
+          value 4;
+          description
+            "Indicates that the config status is noresume.";
+        }
+        enum "config" {
+          value 5;
+          description
+            "Indicates that the config status is config.";
+        }
+      }
+      description
+        "ONT configuration status.";
+    }
+    leaf discovery-status {
+      type enumeration {
+        enum "on" {
+          value 1;
+          description
+            "Indicates that the discovery status is on.";
+        }
+        enum "off" {
+          value 2;
+          description
+            "Indicates that the discovery status is off.";
+        }
+      }
+      description
+        "ONT discovery state.";
+    }
+    leaf match-status {
+      type enumeration {
+        enum "initialization" {
+          value 1;
+          description
+            "Indicates that the match status is initialization.";
+        }
+        enum "match" {
+          value 2;
+          description
+            "Indicates that the match status is match.";
+        }
+        enum "mismatch" {
+          value 3;
+          description
+            "Indicates that the match status is mismatch.";
+        }
+      }
+      description
+        "ONT match status.";
+    }
+    leaf dba-status {
+      type enumeration {
+        enum "nsr" {
+          value 1;
+          description
+            "Indicates that the dba status is nsr.";
+        }
+        enum "sr" {
+          value 2;
+          description
+            "Indicates that the dba status is sr.";
+        }
+      }
+      description
+        "ONT DBA report status.";
+    }
+    leaf current-distance {
+      type int64;
+      units "m";
+      description
+        "This object indicates the result of the ONT ranging.";
+    }
+    leaf mac-count {
+      type int32;
+      description
+        "Indicates the number of MAC addresses that are learned by the ONT.";
+    }
+    leaf last-up-time {
+      type yang:date-and-time;
+      description
+        "Indicates the time when the ONT last went online date-time specification.";
+    }
+    leaf last-down-time {
+      type yang:date-and-time;
+      description
+        "Indicates the time when the ONT last went offline date-time specification.";
+    }
+    leaf last-down-cause {
+      type enumeration {
+        enum "los" {
+          value 1;
+          description
+            "The cause of ONT's down is that the ONT is LOS.";
+        }
+        enum "losi-or-lobi" {
+          value 2;
+          description
+            "The cause of ONT's down is that the ONT is LOSi Or LOBi.";
+        }
+        enum "lofi" {
+          value 3;
+          description
+            "The cause of ONT's down is that the ONT is LOFI.";
+        }
+        enum "sfi" {
+          value 4;
+          description
+            "The cause of ONT's down is that the ONT is SFI.";
+        }
+        enum "loai" {
+          value 5;
+          description
+            "The cause of ONT's down is that the ONT is LOAI.";
+        }
+        enum "loami" {
+          value 6;
+          description
+            "The cause of ONT's down is that the ONT is LOAMI.";
+        }
+        enum "deactive-ont-fail" {
+          value 7;
+          description
+            "The cause of ONT's down is that the ONT is deactived ONT fail.";
+        }
+        enum "deactive-ont-success" {
+          value 8;
+          description
+            "The cause of ONT's down is that the ONT is deactived ONT success.";
+        }
+        enum "reset-ont" {
+          value 9;
+          description
+            "The cause of ONT's down is that the ONT is reseted.";
+        }
+        enum "re-register-ont" {
+          value 10;
+          description
+            "The cause of ONT's down is that the ONT is re-register.";
+        }
+        enum "popup-fail" {
+          value 11;
+          description
+            "The cause of ONT's down is that the ONT popup test fails.";
+        }
+        enum "dying-gasp" {
+          value 13;
+          description
+            "The cause of ONT's down is that the ONT is dyinggasp.";
+        }
+        enum "loki" {
+          value 15;
+          description
+            "The cause of ONT's down is that the ONT is LOKI.";
+        }
+        enum "deactived-ont-due-to-the-ring" {
+          value 18;
+          description
+            "The cause of ONT's down is that the ONT is deactived ONT due to the ring.";
+        }
+        enum "dos-rogue-ont" {
+          value 26;
+          description
+            "The cause of ONT's down is that the ONT DoS attack detected.";
+        }
+        enum "shutdown-ont-optical-module" {
+          value 30;
+          description
+            "The cause of ONT's down is that the ONT is shut down ONT optical module.";
+        }
+        enum "reset-ont-by-ont-command" {
+          value 31;
+          description
+            "The cause of ONT's down is that the ONT is reseted ONT by ONT command.";
+        }
+        enum "reset-ont-by-ont-reset-button" {
+          value 32;
+          description
+            "The cause of ONT's down is that the ONT is reseted ONT by ONT reset button.";
+        }
+        enum "reset-ont-by-ont-software" {
+          value 33;
+          description
+            "The cause of ONT's down is that the ONT is reseted ONT by ONT software.";
+        }
+        enum "deactived-ont-due-to-broadcast-attack" {
+          value 34;
+          description
+            "The cause of ONT's down is that the ONT is deactivated due to broadcast attack.";
+        }
+        enum "operator-check-fail" {
+          value 35;
+          description
+            "The cause of ONT's down is that operator check fail.";
+        }
+        enum "rogue-ont-detected-by-itself" {
+          value 37;
+          description
+            "The cause of ONT's down is that the rogue ONT detected by itself.";
+        }
+        enum "auto-ioslate-reset" {
+          value 38;
+          description
+            "The cause of ONT's down is that the ONT is auto ioslate reset.";
+        }
+        enum "auto-ioslate-deactived" {
+          value 39;
+          description
+            "The cause of ONT's down is that the ONT is auto ioslate deactived.";
+        }
+        enum "not-in-whitelist" {
+          value 40;
+          description
+            "The cause of ONT's down is that the ONT is not in white list.";
+        }
+        enum "bandwidth-insufficient" {
+          value 41;
+          description
+            "The channel's bandwidth is insufficient.";
+        }
+      }
+      description
+        "The reason why the ONT last went offline.";
+    }
+    leaf last-dying-gasp-time {
+      type yang:date-and-time;
+      description
+        "Indicates the time when the ONT last went down due to Dying Gasp date-time specification.";
+    }
+    leaf isolation-state {
+      type enumeration {
+        enum "normal" {
+          value 0;
+          description
+            "Indicates that the isolation state is normal.";
+        }
+        enum "isolated" {
+          value 1;
+          description
+            "Indicates that the isolation state is isolated.";
+        }
+      }
+      description
+        "The ONT isolation status.";
+    }
+    leaf battery-current-state {
+      type enumeration {
+        enum "not-support" {
+          value 0;
+          description
+            "Indicates that the battery current state is not support.";
+        }
+        enum "charge" {
+          value 1;
+          description
+            "Indicates that the battery current state is charge.";
+        }
+        enum "discharge" {
+          value 2;
+          description
+            "Indicates that the battery current state is discharge.";
+        }
+        enum "holding" {
+          value 3;
+          description
+            "Indicates that the battery current state is holding.";
+        }
+        enum "support-but-invalid" {
+          value 4;
+          description
+            "Indicates that the battery current state is support but invalid.";
+        }
+        enum "unknown-status" {
+          value 5;
+          description
+            "Indicates that the battery current state is unknown.";
+        }
+      }
+      description
+        "The ONT battery status.";
+    }
+    leaf config-file-crc {
+      type uint32;
+      description
+        "The CRC value of the ONT config file.";
+    }
+    leaf load-xml-state {
+      type uint32;
+      description
+        "The state of the xml load for ONT.
+         0x01 initstate
+         0x02 process 0%
+         0x03 ftp load fail
+         0x04 loaded to mainboard process 10%
+         0x05 loaded to ponboard process 20%
+         0x06 loaded to ponboard fail
+         0x07 process 80%
+         0x08 process 100%
+         0x09 fail:user stop
+         0x0a fail:ONT not support xml
+         0x0b fail:ONT offline
+         0x0c fail:ONT response unknown fail
+         0x0d fail:ONT response timeout
+         0x0e fail:xml error ONT will reconfigure fail
+         0x0f fail:xml format error
+         0x10 fail:xml content error
+         0x11 fail:ONT find xml transfer error
+         0x12 fail:unknown error from ONT
+         0x13 fail:unknown error from ponboard
+         0x14 fail:system is busy because the ponboard's channel is occupied
+         0x16 fail:ONT protect group switchover
+         0xff fail:unknown reason.";
+    }
+    leaf support-xml-version {
+      type string {
+        length "0..25";
+      }
+      description
+        "The xml version that the ONT supports, it is a V.R.C.SP string.";
+    }
+    leaf load-xml-error-info {
+      type string {
+        length "0..280";
+      }
+      description
+        "Indicates the error information when the ONT XML configuration fails to be loaded.";
+    }
+    leaf load-app-state {
+      type uint32;
+      description
+        "The state of the app load for ONT.
+         0x01 initstate
+         0x02 process 0%
+         0x03 ftp load fail
+         0x04 loaded to mainboard process 10%
+         0x05 loaded to ponboard process 20%
+         0x06 loaded to ponboard fail
+         0x07 process 80%
+         0x08 fail:user stop
+         0x09 fail:ONT offline
+         0x0a fail:ONT response fail
+         0x0b fail:ONT response timeout
+         0x0c fail:PON inner error
+         0x0d process 100%, ONT restart
+         0x0e Process 100% the ONT now is in survival mode
+         0x0f fail:system is busy because the ponboard's channel is occupied
+         0x10 fail:failed to verify the version information
+         0x11 fail:processing the loading task timed out
+         0x12 fail:ONT file check failure
+         0x13 fail:code file validate failure
+         0x14 fail:system buffer is insufficient
+         0x15 fail:ONT not support load
+         0x16 fail:ONT storage space insufficient
+         0x17 fail:ONT image file error
+         0x18 fail:ONT image file existed
+         0x19 fail:ONT activate image file fail
+         0x1a fail:ONT commit image file fail
+         0x1b fail:ONT image file crc error
+         0x1c fail:ONT protect group switchover
+         0xff fail:unknown reason.";
+    }
+    leaf memory-occupation {
+      type bbf-yang:percent;
+      description
+        "The memory occupation of the ONT.";
+    }
+    leaf cpu-occupation {
+      type bbf-yang:percent;
+      description
+        "The CPU occupation of the ONT.";
+    }
+    leaf temperature {
+      type int32;
+      units "°C";
+      description
+        "The temperature of the ONT.";
+    }
+    leaf used-mutual-auth {
+      type enumeration {
+        enum "yes" {
+          value 1;
+          description
+            "Indicates the ONT uses mutual authentication.";
+        }
+        enum "no" {
+          value 2;
+          description
+            "Indicates the ONT does not use mutual authentication.";
+        }
+      }
+      description
+        "Indicates whether the ONT uses mutual authentication.";
+    }
+    leaf power-reduction-status {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "It means the ONT is in normal state, it is running normally and is not performing power reduction function.";
+        }
+        enum "doze" {
+          value 2;
+          description
+            "Doze mode:when in a LowPower state (the Asleep state) in this mode the ONT receiver remains active,
+             ONT can receive downstream traffic, but it will deactivate its transmitter periodicly,
+             at this time it can't send its upstream traffic.";
+        }
+        enum "cyclicsleep" {
+          value 3;
+          description
+            "Cyclic sleep mode:when in a LowPower state (the Asleep state) in this mode, the ONT receiver is inactive;
+             the ONT cannot receive downstream traffic. its transmitter is also inactive, so it can't send its upstream traffic.";
+        }
+        enum "watchfulsleep" {
+          value 4;
+          description
+            "Watchful sleep mode:when in a LowPower state (the Watch state) in this mode,
+             the ONT periodically checks the downstream traffic for wakeup indications from the OLT.";
+        }
+      }
+      description
+        "Indicates whether the ONT is in power reduction state and its actual power reduction state.";
+    }
+    leaf nni-physical-up-rate {
+      type int32;
+      units "kbit/s";
+      description
+        "Indicates the upstream physical rate negotiated between the ONT and OLT:
+         EPON or asymmetric 10G EPON: 1000000;
+         GPON: 1244160;
+         XG-PON: 2488320;
+         symmetric 10G EPON: 10000000;
+         XGS-PON: 9953280;
+         XGT or 50G: 12441600;
+         50G: 2883200;
+         50GS: 49766400.";
+    }
+    leaf nni-physical-down-rate {
+      type int32;
+      units "kbit/s";
+      description
+        "This object indicates the downstream physical rate negotiated between the ONT and OLT.
+         For example,
+         The downstream physical rate of the ONT is 1,000,000 Kbps in the EPON system.
+         The downstream physical rate of the ONT is 2,488,320 Kbps in the GPON system.
+         The downstream physical rate of the ONT is 9,953,280 Kbps in the XG-PON or XGS-PON system.
+         The downstream physical rate of the ONT is 10,000,000 Kbps in the 10G EPON system.
+         The downstream physical rate of the ONT is 12,441,600 Kbps in the XGT system.
+         The downstream physical rate of the ONT is 49,766,400 Kbps in the 50G or 50GS system.";
+    }
+    leaf actual-nni-type {
+      type xpon-types:ont-nni-type;
+      description
+        "Indicates the actual NNI type of the ONT.";
+    }
+    leaf last-actual-nni-type {
+      type xpon-types:ont-nni-type;
+      description
+        "Indicates the last actual NNI type of the ONT.";
+    }
+    leaf power-type {
+      type enumeration {
+        enum "dc" {
+          value 1;
+          description
+            "Indicates that the ONT power type is DC.";
+        }
+        enum "ac" {
+          value 2;
+          description
+            "Indicates that the ONT power type is AC.";
+        }
+      }
+      description
+        "This object indicates the power type of the ONT.";
+    }
+    leaf actual-serial-number {
+      type xpon-common-types:general-onu-serial-number;
+      description
+        "The serial number is unique for each ONT and contains
+         the vendor ID and version number. The first four
+         bytes are an ASCII-encoded vendor ID four letter
+         mnemonic. The second four bytes are a binary encoded
+         serial number under the control of the ONT vendor.";
+      reference
+        "ITU-T G.984, G.988, G.9807, G.987, G.989";
+    }
+    leaf system-up-duration {
+      type int32;
+      units "s";
+      description
+        "The system up duration of the ONT.";
+    }
+    leaf device-type {
+      type enumeration {
+        enum "sfu" {
+          value 0;
+          description
+            "Indicates that the ONT device type is SFU.";
+        }
+        enum "hgu" {
+          value 1;
+          description
+            "Indicates that the ONT device type is HGU.";
+        }
+        enum "sbu" {
+          value 2;
+          description
+            "Indicates that the ONT device type is SBU.";
+        }
+        enum "mdu" {
+          value 3;
+          description
+            "Indicates that the ONT device type is MDU.";
+        }
+        enum "mtu" {
+          value 4;
+          description
+            "Indicates that the ONT device type is MTU.";
+        }
+        enum "cbu" {
+          value 5;
+          description
+            "Indicates that the ONT device type is CBU.";
+        }
+        enum "sfu-1fe-1pots" {
+          value 6;
+          description
+            "Indicates that the ONT device type is SFU(1FE+1POTS).";
+        }
+      }
+      description
+        "Indicates the ONT device type.";
+    }
+    leaf actual-access-scenario {
+      type access-scenario-type;
+      description
+        "Indicates the actual access scenario type of ONT.";
+    }
+    container ont-version {
+      description
+        "Statistics of the version info of the ONT.";
+      leaf version {
+        type string {
+          length "0..15";
+        }
+        description
+          "The ONT version number.";
+      }
+      leaf vendor-id {
+        type binary {
+          length "4";
+        }
+        description
+          "This object indicates the ONT vendorId.";
+        reference
+          "ITU-T G.984, G.988, G.9807, G.987, G.989";
+      }
+      leaf product-id {
+        type int32;
+        description
+          "This object indicates the ONT productId.";
+      }
+      leaf equipment-id {
+        type binary {
+          length "20";
+        }
+        description
+          "This object indicates the ONT equipmentId.";
+        reference
+          "ITU-T G.988";
+      }
+      leaf main-software-version {
+        type string {
+          length "0..14";
+        }
+        description
+          "The active software version of the ONT.";
+      }
+      leaf standby-software-version {
+        type string {
+          length "0..14";
+        }
+        description
+          "The standby software version of the ONT.";
+      }
+      leaf software-work-mode {
+        type enumeration {
+          enum "normal" {
+            value 1;
+            description
+              "Indicates that the software working mode is normal.";
+          }
+          enum "survival-mode" {
+            value 2;
+            description
+              "Indicates that the software working mode is survival-mode.";
+          }
+        }
+        description
+          "This object indicates the software working mode of the GPON ONT.";
+      }
+      leaf customized-info {
+        type string {
+          length "0..24";
+        }
+        description
+          "This object indicates the ONT customize information.";
+      }
+      leaf equipment-serial-number {
+        type string {
+          length "0..25";
+        }
+        description
+          "This object indicates the ONT equipment serial number.";
+      }
+      leaf mac {
+        type yang:phys-address;
+        description
+          "This object indicates the ONT MAC address.";
+      }
+    }
+  }
+
+  grouping ex-v-ontani-config-data {
+    description
+      "ONT config data.";
+    leaf ont-mngt-mode {
+      type enumeration {
+        enum "omci" {
+          value 1;
+          description
+            "Indicates the ONT management mode is OMCI.";
+        }
+        enum "stand-alone" {
+          value 2;
+          description
+            "Indicates the ONT management mode is stand alone.";
+        }
+      }
+      default "omci";
+      description
+        "Indicates the ONT management mode.";
+    }
+    leaf qos-mode {
+      type enumeration {
+        enum "priority-queue" {
+          value 1;
+          description
+            "In this mode, the user specifies the transmit queue of the GEM port packets in a T-CONT.
+             When transmitting the upstream data, the T-CONT transmits the data strictly according
+             to the priority of the queue.";
+        }
+        enum "gem-car" {
+          value 2;
+          description
+            "In this mode, the ONT controls the traffic rate based on the GEM port.
+             When multiple service flows exist at the GEM port, the scheduling mode
+             of the service flows is determined by the configured scheduling mode of the ONT.";
+        }
+        enum "flow-car" {
+          value 3;
+          description
+            "In this mode, the ONT controls the traffic rate based on the traffic stream of the GEM port.
+             After flow control is completed, the service flows are scheduled in the T-CONT queue.
+             The scheduling mode of the service flows is determined by the configured scheduling mode
+             of the ONT.";
+        }
+      }
+      default "priority-queue";
+      description
+        "The QoS mode of the ONT.";
+    }
+    leaf loid {
+      when "not('/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:expected-serial-number' and'/if:interfaces/if:interface/bbf-xponvani:v-ani/bbf-xponvani:expected-registration-id')";
+      type string {
+        length "1..24";
+      }
+      description
+        "The object indicates the loid of the ONT.
+         The expected-serial-number and expected-registration-id cannot be configured when configuring loid.";
+    }
+    leaf check-code {
+      when "../loid";
+      type string {
+        length "1..12";
+      }
+      description
+        "The object indicates the checkcode of the ONT.";
+    }
+    leaf mapping-mode {
+      type enumeration {
+        enum "vlan" {
+          value 1;
+          description
+            "Indicates the VLAN mapping.";
+        }
+        enum "priority" {
+          value 2;
+          description
+            "Indicates the 802.1p priority mapping.";
+        }
+        enum "vlan-priority" {
+          value 3;
+          description
+            "Indicates the VLAN + 802.1p priority mapping.";
+        }
+        enum "port" {
+          value 4;
+          description
+            "Indicates the port ID mapping.";
+        }
+        enum "port-vlan" {
+          value 5;
+          description
+            "Indicates the port ID+VLAN mapping.";
+        }
+        enum "port-priority" {
+          value 6;
+          description
+            "Indicates the port ID+802.1p priority mapping.";
+        }
+        enum "port-vlan-priority" {
+          value 7;
+          description
+            "Indicates the port ID+VLAN+802.1p priority mapping.";
+        }
+      }
+      default "vlan-priority";
+      description
+        "Indicates the ONT mapping mode.";
+    }
+    leaf gem-encrypt-mode {
+      type enumeration {
+        enum "aes128" {
+          value 1;
+          description
+            "Indicates the aes128 gem encrypt mode.";
+        }
+        enum "aes256" {
+          value 2;
+          description
+            "Indicates the aes256 gem encrypt mode.";
+        }
+        enum "sm4128" {
+          value 3;
+          description
+            "Indicates the sm4128 gem encrypt mode.";
+        }
+      }
+      default "aes128";
+      description
+        "Indicates the gem encrypt mode.";
+    }
+    list tpid {
+      key "index";
+      description
+        "Configure the TPID value of GPON ONT.";
+      leaf index {
+        type uint8 {
+          range "0..3";
+        }
+        description
+          "Indicates the index of the TPID.";
+      }
+      leaf val {
+        type uint16 {
+          range "1536..65535";
+        }
+        description
+          "Indicates the value of the TPID.";
+      }
+    }
+    leaf tcont-group-index-ref {
+      type uint8 {
+        range "0..7";
+      }
+      description
+        "Indicates the default tcont-group index.";
+    }
+    leaf access-scenario {
+      type access-scenario-type;
+      description
+        "Indicates the access scenario type of ONT.";
+    }
+  }
+
+  grouping ont-ethernet-port-data {
+    description
+      "ONT ETH port table query.";
+    leaf actual-port-type {
+      type enumeration {
+        enum "t1" {
+          value 13;
+          description
+            "The value (13) indicates that the port type is T1.";
+        }
+        enum "e1" {
+          value 14;
+          description
+            "The value (14) indicates that the port type is E1.";
+        }
+        enum "fe" {
+          value 24;
+          description
+            "The value (24) indicates that the port type is FE.";
+        }
+        enum "ge" {
+          value 34;
+          description
+            "The value (34) indicates that the port type is GE.";
+        }
+        enum "moca" {
+          value 46;
+          description
+            "The value (46) indicates that the port type is MOCA.";
+        }
+        enum "eth" {
+          value 47;
+          description
+            "The value (47) indicates that the port type is ETH.";
+        }
+        enum "iphost" {
+          value 50;
+          description
+            "The value (50) indicates that the port type is IPHOST.";
+        }
+        enum "10ge" {
+          value 54;
+          description
+            "The value (54) indicates that the port type is 10GE.";
+        }
+      }
+      description
+        "This object indicates the actual ETH port type of the ONT.";
+    }
+    leaf ring-status {
+      type enumeration {
+        enum "loop" {
+          value 1;
+          description
+            "Indicates that the ring status of ONT ETH port is loop.";
+        }
+        enum "noloop" {
+          value 2;
+          description
+            "Indicates that the ring status of ONT ETH port is no loop.";
+        }
+      }
+      description
+        "The object is used to enable or disable the switch of ONT port IGMP forward mode.";
+    }
+    leaf mode {
+      type enumeration {
+        enum "electric" {
+          value 1;
+          description
+            "Indicates that the mode status of ONT ETH port is electric.";
+        }
+        enum "optic" {
+          value 2;
+          description
+            "Indicates that the mode status of ONT ETH port is optic.";
+        }
+      }
+      description
+        "Indicates the optical module status of the ONT ETH port.";
+    }
+    leaf optical-module-status {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "Indicates that the optical module status of ONT ETH port is normal.";
+        }
+        enum "absence" {
+          value 2;
+          description
+            "Indicates that the optical module status of ONT ETH port is absence.";
+        }
+        enum "mismatch" {
+          value 3;
+          description
+            "Indicates that the optical module status of ONT ETH port is mismatch.";
+        }
+      }
+      description
+        "The status of the ONT ETH port.";
+    }
+    leaf online-duration {
+      type yang:gauge32;
+      units "s";
+      description
+        "Indicates the online duration of the ONT ETH port.";
+    }
+    leaf duplex {
+      type enumeration {
+        enum "unknown" {
+          value 1;
+          description
+            "Current duplex mode could not be determined.";
+          reference
+            "IEEE Std 802.3, 30.3.1.1.32, aDuplexStatus";
+        }
+        enum "half" {
+          value 2;
+          description
+            "Half duplex.";
+          reference
+            "IEEE Std 802.3, 30.3.1.1.32, aDuplexStatus";
+        }
+        enum "full" {
+          value 3;
+          description
+            "Full duplex.";
+          reference
+            "IEEE Std 802.3, 30.3.1.1.32, aDuplexStatus";
+        }
+      }
+      description
+        "The duplex mode of ONT Ethernet port.
+         The value of 'unknown' indicates that the current duplex mode could not be determined.
+         The value of 'full' indicates that the IEEE Std 802.3 Ethernet interface operates in full duplex mode.
+         The value of 'half' indicates that the IEEE Std 802.3 Ethernet interface operates in half duplex mode.";
+      reference
+        "IEEE Std 802.3, 30.3.1.1.32, aDuplexStatus.";
+    }
+    leaf speed {
+      type uint64;
+      units "Mbit/s";
+      description
+        "The speed of ONT Ethernet port.";
+    }
+    leaf active-fec-mode {
+      type fec-mode-type;
+      description
+        "The FEC mode of the ONT ETH port.";
+    }
+  }
+
+  grouping ex-port-bundle {
+    description
+      "Configure the binding function of an ONT port.";
+    list eth-bundle {
+      key "bundle-index";
+      description
+        "Configure the binding function of ONT ETH port.";
+      leaf bundle-index {
+        type uint8 {
+          range "0..7";
+        }
+        description
+          "Indicates the index of a binding group.";
+      }
+      container port-list {
+        description
+          "Configure the binding function of port list.";
+        leaf-list port {
+          type if:interface-ref;
+          must "/if:interfaces/if:interface/if:type='ianaift:ethernetCsmacd'" {
+            error-message
+              "Must reference an ethernetCsmacd interface.";
+          }
+          description
+            "Configure the name of ONT ETH interface.";
+        }
+      }
+      leaf master-port {
+        type uint8 {
+          range "1..32";
+        }
+        description
+          "Configure the master port of a binding group.
+           While querying, the value (-1) means no master port on the bundle group.
+           While setting, the value (-1) means to unset master port on the bundle group.
+           Otherwise, the value in port-list indicates that the port is master port.";
+      }
+    }
+  }
+
+  grouping onu-snmp-route {
+    description
+      "Configure SNMP route data for Optical Network Unit (ONU) management.";
+    list onu-snmp-route {
+      key "url mask output-port";
+      max-elements 8;
+      description
+        "Configure the SNMP route for Optical Network Unit (ONU) management.";
+      leaf url {
+        type inet:ip-address;
+        description
+          "The IP address of the Optical Network Unit (ONU) SNMP route.";
+      }
+      leaf mask {
+        type inet:ip-address;
+        description
+          "The subnet mask of the IP address.";
+      }
+      leaf output-port {
+        type uint32 {
+          range "0..254";
+        }
+        description
+          "The output portid of the Optical Network Unit (ONU) SNMP route.";
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface/ieee802-eth-if:ethernet" {
+    when "../if:type = 'ianaift:ethernetCsmacd'";
+    description
+      "Huawei extend ONT ETH port config data.";
+    container optical-module {
+      description
+        "Configure ONT ETH port optical module.";
+      leaf optical-alarm-profile {
+        type string {
+          length "0..32";
+        }
+        description
+          "Assigns a threshold profile to an ONT ETH port.
+           If no threshold profile is assigned, alarm reporting for all thresholds is disabled.";
+      }
+    }
+    container fec-mode {
+      description
+        "Configure FEC mode for the ONT ETH port.";
+      leaf config-fec-mode {
+        type fec-mode-type;
+        description
+          "Configure FEC mode for the ONT ETH port.";
+      }
+    }
+  }
+
+  rpc calculate-consume-bandwidth {
+    description
+      "Calculates the consumed bandwidth when a T-CONT is added to a specified ONT.";
+
+    input {
+      leaf v-ani-if-name {
+        type if:interface-ref;
+        description
+          "The name of ONT virtual ANI interface.";
+      }
+      leaf fixed-bandwidth {
+        type uint64;
+        units "bit/s";
+        default "0";
+        description
+          "Represents the reserved portion of the link capacity that
+           is allocated to the given traffic flow, regardless of its
+           traffic demand and the overall traffic load conditions.";
+        reference
+          "ITU-T G.984.3 clause 7.4.4.3";
+      }
+      leaf assured-bandwidth {
+        type uint64;
+        units "bit/s";
+        default "0";
+        description
+          "Represents a portion of the link capacity that is allocated
+           to the given traffic flow as long as the flow has
+           unsatisfied traffic demand, regardless of the overall
+           traffic conditions.";
+        reference
+          "ITU-T G.984.3 clause 7.4.4.3";
+      }
+      leaf maximum-bandwidth {
+        type uint64;
+        units "bit/s";
+        must
+          "((../fixed-bandwidth) and
+           (../assured-bandwidth) and
+           (. >= ../fixed-bandwidth + ../assured-bandwidth))
+           or
+           ((../fixed-bandwidth) and
+           not((../assured-bandwidth)) and
+           (. >= ../fixed-bandwidth))
+           or
+           (not((../fixed-bandwidth)) and
+           (../assured-bandwidth) and
+           (. >= ../assured-bandwidth))
+           or
+           (not((../fixed-bandwidth)) and
+           not((../assured-bandwidth)))" {
+          error-message
+            "The maximum bandwidth must be greater than or equal to
+             the sum of the configured fixed and assured bandwidth.";
+          description
+            "The maximum bandwidth must be greater than or equal
+             to the sum of any configured fixed and assured
+             bandwidth.";
+        }
+        description
+          "Represents the upper limit on the total bandwidth that can
+           be allocated to the traffic flow under any traffic
+           conditions.";
+        reference
+          "ITU-T G.984.3 clause 7.4.4.3";
+      }
+    }
+    output {
+      container channels {
+        description
+          "List of the channel of the port.";
+        list channel {
+          key "index";
+          description
+            "Operational data of the channel.";
+          leaf index {
+            type uint8 {
+              range "0..2";
+            }
+            description
+              "Indicates the index of channel.";
+          }
+          leaf type {
+            type enumeration {
+              enum "gpon" {
+                value 1;
+                description
+                  "Indicates that the channel type of the PON port is GPON.";
+              }
+              enum "xgpon" {
+                value 2;
+                description
+                  "Indicates that the channel type of the PON port is XG-PON.";
+              }
+              enum "xgspon" {
+                value 3;
+                description
+                  "Indicates that the channel type of the PON port is XGS-PON.";
+              }
+              enum "50gspon" {
+                value 4;
+                description
+                  "Indicates that the channel type of the PON port is 50GS-PON.";
+              }
+            }
+            description
+              "The channel type of the PON port.";
+          }
+          leaf consume-guaranteed-bandwidth {
+            type uint64;
+            units "bit/s";
+            description
+              "This object indicates the consumed guaranteed bandwidth.";
+          }
+          leaf left-guaranteed-bandwidth {
+            type uint64;
+            units "bit/s";
+            description
+              "This object indicates the left guaranteed bandwidth.";
+          }
+        }
+      }
+    }
+  }
+}

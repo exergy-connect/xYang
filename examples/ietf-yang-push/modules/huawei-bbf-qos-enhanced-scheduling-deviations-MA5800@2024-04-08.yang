@@ -1,0 +1,40 @@
+module huawei-bbf-qos-enhanced-scheduling-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-enhanced-scheduling-deviations-MA5800";
+  prefix bbf-qos-tm-devs-MA5800;
+
+  import bbf-qos-traffic-mngt {
+    prefix bbf-qos-tm;
+  }
+  import bbf-qos-enhanced-scheduling {
+    prefix bbf-qos-sched;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-enhanced-scheduling module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-qos-sched:egress-tm-objects" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-sched:scheduler-node" {
+    deviate not-supported;
+  }
+}

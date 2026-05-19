@@ -1,0 +1,1130 @@
+module huawei-ethernet-an {
+  namespace "urn:huawei:yang:huawei-ethernet-an";
+  prefix hw-ethernet-an;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ietf-hardware {
+    prefix hw;
+  }
+  import iana-if-type {
+    prefix iana;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import bbf-hardware-transceivers {
+    prefix bbf-hw-xcvr;
+  }
+  import huawei-ethernet-types-an {
+    prefix ethernet-types;
+  }
+  import ieee802-ethernet-interface {
+    prefix ieee802-eth-if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for managing ethernet interfaces.";
+
+  revision 2024-10-17 {
+    description
+      "Add enum value of mdi.";
+    reference
+      "";
+  }
+  revision 2023-10-17 {
+    description
+      "Add 25GE ethernet port type.";
+    reference
+      "";
+  }
+  revision 2022-09-26 {
+    description
+      "Add 40GE ethernet port type.";
+    reference
+      "";
+  }
+  revision 2021-05-14 {
+    description
+      "Add ethernet optic modeule.";
+    reference
+      "";
+  }
+  revision 2020-12-03 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+ 
+
+  grouping eth-optic-transceiver {
+    description
+      "Huawei eth optical transceiver data.";
+    leaf identifier {
+      type ethernet-types:optical-module-identifier;
+      config false;
+      description
+        "Indicate the identifier of optical module.";
+    }
+    leaf connector {
+      type ethernet-types:connector-type;
+      config false;
+      description
+        "Indicate the type of optical module connector.";
+    }
+    leaf cc-base {
+      type uint32;
+      config false;
+      description
+        "The check code for base ID fields.";
+    }
+  }
+
+  augment "/if:interfaces/if:interface/ieee802-eth-if:ethernet" {
+    description
+      "Huawei's properties of interface.";
+    container physical {
+      when "../../if:type = 'iana:ethernetCsmacd'";
+      presence "ethernet interface related configuration";
+      description
+        "Configure ethernet interfaces.";
+      leaf loopback-mode {
+        type enumeration {
+          enum "no-loopback" {
+            value 0;
+            description
+              "No loopback.";
+          }
+          enum "inner-loopback" {
+            value 1;
+            description
+              "Inner loopback.";
+          }
+          enum "outer-loopback" {
+            value 2;
+            description
+              "Outer loopback.";
+          }
+        }
+        description
+          "Setting port loopback.";
+      }
+      leaf mdi {
+        type enumeration {
+          enum "auto" {
+            value 1;
+            description
+              "The ethernet port is auto.";
+          }
+          enum "normal" {
+            value 2;
+            description
+              "The ethernet port is normal.";
+          }
+          enum "across" {
+            value 3;
+            description
+              "The ethernet port is across.";
+          }
+          enum "not-supported" {
+            value 4;
+            description
+              "The ethernet port is not supported.";
+          }
+        }
+        description
+          "Indicates whether ethernet port supports network cable adaptation.";
+      }
+      leaf port-type {
+        type enumeration {
+          enum "FE" {
+            value 1;
+            description
+              "The port type is FE.";
+          }
+          enum "GE" {
+            value 2;
+            description
+              "The port type is GE.";
+          }
+          enum "10GE" {
+            value 3;
+            description
+              "The port type is 10GE.";
+          }
+          enum "100GE" {
+            value 4;
+            description
+              "The port type is 100GE.";
+          }
+          enum "40GE" {
+            value 5;
+            description
+              "The port type is 40GE.";
+          }
+          enum "25GE" {
+            value 6;
+            description
+              "The port type is 25GE.";
+          }
+        }
+        description
+          "Configure the status of the ports type.";
+      }
+      leaf port-state-change-times {
+        type uint32;
+        config false;
+        description
+          "Total number of port state change times.";
+      }
+    }
+    container logical {
+      when "../../if:type = 'iana:ethernetCsmacd'";
+      presence "huawei's logic configuration of interface.";
+      description
+        "Configure huawei's interface logic.";
+      container tx-auto-off {
+        description
+          "Configure the tx power auto off of the interface.";
+        leaf enabled {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable tx auto off on this interface.";
+        }
+        leaf detect-time {
+          when "../enabled = 'true'";
+          type int32 {
+            range "1..60";
+          }
+          units "min";
+          default "10";
+          description
+            "If the port cannot receive any optical signal in a period time, the port will stop transmitting optical signals.";
+        }
+        leaf resume-detect-mode {
+          when "../enabled = 'true'";
+          type enumeration {
+            enum "manual" {
+              value 0;
+              description
+                "Tx power resume detection manually.";
+            }
+            enum "auto" {
+              value 1;
+              description
+                "Tx power resume detection automatically.";
+            }
+          }
+          default "manual";
+          description
+            "Indicates the switch of Tx auto power resume detection.";
+        }
+        leaf resume-detect-interval {
+          when "../enabled = 'true' and
+           ../resume-detect-mode = 'auto'";
+          type int32 {
+            range "100..300";
+          }
+          units "s";
+          default "100";
+          description
+            "Indicates the interval at which the port automatically transmits optical signals.";
+        }
+        leaf resume-detect-duration {
+          when "../enabled = 'true'";
+          type int32 {
+            range "100..3000";
+          }
+          units "ms";
+          default "2000";
+          description
+            "Indicates the pulse width of the optical signal.";
+        }
+      }
+    }
+    container ethernet-frame {
+      description
+        "Configure Jumbo-frame or mtu on a port.";
+      leaf jumbo-frame {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable jumbo frame.";
+      }
+      leaf mtu {
+        type uint16 {
+          range "1519..9280";
+        }
+        units "Byte";
+        default "2052";
+        description
+          "Configure the MTU on a port..";
+      }
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    description
+      "Optical module informations of the ethernet port.";
+    container eth-optical-module-info {
+      config false;
+      description
+        "Operational state of the optical module infomation.";
+      uses eth-optic-transceiver;
+      leaf br-nomimal {
+        type uint32;
+        units "100 Mbit/s";
+        config false;
+        description
+          "Nominal bit rate.";
+      }
+      leaf length-9-um-km {
+        type uint32;
+        units "km";
+        config false;
+        description
+          "Indicates the transmission reach in the unit of km supported when a 9/125 μm fiber is used.";
+      }
+      leaf length-9-um {
+        type uint32;
+        units "100 m";
+        config false;
+        description
+          "Indicates the transmission reach in the unit of 100 m supported when a 9/125 μm fiber is used.";
+      }
+      leaf wave-length {
+        type uint32;
+        units "nm";
+        config false;
+        description
+          "The laser wavelength.";
+      }
+      leaf diagnostic-monitoring-type {
+        type enumeration {
+          enum "internally-calibrate" {
+            value 1;
+            description
+              "The diagnostic monitoring type is internally calibrated.";
+          }
+          enum "externally-calibrate" {
+            value 2;
+            description
+              "The diagnostic monitoring type is externally calibrated.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+        }
+        config false;
+        description
+          "Indicates the diagnostic monitoring type of an optical transceiver.";
+      }
+      leaf cc-ext {
+        type uint32;
+        config false;
+        description
+          "Check code for the extended ID fields.";
+      }
+      leaf info-remote {
+        type enumeration {
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+          enum "remote" {
+            value 1;
+            description
+              "The operation is performed on a remote optical module.";
+          }
+        }
+        config false;
+        description
+          "Indicates the operation is performed on a remote optical module.";
+      }
+      leaf sfp-plus-cable-tech {
+        type enumeration {
+          enum "passive-cable" {
+            value 1;
+            description
+              "Passive cable.";
+          }
+          enum "active-cable" {
+            value 2;
+            description
+              "Active cable.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+        }
+        config false;
+        description
+          "Indicates the cable specification compliance.";
+      }
+      leaf wdm-class {
+        type enumeration {
+          enum "no-wdm" {
+            value 1;
+            description
+              "No WDM.";
+          }
+          enum "cwdm" {
+            value 2;
+            description
+              "WDM class is CWDM.";
+          }
+          enum "dwdm" {
+            value 3;
+            description
+              "WDM class is DWDM.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid.";
+          }
+        }
+        config false;
+        description
+          "Extended identifier: WDM class.";
+      }
+      leaf dwdm-power {
+        type enumeration {
+          enum "dwdm-power-level1" {
+            value 1;
+            description
+              "The power is lower than 1W.";
+          }
+          enum "dwdm-power-level2" {
+            value 2;
+            description
+              "The power is between 1W and 1.5W.";
+          }
+          enum "dwdm-power-level3" {
+            value 3;
+            description
+              "The power is higher than 1.5W.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+        }
+        config false;
+        description
+          "Extended identifier: Power level.";
+      }
+      leaf dwdm-max-temperature {
+        type uint32;
+        units "0.000001 ℃";
+        config false;
+        description
+          "Max temperature.";
+      }
+      leaf dwdm-min-temperature {
+        type int32;
+        units "0.000001 ℃";
+        config false;
+        description
+          "Min temperature.";
+      }
+      leaf dwdm-max-supply-current {
+        type uint32;
+        units "0.000001 A";
+        config false;
+        description
+          "Max supply current.";
+      }
+      leaf dwdm-channel-spacing {
+        type enumeration {
+          enum "channel-spacing-200g" {
+            value 1;
+            description
+              "The fibre channel spacing is 200GHz.";
+          }
+          enum "channel-spacing-100g" {
+            value 2;
+            description
+              "The fibre channel spacing is 100GHZ.";
+          }
+          enum "channel-spacing-50g" {
+            value 3;
+            description
+              "The fibre channel spacing is 50GHZ.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+        }
+        config false;
+        description
+          "Fibre channel spacing.";
+      }
+      leaf dwdm-number-of-channels {
+        type int32;
+        config false;
+        description
+          "Number of channels.";
+      }
+      leaf dwdm-wave-length {
+        type int32;
+        units "0.01 nm";
+        config false;
+        description
+          "Laser wavelength.";
+      }
+      leaf module-user-eeprom {
+        type string {
+          length "0..384";
+        }
+        config false;
+        description
+          "Optics module user EEPROM information.";
+      }
+      leaf sff8636-compliance {
+        type ethernet-types:sff8636-version;
+        config false;
+        description
+          "Indicate the SFF-8636 standard.";
+      }
+      leaf vendor-oui {
+        type uint32;
+        config false;
+        description
+          "Indicate the vendor IEEE company ID of a optical module.";
+      }
+      leaf vendor-specific {
+        type string {
+          length "0..96";
+        }
+        config false;
+        description
+          "Vendor of Optical module specific information.";
+      }
+      leaf ext-id {
+        type ethernet-types:extid-data;
+        config false;
+        description
+          "Indicate the extended type of optical module.";
+      }
+      leaf encoding {
+        type ethernet-types:encoding-data;
+        config false;
+        description
+          "Indicate the encoding mechanism.";
+      }
+      leaf options {
+        type ethernet-types:options-data;
+        config false;
+        description
+          "Indicate the Options.";
+      }
+      leaf enhanced-options {
+        type ethernet-types:enhanced-options-data;
+        config false;
+        description
+          "Indicate the enhanced Options.";
+      }
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    description
+      "Operational state of 10ge optical module about eth port.";
+    container eth-10ge-optical-module-info {
+      config false;
+      description
+        "Operational state of 10ge optical module.";
+      uses eth-optic-transceiver;
+      leaf compliancebase-ew {
+        type enumeration {
+          enum "non-eth-compliance-base-ew" {
+            value 0;
+            description
+              "Not support 10GBASE-EW.";
+          }
+          enum "eth-compliance-base-ew" {
+            value 1;
+            description
+              "Indicate 10GBASE-EW support or not.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-EW support or not.";
+      }
+      leaf compliance-base-lw {
+        type enumeration {
+          enum "non-eth-compliance-base-lw" {
+            value 0;
+            description
+              "Not support 10GBASE-LW.";
+          }
+          enum "eth-compliance-base-lw" {
+            value 1;
+            description
+              "Support 10GBASE-LW.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-LW support or not.";
+      }
+      leaf compliance-base-sw {
+        type enumeration {
+          enum "non-eth-compliance-base-sw" {
+            value 0;
+            description
+              "Not support 10GBASE-SW.";
+          }
+          enum "eth-compliance-base-sw" {
+            value 1;
+            description
+              "Support 10GBASE-SW.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-SW support or not.";
+      }
+      leaf compliance-base-lrm {
+        type enumeration {
+          enum "non-eth-compliance-base-lrm" {
+            value 0;
+            description
+              "Not support 10GBASE-LRM.";
+          }
+          enum "eth-compliance-base-lrm" {
+            value 1;
+            description
+              "Support 10GBASE-LRM.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-LRM support or not.";
+      }
+      leaf compliance-base-er {
+        type enumeration {
+          enum "non-eth-compliance-base-er" {
+            value 0;
+            description
+              "Not support 10GBASE-ER.";
+          }
+          enum "eth-compliance-base-er" {
+            value 1;
+            description
+              "Support 10GBASE-ER.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-ER support or not.";
+      }
+      leaf compliance-base-lr {
+        type enumeration {
+          enum "non-eth-compliance-base-lr" {
+            value 0;
+            description
+              "Not support 10GBASE-LR.";
+          }
+          enum "eth-compliance-base-lr" {
+            value 1;
+            description
+              "Support 10GBASE-LR.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-LR support or not.";
+      }
+      leaf compliance-base-sr {
+        type enumeration {
+          enum "non-eth-compliance-base-sr" {
+            value 0;
+            description
+              "Not support 10GBASE-SR.";
+          }
+          enum "eth-compliance-base-sr" {
+            value 1;
+            description
+              "Support 10GBASE-SR.";
+          }
+        }
+        config false;
+        description
+          "Indicate 10GBASE-SR support or not.";
+      }
+      leaf fibre-compliance {
+        type ethernet-types:fibre-compliance-data;
+        config false;
+        description
+          "Indicate 10 Gigabit Fibre Channel Compliance type.";
+      }
+      leaf lower-speed-link {
+        type ethernet-types:lower-speed-link-data;
+        config false;
+        description
+          "Indicate Lower Speed Links type.";
+      }
+      leaf sonetsdhcodes-i64point5 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.5.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.5.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.5 support or not.";
+      }
+      leaf sonetsdhcodes-i64point3 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.3.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.3.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.3 support or not.";
+      }
+      leaf sonetsdhcodes-i64point2 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.2.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.2.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.2 support or not.";
+      }
+      leaf sonetsdhcodes-i64point2r {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.2r.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.2r.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.2r support or not.";
+      }
+      leaf sonetsdhcodes-i64point1 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.1.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.1.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.1 support or not.";
+      }
+      leaf sonetsdhcodes-i64point1r {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support I-64.1r.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support I-64.1r.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes I-64.1r support or not.";
+      }
+      leaf sonetsdhcodes-s64point5b {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.5b.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.5b.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.5b support or not.";
+      }
+      leaf sonetsdhcodes-s64point5a {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.5a.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.5a.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.5a support or not.";
+      }
+      leaf sonetsdhcodes-s64point3b {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.3b.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.3b.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.3b support or not.";
+      }
+      leaf sonetsdhcodes-s64point3a {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.3a.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.3a.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.3a support or not.";
+      }
+      leaf sonetsdhcodes-s64point2b {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.2b.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.2b.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.2b support or not.";
+      }
+      leaf sonetsdhcodes-s64point2a {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.2a.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.2a.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.2a support or not.";
+      }
+      leaf sonetsdhcodes-s64point1 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support S-64.1.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support S-64.1.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes S-64.1 support or not.";
+      }
+      leaf sonetsdhcode-sg959p1l1 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support G.959.1 P1L1-2D2.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support G.959.1 P1L1-2D2.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes G.959.1 P1L1-2D2 support or not.";
+      }
+      leaf sonetsdhcodes-l64point3 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support L-64.3.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support L-64.3.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes L-64.3 support or not.";
+      }
+      leaf sonetsdhcodes-l64point2c {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support L-64.2c.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support L-64.2c.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes L-64.2c support or not.";
+      }
+      leaf sonetsdhcodes-l64point2b {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support L-64.2b.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support L-64.2b.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes L-64.2b support or not.";
+      }
+      leaf sonetsdhcodes-l64point2a {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support L-64.2a.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support L-64.2a.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes L-64.2b support or not.";
+      }
+      leaf sonetsdhcodes-l64point1 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support L-64.1.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support L-64.1.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes L-64.1 support or not.";
+      }
+      leaf sonetsdhcodes-v64point3 {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support V-64.3.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support V-64.3.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes V-64.3 support or not.";
+      }
+      leaf sonetsdhcodes-v64point2b {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support V-64.2b.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support V-64.2b.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes V-64.2b support or not.";
+      }
+      leaf sonetsdhcodes-v64point2a {
+        type enumeration {
+          enum "not-support" {
+            value 0;
+            description
+              "Not support V-64.2a.";
+          }
+          enum "support" {
+            value 1;
+            description
+              "Support V-64.2a.";
+          }
+        }
+        config false;
+        description
+          "Indicate SONET/SDH Codes V-64.2a support or not.";
+      }
+      leaf encoding-sont {
+        type enumeration {
+          enum "non-encoding-sont" {
+            value 0;
+            description
+              "Not support SONT.";
+          }
+          enum "encoding-sont" {
+            value 1;
+            description
+              "Support SONT.";
+          }
+        }
+        config false;
+        description
+          "Indicate encoding mechanism SONT support or not..";
+      }
+      leaf dbrmin {
+        type uint32;
+        units "100 Mbit/s";
+        config false;
+        description
+          "Indicate Minimum bit rate.";
+      }
+      leaf support-len-smf {
+        type uint32;
+        config false;
+        description
+          "Indicate the link length that is supported by the transceiver with the applicable standards
+           using Single-mode Fiber.";
+      }
+      leaf wavelength {
+        type uint32;
+        config false;
+        description
+          "The laser wavelength.";
+      }
+      leaf ccext {
+        type uint32;
+        config false;
+        description
+          "Indicate the CC_EXT.";
+      }
+      leaf detector {
+        type enumeration {
+          enum "non-detector" {
+            value 0;
+            description
+              "Detector is disable.";
+          }
+          enum "detector" {
+            value 1;
+            description
+              "Detector is enable.";
+          }
+          enum "invalid" {
+            value -1;
+            description
+              "Invalid value.";
+          }
+        }
+        config false;
+        description
+          "Indicates the detector switch.";
+      }
+    }
+  }
+}

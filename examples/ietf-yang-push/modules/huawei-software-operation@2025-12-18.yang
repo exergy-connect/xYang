@@ -1,0 +1,1266 @@
+submodule huawei-software-operation {
+  yang-version 1.1;
+  belongs-to huawei-software-management {
+    prefix hw-sm;
+  }
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import ietf-hardware {
+    prefix hw;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     supporting software management.";
+
+  revision 2025-12-18 {
+    description
+      "Add XFTP Yang model support.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-10-17 {
+    description
+      "Add leaf board-name.
+       Add enum update to enumeration type load-policy-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-05-24 {
+    description
+      "Add identity yang-configuration, cli-configuration.
+       Modify undo-content container to undo-content list.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-03-25 {
+    description
+      "Add ssd-g2-crl identity.";
+    reference
+      "";
+  }
+  revision 2025-03-10 {
+    description
+      "Add the loading and backup content.";
+    reference
+      "";
+  }
+  revision 2024-08-29 {
+    description
+      "Change is-can-load-software to a non-configuration node.";
+    reference
+      "";
+  }
+  revision 2024-05-20 {
+    description
+      "Add leaf is-can-load-software.";
+    reference
+      "";
+  }
+  revision 2023-11-27 {
+    description
+      "Add three nodes, encrypt-algorithm-type, encrypt-key-code and encrypt-iv-code.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-05-10 {
+    description
+      "Add one node, sftp-server-publickey-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-12-23 {
+    description
+      "
+       Adjust the keyword identity order.
+       Modify the description of operation-status.
+       Modify the description of operation-config.
+       Modify the description of file-servers.
+       Modify the description of file-server.
+       Modify the description of operation-state.
+       Modify the description of operation.
+       Modify the description of system-status-collcet.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-12-11 {
+    description
+      "Add one node, switchover-update-software.";
+    reference
+      "";
+  }
+  revision 2020-06-28 {
+    description
+      "Add two nodes, sftp-server-public-key-code and sftp-server-publickey-encoding-type.";
+    reference
+      "";
+  }
+  revision 2019-06-13 {
+    description
+      "Add a container of file-servers.";
+    reference
+      "";
+  }
+  revision 2018-04-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity operation-type {
+    description
+      "Base identity for operation type.
+       Vendors can define physical type of the device.";
+  }
+
+  identity save-operation {
+    base operation-type;
+    description
+      "Save operation.";
+  }
+
+  identity download-operation {
+    base operation-type;
+    description
+      "Download operation.";
+  }
+
+  identity backup-operation {
+    base operation-type;
+    description
+      "Backup operation.";
+  }
+
+  identity activate-operation {
+    base operation-type;
+    description
+      "Activate operation.";
+  }
+
+  identity rollback-operation {
+    base operation-type;
+    description
+      "Rollback operation.";
+  }
+
+  identity undo-rollback-operation {
+    base operation-type;
+    description
+      "Undo rollback operation.";
+  }
+
+  identity activate-patch-operation {
+    base operation-type;
+    description
+      "Activate patch operation.";
+  }
+
+  identity deactivate-patch-operation {
+    base operation-type;
+    description
+      "Deactivate patch operation.";
+  }
+
+  identity run-patch-operation {
+    base operation-type;
+    description
+      "Run patch operation.";
+  }
+
+  identity delete-patch-operation {
+    base operation-type;
+    description
+      "Delete patch operation.";
+  }
+
+  identity rollback-patch-operation {
+    base operation-type;
+    description
+      "Rollback patch operation.";
+  }
+
+  identity update-operation {
+    base operation-type;
+    description
+      "Update operation.";
+  }
+
+  identity content-type {
+    description
+      "Base identity for content type.
+       Vendors can define the type. For example: software-package, database, configuration,patch,license,etc..";
+  }
+
+  identity collect-content {
+    description
+      "Base identity for collect content.
+       Vendors can define the type. For example: cpu, board running status, upstream port status, etc..";
+  }
+
+  identity software-package {
+    base content-type;
+    description
+      "Software package.";
+  }
+
+  identity patch {
+    base content-type;
+    description
+      "Patch.";
+  }
+
+  identity license {
+    base content-type;
+    description
+      "License.";
+  }
+
+  identity database {
+    base content-type;
+    description
+      "Database.";
+  }
+
+  identity configuration {
+    base content-type;
+    description
+      "Configuration.";
+  }
+
+  identity yang-configuration {
+    base content-type;
+    description
+      "Configuration base on YANG.";
+  }
+
+  identity cli-configuration {
+    base content-type;
+    description
+      "Configuration base on cli.";
+  }
+
+  identity script {
+    base content-type;
+    description
+      "Script.";
+  }
+
+  identity ont-interoperability-file {
+    base content-type;
+    description
+      "Ont interoperability file.";
+  }
+
+  identity program {
+    base content-type;
+    description
+      "Program file.";
+  }
+
+  identity program-app {
+    base content-type;
+    description
+      "Application program.";
+  }
+
+  identity logic-fpga {
+    base content-type;
+    description
+      "Fpga logic file.";
+  }
+
+  identity logic-cpld {
+    base content-type;
+    description
+      "Cpld logic file.";
+  }
+
+  identity logic-pci {
+    base content-type;
+    description
+      "Pci logic file.";
+  }
+
+  identity app-firmware {
+    base content-type;
+    description
+      "Firmware.";
+  }
+
+  identity program-extended-bios {
+    base content-type;
+    description
+      "Extended bios file.";
+  }
+
+  identity program-base-bios {
+    base content-type;
+    description
+      "Base bios file.";
+  }
+
+  identity logic-cpld2 {
+    base content-type;
+    description
+      "Cpld2 file.";
+  }
+
+  identity logic-cpld3 {
+    base content-type;
+    description
+      "Cpld3 file.";
+  }
+
+  identity declaration {
+    base content-type;
+    description
+      "Declaration file.";
+  }
+
+  identity elabel {
+    base content-type;
+    description
+      "Elabel file.";
+  }
+
+  identity back-board-elabel {
+    base content-type;
+    description
+      "Frame back board elabel file.";
+  }
+
+  identity user-file {
+    base content-type;
+    description
+      "User common file.";
+  }
+
+  identity ssdca {
+    base content-type;
+    description
+      "SSD CA file.";
+  }
+
+  identity cabinet-elabel {
+    base content-type;
+    description
+      "Cabinet elabel file.";
+  }
+
+  identity rtu-clean-file {
+    base content-type;
+    description
+      "Rtu clean file.";
+  }
+
+  identity rootfs {
+    base content-type;
+    description
+      "Rootfs file.";
+  }
+
+  identity uimage {
+    base content-type;
+    description
+      "Uimage file.";
+  }
+
+  identity initrd {
+    base content-type;
+    description
+      "Initrd file.";
+  }
+
+  identity frame-elabel {
+    base content-type;
+    description
+      "Frame elabel file.";
+  }
+
+  identity ssl-cert-file {
+    base content-type;
+    description
+      "Ssl certification file.";
+  }
+
+  identity ssl-key-file {
+    base content-type;
+    description
+      "Ssl key file.";
+  }
+
+  identity ssl-crl-file {
+    base content-type;
+    description
+      "Ssl crl file.";
+  }
+
+  identity script-with-result {
+    base content-type;
+    description
+      "Script configuration command file with result.";
+  }
+
+  identity ssd-crl {
+    base content-type;
+    description
+      "Ssd crl file.";
+  }
+
+  identity ssd-g2-crl {
+    base content-type;
+    description
+      "Ssd crl-g2 file.";
+  }
+
+  identity app-program-file {
+    base content-type;
+    description
+      "App program file.";
+  }
+
+  identity pki-local-cert-file {
+    base content-type;
+    description
+      "Pki local certification file.";
+  }
+
+  identity pki-trust-ca-file {
+    base content-type;
+    description
+      "Pki trusted-ca file.";
+  }
+
+  identity pki-crl-file {
+    base content-type;
+    description
+      "Pki crl file.";
+  }
+
+  identity port {
+    base content-type;
+    description
+      "Vectoring run info.";
+  }
+
+  identity vectoring {
+    base content-type;
+    description
+      "Port status information.";
+  }
+
+  identity iop {
+    base content-type;
+    description
+      "Iop file.";
+  }
+
+  identity nms-collect-info {
+    base content-type;
+    description
+      "Nms collect information file.";
+  }
+
+  identity reset-record {
+    base content-type;
+    description
+      "Debug information of board.";
+  }
+
+  identity frame-pnp {
+    base content-type;
+    description
+      "Frame pnp.";
+  }
+
+  identity board-pnp {
+    base content-type;
+    description
+      "Board pnp.";
+  }
+
+  identity subboard-pnp {
+    base content-type;
+    description
+      "Subboard pnp.";
+  }
+
+  identity hm-status-collect-info {
+    base content-type;
+    description
+      "Hm status information file.";
+  }
+
+  identity device-capability-file {
+    base content-type;
+    description
+      "Device capability decoupling file.";
+  }
+
+  identity ibms-file {
+    base content-type;
+    description
+      "Installed Base Management System (IBMS) file type.";
+  }
+
+  identity debug-log-current {
+    base content-type;
+    description
+      "Current debug log file.";
+  }
+
+  identity restore-point-file {
+    base content-type;
+    description
+      "Restore point file.";
+  }
+
+  identity data-type {
+    description
+      "Base identity for file server data type.
+       Vendors can define the type. For example: program, data, log, alarm, last-word, etc..";
+  }
+
+  typedef publickey-encoding-type {
+    type enumeration {
+      enum "der" {
+        value 0;
+        description
+          "Der encode type.";
+      }
+      enum "pem" {
+        value 1;
+        description
+          "Pem encode type.";
+      }
+    }
+    description
+      "Public key encode type list.";
+  }
+
+  typedef server-type {
+    type enumeration {
+      enum "auto-backup" {
+        value 0;
+        description
+          "Indicates the file server type is autobackup.";
+      }
+      enum "auto-load" {
+        value 1;
+        description
+          "Indicates the file server type is autoload.";
+      }
+    }
+    description
+      "This attribute depicts status collect type.";
+  }
+
+  typedef server-priority {
+    type enumeration {
+      enum "primary" {
+        value 0;
+        description
+          "Indicates the file server priority is primary.";
+      }
+      enum "secondary" {
+        value 1;
+        description
+          "Indicates the file server priority is secondary.";
+      }
+    }
+    description
+      "This attribute depicts status collect type.";
+  }
+
+  typedef operation-status {
+    type enumeration {
+      enum "initial" {
+        value 0;
+        description
+          "Initial: Initial status.";
+      }
+      enum "running" {
+        value 1;
+        description
+          "Running: Operation is running.";
+      }
+      enum "success" {
+        value 2;
+        description
+          "Success: Operation is success.";
+      }
+      enum "fail" {
+        value 3;
+        description
+          "Fail: Operation is failed.";
+      }
+    }
+    description
+      "This attribute depicts whether the operation like
+       Download, Backup, Activation, Rollback or Undo-rollback is successfully completed or failed.";
+  }
+
+  typedef software-status {
+    type enumeration {
+      enum "active" {
+        value 0;
+        description
+          "Indicates the area is activate.";
+      }
+      enum "standby" {
+        value 1;
+        description
+          "Indicates the area is standby.";
+      }
+    }
+    description
+      "This attribute depicts software status.";
+  }
+
+  typedef upgrade-mode {
+    type enumeration {
+      enum "issu" {
+        value 1;
+        description
+          "Indicates that the software upgrade without service interrupted.";
+      }
+      enum "ossu" {
+        value 2;
+        description
+          "Indicates that the software upgrade with service interrupted.";
+      }
+    }
+    description
+      "This attribute depicts software upgrade mode.";
+  }
+
+  typedef collect-indicate {
+    type enumeration {
+      enum "start" {
+        value 0;
+        description
+          "Indicates the collect is start.";
+      }
+      enum "stop" {
+        value 1;
+        description
+          "Indicates the collect is stop.";
+      }
+    }
+    description
+      "This attribute depicts status collect indicate.";
+  }
+
+  typedef collect-type {
+    type enumeration {
+      enum "fault" {
+        value 0;
+        description
+          "Indicates the collect type is fault.";
+      }
+      enum "all" {
+        value 1;
+        description
+          "Indicates the collect type is all.";
+      }
+    }
+    description
+      "This attribute depicts status collect type.";
+  }
+
+  typedef public-key-type {
+    type enumeration {
+      enum "rsa" {
+        value 1;
+        description
+          "RSA encode type.";
+      }
+      enum "ed25519" {
+        value 2;
+        description
+          "ED25519 encode type.";
+      }
+    }
+    description
+      "Public key type list.";
+  }
+
+  typedef algorithm-type {
+    type enumeration {
+      enum "none" {
+        value 1;
+        description
+          "Indicates that the load file is not encrypt.";
+      }
+      enum "aes256-cbc" {
+        value 2;
+        description
+          "Indicates that the script file encrypt algorithm is AES256-CBC.";
+      }
+      enum "aes256-gcm" {
+        value 3;
+        description
+          "Indicates that the script file encrypt algorithm is AES256-GCM.";
+      }
+    }
+    description
+      "Algorithm type list.";
+  }
+
+  typedef load-policy-type {
+    type enumeration {
+      enum "normal" {
+        value 1;
+        description
+          "Indicates that the entire package file is loaded into the system.";
+      }
+      enum "smart" {
+        value 2;
+        description
+          "Indicates that part of the package file is loaded into the system
+           according to the hardware configuration of the device.";
+      }
+      enum "update" {
+        value 3;
+        description
+          "Update the software of the board corresponding to the leaf board-name.";
+      }
+    }
+    description
+      "Load entire or part of the package file.";
+  }
+
+  typedef xftp-protocol-type {
+    type enumeration {
+      enum "ftp" {
+        value 1;
+        description
+          "Indicates ftp service.";
+      }
+      enum "sftp" {
+        value 2;
+        description
+          "Indicates sftp service.";
+      }
+    }
+    description
+      "Xftp protocol type.";
+  }
+
+  container software-operation {
+    description
+      "The software operation.";
+    container operation-config {
+      description
+        "Configure the software operation.";
+      container file-servers {
+        description
+          "List of file-servers.";
+        list file-server {
+          key "server-type data-type server-priority";
+          description
+            "Configure a file server.";
+          leaf server-type {
+            type server-type;
+            description
+              "Server type.";
+          }
+          leaf data-type {
+            type identityref {
+              base data-type;
+            }
+            description
+              "Data type.";
+          }
+          leaf server-priority {
+            type server-priority;
+            description
+              "Data type.";
+          }
+          leaf url {
+            type inet:uri;
+            mandatory true;
+            description
+              "URL containing the information required to
+               download and upload the specified file included
+               protocol, IP address, filepath, etc..
+               Example1: sftp://username:password@ServerIpAddress[:port]/filename;
+               Example2:./directory/filename.";
+          }
+        }
+      }
+      container xftp {
+        description
+          "Configure xftp user config.";
+        container xftp-servers {
+          description
+            "List of operational ftp/sftp user config.";
+          list xftp-server {
+            key "service-type";
+            description
+              "Configure xftp server.";
+            leaf service-type {
+              type xftp-protocol-type;
+              description
+                "Configure ftp/sftp type.";
+            }
+            leaf user {
+              type string {
+                length "1..40";
+              }
+              description
+                "Configure xftp username.";
+            }
+            leaf password {
+              type string {
+                length "0..153";
+              }
+              description
+                "Configure xftp password.";
+            }
+            leaf port {
+              when "../service-type = 'sftp'" {
+                description
+                  "Visible only when service-type is sftp.";
+              }
+              type uint16;
+              default "22";
+              description
+                "Configure xftp server port, only sftp support.";
+            }
+          }
+        }
+      }
+      container smart-load-boards {
+        description
+          "List of boards supporting smart loading.";
+        list smart-load-board {
+          key "board-name";
+          description
+            "Configure the board-name is allowed for smart loading.";
+          leaf board-name {
+            type string {
+              length "3..20";
+            }
+            description
+              "Board Name.";
+          }
+        }
+      }
+    }
+    container operation-state {
+      config false;
+      description
+        "Operational state of software.";
+      list operations {
+        key "request-id";
+        description
+          "Operational state of software.";
+        leaf request-id {
+          type uint32;
+          description
+            "Request id.";
+        }
+        leaf type {
+          type identityref {
+            base operation-type;
+          }
+          description
+            "Software operation type.";
+        }
+        leaf status {
+          type operation-status;
+          description
+            "Software operation status.";
+        }
+        leaf progress {
+          type uint32;
+          description
+            "Operation progress.";
+        }
+        leaf start-time {
+          type yang:date-and-time;
+          description
+            "Operation start time.";
+        }
+        leaf end-time {
+          type yang:date-and-time;
+          description
+            "Operation end time.";
+        }
+        leaf error-string {
+          type string {
+            length "0..255";
+          }
+          description
+            "A text string representing the operation error code and description with '-' connection,
+             where error code 0 indicates success.
+             Example1: 0-Success;
+             Example2: x-xxx.";
+        }
+      }
+    }
+    container system-status-collect {
+      config false;
+      description
+        "The system status statistics.";
+      leaf progress {
+        type uint8;
+        description
+          "Progress.";
+      }
+      leaf result {
+        type string {
+          length "0..255";
+        }
+        description
+          "Collect result.";
+      }
+    }
+    leaf is-can-load-software {
+      type enumeration {
+        enum "enable-load" {
+          value 1;
+          description
+            "Enable load operator.";
+        }
+        enum "disable-load" {
+          value 2;
+          description
+            "Disable load operator.";
+        }
+      }
+      config false;
+      description
+        "The object is used to identify whether the current system can load software.";
+    }
+    container undo-contents {
+      description
+        "List of undo contents.";
+      list undo-content {
+        key "content-type";
+        config false;
+        description
+          "Operational of undo content.";
+        leaf content-type {
+          type identityref {
+            base content-type;
+          }
+          description
+            "Indicates the type of undo content.";
+        }
+        leaf undo-load-state {
+          type string {
+            length "0..50";
+          }
+          description
+            "Indicates the status of canceling the loading. Currently, only the loading of the package file can be canceled.";
+        }
+        action undo-load {
+          description
+            "Cancel the contents of the operation.";
+        }
+        action undo-backup {
+          description
+            "Cancel the contents of the operation.";
+        }
+      }
+    }
+  }
+
+  rpc status-collect {
+    description
+      "Status collect operation.";
+
+    input {
+      leaf indicate {
+        type collect-indicate;
+        description
+          "Collection operation type.";
+      }
+      leaf-list content {
+        type string {
+          length "1..32";
+        }
+        description
+          "Collection of content. Refer to collect-content-type.";
+      }
+      leaf type {
+        type collect-type;
+        description
+          "Collect type.";
+      }
+    }
+  }
+  rpc download {
+    description
+      "Download operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf content {
+        type identityref {
+          base content-type;
+        }
+        mandatory true;
+        description
+          "The load content.";
+      }
+      leaf url {
+        type inet:uri;
+        mandatory true;
+        description
+          "URL containing the information required to
+           download the specified file included
+           protocol, IP address, filepath, etc..
+           Example1: sftp://username:password@ServerIpAddress[:port]/filename;
+           Example2:./directory/filename.";
+      }
+      leaf sftp-server-public-key-code {
+        type string {
+          length "1..2048";
+        }
+        description
+          "The public key code of the SFTP server.";
+      }
+      leaf sftp-server-publickey-encoding-type {
+        type publickey-encoding-type;
+        description
+          "The encoding type of the public key of the SFTP server.";
+      }
+      leaf sftp-server-publickey-type {
+        type public-key-type;
+        description
+          "The public key type of the SFTP server.";
+      }
+      leaf encrypt-algorithm {
+        type algorithm-type;
+        description
+          "This object is used to identify the encrypt algorithm of the load file.
+           Options:
+           1.none(1):indicates that the load file is not encrypt.
+           2.aes256-cbc(2):indicates that the script file encrypt algorithm is AES256-CBC.
+           3.aes256-gcm(3):indicates that the script file encrypt algorithm is AES256-GCM.";
+      }
+      leaf encrypt-key {
+        type string {
+          length "0..32";
+        }
+        description
+          "This object is used to identify the encrypt key.";
+      }
+      leaf encrypt-iv {
+        type string {
+          length "0..16";
+        }
+        description
+          "This object is used to identify the initialization vector of the encrypt file.";
+      }
+      choice target {
+        description
+          "Downloaded target board or chassis.";
+        case hardware-component {
+          description
+            "This case specifies that the target board or chassis.";
+          leaf hardware-component-ref {
+            type leafref {
+              path "/hw:hardware/hw:component/hw:name";
+            }
+            description
+              "The name assigned to this component.";
+          }
+        }
+        case all-sub-chassis {
+          description
+            "This case specifies that the target chassis.";
+          leaf all {
+            type empty;
+            description
+              "Target chassis.";
+          }
+        }
+      }
+      leaf load-option {
+        type enumeration {
+          enum "no-load-active-and-standby" {
+            value -1;
+            description
+              "Indicates that the active and standby control boards
+               are not loaded at the same time.";
+          }
+          enum "load-active-and-standby" {
+            value 1;
+            description
+              "Indicates that the active and standby control boards
+               are loaded at the same time.";
+          }
+        }
+        description
+          "Batch load options. This object is used to determine whether the slot number
+           of the active control board or the standby control board is selected.";
+      }
+      leaf load-policy {
+        when "../hw-sm:content='hw-sm:software-package'" {
+          description
+            "This container is only applicable if the load content is software-package.";
+        }
+        type load-policy-type;
+        description
+          "This object is used to identify the loading mode of the package file.
+           Default { normal }";
+      }
+      leaf security-integrity {
+        type empty;
+        description
+          "This object is used to identify file integrity check is performed.";
+      }
+      leaf board-name {
+        type string {
+          length "3..20";
+        }
+        description
+          "Name of the board with software to be updated.";
+      }
+    }
+  }
+  rpc backup {
+    description
+      "Backup operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf content {
+        type identityref {
+          base content-type;
+        }
+        mandatory true;
+        description
+          "The backup content.";
+      }
+      leaf url {
+        type inet:uri;
+        mandatory true;
+        description
+          "URL containing the information required to
+           backup the specified file included
+           protocol, IP address, filepath, etc..
+           Example1: ftp://username:password@ServerIpAddress[:port]/filename;
+           Example2:./directory/filename.";
+      }
+      leaf sftp-server-public-key-code {
+        type string {
+          length "1..2048";
+        }
+        description
+          "The public key code of the SFTP server.";
+      }
+      leaf sftp-server-publickey-encoding-type {
+        type publickey-encoding-type;
+        description
+          "The encoding type of the public key of the SFTP server.";
+      }
+      leaf sftp-server-publickey-type {
+        type public-key-type;
+        description
+          "The public key type of the SFTP server.";
+      }
+      leaf customized-para {
+        type string {
+          length "0..4096";
+        }
+        description
+          "Customized parameter carried during file backup. The parameter is related to the contents of the backup file.";
+      }
+      leaf hardware-component-ref {
+        type leafref {
+          path "/hw:hardware/hw:component/hw:name";
+        }
+        description
+          "Backup target board.";
+      }
+    }
+  }
+  rpc activate-software {
+    description
+      "Activate software operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf mode {
+        type upgrade-mode;
+        mandatory true;
+        description
+          "The activate software operation mode.";
+      }
+    }
+  }
+  rpc rollback-software {
+    description
+      "Rollback software operation. Switch active software area to standby.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+    }
+  }
+  rpc undo-rollback-software {
+    description
+      "Undo rollback software operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+    }
+  }
+  rpc switchover-update-software {
+    description
+      "Update software operation with switchover.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+    }
+  }
+}

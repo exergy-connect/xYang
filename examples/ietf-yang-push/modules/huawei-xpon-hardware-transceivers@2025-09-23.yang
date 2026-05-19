@@ -1,0 +1,1336 @@
+module huawei-xpon-hardware-transceivers {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-xpon-hardware-transceivers";
+  prefix hwxpon-xcvr;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import bbf-hardware-transceivers {
+    prefix bbf-hw-xcvr;
+  }
+  import huawei-xpon-types {
+    prefix xpon-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "This module contains transceivers data.";
+
+  revision 2025-09-23 {
+    description
+      "Add the enum sfp-dd of the leaf encapsulation-type.
+       Add the enum sfp-dd of the leaf physical-device.
+       Add the enum sfp-dd-a of the leaf physical-device.
+       Add the enum sfp-dd-f of the leaf physical-device.";
+    reference
+      "";
+  }
+  revision 2025-05-19 {
+    description
+      "Add the enum ngsfpl of the leaf physical-device.";
+    reference
+      "";
+  }
+  revision 2025-03-26 {
+    description
+      "Add the enum ngsfpl of the leaf encapsulation-type.";
+    reference
+      "";
+  }
+  revision 2024-02-17 {
+    description
+      "Add leaf for ex-xpon-transceiver.";
+    reference
+      "";
+  }
+  revision 2023-11-30 {
+    description
+      "Add leaf for ex-combopon-diagnostics and ex-combopon-thresholds.";
+    reference
+      "";
+  }
+  revision 2023-09-19 {
+    description
+      "Change the enum name of the leaf encapsulation-type from qsfp to qsfp28,
+       Add the enum value to temp-level leaf.";
+    reference
+      "";
+  }
+  revision 2023-04-07 {
+    description
+      "Add the enum value of the leaf encapsulation-type.";
+    reference
+      "";
+  }
+  revision 2023-03-19 {
+    description
+      "Add leaf for ex-combopon-wavelength and enum value of encapsulation-type.";
+    reference
+      "";
+  }
+  revision 2022-07-19 {
+    description
+      "Add transceiver data of huawei extend thresholds and modify grouping name ex-combopon-thresholds.";
+    reference
+      "";
+  }
+  revision 2021-12-21 {
+    description
+      "Add rx-wavelength and the enum value of the leaf encapsulation-type.";
+    reference
+      "";
+  }
+  revision 2021-07-08 {
+    description
+      "Modify grouping name ex-xpon-optic-info, ex-xpon-transceiver, ex-combopon-transceiver,
+       ex-xgpon-transceiver, ex-combopon-wavelength, ex-xpon-diagnostics, ex-combopon-diagnostics,
+       ex-combopon-thresholds.";
+    reference
+      "";
+  }
+  revision 2019-05-06 {
+    description
+      "Add transceiver data of combo PON.";
+    reference
+      "";
+  }
+  revision 2019-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472";
+  }
+
+  feature ex-xpon-optic-info {
+    description
+      "Indicates the huawei extended XPON optical modular information.";
+  }
+
+  identity ngsfpl {
+    base bbf-hw-xcvr:physical-device;
+    description
+      "Huawei specfic encapsulation type.";
+    reference
+      "Huawei specfic physical device";
+  }
+
+  identity sfp-dd {
+    base bbf-hw-xcvr:physical-device;
+    description
+      "Huawei specfic encapsulation type.";
+    reference
+      "Huawei specfic physical device";
+  }
+
+  identity sfp-dd-a {
+    base bbf-hw-xcvr:physical-device;
+    description
+      "Huawei specfic encapsulation type.";
+    reference
+      "Huawei specfic physical device";
+  }
+
+  identity sfp-dd-f {
+    base bbf-hw-xcvr:physical-device;
+    description
+      "Huawei specfic encapsulation type.";
+    reference
+      "Huawei specfic physical device";
+  }
+
+  typedef support-type {
+    type enumeration {
+      enum "support" {
+        value 0;
+        description
+          "Support.";
+      }
+      enum "not-support" {
+        value 1;
+        description
+          "Not support.";
+      }
+    }
+    description
+      "Support or not support.";
+  }
+
+  typedef aux-monitoring-type {
+    type enumeration {
+      enum "not-implemented" {
+        value 0;
+        description
+          "Auxiliary monitoring not implemented.";
+      }
+      enum "apd-bias-voltage" {
+        value 1;
+        description
+          "APD bias voltage.";
+      }
+      enum "tx-bias-current-1g" {
+        value 2;
+        description
+          "1G Tx bias current.";
+      }
+      enum "tec-current" {
+        value 3;
+        description
+          "Thermoelectric cooler (TEC) current (mA).";
+      }
+      enum "laser-temperature" {
+        value 4;
+        description
+          "Laser temperature.";
+      }
+      enum "laser-wavelength" {
+        value 5;
+        description
+          "Laser wavelength.";
+      }
+      enum "supply-voltage-5v" {
+        value 6;
+        description
+          "+5V supply voltage.";
+      }
+      enum "tx-power-1g" {
+        value 7;
+        description
+          "1G Tx power.";
+      }
+      enum "supply-voltage-1p8v" {
+        value 8;
+        description
+          "+1.8V supply voltage.";
+      }
+      enum "supply-voltage-neg5p2v" {
+        value 9;
+        description
+          "-5.2V supply voltage.";
+      }
+      enum "supply-current-5v" {
+        value 10;
+        description
+          "+5V supply current.";
+      }
+      enum "supply-current-3p3v" {
+        value 11;
+        description
+          "+3.3V supply current.";
+      }
+      enum "supply-current-1p8v" {
+        value 12;
+        description
+          "+1.8V supply current.";
+      }
+      enum "supply-current-neg5p2v" {
+        value 13;
+        description
+          "-5.2V supply current.";
+      }
+    }
+    description
+      "Indicates the auxiliary monitoring input type.";
+  }
+
+  grouping ex-xpon-transceiver {
+    description
+      "Indicates the huawei extend xpon optical transceiver data.";
+    leaf module-type {
+      type xpon-types:module-type;
+      config false;
+      description
+        "The type of the transceiver.";
+    }
+    leaf module-sub-type {
+      type xpon-types:module-sub-type;
+      config false;
+      description
+        "The sub type of the transceiver.";
+    }
+    leaf used-type {
+      type xpon-types:used-type;
+      config false;
+      description
+        "The application scenario of the transceiver.";
+    }
+    leaf encapsulation-type {
+      type enumeration {
+        enum "unknown" {
+          value 0;
+          description
+            "Unknown.";
+        }
+        enum "sff2x5" {
+          value 1;
+          description
+            "SFF 2x5.";
+        }
+        enum "sff2x10" {
+          value 2;
+          description
+            "SFF 2x10.";
+        }
+        enum "sfp" {
+          value 3;
+          description
+            "SFP.";
+        }
+        enum "xfp" {
+          value 4;
+          description
+            "XFP.";
+        }
+        enum "lxfp" {
+          value 5;
+          description
+            "LXFP.";
+        }
+        enum "bosa-on-board" {
+          value 6;
+          description
+            "BOSA ON BOARD.";
+        }
+        enum "sfp-plus" {
+          value 7;
+          description
+            "SFP+.";
+        }
+        enum "sfp-sfp-plus" {
+          value 8;
+          description
+            "SFP/SFP+.";
+        }
+        enum "qsfp28" {
+          value 9;
+          description
+            "QSFP28.";
+        }
+        enum "sfp-dp" {
+          value 10;
+          description
+            "SFP-DP.";
+        }
+        enum "ngsfpl" {
+          value 11;
+          description
+            "NGSFPL.";
+        }
+        enum "sfp-dd" {
+          value 12;
+          description
+            "SFP-DD.";
+        }
+      }
+      config false;
+      description
+        "Indicates the encapsulation information about the optical transceiver.";
+    }
+    leaf otdr-capability {
+      type enumeration {
+        enum "unsupport" {
+          value 0;
+          description
+            "Indicates that the optical module does not support the eOTDR.";
+        }
+        enum "support-down-wave" {
+          value 1;
+          description
+            "Indicates that the optical module supports down wavelength eOTDR.";
+        }
+        enum "support-down-up-wave" {
+          value 2;
+          description
+            "Indicates that the optical module supports down and up wavelength eOTDR.";
+        }
+        enum "support-independent" {
+          value 3;
+          description
+            "Indicates that the optical module supports independent wavelength eOTDR.";
+        }
+      }
+      config false;
+      description
+        "Indicates whether the optical module supports the OTDR test.";
+    }
+    leaf max-distance {
+      type uint8;
+      units "km";
+      config false;
+      description
+        "Indicates the maximum transmission distance of an optical module.";
+    }
+    leaf max-rate {
+      type uint32;
+      units "kbit/s";
+      config false;
+      description
+        "Indicates the maximum rate of an optical module.";
+    }
+    leaf fiber-type {
+      type enumeration {
+        enum "single-mode" {
+          value 0;
+          description
+            "Indicates the fiber type is single mode.";
+        }
+        enum "multi-mode" {
+          value 1;
+          description
+            "Indicates the fiber type is multiple mode.";
+        }
+      }
+      config false;
+      description
+        "Indicates the fiber type.";
+    }
+    leaf cc-base {
+      type enumeration {
+        enum "correct" {
+          value 0;
+          description
+            "Indicates the CC_BASE match state is correct.";
+        }
+        enum "incorrect" {
+          value 1;
+          description
+            "Indicates the CC_BASE match state is incorrect.";
+        }
+      }
+      config false;
+      description
+        "Indicates the CC_BASE match state.";
+    }
+    leaf cc-ext {
+      type enumeration {
+        enum "correct" {
+          value 0;
+          description
+            "Indicates the CC_EXT match state is correct.";
+        }
+        enum "incorrect" {
+          value 1;
+          description
+            "Indicates the CC_EXT match state incorrect.";
+        }
+      }
+      config false;
+      description
+        "Indicates the CC_EXT match state.";
+    }
+    leaf olt-rx-power {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "OLT Rx ONT optical power.";
+    }
+    leaf catv-rx-power {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "CATV Rx optical power.";
+    }
+    leaf catv-rx-power-high-alarm-threshold {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "CATV Rx power high alarm threshold.";
+    }
+    leaf catv-rx-power-low-alarm-threshold {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "CATV Rx low power alarm threshold.";
+    }
+    leaf diagnostics-monitoring {
+      type bits {
+        bit digital-diagnostic-monitoring {
+          position 6;
+          description
+            "Digital diagnostic monitoring.";
+          reference
+            "SFF-8472 Revision 12.2, Table 8-5, A0=92, bit 6";
+        }
+        bit internally-calibrated {
+          position 5;
+          description
+            "Internally Calibrated.";
+          reference
+            "SFF-8472 Revision 12.2, Table 8-5, A0=92, bit 5";
+        }
+        bit externally-calibrated {
+          position 4;
+          description
+            "Externally Calibrated.";
+          reference
+            "SFF-8472 Revision 12.2, Table 8-5, A0=92, bit 4";
+        }
+        bit measurement-type {
+          position 3;
+          description
+            "Received power measurement type:(0 = OMA, 1 = Average).";
+          reference
+            "SFF-8472 Revision 12.2, Table 8-5, A0=92, bit 3";
+        }
+        bit address-change-required {
+          position 2;
+          description
+            "Address change required.";
+          reference
+            "SFF-8472 Revision 12.2, Table 8-5, A0=92, bit 2";
+        }
+      }
+      config false;
+      description
+        "Describes how diagnostic monitoring is implemented in the particular transceiver.";
+      reference
+        "SFF-8472 Revision 12.2, Section 8.8 - Diagnostic Monitoring Type.";
+    }
+    leaf actual-mode {
+      type enumeration {
+        enum "gpon-and-xgspon" {
+          value 0;
+          description
+            "Indicates the actual mode of an optical module is XGSPON and GPON.";
+        }
+        enum "gpon-and-xgtpon" {
+          value 1;
+          description
+            "Indicates the actual mode of an optical module is XGTPON and GPON.";
+        }
+      }
+      config false;
+      description
+        "Indicates the actual mode of an optical module.";
+    }
+  }
+
+  grouping ex-xgpon-transceiver {
+    description
+      "Indicates the huawei extend xg-pon optical transceiver data.";
+    leaf wavelength-tolerance {
+      type uint16;
+      units "nm";
+      config false;
+      description
+        "Indicates the wavelength tolerance.";
+    }
+    leaf ext-clei-code {
+      type enumeration {
+        enum "non-clei-code" {
+          value 0;
+          description
+            "No CLEI code present in Table 02h.";
+        }
+        enum "clei-code" {
+          value 1;
+          description
+            "CLEI code present in Table 02h.";
+        }
+      }
+      config false;
+      description
+        "Indicates the CLEI code of the transceiver.";
+    }
+    leaf ext-txref-clock {
+      type enumeration {
+        enum "non-txref-clock" {
+          value 0;
+          description
+            "Tx reference clock input not required.";
+        }
+        enum "txref-clock" {
+          value 1;
+          description
+            "Tx reference clock input required.";
+        }
+      }
+      config false;
+      description
+        "The Tx reference clock of the transceiver.";
+    }
+    leaf ext-cdrfunc {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports CDR function or not.";
+    }
+    leaf ext-power-level {
+      type enumeration {
+        enum "power-level1" {
+          value 0;
+          description
+            "Power level one.";
+        }
+        enum "power-level2" {
+          value 1;
+          description
+            "Power level two.";
+        }
+        enum "power-level3" {
+          value 2;
+          description
+            "Power level three.";
+        }
+        enum "power-level4" {
+          value 3;
+          description
+            "Power level four.";
+        }
+      }
+      config false;
+      description
+        "Indicates the power level of the transceiver.";
+    }
+    leaf encoding-rz {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports RZ encoding or not.";
+    }
+    leaf encoding-nrz {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports NRZ encoding or not.";
+    }
+    leaf encoding-8b10b {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports 8B/10B encoding or not.";
+    }
+    leaf encoding-64b66b {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports 64B/66B encoding or not.";
+    }
+    leaf length-e50um {
+      type uint32;
+      units "2 m";
+      config false;
+      description
+        "Link length supported for EBW 50/125 um fiber.";
+    }
+    leaf transmitter-tunable {
+      type enumeration {
+        enum "tunable" {
+          value 0;
+          description
+            "Indicates the transmitter is tunable.";
+        }
+        enum "not-tunable" {
+          value 1;
+          description
+            "Indicates the transmitter is not tunable.";
+        }
+      }
+      config false;
+      description
+        "Indicates if the transmitter is tunable or not.";
+    }
+    leaf detector {
+      type enumeration {
+        enum "pin" {
+          value 0;
+          description
+            "Indicates the interface mode of the transceiver is PIN.";
+        }
+        enum "apd" {
+          value 1;
+          description
+            "Indicates the interface mode of the transceiver is APD.";
+        }
+      }
+      config false;
+      description
+        "Indicates the interface mode of the transceiver.";
+    }
+    leaf wavelength-control {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports wavelength control or not.";
+    }
+    leaf cool-transmitter-device {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports the cooled transmitter or not.";
+    }
+    leaf transmitter-technology {
+      type enumeration {
+        enum "vcsel850" {
+          value 0;
+          description
+            "Indicates the transceiver technology is VCSEL850.";
+        }
+        enum "vcsel1310" {
+          value 1;
+          description
+            "Indicates the transceiver technology is VCSEL1310.";
+        }
+        enum "vcsel1550" {
+          value 2;
+          description
+            "Indicates the transceiver technology is VCSEL1550.";
+        }
+        enum "fp1310" {
+          value 3;
+          description
+            "Indicates the transceiver technology is FP1310.";
+        }
+        enum "dfb1310" {
+          value 4;
+          description
+            "Indicates the transceiver technology is DFB1310.";
+        }
+        enum "dfb1550" {
+          value 5;
+          description
+            "Indicates the transceiver technology is DFB1550.";
+        }
+        enum "eml1310" {
+          value 6;
+          description
+            "Indicates the transceiver technology is EML1310.";
+        }
+        enum "eml1550" {
+          value 7;
+          description
+            "Indicates the transceiver technology is EML1550.";
+        }
+        enum "copper" {
+          value 8;
+          description
+            "Indicates the transceiver technology is COPPER.";
+        }
+      }
+      config false;
+      description
+        "Indicates the transceiver technology.";
+    }
+    leaf xfi-loopback-mode-cap {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports XFI loopback mode or not.";
+    }
+    leaf line-side-loopback-mode-cap {
+      type support-type;
+      config false;
+      description
+        "Indicates if the transceiver supports line side loopback mode or not.";
+    }
+    leaf cdr-max-bitrate {
+      type enumeration {
+        enum "not-support" {
+          value 0;
+          description
+            "Not support the maximum CDR bit rate.";
+        }
+        enum "cdr11p1" {
+          value 1;
+          description
+            "The maximum CDR bit rate is 11.1 Gbps.";
+        }
+        enum "cdr10p7" {
+          value 2;
+          description
+            "The maximum CDR bit rate is 10.7 Gbps.";
+        }
+        enum "cdr10p5" {
+          value 3;
+          description
+            "The maximum CDR bit rate is 10.5 Gbps.";
+        }
+        enum "cdr10p3" {
+          value 4;
+          description
+            "The maximum CDR bit rate is 10.3 Gbps.";
+        }
+        enum "cdr9p95" {
+          value 5;
+          description
+            "The maximum CDR bit rate is 9.95 Gbps.";
+        }
+      }
+      config false;
+      description
+        "Indicates the maximum CDR bit rate.";
+    }
+    leaf max-case-temp {
+      type int32;
+      units "°C";
+      config false;
+      description
+        "Indicates the maximum case temperature.";
+    }
+    leaf max-power-dissipation {
+      type int32;
+      units "mW";
+      config false;
+      description
+        "Indicates the maximum power dissipation.";
+    }
+    leaf max-power-dissipation-low {
+      type int32;
+      units "mW";
+      config false;
+      description
+        "Indicates the maximum total power dissipation in power down mode.";
+    }
+    leaf max-current-5v {
+      type int32;
+      units "mA";
+      config false;
+      description
+        "Indicates the maximum current required by +5V supply.";
+    }
+    leaf max-current-3p3v {
+      type int32;
+      units "mA";
+      config false;
+      description
+        "Indicates the maximum current required by +3.3V supply.";
+    }
+    leaf max-current-1p8v {
+      type int32;
+      units "mA";
+      config false;
+      description
+        "Indicates the maximum current required by +1.8V supply.";
+    }
+    leaf max-current-neg5p2v {
+      type int32;
+      units "mA";
+      config false;
+      description
+        "Indicates the maximum current required by -5.2V supply.";
+    }
+    leaf rx-power-measure-type {
+      type enumeration {
+        enum "oma" {
+          value 0;
+          description
+            "Indicates the received power measurement type is OMA.";
+        }
+        enum "average-power" {
+          value 1;
+          description
+            "Indicates the received power measurement type is average power.";
+        }
+      }
+      config false;
+      description
+        "Indicates the Rx power measurement type.";
+    }
+    leaf respond-fec-ber {
+      type support-type;
+      config false;
+      description
+        "Indicates whether to support the reporting of the forward error correction (FEC) bit error ratio (BER).";
+    }
+    leaf aux-monitoring-1 {
+      type aux-monitoring-type;
+      config false;
+      description
+        "Indicates the auxiliary monitoring 1.";
+    }
+    leaf aux-monitoring-2 {
+      type aux-monitoring-type;
+      config false;
+      description
+        "Indicates the auxiliary monitoring 2.";
+    }
+    leaf temp-level {
+      type enumeration {
+        enum "unknown" {
+          value 0;
+          description
+            "Unknown.";
+        }
+        enum "commercial" {
+          value 1;
+          description
+            "Commercial.";
+        }
+        enum "industrial" {
+          value 2;
+          description
+            "Industrial.";
+        }
+        enum "expand-temp" {
+          value 3;
+          description
+            "Expand temperature.";
+        }
+        enum "ultra-industrial" {
+          value 4;
+          description
+            "Ultra industrial.";
+        }
+        enum "enhanced-commercial" {
+          value 5;
+          description
+            "Enhanced commercial.";
+        }
+      }
+      config false;
+      description
+        "Indicates the application scenario of the transceiver.";
+    }
+    leaf opm-precision {
+      type uint8;
+      units "0.1 dBm";
+      config false;
+      description
+        "Indicates the OPM precision.";
+    }
+  }
+
+  grouping ex-combopon-transceiver {
+    description
+      "Indicates the huawei extend combo PON optical transceiver data.";
+    leaf module-combo-mode {
+      type enumeration {
+        enum "wdm" {
+          value 0;
+          description
+            "WDM.";
+        }
+        enum "tdm" {
+          value 1;
+          description
+            "TDM.";
+        }
+      }
+      config false;
+      description
+        "Indicates the combo mode of the transceiver.";
+    }
+  }
+
+  grouping ex-combopon-wavelength {
+    description
+      "Indicates the huawei extend wavelength data.";
+    leaf wavelength-1p25g {
+      type uint32;
+      units "nm";
+      config false;
+      description
+        "Indicates the wavelength for 1.25G.";
+    }
+    leaf wavelength-2p5g {
+      type uint32;
+      units "nm";
+      config false;
+      description
+        "Indicates the wavelength for 2.5G.";
+    }
+    leaf wavelength-10g {
+      type uint32;
+      units "nm";
+      config false;
+      description
+        "Indicates the wavelength for 10G.";
+    }
+    leaf wavelength-50g {
+      type uint32;
+      units "nm";
+      config false;
+      description
+        "Indicates the wavelength for 50G.";
+    }
+  }
+
+  grouping ex-xpon-diagnostics {
+    description
+      "Indicates the huawei extend diagnostics data.";
+    leaf module-state {
+      type enumeration {
+        enum "online" {
+          value 0;
+          description
+            "Indicates the status of the optical module is online.";
+        }
+        enum "offline" {
+          value 1;
+          description
+            "Indicates the status of the optical module is offline.";
+        }
+      }
+      config false;
+      description
+        "Indicates the status of the optical module.";
+    }
+    leaf laser-state {
+      type enumeration {
+        enum "normal" {
+          value 0;
+          description
+            "Indicates the laser status of an optical module is normal.";
+        }
+        enum "failed" {
+          value 1;
+          description
+            "Indicates the laser status of an optical module is failed.";
+        }
+      }
+      config false;
+      description
+        "Indicates the laser status of an optical module.";
+    }
+  }
+
+  grouping ex-xpon-diagnostics-dbm {
+    description
+      "Indicates the huawei extend diagnostics data.";
+    leaf tx-power-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Measured TX power in dBm.";
+    }
+    leaf rx-power-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Measured RX power in dBm.";
+    }
+  }
+
+  grouping ex-xpon-thresholds-dbm {
+    description
+      "Indicates the huawei extend thresholds data.";
+    leaf tx-power-high-alarm-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper alarm threshold of Tx power, measured in dBm.";
+    }
+    leaf tx-power-low-alarm-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower alarm threshold of Tx power, measured in dBm.";
+    }
+    leaf tx-power-high-warning-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper warning threshold of Tx power, measured in dBm.";
+    }
+    leaf tx-power-low-warning-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower warning threshold of Tx power, measured in dBm.";
+    }
+    leaf rx-power-high-alarm-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper alarm threshold of Rx power, measured in dBm.";
+    }
+    leaf rx-power-low-alarm-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower alarm threshold of Rx power, measured in dBm.";
+    }
+    leaf rx-power-high-warning-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper warning threshold of Rx power, measured in dBm.";
+    }
+    leaf rx-power-low-warning-dbm {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower warning threshold of Rx power, measured in dBm.";
+    }
+  }
+
+  grouping ex-combopon-diagnostics {
+    description
+      "Indicates the huawei extend diagnostics data.";
+    leaf tx-bias-channel-0 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Measured channel 0 optical transceiver bias current.";
+    }
+    leaf tx-bias-channel-1 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Measured channel 1 optical transceiver bias current.";
+    }
+    leaf tx-bias-channel-2 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Measured channel 2 optical transceiver bias current.";
+    }
+    leaf tx-power-channel-0 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Measured channel 0 optical transceiver Tx power.";
+    }
+    leaf tx-power-channel-1 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Measured channel 1 optical transceiver TX power.";
+    }
+    leaf tx-power-channel-2 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Measured channel 2 optical transceiver TX power.";
+    }
+  }
+
+  grouping ex-combopon-thresholds {
+    description
+      "Indicates the huawei extend transceiver thresholds for combo PON.";
+    leaf tx-bias-high-alarm-channel-0 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper alarm threshold of a channel 0 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-alarm-channel-0 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower alarm threshold of a channel 0 optical transceiver bias current.";
+    }
+    leaf tx-bias-high-warning-channel-0 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper warning threshold of a channel 0 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-warning-channel-0 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower warning threshold of a channel 0 optical transceiver bias current.";
+    }
+    leaf tx-bias-high-alarm-channel-1 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper alarm threshold of a channel 1 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-alarm-channel-1 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower alarm threshold of a channel 1 optical transceiver bias current.";
+    }
+    leaf tx-bias-high-warning-channel-1 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper warning threshold of a channel 1 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-warning-channel-1 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower warning threshold of a channel 1 optical transceiver bias current.";
+    }
+    leaf tx-bias-high-alarm-channel-2 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper alarm threshold of a channel 2 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-alarm-channel-2 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower alarm threshold of a channel 2 optical transceiver bias current.";
+    }
+    leaf tx-bias-high-warning-channel-2 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Upper warning threshold of a channel 2 optical transceiver bias current.";
+    }
+    leaf tx-bias-low-warning-channel-2 {
+      type int32;
+      units "uA";
+      config false;
+      description
+        "Lower warning threshold of a channel 2 optical transceiver bias current.";
+    }
+    leaf tx-power-high-alarm-channel-0 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper alarm threshold of a channel 0 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-alarm-channel-0 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower alarm threshold of a channel 0 optical transceiver Tx power.";
+    }
+    leaf tx-power-high-warning-channel-0 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper warning threshold of a channel 0 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-warning-channel-0 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower warning threshold of a channel 0 optical transceiver Tx power.";
+    }
+    leaf tx-power-high-alarm-channel-1 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper alarm threshold of a channel 1 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-alarm-channel-1 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower alarm threshold of a channel 1 optical transceiver Tx power.";
+    }
+    leaf tx-power-high-warning-channel-1 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper warning threshold of a channel 1 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-warning-channel-1 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower warning threshold of a channel 1 optical transceiver Tx power.";
+    }
+    leaf tx-power-high-alarm-channel-2 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper alarm threshold of a channel 2 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-alarm-channel-2 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower alarm threshold of a channel 2 optical transceiver Tx power.";
+    }
+    leaf tx-power-high-warning-channel-2 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Upper warning threshold of a channel 2 optical transceiver Tx power.";
+    }
+    leaf tx-power-low-warning-channel-2 {
+      type int32;
+      units "0.01 dBm";
+      config false;
+      description
+        "Lower warning threshold of a channel 2 optical transceiver Tx power.";
+    }
+  }
+
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    if-feature "ex-xpon-optic-info";
+    description
+      "Indicates the huawei extend transceiver information.";
+    uses ex-combopon-transceiver;
+    uses ex-xpon-transceiver;
+    uses ex-xgpon-transceiver;
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver-link/bbf-hw-xcvr:wavelength-or-specification-compliance/bbf-hw-xcvr:wavelength" {
+    if-feature "ex-xpon-optic-info";
+    description
+      "Indicates the huawei extend diagnostic data of the transceiver.";
+    uses ex-combopon-wavelength;
+    leaf rx-wavelength {
+      type uint32;
+      units "nm";
+      config false;
+      description
+        "Rx wavelength of the optical transceiver.";
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver-link/bbf-hw-xcvr:diagnostics" {
+    if-feature "ex-xpon-optic-info";
+    description
+      "Indicates the huawei extend diagnostic data of the transceiver.";
+    uses ex-xpon-diagnostics;
+    uses ex-xpon-diagnostics-dbm;
+    uses ex-combopon-diagnostics;
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver/bbf-hw-xcvr:thresholds" {
+    if-feature "ex-xpon-optic-info";
+    description
+      "Indicates the huawei extend thresholds of the transceiver.";
+    uses ex-xpon-thresholds-dbm;
+    uses ex-combopon-thresholds;
+  }
+}

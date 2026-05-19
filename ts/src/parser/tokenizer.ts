@@ -1,4 +1,5 @@
 import { makeYangToken, TokenStream, YangToken, YangTokenType } from "./parser-context";
+import { unescapeYangQuotedString } from "./yang-strings";
 
 const IDENTIFIER_START = /[A-Za-z_]/;
 const IDENTIFIER_CONT = /[A-Za-z0-9_.-]/;
@@ -81,7 +82,7 @@ export class YangTokenizer {
         }
         add_token(
           YangTokenType.STRING,
-          content.slice(start, i),
+          unescapeYangQuotedString(content.slice(start, i), quote as "'" | '"'),
           token_start,
           token_line,
           token_line_start

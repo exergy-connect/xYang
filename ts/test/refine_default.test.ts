@@ -106,7 +106,7 @@ describe("python parity: test_refine_default", () => {
     const schema = generateJsonSchema(mod);
     const cSchema = (schema.properties as Record<string, unknown>).c as Record<string, unknown>;
     const flagSchema = (cSchema.properties as Record<string, unknown>).flag as Record<string, unknown>;
-    expect(flagSchema.default).toBe("false");
+    expect(flagSchema.default).toBe(false);
 
     const mod2 = parseJsonSchema(JSON.stringify(schema));
     const leaf = leafUnderContainerC(mod2, "flag");

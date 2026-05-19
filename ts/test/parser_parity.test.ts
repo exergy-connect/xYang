@@ -51,8 +51,7 @@ describe("parser parity with Python", () => {
     expect(c).toBeDefined();
   });
 
-  it("config false parses with warning", () => {
-    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+  it("config false is stored on the container", () => {
     const mod = parseYangString(`module m {
   yang-version 1.1;
   namespace "urn:example:m";
@@ -62,9 +61,9 @@ describe("parser parity with Python", () => {
     leaf x { type string; }
   }
 }`);
-    expect(mod.findStatement("state-tree")).toBeDefined();
-    expect(warn.mock.calls.some((c) => String(c[0]).includes("config"))).toBe(true);
-    warn.mockRestore();
+    const c = mod.findStatement("state-tree");
+    expect(c).toBeDefined();
+    expect(c?.data.config).toBe(false);
   });
 
   it("YangSyntaxError toString includes line and message", () => {

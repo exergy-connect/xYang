@@ -1,0 +1,62 @@
+module huawei-energy-management-an-ext {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-energy-management-an-ext";
+  prefix hw-energy-mgnt-an-ext;
+
+  import huawei-energy-management-an {
+    prefix hw-energy-mgnt-an;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for power and energy management of devices.";
+
+  revision 2025-01-10 {
+    description
+      "The default value for leaf port-deep-saving is added.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-09-20 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  feature port-deep-saving {
+    description
+      "The system supports the port deep saving for energy saving.";
+  }
+
+  augment "/hw-energy-mgnt-an:energy-management-an/hw-energy-mgnt-an:energy-saving" {
+    if-feature "port-deep-saving";
+    description
+      "Interface for setting port deep energy saving.";
+    leaf port-deep-saving {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable the port deep saving.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable the port deep saving.";
+        }
+      }
+      default "disable";
+      description
+        "Indicates whether to enable the port deep saving for energy saving.";
+    }
+  }
+}

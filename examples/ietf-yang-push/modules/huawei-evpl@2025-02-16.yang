@@ -1,0 +1,347 @@
+module huawei-evpl {
+  namespace "urn:huawei:yang:huawei-evpl";
+  prefix evpl;
+
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "Management of Ethernet virtual private line.";
+
+  revision 2025-02-16 {
+    description
+      "Add leaf description for evpl instance.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-02-06 {
+    description
+      "Add 50-100GE for ccc.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-30 {
+    description
+      "Modify must condition for ccc.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-26 {
+    description
+      "Add 50|100GE for ccc.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-16 {
+    description
+      "Add node ignore-ac-state for ccc.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-09 {
+    description
+      "Modify the range of EVPL instance ID and service ID.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-28 {
+    description
+      "Modify the must condition for new interface type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-11 {
+    description
+      "Add node evpl-ccc-info.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-08-29 {
+    description
+      "Add node ccc.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-20 {
+    description
+      "Modify node evpl-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-07-21 {
+    description
+      "Add node ignore-ac-state.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-03-01 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  typedef evpl-mode {
+    type enumeration {
+      enum "vxlan-mode" {
+        value 0;
+        description
+          "VXLAN mode.";
+      }
+      enum "mpls-mode" {
+        value 1;
+        status deprecated;
+        description
+          "MPLS mode.";
+      }
+      enum "srv6-mode" {
+        value 2;
+        status deprecated;
+        description
+          "SRv6 mode.";
+      }
+      enum "none" {
+        value 3;
+        description
+          "None mode.";
+      }
+      enum "static-mode" {
+        value 4;
+        description
+          "Static mode.";
+      }
+    }
+    description
+      "The mode of EVPL instance.";
+  }
+
+  typedef evpl-state {
+    type enumeration {
+      enum "down" {
+        value 0;
+        description
+          "The state of the EVPL instance is down.";
+      }
+      enum "up" {
+        value 1;
+        description
+          "The state of the EVPL instance is up.";
+      }
+    }
+    description
+      "EVPL state.";
+  }
+
+  typedef interface-state {
+    type enumeration {
+      enum "down" {
+        value 0;
+        description
+          "The state of the interface is down.";
+      }
+      enum "up" {
+        value 1;
+        description
+          "The state of the interface is up.";
+      }
+    }
+    description
+      "Interface state.";
+  }
+
+  container evpl {
+    description
+      "Management of EVPL.";
+    container instances {
+      description
+        "List of EVPL instances.";
+      list instance {
+        key "id";
+        description
+          "Configure attribute of EVPL instance.";
+        leaf id {
+          type uint32 {
+            range "1..4294967295";
+          }
+          description
+            "The identification of the EVPL instance.";
+        }
+        leaf mode {
+         
+          type evpl-mode;
+          mandatory true;
+          description
+            "The mode of the EVPL instance, that not support modification.";
+        }
+        leaf description {
+          type string {
+            length "1..242";
+            pattern "([^?]*)";
+          }
+          description
+            "The description of an EVPL instance.";
+        }
+        container interfaces {
+          when "(../mode != 'vxlan-mode')";
+          description
+            "List of service interfaces that a EVPL instance corresponds.";
+          list interface {
+            key "name";
+            max-elements 1;
+            description
+              "Configure the service interface that a EVPL instance corresponds.";
+            leaf name {
+              type leafref {
+                path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+              }
+              must "(/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'PW-VE' and /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:class != 'main-interface') or (/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type != 'PW-VE')";
+              description
+                "The name of interface.";
+            }
+            leaf ignore-ac-state {
+              type boolean;
+              must "(../ignore-ac-state='true' and /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()/../name]/ifm:type != 'PW-VE') or (../ignore-ac-state='false')";
+              default "false";
+              description
+                "Enable/disable ignore the attachment circuit status on an interface.";
+            }
+          }
+        }
+        container peers {
+          when "(../mode = 'vxlan-mode')";
+          description
+            "List of provider edge nodes that a EVPL instance corresponds with VXLAN encapsulation.";
+          list peer {
+            key "name peer-ip";
+            max-elements 1;
+            description
+              "Configure provider edge node that a EVPL instance corresponds with VXLAN encapsulation.";
+            leaf name {
+              type leafref {
+                path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+              }
+              must "/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'PW-VE' and /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:class = 'main-interface'";
+              description
+                "The name of interface.";
+            }
+            leaf peer-ip {
+              type inet:ipv4-address-no-zone;
+              description
+                "The address of provider edge node.";
+            }
+          }
+        }
+        container evpl-statistics {
+          when "(../mode = 'vxlan-mode')";
+          description
+            "Configure an EVPL instance.";
+          leaf statistics-enable {
+            type boolean;
+            default "false";
+            description
+              "Enable/disable EVPL message statistical function.";
+          }
+        }
+        container ccc {
+          when "(../mode != 'vxlan-mode') and (../mode != 'static-mode')";
+          must "((./interface and ./out-interface) and (./interface != ./out-interface) and not(../interfaces/interface)) or (not(./interface) and not(./out-interface))";
+          description
+            "Configure the circuit cross connection.";
+          leaf interface {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            must "/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type ='Ethernet' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'GigabitEthernet' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'Eth-Trunk' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '100GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '200GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '1200GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '40GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '10GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '25GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '400GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'MultiGE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'FlexE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50|100GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50-100GE'";
+            description
+              "The name of the interface.";
+          }
+          leaf out-interface {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            must "/ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type ='Ethernet' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'GigabitEthernet' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'Eth-Trunk' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '100GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '200GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '1200GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '40GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '10GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '25GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '400GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'MultiGE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = 'FlexE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50|100GE' or /ifm:ifm/ifm:interfaces/ifm:interface[ifm:name=current()]/ifm:type = '50-100GE'";
+            description
+              "The name of the out-interface.";
+          }
+          leaf ignore-ac-state {
+            when "../interface and ../out-interface";
+            type boolean;
+            default "false";
+            description
+              "Enable/disable ignore the attachment circuit status on an interface.";
+          }
+        }
+        container evpl-ccc-info {
+          config false;
+          description
+            "Operational state of EVPL CCC.";
+          leaf evpl-state {
+            type evpl-state;
+            description
+              "The state of the EVPL instance.";
+          }
+          leaf evpl-mode {
+            type evpl-mode;
+            description
+              "The mode of the EVPL instance.";
+          }
+          leaf interface {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            description
+              "The name of the interface.";
+          }
+          leaf interface-state {
+            type interface-state;
+            description
+              "The state of the interface.";
+          }
+          leaf if-last-up-time {
+            type yang:date-and-time;
+            description
+              "The last up time of the interface.";
+          }
+          leaf out-interface {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            description
+              "The name of the out-interface.";
+          }
+          leaf out-interface-state {
+            type interface-state;
+            description
+              "The state of the out-interface.";
+          }
+          leaf out-if-last-up-time {
+            type yang:date-and-time;
+            description
+              "The last up time of the out-interface.";
+          }
+        }
+      }
+    }
+  }
+}

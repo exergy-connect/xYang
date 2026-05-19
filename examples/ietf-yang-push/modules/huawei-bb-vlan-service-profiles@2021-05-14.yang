@@ -1,0 +1,721 @@
+module huawei-bb-vlan-service-profiles {
+  namespace "urn:huawei:yang:huawei-bb-vlan-service-profiles";
+  prefix hw-bb-vlan-srvprof;
+
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of yang definitions for
+     configuring the information of VLAN service profile for the broadband services.";
+
+  revision 2021-05-14 {
+    description
+      "Delete restriction between leaf force and leaf priority.";
+    reference
+      "";
+  }
+  revision 2020-05-20 {
+    description
+      "Import huawei-bb-vlan.";
+    reference
+      "";
+  }
+  revision 2019-09-16 {
+    description
+      "Adds priority of vlans.";
+    reference
+      "HUAWEI-ETHERLIK-EXT-MIB";
+  }
+  revision 2018-06-13 {
+    description
+      "Add four discrete configurations to vlan:
+           forwarding-mode,
+              \t policy-multicast,
+       policy-unknown-unicast,
+              \t policy-broadcast.";
+    reference
+      "";
+  }
+  revision 2018-03-30 {
+    description
+      "Initial revision.";
+    reference
+      "HUAWEI VLAN MIB";
+  }
+
+  typedef vlan-enable-status {
+    type enumeration {
+      enum "enable" {
+        value 1;
+        description
+          "Enable.";
+      }
+      enum "disable" {
+        value 2;
+        description
+          "Disable.";
+      }
+      enum "not-config" {
+        value 3;
+        description
+          "Switch status rely on discrete configuration.";
+      }
+    }
+    description
+      "Vlan enable status";
+  }
+
+  typedef vlan-feature-switch {
+    type enumeration {
+      enum "enable" {
+        value 1;
+        description
+          "Feature enable.";
+      }
+      enum "disable" {
+        value 2;
+        description
+          "Feature disable.";
+      }
+    }
+    description
+      "Vlan feature switch, only has two values: enable or disable.";
+  }
+
+  typedef vlan-mac-mode {
+    type enumeration {
+      enum "multi-mac" {
+        value 1;
+        description
+          "indicates that the multi-MAC mode is adopted.";
+      }
+      enum "single-mac" {
+        value 2;
+        description
+          "indicates that the single-MAC mode is adopted.";
+      }
+      enum "not-config" {
+        value 3;
+        description
+          "Switch status rely on discrete configuration.";
+      }
+    }
+    description
+      "Indicates VMAC Allocate Mode.";
+  }
+
+  typedef vlan-forward-policy {
+    type enumeration {
+      enum "forward" {
+        value 1;
+        description
+          "indicates that the packets are transparently transmitted.";
+      }
+      enum "discard" {
+        value 2;
+        description
+          "indicates that the packets are discarded.";
+      }
+      enum "not-config" {
+        value 3;
+        description
+          "Indicates forwarding based on descrete configuration.";
+      }
+    }
+    description
+      "Indicates the packet forward policy.";
+  }
+
+  container vlan-service-profiles {
+    description
+      "The configurations of vlan service profile";
+    list vlan-service-profile {
+      key "name";
+      description
+        "A list of vlan service profiles";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Specifies the vlan service profile";
+      }
+      container forward-mode {
+        description
+          "Vlan forwarding mode";
+        leaf forwarding-mode {
+          type enumeration {
+            enum "vlan-mac" {
+              value 1;
+              description
+                "Indicates forwarding based on the VLAN+MAC";
+            }
+            enum "vlan-connect" {
+              value 2;
+              description
+                "Indicates forwarding based on the SVLAN+CVLAN";
+            }
+            enum "not-config" {
+              value 3;
+              description
+                "Indicates forwarding based on descrete configuration.";
+            }
+          }
+          default "not-config";
+          description
+            "The VLAN forwarding policy";
+        }
+      }
+      container security-feature-switch {
+        description
+          "Security feature switch bundle.";
+        leaf vmac-status {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the VLAN-based VMAC.";
+        }
+        leaf pitp-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the PITP switch based on VLAN.";
+        }
+        leaf pppoe-mac-mode {
+          type vlan-mac-mode;
+          default "not-config";
+          description
+            "Indicates the pppoe mac mode.";
+        }
+        leaf dhcp-option82-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based DHCP option82 function.";
+        }
+        leaf anti-ip-spoofing {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "Anti-ip spoofing switch";
+        }
+        leaf anti-mac-spoofing {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "Anti-mac spoofing switch";
+        }
+        leaf anti-mac-duplicate-switch {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the VLAN-based mac-duplicate function.";
+        }
+        leaf cable-source-verify {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based source address verification function for CM configured policies.";
+        }
+        leaf cable-ipv6-source-verify {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based IPv6 source address verification function for CM configured policies.";
+        }
+        leaf anti-ipv6-spoofing-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based anti-IPv6-spoofing function.";
+        }
+        leaf ipv4-arp-unicast-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based arp unicast function.";
+        }
+        leaf ipv6-ns-unicast-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based arp unicast function.";
+        }
+        leaf ipv6-dad-proxy-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based IPv6 dad proxy function.";
+        }
+        leaf ipv6-ns-reply-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based ns reply function.";
+        }
+        leaf ipv4-arp-reply-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based arp reply function.";
+        }
+        leaf ipv6-bind-route-and-nd-switch {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based bind-route-nd function.";
+        }
+        leaf arp-detect-max-user-count-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the arp detect max user count switch.";
+        }
+        leaf ipv6-ns-unicast-unknown-policy {
+          type enumeration {
+            enum "forward" {
+              value 1;
+              description
+                "indicates that NS packets are broadcast to ports inside the VLAN on the user, cascading, and network sides.";
+            }
+            enum "discard" {
+              value 2;
+              description
+                "indicates that NS packets are discarded on the user side, and only broadcast to ports inside the VLAN on the cascading and network sides.";
+            }
+          }
+          default "forward";
+          description
+            "used for setting whether to forward or discard NS packets received from the network side when the user is offline, it takes effect only when the NS unicast function is enable.";
+        }
+        leaf ipv4-arp-unicast-unknown-policy {
+          type enumeration {
+            enum "forward" {
+              value 1;
+              description
+                "indicates that ARP packets are broadcast to ports inside the VLAN on the user, cascading, and network side.";
+            }
+            enum "discard" {
+              value 2;
+              description
+                "indicates that ARP packets are discarded on the user side, and only broadcast to ports inside the VLAN on the cascading and network sides.";
+            }
+          }
+          default "forward";
+          description
+            "indicates the VLAN-based forwarding policy for the control board unknown multicast packets.";
+        }
+        leaf ipoe-mac-mode {
+          type enumeration {
+            enum "multi-mac" {
+              value 1;
+              description
+                "indicates that the multi-MAC mode is adopted.";
+            }
+            enum "single-mac" {
+              value 2;
+              description
+                "indicates that the single-MAC mode is adopted.";
+            }
+          }
+          default "multi-mac";
+          description
+            "indicates the mode of allocating MAC addresses to DHCP users.";
+        }
+        leaf vmac-aging-mode {
+          type enumeration {
+            enum "mac-learning" {
+              value 1;
+              description
+                "indicates that the VMAC are reallocated to users after the corresponding MAC address learning entry ages.";
+            }
+            enum "dhcp" {
+              value 2;
+              description
+                "indicates that the VMAC addresses are reallocated to users after the corresponding IP addresses are released or the lease time of the IP address expires.";
+            }
+          }
+          default "mac-learning";
+          description
+            "indicates the time selection mode for reallocating VMAC addresses to users.";
+        }
+        leaf vmac-ipoe-sub-status {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the VLAN-based ipoe vmac function.";
+        }
+        leaf vmac-pppoe-sub-status {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the VLAN-based pppoe vmac function.";
+        }
+        leaf vmac-pppoa-sub-status {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the VLAN-based pppoa vmac function.";
+        }
+        leaf pppoa-mac-mode {
+          type vlan-mac-mode;
+          default "not-config";
+          description
+            "indicates the VLAN-based PPPoA single-MAC function.";
+        }
+      }
+      container protocol-switch {
+        description
+          "Protocol switch bundle.";
+        leaf dhcp-proxy-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based DHCP proxy function.";
+        }
+        leaf user-bridging {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based bridging function.";
+        }
+        leaf dhcp-mode {
+          type enumeration {
+            enum "not-config" {
+              value 1;
+              description
+                "indicates the DHCP L3 forwarding mode refers to discrete configuration.";
+            }
+            enum "layer2" {
+              value 2;
+              description
+                "indicates the DHCP l2 forwarding mode.";
+            }
+            enum "l3standard" {
+              value 3;
+              description
+                "indicates the standard mode of the DHCP L3 forwarding mode.";
+            }
+            enum "l3option60" {
+              value 4;
+              description
+                "indicates the option 60 mode of the DHCP L3 forwarding mode.";
+            }
+            enum "l3macrange" {
+              value 5;
+              description
+                "indicates the mac range mode of the DHCP L3 forwarding mode.";
+            }
+          }
+          default "not-config";
+          description
+            "indicates the VLAN-based DHCP L2/L3 mode switch.";
+        }
+        leaf dhcpv6-mode {
+          type enumeration {
+            enum "not-config" {
+              value 1;
+              description
+                "indicates the dhcpv6 mode refers to discrete configuration.";
+            }
+            enum "layer2" {
+              value 2;
+              description
+                "indicates the DHCPv6 l2 forwarding mode.";
+            }
+            enum "layer3" {
+              value 3;
+              description
+                "indicates the standard mode of the DHCPv6 L3 forwarding mode.";
+            }
+            enum "layer3option16" {
+              value 4;
+              description
+                "indicates the option 16 mode of the DHCPv6 L3 forwarding mode.";
+            }
+          }
+          default "not-config";
+          description
+            "indicates the VLAN-based DHCPv6 L2/L3 mode switch.";
+        }
+        leaf dhcpv6-option-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based DHCPv6 option function.";
+        }
+        leaf dhcp-relay-interface-relay-agent-switch {
+          type enumeration {
+            enum "receive" {
+              value 1;
+              description
+                "indicates that in the DHCP packet sent from the DHCP relay agent to the server,the gateway IP address is set to the IP address of the Rx interface (user-side interface).";
+            }
+            enum "send" {
+              value 2;
+              description
+                "indicates that in the DHCP packet sent from the DHCP relay agent to the server,the gateway IP address is set to the IP address of the Tx interface (network-side interface).";
+            }
+            enum "not-config" {
+              value 3;
+              description
+                "refers to discrete configuration.";
+            }
+          }
+          default "not-config";
+          description
+            "indicates the VLAN-based filling mode of the GIADDR field of the current DHCP-relay upstream packet.";
+        }
+        leaf igmp-user-max-vlan-tag {
+          type enumeration {
+            enum "unaware" {
+              value 1;
+              description
+                "indicates that the maximum number of VLAN tags for the IGMP user is not concerned.";
+            }
+            enum "untag" {
+              value 2;
+              description
+                "indicates that the maxium number of VLAN tags for the IGMP user is untag";
+            }
+            enum "single" {
+              value 3;
+              description
+                "indicates that the maxium number of VLAN tags for the IGMP user is one tag";
+            }
+            enum "double" {
+              value 4;
+              description
+                "indicates that the maxium number of VLAN tags for the IGMP user is two tags";
+            }
+          }
+          default "unaware";
+          description
+            "indicates the VLAN-based IGMP user max VLAN tag mode.";
+        }
+      }
+      container tunnel-switch {
+        description
+          "Tunnel switch bundle.";
+        leaf bpdu-tunnel {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the vlan-based BPDU transparent transmission function.";
+        }
+        leaf rip-tunnel {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the vlan-based RIP transparent transmission function.";
+        }
+        leaf vtp-cdp-tunnel {
+          type vlan-enable-status;
+          default "not-config";
+          description
+            "indicates the vlan-based VTP-CTP transparent transmission function.";
+        }
+        leaf ospf-tunnel {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based OSPF transparent transmission function.";
+        }
+        leaf l3protocol-tunnel {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based L2 transparent transmission function of other L3 protocol packets except RIP and OSPF packets.";
+        }
+        leaf ripng-tunnel {
+          type vlan-feature-switch;
+          default "disable";
+          description
+            "indicates the VLAN-based RIPng transmission function.";
+        }
+      }
+      container forward-policy {
+        description
+          "Forward policy bundle.";
+        leaf policy-broadcast {
+          type vlan-forward-policy;
+          default "not-config";
+          description
+            "indicates the VLAN-based forwarding policy for the broadcast packets.";
+        }
+        leaf policy-multicast {
+          type vlan-forward-policy;
+          default "not-config";
+          description
+            "indicates the VLAN-based forwarding policy for the unknown multicast packets.";
+        }
+        leaf policy-unknown-unicast {
+          type vlan-forward-policy;
+          default "not-config";
+          description
+            "indicates the VLAN-based forwarding policy for the unknown unicast packets.";
+        }
+        leaf policy-multicast-fabric {
+          type enumeration {
+            enum "forward" {
+              value 1;
+              description
+                "indicates that the control board unknown multicast packets are forwarded.";
+            }
+            enum "discard" {
+              value 2;
+              description
+                "indicates that the control board unknown multicast packets are discarded.";
+            }
+          }
+          default "forward";
+          description
+            "indicates the VLAN-based forwarding policy for the control board unknown multicast packets.";
+        }
+        leaf mismatch-igmp-policy {
+          type enumeration {
+            enum "transparent" {
+              value 1;
+              description
+                "indicates that the mismatched IGMP packets are transparently transmitted.";
+            }
+            enum "discard" {
+              value 2;
+              description
+                "indicates that the mismatched IGMP packets are discarded.";
+            }
+          }
+          default "discard";
+          description
+            "indicates the VLAN-based forwarding policy for the mismatched IGMP packets.";
+        }
+        leaf fabric-mac-learning-switch {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the VLAN-based MAC address learning capability switch of the control board";
+        }
+        leaf router-redirect-reverse {
+          type vlan-feature-switch;
+          default "enable";
+          description
+            "indicates the Layer 2 forwarding function of reverse Router-Redirect packets.";
+        }
+      }
+    }
+  }
+
+  augment "/huawei-vlan:vlans/huawei-vlan:vlan" {
+    description
+      "vlan binded vlan service profile and discrete configuration switches.
+              \t Restrictions:
+              \t 1. Bind is not allowed when creating vlan;
+       2. Bind is not allowed when modifying vlan attributes or vlan discrete configuration switches;
+       3. Modification of vlan discrete configuration switches is not allowed when creating vlan or binding vlan service profile;
+       4. Modification of vlan discrete configuration switches is not allowed when modifying vlan attributes.
+              \t ";
+    leaf vlan-service-profile {
+      type leafref {
+        path "/hw-bb-vlan-srvprof:vlan-service-profiles/hw-bb-vlan-srvprof:vlan-service-profile/hw-bb-vlan-srvprof:name";
+      }
+      description
+        "Augment the vlan service profile to huawei-vlan";
+    }
+    leaf forwarding-mode {
+      type enumeration {
+        enum "vlan-mac" {
+          value 1;
+          description
+            "Indicates forwarding based on the VLAN+MAC";
+        }
+        enum "vlan-connect" {
+          value 2;
+          description
+            "Indicates forwarding based on the SVLAN+CVLAN";
+        }
+      }
+      default "vlan-mac";
+      description
+        "The VLAN forwarding policy";
+    }
+    leaf policy-multicast {
+      type enumeration {
+        enum "forward" {
+          value 1;
+          description
+            "indicates that the unknown multicast packets are transparently transmitted.";
+        }
+        enum "discard" {
+          value 2;
+          description
+            "indicates that the unknown multicast packets are discarded.";
+        }
+      }
+      default "forward";
+      description
+        "indicates the packet policy for the unknown multicast packets.";
+    }
+    leaf policy-unknown-unicast {
+      type enumeration {
+        enum "forward" {
+          value 1;
+          description
+            "indicates that the unknown unicast packets are transparently transmitted.";
+        }
+        enum "discard" {
+          value 2;
+          description
+            "indicates that the unknown unicast packets are discarded.";
+        }
+      }
+      default "forward";
+      description
+        "indicates the packet policy for the unknown unicast packets.";
+    }
+    leaf policy-broadcast {
+      type enumeration {
+        enum "forward" {
+          value 1;
+          description
+            "indicates that the broadcast packets are transparently transmitted.";
+        }
+        enum "discard" {
+          value 2;
+          description
+            "indicates that the broadcast packets are discarded.";
+        }
+      }
+      default "forward";
+      description
+        "indicates the packet policy for the broadcast packets.";
+    }
+    container vlan-priority {
+      description
+        "Indicates the container of VLAN priority";
+      leaf priority {
+        type uint32 {
+          range "0..7";
+        }
+        description
+          "Indicates the VLAN priority. The priority increases with the value.";
+      }
+      leaf force {
+        type boolean;
+        default "false";
+        description
+          "Indicates that the force mode of VLAN priority. After the force configuration with true, the VLAN priority of packets use the configured value forcibly.";
+      }
+    }
+  }
+}

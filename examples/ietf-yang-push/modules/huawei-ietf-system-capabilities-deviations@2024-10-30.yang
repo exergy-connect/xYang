@@ -1,0 +1,37 @@
+module huawei-ietf-system-capabilities-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-system-capabilities-deviations";
+  prefix sysc-devs;
+
+  import ietf-system-capabilities {
+    prefix sysc;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-system-capabilities data
+     model set for Huawei devices.";
+
+  revision 2024-10-30 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sysc:system-capabilities/sysc:datastore-capabilities/sysc:per-node-capabilities/sysc:node-selection/sysc:node-selector/sysc:node-selector" {
+    deviate replace {
+      type yang:xpath1.0;
+    }
+  }
+}

@@ -1,0 +1,177 @@
+module huawei-bb-traffic-suppress {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bb-traffic-suppress";
+  prefix hw-traffic-suppress;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-board {
+    prefix board;
+  }
+  import huawei-bb-nerg {
+    prefix hw-bb-nerg;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of yang definitions for configuring traffic suppression.";
+
+  revision 2024-07-02 {
+    description
+      "Add traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for NERG group.";
+    reference
+      "";
+  }
+  revision 2021-02-24 {
+    description
+      "Add traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for a board.";
+    reference
+      "";
+  }
+  revision 2019-06-13 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef traffic-suppress-level {
+    type uint8 {
+      range "0..13";
+    }
+    description
+      "Indicates the level id of the traffic suppression level.
+       The system uses a level id to indicate the traffic suppression level.
+       The smaller the level id value, the lower the broadcast, unknown multicast, and unknown unicast traffic rate.
+       When the level id is 13, all broadcast, unknown multicast, and unknown unicast packets are suppressed.
+       By default, the suppression level for broadcast traffic and unknown unicast traffic is 7.
+       The suppression level for unknown multicast traffic in MPU and ETH modes is 7.
+       Suppression of unknown multicast traffic is disabled in global mode.
+       Determine the packet suppression policy based on actual network conditions.";
+  }
+
+  grouping suppress-level {
+    description
+      "The system uses an level id to indicate the traffic suppression level. The traffic suppression level is represented in three dimensions.
+       Minimum limited bandwidth.
+       Maximum limited bandwidth.
+       Packets per second.
+       The smaller the index value, the lower the broadcast, unknown multicast, and unknown unicast traffic rate.";
+    leaf level-id {
+      type traffic-suppress-level;
+      description
+        "Indicates the index of a traffic suppression table.
+         When the level id is 1, the minimum limited bandwidth is 6 kbit/s, the maximum limited bandwidth is 145 kbit/s, and the system sends 12 packets per second.
+         When the level id increases from 1 to 12, the values of these parameters multiply on the original basis.
+         When the level id is 13, all broadcast, unknown multicast, and unknown unicast packets are suppressed.";
+    }
+    leaf min-bandwidth {
+      type uint32;
+      units "kbit/s";
+      description
+        "Indicates the minimum limited bandwidth (unit: kbit/s). The larger the parameter value, the higher the broadcast, unknown multicast, and unknown unicast traffic rate.";
+    }
+    leaf max-bandwidth {
+      type uint32;
+      units "kbit/s";
+      description
+        "Indicates the maximum limited bandwidth (unit: kbit/s). The larger the parameter value, the higher the broadcast, unknown multicast, and unknown unicast traffic rate.";
+    }
+    leaf packet-number {
+      type uint32;
+      units "pps";
+      description
+        "Indicates the number of packets sent in every second. The larger the parameter value, the higher the broadcast, unknown multicast, and unknown unicast traffic rate.";
+    }
+  }
+
+  grouping traffic-suppress-level {
+    description
+      "When the level id is 0, traffic suppression is disable.
+       When the level id is 1, the minimum limited bandwidth is 6 kbit/s, the maximum limited bandwidth is 145 kbit/s, and the system sends 12 packets per second.
+       When the level id increases from 1 to 12, the values of these parameters multiply on the original basis.
+       When the level id is 13, all broadcast, unknown multicast, and unknown unicast packets are suppressed.";
+    leaf broadcast-level {
+      type traffic-suppress-level;
+      description
+        "Sets the permitted broadcast traffic to prevent broadcast storm on the port.";
+    }
+    leaf multicast-level {
+      type traffic-suppress-level;
+      description
+        "Sets the permitted unknown multicast traffic to prevent unknown multicast storm on the port.";
+    }
+    leaf unicast-level {
+      type traffic-suppress-level;
+      description
+        "Sets the permitted unknown unicast traffic to prevent unknown unicast storm on the port.";
+    }
+  }
+
+  container bb-traffic-suppress {
+    description
+      "The bb-traffic-suppress container is used to set the traffic suppression default level of broadcast, unknown multicast, and unknown unicast traffic for a port or a board.
+       You can use it when network congestion occurs because packet transmission occupies excessive network resources, or when service processing slows down (with symptoms such as dialup failures or low Internet access rate) due to packet loss.
+       If traffic control of a port is enabled, the traffic of the port is limited based on the traffic suppression level.";
+    container suppress-levels {
+      config false;
+      description
+        "A container of traffic suppression levels.";
+      list suppress-level {
+        key "level-id";
+        description
+          "A list of traffic suppression level.";
+        uses suppress-level;
+      }
+    }
+    container traffic-suppress-default-level {
+      description
+        "The traffic-suppress-default-level is used to configure the default level of the global traffic suppression.
+         After it is successfully configed, the system configures the traffic suppression with the default level for boards or Ethernet ports that are newly added.";
+      container eth-port-default-level {
+        description
+          "Indicates the default level of the global traffic suppression for Ethernet ports.";
+        uses traffic-suppress-level;
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface" {
+    description
+      "The vendor's properties of interface.";
+    container traffic-suppress {
+      description
+        "The traffic-suppress container is used to set the traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for a port.
+         You can use it when network congestion occurs because packet transmission occupies excessive network resources, or when service processing slows down (with symptoms such as dialup failures or low Internet access rate) due to packet loss.
+         If traffic control of a port is enabled, the traffic of the port is limited based on the traffic suppression level.";
+      uses traffic-suppress-level;
+    }
+  }
+  augment "/board:boards/board:board" {
+    description
+      "The vendor's properties of board.";
+    container traffic-suppress {
+      description
+        "The traffic-suppress container is used to set the traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for a board";
+      uses traffic-suppress-level;
+    }
+  }
+  augment "/hw-bb-nerg:bb-nerg/hw-bb-nerg:nerg-traffic-suppress" {
+    description
+      "The vendor's properties of NERG group.";
+    container traffic-suppress {
+      description
+        "The traffic-suppress container is used to set the traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for NERG group";
+      uses traffic-suppress-level;
+    }
+  }
+}

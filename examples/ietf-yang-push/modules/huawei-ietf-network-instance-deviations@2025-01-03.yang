@@ -1,0 +1,32 @@
+module huawei-ietf-network-instance-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-network-instance-deviations";
+  prefix hw-ni-devs;
+
+  import ietf-network-instance {
+    prefix ni;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-network-instance data
+     model set for Huawei devices.";
+
+  revision 2025-01-03 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/ni:bind-ni-name-failed/ni:ipv6" {
+    deviate not-supported;
+  }
+}

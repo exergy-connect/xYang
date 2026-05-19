@@ -1,0 +1,132 @@
+module huawei-bb-vlan-deviations {
+  namespace "urn:huawei:yang:huawei-bb-vlan-deviations";
+  prefix hw-vlan-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for configuring
+     service flows in the broadband field.";
+
+  revision 2020-10-12 {
+    description
+      "Delete typedef vlan-id-deviations.";
+    reference
+      "";
+  }
+  revision 2020-05-20 {
+    description
+      "Import huawei-bb-vlan.";
+    reference
+      "";
+  }
+  revision 2019-12-20 {
+    description
+      "Modify vlan-id to vlan-id-deviations";
+    reference
+      "";
+  }
+  revision 2018-08-01 {
+    description
+      "Modify the prefix of huawei-vlan";
+    reference
+      "";
+  }
+  revision 2017-12-25 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  deviation "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:reserved" {
+    deviate not-supported;
+  }
+  deviation "/huawei-vlan:vlans/huawei-vlan:management-vlan" {
+    deviate not-supported;
+  }
+  deviation "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id" {
+    deviate replace {
+      type union {
+        type uint16 {
+          range "1..4093";
+        }
+        type string {
+          length "1..64";
+        }
+      }
+    }
+  }
+  deviation "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:name" {
+    deviate replace {
+      type string {
+        length "1..15";
+      }
+    }
+  }
+  deviation "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:description" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/huawei-vlan:vlans/huawei-vlan:lan-vlan" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/huawei-vlan:vlan/huawei-vlan:port-link-type" {
+    deviate replace {
+      type enumeration {
+        enum "trunk" {
+          value 2;
+          description
+            "Trunk port.";
+        }
+      }
+    }
+  }
+  deviation "/if:interfaces/if:interface/huawei-vlan:vlan/huawei-vlan:link-type/huawei-vlan:hybrid" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/huawei-vlan:vlan/huawei-vlan:link-type/huawei-vlan:dot1q" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/huawei-vlan:vlan/huawei-vlan:link-type/huawei-vlan:trunk/huawei-vlan:trunk/huawei-vlan:trunk-vlan" {
+    deviate replace {
+      type union {
+        type uint16 {
+          range "1..4093";
+        }
+        type string {
+          length "1..64";
+        }
+      }
+    }
+  }
+  deviation "/if:interfaces/if:interface/huawei-vlan:vlan/huawei-vlan:default-vlan" {
+    deviate replace {
+      type union {
+        type uint16 {
+          range "1..4093";
+        }
+        type string {
+          length "1..64";
+        }
+      }
+    }
+  }
+}

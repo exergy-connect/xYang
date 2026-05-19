@@ -1,0 +1,369 @@
+module huawei-bb-security {
+  namespace "urn:huawei:yang:huawei-bb-security";
+  prefix hw-bb-security;
+
+  import huawei-extension {
+    prefix ext;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "Configure the information of system security with module which contains a collection of definitions.";
+
+  revision 2024-01-18 {
+    description
+      "Add container anti IPv6 conflict refresh.";
+    reference
+      "";
+  }
+  revision 2021-09-17 {
+    description
+      "Add leaf nd-threshold.";
+    reference
+      "";
+  }
+  revision 2021-01-18 {
+    description
+      "Add container security-global.";
+    reference
+      "";
+  }
+  revision 2018-12-20 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+ 
+
+  typedef packet-rate-total-threshold {
+    type uint16 {
+      range "0..254";
+    }
+    units "pps";
+    default "63";
+    description
+      "This type is used by data models that need to reference configured anti-dos control-packet rate.";
+  }
+
+  typedef packet-rate-threshold {
+    type uint16 {
+      range "0..63 | 65535";
+    }
+    units "pps";
+    default "65535";
+    description
+      "This type is used by data models that need to reference configured anti-dos control-packet rate for specific protocol.
+          \t The value 65535 indicates no-limit for the packet.";
+  }
+
+  grouping packet-rate-threshold-data {
+    description
+      "All config data for anti-dos control packet rate.";
+    container packet-rate-thresholds {
+      description
+        "Configure anti-dos control packet rates. There are two level rate threshold: total and protocol level.
+                \t When both level configured, the minimum of the rate thresholds take effects.";
+      leaf total-threshold {
+        type packet-rate-total-threshold;
+        description
+          "Configure total packet rate threshold.";
+      }
+      leaf igmp-threshold {
+        type packet-rate-threshold;
+        description
+          "Configure packet rate threshold for IGMP protocol.";
+      }
+      leaf dhcp-threshold {
+        type packet-rate-threshold;
+        description
+          "Configure packet rate threshold for DHCP protocol.";
+      }
+      leaf arp-threshold {
+        type packet-rate-threshold;
+        description
+          "Configure packet rate threshold for ARP protocol.";
+      }
+      leaf pppoe-threshold {
+        type packet-rate-threshold;
+        description
+          "Configure packet rate threshold for PPPoE protocol.";
+      }
+      leaf nd-threshold {
+        type packet-rate-threshold;
+        description
+          "Configure packet rate threshold for ND protocol.";
+      }
+    }
+  }
+
+  container bb-security {
+    description
+      "System security global configurations in broadband area.";
+    container anti-dos {
+      description
+        "Configure anti-dos.";
+      leaf status {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates anti-dos global switch is enabled.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates anti-dos global switch is disabled.";
+          }
+        }
+        default "disable";
+        description
+          "This leaf contains the configured, desired state of the anti-dos.
+           Enabling anti-dos means that a DoS attack alarm will be reported when
+           the rate of the control packets sent to the CPU exceeds the present threshold.
+           Anti-dos disabled means that the DoS attack alarm will not be reported.";
+      }
+      leaf control-packet-policy {
+        type enumeration {
+          enum "permit" {
+            value 0;
+            description
+              "Indicates that protocol packets permitted to be sent to the CPU and processed by the CPU.";
+          }
+          enum "deny" {
+            value 1;
+            description
+              "Indicates that protocol packets are directly discarded.";
+          }
+        }
+        default "deny";
+        description
+          "Configure the policy for processing protocol packets when a DoS attack is detected.";
+      }
+    }
+    container dhcp-option82 {
+      description
+        "Configure dhcp-option82.";
+      leaf status {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates the dhcp-option82 global switch is enabled.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates the dhcp-opiton82 global switch is disabled.";
+          }
+          enum "forward" {
+            value 3;
+            description
+              "Indicates the dhcp-option82 service is enabled and working at forward mode.";
+          }
+          enum "rebuild" {
+            value 4;
+            description
+              "Indicates the dhcp-option82 service is enabled and working at rebuild mode.";
+          }
+        }
+        default "disable";
+        description
+          "Configure the global dhcp-option82 switch.";
+      }
+    }
+    container dhcpv6-option {
+      description
+        "Configure dhcpv6-option.";
+      leaf status {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates the dhcpv6-option global switch is enabled.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates the dhcpv6-option global switch is disabled.";
+          }
+          enum "rebuild" {
+            value 3;
+            description
+              "Indicates the dhcpv6-option service is enabled and working at rebuild mode.";
+          }
+        }
+        default "disable";
+        description
+          "Configure the global dhcpv6 option switch.";
+      }
+    }
+    container pitp {
+      description
+        "Configure pitp global switch. pitp can only work at pmode or vmode.";
+      leaf status {
+        type enumeration {
+          enum "disable" {
+            value 1;
+            description
+              "Indicates pitp feature is disabled.";
+          }
+          enum "enable-vmode" {
+            value 2;
+            description
+              "Indicates pitp is working on vmode.";
+          }
+          enum "enable-pmode" {
+            value 3;
+            description
+              "Indicates pitp is working on pmode.";
+          }
+          enum "forward-pmode" {
+            value 4;
+            description
+              "Indicates pitp is working on forward mode. Only pmode support forward mode.";
+          }
+          enum "rebuild-pmode" {
+            value 5;
+            description
+              "Indicates pitp is working on rebuild mode. Only pmode support rebuild mode.";
+          }
+        }
+        default "disable";
+        description
+          "Configure pitp status.";
+      }
+    }
+    container security-global {
+      description
+        "Configure the global security function.";
+      container anti-ipspf {
+        description
+          "Configure anti-ipspoofing switch.";
+        leaf enable {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the switch of global anti-ipspoofing switch.";
+        }
+        leaf exclude-igmp {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the anti-ipspoofing exclude IGMP packets.";
+        }
+        leaf exclude-dhcp {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the anti-ipspoofing exclude DHCP packets.";
+        }
+      }
+      container anti-macspf {
+        description
+          "Configure anti-macspoofing switch.";
+        leaf enable {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the switch of global anti-macspoofing switch.";
+        }
+        leaf exclude-igmp {
+          type boolean;
+          default "true";
+          description
+            "Enable/disable the anti-macspoofing exclude IGMP packets.";
+        }
+        leaf exclude-mld {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the anti-macspoofing exclude MLD packets.";
+        }
+      }
+      container anti-macduplicate {
+        description
+          "Configure anti-macduplicate switch.";
+        leaf enable {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the switch of global anti-macduplicate switch.";
+        }
+      }
+      container src-route-filter {
+        description
+          "Configure source route filter switch.";
+        leaf enable {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the switch of global source route filter switch.";
+        }
+      }
+      container anti-attack {
+        description
+          "Configure anti attack switch.";
+        leaf anti-icmp-attack {
+          type boolean;
+          default "true";
+          description
+            "Enable/disable the switch of anti-icmp-attack switch.";
+        }
+      }
+      container anti-ipv6conflict-refresh {
+        description
+          "Configure anti IPv6 conflict refresh switch.";
+        leaf anti-ipv6conflict-refresh {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable the switch of anti IPv6 conflict refresh.";
+        }
+      }
+    }
+  }
+
+  augment "/huawei-vlan:vlans/huawei-vlan:vlan" {
+    description
+      "Indicates the parameters applying to the VLAN.";
+    container security {
+      description
+        "Configure the VLAN level security function.";
+      leaf anti-macspf {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the switch of VLAN level anti-macspoofing switch.";
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface" {
+    description
+      "Configure anti-dos threshold to each interface.";
+    container security {
+      description
+        "Configure security management.";
+      container anti-dos {
+        description
+          "Configure security anti-dos management.";
+        uses packet-rate-threshold-data;
+      }
+    }
+  }
+}

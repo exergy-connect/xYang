@@ -1,0 +1,31 @@
+module huawei-ieee802-dot1q-cfm-deviations {
+  namespace "urn:huawei:yang:huawei-ieee802-dot1q-cfm-deviations";
+  prefix hw-cfm-devs;
+
+  import ieee802-dot1q-cfm {
+    prefix dot1q-cfm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ieee802-dot1q-cfm module.";
+
+  revision 2025-07-16 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/dot1q-cfm:cfm" {
+    deviate not-supported;
+  }
+}

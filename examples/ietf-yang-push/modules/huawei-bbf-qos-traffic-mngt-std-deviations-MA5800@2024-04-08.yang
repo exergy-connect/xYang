@@ -1,0 +1,94 @@
+module huawei-bbf-qos-traffic-mngt-std-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-traffic-mngt-deviations-MA5800";
+  prefix bbf-qos-tm-std-devs-MA5800;
+
+  import bbf-qos-traffic-mngt {
+    prefix bbf-qos-tm;
+  }
+  import bbf-qos-shaping {
+    prefix bbf-qos-shap;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-traffic-mngt module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:max-queue-size" {
+    deviate replace {
+      type uint16 {
+        range "32..16384";
+      }
+      units "packet";
+    }
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:tc-id-2-queue-id-mapping-profile/bbf-qos-tm:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:bac-type/bbf-qos-tm:taildrop" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:bac-type/bbf-qos-tm:red" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:bac-type/bbf-qos-tm:wtaildrop" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:bac-entry/bbf-qos-tm:bac-type/bbf-qos-tm:wred/bbf-qos-tm:wred/bbf-qos-tm:color/bbf-qos-tm:red" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue/bbf-qos-tm:queue-scheduling-cfg-type/bbf-qos-tm:inline/bbf-qos-tm:priority" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue/bbf-qos-tm:queue-scheduling-cfg-type/bbf-qos-tm:inline/bbf-qos-tm:extended-weight" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue/bbf-qos-tm:queue-scheduling-cfg-type/bbf-qos-tm:dual-rate-scheduling" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue/bbf-qos-tm:pre-emption" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue-statistics-enable" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-tm:tm-profiles/bbf-qos-tm:queue-templates" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues-from-template" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root/bbf-qos-tm:children-type/bbf-qos-tm:queues/bbf-qos-tm:queue/bbf-qos-shap:shaper-name" {
+    deviate delete {
+      must "(not(boolean(current()/../bbf-qos-tm:dual-rate-scheduling)) and boolean(/bbf-qos-tm:tm-profiles/bbf-qos-shap:shaper-profile[bbf-qos-shap:name=current()]/bbf-qos-shap:single-token-bucket)) or (boolean(current()/../bbf-qos-tm:dual-rate-scheduling) and boolean(/bbf-qos-tm:tm-profiles/bbf-qos-shap:shaper-profile[bbf-qos-shap:name=current()]/bbf-qos-shap:two-token-bucket))";
+    }
+  }
+}

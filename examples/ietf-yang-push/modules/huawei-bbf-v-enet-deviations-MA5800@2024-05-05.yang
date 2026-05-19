@@ -1,0 +1,40 @@
+module huawei-bbf-v-enet-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-v-enet-deviations-MA5800";
+  prefix bbf-v-enet-devs-MA5800;
+
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+  import bbf-xponvani {
+    prefix bbf-xponvani;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xponani module.";
+
+  revision 2024-05-05 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-xponani:onu-v-enet/bbf-xponani:ani" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xponvani:olt-v-enet/bbf-xponvani:lower-layer-interface" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,38 @@
+module huawei-ietf-netconf-acm-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-netconf-acm-deviations";
+  prefix nacm-devs;
+
+  import ietf-netconf-acm {
+    prefix nacm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of IETF netconf acm data
+     model set for Huawei devices.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/nacm:nacm/nacm:denied-operations" {
+    deviate not-supported;
+  }
+  deviation "/nacm:nacm/nacm:denied-data-writes" {
+    deviate not-supported;
+  }
+  deviation "/nacm:nacm/nacm:denied-notifications" {
+    deviate not-supported;
+  }
+}

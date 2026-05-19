@@ -71,25 +71,35 @@ def _load_anydata_module_map(
     extra_module_paths: list[Path],
 ) -> Dict[str, Any]:
     """Build ``module-name -> YangModule`` for anydata subtree validation."""
-    from xyang import parse_yang_file
+    from xyang.augment_expand import (
+        apply_augmentations_across_module_map,
+        register_module_closure,
+    )
     from xyang.module import YangModule
+    from xyang.parser import YangParser
 
-    modules: Dict[str, YangModule] = {host_module.name: host_module}
+    modules: Dict[str, YangModule] = {}
+    register_module_closure(modules, host_module)
+
     if extra_module_paths:
         paths = extra_module_paths
     else:
         search_dirs = [host_path.parent, *[Path(p) for p in include_path]]
         paths = _yang_files_in_dirs(search_dirs)
 
+    extras = tuple(Path(p) for p in include_path)
+    parser = YangParser(include_path=extras)
     for yang_path in paths:
         if yang_path.resolve() == host_path.resolve():
             continue
         try:
-            mod = parse_yang_file(str(yang_path), include_path=include_path)
+            mod = parser.parse_file(yang_path)
         except _CLI_ERRORS as exc:
             print(f"Warning: skipping {yang_path}: {exc}", file=sys.stderr)
             continue
-        modules[mod.name] = mod
+        register_module_closure(modules, mod)
+
+    apply_augmentations_across_module_map(modules)
     return modules
 
 

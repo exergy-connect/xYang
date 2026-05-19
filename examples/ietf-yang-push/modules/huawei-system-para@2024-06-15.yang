@@ -1,0 +1,109 @@
+module huawei-system-para {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-system-para";
+  prefix hw-system-para;
+
+  import ietf-system {
+    prefix sys;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for system paras of devices.";
+
+  revision 2024-06-15 {
+    description
+      "Delete leaf sys-time.";
+    reference
+      "";
+  }
+  revision 2024-03-13 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef sys-work-mode-type {
+    type enumeration {
+      enum "amsanamsan" {
+        value 1;
+        description
+          "Indicates that the active and standby control boards are in position,
+           with the active control board of AMSAN and the standby control board of AMSAN.";
+      }
+      enum "independent" {
+        value 13;
+        description
+          "Indicates that the working mode of the current subrack is independent.";
+      }
+      enum "stack" {
+        value 14;
+        description
+          "Indicates that the working mode of the current subrack is stack.";
+      }
+      enum "null" {
+        value 65536;
+        description
+          "Indicates that the system work mode is not set.";
+      }
+    }
+    description
+      "System working mode type.";
+  }
+
+  augment "/sys:system" {
+    description
+      "Parameter for system.";
+    container sys-para {
+      description
+        "Operational state of configure parameter for system.";
+      leaf sys-version {
+        type string {
+          length "0..512";
+        }
+        config false;
+        description
+          "The system software version format is consistent with the
+           specification of HUAWEI product. For example, MA5800V100R024C00.";
+      }
+      leaf sys-work-mode {
+        type sys-work-mode-type;
+        config false;
+        description
+          "This object is used for obtaining the working mode of the system.";
+      }
+      leaf sys-version-vrcb {
+        type string {
+          length "0..512";
+        }
+        config false;
+        description
+          "Get system VRCB version.
+           V indicates the change of the main product platform.
+           R indicates a general version released to all customers.
+           C identifies the customized version developed based on the R version to quickly meet customer requirements.
+           B identifies the Build version in the development process.";
+      }
+      leaf sys-pbi-version {
+        type string {
+          length "0..63";
+        }
+        config false;
+        description
+          "The system software version format is consistent with the specification of HUAWEI product.";
+      }
+    }
+  }
+}

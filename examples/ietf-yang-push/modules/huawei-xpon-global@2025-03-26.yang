@@ -1,0 +1,930 @@
+submodule huawei-xpon-global {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide XPON global management.";
+
+  revision 2025-03-26 {
+    description
+      "Add new leafnodes: port-peak-rate-sampling-interval.";
+    reference
+      "";
+  }
+  revision 2025-03-14 {
+    description
+      "Add new container: ont-rssi-difference.";
+    reference
+      "";
+  }
+  revision 2024-09-21 {
+    description
+      "Add new leafnodes: channel-rogue-alarm-switch, rogueont-rssi-variation-threshold.";
+    reference
+      "";
+  }
+  revision 2024-03-11 {
+    description
+      "YANG 2.0 Extension, Adding New Nodes and Containers;
+       Add new leafnodes and containers: distance-time, conflict-check-switch, additional-notice-switch,
+       additional-notice-times, additional-notice-distance-times and so on.";
+    reference
+      "";
+  }
+  revision 2023-11-10 {
+    description
+      "Add new leafnode: frequency-type.";
+    reference
+      "";
+  }
+  revision 2022-01-18 {
+    description
+      "Add new leafnode: xpon-olt-rx-power-mode.";
+    reference
+      "";
+  }
+  revision 2021-07-08 {
+    description
+      "Add new leafnodes: xpon-rogueont-detect-rssi-threshold, xpon-rogueont-clear-rssi-threshold.";
+    reference
+      "";
+  }
+  revision 2020-11-25 {
+    description
+      "Add new leafnodes: gpon-multicast-gemport-id, xgpon-multicast-gemport-id.";
+    reference
+      "";
+  }
+  revision 2020-11-24 {
+    description
+      "Add new leafnode: ont-pq-map-policy.";
+    reference
+      "";
+  }
+  revision 2020-11-05 {
+    description
+      "Add new leafnode: renew-interval.";
+    reference
+      "";
+  }
+  revision 2019-09-19 {
+    description
+      "Add new leafnodes: anti-weak-light-switch, timeout, tcont-pq-priority-reverse.";
+    reference
+      "";
+  }
+  revision 2019-05-22 {
+    description
+      "Add new leafnodes: ont-authentication-conflict-check-by-sn, ont-authentication-conflict-check-by-loid.";
+    reference
+      "";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  grouping xpon-global-config-data {
+    description
+      "Xpon global configration data.";
+    leaf dba-bandwidth-assignment-mode {
+      type enumeration {
+        enum "max-bandwidth-usage" {
+          value 1;
+          description
+            "Indicates that the dba bandwidth assignment mode is max-bandwidth-usage.";
+        }
+        enum "min-loop-delay" {
+          value 2;
+          description
+            "Indicates that the dba bandwidth assignment mode is min-loop-delay.";
+        }
+        enum "manual" {
+          value 3;
+          description
+            "Indicates that the dba bandwidth assignment mode is manual.";
+        }
+      }
+      default "min-loop-delay";
+      description
+        "The DBA bandwidth assignment mode of the Device.";
+    }
+    leaf rogue-ont-detect-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable ONT automatic detect.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable ONT automatic detect.";
+        }
+      }
+      default "disable";
+      description
+        "The rogue ONT automatic detection switch.";
+    }
+    leaf ont-self-detect-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable ONT self rogue ONT detect.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable ONT self rogue ONT detect.";
+        }
+        enum "unconcern" {
+          value 3;
+          description
+            "The self-detected switch of rogue ONTs is unconcern.";
+        }
+      }
+      default "unconcern";
+      description
+        "The ONT self rogue ONT detection switch.";
+    }
+    leaf anti-weak-light-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable the function of anti-rogue ONTs that transmit weak optical signals.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable the function of anti-rogue ONTs that transmit weak optical signals.";
+        }
+      }
+      default "disable";
+      description
+        "The switch of anti-rogue ONTs that transmit weak optical signals.";
+    }
+    leaf ont-authentication-conflict-check-by-sn {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable the global ONT SN conflict detection function.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable the global ONT SN conflict detection function.";
+        }
+      }
+      default "enable";
+      description
+        "Indicates the switch of the global ONT SN conflict detection function.";
+    }
+    leaf ont-authentication-conflict-check-by-loid {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable the global ONT LOID conflict detection function.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable the global ONT LOID conflict detection function.";
+        }
+      }
+      default "enable";
+      description
+        "Indicates the switch of the global ONT LOID conflict detection function.";
+    }
+    leaf ont-password-renew-interval {
+      type union {
+        type uint16 {
+          range "5..1440";
+        }
+        type enumeration {
+          enum "no-renew" {
+            value 0;
+            description
+              "Indicates that the ONT password will not update.";
+          }
+        }
+      }
+      units "min";
+      description
+        "The interval time of ONT's password renew.";
+    }
+    leaf ont-pq-map-policy {
+      type enumeration {
+        enum "gem-map" {
+          value 1;
+          description
+            "Indicates that gpon ONT priority queue mapping policy is gemMap.";
+        }
+        enum "cos-map" {
+          value 2;
+          description
+            "Indicates that gpon ONT priority queue mapping policy is cosMap.";
+        }
+      }
+      default "gem-map";
+      description
+        "The value of gpon ONT priority queue mapping policy.";
+    }
+    container ont-auto-find {
+      description
+        "Configure the ONT automatically discovers in the global configuration.";
+      leaf timeout {
+        type union {
+          type uint16 {
+            range "100..300";
+          }
+          type enumeration {
+            enum "no-aging" {
+              value 0;
+              description
+                "Indicates that the ONT will not aging.";
+            }
+          }
+        }
+        units "s";
+        default "300";
+        description
+          "The aging time of the auto-found ONT.";
+      }
+      leaf distance-time {
+        type uint8 {
+          range "1..10";
+        }
+        units "s";
+        default "5";
+        description
+          "Indicates the interval for automatically finding an ONU. When you need the OLT periodically
+           finds whether there are new online ONUs, trigger this configuration.";
+      }
+      leaf conflict-check-switch {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Open the switch of the ONT autofind conflict-check.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Close the switch of the ONT autofind conflict-check.";
+          }
+        }
+        default "disable";
+        description
+          "This object is used to open or close the ONT autofind conflict-check switch.";
+      }
+      leaf additional-notice-switch {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates ont autofind additional-notice switch is enable.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates ont autofind additional-notice switch is disable.";
+          }
+        }
+        default "disable";
+        description
+          "Indicates ont autofind additional-notice switch.";
+      }
+      leaf additional-notice-times {
+        when "../additional-notice-switch = 'enable'";
+        type uint8 {
+          range "1..10";
+        }
+        default "3";
+        description
+          "Indicates the times of sending the ONT auto-find additional notices.";
+      }
+      leaf additional-notice-distance-times {
+        when "../additional-notice-switch = 'enable'";
+        type uint8 {
+          range "30..100";
+        }
+        units "s";
+        default "100";
+        description
+          "Indicates the interval of sending the ONT auto-find additional notices.";
+      }
+    }
+    container ont-interoperability {
+      description
+        "Configure the ONT interoperability mode in the global configuration.";
+      leaf tcont-pq-priority-reverse {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Enable the priority reverse switch.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Disable the priority reverse switch.";
+          }
+        }
+        default "disable";
+        description
+          "The priority reverse switch of gpon ONT priority queue.";
+      }
+      leaf onu-tcont-config-order {
+        type enumeration {
+          enum "omci-first" {
+            value 1;
+            description
+              "Send OMCI message first when config the ont T-CONT.";
+          }
+          enum "ploam-first" {
+            value 2;
+            description
+              "Send PLOAM message first when config the ont T-CONT.";
+          }
+        }
+        default "omci-first";
+        description
+          "Global config of T-CONT config order between omci and ploam message.";
+      }
+      leaf mode {
+        type enumeration {
+          enum "itu-t" {
+            value 1;
+            description
+              "The switch mode of gpon ont interoperability is ituT.";
+          }
+          enum "ctc" {
+            value 2;
+            description
+              "The switch mode of gpon ont interoperability is ctc.";
+          }
+          enum "eric-v1" {
+            value 3;
+            description
+              "The switch mode of gpon ont interoperability is ericVa.";
+          }
+          enum "eric-v2" {
+            value 4;
+            description
+              "The switch mode of gpon ont interoperability is ericV2.";
+          }
+          enum "itu-tg984" {
+            value 5;
+            description
+              "The switch mode of gpon ont interoperability is ituTG984.";
+          }
+          enum "itu-tg988" {
+            value 6;
+            description
+              "The switch mode of gpon ont interoperability is ituTG988.";
+          }
+          enum "cuc" {
+            value 7;
+            description
+              "The switch mode of gpon ont interoperability is cuc.";
+          }
+          enum "cmcc" {
+            value 8;
+            description
+              "The switch mode of gpon ont interoperability is cmcc.";
+          }
+          enum "eci" {
+            value 9;
+            description
+              "The switch mode of gpon ont interoperability is eci.";
+          }
+          enum "mode1" {
+            value 10;
+            description
+              "The switch mode of gpon ont interoperability is mode1.";
+          }
+          enum "mode2" {
+            value 11;
+            description
+              "The switch mode of gpon ont interoperability is mode2.";
+          }
+          enum "mode2-v2" {
+            value 12;
+            description
+              "The switch mode of gpon ont interoperability is mode2V2.";
+          }
+          enum "mode3" {
+            value 13;
+            description
+              "The switch mode of gpon ont interoperability is mode3.";
+          }
+          enum "mode4" {
+            value 14;
+            description
+              "The switch mode of gpon ont interoperability is mode4.";
+          }
+          enum "mode2-v3" {
+            value 15;
+            description
+              "The switch mode of gpon ont interoperability is mode2V3.";
+          }
+          enum "mode2-v4" {
+            value 16;
+            description
+              "The switch mode of gpon ont interoperability is mode2V4.";
+          }
+          enum "mode5" {
+            value 17;
+            description
+              "The switch mode of gpon ont interoperability is mode5.";
+          }
+          enum "eci-v2" {
+            value 18;
+            description
+              "The switch mode of gpon ont interoperability is eciV2.";
+          }
+          enum "mode1-v2" {
+            value 19;
+            description
+              "The switch mode of gpon ont interoperability is mode1V2.";
+          }
+          enum "mode2-v5" {
+            value 20;
+            description
+              "The switch mode of gpon ont interoperability is mode2V5.";
+          }
+          enum "eric-v3" {
+            value 21;
+            description
+              "The switch mode of gpon ont interoperability is ericV3.";
+          }
+          enum "eric-v4" {
+            value 22;
+            description
+              "The switch mode of gpon ont interoperability is ericV4.";
+          }
+          enum "mode6" {
+            value 23;
+            description
+              "The switch mode of gpon ont interoperability is mode6.";
+          }
+          enum "eric-v5" {
+            value 24;
+            description
+              "The switch mode of gpon ont interoperability is ericV5.";
+          }
+          enum "mode7" {
+            value 25;
+            description
+              "The switch mode of gpon ont interoperability is mode7.";
+          }
+        }
+        description
+          "The switch mode of gpon ont interoperability.";
+      }
+      leaf active-mode {
+        type enumeration {
+          enum "immediate" {
+            value 1;
+            description
+              "Indicates that the ONT takes effect immediately.";
+          }
+          enum "next-startup" {
+            value 2;
+            description
+              "Indicates that the ONT takes effect after next startup.";
+          }
+        }
+        default "next-startup";
+        description
+          "Indicates the active mode of gpon ONT interoperability mode.";
+      }
+    }
+    leaf gpon-multicast-gemport-id {
+      type uint32 {
+        range "4000..4095";
+      }
+      default "4095";
+      description
+        "The special GEM port ID is used for the GPON multicast service.";
+    }
+    leaf xgpon-multicast-gemport-id {
+      type uint32 {
+        range "65439..65534";
+      }
+      default "65534";
+      description
+        "The GEM port ID for XG-PON multicast service.";
+    }
+    leaf xpon-rogueont-detect-rssi-threshold {
+      type int32 {
+        range "-3500..-1000";
+      }
+      units "0.01 dBm";
+      default "-2800";
+      description
+        "The xpon rogue ONT detect-rssi-threshold.";
+    }
+    leaf xpon-rogueont-clear-rssi-threshold {
+      type int32 {
+        range "-3500..-1000";
+      }
+      units "0.01 dBm";
+      default "-2800";
+      description
+        "The xpon rogue ONT clear-rssi-threshold.";
+    }
+    leaf xpon-olt-rx-power-mode {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "The normal mode of OLT RX ONT power.";
+        }
+        enum "high-precision-mode" {
+          value 2;
+          description
+            "The high precision mode of OLT RX ONT power.";
+        }
+      }
+      default "normal";
+      description
+        "The mode of OLT RX ONT power.";
+    }
+    container alarm-los-control {
+      description
+        "Configure the los alarm advanced function in the global configuration.";
+      leaf control-switch {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates the los alarm advanced switch is enable.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates the los alarm advanced switch is disable.";
+          }
+        }
+        default "disable";
+        description
+          "Indicates the switch of the advanced los alarm.";
+      }
+      leaf dgi-threshold-time {
+        type uint16 {
+          range "6..600";
+        }
+        units "s";
+        default "6";
+        description
+          "Indicates the time threshold for ONT power-off users.";
+      }
+      leaf dgi-threshold-ratio {
+        type union {
+          type uint16 {
+            range "1..100";
+          }
+          type enumeration {
+            enum "unconcern" {
+              value 0;
+              description
+                "Indicates that LOS alarms are not concerned for optimization.";
+            }
+          }
+        }
+        units "%";
+        default "unconcern";
+        description
+          "Indicates the threshold for the percentage of ONT power-off users.";
+      }
+    }
+    leaf group-poweroff-control-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Open the group power off report switch.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Close the group power off report switch.";
+        }
+      }
+      default "disable";
+      description
+        "This object is used to open or close the group power off report switch.";
+    }
+    leaf suppress-initial-alarm-state {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Open the switch, suppress initial alarm state.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Close the switch, does not suppress initial alarm state.";
+        }
+        enum "enable-except-optical-alarm" {
+          value 3;
+          description
+            "Suppress other alarms, does not suppress optical module.";
+        }
+      }
+      default "enable";
+      description
+        "The object is used to set whether suppress initial alarm.";
+    }
+    container operator-check {
+      description
+        "Configure the operator check code in the global configuration.";
+      leaf switch {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Open the group power off report switch.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Close the group power off report switch.";
+          }
+        }
+        default "disable";
+        description
+          "The object is used to set operator check switch.";
+      }
+      leaf code {
+        type string {
+          length "0..16";
+        }
+        description
+          "The object is used to set operator check code.";
+      }
+      leaf history-code-max-number {
+        type uint16 {
+          range "0..11";
+        }
+        default "10";
+        description
+          "The object is used to set max number of operator check history code.";
+      }
+      leaf version {
+        type enumeration {
+          enum "version1" {
+            value 1;
+            description
+              "Set operator check version1.";
+          }
+          enum "version2" {
+            value 2;
+            description
+              "Set operator check version2.";
+          }
+        }
+        default "version1";
+        description
+          "The object is used to set operator check version.";
+      }
+    }
+    leaf onu-user-multicast-process {
+      type enumeration {
+        enum "forward" {
+          value 1;
+          description
+            "Indicates the forward processing mode.";
+        }
+        enum "discard" {
+          value 2;
+          description
+            "Indicates the discard processing mode.";
+        }
+      }
+      default "forward";
+      description
+        "The object is used to set max number of operator check history code.";
+    }
+    leaf typeb-los-alarm-control-state {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Open the switch of the los alarm for the standby port in the Type B protect group.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Close the switch of the los alarm for the standby port in the Type B protect group.";
+        }
+      }
+      default "disable";
+      description
+        "The object is used to open or close the switch of the los alarm for the standby port
+         in the Type B protect group.";
+    }
+    leaf onu-distance-variation-threshold {
+      type union {
+        type uint16 {
+          range "1..1000";
+        }
+        type enumeration {
+          enum "unlimited" {
+            value -1;
+            description
+              "The value of ONT distance variation threshold is unlimited.";
+          }
+        }
+      }
+      units "m";
+      default "unlimited";
+      description
+        "This parameter is used to set the ONU distance variation threshold.";
+    }
+    leaf optical-info-mode {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "The optical info mode is normal.";
+        }
+        enum "dt" {
+          value 2;
+          description
+            "The optical info mode is dt.";
+        }
+      }
+      default "normal";
+      description
+        "Indicates the optical info mode.";
+    }
+    leaf anti-dos-ploam-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "The switch value of anti-dos PLOAM is enable.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "The switch value of anti-dos PLOAM is disable.";
+        }
+      }
+      default "disable";
+      description
+        "The switch value of anti-dos PLOAM.";
+    }
+    leaf channel-rogue-alarm-switch {
+      type enumeration {
+        enum "enable" {
+          value 1;
+          description
+            "Enable the switch of the channel rogue ONTs intrusion alarm.";
+        }
+        enum "disable" {
+          value 2;
+          description
+            "Disable the switch of the channel rogue ONTs intrusion alarm.";
+        }
+      }
+      default "disable";
+      description
+        "Indicates channel rogue ONTs intrusion alarm switch.";
+    }
+    leaf rogueont-rssi-variation-threshold {
+      type int32 {
+        range "100..1000";
+      }
+      units "0.01 dB";
+      default "100";
+      description
+        "The rogue ONT rssi-variation-threshold.";
+    }
+    container ont-rssi-difference {
+      description
+        "Configure the container ont-rssi-difference function in the global configuration.";
+      leaf switch {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Open the alarm detection of ont-rssi-difference.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Close the alarm detection of ont-rssi-difference.";
+          }
+        }
+        default "disable";
+        description
+          "Indicates the switch of the container ont-rssi-difference.";
+      }
+      leaf rssi-difference-clear-threshold {
+        when "../switch = 'enable'";
+        type uint32 {
+          range "0..1500";
+        }
+        units "0.01 dBm";
+        description
+          "Indicates the rssi-difference alarm clear threshold.";
+      }
+    }
+    leaf port-peak-rate-sampling-interval {
+      type enumeration {
+        enum "500ms" {
+          value 1;
+          description
+            "GPON telemetry port peak rate sample interval is 500ms.";
+        }
+        enum "1s" {
+          value 2;
+          description
+            "GPON telemetry port peak rate sample interval is 1s.";
+        }
+      }
+      default "1s";
+      description
+        "GPON telemetry port peak rate sample interval.";
+    }
+  }
+
+  augment "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:traffic-descriptor-profiles/bbf-xpongemtcont:traffic-descriptor-profile" {
+    description
+      "Huawei extend assignment frequency type of the traffic descriptor profile.";
+    container assignment-frequency {
+      description
+        "Configure traffic descriptor profile assignment frequency type.";
+      leaf frequency-type {
+        type enumeration {
+          enum "calculate-period" {
+            value 0;
+            description
+              "The final effective assignment frequency type depends on the bandwidth assignment mode of the port.
+               If the min-loop-delay mode is used, the assignment frequency type is 2 bursts per frame.
+               If the max-bandwidth-usage mode is used, the assignment frequency type is 8 bursts per frame.";
+          }
+          enum "single-frame" {
+            value 1;
+            description
+              "The assignment frequency type is single burst per frame.";
+          }
+          enum "two-burst-per-frame" {
+            value 2;
+            description
+              "The assignment frequency type is 2 bursts per frame.";
+          }
+          enum "four-burst-per-frame" {
+            value 3;
+            description
+              "The assignment frequency type is 4 bursts per frame.";
+          }
+          enum "eight-burst-per-frame" {
+            value 4;
+            description
+              "The assignment frequency type is 8 bursts per frame.";
+          }
+          enum "sixteen-burst-per-frame" {
+            value 5;
+            description
+              "The assignment frequency type is 16 bursts per frame.";
+          }
+          enum "thirty-two-burst-per-frame" {
+            value 6;
+            description
+              "The assignment frequency type is 32 bursts per frame.";
+          }
+        }
+        default "single-frame";
+        description
+          "The assignment frequency type of the traffic descriptor profile.";
+      }
+    }
+  }
+}

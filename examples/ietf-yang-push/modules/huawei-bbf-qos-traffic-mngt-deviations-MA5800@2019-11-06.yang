@@ -1,0 +1,34 @@
+module huawei-bbf-qos-traffic-mngt-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-traffic-mngt-deviations-MA5800";
+  prefix bbf-qos-tm-devs-MA5800;
+
+  import bbf-qos-traffic-mngt {
+    prefix bbf-qos-tm;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-traffic-mngt module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-qos-tm:tm-root" {
+    deviate not-supported;
+  }
+}

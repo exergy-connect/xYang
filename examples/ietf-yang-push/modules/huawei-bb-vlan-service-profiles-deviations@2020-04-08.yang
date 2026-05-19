@@ -1,0 +1,34 @@
+module huawei-bb-vlan-service-profiles-deviations {
+  namespace "urn:huawei:yang:huawei-bb-vlan-service-profiles-deviations";
+  prefix hw-bb-vlan-srvprof-devs;
+
+  import huawei-bb-vlan-service-profiles {
+    prefix hw-bb-vlan-srvprof;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This is a deviation for huawei-bb-VLAN-service-profiles module.";
+
+  revision 2020-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  deviation "/hw-bb-vlan-srvprof:vlan-service-profiles/hw-bb-vlan-srvprof:vlan-service-profile/hw-bb-vlan-srvprof:security-feature-switch/hw-bb-vlan-srvprof:cable-source-verify" {
+    deviate not-supported;
+  }
+  deviation "/hw-bb-vlan-srvprof:vlan-service-profiles/hw-bb-vlan-srvprof:vlan-service-profile/hw-bb-vlan-srvprof:security-feature-switch/hw-bb-vlan-srvprof:cable-ipv6-source-verify" {
+    deviate not-supported;
+  }
+}

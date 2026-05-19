@@ -1,0 +1,340 @@
+module huawei-interfaces {
+  namespace "urn:huawei:params:xml:ns:yang:huawei-interfaces";
+  prefix huawei-interfaces;
+
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     managing common interfaces.";
+
+  revision 2021-06-22 {
+    description
+      "Re-archive the huawei-interfaces module file, delete all deviation nodes. Fix huawei check problems.";
+    reference
+      "";
+  }
+  revision 2018-05-21 {
+    description
+      "1: Add derive-component node. 2: Standardization modify.";
+    reference
+      "";
+  }
+  revision 2017-12-12 {
+    description
+      "Add passthrough-interface node and service-chain node.";
+    reference
+      "";
+  }
+  revision 2017-07-11 {
+    description
+      "Add port-mode node.";
+    reference
+      "";
+  }
+  revision 2017-03-28 {
+    description
+      "Add description at interface state.";
+    reference
+      "";
+  }
+  revision 2017-03-27 {
+    description
+      "Add interface status by AR.";
+    reference
+      "";
+  }
+  revision 2016-08-10 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  grouping common-state {
+    description
+      "Common state of the interface.";
+    leaf description {
+      type string {
+        length "0..261";
+      }
+      description
+        "A textual description of the interface.";
+      reference
+        "The Interfaces Group MIB - ifAlias";
+    }
+  }
+
+  grouping ex-interface-statistics {
+    description
+      "Huawei extend statistics of the interface.";
+    leaf in-pkts {
+      type yang:counter64;
+      description
+        "The total number of packets received on the interface.";
+    }
+    leaf in-64-pkts {
+      type yang:counter64;
+      description
+        "The total number of 64-octet packets received on the interface.";
+    }
+    leaf in-65-127-pkts {
+      type yang:counter64;
+      description
+        "The total number of 65-octet~127-octet packets received on the interface.";
+    }
+    leaf in-128-255-pkts {
+      type yang:counter64;
+      description
+        "The total number of 128-octet~255-octet packets received on the interface.";
+    }
+    leaf in-256-511-pkts {
+      type yang:counter64;
+      description
+        "The total number of 256-octet~511-octet packets received on the interface.";
+    }
+    leaf in-512-1023-pkts {
+      type yang:counter64;
+      description
+        "The total number of 512-octet~1023-octet packets received on the interface.";
+    }
+    leaf in-1024-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of 1024-octet~1518-octet packets received on the interface.";
+    }
+    leaf in-over-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of over 1518-octet packets received on the interface.";
+    }
+    leaf in-oversize-discard-pkts {
+      type yang:counter64;
+      description
+        "The total number of over oversize discard packets received on the interface.";
+    }
+    leaf in-frag {
+      type yang:counter64;
+      description
+        "The total number of fragments received on the interface.";
+    }
+    leaf in-jabber {
+      type yang:counter64;
+      description
+        "The total number of jabber error received on the interface.";
+    }
+    leaf in-fcs-err {
+      type yang:counter64;
+      description
+        "The total number of fcs error packets received on the interface.";
+    }
+    leaf in-align-err {
+      type yang:counter64;
+      description
+        "The total number of alignment error packets received on the interface.";
+    }
+    leaf in-fifo-overflow {
+      type yang:counter64;
+      description
+        "The total number of fifo overflow counts on the interface.";
+    }
+    leaf in-pause {
+      type yang:counter64;
+      description
+        "The total number of pause packets received on the interface.";
+    }
+    leaf in-byte-ok {
+      type yang:counter64;
+      description
+        "The total number of good bytes received on the interface.";
+    }
+    leaf in-byte-err {
+      type yang:counter64;
+      description
+        "The total number of bad bytes received on the interface.";
+    }
+    leaf out-pkts {
+      type yang:counter64;
+      description
+        "The total number of packets transmitted out of the interface.";
+    }
+    leaf out-64-pkts {
+      type yang:counter64;
+      description
+        "The total number of 64-octet packets transmitted out of the interface.";
+    }
+    leaf out-65-127-pkts {
+      type yang:counter64;
+      description
+        "The total number of 65-octet~127-octet packets transmitted out of the interface.";
+    }
+    leaf out-128-255-pkts {
+      type yang:counter64;
+      description
+        "The total number of 128-octet~255-octet packets transmitted out of the interface.";
+    }
+    leaf out-256-511-pkts {
+      type yang:counter64;
+      description
+        "The total number of 256-octet~511-octet packets transmitted out of the interface.";
+    }
+    leaf out-512-1023-pkts {
+      type yang:counter64;
+      description
+        "The total number of 512-octet~1023-octet packets transmitted out of the interface.";
+    }
+    leaf out-1024-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of 1024-octet~1518-octet packets transmitted out of the interface.";
+    }
+    leaf out-over-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of over 1518-octet packets transmitted out of the interface.";
+    }
+    leaf out-pause-pkts {
+      type yang:counter64;
+      description
+        "The total number of pause packets transmitted out of the interface.";
+    }
+    leaf out-single-col {
+      type yang:counter64;
+      description
+        "The total number of deferred sent packets due to single collision.";
+    }
+    leaf out-multi-col {
+      type yang:counter64;
+      description
+        "The total number of deferred sent packets due to multiple collision.";
+    }
+    leaf out-excess-col {
+      type yang:counter64;
+      description
+        "The total number of discard packets due to excessive collision.";
+    }
+    leaf out-fifo-overflow {
+      type yang:counter64;
+      description
+        "The total number of packet discard counts due to fifo overflow.";
+    }
+    leaf out-byte-ok {
+      type yang:counter64;
+      description
+        "The total number of good bytes transmitted out of the interface.";
+    }
+    leaf out-byte-err {
+      type yang:counter64;
+      description
+        "The total number of bad bytes transmitted out of the interface.";
+    }
+    leaf change-times {
+      type yang:counter64;
+      description
+        "The total number of counts the interface state changed.";
+    }
+    leaf statistic-duration {
+      type yang:counter64;
+      units "s";
+      description
+        "The duration of the interface statistics.";
+    }
+  }
+
+  augment "/if:interfaces-state/if:interface" {
+    description
+      "Data nodes for the operational state of the interface.";
+    container common {
+      config false;
+      description
+        "Operational state of the interface.";
+      uses common-state;
+    }
+    leaf derive-component {
+      type string {
+        length "0..32";
+      }
+      config false;
+      description
+        "The derive from component name. Refer to leaf of XPath:/hw:hardware/hw:component/hw:name.
+         The leaf only for netconf subtree filter.
+         When netconf get/get config the leaf, return empty string.";
+    }
+  }
+  augment "/if:interfaces-state/if:interface/if:statistics" {
+    description
+      "Huawei extend statistics of the interface.";
+    uses ex-interface-statistics;
+  }
+
+  rpc reset-statistics {
+    description
+      "Request a reset of the statistics.";
+
+    input {
+      leaf reset-ifname {
+        type if:interface-ref;
+        description
+          "Reset the interface statistics.";
+      }
+    }
+  }
+
+  notification interface-status-change {
+    description
+      "Interface status change noification.";
+    leaf name {
+      type string {
+        length "0..32";
+      }
+      description
+        "Interface name.";
+    }
+    leaf admin-status {
+      type enumeration {
+        enum "up" {
+          value 1;
+          description
+            "Ready to pass packets.";
+        }
+        enum "down" {
+          value 2;
+          description
+            "Not ready to pass packets and not in some test mode.";
+        }
+      }
+      description
+        "The desired state of the interface.";
+    }
+    leaf oper-status {
+      type enumeration {
+        enum "up" {
+          value 1;
+          description
+            "Ready to pass packets.";
+        }
+        enum "down" {
+          value 2;
+          description
+            "The interface does not pass any packets.";
+        }
+      }
+      description
+        "The current operational state of the interface.";
+    }
+  }
+}

@@ -1,0 +1,46 @@
+module huawei-bbf-qos-policies-sub-interfaces-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-policies-sub-interfaces-deviations-MA5800";
+  prefix bbf-qos-pol-subif-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import bbf-sub-interface-tagging {
+    prefix bbf-subif-tag;
+  }
+  import bbf-qos-policies-sub-interfaces {
+    prefix bbf-qos-pol-subif;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-policies-sub-interfaces module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/bbf-subif-tag:push-tag/bbf-subif-tag:dot1q-tag/bbf-subif-tag:dei" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:egress-rewrite/bbf-subif-tag:push-tag/bbf-subif-tag:dot1q-tag/bbf-subif-tag:pbit" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:egress-rewrite/bbf-subif-tag:push-tag/bbf-subif-tag:dot1q-tag/bbf-subif-tag:dei" {
+    deviate not-supported;
+  }
+}

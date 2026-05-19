@@ -7,7 +7,7 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 
 from __future__ import annotations
 
-from typing import Callable, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional, Tuple
 
 from .ast import (
     YangAugmentStmt,
@@ -135,6 +135,73 @@ def resolve_absolute_schema_path(
     return cur
 
 
+def _stamp_defining_module(stmt: YangStatement, module_name: str) -> None:
+    """Mark *stmt* and descendants as defined in *module_name* (RFC 7951 qualified JSON names)."""
+    if hasattr(stmt, "defining_module"):
+        stmt.defining_module = module_name  # type: ignore[attr-defined]
+    for child in stmt.statements:
+        _stamp_defining_module(child, module_name)
+    if isinstance(stmt, YangChoiceStmt):
+        for case in stmt.cases:
+            _stamp_defining_module(case, module_name)
+
+
+def _merge_augment_into_target(
+    aug: YangAugmentStmt, target: YangStatement, *, source_module: YangModule
+) -> None:
+    """Copy augmented children onto *target* (``uses``-expanded body expected)."""
+    copies = [copy_yang_statement(x) for x in aug.statements]
+    for c in copies:
+        _stamp_defining_module(c, source_module.name)
+    _merge_uses_if_features_into_grouping_roots(copies, aug.if_features)
+    _merge_uses_when_into_grouping_roots(copies, aug.when)
+    if isinstance(target, YangChoiceStmt):
+        for c in copies:
+            if isinstance(c, YangCaseStmt):
+                target.cases.append(c)
+            else:
+                target.statements.append(c)
+    else:
+        tlist: YangStatementList = target  # type: ignore[assignment]
+        for c in copies:
+            tlist.statements.append(c)
+
+
+def register_module_closure(modules: Dict[str, YangModule], mod: YangModule) -> None:
+    """Register *mod* and every module reachable via ``import`` (RFC 7950 import closure)."""
+    modules[mod.name] = mod
+    for imported in mod.import_prefixes.values():
+        register_module_closure(modules, imported)
+
+
+def apply_augmentations_across_module_map(modules: Dict[str, YangModule]) -> None:
+    """
+    Apply every top-level ``augment`` still present in any module in *modules*.
+
+    Use after loading a set of related modules (e.g. anydata validation map) so
+    augments defined in one file merge into targets in another module that shares
+    the same :class:`YangModule` instances (one :class:`~xyang.parser.yang_parser.YangParser`
+    cache per load batch).
+    """
+    pending: list[tuple[YangModule, YangAugmentStmt]] = []
+    seen: set[int] = set()
+    for mod in modules.values():
+        oid = id(mod)
+        if oid in seen:
+            continue
+        seen.add(oid)
+        for stmt in mod.statements:
+            if isinstance(stmt, YangAugmentStmt):
+                pending.append((mod, stmt))
+    for aug_module, aug in pending:
+        target = resolve_augment_target(aug_module, aug.augment_path)
+        _merge_augment_into_target(aug, target, source_module=aug_module)
+    for mod in modules.values():
+        mod.statements = [
+            s for s in mod.statements if not isinstance(s, YangAugmentStmt)
+        ]
+
+
 def apply_augmentations(root: YangModule) -> None:
     """
     For each top-level ``augment``, copy its (already ``uses``-expanded) children onto the
@@ -144,17 +211,5 @@ def apply_augmentations(root: YangModule) -> None:
     augments = [s for s in root.statements if isinstance(s, YangAugmentStmt)]
     for aug in augments:
         target = resolve_augment_target(root, aug.augment_path)
-        copies = [copy_yang_statement(x) for x in aug.statements]
-        _merge_uses_if_features_into_grouping_roots(copies, aug.if_features)
-        _merge_uses_when_into_grouping_roots(copies, aug.when)
-        if isinstance(target, YangChoiceStmt):
-            for c in copies:
-                if isinstance(c, YangCaseStmt):
-                    target.cases.append(c)
-                else:
-                    target.statements.append(c)
-        else:
-            tlist: YangStatementList = target  # type: ignore[assignment]
-            for c in copies:
-                tlist.statements.append(c)
+        _merge_augment_into_target(aug, target, source_module=root)
     root.statements = [s for s in root.statements if not isinstance(s, YangAugmentStmt)]

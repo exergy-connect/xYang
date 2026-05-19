@@ -1,0 +1,358 @@
+module huawei-bb-nsi {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bb-nsi";
+  prefix hw-bb-nsi;
+
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+  import huawei-slice-an {
+    prefix slice-an;
+  }
+  import huawei-tc-an {
+    prefix tc-an;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of definitions for configuring the information of slice.";
+
+  revision 2025-08-01 {
+    description
+      "Add the grouping slice-instance-ont.
+       Add the grouping slice-instance-ont from dnet-slice-instance.";
+    reference
+      "";
+  }
+  revision 2025-06-17 {
+    description
+      "Delete the grouping slice-instance-ont.
+       Delete the grouping slice-instance-ont from dnet-slice-instance.";
+    reference
+      "";
+  }
+  revision 2025-02-26 {
+    description
+      "Add the grouping slice-instance-ont to dnet-slice-instance.";
+    reference
+      "";
+  }
+  revision 2025-02-22 {
+    description
+      "Add the grouping slice-instance-ont.";
+    reference
+      "";
+  }
+  revision 2023-10-10 {
+    description
+      "Modify the range of leaf channel-index.";
+    reference
+      "";
+  }
+  revision 2022-03-09 {
+    description
+      "Reorganize port, VLAN, and VNI data by grouping.
+       Extending Network Slice Instances to huawei-slice-an.";
+    reference
+      "";
+  }
+  revision 2021-04-16 {
+    description
+      "Modifying the bandwidth value range of a slice port or channel.";
+    reference
+      "";
+  }
+  revision 2021-03-01 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef nsi-service-type {
+    type enumeration {
+      enum "any" {
+        value 0;
+        description
+          "Indicates that the slice service type is not limited.";
+      }
+      enum "multicast" {
+        value 1;
+        description
+          "Indicates the multicast duplication mode to multicast.
+           The access device duplicates only one multicast packet to each PON port after receiving a multicast packet.
+           The Layer 2 device then duplicates the multicast packet to the multicast users.
+           The PON ports support the connection admission control (CAC) function.";
+      }
+    }
+    description
+      "Indicates the slice service type.";
+  }
+
+  grouping slice-bandwidth {
+    description
+      "Indicates the bandwidth and convergence ratio of a slice.";
+    leaf bandwidth {
+      type uint32 {
+        range "1..100000";
+      }
+      units "Mbit/s";
+      mandatory true;
+      description
+        "Indicates the bandwidth allocated to the port.";
+    }
+    leaf convergence-ratio {
+      type decimal64 {
+        range "1.0..5.0";
+        fraction-digits 1;
+      }
+      default "1.0";
+      description
+        "Configure the bandwidth convergence ratio of the interface.";
+    }
+  }
+
+  grouping slice-instance-attr {
+    description
+      "Indicates a network slice instance attribute.";
+    leaf slice-name {
+      type string {
+        length "1..32";
+      }
+      description
+        "Indicates the name of a slice instance. Names with only one or more space characters are not supported.";
+    }
+    leaf priority {
+      type uint8 {
+        range "1..7";
+      }
+      mandatory true;
+      description
+        "Indicates the slice priority. 6 and 7 indicate gold slices, and 1 to 5 indicate silver slices.";
+    }
+    leaf queue-buffer {
+      type uint8 {
+        range "1..16";
+      }
+      default "6";
+      description
+        "Configure a queue cache level for a network slice.";
+    }
+    leaf service-type {
+      type nsi-service-type;
+      default "any";
+      description
+        "Indicates the slice service type.";
+    }
+  }
+
+  grouping slice-instance-vlan {
+    description
+      "Indicates a network slice instance VLAN.";
+    container vlans {
+      description
+        "List of VLANs in a network slice instance.";
+      list vlan {
+        key "vlan-id";
+        description
+          "Configure VLAN to a network slice.";
+        leaf vlan-id {
+          type leafref {
+            path "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id";
+          }
+          description
+            "Configure a VLAN to a network slice.
+              VLAN 1 and reserved VLANs cannot be added to network slices.
+              After a port VLAN or service flow is added to a VLAN, the VLAN cannot be added to a network slice.
+              A slice can be added to a maximum of 32 VLANs.";
+        }
+      }
+    }
+  }
+
+  grouping slice-instance-vni {
+    description
+      "Indicates a network slice instance VNI.";
+    container vxlans {
+      description
+        "List of VXLANs in a network slice instance.";
+      list vxlan {
+        key "vni-id";
+        description
+          "Configure vxlan to a network slice.";
+        leaf vni-id {
+          type uint32 {
+            range "1..16777215";
+          }
+          description
+            "Configure VXLAN to a network slice. A maximum of 32 VXLANs can be added to a slice.";
+        }
+      }
+    }
+  }
+
+  grouping slice-instance-port {
+    description
+      "Indicates a network slice instance port or channel.";
+    container ports {
+      description
+        "List of ports in a network slice instance.";
+      list port {
+        key "ifname";
+        description
+          "Configure ethernetCsmacd ports, epon ports or gpon ports or vports to a network slice.";
+        leaf ifname {
+          type if:interface-ref;
+          must
+            "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd' or
+                     /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:gpon' or
+                     /if:interfaces/if:interface[if:name = current()]/if:type='ianaift:aluEpon' or
+                     /if:interfaces/if:interface[if:name = current()]/if:type='tc-an:vport'" {
+            error-message
+              "must reference an ethernetCsmacd interface, epon interface or gpon or vport interface.";
+          }
+          description
+            "Name of an ethernet port, epon port or gpon port.";
+        }
+        choice slice-port-type {
+          description
+            "Indicates the port type of a slice.";
+          case port {
+            description
+              "Indicates an ethernet port or gpon port add to slice.";
+            uses slice-bandwidth;
+          }
+          case port-channel {
+            description
+              "Indicates a combo pon port channel add to slice.";
+            container channels {
+              description
+                "List of channels in a combo pon port.";
+              list channel {
+                key "channel-index";
+                description
+                  "Configure combo pon port channel to a network slice.";
+                leaf channel-index {
+                  type uint8 {
+                    range "0..2";
+                  }
+                  description
+                    "The channel ID of a combo pon port.";
+                }
+                uses slice-bandwidth;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping slice-instance-ont {
+    description
+      "Indicates the onts in a network slice instance.";
+    container onts {
+      config false;
+      description
+        "List of onts in a network slice instance.";
+      list ont {
+        key "ifname";
+        description
+          "Operational state of the ont configuration state statistics for the interface.";
+        leaf ifname {
+          type if:interface-ref;
+          must "/if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+            error-message
+              "must reference an ani interface.";
+          }
+          description
+            "The name of the interface.";
+        }
+        leaf run-state {
+          type enumeration {
+            enum "up" {
+              value 1;
+              description
+                "Indicates that the run state is up.";
+            }
+            enum "down" {
+              value 2;
+              description
+                "Indicates that the run state is down.";
+            }
+          }
+          description
+            "Indicates run state of the ont.";
+        }
+      }
+    }
+  }
+
+  grouping slice-instance {
+    description
+      "Indicates a network slice instance.";
+    container slice-instances {
+      description
+        "List of Slice Instances.";
+      list slice-instance {
+        key "slice-name";
+        description
+          "Configure a slice instance.";
+        uses slice-instance-attr;
+        uses slice-instance-vlan;
+        uses slice-instance-vni;
+        uses slice-instance-port;
+        uses slice-instance-ont;
+        uses slice-an:slice-statistics;
+      }
+    }
+  }
+
+  grouping dnet-slice-instance {
+    description
+      "Indicates the network slice instance of a dedicated network.";
+    container slice-instances {
+      description
+        "List of Slice Instances of a dedicated network.";
+      list slice-instance {
+        key "slice-name";
+        description
+          "Configure a slice instance of a dedicated network.";
+        uses slice-instance-attr;
+        uses slice-instance-vlan;
+        uses slice-instance-port;
+        uses slice-instance-ont;
+        uses slice-an:slice-statistics;
+      }
+    }
+  }
+
+  container bb-nsi {
+    description
+      "Indicates a slice. A slice instance can be configured. Add VLANs, ports, and VNIs to slices.";
+    uses slice-instance;
+  }
+
+  augment "/slice-an:slice-an/slice-an:dedicated-networks/slice-an:dedicated-network" {
+    description
+      "Indicates a network slice instance can be configured under a dedicated network.";
+    uses dnet-slice-instance;
+  }
+}

@@ -1,0 +1,123 @@
+module huawei-hardware {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-hardware";
+  prefix hw-hw;
+
+  import bbf-hardware-types {
+    prefix bbf-hwt;
+  }
+  import ietf-hardware {
+    prefix hw;
+  }
+  import bbf-hardware-transceivers {
+    prefix bbf-hw-xcvr;
+  }
+  import iana-hardware {
+    prefix ianahw;
+  }
+  import bbf-xpon-common-types {
+    prefix xpon-common-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "The YANG module defines huawei hardware types.";
+
+  revision 2025-11-13 {
+    description
+      "Remove redundant when condition validate.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-09-18 {
+    description
+      "Add base class ianahw:chassis and ianahw:port for leaf sub-class.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-08-21 {
+    description
+      "Move module-type and module-sub-type nodes from
+       bbf-xpon-hardware-transceivers module to current module.";
+    reference
+      "";
+  }
+  revision 2024-09-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  grouping xpon-transceiver-diagnostics {
+    description
+      "Indicates the huawei extend tranceiver diagnostics data.";
+    leaf module-type {
+      type xpon-common-types:module-type;
+      config false;
+      description
+        "The type of the transceiver.";
+    }
+    leaf module-sub-type {
+      type xpon-common-types:module-sub-type;
+      config false;
+      description
+        "The sub type of the transceiver.";
+    }
+  }
+
+  grouping xpon-transceiver-link-diagnostics {
+    description
+      "Indicates the huawei extend tranceiver-link diagnostics data.";
+    leaf sd {
+      type boolean;
+      config false;
+      description
+        "Indicates the SD on the tranceiver-link,
+         'true' indicates that the channel has optical signal transmission.";
+    }
+    leaf idle-rssi {
+      type int32;
+      units "0.000001 dBm";
+      config false;
+      description
+        "RSSI on the channel of tranceiver-link,
+         Options: 0x7FFFFFFF - Indicates that the query fails or no information is detected.";
+    }
+  }
+
+  augment "/hw:hardware/hw:component" {
+    when " derived-from-or-self(hw:class,'bbf-hwt:transceiver') or  derived-from-or-self(hw:class,'bbf-hwt:transceiver-link') or  derived-from-or-self(hw:class,'ianahw:chassis') or  derived-from-or-self(hw:class,'ianahw:port')";
+    description
+      "Indicates the huawei extend data of the chassis, port, transceiver and transceiver-link.";
+    leaf sub-class {
+      type identityref {
+        base bbf-hwt:transceiver;
+        base bbf-hwt:transceiver-link;
+        base ianahw:chassis;
+        base ianahw:port;
+      }
+      config false;
+      description
+        "Indicates the chassis, port, transceiver and transceiver-link sub-class.";
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver-link/bbf-hw-xcvr:diagnostics" {
+    description
+      "Indicates the huawei extend diagnostic data of the transceiver-link.";
+    uses xpon-transceiver-link-diagnostics;
+  }
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    description
+      "Indicates the huawei extend diagnostic data of the transceiver.";
+    uses xpon-transceiver-diagnostics;
+  }
+}

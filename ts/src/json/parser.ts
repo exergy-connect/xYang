@@ -1,7 +1,8 @@
 import { YangModule, type ModuleSource, type SerializedStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
-import { YANG_SCHEMA_KEYS } from "./schema-keys";
+import { yangDefaultFromJsonSchema } from "./default-values";
+import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   decimal64FractionDigitsFromSchema,
   JSON_TYPE_ARRAY,
@@ -12,6 +13,12 @@ import {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function setConfigFromXyang(stmt: SerializedStatement, xyang: Record<string, unknown>): void {
+  if (XYANG_KEYS.config in xyang && typeof xyang[XYANG_KEYS.config] === "boolean") {
+    stmt.config = xyang[XYANG_KEYS.config] as boolean;
+  }
 }
 
 function resolveSchema(schema: Record<string, unknown>, defs: Record<string, unknown>): Record<string, unknown> {
@@ -258,7 +265,9 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
     out.description = resolved.description;
   }
   if (resolved.default !== undefined) {
-    out.default = resolved.default;
+    const schemaType = typeof resolved.type === "string" ? resolved.type : undefined;
+    const xyType = typeof xy.type === "string" ? xy.type : undefined;
+    out.default = yangDefaultFromJsonSchema(resolved.default, schemaType, xyType);
   }
   if (when) {
     out.when = when;
@@ -269,6 +278,7 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
       out.if_features = feats;
     }
   }
+  setConfigFromXyang(out, xy);
   return out;
 }
 
@@ -384,6 +394,7 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
   } else if (typeof schema.description === "string" && schema.description.length > 0) {
     choiceStmt.description = schema.description;
   }
+  setConfigFromXyang(choiceStmt, xy);
 
   let caseIndex = 0;
   for (const branchRaw of extractChoiceBranches(schema)) {
@@ -496,6 +507,7 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
   if (when) {
     out.when = when;
   }
+  setConfigFromXyang(out, xy);
   const choice = xy.choice;
   if (!hasExplicitChoiceChildren && choice && typeof choice === "object") {
     const ch = asRecord(choice);
@@ -610,6 +622,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
   if (when) {
     out.when = when;
   }
+  setConfigFromXyang(out, xy);
   return out;
 }
 
@@ -647,6 +660,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
       out.defaults = [schema.default];
     }
   }
+  setConfigFromXyang(out, xy);
   return out;
 }
 

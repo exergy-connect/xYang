@@ -1,0 +1,37 @@
+module huawei-bbf-qos-filters-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-filters-deviations-MA5800";
+  prefix bbf-qos-filt-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import bbf-qos-filters {
+    prefix bbf-qos-filt;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-filters module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-filt:by-reference" {
+    deviate not-supported;
+  }
+}

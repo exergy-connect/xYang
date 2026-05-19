@@ -1,0 +1,49 @@
+module huawei-xpon-sub-interfaces-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-xpon-sub-interfaces-deviations-MA5800";
+  prefix hwxpon-subif-devs-MA5800;
+
+  import huawei-xpon-sub-interfaces {
+    prefix hwxpon-subif;
+  }
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-sub-interface-tagging {
+    prefix bbf-subif-tag;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for huawei-xpon-sub-interfaces module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:flexible-match/bbf-subif-tag:match-criteria/hwxpon-subif:ont-vlan-tag-match-type/hwxpon-subif:vlan-tagged/hwxpon-subif:tag/hwxpon-subif:dot1q-tag/hwxpon-subif:dei" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/hwxpon-subif:ont-push-tag/hwxpon-subif:dot1q-tag/hwxpon-subif:vlan-id-from-tag-index-or-discard" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/hwxpon-subif:ont-push-tag/hwxpon-subif:dot1q-tag/hwxpon-subif:pbit/hwxpon-subif:write-pbit-0" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/hwxpon-subif:ont-push-tag/hwxpon-subif:dot1q-tag/hwxpon-subif:dei" {
+    deviate not-supported;
+  }
+}

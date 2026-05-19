@@ -1,0 +1,766 @@
+module huawei-bb-raio-profiles {
+  namespace "urn:huawei:yang:huawei-bb-raio-profiles";
+  prefix hw-bb-raio-prof;
+
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of yang definitions for
+     configuring the RAIO profile for the broadband services.";
+
+  revision 2020-11-10 {
+    description
+      "Modify the description of container xpon";
+    reference
+      "";
+  }
+  revision 2020-05-20 {
+    description
+      "Import huawei-bb-vlan.";
+    reference
+      "";
+  }
+  revision 2019-10-08 {
+    description
+      "Modify the description of leaf cid.
+       Modify the description of leaf rid.
+       Modify the description of leaf info";
+    reference
+      "";
+  }
+  revision 2019-08-30 {
+    description
+      "Modify the description of leaf cid.
+       Modify the description of leaf rid.
+       Modify the description of container bb-raio-profiles";
+    reference
+      "";
+  }
+  revision 2019-08-06 {
+    description
+      "Modify the name of leaf not-config to none.
+       Modify the name of enum xdslPortRate to xdsl-port-rate";
+    reference
+      "";
+  }
+  revision 2018-08-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef raio-mode-options {
+    type enumeration {
+      enum "common" {
+        value 1;
+        description
+          "common mode:
+                      1. ETH
+                 \t\t    CID:anid eth frame/slot/subslot/port:vlanid
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t 3. docsis
+                 \t\t    CID:anid docsis frame/slot/subslot/port
+                 \t\t\tRID:splabel
+                 \t\t";
+      }
+      enum "xdsl-port-rate" {
+        value 2;
+        description
+          "xdslPort mode for MA5600T, not supported on MA5800:
+                      1. ETH/EoC
+                 \t\t    CID:anid eth frame/slot/subslot/port:vlanid
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t 3. ATM
+                 \t\t    CID:anid atm frame/slot/subslot/port:vpi.vci%up:uprate down:dnrate
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "cntel" {
+        value 3;
+        description
+          "cntel mode:
+                      1. ETH
+                 \t\t    CID:bporttype bslot/bsubslot/bport:xpi.xci anid/rack/frame/slot/subslot/port:axpi.axci
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "ti" {
+        value 4;
+        description
+          "ti mode:
+                      1. ETH
+                 \t\t    CID:anid eth frame/slot02/subslot/port03:vlanid04
+                 \t\t\tRID:plabel
+                 \t\t 2. XPON
+                 \t\t    CID:anid pon frame/slot02/port/ontid03:vlanid04
+                 \t\t\tRID:ontlabel
+                 \t\t";
+      }
+      enum "neuf" {
+        value 5;
+        description
+          "neuf mode:
+                      1. ETH
+                 \t\t    CID:anid-0002-vlanid04-GE
+                 \t\t\tRID:anid-0002-vlanid04-GE
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.ontportid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "port-userlabel" {
+        value 6;
+        description
+          "port-userlabel mode:
+                      1. ETH
+                 \t\t    CID:anid eth slot02/port:vlanid
+                 \t\t\tRID:plabel
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID:plabel
+                 \t\t";
+      }
+      enum "bt" {
+        value 7;
+        description
+          "bt mode, not supported on MA5800";
+      }
+      enum "service-port-userlabel" {
+        value 8;
+        description
+          "service-port-userlabel mode:
+                      1. ETH
+                 \t\t    CID:anid eth slot02/port:vlanid
+                 \t\t\tRID:plabel
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID:splabel
+                 \t\t";
+      }
+      enum "dslforum-default" {
+        value 9;
+        description
+          "dslforum-default mode:
+                      1. ETH
+                 \t\t    CID:anid eth slot/port:vlanid
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "ft" {
+        value 10;
+        description
+          "ft mode:
+                      CID:splabel
+                 \t\t RID:remote description
+                 \t\t";
+      }
+      enum "brt" {
+        value 11;
+        description
+          "brt mode:
+                      1. ETH
+                 \t\t    CID:anid.slot.port
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid xpon frame/slot/subslot/port:ontid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "user-defined" {
+        value 12;
+        description
+          "user-defined mode, cid and rid format refer to format-string
+                 \t\t";
+      }
+      enum "cntel-xpon" {
+        value 13;
+        description
+          "cntel-xpon mode:
+                      1. ETH
+                 \t\t    CID:bporttype bslot/bsubslot/bport:xpi.xci anid/rack/frame/slot/subslot/port:axpi.axci
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID(FTTH):bporttype bslot/bsubslot/bport:svlanid.cvlanid anid/rack/frame/slot/subslot/port/onuid accesstype
+                 \t\t\tCID(FTTB):bporttype bslot/bsubslot/bport:svlanid.cvlanid anid/rack/frame/slot/subslot/port/onuid onuslot/onusubslot/onuportid:onuporttype/portxpi.portxci accesstype
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "tm" {
+        value 14;
+        description
+          "tm mode:
+                      1. ETH
+                 \t\t    CID is empty
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID:anid frame/slot/subslot/port/ontid.ontportid.gemport.vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "bbf" {
+        value 15;
+        description
+          "bbf mode:
+                      1. ETH
+                 \t\t    CID:anid eth slot.port[:vlanid]
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID(ATM):anid atm slot/port/onuid/slot/port:vpi.vci
+                 \t\t\tCID(ETH):anid eth slot/port/onuid/slot/port[:vlanid]
+                 \t\t\tRID:ontlabel
+                 \t\t";
+      }
+      enum "vnpt" {
+        value 16;
+        description
+          "vnpt mode:
+                      1. ETH
+                 \t\t    CID:anid eth frame/frame/frame/frame/slot/port: axci.vlanid
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID(ATM):anid atm frame/slot/port/onuid/slot/port:vpi.vci
+                 \t\t\tCID(ETH):anid eth frame/slot/port/onuid/slot/port: axci .vlanid
+                 \t\t\tRID is empty
+                 \t\t";
+      }
+      enum "true" {
+        value 17;
+        description
+          "true mode:
+                      1. ETH
+                 \t\t    CID is empty
+                 \t\t\tRID is empty
+                 \t\t 2. XPON
+                 \t\t    CID is empty
+                 \t\t\tRID is empty
+                 \t\t 3. docsis
+                 \t\t    CID:xifindex
+                 \t\t\tRID:splabel
+                 \t\t";
+      }
+      enum "skb" {
+        value 18;
+        description
+          "skb mode: not supported on MA5800";
+      }
+    }
+    description
+      "Configuration of raio mode options.";
+  }
+
+  typedef sub-option-switch {
+    type bits {
+      bit sub-option81 {
+        description
+          "Sub-option81 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option82 {
+        description
+          "Sub-option82 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option83 {
+        description
+          "Sub-option83 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option84 {
+        description
+          "Sub-option84 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option85 {
+        description
+          "Sub-option85 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option86 {
+        description
+          "Sub-option86 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option87 {
+        description
+          "Sub-option87 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option88 {
+        description
+          "Sub-option88 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option89 {
+        description
+          "Sub-option89 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8a {
+        description
+          "Sub-option8a status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8b {
+        description
+          "Sub-option8b status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8c {
+        description
+          "Sub-option8c status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8d {
+        description
+          "Sub-option8d status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8e {
+        description
+          "Sub-option8e status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option8f {
+        description
+          "Sub-option8f status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option90 {
+        description
+          "Sub-option90 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option91 {
+        description
+          "Sub-option91 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option92 {
+        description
+          "Sub-option92 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option94 {
+        description
+          "Sub-option94 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option95 {
+        description
+          "Sub-option95 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option97 {
+        description
+          "Sub-option97 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+      bit sub-option98 {
+        description
+          "Sub-option98 status. The sub-option is enabled
+              \t   when this bit is set.";
+      }
+    }
+    description
+      "Configuration of sub-options switch.";
+  }
+
+  grouping raio-format-string {
+    description
+      "Configuration of raio format string.";
+    container docsis {
+      description
+        "format-string for docsis access.";
+      leaf cid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Cid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+      leaf rid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Rid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+    container eth {
+      description
+        "format-string for ethernet access.";
+      leaf cid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Cid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+      leaf rid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Rid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+    container xpon {
+      description
+        "format-string for xpon access.";
+      leaf cid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Cid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID, pwd. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+      leaf rid {
+        type string {
+          length "0..255";
+        }
+        description
+          "Rid format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+  }
+
+  grouping pitp-vmode-format {
+    description
+      "Configuration of raio format pitp vmode format string.";
+    container docsis {
+      description
+        "format-string for docsis access.";
+      leaf info {
+        type string {
+          length "0..255";
+        }
+        description
+          "Info format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+    container eth {
+      description
+        "format-string for eth access.";
+      leaf info {
+        type string {
+          length "0..255";
+        }
+        description
+          "Info format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+    container xpon {
+      description
+        "format-string for xpon access.";
+      leaf info {
+        type string {
+          length "0..255";
+        }
+        description
+          "Info format string. The string is the combination of
+              \t   system-defined key words and separators as following:
+             \t   System-defined key words:
+              \t   anid, anip, eth, accesstype, linetype, xpon, chassis, rack, frame,
+              \t   slot, logicalslot, subslot, port, port+1, cvlanid, vlanid, priority,
+              \t   plabel, splabel, sprlabel, sprlabelhex, bslot, bsubslot, bport,
+              \t   bvlanid, bporttype, 8021p, xpi, xci, axpi, axci, gem-index, gemport,
+              \t   uprate, dnrate, ontid, ontid+1, ontportid, ontporttype, ontlabel,
+              \t   onuid, onutag, SN, SN_ASCII, loid, 0002, up, down, ge, docsis,
+              \t   plain text, optional keyword, onusnmac, svlanid, SN_HYBRID, pwd. The key
+              \t   words also allow user-defined string enclosed by double quotation
+              \t   marks and optional content enclosed by brackets.
+              \t   System-defined separators:
+              \t   ' ', '.', ':', '/', '-', '%', ',', ';', '#', '!'
+              \t  ";
+      }
+    }
+  }
+
+  container bb-raio-profiles {
+    description
+      "configuration of raio profile for dhcp-option82, dhcpv6-option, pitp-pmode and pitp-vmode.";
+    list raio-profile {
+      key "name";
+      description
+        "The list of raio-profile";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Specifies the raio profile";
+      }
+      leaf access-node-id {
+        type string {
+          length "0..50";
+        }
+        description
+          "Indicate the ANID, empty string indicates undo operation. When raio-mode is bbf, blank space is not allowed in the string.";
+      }
+      choice access-node-ip {
+        description
+          "Indicates the l3-interface for anip.";
+        leaf meth {
+          type string {
+            length "1..32";
+            pattern "MEth0";
+          }
+          description
+            "Indicates the anip refers to meth0.";
+        }
+        leaf loopback {
+          type string {
+            length "1..32";
+            pattern "LoopBack([1-2]{0,1}[0-9]|3[0-1])";
+          }
+          description
+            "Indicates the anip refers to loopback port ranged from 0 to 31.";
+        }
+        leaf vlanif {
+          type string {
+            length "1..32";
+            pattern "Vlanif(([1-9][0-9]{0,2})|([1-3][0-9]{3})|(40[0-8][0-9])|(409[0-3]))";
+          }
+          description
+            "Indicates the anip refers to vlanif port ranged from 1 to 4093.";
+        }
+        leaf none {
+          type empty;
+          description
+            "Indicates the anip is not configured.";
+        }
+      }
+      leaf dhcpv6-option37-enterprise-number {
+        type uint32 {
+          range "0..4294967295";
+        }
+        default "2011";
+        description
+          "Indicates the dhcpv6 option37 enterprise number.";
+      }
+      container dhcp-option82 {
+        description
+          "Dhcp-option82 raio configuration.";
+        leaf mode {
+          type raio-mode-options;
+          default "common";
+          description
+            "Dhcp-option82 raio mode.";
+        }
+        leaf sub-options {
+          type sub-option-switch;
+          description
+            "Dhcp-option82 sub-option status.";
+        }
+        container format-string {
+          description
+            "Applied only for user-defined mode.";
+          uses raio-format-string;
+        }
+      }
+      container dhcpv6-option {
+        description
+          "Dhcpv6-option raio configuration.";
+        leaf mode {
+          type raio-mode-options;
+          default "common";
+          description
+            "Dhcpv6-option raio mode.";
+        }
+        leaf sub-options {
+          type sub-option-switch;
+          description
+            "Dhcpv6-option sub-option status.";
+        }
+        container format-string {
+          description
+            "Applied only for user-defined mode.";
+          uses raio-format-string;
+        }
+      }
+      container pitp-pmode {
+        description
+          "pitp-pmode raio configuration.";
+        leaf mode {
+          type raio-mode-options;
+          default "common";
+          description
+            "pitp-pmode raio mode.";
+        }
+        leaf sub-options {
+          type sub-option-switch;
+          description
+            "pitp-pmode sub-option status.";
+        }
+        container format-string {
+          description
+            "Applied only for user-defined mode.";
+          uses raio-format-string;
+        }
+      }
+      container pitp-vmode {
+        description
+          "pitp-vmode raio configuration.";
+        leaf mode {
+          type raio-mode-options;
+          default "common";
+          description
+            "pitp-vmode raio mode.";
+        }
+        container format-string {
+          description
+            "Applied only for user-defined mode.";
+          uses pitp-vmode-format;
+        }
+      }
+    }
+  }
+
+  augment "/huawei-vlan:vlans/huawei-vlan:vlan" {
+    description
+      "raio profile binded to vlan";
+    leaf raio-profile {
+      type leafref {
+        path "/hw-bb-raio-prof:bb-raio-profiles/hw-bb-raio-prof:raio-profile/hw-bb-raio-prof:name";
+      }
+      description
+        "Augment the raio profile to huawei-vlan";
+    }
+  }
+}

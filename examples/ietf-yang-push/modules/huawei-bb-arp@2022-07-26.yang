@@ -1,0 +1,84 @@
+module huawei-bb-arp {
+  namespace "urn:huawei:yang:huawei-bb-arp";
+  prefix hw-bb-arp;
+
+  import huawei-ifm {
+    prefix ifm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private YANG module is describing the configuration and operational model for arp.";
+
+  revision 2022-07-26 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  container bb-arp {
+    description
+      "Configure arp system information.";
+    container bb-gratuitous-arp {
+      description
+        "Configure gratuitous arp information.";
+      leaf period-send-mode {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable the VLANIF interface periodically sends gratuitous ARP packets.";
+      }
+    }
+    container bb-arp-global {
+      description
+        "Configure arp proxy switch on global.";
+      leaf arp-proxy-global {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the arp proxy switch on global.";
+      }
+    }
+  }
+
+  augment "/ifm:ifm/ifm:interfaces/ifm:interface" {
+    when "ifm:type = 'Vlanif'";
+    description
+      "Extend the interface name attribute to the OLT product.";
+    container bb-arp-proxys {
+      description
+        "Configure attributes specific to the OLT product.";
+      leaf arp-proxy-enable {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the arp proxy switch on interface.";
+      }
+      container sub-vlans {
+        description
+          "List of configurations for sub VLAN.";
+        list sub-vlan {
+          key "vlan-id";
+          description
+            "Configure the arp proxy switch on sub VLAN.";
+          leaf vlan-id {
+            type uint16 {
+              range "1..4093";
+            }
+            description
+              "VLAN ID.";
+          }
+        }
+      }
+    }
+  }
+}

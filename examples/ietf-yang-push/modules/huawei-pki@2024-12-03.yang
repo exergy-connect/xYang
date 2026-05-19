@@ -1,0 +1,2334 @@
+module huawei-pki {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-pki";
+  prefix pki;
+
+  import huawei-extension {
+    prefix ext;
+  }
+  import huawei-pub-type {
+    prefix pub-type;
+  }
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import huawei-l3vpn {
+    prefix l3vpn;
+  }
+  import huawei-network-instance {
+    prefix ni;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for configuring PKI certificate operation.";
+
+  revision 2024-12-03 {
+    description
+      "Add the CMPv2 global options and modify the description of the preset cert.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-07 {
+    description
+      "Add the separate-ca node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-08-09 {
+    description
+      "Declare secret-value as the password type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-07-23 {
+    description
+      "Add the CRL expiration check node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-06-03 {
+    description
+      "Corrected the spelling error of modulus.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-05-09 {
+    description
+      "Add default value of cmp-session authentication-method and expire-time.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-04-09 {
+    description
+      "Modify the entity department node to support multiple departments.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-08 {
+    description
+      "Modify the scep verification cert node to ra switch.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-04 {
+    description
+      "Add node support enable/disable synchronization of master and standby devices.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-10 {
+    description
+      "Change the length of scep server-url to 255.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-29 {
+    description
+      "Adds restrictions to the curve-type of query certificates and key-pairs.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-19 {
+    description
+      "Add node support ecc, include key-pair create/destroy/import/display/cmp request.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-09 {
+    description
+      "Add scep-get-cert, scep-enroll-cert rpcs and scep node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-04 {
+    description
+      "Remove the range limit on the key size when querying.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-07-28 {
+    description
+      "Add supported ecc curve type: secp521r1.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-13 {
+    description
+      "Add ldap over ssl configure.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-01-31 {
+    description
+      "Add database restoration history query node and output node for database factory setting reset.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-12-13 {
+    description
+      "Rename certificate validation rpcs' name.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-29 {
+    description
+      "Add preset certificate query node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-25 {
+    description
+      "Add pki strict check mode node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-24 {
+    description
+      "Add cert matching key query, cert validation and reset database rpcs.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-21 {
+    description
+      "Modify certificate-infos node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-23 {
+    description
+      "Add and modify nodes for keypair container and rpcs.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-22 {
+    description
+      "Add key usage type and certificate validate method nodes for PKI domain.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-14 {
+    description
+      "Add CRL update type node, delete password length and modify ca-name length.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-05 {
+    description
+      "Add new nodes CRL expiration check and CRL update type, and add vpn-instance reference.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-08-26 {
+    description
+      "Add new nodes CRL info and rpcs.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-07-30 {
+    description
+      "Add new nodes for domains and certificate infos.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-21 {
+    description
+      "Modify some descriptions and nodes to be more speccompliant.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-17 {
+    description
+      "Delete the domain-infos node, certificate verification node, and ECC type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-01 {
+    description
+      "Modify some nodes including entiytys, domains, public-key-infos and cmp-sessions.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-26 {
+    description
+      "Add node of operations with key import and modify generate-csr node.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-21 {
+    description
+      "Modify node of CMPv2 session.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-18 {
+    description
+      "Add node of operations with certificate configuration.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-09 {
+    description
+      "Modify the password leaf of import certificate operation.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-09 {
+    description
+      "Add node of delete the certificates by domain.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-01-18 {
+    description
+      "Add node of CMPv2 configuration.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-06-02 {
+    description
+      "Roll back poc test version modification.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-04-08 {
+    description
+      "Add node of CMPv2 configuration.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-01-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  typedef certificate-type {
+    type enumeration {
+      enum "ca" {
+        value 0;
+        description
+          "Certificate awarded by a CA.";
+      }
+      enum "local" {
+        value 1;
+        description
+          "Local stored certifacation.";
+      }
+      enum "default-ca" {
+        value 2;
+        description
+          "Default CA certificate.";
+      }
+      enum "default-local" {
+        value 3;
+        description
+          "Default local certificate.";
+      }
+    }
+    description
+      "Certificate type.";
+  }
+
+  typedef file-format {
+    type enumeration {
+      enum "pem" {
+        value 0;
+        description
+          "PEM format.";
+      }
+      enum "der" {
+        value 1;
+        description
+          "DER format.";
+      }
+      enum "pkcs12" {
+        value 2;
+        description
+          "PKCS12 format.";
+      }
+    }
+    description
+      "Certificate file format.";
+  }
+
+  typedef key-pair-algorithm {
+    type enumeration {
+      enum "rsa" {
+        value 0;
+        description
+          "Indicate that the key pair algorithm is rsa.";
+      }
+      enum "sm2" {
+        value 1;
+        description
+          "Indicate that the key pair algorithm is sm2.";
+      }
+      enum "ecc" {
+        value 2;
+        description
+          "Indicate that the key pair algorithm is ecc.";
+      }
+    }
+    description
+      "Indicate the key pair algorithm type.";
+  }
+
+  typedef ecc-curve-type {
+    type enumeration {
+      enum "prime256v1" {
+        value 0;
+        description
+          "Indicate that the ecc curve type is prime256v1.";
+      }
+      enum "ec192wapi" {
+        value 1;
+        description
+          "Indicate that the ecc curve type is ec192wapi.";
+      }
+      enum "secp384r1" {
+        value 2;
+        description
+          "Indicate that the ecc curve type is secp384r1.";
+      }
+      enum "secp521r1" {
+        value 3;
+        description
+          "Indicate that the ecc curve type is secp521r1.";
+      }
+    }
+    description
+      "Indicate the ecc curve type.";
+  }
+
+  typedef cmp-request-type {
+    type enumeration {
+      enum "IR" {
+        value 0;
+        description
+          "Indicate that the certificate request type is initiation request.";
+      }
+      enum "CR" {
+        value 1;
+        description
+          "Indicate that the certificate request type is certificate request.";
+      }
+      enum "KUR" {
+        value 2;
+        description
+          "Indicate that the certificate request type is key update request.";
+      }
+    }
+    description
+      "Indicate the CMPv2 certificate request type.";
+  }
+
+  typedef cmp-authentication-method {
+    type enumeration {
+      enum "message-code" {
+        value 0;
+        description
+          "Indicate that the authentication method of the CA server is message code.";
+      }
+      enum "signature" {
+        value 1;
+        description
+          "Indicate that the authentication method of the CA server is certificate authentication.";
+      }
+    }
+    description
+      "Indicate the authentication method of the CA server.";
+  }
+
+  typedef digest-algorithm-type {
+    type enumeration {
+      enum "sha-256" {
+        value 0;
+        description
+          "Select SHA-256 as the hash algorithm.";
+      }
+      enum "sha-384" {
+        value 1;
+        description
+          "Select SHA-384 as the hash algorithm.";
+      }
+      enum "sha-512" {
+        value 2;
+        description
+          "Select SHA-512 as the hash algorithm.";
+      }
+      enum "md5" {
+        value 3;
+        description
+          "Select MD5 as the hash algorithm.";
+      }
+      enum "sm3" {
+        value 4;
+        description
+          "Select SM3 as the hash algorithm.";
+      }
+      enum "sha1" {
+        value 5;
+        description
+          "Select SHA1 as the hash algorithm.";
+      }
+    }
+    description
+      "Indicate certificate hash algorithm.";
+  }
+
+  typedef key-usage {
+    type enumeration {
+      enum "signature" {
+        value 1;
+        description
+          "Indicate the key is for signature.";
+      }
+      enum "encipherment" {
+        value 2;
+        description
+          "Indicate the key is for encipherment.";
+      }
+    }
+    description
+      "Indicate certificate key usage.";
+  }
+
+  typedef certificate-validate-method {
+    type enumeration {
+      enum "none" {
+        value 0;
+        description
+          "Select none check, check success.";
+      }
+      enum "crl" {
+        value 1;
+        description
+          "Select CRL check, if not exist check fail.";
+      }
+      enum "ocsp" {
+        value 2;
+        description
+          "Select OCSP check, if not available check fail.";
+      }
+      enum "crl-none" {
+        value 3;
+        description
+          "Select CRL check, if CRL not exist check success.";
+      }
+    }
+    description
+      "Indicate certificate verification type.";
+  }
+
+  typedef crl-update-method {
+    type enumeration {
+      enum "http" {
+        value 0;
+        description
+          "Indicate that the CRL update method is HTTP.";
+      }
+      enum "ldap" {
+        value 1;
+        description
+          "Indicate that the CRL update method is LDAP.";
+      }
+    }
+    description
+      "Indicate CRL update method.";
+  }
+
+  typedef validation-exception-cause {
+    type enumeration {
+      enum "unknown-causes" {
+        value 0;
+        description
+          "The certificate is invalid due to unknown reasons.";
+      }
+      enum "beyond-validity-period" {
+        value 1;
+        description
+          "The certificate is expired or not yet valid.";
+      }
+      enum "missing-issuer" {
+        value 2;
+        description
+          "The CA certificate does not exist.";
+      }
+      enum "cert-revoked" {
+        value 3;
+        description
+          "The certificate has been revoked.";
+      }
+      enum "missing-crl" {
+        value 4;
+        description
+          "The CRL file does not exist.";
+      }
+      enum "self-signed" {
+        value 5;
+        description
+          "The certificate is self signed.";
+      }
+    }
+    description
+      "Indicate the cause of certificate validation exception.";
+  }
+
+  grouping certificates {
+    description
+      "Certificate details.";
+    container certificates {
+      description
+        "List of the certificates.";
+      list certificate {
+        key "issuer subject";
+        description
+          "Statistics of the certificate.";
+        leaf issuer {
+          type string {
+            length "1..2048";
+          }
+          description
+            "Indicate the issuer of the certificate.";
+        }
+        leaf subject {
+          type string {
+            length "1..2048";
+          }
+          description
+            "Indicate the subject of the certificate.";
+        }
+        leaf serial-number {
+          type string {
+            length "1..128";
+          }
+          description
+            "Indicate the serial number of the certificate.";
+        }
+        leaf version {
+          type string {
+            length "1..64";
+          }
+          description
+            "Indicate the version of the certificate.";
+        }
+        leaf not-before {
+          type string {
+            length "1..64";
+          }
+          description
+            "Indicate the validity start time of the certificate.";
+        }
+        leaf not-after {
+          type string {
+            length "1..64";
+          }
+          description
+            "Indicate the validity end time of the certificate.";
+        }
+        leaf signature-algorithm {
+          type string {
+            length "1..64";
+          }
+          description
+            "Indicate the signature algorithm of the certificate.";
+        }
+        leaf fingerprint {
+          type string {
+            length "1..4096";
+          }
+          description
+            "Indicate the fingerprint of the certificate.";
+        }
+        leaf key-pair-type {
+          type key-pair-algorithm;
+          description
+            "Indicate the algorithm type of the public key pair from the certificate.";
+        }
+        leaf key-size {
+          type uint32;
+          description
+            "Indicate the key pair modulus from the certificate.";
+        }
+        leaf curve-type {
+          when "../key-pair-type = 'ecc'";
+          type ecc-curve-type;
+          description
+            "Indicate the curve type of the ecc key pair from the certificate.";
+        }
+      }
+    }
+  }
+
+  grouping validate-cert-result {
+    description
+      "Certificate validation results.";
+    container results {
+      description
+        "List of certificate validation results.";
+      list result {
+        key "issuer subject";
+        description
+          "Operational data of certificate validation result.";
+        leaf issuer {
+          type string {
+            length "1..2048";
+          }
+          description
+            "Indicate the certificate issuer.";
+        }
+        leaf subject {
+          type string {
+            length "1..2048";
+          }
+          description
+            "Indicate the certificate subject.";
+        }
+        leaf valid {
+          type boolean;
+          description
+            "Indicate if the certificate is valid.";
+        }
+        leaf cause {
+          type validation-exception-cause;
+          description
+            "Indicate the cause of validation exception.";
+        }
+      }
+    }
+  }
+
+  grouping equipment-operation-result {
+    description
+      "The result of PKI equipment operation.";
+    leaf result-code {
+      type uint32 {
+        range "3 | 6";
+      }
+      description
+        "The final result of PKI equipment operation: '3' means success and '6' means failure.";
+    }
+    leaf result-detail {
+      type string {
+        length "1..128";
+      }
+      description
+        "The detail of PKI equipment operation result.";
+    }
+  }
+
+  container pki {
+    description
+      "Specify PKI configuration.";
+    container global {
+      description
+        "Configure global configuration information.";
+      leaf strict-check-mode {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable strict check mode, recommended enable only when need high security requirements.";
+      }
+      leaf synchronize-standby-device {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable PKI synchronization of master and standby devices.";
+      }
+      container certificate-check {
+        description
+          "Configure the expiration check attributes for the certificate.";
+        leaf validate-method {
+          type certificate-validate-method;
+          default "crl-none";
+          description
+            "Specify certificate validate method.";
+        }
+        leaf expiration-check-interval {
+          type uint16 {
+            range "5..1440";
+          }
+          units "min";
+          default "5";
+          description
+            "Specify the expiration check interval in minutes.";
+        }
+        leaf expiration-prewarning-day {
+          type uint16 {
+            range "7..180";
+          }
+          units "d";
+          default "90";
+          description
+            "Specify the amount of days before expiration for prewarning.";
+        }
+      }
+      container crl-check {
+        description
+          "Configure the check attributes for CRLs.";
+        container expiration-check {
+          description
+            "Configure the expiration check attributes for CRLs.";
+          leaf enable {
+            type boolean;
+            default "true";
+            description
+              "Enable/disable the expiration check for CRLs.";
+          }
+          leaf interval {
+            type uint16 {
+              range "1..24";
+            }
+            units "h";
+            default "24";
+            description
+              "Specify the expiration check interval in hours.";
+          }
+          leaf prewarning-remain-percent {
+            type uint16 {
+              range "0..100";
+            }
+            units "%";
+            default "5";
+            description
+              "Specify the remaining validity period percentage of CRLs for prewarning.";
+          }
+        }
+      }
+      container load-certificate {
+        description
+          "Configure the default certificate options.";
+        leaf default-ca {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable loading the initial CA certificate during the startup process.";
+        }
+        leaf default-local {
+          type boolean;
+          default "true";
+          description
+            "Enable/disable loading the initial local certificate during the startup process.";
+        }
+      }
+      container cmp {
+        description
+          "Configure the CMPv2 global options.";
+        leaf auto-import-ca {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable importing ca certificates automatically during CMPv2 update.";
+        }
+        leaf host-from-domain-url {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable filling the HOST field of the HTTP message with the domain name in the url instead of the IP address obtained through DNS resolution.";
+        }
+      }
+    }
+    container entitys {
+      description
+        "List of entitys.";
+      list entity {
+        key "name";
+        description
+          "Specify the name of entity.";
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of entity.";
+        }
+        leaf common-name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the common name of entity.";
+        }
+        leaf fqdn {
+          type string {
+            length "1..255";
+          }
+          description
+            "Specify the FQDN name of entity.";
+        }
+        choice organization-unit {
+          description
+            "Specify the department name of entity.";
+          case department {
+            description
+              "Specify the department name of entity.";
+            leaf department {
+              type string {
+                length "1..31";
+              }
+              description
+                "Specify the department name of entity.";
+            }
+          }
+          case departments {
+            description
+              "Specify multiple department names of entity.";
+            leaf-list departments {
+              type string {
+                length "1..31";
+              }
+              description
+                "Specify multiple department names of entity.";
+            }
+          }
+        }
+        leaf organization {
+          type string {
+            length "1..32";
+          }
+          description
+            "Specify the organization name of entity.";
+        }
+        leaf locality {
+          type string {
+            length "1..32";
+          }
+          description
+            "Specify the locality of entity.";
+        }
+        leaf state {
+          type string {
+            length "1..32";
+          }
+          description
+            "Specify the state name or province of entity.";
+        }
+        leaf country {
+          type string {
+            length "2";
+          }
+          description
+            "Specify the country code of entity.";
+        }
+        leaf email {
+          type string {
+            length "1..128";
+          }
+          description
+            "Specify the email address of entity.";
+        }
+        choice address {
+          description
+            "Specify the address of entity.";
+          case ip-address {
+            description
+              "Specify the IP address of entity.";
+            leaf ip-address {
+              type inet:ip-address-no-zone;
+              description
+                "Specify the IP address of entity.";
+            }
+          }
+          case interface-address {
+            description
+              "Specify the Interface address of entity.";
+            container interface-address {
+              description
+                "Configure the Interface address of entity.";
+              leaf interface-name {
+                type leafref {
+                  path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+                }
+                mandatory true;
+                description
+                  "Specify the Interface name of entity.";
+              }
+              leaf ip-version {
+                type inet:ip-version;
+                mandatory true;
+                description
+                  "Specify the IP version of interface.";
+              }
+            }
+          }
+        }
+      }
+    }
+    container cmp-sessions {
+      description
+        "List of cmp sessions.";
+      list cmp-session {
+        key "name";
+        description
+          "Specify the name of cmp session.";
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of cmp session.";
+        }
+        leaf entity {
+          type leafref {
+            path "/pki:pki/pki:entitys/pki:entity/pki:name";
+          }
+          description
+            "Specify the entity of CMP session.";
+        }
+        leaf ca-name {
+          type string {
+            length "1..255";
+          }
+          description
+            "Specify the CA name of cmp session.";
+        }
+        container server-url {
+          presence "Enable server-url";
+          description
+            "Configure the URL address of the CA server.";
+          leaf url {
+            type string {
+              length "1..128";
+            }
+            mandatory true;
+            description
+              "Specify the URL address of the CA server.";
+          }
+          leaf ascii-enable {
+            type boolean;
+            mandatory true;
+            description
+              "Enable/disable the entering of URLs in the ASCII code.";
+          }
+        }
+        container key-pair {
+          presence "Enable key-pair";
+          description
+            "Configure the key pair of cmp session.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the key pair of cmp session.";
+          }
+          leaf type {
+            type key-pair-algorithm;
+            default "rsa";
+            description
+              "Specify the key-pair algorithm type.";
+          }
+          leaf regenerate {
+            type boolean;
+            mandatory true;
+            description
+              "Enable/disable regeneration.";
+          }
+          leaf key-size {
+            when "../regenerate = 'true' and ../type != 'ecc' and ../type != 'sm2'";
+            type uint32 {
+              range "2048..4096";
+            }
+            mandatory true;
+            description
+              "Specify the key pair modulus. Unit is bit.";
+          }
+          leaf curve-type {
+            when "../regenerate = 'true' and ../type = 'ecc'";
+            type ecc-curve-type;
+            mandatory true;
+            description
+              "Specify the curve type of ecc key pair.";
+          }
+        }
+        container authentication-code {
+          presence "Enable authentication-code";
+          description
+            "Configure the message authentication code of cmp session.";
+          leaf reference-value {
+            type string {
+              length "1..128";
+            }
+            mandatory true;
+            description
+              "Specify the reference value of the message authentication code.";
+          }
+          leaf secret-value {
+            type pub-type:password-extend {
+              length "1..268";
+            }
+            mandatory true;
+            description
+              "Specify the secret value of the message authentication code.";
+          }
+        }
+        leaf auto-update {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable certificate auto-update.";
+        }
+        leaf expire-time {
+          type uint32 {
+            range "10..100";
+          }
+          units "%";
+          default "50";
+          description
+            "Specify the percentage of the validity of the certificate, the default is 50 percent.";
+        }
+        leaf authentication-cert {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of certificate for authentication.";
+        }
+        leaf verification-cert {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of certificate for verification.";
+        }
+        leaf authentication-method {
+          type cmp-authentication-method;
+          default "message-code";
+          description
+            "Specify the authentication method of cmp session.";
+        }
+        choice source-address {
+          description
+            "Specify the source address of the cmp session.";
+          case source-ip {
+            description
+              "Specify the source address of the cmp session.";
+            leaf source-ip {
+              type inet:ip-address-no-zone;
+              description
+                "Specify the source address of the cmp session.";
+            }
+          }
+          case source-interface {
+            description
+              "Specify the source interface of the cmp session.";
+            leaf source-interface {
+              type leafref {
+                path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+              }
+              description
+                "Specify the source interface of the cmp session.";
+            }
+          }
+        }
+        leaf vpn-instance {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/ni:name";
+          }
+          must "/ni:network-instance/ni:instances/ni:instance[ni:name=current()]/l3vpn:afs/l3vpn:af[l3vpn:type='ipv4-unicast']";
+          description
+            "Specify the name of vpn instance.";
+        }
+        leaf domain-name {
+          type string {
+            length "1..64";
+          }
+          mandatory true;
+          description
+            "Specify the domain which the session is located.";
+        }
+      }
+    }
+    container domains {
+      description
+        "List of PKI domains.";
+      list domain {
+        key "name";
+        description
+          "Specify the name of domain.";
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of domain.";
+        }
+        leaf entity {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the name of entity.";
+        }
+        leaf digest-algorithm {
+          type digest-algorithm-type;
+          default "sha-256";
+          description
+            "Specify the hash algorithm of digest for certificate signing request.";
+        }
+        container key-pair {
+          presence "Enable key-pair";
+          description
+            "Configure the key pair for certificate signing request.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the key pair name.";
+          }
+          leaf type {
+            type key-pair-algorithm;
+            mandatory true;
+            description
+              "Specify the key pair algorithm.";
+          }
+        }
+        leaf key-usage {
+          type key-usage;
+          description
+            "Specify the key usage of domain.";
+        }
+        leaf validate-method {
+          type certificate-validate-method;
+          description
+            "Specify the certificate validate method of domain.";
+        }
+        container crl-update {
+          description
+            "Configure the CRL automatic update.";
+          leaf update-type {
+            type crl-update-method;
+            default "ldap";
+            description
+              "Specify CRL update method.";
+          }
+          container http-services {
+            when "../update-type = 'http'";
+            description
+              "List of HTTP server URL.";
+            list http-service {
+              key "url";
+              max-elements 10;
+              description
+                "Specify HTTP server URL.";
+              leaf url {
+                type string {
+                  length "1..255";
+                }
+                description
+                  "Specify URL address.";
+              }
+              leaf source-address {
+                type inet:ipv4-address-no-zone;
+                description
+                  "Specify Source IP address.";
+              }
+              leaf vpn-instance {
+                type leafref {
+                  path "/ni:network-instance/ni:instances/ni:instance/ni:name";
+                }
+                must "/ni:network-instance/ni:instances/ni:instance[ni:name=current()]/l3vpn:afs/l3vpn:af[l3vpn:type='ipv4-unicast']";
+                description
+                  "Specify vpn instance.";
+              }
+            }
+          }
+          container ldap-services {
+            when "../update-type = 'ldap'";
+            description
+              "List of certificate revocation LDAP service.";
+            list ldap-service {
+              key "server-address";
+              description
+                "Configure LDAP service of certificate revocation.";
+              leaf server-address {
+                type inet:ipv4-address-no-zone;
+                description
+                  "Specify LDAP server IP address.";
+              }
+              leaf server-port {
+                type uint16 {
+                  range "1..65535";
+                }
+                default "389";
+                description
+                  "Specify LDAP port.";
+              }
+              leaf source-address {
+                type inet:ipv4-address-no-zone;
+                description
+                  "Specify Source IP address.";
+              }
+              leaf vpn-instance {
+                type leafref {
+                  path "/ni:network-instance/ni:instances/ni:instance/ni:name";
+                }
+                must "/ni:network-instance/ni:instances/ni:instance[ni:name=current()]/l3vpn:afs/l3vpn:af[l3vpn:type='ipv4-unicast']";
+                description
+                  "Specify vpn instance.";
+              }
+              leaf version {
+                type uint8 {
+                  range "2..3";
+                }
+                default "3";
+                description
+                  "LDAP version.";
+              }
+              leaf user-name {
+                type string {
+                  length "1..31";
+                }
+                description
+                  "Specify LDAP server user name.";
+              }
+              leaf password {
+                type pub-type:password-extend {
+                  length "1..128";
+                }
+                must "../user-name";
+                description
+                  "Specify LDAP server password, which is a string ranging from 1 to 31 characters for an unencrypted password and 20 to 128 characters for an encrypted password.";
+              }
+              leaf ssl {
+                type boolean;
+                default "false";
+                description
+                  "Enable/disable LDAP over SSL when the LDAP authentication between the device and LDAP server.";
+              }
+            }
+          }
+          leaf auto-update {
+            type boolean;
+            default "false";
+            description
+              "Enable/disable CRL auto-update.";
+          }
+          leaf period {
+            type uint16 {
+              range "1..720";
+            }
+            units "h";
+            default "8";
+            description
+              "Specify the CRL update period in hours.";
+          }
+        }
+        container scep {
+          description
+            "Configure the Simple Certificate Enrollment Protocol configuration.";
+          leaf server-url {
+            type string {
+              length "1..255";
+            }
+            description
+              "Specify the URL address of the CA server.";
+          }
+          leaf ca-id {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the certification authority issuer identifier.";
+          }
+          leaf verification-cert {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the name of certificate for CA server verification.";
+          }
+          leaf enroll-interval {
+            type uint16 {
+              range "1..1440";
+            }
+            units "min";
+            default "1";
+            description
+              "Specify the enrolling interval in minutes.";
+          }
+          leaf enroll-times {
+            type uint16 {
+              range "1..100";
+            }
+            default "5";
+            description
+              "Specify the max enrolling times.";
+          }
+          container auto-enroll {
+            presence "Enable auto-enroll";
+            description
+              "Enable/disable certificate auto-enroll.";
+            leaf expire-time {
+              type uint32 {
+                range "10..100";
+              }
+              units "%";
+              default "50";
+              description
+                "Specify the percentage of the validity of the certificate.";
+            }
+            leaf regenerate-key {
+              type boolean;
+              default "false";
+              description
+                "Enable/disable regenerating key pairs.";
+            }
+            leaf regenerate-key-size {
+              when "../regenerate-key = 'true'";
+              type uint32 {
+                range "2048..4096";
+              }
+              units "bit";
+              default "3072";
+              description
+                "Specify the key pair modulus.";
+            }
+          }
+          leaf ca-fingerprint {
+            type string {
+              length "32 | 40 | 64";
+            }
+            description
+              "Specify the fingerprint of root ca. The md5 fingerprint should have 32 characters, the sha1 fingerprint should have 40 characters, and the sha256 fingerprint should have 64 characters.";
+          }
+        }
+        leaf password {
+          type pub-type:password-extend {
+            length "1..64 | 128..188";
+          }
+          description
+            "Specify the challenge password.";
+        }
+        choice source-address {
+          description
+            "Specify the source address of the pki domain.";
+          case source-ip {
+            description
+              "Specify the source address of the pki domain.";
+            leaf source-ip {
+              type inet:ip-address-no-zone;
+              description
+                "Specify the source address of the pki domain.";
+            }
+          }
+          case source-interface {
+            description
+              "Specify the source interface of the pki domain.";
+            leaf source-interface {
+              type leafref {
+                path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+              }
+              description
+                "Specify the source interface of the pki domain.";
+            }
+          }
+        }
+        leaf vpn-instance {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/ni:name";
+          }
+          must "/ni:network-instance/ni:instances/ni:instance[ni:name=current()]/l3vpn:afs/l3vpn:af[l3vpn:type='ipv4-unicast']";
+          description
+            "Specify the name of vpn instance.";
+        }
+      }
+    }
+    container certificate-infos {
+      config false;
+      description
+        "List of PKI certificate infos.";
+      list certificate-info {
+        key "type domain-name name";
+        description
+          "Statistics of the PKI certificate info.";
+        leaf type {
+          type certificate-type;
+          description
+            "Specify the file type of certificate.";
+        }
+        leaf domain-name {
+          type string {
+            length "0..64";
+          }
+          description
+            "Specify the domain name.";
+        }
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the certificate name.";
+        }
+        uses certificates;
+      }
+    }
+    container preset-certificate-infos {
+      config false;
+      description
+        "List of PKI device certificate infos.";
+      list preset-certificate-info {
+        key "slot cert-type key-type";
+        description
+          "Statistics of the PKI device certificate info.";
+        leaf slot {
+          type string {
+            length "1..31";
+          }
+          description
+            "Specify the slot ID.";
+        }
+        leaf cert-type {
+          type certificate-type;
+          description
+            "Specify the certificate type of initial certificate.";
+        }
+        leaf key-type {
+          type key-pair-algorithm;
+          description
+            "Specify the key pair type of initial certificate.";
+        }
+        uses certificates;
+      }
+    }
+    container crl-infos {
+      config false;
+      description
+        "List of PKI CRL infos.";
+      list crl-info {
+        key "domain-name name";
+        description
+          "Statistics of the PKI CRL info.";
+        leaf domain-name {
+          type string {
+            length "0..64";
+          }
+          description
+            "Specify the domain name.";
+        }
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the CRL file name.";
+        }
+        container crl {
+          description
+            "Statistics of the CRL.";
+          leaf version {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the version of the CRL.";
+          }
+          leaf issuer {
+            type string {
+              length "1..2048";
+            }
+            description
+              "Specify the issuer of the CRL.";
+          }
+          leaf last-update {
+            type yang:date-and-time;
+            description
+              "Specify the last update time of the CRL.";
+          }
+          leaf next-update {
+            type yang:date-and-time;
+            description
+              "Specify the next update time of the CRL.";
+          }
+          leaf signature-algorithm {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the signature algorithm of the CRL.";
+          }
+        }
+      }
+    }
+    container key-pair-infos {
+      config false;
+      description
+        "List of PKI key pair infos.";
+      list key-pair-info {
+        key "name type";
+        description
+          "Operational data of the PKI key pair info.";
+        leaf name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Key name.";
+        }
+        leaf type {
+          type key-pair-algorithm;
+          description
+            "Public key type.";
+        }
+        leaf key-size {
+          type uint32;
+          description
+            "Specify the key pair modulus.";
+        }
+        leaf curve-type {
+          when "../type = 'ecc'";
+          type ecc-curve-type;
+          description
+            "Specify the curve type of ecc key pair.";
+        }
+      }
+    }
+    container cert-key-pair-infos {
+      config false;
+      description
+        "List of certificates and key-pairs matching infos.";
+      list cert-key-pair-info {
+        key "cert-name";
+        description
+          "Statistics of certificates and key-pairs matching info.";
+        leaf cert-name {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the certificate file name.";
+        }
+        container cert-key-pairs {
+          description
+            "List of the key-pairs matched the certificates.";
+          list cert-key-pair {
+            key "issuer subject key-type";
+            description
+              "Statistics of key-pair matched the certificate.";
+            leaf issuer {
+              type string {
+                length "1..2048";
+              }
+              description
+                "Specify the issuer of the certificate.";
+            }
+            leaf subject {
+              type string {
+                length "1..2048";
+              }
+              description
+                "Specify the subject of the certificate.";
+            }
+            leaf key-type {
+              type key-pair-algorithm;
+              description
+                "Specify the key-pair type.";
+            }
+            leaf key-name {
+              type string {
+                length "1..64";
+              }
+              description
+                "Specify the key-pair name.";
+            }
+          }
+        }
+      }
+    }
+    container database-restore-historys {
+      config false;
+      description
+        "List of database restoration historys.";
+      list database-restore-history {
+        key "time";
+        description
+          "Statistics of the database restoration history.";
+        leaf time {
+          type yang:date-and-time;
+          description
+            "Indicate the database restoration time.";
+        }
+        leaf result {
+          type string {
+            length "1..16";
+          }
+          description
+            "Indicate the database restoration result.";
+        }
+      }
+    }
+  }
+
+  augment "/pki:pki/pki:preset-certificate-infos/pki:preset-certificate-info/pki:certificates/pki:certificate" {
+    description
+      "Device information of the initial local certificate.";
+    container device-info {
+      when "../../../cert-type='local'";
+      description
+        "Statistics of Device information.";
+      leaf cpu-id {
+        type string {
+          length "1..256";
+        }
+        description
+          "Indicate the cpu die id.";
+      }
+      leaf np-id {
+        type string {
+          length "1..256";
+        }
+        description
+          "Indicate the np id.";
+      }
+      leaf htm-id {
+        type string {
+          length "1..256";
+        }
+        description
+          "Indicate the htm id.";
+      }
+    }
+  }
+
+  rpc key-pair-create {
+    description
+      "Key pairs create operation.";
+
+    input {
+      container key-pairs {
+        description
+          "List of key pairs.";
+        list key-pair {
+          key "name type";
+          description
+            "Operational data of key pair.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the name of key pair or domain.";
+          }
+          leaf type {
+            type key-pair-algorithm;
+            description
+              "Specify the key pair algorithm type.";
+          }
+          leaf key-size {
+            type uint32 {
+              range "2048..4096";
+            }
+            description
+              "Specify the key pair modulus. Unit is bit.";
+          }
+          leaf exportable {
+            type boolean;
+            description
+              "Enable/disable to export key pair.";
+          }
+          leaf curve-type {
+            when "../type = 'ecc'";
+            type ecc-curve-type;
+            mandatory true;
+            description
+              "Specify the curve type of ecc key pair.";
+          }
+        }
+      }
+    }
+  }
+  rpc key-pair-destroy {
+    description
+      "Key pairs destroy operation.";
+
+    input {
+      container key-pairs {
+        description
+          "List of key pairs.";
+        list key-pair {
+          key "name type";
+          description
+            "Operational data of key pair.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the name of key pair or domain.";
+          }
+          leaf type {
+            type key-pair-algorithm;
+            description
+              "Specify the key pair algorithm type.";
+          }
+        }
+      }
+    }
+  }
+  rpc key-pair-import {
+    description
+      "Key pairs import operation.";
+
+    input {
+      container key-pairs {
+        description
+          "List of key pairs.";
+        list key-pair {
+          key "name type";
+          description
+            "Operational data of key pair.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the name of key pair.";
+          }
+          leaf type {
+            type key-pair-algorithm;
+            description
+              "Specify the key pair algorithm type.";
+          }
+          leaf format {
+            type file-format;
+            mandatory true;
+            description
+              "Key pair file format.";
+          }
+          leaf file-name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the name of key file.";
+          }
+          leaf password {
+            type pub-type:password-extend;
+            mandatory true;
+            description
+              "Local key-pair encrypt password.";
+          }
+        }
+      }
+    }
+  }
+  rpc cmp-request-certificate {
+    description
+      "Obtain the certificate through the CMPv2 protocol.";
+
+    input {
+      container request-certificate {
+        description
+          "Obtain the certificate through the CMPv2 protocol.";
+        leaf cmp-session {
+          type string {
+            length "1..64";
+          }
+          description
+            "Specify the cmp session name.";
+        }
+        leaf type {
+          type cmp-request-type;
+          description
+            "Specify the certificate request type.";
+        }
+      }
+    }
+  }
+  rpc certificate-import {
+    description
+      "Certificate import operation.";
+
+    input {
+      container certificates {
+        description
+          "List of certificate import operation.";
+        list certificate {
+          key "name type";
+          description
+            "Import certificates.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Certificate file name. If the type is configured as default-local/default-ca, the name must be configured as default_local.cer/default_ca.cer.";
+          }
+          leaf type {
+            type certificate-type;
+            description
+              "Certificate type.";
+          }
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "PKI domain name.";
+          }
+          leaf format {
+            type file-format;
+            description
+              "Certificate file format.";
+          }
+          leaf password {
+            when "../format = 'pkcs12'";
+            type pub-type:password {
+              length "1..32";
+            }
+            mandatory true;
+            description
+              "Local key-pair encryption password.";
+          }
+          leaf allow-same-cert {
+            type boolean;
+            description
+              "Allow/disallow importing certificate with same issuer-name and subject-name.";
+          }
+          leaf separate-ca {
+            when "../type = 'local'";
+            type boolean;
+            default "false";
+            description
+              "Whether to separate the CA certificates from the local certificate.";
+          }
+        }
+      }
+    }
+  }
+  rpc certificate-delete {
+    description
+      "Certificate delete operation.";
+
+    input {
+      container certificates {
+        description
+          "List of certificate delete operation.";
+        list certificate {
+          key "name type";
+          description
+            "Delete certificates.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Certificate file name.";
+          }
+          leaf type {
+            type certificate-type;
+            description
+              "Certificate type.";
+          }
+        }
+      }
+    }
+  }
+  rpc certificate-delete-by-domain {
+    description
+      "Delete the certificates by domain.";
+
+    input {
+      container domain-certificates {
+        description
+          "List of certificate delete operation.";
+        list domain-certificate {
+          key "domain-name type";
+          description
+            "Delete certificates.";
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Pki domain name.";
+          }
+          leaf type {
+            type certificate-type;
+            description
+              "Certificate type.";
+          }
+          leaf file-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Case insensitive file name of the certificate.";
+          }
+        }
+      }
+    }
+  }
+  rpc certificate-replace {
+    description
+      "Certificate replace operation.";
+
+    input {
+      container certificates {
+        description
+          "List of certificate replace operation.";
+        list certificate {
+          key "file-name type domain-name";
+          description
+            "Certificates to replace.";
+          leaf file-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Certificate file name.";
+          }
+          leaf type {
+            type certificate-type;
+            description
+              "Certificate type.";
+          }
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Pki domain name.";
+          }
+          leaf password {
+            type pub-type:password {
+              length "1..32";
+            }
+            description
+              "Local key-pair encryption password. Uncheck this leaf to replace certificate excluding key-pair.";
+          }
+          leaf allow-same-cert {
+            type boolean;
+            description
+              "Allow/disallow importing certificate with same issuer-name and subject-name.";
+          }
+        }
+      }
+    }
+  }
+  rpc csr-generate {
+    description
+      "Generate csr file.";
+
+    input {
+      container csrs {
+        description
+          "List of csr file generation.";
+        list csr {
+          key "domain-name";
+          description
+            "Csr file Generation.";
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the domain name.";
+          }
+          leaf file-name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the certificate requset file name.";
+          }
+          leaf password {
+            type pub-type:password-extend;
+            description
+              "Specify the challenge password.";
+          }
+          leaf digest-algorithm {
+            type digest-algorithm-type;
+            default "sha-256";
+            description
+              "Specify the hash algorithm of digest.";
+          }
+        }
+      }
+    }
+  }
+  rpc crl-import {
+    description
+      "CRL import operation.";
+
+    input {
+      container crls {
+        description
+          "List of CRL import operations.";
+        list crl {
+          key "file-name";
+          description
+            "CRL attributes.";
+          leaf file-name {
+            type string {
+              length "1..64";
+            }
+            mandatory true;
+            description
+              "Specify the case insensitive file name of the CRL.";
+          }
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the PKI domain name.";
+          }
+        }
+      }
+    }
+  }
+  rpc crl-delete {
+    description
+      "CRL delete operation.";
+
+    input {
+      container crls {
+        description
+          "List of CRL delete operations.";
+        list crl {
+          key "name";
+          description
+            "CRL attributes.";
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the case insensitive file name of the CRL.";
+          }
+        }
+      }
+    }
+  }
+  rpc crl-delete-by-domain {
+    description
+      "CRL delete-by-domain operation.";
+
+    input {
+      container crls {
+        description
+          "List of CRL delete-by-domain operations.";
+        list crl {
+          key "domain-name";
+          description
+            "CRL attributes.";
+          leaf domain-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the PKI domain name.";
+          }
+          leaf name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Specify the case insensitive file name of the CRL.";
+          }
+        }
+      }
+    }
+  }
+  rpc cert-validate-by-domain {
+    description
+      "Validate certificates in domain.";
+
+    input {
+      leaf domain-name {
+        type string {
+          length "1..64";
+        }
+        mandatory true;
+        description
+          "Specify the PKI domain name.";
+      }
+    }
+    output {
+      container validate-results {
+        description
+          "List of validation results.";
+        list validate-result {
+          key "cert-name";
+          description
+            "Operational data of validation result.";
+          leaf cert-name {
+            type string {
+              length "1..64";
+            }
+            description
+              "Indicate the certificate name.";
+          }
+          uses validate-cert-result;
+        }
+      }
+    }
+  }
+  rpc preset-cert-validate {
+    description
+      "Validate initial certificates.";
+
+    input {
+      leaf slot {
+        type string {
+          length "1..31";
+        }
+        mandatory true;
+        description
+          "Specify the slot ID.";
+      }
+      leaf type {
+        type key-pair-algorithm;
+        must "current() = 'rsa' or current() = 'ecc'";
+        mandatory true;
+        description
+          "Specify the initial certificate algorithm type.";
+      }
+    }
+    output {
+      leaf valid {
+        type boolean;
+        description
+          "Indicate if the initial certificate is valid.";
+      }
+    }
+  }
+  rpc reset-factory-setting {
+    description
+      "Reset PKI database to factory settings.";
+
+    output {
+      leaf result {
+        type string {
+          length "1..64";
+        }
+        description
+          "Indicate the result of restoring the database to factory settings.";
+      }
+    }
+  }
+  rpc preset-cert-clear {
+    description
+      "Clear initial cert operation.";
+
+    input {
+      leaf slot {
+        type string {
+          length "1..31";
+        }
+        mandatory true;
+        description
+          "Specify the slot ID.";
+      }
+    }
+    output {
+      container result {
+        description
+          "Result of clearing initial certificate.";
+        uses equipment-operation-result;
+      }
+    }
+  }
+  rpc preset-csr-generate {
+    description
+      "Generate initial csr operation.";
+
+    input {
+      leaf slot {
+        type string {
+          length "1..31";
+        }
+        mandatory true;
+        description
+          "Specify the slot ID.";
+      }
+      leaf esn {
+        type string {
+          length "1..256";
+        }
+        mandatory true;
+        description
+          "Specify the esn of certificate request file.";
+      }
+      leaf key-type {
+        type key-pair-algorithm;
+        mandatory true;
+        description
+          "Specify the key pair algorithm type.";
+      }
+    }
+    output {
+      container result {
+        description
+          "Result of generating initial csr.";
+        uses equipment-operation-result;
+        leaf csr-data {
+          type string {
+            length "1..4096";
+          }
+          description
+            "The data of initial csr.";
+        }
+      }
+    }
+  }
+  rpc preset-cert-load {
+    description
+      "Load initial cert operation.";
+
+    input {
+      leaf slot {
+        type string {
+          length "1..31";
+        }
+        mandatory true;
+        description
+          "Specify the slot ID.";
+      }
+      leaf key-type {
+        type key-pair-algorithm;
+        mandatory true;
+        description
+          "Specify the key pair algorithm type.";
+      }
+      leaf file-name {
+        type string {
+          length "1..128";
+        }
+        mandatory true;
+        description
+          "Specify the file name of initial cert.";
+      }
+    }
+    output {
+      container result {
+        description
+          "Result of loading initial certificate.";
+        uses equipment-operation-result;
+      }
+    }
+  }
+  rpc scep-get-cert {
+    description
+      "Get ca certificate through the SCEP.";
+
+    input {
+      leaf domain-name {
+        type string {
+          length "1..64";
+        }
+        mandatory true;
+        description
+          "Specify the domain to get ca by scep.";
+      }
+    }
+  }
+  rpc scep-enroll-cert {
+    description
+      "Enroll certificate through the SCEP.";
+
+    input {
+      leaf domain-name {
+        type string {
+          length "1..64";
+        }
+        mandatory true;
+        description
+          "Specify the domain to enroll certificate by scep.";
+      }
+      leaf password {
+        type pub-type:password-extend {
+          length "1..64 | 128..188";
+        }
+        description
+          "Specify the challenge password.";
+      }
+    }
+  }
+}

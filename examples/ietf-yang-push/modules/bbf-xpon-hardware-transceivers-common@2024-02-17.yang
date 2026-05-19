@@ -1,0 +1,62 @@
+module bbf-xpon-hardware-transceivers-common {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-xpon-hardware-transceivers-common";
+  prefix bbf-xpon-xcvr-com;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import bbf-hardware-transceivers {
+    prefix bbf-hw-xcvr;
+  }
+  import bbf-hardware-types {
+    prefix bbf-hwt;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area.";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor: XinWen Yao, Huawei";
+  description
+    "This module contains transceivers data.";
+
+  revision 2024-02-17 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472";
+  }
+
+  grouping xpon-transceiver {
+    description
+      "Indicates the extend xpon optical transceiver data.";
+    leaf module-state {
+      type enumeration {
+        enum "online" {
+          value 0;
+          description
+            "Indicates the status of the optical module is online.";
+        }
+        enum "offline" {
+          value 1;
+          description
+            "Indicates the status of the optical module is offline.";
+        }
+      }
+      config false;
+      description
+        "Indicates the status of the optical module.";
+    }
+  }
+
+  augment "/hw:hardware/hw:component/bbf-hw-xcvr:transceiver" {
+    when "derived-from-or-self(../hw:class,'bbf-hwt:transceiver')";
+    description
+      "Indicates the extend transceiver information.";
+    uses xpon-transceiver;
+  }
+}

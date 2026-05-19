@@ -1,0 +1,55 @@
+module ieee802-ethernet-interface-deviations {
+  namespace "urn:ieee:std:802.3:yang:ieee802-ethernet-interface-deviations";
+  prefix ieee802-eth-if-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import ieee802-ethernet-interface {
+    prefix ieee802-eth-if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Jinye Road, \tYanta
+     Xi'an 512639
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This is a deviation for ieee802-ethernet-interface module.";
+
+  revision 2021-04-14 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:auto-negotiation/ieee802-eth-if:negotiation-status" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:flow-control/ieee802-eth-if:pause" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:flow-control/ieee802-eth-if:pfc" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:max-frame-length" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:mac-control-extension-control" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:frame-limit-slow-protocol" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:capabilities" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/ieee802-eth-if:ethernet/ieee802-eth-if:statistics" {
+    deviate not-supported;
+  }
+}

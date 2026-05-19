@@ -84,6 +84,11 @@ class YangStatementWithWhen(YangStatement):
     when: Optional['YangWhenStmt'] = None
     # RFC 7950 / 7952: one or more ``if-feature`` substatements (AND of expressions).
     if_features: List[str] = field(default_factory=list)
+    # RFC 7950 §7.21.1: explicit ``config true|false``; ``None`` means inherit from parent.
+    config: Optional[bool] = None
+    # RFC 7951: module that defined this node when it differs from the enclosing parent
+    # (e.g. merged from ``augment``); ``None`` means same module as the parent data node.
+    defining_module: Optional[str] = None
 
     def get_schema_node(self) -> Optional[str]:
         """Default for data-shaped nodes: instance key is ``name``.
@@ -366,6 +371,8 @@ class YangRefineStmt(YangStatementWithMust):
     refined_defaults: List[Any] = field(default_factory=list)
     # RFC 7950 §7.13.2: leaf / choice may get a different mandatory; None = omit from refine
     refined_mandatory: Optional[bool] = None
+    # RFC 7950 §7.13.2: container / leaf / list / leaf-list may get config refined
+    refined_config: Optional[bool] = None
     # RFC 7950 §7.13.2: additional if-feature expressions (AND with target node's own).
     if_features: List[str] = field(default_factory=list)
 

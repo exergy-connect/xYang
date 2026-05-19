@@ -1,0 +1,73 @@
+module huawei-bbf-qos-composite-filters-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-composite-filters-deviations-MA5800";
+  prefix bbf-qos-cpsfilt-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import bbf-qos-composite-filters {
+    prefix bbf-qos-cpsfilt;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for huawei-bbf-qos-composite-filters module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-cpsfilt:composite-filters/bbf-qos-cpsfilt:composite-filter/bbf-qos-cpsfilt:filter/bbf-qos-cpsfilt:filter-method/bbf-qos-cpsfilt:inline/bbf-qos-cpsfilt:transport" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:composite-filter" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:source-mac-address" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:destination-mac-address" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:vlans" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:ethernet-frame-type" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:ipv4" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:ipv6" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:ip-common" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:transport" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:protocol" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:dei-marking-list" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cpsfilt:enhanced-classifier/bbf-qos-cpsfilt:flow-color" {
+    deviate not-supported;
+  }
+}

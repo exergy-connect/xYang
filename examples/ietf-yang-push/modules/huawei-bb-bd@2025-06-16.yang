@@ -1,0 +1,199 @@
+module huawei-bb-bd {
+  namespace "urn:huawei:yang:huawei-bb-bd";
+  prefix hw-bb-bd;
+
+  import huawei-bd {
+    prefix bd;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private YANG module is a supplement to the huawei-bd.yang, describing
+     the configuration and operational model for bridge domain.";
+
+  revision 2025-06-16 {
+    description
+      "Add vlan list to container 'bb-bd'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-06-13 {
+    description
+      "Modify condition of the leaf node 'max-mac-count' and 'mac-limit'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-03-11 {
+    description
+      "Modify the leaf node 'nerg-id'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-09-24 {
+    description
+      "Modify type of the leaf node 'port-id'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-05-15 {
+    description
+      "Add a container of 'bind-nergs'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-04-20 {
+    description
+      "Add nerg type of the leaf node 'forwarding-mode'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-12-29 {
+    description
+      "Add a leaf node of 'statistics-enable'.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-07-26 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef vlan-ref {
+    type leafref {
+      path "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id";
+    }
+    description
+      "A reference to VLAN.";
+  }
+
+  augment "/bd:bd/bd:instances/bd:instance" {
+    description
+      "Extend bridge-domain attribute to the OLT product.";
+    container bb-bd {
+      description
+        "Configure attributes specific to the OLT product.";
+      leaf forwarding-mode {
+        type enumeration {
+          enum "vlan-mac" {
+            value 1;
+            description
+              "Indicates forwarding based on the VLAN+MAC.";
+          }
+          enum "vlan-connect" {
+            value 2;
+            description
+              "Indicates forwarding based on the SVLAN+CVLAN.";
+          }
+          enum "nerg" {
+            value 3;
+            description
+              "Indicates forwarding based on the NERG mode.";
+          }
+        }
+        default "vlan-mac";
+        description
+          "The bridge-domain forwarding policy.";
+      }
+      leaf max-mac-count {
+        when "../forwarding-mode = 'vlan-mac'";
+        type uint32 {
+          range "0..32768";
+        }
+        description
+          "The maximum mac-address learning of the bridge domain.";
+      }
+      leaf mac-limit {
+        when "../forwarding-mode = 'vlan-mac'";
+        type enumeration {
+          enum "forward" {
+            value 1;
+            description
+              "Forward.";
+          }
+          enum "discard" {
+            value 2;
+            description
+              "Discard.";
+          }
+        }
+        default "forward";
+        description
+          "Indicates the forwardPolicy of the bridge domain if mac-address over max-mac-count.";
+      }
+      leaf statistics-enable {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable BD message statistical function.";
+      }
+      container flow-members {
+        description
+          "List of collections of bridge-domain members.";
+        list flow-member {
+          key "flow-id";
+          description
+            "Configure the access service flow index.";
+          leaf flow-id {
+            type uint32;
+            description
+              "Access service flow index.";
+          }
+        }
+      }
+      container bind-nergs {
+        description
+          "List of nerg ports binding with specify bd.";
+        list bind-nerg {
+          key "nerg-instance-name port-id";
+          description
+            "Configure nerg bound by BD.";
+          leaf nerg-instance-name {
+            type string {
+              length "1..32";
+            }
+            description
+              "Configure the binding nerg instance name.";
+          }
+          leaf port-id {
+            type union {
+              type uint32 {
+                range "0..15";
+              }
+              type enumeration {
+                enum "unconcerned" {
+                  description
+                    "Configure the binding nerg without port index.";
+                }
+              }
+            }
+            description
+              "Configure the binding port index.";
+          }
+        }
+      }
+      list vlan {
+        key "vlan";
+        description
+          "List of vlans binding with specify BD.";
+        leaf vlan {
+          type vlan-ref;
+          description
+            "Indicates the VLAN.";
+        }
+      }
+    }
+  }
+}

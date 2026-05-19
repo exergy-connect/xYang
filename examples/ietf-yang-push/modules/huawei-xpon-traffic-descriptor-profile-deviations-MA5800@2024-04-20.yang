@@ -1,0 +1,54 @@
+module huawei-xpon-traffic-descriptor-profile-deviations-MA5800 {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-xpon-traffic-descriptor-profile-deviations-MA5800";
+  prefix hwxpon-traffic-descriptor-profile-deviations;
+
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xpon-power-management.";
+
+  revision 2024-04-20 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:traffic-descriptor-profiles/bbf-xpongemtcont:traffic-descriptor-profile/bbf-xpongemtcont:additional-bw-eligibility-indicator" {
+    deviate add {
+      must "(../bbf-xpongemtcont:fixed-bandwidth) and (../bbf-xpongemtcont:assured-bandwidth) and(../bbf-xpongemtcont:maximum-bandwidth)" {
+        error-message
+          "When additional-bw-eligibility-indicator is configured,
+           fixed-bandwidth, assured-bandwidth and maximum-bandwidth must be configured at the same time.";
+        description
+          "When additional-bw-eligibility-indicator is configured,
+           fixed-bandwidth, assured-bandwidth and maximum-bandwidth
+           must be configured at the same time.";
+      }
+    }
+  }
+  deviation "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:traffic-descriptor-profiles/bbf-xpongemtcont:traffic-descriptor-profile/bbf-xpongemtcont:weight" {
+    deviate add {
+      must "(../bbf-xpongemtcont:maximum-bandwidth) or((../bbf-xpongemtcont:fixed-bandwidth) and (../bbf-xpongemtcont:assured-bandwidth) and(../bbf-xpongemtcont:maximum-bandwidth))" {
+        error-message
+          "When weight is configured,
+           maximum-bandwidth must be configured.";
+        description
+          "When weight is configured,
+           maximum-bandwidth must be configured.";
+      }
+    }
+  }
+}

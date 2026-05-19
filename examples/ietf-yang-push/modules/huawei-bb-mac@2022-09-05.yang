@@ -1,0 +1,138 @@
+module huawei-bb-mac {
+  namespace "urn:huawei:yang:huawei-bb-mac";
+  prefix hw-bb-mac;
+
+  import huawei-bb-service-flow {
+    prefix hw-bb-srv-flow;
+  }
+  import huawei-slice-an {
+    prefix slice-an;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of definitions for configuring
+     service flows for the broadband services.";
+
+  revision 2022-09-05 {
+    description
+      "Add the total-mac-learn-number and extend max-learn-number to dedicated network.";
+    reference
+      "";
+  }
+  revision 2021-03-06 {
+    description
+      "Add mac-aging config.";
+    reference
+      "";
+  }
+  revision 2019-09-16 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  container bb-mac {
+    description
+      "Indicates the module bb-mac.";
+    leaf total-mac-learn-number {
+      type uint32;
+      config false;
+      description
+        "Indicates the total number of learnable MAC addresses of the system.";
+    }
+    container mac-learnings {
+      description
+        "List of dynamic MAC address learning based on service flows.";
+      list mac-learning {
+        key "index";
+        description
+          "Configure dynamic MAC address learning number to service flow.";
+        leaf index {
+          type leafref {
+            path "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow/hw-bb-srv-flow:index";
+          }
+          description
+            "The index references the service flow.";
+        }
+        leaf max-number-mac-address {
+          type union {
+            type uint32;
+            type string {
+              pattern "unlimited" {
+                description
+                  "Indicates unlimited to learning MAC address.";
+              }
+            }
+          }
+          description
+            "Indicates the maximum number of learnable MAC addresses of the service flow,
+             the default value is unlimited.";
+        }
+      }
+    }
+    container mac-aging {
+      description
+        "Configure the mac address aging time and aging-mode to system.";
+      leaf aging-time {
+        type union {
+          type string {
+            pattern "no-aging" {
+              description
+                "Indicates unlimited mac address aging time.";
+            }
+          }
+          type uint32;
+        }
+        units "s";
+        default "300";
+        description
+          "Indicates mac address aging time (unit:s),Range:10-1000000.
+           the default value is 300s.";
+      }
+      leaf aging-mode {
+        type enumeration {
+          enum "bidirectional" {
+            value 0;
+            description
+              "Supporting bidirectional configurations for mac address aging mode.";
+          }
+          enum "unidirectional" {
+            value 1;
+            description
+              "Supporting unidirectional configurations for mac address aging mode.";
+          }
+        }
+        default "bidirectional";
+        description
+          "Indicates the configuration for mac address aging mode.";
+      }
+    }
+  }
+
+  augment "/slice-an:slice-an/slice-an:dedicated-networks/slice-an:dedicated-network" {
+    description
+      "Extend dedicated network attribute.";
+    container dynamic-mac {
+      description
+        "Configure the dynamic mac address learning number.";
+      leaf max-learn-number {
+        type uint32 {
+          range "1..244735";
+        }
+        default "16384";
+        description
+          "Indicates the maximum number of learnable MAC addresses of the dedicated network.";
+      }
+    }
+  }
+}

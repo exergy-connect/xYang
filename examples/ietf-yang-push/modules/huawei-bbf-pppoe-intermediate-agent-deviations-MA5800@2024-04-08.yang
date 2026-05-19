@@ -1,0 +1,40 @@
+module huawei-bbf-pppoe-intermediate-agent-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-pppoe-intermediate-agent-deviations-MA5800";
+  prefix hwxpon-bbf-pppoe-ia-devs-MA5800;
+
+  import bbf-pppoe-intermediate-agent {
+    prefix bbf-pppoe-ia;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-pppoe-intermediate-agent module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-pppoe-ia:pppoe/bbf-pppoe-ia:profile-ref" {
+    deviate not-supported;
+  }
+  deviation "/bbf-pppoe-ia:pppoe-profiles" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:statistics/bbf-pppoe-ia:pppoe" {
+    deviate not-supported;
+  }
+}

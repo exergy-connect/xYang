@@ -1,0 +1,246 @@
+module huawei-bb-nerg {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bb-nerg";
+  prefix hw-bb-nerg;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import bbf-hardware-types {
+    prefix bbf-hwt;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private YANG module is describing the configuration and operational model for Networked Enhanced Residential Gateway (NERG).";
+
+  revision 2024-12-02 {
+    description
+      "Expand the maximum value of the leaf max-mac-count for MC5101.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-14 {
+    description
+      "Add leaf max-mac-count for container nerg-groups.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-09-14 {
+    description
+      "Add leaf group-type for container nerg-groups.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-07-02 {
+    description
+      "Add traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for NERG group.";
+    reference
+      "";
+  }
+  revision 2024-05-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  identity nerg-group-port {
+    base ianaift:iana-interface-type;
+    description
+      "Nerg goup port Virtual Interface.";
+  }
+
+  typedef user-vlan {
+    type uint16 {
+      range "1..4095";
+    }
+    description
+      "Type definition representing a user VLAN.";
+  }
+
+  typedef nerg-port-role {
+    type enumeration {
+      enum "lan" {
+        value 1;
+        description
+          "Lan port.";
+      }
+      enum "wan-bridged" {
+        value 2;
+        description
+          "Wan bridged port.";
+      }
+      enum "wan-routed" {
+        value 3;
+        description
+          "Wan routed port.";
+      }
+      enum "internet" {
+        value 4;
+        description
+          "Internet port.";
+      }
+    }
+    description
+      "NERG port role.";
+  }
+
+  container bb-nerg {
+    description
+      "Configure NERG information.";
+    container nerg-profiles {
+      description
+        "List of NERG profiles.";
+      list nerg-profile {
+        key "nerg-profile-name";
+        description
+          "Configure NERG profiles.";
+        leaf nerg-profile-name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Specifies the NERG profile.";
+        }
+        container nerg-port-attrs {
+          description
+            "List of NERG port attributes.";
+          list nerg-port-attr {
+            key "nerg-port-id";
+            description
+              "Configure NERG ports.";
+            leaf nerg-port-id {
+              type uint8 {
+                range "1..15";
+              }
+              description
+                "Specifies the NERG port ID.";
+            }
+            leaf port-role {
+              type nerg-port-role;
+              description
+                "Indicates the NERG port role.";
+            }
+          }
+        }
+      }
+    }
+    container nerg-groups {
+      description
+        "List of NERG groups.";
+      list nerg-group {
+        key "nerg-group-id";
+        description
+          "Configure NERG groups.";
+        leaf nerg-group-id {
+          type uint16 {
+            range "0..2047";
+          }
+          description
+            "Specifies the NERG group ID.";
+        }
+        leaf group-type {
+          type enumeration {
+            enum "general" {
+              value 0;
+              description
+                "Indicates that the NERG group type is nerg.";
+            }
+            enum "mesh" {
+              value 1;
+              description
+                "Indicates that the NERG group type is mesh.";
+            }
+          }
+          mandatory true;
+          description
+            "Indicates the type of NERG group.";
+        }
+        leaf board-ref {
+          type leafref {
+            path "/hw:hardware/hw:component/hw:name";
+          }
+          must "derived-from-or-self (/hw:hardware/hw:component[hw:name=current()]/hw:class, 'bbf-hwt:board')" {
+            error-message
+              "Referenced component is or is derived from class 'board'.";
+          }
+          mandatory true;
+          description
+            "Reference to a board.";
+        }
+        leaf vlan-id {
+          type user-vlan;
+          mandatory true;
+          description
+            "Specifies the VLAN ID.";
+        }
+        leaf nerg-profile-name {
+          type leafref {
+            path "/hw-bb-nerg:bb-nerg/hw-bb-nerg:nerg-profiles/hw-bb-nerg:nerg-profile/hw-bb-nerg:nerg-profile-name";
+          }
+          description
+            "The name of the referenced NERG profile.
+             If the group-type is not mesh, this leaf is mandatory.";
+        }
+        leaf max-mac-count {
+          type uint32 {
+            range "0..1048576";
+          }
+          description
+            "Specifies the NERG group max mac-count. The maximum value varies according to hardware. To query the value, you can perform a get operation.";
+        }
+      }
+    }
+    container nerg-instances {
+      description
+        "List of NERG instances.";
+      list nerg-instance {
+        key "nerg-instance-name";
+        description
+          "Configure NERG instances.";
+        leaf nerg-instance-name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Specifies the NERG instance.";
+        }
+        leaf nerg-group-id {
+          type leafref {
+            path "/hw-bb-nerg:bb-nerg/hw-bb-nerg:nerg-groups/hw-bb-nerg:nerg-group/hw-bb-nerg:nerg-group-id";
+          }
+          mandatory true;
+          description
+            "The name of the referenced NERG group.";
+        }
+        leaf user-vlan-id {
+          type user-vlan;
+          mandatory true;
+          description
+            "Specifies the user VLAN ID.";
+        }
+      }
+    }
+    container nerg-traffic-suppress {
+      description
+        "Configure the traffic-suppress container is used to set the traffic suppression level of broadcast, unknown multicast, and unknown unicast traffic for NERG group.";
+    }
+  }
+}

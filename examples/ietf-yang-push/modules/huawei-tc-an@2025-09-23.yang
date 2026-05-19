@@ -1,0 +1,3237 @@
+module huawei-tc-an {
+  namespace "urn:huawei:yang:huawei-tc-an";
+  prefix tc-an;
+
+  import huawei-device-common {
+    prefix dev-com;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix iana-if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "Huawei text conventions and common definition.";
+
+  revision 2025-09-23 {
+    description
+      "Add new board identity, H902ACSC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-08-30 {
+    description
+      "Add new board identity, H901MPSK";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-07-16 {
+    description
+      "Add new board identity, V922MPCB, V922FLHF, V922NXHC, H902HTED.
+       Add New device identity, MA5801-FL16-H2.
+       Add New chassis identity, MA5801-FL16-H2-FRAME.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-07-10 {
+    description
+      "Add new board identity, V951FLHD, V951NQHC, H951PICC, V951MPBA, V951CIUA.
+       Add device identity, MA5801C-FL08.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-07-03 {
+    description
+      "Add new board identity, V922MPCG, V921FLHD, V926NXHC.
+       Add New device identity, MA5801-FL08-H1.
+       Add New chassis identity, MA5801-FL08-H1-FRAME";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-06-20 {
+    description
+      "Delete new board identity, V951FLHD, V951NQHC, H951PICC, V951MPBA, V951CIUA.
+       Delete device identity, MA5801C-FL08.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-04-23 {
+    description
+      "Add new board identity, H901MPLHE, HA01ATHF, V951FLHD, V951NQHC, H951PICC, V951MPBA, V951CIUA.
+       Add New device identity, MA5801C-FL08.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-03-05 {
+    description
+      "Add new board identity, H901FLRF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-01-23 {
+    description
+      "Add new board identity, H901MPSJ, H901HEED, H901FLBF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-11 {
+    description
+      "Add new board identity, H901DPWB.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-05 {
+    description
+      "Add new board identity, HA01PDMA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-09-18 {
+    description
+      "Add New board identity,   PAC1K2S12, PAC600S12, PDC1K2S12.
+       Add new device identity,  MC5101-C04Q40E.
+       Add new chassis identity, MC5101-C04Q40E-FRAME.
+       Add new board identity,   C04Q40E.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-08-12 {
+    description
+      "Add new device identity, MA5801-CG04-H2.
+       Add new chassis identity, MA5801-CG04-H2-FRAME.
+       Add New board identity, V921CGHC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-08-12 {
+    description
+      "Add New board identity, H908CSHF.
+       Add New board identity, H909CGHF.
+       Add New board identity, H908FLHF.
+       Add New board identity, H905OGHK.
+       Add New board identity, H908CSHFE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-07-03 {
+    description
+      "Add new device identity, MA5800T-X15.
+       Add new chassis identity, HA01BPIA.
+       Add new chassis identity, HA01BPMA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-04-24 {
+    description
+      "Add New board identity, H901HTED.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-04-13 {
+    description
+      "Add new device identity, EA5800T-X8.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-14 {
+    description
+      "Add new board identity, HA01PDMB.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-14 {
+    description
+      "Add new device identity, MA5800T-X8.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-13 {
+    description
+      "Add New board identity, H901MPLH.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-13 {
+    description
+      "Add New board identity, HA01CILA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-11 {
+    description
+      "Add New board identity, H901ATHD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-08 {
+    description
+      "Add New board identity, H901HTHD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-01 {
+    description
+      "Add New board identity, HE01MCSA.
+       Add New board identity, HE01LXSG.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-18 {
+    description
+      "Add New board identity, H901GPEF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-23 {
+    description
+      "Modify device identity MA5801-FL04 to MA5801-FL04-H1,
+       Modify chassis identity MA5801-FL04-FRAME to MA5801-FL04-H1-FRAME.
+       Add New board identity, V921MPCG.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-19 {
+    description
+      "Add new board identity, H901FLVFE, HA01UPLA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-17 {
+    description
+      "Add Ethernet 25GE optical port: eth-sub-type-25ge-opt.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-10-16 {
+    description
+      "Add new board identity, H901HXEDE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-30 {
+    description
+      "Add new board identity, H901DPWA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-20 {
+    description
+      "Add new board identity, HA01PDLA, HA01PDLB.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-17 {
+    description
+      "Add new device identity, MA5800T-X17.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-16 {
+    description
+      "Add new board identity, HA01BPLA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-11 {
+    description
+      "Add new board identity, H901FLVF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-11 {
+    description
+      "Add new board identity, H901NCEC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-07 {
+    description
+      "Add new board identity, H901ATED.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-01 {
+    description
+      "Add new board identity, H901AEED.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-07-28 {
+    description
+      "Add new board identity, H901HXED.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-04-10 {
+    description
+      "Add new board identity, H905PILA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-04-06 {
+    description
+      "Add new board identity, H901FLPF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-22 {
+    description
+      "Add new board identity, H901FLSF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-14 {
+    description
+      "Add new board identity, H901MPSH.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-13 {
+    description
+      "Add new board identity, H901FLHH, H901HXHD H906CSHF, H902FLSF, H906FLHF,
+       H901OSCL, H906FLHFE, H906CSHFE";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-01-19 {
+    description
+      "Add new board identity, H901MPSF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-26 {
+    description
+      "Add new board identity, H902MPLG, H902MPLGE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-21 {
+    description
+      "Delete board identity, H902CRED.
+       Add New board identity, ORCSF2, H902CSPDE, H902CGPDE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-17 {
+    description
+      "Add new board identity, H907MPLB, H907MPLBE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-14 {
+    description
+      "Add New device identity, EA5801S-FL16-H2.
+       Add New chassis identity, EA5801S-FL16-H2-FRAME.
+       Add New board identity, V932MPBAE, V932FLHFE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-13 {
+    description
+      "Add New board identity, H901MPSDE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-13 {
+    description
+      "Add new board identity, H907CIUA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-10-08 {
+    description
+      "Add new board identity, H908CGHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-26 {
+    description
+      "Add Ethernet 40GE optical port: eth-sub-type-40ge-opt.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-23 {
+    description
+      "Delete backplane identity: H901BPLG, H901BPIG, H901BPMG.
+       Delete device identity, MA5800-X7E, MA5800-X15E, MA5800-X17E, EA5800-X7E, EA5800-X15E, EA5800-X17E.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-08-31 {
+    description
+      "Add new board identity, H905XEHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-08-30 {
+    description
+      "Add New device identity, MA5801S-FL16-H2.
+       Add New chassis identity, MA5801S-FL16-H2-FRAME.
+       Add New board identity, V932MPBA, V935NXHC, V932FLHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-08-29 {
+    description
+      "Add new board identity, H902DQHF, H907CGUD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-22 {
+    description
+      "Add new board identity, H901ACSC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-21 {
+    description
+      "Add new device identity, EA5801E-FL16-H1.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-14 {
+    description
+      "Add new device identity, EA5800-X7E, EA5800-X15E, EA5800-X17E.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-28 {
+    description
+      "Add New board identity, H902TNSC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-12 {
+    description
+      "Add new device identity, MA5800-X7E, MA5800-X15E, MA5800-X17E.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-08 {
+    description
+      "Add New board identity, H901DQHT, H902CSPD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-31 {
+    description
+      "Add New device identity, MA5801-GP16-H2, MA5801-GP08-H3, MA5801S-GP16-H2, MA5801S-GP16-S2.
+       Add New chassis identity, MA5801-GP16-H2-FRAME, MA5801-GP08-H3-FRAME,
+                                 MA5801S-GP16-H2-FRAME, MA5801S-GP16-S2-FRAME.
+       Add New board identity, V922MPCC, V922GPHF, V922GPHD, V925NXHC,
+                               V932MPBB, V932GPHF, V932GPSF, V933NXHC, V933NXSC.
+               Add New device identity, EA5801E-GP16-H2, EA5801E-GP08-H3, EA5801E-GP04-H2, EA5801S-GP16-H2.
+       Add New chassis identity, EA5801E-GP16-H2-FRAME, EA5801E-GP08-H3-FRAME,
+                                         EA5801E-GP04-H2-FRAME, EA5801S-GP16-H2-FRAME.
+       Add New board identity, V922MPCCE, V922GPHFE, V922MPCDE, V922GPHDE,
+                                       V922MPCEE, V922GPHCE, V932MPBBE, V932GPHFE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-16 {
+    description
+      "Add New board identity, H907CGHD, H902CGPD.
+       Add New board identity, H905FLHF, H905FLHFE, H905CSHF, H905CSHFE, H905XSHF, H905XSHFE.
+               Add New board identity, H903OGHK, H905OXEG.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-03-01 {
+    description
+      "Add New board identity, V921MPCDE, V921MPCEE.
+       Add New board identity, V921GPHCE.
+       Add New chassis identity, EA5801E-GP04-H1-FRAME.
+       Add New device identity, EA5801E-GP04-H1.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-09 {
+    description
+      "Add New board identity, H905MPLB.
+       Add New board identity, H905GPHF, H905XEHD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-01-25 {
+    description
+      "Add new backplane identity: H901BPLG, H901BPIG, H901BPMG.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-12-23 {
+    description
+      "Add New Port Type: VPORT, LPORT.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-11-23 {
+    description
+      "Add New board identity, V931MPBBE, V931GPHFE, H901CGPD, H901FGHFE, H907CGHF, H907CGUF.
+       Add New device identity, EA5801S-GP16-H1.
+       Add New chassis identity, EA5801S-GP16-H1-FRAME.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-11-05 {
+    description
+      "Add New board identity, H901MPSG, H901MPSFE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-11-01 {
+    description
+      "Add New board identity, H902ACSA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-09-06 {
+    description
+      "Add New device identity, EA5801E-GP08-H2.
+       Add New chassis identity, EA5801E-GP08-H2-FRAME.
+       Add New board identity, V921GPHDE.
+       Add New board identity, H901MPLGE.
+       Add New board identity, H903XSHFE, H905NXED, H905OXHD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-08-30 {
+    description
+      "Add New board identity, H901DQHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-08-05 {
+    description
+      "Add New board identity, H905MPLA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-07-09 {
+    description
+      "Add New board identity, V932NXSC, H901FGHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-05-13 {
+    description
+      "Add New board identity, H901MPLG, H901TNSC.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-03-31 {
+    description
+      "Add New device identity, MA5801S-GP16-S1, MA5801-GP08-H2.
+       Add New chassis identity, MA5801S-GP16-S1-FRAME, MA5801-GP08-H2-FRAME.
+       Add New board identity, V931GPSF, V921GPHD.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-03-26 {
+    description
+      "Modify device identity MA5801-FL16 to MA5801-FL16-H1,
+       Modify chassis identity MA5801-FL16-FRAME to MA5801-FL16-H1-FRAME.
+       Add New device identity, MA5801-CG16-H1,
+       Add New chassis identity, MA5801-CG16-H1-FRAME,
+       Add New board identity, V921MPCB, V921CGHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-03-19 {
+    description
+      "Add New board identity, H901OTHF, H903OXEG.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-03-05 {
+    description
+      "Add New board identity, H901ACSA, H903XGLF, H903CSHFE, H903FLHFE, H903GPHFE, H903XEHF, H903GPSF, H903XSHF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-01-30 {
+    description
+      "Add New board identity, H901CSPD, ORCSF1.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-12-22 {
+    description
+      "Delete board identity, H905CIUA, H901GPEF, H901GPEFE, H901OTEF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-12-04 {
+    description
+      "Add New device identity, EA5801E-GP16.
+       Add New chassis identity, EA5801E-GP16-FRAME.
+       Add New board identity, H906CIUA, H906CGHF, H903CSHF, H906CGUF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-10-26 {
+    description
+      "Add New device identity, OSN1600IIM.
+       Add New board identity, TM62HPCS8, TM62HPXCL.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-08-25 {
+    description
+      "Add New board identity, H903CGHF, H901GPEF, H905CIUA, H901OTEF, H901CASZT.
+       Add New board identity, H901GPEFE, H903CSHDE, V921MPCCE, V921GPHFE, V923NXHCE.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-08-12 {
+    description
+      "Add New device identity, MA5801-GP16, MA5801S-GP16.
+       Add New chassis identity, MA5801-GP16-FRAME, MA5801S-GP16-FRAME.
+       Add New board identity, V921MPCC, V931MPBB, V923NXHC, V932NXHC, V921GPHF, V931GPHF.
+       Add New board identity, H905CGHD, H903MPLB, H903MPLBE, H903PILA.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-03-26 {
+    description
+      "Add New device identity, MA5801-FL16, MA5801S-FL16.
+       Add New chassis identity, MA5801-FL16-FRAME, MA5801S-FL16-FRAME.
+       Add New board identity, H921MPCB, V921CIUA, V921NXHC, V921FLHF, PAC300S12, PDC300S12.
+       Add New board identity, V931MPBA, V931CIUA, V931NXHC, V931FLHF, H931PICA, H931PICB.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-02-13 {
+    description
+      "Add New board identity, H901MPLF.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-01-07 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2020-01-06 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-11-28 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-10-22 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-07-19 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-06-25 {
+    description
+      "Add New board identity.";
+    reference
+      "Huawei private.";
+  }
+  revision 2017-12-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  identity MA5800-X17 {
+    base dev-com:device-type;
+    description
+      "MA5800-X17.";
+  }
+
+  identity MA5800-X15 {
+    base dev-com:device-type;
+    description
+      "MA5800-X15.";
+  }
+
+  identity MA5800-X7 {
+    base dev-com:device-type;
+    description
+      "MA5800-X7.";
+  }
+
+  identity MA5800-X2 {
+    base dev-com:device-type;
+    description
+      "MA5800-X2.";
+  }
+
+  identity EA5800-X17 {
+    base dev-com:device-type;
+    description
+      "EA5800-X17.";
+  }
+
+  identity EA5800-X15 {
+    base dev-com:device-type;
+    description
+      "EA5800-X15.";
+  }
+
+  identity EA5800-X7 {
+    base dev-com:device-type;
+    description
+      "EA5800-X7.";
+  }
+
+  identity EA5800-X2 {
+    base dev-com:device-type;
+    description
+      "EA5800-X2.";
+  }
+
+  identity MA5801-GP08 {
+    base dev-com:device-type;
+    description
+      "MA5801-GP08.";
+  }
+
+  identity MA5801-CG04 {
+    base dev-com:device-type;
+    description
+      "MA5801-CG04.";
+  }
+
+  identity EA5801-GP08 {
+    base dev-com:device-type;
+    description
+      "EA5801-GP08.";
+  }
+
+  identity EA5801-CG04 {
+    base dev-com:device-type;
+    description
+      "EA5801-CG04.";
+  }
+
+  identity MA5801-FL16-H1 {
+    base dev-com:device-type;
+    description
+      "MA5801-FL16-H1.";
+  }
+
+  identity MA5801-FL16-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801-FL16-H2.";
+  }
+
+  identity MA5801-FL08-H1 {
+    base dev-com:device-type;
+    description
+      "MA5801-FL08-H1.";
+  }
+
+  identity MA5801-FL04-H1 {
+    base dev-com:device-type;
+    description
+      "MA5801-FL04-H1.";
+  }
+
+  identity MA5801S-FL16 {
+    base dev-com:device-type;
+    description
+      "MA5801S-FL16.";
+  }
+
+  identity MA5801C-FL08 {
+    base dev-com:device-type;
+    description
+      "MA5801C-FL08.";
+  }
+
+  identity MA5801-GP16 {
+    base dev-com:device-type;
+    description
+      "MA5801-GP16.";
+  }
+
+  identity EA5801E-GP16 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP16.";
+  }
+
+  identity MA5801S-GP16-S1 {
+    base dev-com:device-type;
+    description
+      "MA5801S-GP16-S1.";
+  }
+
+  identity MA5801-GP08-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801-GP08-H2.";
+  }
+
+  identity EA5801E-GP08-H2 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP08-H2.";
+  }
+
+  identity EA5801E-GP04-H1 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP04-H1.";
+  }
+
+  identity OSN1600IIM {
+    base dev-com:device-type;
+    description
+      "OSN1600IIM.";
+  }
+
+  identity MA5801S-GP16 {
+    base dev-com:device-type;
+    description
+      "MA5801S-GP16.";
+  }
+
+  identity EA5801S-GP16-H1 {
+    base dev-com:device-type;
+    description
+      "EA5801S-GP16-H1.";
+  }
+
+  identity MA5600T {
+    base dev-com:device-type;
+    description
+      "MA5600T.";
+  }
+
+  identity MA5801-CG16-H1 {
+    base dev-com:device-type;
+    description
+      "MA5801-CG16-H1.";
+  }
+
+  identity MA5801-GP16-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801-GP16-H2.";
+  }
+
+  identity MA5801-GP08-H3 {
+    base dev-com:device-type;
+    description
+      "MA5801-GP08-H3.";
+  }
+
+  identity MA5801S-GP16-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801S-GP16-H2.";
+  }
+
+  identity MA5801S-GP16-S2 {
+    base dev-com:device-type;
+    description
+      "MA5801S-GP16-S2.";
+  }
+
+  identity EA5801E-GP16-H2 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP16-H2.";
+  }
+
+  identity EA5801E-GP08-H3 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP08-H3.";
+  }
+
+  identity EA5801E-GP04-H2 {
+    base dev-com:device-type;
+    description
+      "EA5801E-GP04-H2.";
+  }
+
+  identity EA5801S-GP16-H2 {
+    base dev-com:device-type;
+    description
+      "EA5801S-GP16-H2.";
+  }
+
+  identity EA5801E-FL16-H1 {
+    base dev-com:device-type;
+    description
+      "EA5801E-FL16-H1.";
+  }
+
+  identity MA5801S-FL16-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801S-FL16-H2.";
+  }
+
+  identity EA5801S-FL16-H2 {
+    base dev-com:device-type;
+    description
+      "EA5801S-FL16-H2.";
+  }
+
+  identity MA5800T-X17 {
+    base dev-com:device-type;
+    description
+      "MA5800T-X17.";
+  }
+
+  identity MA5800T-X8 {
+    base dev-com:device-type;
+    description
+      "MA5800T-X8.";
+  }
+
+  identity EA5800T-X8 {
+    base dev-com:device-type;
+    description
+      "EA5800T-X8.";
+  }
+
+  identity MA5800T-X15 {
+    base dev-com:device-type;
+    description
+      "MA5800T-X15.";
+  }
+
+  identity MC5101-C04Q40E {
+    base dev-com:device-type;
+    description
+      "MC5101-C04Q40E.";
+  }
+
+  identity MA5801-CG04-H2 {
+    base dev-com:device-type;
+    description
+      "MA5801-CG04-H2.";
+  }
+
+  identity H901BPLB {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800.";
+  }
+
+  identity H901BPLD {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800.";
+  }
+
+  identity H901BPMB {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800.";
+  }
+
+  identity H901BPLE {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800.";
+  }
+
+  identity H901BPIB {
+    base dev-com:chassis-type;
+    description
+      "19inch, 200G backplane for MA5800-X15.";
+  }
+
+  identity H901BPSB {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800-X2.";
+  }
+
+  identity H901MABC {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5600T.";
+  }
+
+  identity MA5801-GP08-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-CG04-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity EA5801-GP08-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801.";
+  }
+
+  identity EA5801-CG04-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801.";
+  }
+
+  identity MA5801-FL16-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-FL16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-FL08-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-FL04-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801S-FL16-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity MA5801-GP16-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity EA5801E-GP16-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity MA5801S-GP16-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity EA5801E-GP04-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity MA5801S-GP16-S1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity EA5801S-GP16-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801S-GP16-H1.";
+  }
+
+  identity MA5801-GP08-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity EA5801E-GP08-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity MA5801-CG16-H1-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-GP16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801-GP08-H3-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801.";
+  }
+
+  identity MA5801S-GP16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity MA5801S-GP16-S2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity EA5801S-GP16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801S.";
+  }
+
+  identity EA5801E-GP16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity EA5801E-GP08-H3-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity EA5801E-GP04-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801E.";
+  }
+
+  identity MA5801S-FL16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801S.";
+  }
+
+  identity EA5801S-FL16-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the EA5801S.";
+  }
+
+  identity HA01BPLA {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800T-X17.";
+  }
+
+  identity HA01BPIA {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800T-X15.";
+  }
+
+  identity MC5101-C04Q40E-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MC5101-C04Q40E.";
+  }
+
+  identity HA01BPMA {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5800T-X8.";
+  }
+
+  identity MA5801-CG04-H2-FRAME {
+    base dev-com:chassis-type;
+    description
+      "Backplane of the MA5801-CG04-H2.";
+  }
+
+  identity H901ACSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902ACSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLH {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLHE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H902MPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSAE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901MPSB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902MPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902MPLAE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903MPLAE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901MPLC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901MPSD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSK {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901MPSJ {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HE01MCSA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPSFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901MPSH {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLE {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903MPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903MPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903MPLBE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H905MPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921MPCA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity H921MPCAE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity H921MPCB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V931MPBA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V921MPCC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921MPCCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity V921MPCDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V921MPCEE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V931MPBB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V931MPBBE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity V931GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity TM62HPXCL {
+    base dev-com:board-type;
+    description
+      "Board of the OSN1600IIM.";
+  }
+
+  identity H901MPLG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPLGE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H902MPLG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902MPLGE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H905MPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907MPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907MPLBE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901XGHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XGHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPHH {
+    base dev-com:board-type;
+    description
+      "Board of the MA5600T.";
+  }
+
+  identity H901GPUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5600T.";
+  }
+
+  identity H902GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902GPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OTSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OTHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901DQHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901ACSA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902ACSA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902GPLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902GPUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OGHK {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902OGHK {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901NCEB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901NCEC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901NXED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity H921NXHCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity V921NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V926NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V931NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V923NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V923NXHCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity V932NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V932NXSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity H902NXED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905NXED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OXHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902OXHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905OXHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OXHG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PILA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902PILA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903PILA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905PILA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HA01PDLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T-X17.";
+  }
+
+  identity HA01PDLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T-X17.";
+  }
+
+  identity H901DPWA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T-X17.";
+  }
+
+  identity H901DPWB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T-X17.";
+  }
+
+  identity H901CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906CGUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPEF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V931CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity H901WPBCT {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPSFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901XEHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901HEED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901ATED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901AEED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901HXED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901HXEDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901XEHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XELD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XEHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XELD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901EPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902EPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902EPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901EDSH {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PILB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CRED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OXEG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPWD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPWE {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901MPWC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XSED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903XSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921GPHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity H921GPHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity V921FLHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V931FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V951FLHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801C.";
+  }
+
+  identity V951MPBA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801C.";
+  }
+
+  identity V951NQHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801C.";
+  }
+
+  identity H951PICC {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801C.";
+  }
+
+  identity V921GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity V931GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V931GPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V921GPHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921GPHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V921GPHCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity TM62HPCS8 {
+    base dev-com:board-type;
+    description
+      "Board of the OSN1600IIM.";
+  }
+
+  identity H901TWED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901TWEDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H902TWED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902TWHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H822CCKRX {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CGCD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CGID {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CSHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921CGHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity H921CGHCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801.";
+  }
+
+  identity H901CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901CSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CSHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H902CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902FLHFE {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901NXLC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CVEC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPSD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901GPLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CRED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PIMA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CGHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CGUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CGUD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CGUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XSED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901DSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905CGHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PISA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PISB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902PISB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903PISB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901PISC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H921PICA {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801.";
+  }
+
+  identity ME170-12A {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801.";
+  }
+
+  identity PAC300S12 {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801.";
+  }
+
+  identity PDC300S12 {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801.";
+  }
+
+  identity H931PICA {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801S.";
+  }
+
+  identity H931PICB {
+    base dev-com:board-type;
+    description
+      "Power Board of the MA5801S.";
+  }
+
+  identity H901XGLD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XGLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XGRD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901XGSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HS33CDAA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HS33CDAX {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HS22CCVW {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HS3BVCMM {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HS91MPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5600T.";
+  }
+
+  identity HS91GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5600T.";
+  }
+
+  identity H902NCEB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902XGLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902FLEF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902OXEG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903OXEG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CGHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CSHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CGUD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903XSHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H901CASZT {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CSPD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity ORCSF1 {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity ORCSF2 {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903XGLF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903CSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903FLHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903XEHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903GPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903XSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H903XSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity V921MPCB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922MPCB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V921MPCG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922MPCG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity H901TNSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901CGPD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FGHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H905GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905XEHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907CGUF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H907CGHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CGPD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CGPDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H905FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905FLHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity HA01ATHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity H901FLVF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLVFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity HA01UPLA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity HA01UPLB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity H905CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905CSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H905XSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905XSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H903OGHK {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905OGHK {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H905OXEG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HE01LXSG {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity V922MPCC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V922GPHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V925NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801.";
+  }
+
+  identity V932MPBB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V932GPHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V932GPSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V933NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V933NXSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V922MPCCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V922GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V922MPCDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V922GPHDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V922MPCEE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V922GPHCE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801E.";
+  }
+
+  identity V932MPBBE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity V932GPHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity H901DQHT {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CSPD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902CSPDE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H902TNSC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902DQHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLHH {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901HXHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity V951CIUA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801C.";
+  }
+
+  identity H908CSHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLRF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H909CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902FLSF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H908FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLBF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901FLPF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901OSCL {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H906FLHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H906CSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H908CSHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5800.";
+  }
+
+  identity H907CGUD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity V932MPBA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V935NXHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity V932FLHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801S.";
+  }
+
+  identity H905XEHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H908CGHF {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity V932MPBAE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity V932FLHFE {
+    base dev-com:board-type;
+    description
+      "Board of the EA5801S.";
+  }
+
+  identity H901HTHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901HTED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H902HTED {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity H901ATHD {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800.";
+  }
+
+  identity HA01CILA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity HA01PDMA {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity HA01PDMB {
+    base dev-com:board-type;
+    description
+      "Board of the MA5800T.";
+  }
+
+  identity V921CGHC {
+    base dev-com:board-type;
+    description
+      "Board of the MA5801-CG04-H2.";
+  }
+
+  identity C04Q40E {
+    base dev-com:board-type;
+    description
+      "Board of the MC5101-C04Q40E.";
+  }
+
+  identity PAC1K2S12 {
+    base dev-com:board-type;
+    description
+      "Board of the MC5101-C04Q40E.";
+  }
+
+  identity PAC600S12 {
+    base dev-com:board-type;
+    description
+      "Board of the MC5101-C04Q40E.";
+  }
+
+  identity PDC1K2S12 {
+    base dev-com:board-type;
+    description
+      "Board of the MC5101-C04Q40E.";
+  }
+
+  identity main-board {
+    base dev-com:board-catagory;
+    description
+      "Main control board.";
+  }
+
+  identity power-board {
+    base dev-com:board-catagory;
+    description
+      "Power board.";
+  }
+
+  identity sub-main-board {
+    base dev-com:board-catagory;
+    description
+      "Main control board of sub chassis.";
+  }
+
+  identity ge-board {
+    base dev-com:board-catagory;
+    description
+      "GE bus service board.";
+  }
+
+  identity gpio-board {
+    base dev-com:board-catagory;
+    description
+      "General Purpose Input/Output board.";
+  }
+
+  identity load-sharing {
+    base dev-com:device-capability-type;
+    description
+      "Service load-sharing capability.";
+  }
+
+  identity vector {
+    base dev-com:chassis-capability-type;
+    description
+      "Service load-sharing capability.";
+  }
+
+  identity clock-source {
+    base dev-com:board-capability-type;
+    description
+      "Service load-sharing capability.";
+  }
+
+  identity auto {
+    base if:interface-type;
+    description
+      "Auto port type.";
+  }
+
+  identity eth-sub-type-fe-elc {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet FE electric port.";
+  }
+
+  identity eth-sub-type-fe-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet FE optical port.";
+  }
+
+  identity eth-sub-type-ge-elc {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet GE electric port.";
+  }
+
+  identity eth-sub-type-ge-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet GE optical port.";
+  }
+
+  identity eth-sub-type-10ge-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet 10GE optical port.";
+  }
+
+  identity eth-sub-type-100ge-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet 100GE optical port.";
+  }
+
+  identity eth-sub-type-40ge-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet 40GE optical port.";
+  }
+
+  identity eth-sub-type-25ge-opt {
+    base iana-if:ethernetCsmacd;
+    description
+      "Ethernet 25GE optical port.";
+  }
+
+  identity vport {
+    base if:interface-type;
+    description
+      "Ethernet like interface.";
+  }
+
+  identity lport {
+    base if:interface-type;
+    description
+      "Ethernet like interface, liquid OTN object.";
+  }
+}

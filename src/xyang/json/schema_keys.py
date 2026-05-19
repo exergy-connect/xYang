@@ -64,6 +64,7 @@ class XYangKey:
     KEY = "key"
     PRESENCE = "presence"
     MANDATORY = "mandatory"
+    CONFIG = "config"
     CHOICE = "choice"
     IF_FEATURES = "if-features"
     MODULE = "module"

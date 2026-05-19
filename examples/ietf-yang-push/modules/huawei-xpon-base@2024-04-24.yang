@@ -1,0 +1,228 @@
+submodule huawei-xpon-base {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+  import bbf-xponvani {
+    prefix bbf-xponvani;
+  }
+  import bbf-xponani {
+    prefix bbf-xponani;
+  }
+
+
+  include "huawei-xpon-alm-policy-profile";
+
+  include "huawei-xpon-alm-threshold-profile";
+
+  include "huawei-xpon-global";
+
+  include "huawei-xpon-port";
+
+  include "huawei-gpon-gemport";
+
+  include "huawei-xpon-ont";
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide GPON management.";
+
+  revision 2024-04-24 {
+    description
+      "Add container ont-ip-packect-ttl-detect-result.";
+    reference
+      "";
+  }
+  revision 2021-09-30 {
+    description
+      "Add container ont-port-bundle.";
+    reference
+      "";
+  }
+  revision 2021-03-25 {
+    description
+      "Add container xpon-ont-port.";
+    reference
+      "";
+  }
+  revision 2019-11-01 {
+    description
+      "Support binding or unbinding an 802.1X profile to an ONT.";
+    reference
+      "";
+  }
+  revision 2019-05-17 {
+    description
+      "Support GEM Port Bundle function.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  container xpon {
+    description
+      "Data nodes for xpon data.";
+    container xpon-profile {
+      description
+        "Configure the data node of xpon profile.";
+      container ont-alm-policy-profile {
+        description
+          "Configure the data node of ONT alarm policy profile.";
+        uses ont-alm-policy-data;
+      }
+      container optic-alm-threshold-profile {
+        description
+          "Configure the data node of optical alarm threshold profile.";
+        uses optic-alm-threshold-prof-data;
+      }
+    }
+    container xpon-global-config {
+      description
+        "Configure the global data of xpon.";
+      uses xpon-global-config-data;
+    }
+    container gem-bundle-config {
+      description
+        "Configure the GEM port bundle data of xpon.";
+      uses ex-gem-bundle-config-data;
+    }
+  }
+
+  augment "/if:interfaces/if:interface" {
+    when "if:type = 'ianaift:gpon'";
+    description
+      "Data nodes for the configuration of gpon port.";
+    container xpon-port-configs {
+      description
+        "Configure the data node of gpon port.";
+      uses line-configs;
+    }
+  }
+  augment "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:gemports/bbf-xpongemtcont:gemport" {
+    description
+      "Huawei extend gemport config container.";
+    container xpon-gemport-configs {
+      description
+        "Configure huawei extend gemport container.";
+      uses ex-gem-config-data;
+    }
+  }
+  augment "/if:interfaces/if:interface/bbf-xponvani:v-ani" {
+    description
+      "Huawei extend ONT virtual ANI config data.";
+    uses ex-v-ontani-config-data;
+    leaf optic-alm-threshold-prof {
+      type string {
+        length "0..32";
+      }
+      description
+        "Assigns an optical alarm threshold profile to a ONT. If no profile is assigned,
+         the default optical alarm threshold profile will be assigned.";
+    }
+    leaf ont-alarm-policy-prof {
+      type string {
+        length "0..32";
+      }
+      description
+        "Assigns an ONT alarm policy profile to a ONT. If no profile is assigned,
+         the default alarm policy profile will be assigned.";
+    }
+    leaf ont-dot1x-prof {
+      type string {
+        length "0..32";
+      }
+      description
+        "Bind or unbind an 802.1X profile to an ONT. Empty string indicates unbind operation.";
+    }
+  }
+  augment "/if:interfaces/if:interface/bbf-xponani:ani" {
+    description
+      "Huawei extend ONT ANI config container.";
+    container xpon-ont-ani-configs {
+      description
+        "Configure huawei extend ONT ANI container.";
+      uses ex-ontani-config-data;
+    }
+  }
+  augment "/if:interfaces-state/if:interface" {
+    when "if:type = 'ianaift:gpon'";
+    description
+      "Data nodes for the operation of gpon port.";
+    container xpon-port-opers {
+      config false;
+      description
+        "Operational data of gpon port.";
+      uses port-oper-states;
+    }
+  }
+  augment "/if:interfaces-state/if:interface/bbf-xponani:ani" {
+    description
+      "Huawei extend ONT ANI oper container.";
+    container xpon-ont-ani-opers {
+      config false;
+      description
+        "Operational data of huawei extend ONT ANI container.";
+      uses ex-ontani-oper-data;
+    }
+    container ont-ip-packect-ttl-detect-result {
+      config false;
+      description
+        "Operational data of ONT ip-packet ttl detection.";
+      leaf portlist {
+        type binary {
+          length "0..641";
+        }
+        description
+          "The ont ports whose IP packets TTL values decrease.";
+      }
+    }
+  }
+  augment "/if:interfaces-state/if:interface" {
+    when "if:type = 'ianaift:ethernetCsmacd'";
+    description
+      "Huawei extend ONT port container.";
+    container xpon-ont-port {
+      description
+        "Operational data of huawei extend ONT port container.";
+      container ethernet {
+        config false;
+        description
+          "Operational data of ONT ethernet port.";
+        uses ont-ethernet-port-data;
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface/bbf-xponani:ani" {
+    description
+      "Huawei extend ONT ANI config container.";
+    container ont-port-bundle {
+      description
+        "Configure huawei extend ONT ANI container.";
+      uses ex-port-bundle;
+    }
+  }
+}

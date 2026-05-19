@@ -1,0 +1,76 @@
+module huawei-bb-tpid {
+  namespace "urn:huawei:yang:huawei-bb-tpid";
+  prefix huawei-bb-tpid;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for tag protocol identifier.";
+
+  revision 2022-09-05 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  typedef tpid-type {
+    type enumeration {
+      enum "dot1q" {
+        value 1;
+        description
+          "TPID (tag protocol ID) value in the VLAN field specified in the 802.1q protocol.";
+      }
+      enum "dot1ad" {
+        value 2;
+        description
+          "TPID value in the outer VLAN field specified in the 802.1ad protocol.";
+      }
+    }
+    description
+      "Indicates the type of the TPID (tag protocol ID).";
+  }
+
+  container bb-tpid {
+    description
+      "The tpid's configurations.";
+    leaf dot1ad-tpid {
+      type bbf-dot1qt:ether-type-hex;
+      default "0x88a8";
+      description
+        "Specifies the hexadecimal type of the 802.1ad Ethernet protocol in the system.";
+    }
+  }
+
+  augment "/if:interfaces/if:interface/huawei-vlan:vlan" {
+    description
+      "Describes the VLAN TPID configuration of the interface.";
+    container port-tpid {
+      description
+        "Configure the TPID information to the interface.";
+      leaf outer-vlan-tpid-type {
+        type tpid-type;
+        default "dot1q";
+        description
+          "The tag protocol ID of the outer VLAN.";
+      }
+    }
+  }
+}

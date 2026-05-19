@@ -24,7 +24,7 @@ export function withDataNodeSubstatements(
 ): Record<string, SubstatementHandler> {
   const out = withMetadataSubstatements(parsers, dispatch);
   out[kw.CONFIG] ??= (tokens, context) => {
-    parsers.parse_config_ignored(tokens, context);
+    parsers.parse_config(tokens, context);
   };
   return out;
 }

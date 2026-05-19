@@ -94,6 +94,9 @@ function applyRefinesFromUses(usesStmt: SerializedStatement, expanded: Serialize
     if (typeof rf.refined_mandatory === "boolean") {
       target.mandatory = rf.refined_mandatory;
     }
+    if (typeof rf.refined_config === "boolean") {
+      target.config = rf.refined_config;
+    }
     const refinedDefaults = rf.refined_defaults;
     if (Array.isArray(refinedDefaults) && refinedDefaults.length > 0) {
       if (target.keyword === YangTokenType.LEAF) {

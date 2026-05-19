@@ -1,0 +1,56 @@
+module bbf-app-flow-interface {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-app-flow-interface";
+  prefix bbf-app-flow-if;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-app-flow {
+    prefix bbf-app-flow;
+  }
+  import bbf-if-type {
+    prefix bbfift;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Lin Kangwen, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains the interface bound to application flow.";
+
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  augment "/if:interfaces/if:interface/bbf-app-flow:app-flow/bbf-app-flow:app-flow-interface" {
+    description
+      "Describes the interface of the application flow.";
+    leaf vlan-sub-interface {
+      type if:interface-ref;
+      must "derived-from-or-self(/if:interfaces/if:interface[if:name=current()]/if:type,'bbfift:vlan-sub-interface')" {
+        error-message
+          "Must reference a vlan-sub-interface.";
+      }
+      description
+        "References the vlan-sub-interface.The application flow
+         interface is applied to the vlan-sub-interface.";
+    }
+  }
+}

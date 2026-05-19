@@ -1,7 +1,8 @@
 import { YangModule, YangStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { expandUses } from "../transform/uses-expand";
-import { YANG_SCHEMA_KEYS } from "./schema-keys";
+import { jsonSchemaDefaultValue } from "./default-values";
+import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   JSON_SCHEMA_DRAFT_2020_12,
   JSON_TYPE_ARRAY,
@@ -79,11 +80,20 @@ function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
   return out;
 }
 
+function explicitConfig(stmt: YangStatement): boolean | undefined {
+  const cfg = stmt.data.config;
+  return typeof cfg === "boolean" ? cfg : undefined;
+}
+
 function withStatementMeta(
   stmt: YangStatement,
   meta: Record<string, unknown>
 ): Record<string, unknown> {
   const out = { ...meta };
+  const config = explicitConfig(stmt);
+  if (config !== undefined) {
+    out[XYANG_KEYS.config] = config;
+  }
   const ifFeatures = Array.isArray(stmt.data.if_features)
     ? stmt.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
     : [];
@@ -363,6 +373,10 @@ function statementToSchema(
       type: "choice",
       mandatory: stmt.data.mandatory === true
     };
+    const choiceConfig = explicitConfig(stmt);
+    if (choiceConfig !== undefined) {
+      xyChoice[XYANG_KEYS.config] = choiceConfig;
+    }
     const ifFeatures = Array.isArray(stmt.data.if_features)
       ? stmt.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
@@ -510,7 +524,11 @@ function statementToSchema(
       [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy }
     };
     if (stmt.data.default !== undefined) {
-      out.default = stmt.data.default;
+      const schemaType = typeof out.type === "string" ? out.type : null;
+      out.default = jsonSchemaDefaultValue(stmt.data.default, {
+        yangTypeName: typeName,
+        jsonSchemaType: schemaType
+      });
     }
     return out;
   }

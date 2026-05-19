@@ -1,0 +1,122 @@
+[
+  {
+    "peer": "10.190.64.79:10100",
+    "id": 1,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:ethernetCsmacd']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.190.64.79:10100",
+    "id": 2,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:gpon']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.80.48.42:10100",
+    "id": 1,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:ethernetCsmacd']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.80.48.42:10100",
+    "id": 2,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:gpon']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.190.64.79:10100",
+    "id": 100,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:ethernetCsmacd']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.190.64.79:10100",
+    "id": 100,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:gpon']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.190.64.78:10100",
+    "id": 1,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:ethernetCsmacd']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  },
+  {
+    "peer": "10.190.64.78:10100",
+    "id": 2,
+    "content_id": "22851",
+    "target": {
+      "ietf-yang-push:datastore": "ietf-datastores:operational",
+      "ietf-yang-push:datastore-xpath-filter": "/ietf-interfaces:interfaces/interface[type='iana-if-type:gpon']/statistics"
+    },
+    "models": [
+      "iana-if-type",
+      "huawei-interface-statistics-mgt",
+      "ietf-interfaces",
+      "ietf-subscribed-notifications"
+    ]
+  }
+]

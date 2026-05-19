@@ -1,0 +1,37 @@
+module huawei-bbf-qos-policer-envelope-profiles-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-policer-envelope-profiles-deviations-MA5800";
+  prefix bbf-qos-plc-ep-devs-MA5800;
+
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import bbf-qos-policer-envelope-profiles {
+    prefix bbf-qos-plc-ep;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-policer-envelope-profiles module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-plc-ep:envelope-profiles" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-plc-ep:envelope-policing" {
+    deviate not-supported;
+  }
+}

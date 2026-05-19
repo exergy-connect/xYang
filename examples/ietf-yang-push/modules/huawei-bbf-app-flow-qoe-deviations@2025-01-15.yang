@@ -1,0 +1,48 @@
+module huawei-bbf-app-flow-qoe-deviations {
+  namespace "urn:huawei:yang:huawei-bbf-app-flow-qoe-deviations";
+  prefix hw-bb-app-flow-qoe-devs;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-bb-qos {
+    prefix hw-bb-qos;
+  }
+  import bbf-app-flow {
+    prefix bbf-app-flow;
+  }
+  import bbf-app-flow-qoe {
+    prefix bbf-app-flow-qoe;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-app-flow-qoe
+     module.";
+
+  revision 2025-01-15 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-app-flow:app-flow/bbf-app-flow:qoe-profiles/bbf-app-flow-qoe:app-qoe-profiles/bbf-app-flow-qoe:ingress-qoe-profile" {
+    deviate replace {
+      type hw-bb-qos:traffic-table-profile-ref;
+    }
+  }
+  deviation "/if:interfaces/if:interface/bbf-app-flow:app-flow/bbf-app-flow:qoe-profiles/bbf-app-flow-qoe:app-qoe-profiles/bbf-app-flow-qoe:egress-qoe-profile" {
+    deviate replace {
+      type hw-bb-qos:traffic-table-profile-ref;
+    }
+  }
+}

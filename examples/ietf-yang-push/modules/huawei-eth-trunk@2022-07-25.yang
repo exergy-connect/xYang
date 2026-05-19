@@ -1,0 +1,403 @@
+module huawei-eth-trunk {
+  namespace "urn:huawei:params:xml:ns:yang:huawei-eth-trunk";
+  prefix hw-eth-trunk;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     managing eth-trunk interfaces.";
+
+  revision 2022-07-25 {
+    description
+      "Delete the eth-trunk-state mandatory constraint.";
+    reference
+      "";
+  }
+  revision 2021-08-04 {
+    description
+      "Delete preempt-mode, preempt-delay-time,
+       system-priority, system-id, least-active-num, max-active-num,
+       max-bandwidth-affected, oper-status, up-port-num, weight,
+       remote-sys-id, remote-sys-pri.";
+    reference
+      "";
+  }
+  revision 2021-02-05 {
+    description
+      "Add lacp-ports.";
+    reference
+      "";
+  }
+  revision 2020-02-15 {
+    description
+      "Add eth-trunk lacp attribute.";
+    reference
+      "";
+  }
+  revision 2018-12-15 {
+    description
+      "Add lacp-key and system-priority.";
+    reference
+      "";
+  }
+  revision 2018-10-23 {
+    description
+      "Add eth-trunk-name for fw compatibility.";
+    reference
+      "";
+  }
+  revision 2018-10-09 {
+    description
+      "Add config and state data of eth-trunk description
+       and config data of load-balance.";
+    reference
+      "";
+  }
+  revision 2018-02-07 {
+    description
+      "Add eth-trunk status.";
+    reference
+      "";
+  }
+  revision 2017-08-17 {
+    description
+      "Add eth-trunk working mode.";
+    reference
+      "";
+  }
+  revision 2015-04-09 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity eth-trunk {
+    base ianaift:iana-interface-type;
+    description
+      "Eth-trunk interface.";
+  }
+
+  container eth-trunk-state {
+    config false;
+    description
+      "Data nodes for the operational state of eth-trunk interfaces.";
+    list interface {
+      key "name";
+      description
+        "Operational data of list of eth-trunk on the device.";
+      leaf name {
+        type string {
+          length "1..63";
+        }
+        description
+          "The name of the interface.
+           A server implementation MAY map this leaf to the ifName
+           MIB object. Such an implementation needs to use some
+           mechanism to handle the differences in size and characters
+           allowed between this leaf and ifName. The definition of
+           such a mechanism is outside the scope of this document.";
+        reference
+          "RFC 2863: The Interfaces Group MIB - ifName";
+      }
+      leaf description {
+        type string {
+          length "0..40";
+        }
+        description
+          "Description of the trunk. Does not support the question mark character.
+           The first and last characters cannot be double quotes, and the
+           double quotes character cannot be followed by a space character.";
+      }
+      leaf lag-id {
+        type int32 {
+          range "0..1023";
+        }
+        description
+          "The lag id of the eth-trunk interface.";
+      }
+      leaf trunk-work-mode {
+        type enumeration {
+          enum "lacp" {
+            value 0;
+            description
+              "LACP mode.";
+          }
+          enum "manual" {
+            value 1;
+            description
+              "Manual load balancing mode.";
+          }
+        }
+        description
+          "Working mode of a link aggregation group.";
+      }
+      leaf load-balance {
+        type enumeration {
+          enum "dst-ip" {
+            value 0;
+            description
+              "According to destination IP hash arithmetic.";
+          }
+          enum "dst-mac" {
+            value 1;
+            description
+              "According to destination MAC hash arithmetic.";
+          }
+          enum "src-ip" {
+            value 2;
+            description
+              "According to source IP hash arithmetic.";
+          }
+          enum "src-mac" {
+            value 3;
+            description
+              "According to source MAC hash arithmetic.";
+          }
+          enum "src-dst-ip" {
+            value 4;
+            description
+              "According to source/destination IP hash arithmetic.";
+          }
+          enum "src-dst-mac" {
+            value 5;
+            description
+              "According to source/destination MAC hash arithmetic.";
+          }
+          enum "enhanced" {
+            value 6;
+            description
+              "Enhanced hash arithmetic.";
+          }
+          enum "diffluence" {
+            value 7;
+            description
+              "According to diffluence hash arithmetic.";
+          }
+          enum "mpls-label" {
+            value 8;
+            description
+              "According to MPLS label.";
+          }
+        }
+        description
+          "Hash algorithm used for load balancing among member interfaces of the Eth-Trunk.";
+      }
+      list eth-trunk-member {
+        key "name";
+        description
+          "Operational data of the list of interfaces on the trunk.";
+        leaf name {
+          type string {
+            length "1..63";
+          }
+          description
+            "The name of the interface.";
+          reference
+            "RFC 2863: The Interfaces Group MIB - ifName";
+        }
+        leaf index {
+          type int32 {
+            range "1..2147483647";
+          }
+          description
+            "The ifIndex value for the ifEntry represented by this interface.";
+          reference
+            "RFC 2863: The Interfaces Group MIB - ifIndex";
+        }
+        leaf oper-status {
+          type enumeration {
+            enum "up" {
+              value 1;
+              description
+                "Ready to pass packets.";
+            }
+            enum "down" {
+              value 2;
+              description
+                "The interface does not pass any packets.";
+            }
+          }
+          description
+            "Status of the local member interface.";
+        }
+      }
+    }
+  }
+  container eth-trunk-global-config {
+    description
+      "Global configuration for eth-trunk.";
+    leaf system-priority {
+      type int32 {
+        range "0..65535";
+      }
+      default "32768";
+      description
+        "System LACP priority.";
+    }
+  }
+  container lacp-ports {
+    description
+      "List of ports which work in LACP working mode.";
+    list lacp-port {
+      key "interface";
+      description
+        "Configure port LACP parameter.";
+      leaf interface {
+        type leafref {
+          path "/if:interfaces/if:interface/if:name";
+        }
+        description
+          "Indicates the interface of LACP port.";
+      }
+      leaf port-priority {
+        type int32 {
+          range "0..32767";
+        }
+        default "16384";
+        description
+          "Port LACP priority.";
+      }
+    }
+  }
+
+  augment "/if:interfaces-state/if:interface" {
+    description
+      "Data nodes for the operational state of the interface.";
+    container eth-trunk {
+      config false;
+      description
+        "Operational data of eth-trunk attributes of the interface.";
+      leaf trunk-name {
+        type string {
+          length "1..63";
+        }
+        description
+          "The name of an Eth-trunk interface.";
+        reference
+          "RFC 2863: The Interfaces Group MIB - ifName";
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface" {
+    description
+      "The vendor's properties of interface.";
+    container eth-trunk {
+      presence "when if:type = iana:eth-trunk";
+      description
+        "Configure of Eth-trunk interface.";
+      leaf description {
+        type string {
+          length "0..40";
+        }
+        description
+          "Description of the trunk. Does not support the question mark character.
+           The first and last characters cannot be double quotes, and the
+           double quotes character cannot be followed by a space character.";
+      }
+      leaf trunk-work-mode {
+        type enumeration {
+          enum "lacp" {
+            value 0;
+            description
+              "LACP working mode.";
+          }
+          enum "manual" {
+            value 1;
+            description
+              "Manual working mode.";
+          }
+        }
+        default "manual";
+        description
+          " Current working mode of trunk.";
+      }
+      leaf lacp-key {
+        type uint32 {
+          range "1..65535";
+        }
+        must "count(/if:interfaces/if:interface/hw-eth-trunk:eth-trunk[hw-eth-trunk:lacp-key=current()]) = 1";
+        description
+          "This node indicates the management key of the LACP static aggregation group.
+           Each aggregation group contains an unique management key for managing the
+           aggregation group. When creating LACP static aggregation group, the system
+           automatically allocates an idle management key.";
+      }
+      leaf-list assign-interface {
+        type leafref {
+          path "/if:interfaces/if:interface/if:name";
+        }
+        min-elements 1;
+        description
+          "Configure of add port to trunk.";
+      }
+      leaf load-balance {
+        type enumeration {
+          enum "dst-ip" {
+            value 0;
+            description
+              "According to destination IP hash arithmetic.";
+          }
+          enum "dst-mac" {
+            value 1;
+            description
+              "According to destination MAC hash arithmetic.";
+          }
+          enum "src-ip" {
+            value 2;
+            description
+              " According to source IP hash arithmetic.";
+          }
+          enum "src-mac" {
+            value 3;
+            description
+              "According to source MAC hash arithmetic.";
+          }
+          enum "src-dst-ip" {
+            value 4;
+            description
+              "According to source/destination IP hash arithmetic.";
+          }
+          enum "src-dst-mac" {
+            value 5;
+            description
+              "According to source/destination MAC hash arithmetic.";
+          }
+          enum "enhanced" {
+            value 6;
+            description
+              "Enhanced hash arithmetic.";
+          }
+          enum "diffluence" {
+            value 7;
+            description
+              "According to diffluence hash arithmetic.";
+          }
+          enum "mpls-label" {
+            value 8;
+            description
+              "According to MPLS label.";
+          }
+        }
+        mandatory true;
+        description
+          "Distribute mode for load balancing among member interfaces of the trunk.";
+      }
+    }
+  }
+}

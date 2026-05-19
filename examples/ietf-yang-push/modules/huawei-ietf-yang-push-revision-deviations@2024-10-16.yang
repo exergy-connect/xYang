@@ -1,0 +1,39 @@
+module huawei-ietf-yang-push-revision-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-yang-push-revision-deviations";
+  prefix ypr-devs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-yang-push-revision {
+    prefix ypr;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-yang-push-revision data
+     model set for Huawei devices.";
+
+  revision 2024-10-16 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sn:subscriptions/sn:subscription/ypr:module-version-config/ypr:module-name" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+}

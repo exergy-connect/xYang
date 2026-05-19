@@ -1,0 +1,86 @@
+module huawei-ietf-interfaces-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-ietf-interfaces-deviations-MA5800";
+  prefix if-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import bbf-xpon-onu-state {
+    prefix bbf-xpon-onu-s;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for ietf-interfaces module.";
+
+  revision 2025-10-09 {
+    description
+      "Cancel deviation of nodes as below:
+       /if:interfaces/if:interface/if:link-up-down-trap-enable
+       /if:interfaces/if:interface/if:admin-status
+       /if:interfaces/if:interface/if:last-change
+       /if:interfaces/if:interface/if:if-index
+       /if:interfaces/if:interface/if:higher-layer-if
+       /if:interfaces/if:interface/if:lower-layer-if
+       /if:interfaces/if:interface/if:speed";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-02-12 {
+    description
+      "Deviate fiftyg-admin-label leaf.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces-state/if:interface/if:admin-status" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:last-change" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:if-index" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:phys-address" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:higher-layer-if" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:lower-layer-if" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/if:speed" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/if:phys-address" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:location" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces/if:interface/bbf-xpon:channel-termination/bbf-xpon:fiftyg-admin-label" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onus-present-on-local-channel-termination" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,252 @@
+module bbf-xpon-onu-power-management {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-xpon-onu-power-management";
+  prefix bbf-xpon-onu-pwr;
+
+  import bbf-xponani-power-management {
+    prefix bbf-xponani-pwr;
+  }
+  import bbf-xpon-power-management {
+    prefix bbf-xpon-pwr;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area.";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:info@broadband-forum.org>.
+
+     Editor: XinWen Yao, Huawei";
+  description
+    "ONU power reduction profile";
+
+  revision 2024-03-11 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989,SFF 8472,SFF 8077";
+  }
+
+  identity power-mode-disabled {
+    base bbf-xpon-pwr:power-mode-base;
+    description
+      "The dynamic power reduction of an ONU is disabled.
+       If this option is used, the ONU bound to the power
+       reduction profile does not support power reduction.";
+  }
+
+  identity power-mode-auto {
+    base bbf-xpon-pwr:power-mode-base;
+    description
+      "Automatic power saving mode.";
+  }
+
+  typedef reduction-period-day-type {
+    type string {
+      pattern "((mon(,tues)?(,wed)?(,thu)?(,fri)?(,sat)?(,sun)?)|(tues(,wed)?(,thu)?(,fri)?(,sat)?(,sun)?)|(wed(,thu)?(,fri)?(,sat)?(,sun)?)|(thu(,fri)?(,sat)?(,sun)?)|(fri(,sat)?(,sun)?)|(sat(,sun))|(sun))";
+    }
+    description
+      "Indicates an ONU power reduction period takes effect days.";
+  }
+
+  typedef reduction-period-time-type {
+    type string {
+      pattern "([01]?[0-9]|2[0-3]):[0-5][0-9]-([01]?[0-9]|2[0-3]):[0-5][0-9]";
+    }
+    description
+      "Indicates power reduction time range, Format: hh:mm-hh:mm,
+       power reduction period cannot be shorter than 1 hour.";
+  }
+
+  grouping onu-power-reduction-profile-data {
+    description
+      "All config data for ONU power reduction profile.";
+    leaf isleep {
+      type uint16 {
+        range "1..500";
+      }
+      units "millisecond";
+      default "200";
+      description
+        "Indicates a detection period before an ONU enters power reduction mode.";
+    }
+    leaf ienter {
+      type uint32 {
+        range "1..900";
+      }
+      units "second";
+      default "300";
+      description
+        "Indicates a detection period before an ONU enters power reduction mode.";
+    }
+    leaf iexit {
+      type uint32 {
+        range "1..60";
+      }
+      units "second";
+      default "3";
+      description
+        "Indicates a detection period before an ONU exits power reduction mode.
+         If the upstream or downstream rate is higher than this threshold in the
+         entire detection period, the ONU exits power reduction mode.";
+    }
+    container rate-threshold {
+      description
+        "Indicates the rate threshold that ONU needs to change power reduction state.";
+      leaf upstream-enter-rate {
+        type uint32 {
+          range "1..100";
+        }
+        units "pps";
+        default "3";
+        description
+          "Indicates the upstream rate threshold that ONU needs to enter power reduction state,
+           during enter-interval(ienter) time,if its upstream rate is continuously lower than this
+           threshold, then the ONU will enter power reduction state if it is bound to
+           power reduction profile and meets other conditions.";
+      }
+      leaf downstream-enter-rate {
+        type uint32 {
+          range "1..100";
+        }
+        units "pps";
+        default "3";
+        description
+          "Indicates the downstream rate threshold that ONU needs to enter power reduction state,
+           during enter-interval(ienter) time,if its downstream rate is continuously lower than this
+           threshold, then the ONU will enter power reduction state if it is bound to power
+           reduction profile and meets other conditions";
+      }
+      leaf upstream-exit-rate {
+        type uint32 {
+          range "1..100";
+        }
+        units "pps";
+        must ". >= ../upstream-enter-rate" {
+          error-message
+            "The exit upstream rate threshold must be greater than or equal to
+             the enter upstream rate threshold.";
+          description
+            "The exit upstream rate threshold must be greater than or equal to
+             the enter upstream rate threshold.";
+        }
+        default "3";
+        description
+          "Indicates the upstream rate threshold that ONU needs to exit power reduction state,
+           during exit-interval(iexit) time,if its upstream rate is continuously higher than this
+           threshold, then the ONU will exit power reduction state if it is bound to power
+           reduction profile and meets other conditions.";
+      }
+      leaf downstream-exit-rate {
+        type uint32 {
+          range "1..100";
+        }
+        units "pps";
+        must ". >= ../downstream-enter-rate" {
+          error-message
+            "The exit downstream rate threshold must be greater than or equal to
+             the enter downstream rate threshold.";
+          description
+            "The exit downstream rate threshold must be greater than or equal to
+             the enter downstream rate threshold.";
+        }
+        default "3";
+        description
+          "Indicates the downstream rate threshold that ONU needs to exit power reduction state,
+           during exit-interval(iexit) time,if its downstream rate is continuously higher than this
+           threshold, then the ONU will exit power reduction state if it is bound to power reduction
+           profile and meets other conditions.";
+      }
+      leaf upstream-exit-burst-rate {
+        type uint32 {
+          range "2..100";
+        }
+        units "pps";
+        must ". >= ../upstream-exit-rate" {
+          error-message
+            "The exit upstream burst rate threshold must be greater than or equal to
+             the exit upstream rate threshold.";
+          description
+            "The exit upstream burst rate threshold must be greater than or equal to
+             the exit upstream rate threshold.";
+        }
+        default "10";
+        description
+          "Indicates the upstream burst rate threshold that ONU needs to exit power reduction state,
+           during exit-interval(iexit) time,if its upstream burst rate is  higher than this
+           threshold, then the ONU will exit power reduction state if it is bound to power reduction
+           profile and meets other conditions.";
+      }
+      leaf downstream-exit-burst-rate {
+        type uint32 {
+          range "2..100";
+        }
+        units "pps";
+        must ". >= ../downstream-exit-rate" {
+          error-message
+            "The exit downstream burst rate threshold must be greater than or equal to
+             the exit downstream rate threshold.";
+          description
+            "The exit downstream burst rate threshold must be greater than or equal to
+             the exit downstream rate threshold.";
+        }
+        default "10";
+        description
+          "Indicates the downstream burst rate threshold that ONU needs to exit power reduction state,
+           during exit-interval(iexit) time,if its downstream burst rate is higher than this
+           threshold, then the ONU will exit power reduction state if it is bound to power reduction
+           profile and meets other conditions.";
+      }
+    }
+    leaf time-range {
+      type union {
+        type reduction-period-time-type;
+        type enumeration {
+          enum "all" {
+            value 1;
+            description
+              "Indicates that an ONU power reduction period
+               takes effect daily based on the days specified by the effective-period node data";
+          }
+        }
+      }
+      default "all";
+      description
+        "Indicates the allowed power reduction period for an ONU.";
+    }
+    leaf effective-period {
+      type union {
+        type reduction-period-day-type;
+        type enumeration {
+          enum "daily" {
+            value 0;
+            description
+              "Indicates that an ONU power reduction period takes effect daily.";
+          }
+          enum "working-day" {
+            value 1;
+            description
+              "Indicates that an ONU power reduction period takes effect
+               on working days (namely, from Monday to Friday).";
+          }
+          enum "off-day" {
+            value 2;
+            description
+              "Indicates that an ONU power reduction period takes effect
+               on weekends (namely, Saturday and Sunday).";
+          }
+        }
+      }
+      default "daily";
+      description
+        "Indicates power reduction period days.";
+    }
+  }
+
+  augment "/bbf-xponani-pwr:xponani-power-management-profiles/bbf-xponani-pwr:power-management-profile" {
+    description
+      "Augment xPON ONU power management profile configuration.";
+    uses onu-power-reduction-profile-data;
+  }
+}

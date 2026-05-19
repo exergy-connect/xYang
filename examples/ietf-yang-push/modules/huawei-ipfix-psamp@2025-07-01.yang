@@ -1,0 +1,200 @@
+module huawei-ipfix-psamp {
+  namespace "urn:huawei:yang:huawei-ipfix-psamp";
+  prefix hw-ipfix-psamp;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import bbf-yang-types {
+    prefix bbf-yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for the
+     management Packet Sampling (PSAMP) over IPFIX.";
+
+  revision 2025-07-01 {
+    description
+      "Add ipfix-psamp container";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-03-01 {
+    description
+      "Initial revision.";
+    reference
+      "RFC 5475, Section 5.1; RFC 5476, Section 6.5.2.1;
+       RFC 5477, Section 8.2.2; RFC 6727, Section 6;";
+  }
+
+  typedef direction {
+    type enumeration {
+      enum "ingress" {
+        value 0;
+        description
+          "This value is used for monitoring incoming packets.";
+      }
+      enum "egress" {
+        value 1;
+        description
+          "This value is used for monitoring outgoing packets.";
+      }
+      enum "both" {
+        value 2;
+        description
+          "This value is used for monitoring incoming and outgoing
+           packets.";
+      }
+    }
+    description
+      "Direction of packets going through an interface.";
+  }
+
+  grouping samp-count-based-parameters {
+    description
+      "Configuration parameters of a Selector applying systematic
+       count-based packet Sampling to the packet stream.";
+    reference
+      "RFC 5475, Section 5.1; RFC 5476, Section 6.5.2.1.";
+    leaf packet-interval {
+      type uint16 {
+        range "1..65535";
+      }
+      units "packet";
+      description
+        "The number of packets that are consecutively sampled between
+         gaps of length packetSpace.
+
+         This parameter corresponds to the Information Element
+         samplingPacketInterval and to psampSampCountBasedInterval
+         in the PSAMP MIB module.";
+      reference
+        "RFC 5477, Section 8.2.2; RFC 6727, Section 6
+         (psampSampCountBasedInterval)";
+    }
+  }
+
+  grouping selector-parameters {
+    description
+      "Configuration and state parameters of a Selector.";
+    choice method {
+      description
+        "Packet selection method applied by the Selector.";
+      case samp-count-based {
+        description
+          "Case of IPFIX Packet Sample Count Based.";
+        container samp-count-based {
+          description
+            "Configure the parameters for count-based packet sampling";
+          uses samp-count-based-parameters;
+        }
+      }
+    }
+  }
+
+  grouping observation-point-parameters {
+    description
+      "Interface as input to Observation Point.";
+    leaf observation-domain-id {
+      type uint32;
+      description
+        "The Observation Domain ID associates the Observation Point
+         to an Observation Domain. Observation Points with identical
+         Observation Domain IDs belong to the same Observation
+         Domain.";
+      reference
+        "RFC 7011; RFC 6615, Section 8
+         (ipfixObservationPointObservationDomainId)";
+    }
+    leaf-list if-name {
+      type leafref {
+        path "/if:interfaces/if:interface/if:name";
+      }
+      must
+        "/if:interfaces/if:interface[if:name = current()]
+         /if:type = 'ianaift:ethernetCsmacd' or /if:interfaces/if:interface[if:name = current()]
+         /if:type = 'ianaift:gpon' or /if:interfaces/if:interface[if:name = current()]
+         /if:type = 'ianaift:aluEpon'";
+      description
+        "List of names identifying interfaces of the Monitoring
+         Device.  The Observation Point observes packets at the
+         specified interfaces.";
+    }
+    leaf direction {
+      type direction;
+      description
+        "Direction of packets. If not applicable (e.g., in the case
+         of a sniffing interface in promiscuous mode), this
+         parameter is ignored.";
+    }
+  }
+
+  container ipfix-psamp {
+    description
+      "Container for PSAMP nodes.";
+    list observation-point {
+      key "name";
+      description
+        "Observation Point of the Monitoring Device.";
+      leaf name {
+        type bbf-yang:string-ascii64;
+        description
+          "An arbitrary string which uniquely identifies the
+           Observation Point.";
+      }
+      uses observation-point-parameters;
+      container selection-process {
+        description
+          "Configure the sampling packet interval in which IPFIX packets are selected.";
+        uses selector-parameters;
+      }
+      leaf observation-point-id {
+        type uint32;
+        config false;
+        description
+          "Observation Point ID (i.e., the value of the Information
+           Element observationPointId) assigned by the Monitoring
+           Device.";
+        reference
+          "IANA registry for IPFIX Entities,
+           http://www.iana.org/assignments/ipfix";
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface" {
+    when "if:type = 'ianaift:ethernetCsmacd' or
+     if:type = 'ianaift:gpon' or
+     if:type='ianaift:aluEpon'" {
+      description
+        "Applies to Ethernet interface, epon interface or gpon interface.";
+    }
+    description
+      "IPFIX Packet Sample based on interface.";
+    container selection-process {
+      presence "Indicates the sampling parameters.";
+      description
+        "Configure the direction in which IPFIX packets are selected.";
+      leaf direction {
+        type direction;
+        description
+          "Direction of packets. If not applicable (e.g., in the case
+           of a sniffing interface in promiscuous mode), this
+           parameter is ignored.";
+      }
+      uses selector-parameters;
+    }
+  }
+}

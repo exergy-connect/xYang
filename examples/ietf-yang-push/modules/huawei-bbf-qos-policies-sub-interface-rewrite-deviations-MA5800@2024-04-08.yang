@@ -1,0 +1,37 @@
+module huawei-bbf-qos-policies-sub-interface-rewrite-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-policies-sub-interface-rewrite-deviations-MA5800";
+  prefix bbf-qos-pol-subif-rw-devs-MA5800;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-sub-interfaces {
+    prefix bbf-subif;
+  }
+  import bbf-qos-policies-sub-interface-rewrite {
+    prefix bbf-qos-pol-subif-rw;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-policies-sub-interface-rewrite module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/bbf-subif:frame-processing/bbf-subif:inline-frame-processing/bbf-subif:inline-frame-processing/bbf-subif:ingress-rule/bbf-subif:rule/bbf-subif:ingress-rewrite/bbf-qos-pol-subif-rw:copy-from-tags-to-marking-list" {
+    deviate not-supported;
+  }
+}

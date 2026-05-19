@@ -1,0 +1,1346 @@
+module huawei-otn-access {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-otn-access";
+  prefix hw-otn-access;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import huawei-tc-an {
+    prefix tc-an;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of definitions for configuring the information of OTN and Liquid OTN.";
+
+  revision 2024-04-18 {
+    description
+      "Change the prefix of the vport configuration node from ianaift to tc-an.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-12-23 {
+    description
+      "Rectified the error in the description of alarm characters.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-10-30 {
+    description
+      "Add vport type, fix problem.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-08-17 {
+    description
+      "Add OTN overhead.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-01-25 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  container otn-access {
+    description
+      "FTTx NEs support OTN uplink boards, This document describes how to configure and query OTN and Liquid OTN informations.";
+    grouping bod-bandwidth-group {
+      description
+        "Common configuration of Liquid OTN bandwidth adjust.";
+      leaf osuflex-tsnum {
+        type leafref {
+          path "/hw-otn-access:otn-access/hw-otn-access:otn-paths/hw-otn-access:otn-path/hw-otn-access:osuflex-tsnum";
+        }
+        description
+          "The bandwidth of 1 tsumnum is 2.4 Mbit/s or 2.6 Mbit/s.";
+      }
+      leaf bod-type {
+        type enumeration {
+          enum "original" {
+            value 0;
+            description
+              "Original path adjust the bandwidth.";
+          }
+          enum "changed" {
+            value 1;
+            description
+              "Change the path and adjust the bandwidth.";
+          }
+        }
+        description
+          "Liquid OTN bandwidth adjust type.";
+      }
+      leaf step {
+        type uint16 {
+          range "1..65535";
+        }
+        description
+          "Indicates bandwidth number, one step is 2.4Mbit/s or 2.6Mbit/s.";
+      }
+    }
+    container global {
+      description
+        "Configure global OTN data.";
+      leaf ts-mode {
+        type enumeration {
+          enum "2.4M" {
+            value 0;
+            description
+              "Liquid OTN ts-mode is 2.4Mbit/s.";
+          }
+          enum "2.6M" {
+            value 1;
+            description
+              "Liquid OTN ts-mode is 2.6Mbit/s.";
+          }
+        }
+        description
+          "Indicates the result of liquid OTN ts-mode.";
+      }
+    }
+    container otn-paths {
+      description
+        "List of OTN and Liquid OTN configuration parameters.";
+      list otn-path {
+        key "name";
+        description
+          "Configure the OTN ODUk and Liquid OTN osuflex path.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "The name of otn port, the format is otn.f.s.p.odupath or
+             otn.f.s.p.odupath.osuflexpath.
+             Odupath information of ODUk, indicates ODUk path, for example:
+             ODU0 path range is 0x1C01 -- 0x1C08.
+             ODU1 path range is 0x2201 -- 0x2204.
+             ODUFLEX path range is 0x2001 -- 0x2008.
+             ODU2 path range is 1;
+             In OTU1 Port Mode:
+             ODU0 path range is 0x1101 -- 0x1102.
+             ODU1 path range is 1.
+             osuflexpath path information of Liquid OTN, indicates Liquid OTN
+             path, Liquid OTN path must be attached to the ODUk.
+             osuflexpath path range is 1 -- 500 for ODU0, ODUFlex.
+             osuflexpath path range is 1 -- 1000 for other ODUk.
+             for example otn.0.15.1.0x1C01 or otn.0.15.1.0x1C01.2.";
+        }
+        leaf type {
+          type enumeration {
+            enum "oduk" {
+              value 0;
+              description
+                "Indicates the configurations of oduk service.";
+            }
+            enum "osuflex" {
+              value 1;
+              description
+                "Indicates the configurations of osuflex service.";
+            }
+          }
+          mandatory true;
+          description
+            "Indicates the configurations of service type.";
+        }
+        leaf oduflex-tsnum {
+          type uint16 {
+            range "1..8";
+          }
+          description
+            "If the ODUflex type is used, the tsnum range must be specified. The bandwidth of 1 tsumnum is 1.25 Gbit/s.
+             If the bandwidth is 10 Gbit/s, tsnum is 8.";
+        }
+        leaf osuflex-tsnum {
+          when "../type='osuflex'";
+          type uint16;
+          default "0";
+          description
+            "If the oduflex type is used, the tsnum range must be specified. The bandwidth of 1 tsumnum is 2.4 Mbit/s or 2.6 Mbit/s.";
+        }
+        leaf vport-index {
+          type uint16;
+          description
+            "Vport index information of board, the vport-index attached to the services, the range now is 0--119,when the vport-index is 0xffff, the vport-index is auto-assigned.";
+        }
+        leaf lport-index {
+          when "../type='osuflex'";
+          type uint16 {
+            range "10001..10120|65535";
+          }
+          description
+            "Lport index information of board, the lport-index attached to the vport-index, the range now is 10001--10200,when the lport-index is 0xffff, the lport-index is auto-assigned.";
+        }
+        leaf priority {
+          when "../type='osuflex'";
+          type uint16 {
+            range "1..3";
+          }
+          default "3";
+          description
+            "Liquid OTN service priority, highlevel priority(1) or midlevel priority(2) or lowlevel priority(3), the default is 3.";
+        }
+      }
+    }
+    container otn-configs {
+      description
+        "List of Configuration of OTN/LIquid OTN overheads, delay measurement, and loopback etc.";
+      list otn-config {
+        key "name";
+        description
+          "Configure overheads, delay measurement, and loopback list.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "The name of otn port, the format is otn.f.s.p.odupath or
+              otn.f.s.p.odupath.osuflexpath.
+                 \t notes: OTN oduk path data is available,
+                 \t liquid OTN data Depending on service mapping creation.
+              Odupath information of ODUk, indicates ODUk path, for example:
+              ODU0 path range is 0x1C01 -- 0x1C08.
+              ODU1 path range is 0x2201 -- 0x2204.
+              ODUFLEX path range is 0x2001 -- 0x2008.
+              ODU2 path range is 1;
+              In OTU1 Port Mode:
+              ODU0 path range is 0x1101 -- 0x1102.
+              ODU1 path range is 1.
+              osuflexpath path information of Liquid OTN, indicates Liquid OTN
+              path, Liquid OTN path must be attached to the ODUk.
+              osuflexpath path range is 1 -- 500 for ODU0, ODUFlex.
+              osuflexpath path range is 1 -- 1000 for other ODUk.
+              for example otn.0.15.1.0x1C01 or otn.0.15.1.0x1C01.2.";
+        }
+        leaf loopback-mode {
+          type enumeration {
+            enum "no-loopback" {
+              value 0;
+              description
+                "No loopback.";
+            }
+            enum "inner-loopback" {
+              value 1;
+              description
+                "Inner loopback.";
+            }
+            enum "outer-loopback" {
+              value 2;
+              description
+                "Outer loopback.";
+            }
+          }
+          description
+            "The OTN/Liquid OTN path lookback mode.";
+        }
+        container overheads {
+          description
+            "List of OTN and liquid OTN overhead configuration.";
+          list overhead {
+            key "level";
+            description
+              "Configure the OTN and Liquid OTN Overhead.";
+            leaf level {
+              type enumeration {
+                enum "pm" {
+                  value 1;
+                  description
+                    "PM overhead.";
+                }
+                enum "tcm1" {
+                  value 2;
+                  description
+                    "OTN TCM1 or liquid OTN TCM overhead. This parameter is multiplexed by tcm and tcm1.";
+                }
+                enum "tcm2" {
+                  value 3;
+                  description
+                    "TCM2 overhead.";
+                }
+                enum "tcm3" {
+                  value 4;
+                  description
+                    "TCM3 overhead.";
+                }
+                enum "tcm4" {
+                  value 5;
+                  description
+                    "TCM4 overhead.";
+                }
+                enum "tcm5" {
+                  value 6;
+                  description
+                    "TCM5 overhead.";
+                }
+                enum "tcm6" {
+                  value 7;
+                  description
+                    "TCM6 overhead.";
+                }
+                enum "sm" {
+                  value 8;
+                  description
+                    "SM overhead.";
+                }
+              }
+              description
+                "Setting the OTN/Liquid OTN Section level of Overhead. Only pm and tcm1 can be input when liquid OTN is used.";
+            }
+            leaf tti-mode {
+              when "../level='sm'";
+              type enumeration {
+                enum "auto" {
+                  value 1;
+                  description
+                    "In auto mode, the SAPI, DAPI can be configured.";
+                }
+                enum "manual" {
+                  value 2;
+                  description
+                    "In manual mode, the SAPI, DAPI, and operator identifier can be configured.";
+                }
+              }
+              default "auto";
+              description
+                "Indicates the mode of Trail Trace Identifier config, SM overhead support.";
+            }
+            leaf tti-tx {
+              type string {
+                length "0..64";
+                pattern ".{0,15}/.{0,15}/.{0,32}";
+              }
+              description
+                "Transmit trail trace identifier of OTN/Liquid OTN Section level of Overhead. The character string must contain two reverse slashes (/).
+                   \t The length before the two reverse slashes cannot exceed 15 characters, and the length after the second reverse slash can
+                   \t contain a maximum of 32 characters.
+                   \t This field is identified as SAPI:Source Access Point Identifier, DAPI:Destination Access Point Identifier and operator identifier.";
+            }
+            leaf tti-rx-expt {
+              type string {
+                length "0..64";
+                pattern ".{0,15}/.{0,15}/.{0,32}";
+              }
+              description
+                "Expected trail trace identifier of OTN/Liquid OTN Section level path monitoring. The character string must contain two reverse slashes (/).
+                     The length before the two reverse slashes cannot exceed 15 characters, and the length after the second reverse slash can
+                         contain a maximum of 32 characters.
+                         This field is identified as SAPI:Source Access Point Identifier, DAPI:Destination Access Point Identifier and operator identifier.";
+            }
+            leaf tti-rx {
+              type string {
+                length "0..64";
+              }
+              config false;
+              description
+                "Receive trail trace identifier of OTN/Liquid OTN Section level path monitoring.";
+            }
+            leaf tim-detectmode {
+              type enumeration {
+                enum "sapi" {
+                  value 1;
+                  description
+                    "Source Access Point Identifier.";
+                }
+                enum "dapi" {
+                  value 2;
+                  description
+                    "Destination Access Point Identifier.";
+                }
+                enum "sapidapi" {
+                  value 3;
+                  description
+                    "Destination Access Point Identifier and Destination Access Point Identifier.";
+                }
+                enum "none" {
+                  value 4;
+                  description
+                    "None.";
+                }
+              }
+              description
+                "Sets the detection mode for trail trace identifier mismatch. The SM, PM, and TCM support the following modes: SAPI Only, DAPI Only, SAPI&DAPI, and No Detection. Default value: none.";
+            }
+            leaf tim-consequent-active {
+              type boolean;
+              default "false";
+              description
+                "Enable/disable TIM consequent active, which affects the insertion of TSF and AIS signals.";
+            }
+            leaf ltc-consequent-active {
+              type boolean;
+              default "false";
+              description
+                "Enable/disable loss Of Tandem Connection consequent active, which affects the insertion of AIS signals.";
+            }
+            leaf nomodeen {
+              type boolean;
+              default "false";
+              description
+                "Enable/disable the switch of the monitoring overhead.";
+            }
+            leaf tcm-source-enabled {
+              type boolean;
+              description
+                "Enable/disable tcm source switch.";
+            }
+            leaf tcm-sink-enabled {
+              type boolean;
+              description
+                "Enable/disable tcm sink switch.";
+            }
+            leaf tcm-source-mode {
+              type enumeration {
+                enum "operational" {
+                  value 1;
+                  description
+                    "Operational mode.";
+                }
+                enum "transparent" {
+                  value 2;
+                  description
+                    "Transparent mode.";
+                }
+                enum "monitor" {
+                  value 3;
+                  description
+                    "Monitor mode.";
+                }
+              }
+              description
+                "Tcm source level mode.";
+            }
+            leaf tcm-sink-mode {
+              type enumeration {
+                enum "operational" {
+                  value 1;
+                  description
+                    "Operational mode.";
+                }
+                enum "transparent" {
+                  value 2;
+                  description
+                    "Transparent mode.";
+                }
+                enum "monitor" {
+                  value 3;
+                  description
+                    "Monitor mode.";
+                }
+              }
+              description
+                "Tcm sink level mode.";
+            }
+            leaf deg-threshold {
+              type uint32 {
+                range "0..82025";
+              }
+              description
+                "The degrade performance threshold, Indicates the number of errored blocks. The unit is 10^3 of the actual errored blocks, The default value is 30% code blocks, 0 means not detected or invaild.";
+            }
+            leaf deg-interval {
+              type uint32 {
+                range "1..10";
+              }
+              units "s";
+              description
+                "The degrade performance detect interval.";
+            }
+            leaf deg-window {
+              type uint32 {
+                range "10|100|1000";
+              }
+              units "ms";
+              description
+                "The degrade performance detect window.";
+            }
+            leaf deg-sq-threshold {
+              type uint32 {
+                range "0..100";
+              }
+              description
+                "The degrade performance threshold, Indicates the number of errored blocks. The unit is 10^3 of the actual errored blocks, Detection of LSQ and TSQ Sequence Number Errors for liquid OTN, 0 means not detected or invaild.";
+            }
+            leaf deg-sq-interval {
+              type uint32 {
+                range "1..10";
+              }
+              units "s";
+              description
+                "The degrade performance detect interval, Detection of LSQ and TSQ Sequence Number Errors for liquid OTN.";
+            }
+            leaf deg-sq-window {
+              type uint32 {
+                range "10|100|1000";
+              }
+              units "ms";
+              description
+                "The degrade performance detect window, Detection of LSQ and TSQ Sequence Number Errors for liquid OTN.";
+            }
+            container alarm-inserts {
+              description
+                "List of OTN and Liquid OTN path Maintenance alarm signal insertion.";
+              list alarm-insert {
+                key "alarm-type";
+                description
+                  "Configure the maintenance alarm signal insertion switch.";
+                leaf alarm-type {
+                  type enumeration {
+                    enum "lof" {
+                      value 1;
+                      description
+                        "Lof alarm.";
+                    }
+                    enum "ais" {
+                      value 2;
+                      description
+                        "Ais alarm.";
+                    }
+                    enum "lck" {
+                      value 3;
+                      description
+                        "Lck alarm.";
+                    }
+                    enum "oci" {
+                      value 4;
+                      description
+                        "Oci alarm.";
+                    }
+                    enum "bdeg" {
+                      value 6;
+                      description
+                        "Bdeg alarm.";
+                    }
+                    enum "lom" {
+                      value 7;
+                      description
+                        "Lom alarm.";
+                    }
+                  }
+                  description
+                    "Configure the alarm type.";
+                }
+                leaf insert-enabled {
+                  type boolean;
+                  description
+                    "Enable/disable the maintenance alarm signal insertion switch.";
+                }
+              }
+            }
+          }
+        }
+        container prbs-test {
+          description
+            "Configure the OTN/Liquid OTN path prbs test.";
+          leaf panel-state {
+            type enumeration {
+              enum "stop" {
+                value 0;
+                description
+                  "Stop prbs panel test.";
+              }
+              enum "start" {
+                value 1;
+                description
+                  "Start prbs panel test.";
+              }
+            }
+            description
+              "Prbs panel test state.";
+          }
+          leaf panel-interval {
+            type uint32 {
+              range "1|600|3600";
+            }
+            units "s";
+            description
+              "Prbs panel test interval.";
+          }
+          leaf panel-period {
+            type uint32 {
+              range "0..255";
+            }
+            description
+              "Prbs panel test cycles.";
+          }
+          leaf start-time {
+            type yang:date-and-time;
+            config false;
+            description
+              "Prbs test start time.";
+          }
+          leaf passed-period {
+            type uint32 {
+              range "1..255";
+            }
+            config false;
+            description
+              "Prbs panel test Number of cycles completed.";
+          }
+          leaf los-seconds {
+            type uint32;
+            units "s";
+            default "0";
+            config false;
+            description
+              "Count of PrbsLos seconds from the start of the test to the current time.";
+          }
+          leaf biterror-cnt {
+            type uint64;
+            default "0";
+            config false;
+            description
+              "Accumulated bit errors from the start of the test to the current reporting time.";
+          }
+          leaf assist-state {
+            type enumeration {
+              enum "stop" {
+                value 0;
+                description
+                  "Stop prbs assist test.";
+              }
+              enum "start" {
+                value 1;
+                description
+                  "Start prbs assist test.";
+              }
+            }
+            description
+              "Prbs assist test state.";
+          }
+        }
+        container latency-measurements {
+          description
+            "List of OTN and Liquid OTN latency.";
+          list latency-measurement {
+            key "level";
+            description
+              "Configure the OTN and Liquid OTN Overhead.";
+            leaf level {
+              type leafref {
+                path "/hw-otn-access:otn-access/hw-otn-access:otn-configs/hw-otn-access:otn-config/hw-otn-access:overheads/hw-otn-access:overhead/hw-otn-access:level";
+              }
+              description
+                "Setting the OTN/Liquid OTN Section level of Overhead. Only pm and tcm1 can be input when liquid OTN is used.";
+            }
+            leaf mode {
+              type enumeration {
+                enum "transparent" {
+                  value 0;
+                  description
+                    "Transparent mode.";
+                }
+                enum "insert" {
+                  value 1;
+                  description
+                    "Insert mode.";
+                }
+                enum "loop" {
+                  value 2;
+                  description
+                    "Loop mode.";
+                }
+              }
+              description
+                "Latency measurement mode.";
+            }
+            leaf latency-value {
+              type uint32;
+              units "us";
+              config false;
+              description
+                "Latency value.";
+            }
+          }
+        }
+      }
+    }
+    container latency-measurement-durations {
+      description
+        "List of latency measurement duration for board.";
+      list latency-measurement-duration {
+        key "board-name";
+        description
+          "Configure the latency measurement duration list.";
+        leaf board-name {
+          type string {
+            length "3..16";
+          }
+          description
+            "Match the board name format of 'frame-id.slot-id'.";
+        }
+        leaf otn-duration {
+          type uint32 {
+            range "180..65535";
+          }
+          description
+            "The otn configuration latency measurement duration for the board.";
+        }
+        leaf liquid-otn-duration {
+          type uint32 {
+            range "180..65535";
+          }
+          description
+            "The liquid otn configuration latency measurement duration for the board.";
+        }
+      }
+    }
+    container packet-sncps {
+      description
+        "List of OTN and Liquid OTN path packet SNCP information.";
+      list packet-sncp {
+        key "group-index";
+        description
+          "Configure the otn packet SNCP.";
+        leaf group-index {
+          type uint16 {
+            range "1..65535";
+          }
+          description
+            "Indicates the index of an SNCP protection group.";
+        }
+        leaf protection-type {
+          type enumeration {
+            enum "snci" {
+              value 2;
+              description
+                "Indicates the sm overhead in the OTUK.No need input the tcm-level
+                  Note: tcm-level (pm|tcm1|tcm2|tcm3|tcm4|tcm5|tcm6|sm) is not support for OTN and liquid OTN services in this mode.";
+            }
+            enum "sncn" {
+              value 3;
+              description
+                "Indicates the pm or TCM byte overhead in the oduk.
+                 Note: tcm-level (pm|tcm1|tcm2|tcm3|tcm4|tcm5|tcm6|sm) must be input in OTN services
+                 and tcm-level (tcm1) must be input in liquid OTN services.";
+            }
+            enum "sncs" {
+              value 4;
+              description
+                "Indicates TCM overhead bytes.
+                 Note: tcm-level (pm|tcm1|tcm2|tcm3|tcm4|tcm5|tcm6|sm) must be input in OTN services
+                 and tcm-level (pm|tcm1) must be input in liquid OTN services.";
+            }
+          }
+          description
+            "SNCP protection type.";
+        }
+        leaf work-member {
+          type string {
+            length "1..32";
+          }
+          description
+            "The name of otn port, the format is otn.f.s.p.odupath or
+             otn.f.s.p.odupath.osuflexpath.
+             Odupath information of ODUk, indicates ODUk path, for example:
+             ODU0 path range is 0x1C01 -- 0x1C08.
+             ODU1 path range is 0x2201 -- 0x2204.
+             ODUFLEX path range is 0x2001 -- 0x2008.
+             ODU2 path range is 1;
+             In OTU1 Port Mode:
+             ODU0 path range is 0x1101 -- 0x1102.
+             ODU1 path range is 1.
+             osuflexpath path information of Liquid OTN, indicates Liquid OTN
+             path, Liquid OTN path must be attached to the ODUk.
+             osuflexpath path range is 1 -- 500 for ODU0, ODUFlex.
+             osuflexpath path range is 1 -- 1000 for other ODUk.
+             for example otn.0.15.1.0x1C01 or otn.0.15.1.0x1C01.2.";
+        }
+        leaf protect-member {
+          type string {
+            length "1..32";
+          }
+          description
+            "The name of otn port, the format is otn.f.s.p.odupath or
+             otn.f.s.p.odupath.osuflexpath.
+             Odupath information of ODUk, indicates ODUk path, for example:
+             ODU0 path range is 0x1C01 -- 0x1C08.
+             ODU1 path range is 0x2201 -- 0x2204.
+             ODUFLEX path range is 0x2001 -- 0x2008.
+             ODU2 path range is 1;
+             In OTU1 Port Mode:
+             ODU0 path range is 0x1101 -- 0x1102.
+             ODU1 path range is 1.
+             osuflexpath path information of Liquid OTN, indicates Liquid OTN
+             path, Liquid OTN path must be attached to the ODUk.
+             osuflexpath path range is 1 -- 500 for ODU0, ODUFlex.
+             osuflexpath path range is 1 -- 1000 for other ODUk.
+             for example otn.0.15.1.0x1C01 or otn.0.15.1.0x1C01.2.";
+        }
+        leaf tcm-level {
+          type enumeration {
+            enum "pm" {
+              value 1;
+              description
+                "PM overhead.";
+            }
+            enum "tcm1" {
+              value 2;
+              description
+                "OTN TCM1 or liquid OTN TCM overhead. This parameter is multiplexed by tcm and tcm1.";
+            }
+            enum "tcm2" {
+              value 3;
+              description
+                "TCM2 overhead.";
+            }
+            enum "tcm3" {
+              value 4;
+              description
+                "TCM3 overhead.";
+            }
+            enum "tcm4" {
+              value 5;
+              description
+                "TCM4 overhead.";
+            }
+            enum "tcm5" {
+              value 6;
+              description
+                "TCM5 overhead.";
+            }
+            enum "tcm6" {
+              value 7;
+              description
+                "TCM6 overhead.";
+            }
+            enum "sm" {
+              value 8;
+              description
+                "SM overhead.";
+            }
+          }
+          description
+            "Setting the OTN Section Layer of a Packet SNCP Protection Group.
+             otn service sncs: pm,tcm1-6,sm; sncn: pm,tcm1-6,sm; snci: nosupport
+             Liquid otn service sncs: tcm; sncn: pm,tcm; snci: nosupport.";
+        }
+        leaf wtr-time {
+          type uint16 {
+            range "0|6..720";
+          }
+          units "s";
+          default "0";
+          description
+            "In non-revertive mode, the value is 0 seconds. In revertive mode, the value ranges from 6 seconds to 720 seconds.
+             The default value is 0 seconds, which indicates non-revertive mode.";
+        }
+        leaf sd-flag {
+          type boolean;
+          default "false";
+          description
+            "Enable/disable SD trigger flag, 0 indicates that SD is not used as the trigger condition, and 1 indicates that SD is used as the trigger condition. The default value is 0, indicating that SD is not used as the trigger condition.";
+        }
+        leaf defect-occur-time {
+          type uint16 {
+            range "0..1000";
+          }
+          units "0.01 s";
+          default "0";
+          description
+            "The Defect Acknowledgment Time of a Packet SNCP Protection Group,0-1000, step:0.01s, i.e. 10 ms, indicating 0-10s. The default value is 0.";
+        }
+        leaf work-delay-time {
+          type uint16 {
+            range "0..100";
+          }
+          units "0.1 s";
+          default "0";
+          description
+            "Work side delay-time, The value ranges from 0 to 100. The step is 100 ms i.e 0.1s, indicating 0s to 10s. The default value is 0.";
+        }
+        leaf protect-delay-time {
+          type uint16 {
+            range "0..100";
+          }
+          units "0.1 s";
+          default "0";
+          description
+            "Protect side delay-time, The value ranges from 0 to 100. The step is 100 ms i.e 0.1s, indicating 0s to 10s. The default value is 0.";
+        }
+        leaf position {
+          type enumeration {
+            enum "work-side" {
+              value 1;
+              description
+                "The packet SNCP working in the work-side.";
+            }
+            enum "protect-side" {
+              value 0;
+              description
+                "The packet SNCP working in the protect-side.";
+            }
+            enum "other" {
+              value 255;
+              description
+                "The packet SNCP working in the, Delay Start Dynamic, This occurs when the power-off delay occurs and the protection group is just started.";
+            }
+          }
+          config false;
+          description
+            "Working position of packet SNCP.";
+        }
+        leaf switch-reason {
+          type enumeration {
+            enum "normal" {
+              value 0;
+              description
+                "Working in the normal.";
+            }
+            enum "WTR" {
+              value 5;
+              description
+                "WTR tigger the packet SNCP switch.";
+            }
+            enum "manual" {
+              value 7;
+              description
+                "Manual tigger the packet SNCP switch.";
+            }
+            enum "SD" {
+              value 9;
+              description
+                "SD alarm tigger the packet SNCP switch.";
+            }
+            enum "SF" {
+              value 12;
+              description
+                "SF alarm tigger the packet SNCP switch.";
+            }
+            enum "forced" {
+              value 14;
+              description
+                "Forced packet SNCP switch.";
+            }
+            enum "locked" {
+              value 15;
+              description
+                "Locked the packet SNCP.";
+            }
+          }
+          config false;
+          description
+            "The member switch reason: 0x00: normal, 0x05: WTR; 0x07: manual switching, 0x09: SD-triggered switching, 0x0c: SF-triggered switching, 0x0e: forced switching, 0x0f: locked switching.";
+        }
+        leaf work-side-status {
+          type enumeration {
+            enum "normal" {
+              value 0;
+              description
+                "Working in the normal.";
+            }
+            enum "SD" {
+              value 1;
+              description
+                "SD alarm status.";
+            }
+            enum "SF" {
+              value 2;
+              description
+                "SF alarm status.";
+            }
+          }
+          config false;
+          description
+            "Status: 0 = normal; 1=SD ; 2=SF.";
+        }
+        leaf protect-side-status {
+          type enumeration {
+            enum "normal" {
+              value 0;
+              description
+                "Working in the normal.";
+            }
+            enum "SD" {
+              value 1;
+              description
+                "SD alarm status.";
+            }
+            enum "SF" {
+              value 2;
+              description
+                "SF alarm status.";
+            }
+          }
+          config false;
+          description
+            "Status: 0 = normal; 1=SD ; 2=SF.";
+        }
+        action member-operation {
+          description
+            "To set the external switching of a packet SNCP protection group.";
+
+          input {
+            leaf operation {
+              type enumeration {
+                enum "manual-switch" {
+                  value 7;
+                  description
+                    "Manual switching.";
+                }
+                enum "force-switch" {
+                  value 14;
+                  description
+                    "Forced switching.";
+                }
+                enum "lock" {
+                  value 15;
+                  description
+                    "Protection locked.";
+                }
+                enum "clear" {
+                  value 16;
+                  description
+                    "Clearing switching.";
+                }
+              }
+              description
+                "SNCP Protection Switching mode.";
+            }
+            leaf direction {
+              type enumeration {
+                enum "work-side" {
+                  value 1;
+                  description
+                    "Switch to the work-side.";
+                }
+                enum "protect-side" {
+                  value 0;
+                  description
+                    "Switch to the protect-side.";
+                }
+              }
+              description
+                "The direction of SNCP Protection Switching.";
+            }
+          }
+        }
+      }
+    }
+    container otn-bods {
+      description
+        "List of Liquid OTN bandwidth adjust information,bandwidth on demand.";
+      list otn-bod {
+        key "index";
+        description
+          "Configure the Liquid OTN bandwidth adjust.";
+        leaf index {
+          type uint16 {
+            range "1..120";
+          }
+          description
+            "Indicates the index of an bandwidth adjust.";
+        }
+        container cross-connect-bod-members {
+          description
+            "List of cross connect BOD member.";
+          list cross-connect-bod-member {
+            key "source";
+            description
+              "Configure the osuflex path of bandwidth adjust, The element is osuflex: otn.0.15.1.0x1C01.2 or lport: lport.0.15.10001
+               The cross-connect usually contains four elements. the A---B and B---A, Currently, Bandwidth adjustment for a new trail is not supported, ABBA must be symmetric.";
+            leaf source {
+              type string {
+                length "1..32";
+              }
+              description
+                "The source end of BOD.";
+            }
+            leaf sink {
+              type string {
+                length "1..32";
+              }
+              description
+                "The sink end of BOD.";
+            }
+            uses bod-bandwidth-group;
+          }
+        }
+        container sncp-bod-members {
+          description
+            "List of SNCP BOD member.";
+          list sncp-bod-member {
+            key "group-index sncp-type";
+            description
+              "Configure the SNCP BOD member.";
+            leaf group-index {
+              type uint16 {
+                range "1..65535";
+              }
+              description
+                "Indicates the index of a SNCP protection group.";
+            }
+            leaf sncp-type {
+              type enumeration {
+                enum "otnsncp" {
+                  value 0;
+                  description
+                    "Liquid otn or otn sncp bandwidth adjust.";
+                }
+                enum "mcsncp" {
+                  value 1;
+                  description
+                    "Mc sncp bandwidth adjust.";
+                }
+                enum "pktsncp" {
+                  value 2;
+                  description
+                    "Packet sncp bandwidth adjust.";
+                }
+              }
+              description
+                "Indicates the type of a SNCP protection group.";
+            }
+            uses bod-bandwidth-group;
+          }
+        }
+        leaf result {
+          type enumeration {
+            enum "normal" {
+              value 1;
+              description
+                "State normal.";
+            }
+            enum "cancel" {
+              value 2;
+              description
+                "State cancel.";
+            }
+            enum "prepareing" {
+              value 3;
+              description
+                "State prepareing.";
+            }
+            enum "prepared" {
+              value 4;
+              description
+                "State prepared.";
+            }
+            enum "adjusting" {
+              value 5;
+              description
+                "State adjusting.";
+            }
+            enum "adjusted" {
+              value 6;
+              description
+                "State adjusted.";
+            }
+            enum "prepare-fail" {
+              value 7;
+              description
+                "State prepare fail.";
+            }
+            enum "adjust-fail" {
+              value 8;
+              description
+                "State adjust fail.";
+            }
+            enum "finish" {
+              value 9;
+              description
+                "State finish.";
+            }
+            enum "timeout" {
+              value 10;
+              description
+                "State timeout.";
+            }
+          }
+          config false;
+          description
+            "Indicates the result of an bandwidth adjust.";
+        }
+      }
+    }
+  }
+
+  augment "/if:interfaces/if:interface" {
+    when "derived-from-or-self(if:type, 'ianaift:otnOtu') or
+     derived-from-or-self(if:type, 'tc-an:vport')";
+    description
+      "Data nodes for the OTN port and vport configuration of the interface.";
+    container otn-port {
+      description
+        "Configure OTN port data, Configure the parameters applying to the interface.";
+      leaf fec-enabled {
+        type boolean;
+        must "/if:interfaces/if:interface/if:type='ianaift:otnOtu'" {
+          error-message
+            "Must reference an otn interface.";
+        }
+        description
+          "Enable/disable if OTN Port FEC.";
+      }
+      leaf otn-speed {
+        type enumeration {
+          enum "standard" {
+            value 1;
+            description
+              "Set the OTN port with standard rate mode.";
+          }
+          enum "advance" {
+            value 2;
+            description
+              "Set the OTN port with speed-up mode.";
+          }
+        }
+        must "/if:interfaces/if:interface/if:type='ianaift:otnOtu'" {
+          error-message
+            "Must reference an otn interface.";
+        }
+        description
+          "Set the OTN speed-up mode and standard rate mode.";
+      }
+      leaf loopback-mode {
+        type enumeration {
+          enum "no-loopback" {
+            value 0;
+            description
+              "No loopback.";
+          }
+          enum "inner-loopback" {
+            value 1;
+            description
+              "Inner loopback.";
+          }
+          enum "outer-loopback" {
+            value 2;
+            description
+              "Outer loopback.";
+          }
+        }
+        must "/if:interfaces/if:interface/if:type='ianaift:otnOtu'" {
+          error-message
+            "Must reference an otn interface.";
+        }
+        description
+          "Setting otn port loopback.";
+      }
+      leaf port-type {
+        type enumeration {
+          enum "2.5G" {
+            value 1;
+            description
+              "Set the OTN port with 2.5G type.";
+          }
+          enum "10G" {
+            value 2;
+            description
+              "Set the OTN port with 10G type.";
+          }
+        }
+        must "/if:interfaces/if:interface/if:type='ianaift:otnOtu'" {
+          error-message
+            "Must reference an otn interface.";
+        }
+        description
+          "Set the OTN port type.";
+      }
+    }
+    container vport {
+      description
+        "Configure virtual port data, Configure the parameters applying to the interface.";
+      leaf gfp-type {
+        type enumeration {
+          enum "gfp-t" {
+            value 1;
+            description
+              "Set vport to Transparent-Mapped Mode Framing Generic Procedure.";
+          }
+          enum "gfp-f" {
+            value 2;
+            description
+              "Set vport to Frame-Mapped Mode Framing Generic Procedure.";
+          }
+        }
+        description
+          "Vport data frame encapsulation format.";
+      }
+    }
+  }
+
+  rpc adjust-bod {
+    description
+      "To set the external operation of a adjust bandwidth group.";
+
+    input {
+      leaf index {
+        type uint16 {
+          range "1..120";
+        }
+        description
+          "Indicates the index of an bandwidth adjust.";
+      }
+      leaf operation {
+        type enumeration {
+          enum "start" {
+            value 1;
+            description
+              "Start Lossless bandwidth adjustment.";
+          }
+          enum "finish" {
+            value 2;
+            description
+              "Finish Lossless bandwidth adjustment.";
+          }
+          enum "cancel" {
+            value 3;
+            description
+              "Cancel Lossless bandwidth adjustment.";
+          }
+        }
+        description
+          "To set the operation of a adjust bandwidth group.";
+      }
+      leaf direction {
+        when "../operation='cancel'";
+        type enumeration {
+          enum "target" {
+            value 1;
+            description
+              "Forcible to target bandwidth.";
+          }
+          enum "original" {
+            value 0;
+            description
+              "Restore the original bandwidth.";
+          }
+        }
+        description
+          "To set the direction of a adjust bandwidth group.";
+      }
+    }
+  }
+  rpc reset-prbs-result {
+    description
+      "Reset statistics about otn or liquid otn prbs test result.";
+
+    input {
+      leaf name {
+        type leafref {
+          path "/hw-otn-access:otn-access/hw-otn-access:otn-configs/hw-otn-access:otn-config/hw-otn-access:name";
+        }
+        description
+          "Indicates the OTN or liquid OTN of path, the format: f.s.p.odupath or f.s.p.odupath.osuflexpath.";
+      }
+    }
+  }
+}

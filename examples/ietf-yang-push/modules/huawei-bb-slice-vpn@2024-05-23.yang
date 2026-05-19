@@ -1,0 +1,65 @@
+module huawei-bb-slice-vpn {
+  namespace "urn:huawei:yang:huawei-bb-slice-vpn";
+  prefix hw-bb-slice-vpn;
+
+  import huawei-bb-nsi {
+    prefix hw-bb-nsi;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This private YANG module is a supplement to the huawei-bb-nsi.yang, describing
+     the configuration and operational model for nsi.";
+
+  revision 2024-05-23 {
+    description
+      "Add bridge domains and vpns to slice instance";
+    reference
+      "Huawei private.";
+  }
+
+  augment "/hw-bb-nsi:bb-nsi/hw-bb-nsi:slice-instances/hw-bb-nsi:slice-instance" {
+    description
+      "Indicates a network slice instance vpn.";
+    container bridge-domains {
+      description
+        "List of BridgeDomains in a network slice instance.";
+      list bridge-domain {
+        key "bd-id";
+        description
+          "Configure BridgeDomain to a network slice.";
+        leaf bd-id {
+          type uint32 {
+            range "1..12288";
+          }
+          description
+            "Configure BridgeDomain to a network slice. A maximum of 32 BridgeDomains can be added to a slice.";
+        }
+      }
+    }
+    container vpns {
+      description
+        "List of VPNs in a network slice instance.";
+      list vpn {
+        key "vpn-name";
+        description
+          "Configure VPN to a network slice.";
+        leaf vpn-name {
+          type string {
+            length "1..31";
+          }
+          description
+            "Configure VPN to a network slice. A maximum of 32 VPNs can be added to a slice.";
+        }
+      }
+    }
+  }
+}

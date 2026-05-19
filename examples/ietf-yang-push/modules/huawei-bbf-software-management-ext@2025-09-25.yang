@@ -1,0 +1,426 @@
+module huawei-bbf-software-management-ext {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bbf-software-management-ext";
+  prefix bbf-yang-ext;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import bbf-software-management {
+    prefix bbf-swm;
+  }
+  import huawei-software-management {
+    prefix hw-sm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "This module extends the BBF SOFTWARE YANG model for Huawei devices.";
+
+  revision 2025-09-25 {
+    description
+      "Remove the import of huawei-extension.";
+    reference
+      "";
+  }
+  revision 2025-03-14 {
+    description
+      "Modify the packet-smart node name to load-policy.";
+    reference
+      "";
+  }
+  revision 2024-04-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity patch-type {
+    description
+      "Base identity for patch type.
+       Vendors can define the type. For example: hot patch,cold patch.";
+  }
+
+  identity hot-patch {
+    base patch-type;
+    description
+      "Hot patch.";
+  }
+
+  identity cold-patch {
+    base patch-type;
+    description
+      "Cold patch.";
+  }
+
+  identity rollback {
+    base bbf-swm:capability;
+    description
+      "Software supports roll back.";
+  }
+
+  identity activate-patch {
+    base bbf-swm:capability;
+    description
+      "Patch supports activate.";
+  }
+
+  identity deactivate-patch {
+    base bbf-swm:capability;
+    description
+      "Patch supports deactivate.";
+  }
+
+  identity commit-patch {
+    base bbf-swm:capability;
+    description
+      "Patch supports commit.";
+  }
+
+  identity rollback-patch {
+    base bbf-swm:capability;
+    description
+      "Patch supports rollback.";
+  }
+
+  identity activate-software {
+    base bbf-swm:capability;
+    description
+      "Software supports activate.";
+  }
+
+  identity commit-software {
+    base bbf-swm:capability;
+    description
+      "Software supports commit.";
+  }
+
+  typedef patch-state {
+    type enumeration {
+      enum "deactive" {
+        value 0;
+        description
+          "Indicates the patch state is deactive.";
+      }
+      enum "active" {
+        value 1;
+        description
+          "Indicates the patch state is active.";
+      }
+      enum "running" {
+        value 2;
+        description
+          "Indicates the patch state is running.";
+      }
+    }
+    description
+      "This attribute depicts patch state.";
+  }
+
+  typedef load-policy-type {
+    type enumeration {
+      enum "normal" {
+        value 1;
+        description
+          "Indicates that the entire package file is loaded into the system.";
+      }
+      enum "smart" {
+        value 2;
+        description
+          "Indicates that part of the package file is loaded into the system
+            according to the hardware configuration of the device.";
+      }
+    }
+    description
+      "Load entire or part of the package file.";
+  }
+
+  typedef extend-frame {
+    type union {
+      type uint32;
+      type enumeration {
+        enum "all-frame" {
+          value -1;
+          description
+            "Load all extend frame.";
+        }
+      }
+    }
+    description
+      "FrameId of the extend frame to be loaded or
+       load all extend frame.";
+  }
+
+  grouping sftp-public-key {
+    description
+      "The sftp server parameters.";
+    leaf sftp-server-public-key-code {
+      type string {
+        length "1..2048";
+      }
+      description
+        "The public key code of the SFTP server.";
+    }
+    leaf sftp-server-publickey-encoding-type {
+      type hw-sm:publickey-encoding-type;
+      description
+        "The encoding type of the public key of the SFTP server.";
+    }
+    leaf sftp-server-publickey-type {
+      type hw-sm:public-key-type;
+      description
+        "The public key type of the SFTP server.";
+    }
+  }
+
+  augment "/hw:hardware/hw:component/bbf-swm:software" {
+    description
+      "Operational data of software Managementanagement.";
+    container software-patch {
+      config false;
+      description
+        "Operational data of patch management.";
+      container patchs {
+        config false;
+        description
+          "List of patch information.";
+        list patch {
+          key "name";
+          description
+            "Statistics of the list of query system patch information.";
+          leaf name {
+            type string {
+              length "1..7";
+            }
+            description
+              "Patch name.";
+          }
+          leaf type {
+            type identityref {
+              base patch-type;
+            }
+            description
+              "Patch type.";
+          }
+          leaf state {
+            type patch-state;
+            description
+              "Patch state.";
+          }
+          leaf dependence {
+            type string {
+              length "0..255";
+            }
+            description
+              "The name of the patch on which the patch depends.";
+          }
+          leaf depended {
+            type string {
+              length "0..255";
+            }
+            description
+              "The patch name that depends on the patch.";
+          }
+          leaf pbi-patch-version {
+            type string {
+              length "0..255";
+            }
+            description
+              "Pbi patch version.";
+          }
+        }
+      }
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-swm:software/bbf-swm:software/bbf-swm:revisions/bbf-swm:download/bbf-swm:download/bbf-swm:input" {
+    description
+      "Parameters of the download operation.";
+    container parameters {
+      description
+        "Parameters.";
+      leaf request-id {
+        type uint32;
+        description
+          "Request id.";
+      }
+      leaf load-policy {
+        type load-policy-type;
+        description
+          "This object is used to identify the loading mode of the package file.
+           Default { normal }";
+      }
+      uses sftp-public-key;
+      leaf extend-frame {
+        type extend-frame;
+        description
+          "Activate the designated frame or all frames.";
+      }
+    }
+  }
+  augment "/hw:hardware/hw:component/bbf-swm:software/bbf-swm:software/bbf-swm:revisions/bbf-swm:revision" {
+    description
+      "Extended Operations.";
+    container load-cancel {
+      when "derived-from(../../../bbf-swm:capability,'bbf-swm:download') and ../bbf-swm:state='downloading'" {
+        description
+          "Action 'cancel-revision' can only be invoked when a
+            download is in progress.";
+      }
+      description
+        "Operational state of the software, cancel the downloading or downloaded software.";
+      action load-cancel {
+        description
+          "Cancel the download process.";
+
+        input {
+          leaf request-id {
+            type uint32;
+            description
+              "Request id.";
+          }
+        }
+      }
+    }
+    container activate-software {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:activate-software') and (../bbf-swm:state='available' or ../bbf-swm:state='in-use')" {
+        description
+          "Action 'activate-software' can only be invoked when a
+            revision is downloaded.";
+      }
+      description
+        "Operational state of the software, activate the downloaded software.";
+      action activate-software {
+        description
+          "Activate software operation.";
+
+        input {
+          leaf request-id {
+            type uint32;
+            description
+              "Request id.";
+          }
+          leaf mode {
+            type enumeration {
+              enum "issu" {
+                value 1;
+                description
+                  "Indicates that the software upgrade without service interrupted.";
+              }
+              enum "ossu" {
+                value 2;
+                description
+                  "Indicates that the software upgrade with service interrupted.";
+              }
+            }
+            description
+              "The activate software operation mode.";
+          }
+        }
+      }
+    }
+    container commit-software {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:commit-software') and (../bbf-swm:state='available' or ../bbf-swm:state='in-use')" {
+        description
+          "Only applicable if the 'commit-software' capability is
+            supported and then only if the revision can be
+            commit-software.";
+      }
+      description
+        "Operational state of the software, commit the software.";
+      action commit-software {
+        description
+          "Commit software operation.";
+
+        input {
+          leaf request-id {
+            type uint32;
+            description
+              "Request id.";
+          }
+        }
+      }
+    }
+    container rollback {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:rollback')and (../bbf-swm:is-committed = 'false')" {
+        description
+          "Action 'rollback' can only be invoked when a
+            revision is activated and not committed.";
+      }
+      description
+        "Operational state of the software, rollback the software.";
+      action rollback {
+        description
+          "Rollback software operation. Switch active software area to standby.";
+
+        input {
+          leaf request-id {
+            type uint32;
+            description
+              "Request id.";
+          }
+        }
+      }
+    }
+    container activate-patch {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:activate-patch')" {
+        description
+          "Only after the patch is loaded can the 'activate' operation be called.";
+      }
+      description
+        "Operational state of the patch, activate the patch.";
+      action activate {
+        description
+          "Activate the patch.";
+      }
+    }
+    container deactivate-patch {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:deactivate')" {
+        description
+          "Action 'deactivate' can only be invoked when a
+            patch is activated and not committed.";
+      }
+      description
+        "Operational state of the patch, deactivate the patch.";
+      action deactivate {
+        description
+          "Deactivate the patch.";
+      }
+    }
+    container commit-patch {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:commit')" {
+        description
+          "Action 'commit' can only be invoked when a
+            patch is activated.";
+      }
+      description
+        "Operational state of the patch, commit the patch.";
+      action commit {
+        description
+          "Commit the patch.";
+      }
+    }
+    container rollback-patch {
+      when "derived-from(../../../bbf-swm:capability,'bbf-yang-ext:rollback-patch')" {
+        description
+          "Action 'rollback-patch' can only be invoked when a
+            revision is activated and not committed.";
+      }
+      description
+        "Operational state of the patch, rollback the patch.";
+      action rollback {
+        description
+          "Rollback the patch.";
+      }
+    }
+  }
+}

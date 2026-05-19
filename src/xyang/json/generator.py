@@ -527,6 +527,11 @@ def _when_to_xyang_json(when: YangWhenStmt) -> dict[str, Any]:
     return out
 
 
+def _explicit_config(stmt: YangStatement) -> bool | None:
+    """Return explicit ``config`` from a data node, or ``None`` if unset (inherit)."""
+    return getattr(stmt, "config", None)
+
+
 def _build_xyang(
     node_type: str,
     key: str | None = None,
@@ -535,6 +540,7 @@ def _build_xyang(
     presence: str | None = None,
     *,
     mandatory: bool | None = None,
+    config: bool | None = None,
     if_features: list[str] | None = None,
     units: str | None = None,
 ) -> dict[str, Any]:
@@ -550,6 +556,8 @@ def _build_xyang(
         xyang[XYangKey.PRESENCE] = presence
     if mandatory is True:
         xyang[XYangKey.MANDATORY] = True
+    if config is not None:
+        xyang[XYangKey.CONFIG] = config
     if if_features:
         xyang[XYangKey.IF_FEATURES] = list(if_features)
     if units:
@@ -636,6 +644,9 @@ def _choice_meta_xyang(choice_stmt: YangChoiceStmt) -> dict[str, Any]:
     ff = _if_features_for_xyang(choice_stmt)
     if ff:
         meta[XYangKey.IF_FEATURES] = ff
+    cfg = _explicit_config(choice_stmt)
+    if cfg is not None:
+        meta[XYangKey.CONFIG] = cfg
     return meta
 
 
@@ -733,6 +744,7 @@ def _container_stmt_to_property(
                 when_stmt=when_stmt,
                 presence=getattr(stmt, "presence", None),
                 if_features=_if_features_for_xyang(stmt),
+                config=_explicit_config(stmt),
             ),
             XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
         }
@@ -771,6 +783,7 @@ def _container_stmt_to_property(
                 when_stmt=when_stmt,
                 presence=getattr(stmt, "presence", None),
                 if_features=_if_features_for_xyang(stmt),
+                config=_explicit_config(stmt),
             ),
             XYangKey.CHOICE: _choice_meta_xyang(ch0),
         }
@@ -797,6 +810,7 @@ def _container_stmt_to_property(
             when_stmt=when_stmt,
             presence=getattr(stmt, "presence", None),
             if_features=_if_features_for_xyang(stmt),
+            config=_explicit_config(stmt),
         ),
     }
     if props:
@@ -884,6 +898,7 @@ def _list_stmt_to_property(
         must_list=getattr(stmt, "must_statements", None) or [],
         when_stmt=when_stmt,
         if_features=_if_features_for_xyang(stmt),
+        config=_explicit_config(stmt),
     )
     items, choice_overlay = _list_items_object_schema(
         list_children, stmt, typedef_names, module
@@ -922,6 +937,7 @@ def _leaf_stmt_to_property(
                 mandatory=stmt.mandatory or None,
                 if_features=_if_features_for_xyang(stmt),
                 units=stmt.units or None,
+                config=_explicit_config(stmt),
             ),
         }
     else:
@@ -939,6 +955,7 @@ def _leaf_stmt_to_property(
             mandatory=stmt.mandatory or None,
             if_features=_if_features_for_xyang(stmt),
             units=stmt.units or None,
+            config=_explicit_config(stmt),
         )
         # Preserve leafref (type, path, require-instance) from type_schema x-yang
         if type_schema.get(JsonSchemaKey.X_YANG):
@@ -1006,6 +1023,7 @@ def _leaf_list_stmt_to_property(
             when_stmt=when_stmt,
             if_features=_if_features_for_xyang(stmt),
             units=stmt.units or None,
+            config=_explicit_config(stmt),
         ),
     }
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
@@ -1030,6 +1048,9 @@ def _choice_stmt_to_property(
         XYangKey.TYPE: "choice",
         XYangKey.MANDATORY: bool(getattr(stmt, "mandatory", False)),
     }
+    cfg = _explicit_config(stmt)
+    if cfg is not None:
+        xy_choice[XYangKey.CONFIG] = cfg
     ff = _if_features_for_xyang(stmt)
     if ff:
         xy_choice[XYangKey.IF_FEATURES] = ff

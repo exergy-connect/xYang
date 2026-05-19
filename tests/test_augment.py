@@ -80,7 +80,9 @@ module main {
     assert isinstance(root.find_statement("extra"), YangLeafStmt)
 
     v = YangValidator(lib)
-    ok, errors, _ = v.validate({"root": {"existing": "a", "extra": "b"}})
+    ok, errors, _ = v.validate(
+        {"root": {"existing": "a", "main:extra": "b"}}
+    )
     assert ok, errors
 
 

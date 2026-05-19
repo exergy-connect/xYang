@@ -1,0 +1,651 @@
+submodule huawei-xpon-port {
+  yang-version 1;
+  belongs-to huawei-xpon {
+    prefix hwxpon;
+  }
+
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import huawei-xpon-types {
+    prefix xpon-types;
+  }
+  import huawei-gpon-uni {
+    prefix hwgponuni;
+  }
+  import bbf-xpongemtcont {
+    prefix bbf-xpongemtcont;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "This module contains XPON port data.";
+
+  revision 2025-03-17 {
+    description
+      "Add enum value of work-mode in line-configs, modify the when condition of the hspon-pon-id leaf.";
+    reference
+      "";
+  }
+  revision 2025-03-04 {
+    description
+      "Change the description of list channel, leaf laser-switch and list tcont-group.";
+    reference
+      "";
+  }
+  revision 2024-04-01 {
+    description
+      "Add enum value of work-mode.";
+    reference
+      "";
+  }
+  revision 2024-01-01 {
+    description
+      "Modify used-fixed-bandwidth, used-assured-bandwidth,
+       used-assured-bandwidth and used-maximum-bandwidth leafnodes.";
+    reference
+      "";
+  }
+  revision 2023-12-07 {
+    description
+      "Add enum value of work-mode;
+       change the enumeration name of leaf channel-type.";
+    reference
+      "";
+  }
+  revision 2023-11-18 {
+    description
+      "Add hspon-pon-id leaf node.";
+    reference
+      "";
+  }
+  revision 2023-10-11 {
+    description
+      "Add tcont-groups container to line-configs grouping;
+       change line-configs/channels/channel/index range to 0~2.";
+    reference
+      "";
+  }
+  revision 2023-06-19 {
+    description
+      "Replace enum type of port-channel-type.";
+    reference
+      "";
+  }
+  revision 2023-03-18 {
+    description
+      "Add enum value of work-mode.";
+    reference
+      "";
+  }
+  revision 2021-01-17 {
+    description
+      "Add new leafnode: rogue-ont-status, ont-num, last-up-time, last-down-time, last-down-cause,
+       energy-saving-state, signal-detect-state, actual-multicast-encrypt, mac-chipset-state,
+       and container channels.";
+    reference
+      "";
+  }
+  revision 2020-11-05 {
+    description
+      "Add new leafnode: renew-interval.";
+    reference
+      "";
+  }
+  revision 2020-09-27 {
+    description
+      "Add new leafnodes: channel-index, channel-type, sd, rssi.";
+    reference
+      "";
+  }
+  revision 2019-05-19 {
+    description
+      "Added PON port work mode function.";
+    reference
+      "";
+  }
+  revision 2018-04-15 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  typedef rogue-ont-rpc-type {
+    type enumeration {
+      enum "start" {
+        value 1;
+        description
+          "Start the rogue ONT detect/check.";
+      }
+    }
+    description
+      "Indicates the detect/check rpc.";
+  }
+
+  grouping line-configs {
+    description
+      "Indicates the port line config data.";
+    leaf ont-auto-find-switch {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the ONT auto find switch.";
+    }
+    leaf optic-alarm-profile {
+      type string {
+        length "0..32";
+      }
+      description
+        "Assigns a threshold profile to a GPON port. If no threshold profile is assigned, alarm reporting for all thresholds is disabled.";
+    }
+    leaf rogue-ont-weak-light-detect-enable {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the detection switch of the rogue ONT that transmit weak optical signals.
+         Options:
+         1.true - Enable the switch.
+         2.false - Disable the switch.";
+    }
+    leaf work-mode {
+      type enumeration {
+        enum "gpon" {
+          value 1;
+          description
+            "Sets the work mode of a PON port to GPON.";
+        }
+        enum "xgpon" {
+          value 2;
+          description
+            "Sets the work mode of a PON port to XG-PON.";
+        }
+        enum "xgspon" {
+          value 3;
+          description
+            "Sets the work mode of a PON port to XGS-PON.";
+        }
+        enum "combo-xgpon-gpon-auto" {
+          value 4;
+          description
+            "Sets the work mode of a PON port to Combo-PON and specifies the combo-PON type to XG-PON&GPON, sets the multiplexing mode of a combo-PON port to auto.";
+        }
+        enum "combo-xgpon-gpon-wdm" {
+          value 5;
+          description
+            "Sets the work mode of a PON port to Combo-PON and specifies the combo-PON type to XG-PON&GPON, sets the multiplexing mode of a combo-PON port to WDM.";
+        }
+        enum "combo-xgspon-gpon-auto" {
+          value 6;
+          description
+            "Sets the work mode of a PON port to Combo-PON and specifies the combo-PON type to XGS-PON&GPON, sets the multiplexing mode of a combo-PON port to auto.";
+        }
+        enum "combo-xgspon-gpon-wdm" {
+          value 7;
+          description
+            "Sets the work mode of a PON port to Combo-PON and specifies the combo-PON type to XGS-PON&GPON, sets the multiplexing mode of a combo-PON port to WDM.";
+        }
+        enum "twdm-pon" {
+          value 8;
+          description
+            "Sets the work mode of a PON port to TWDM-PON.";
+        }
+        enum "combo-xgspon-50gspon" {
+          value 9;
+          description
+            "Sets the work mode of a PON port to XGS/50GS Combo.";
+        }
+        enum "combo-xgtpon-gpon-wdm" {
+          value 10;
+          description
+            "Sets the work mode of a PON port to Combo-PON and specifies the combo-PON type to XGT-PON&GPON, sets the multiplexing mode of a combo-PON port to WDM.";
+        }
+        enum "combo-50gpon-xgspon-gpon" {
+          value 11;
+          description
+            "Sets the work mode of a PON port to GPON/XGS/50G Combo.";
+        }
+        enum "combo-50gspon-xgspon-gpon" {
+          value 12;
+          description
+            "Sets the work mode of a PON port to GPON/XGS/50GS Combo.";
+        }
+      }
+      description
+        "Configure the work mode of a port on a PON service board.";
+    }
+    leaf ont-password-renew-interval {
+      type union {
+        type uint16 {
+          range "5..1440";
+        }
+        type enumeration {
+          enum "no-renew" {
+            value 0;
+            description
+              "Indicating that the ONT password will not update.";
+          }
+        }
+      }
+      units "min";
+      default "1440";
+      description
+        "The interval time of ONT's password renew.";
+    }
+    leaf multi-channel-low-latency-switch {
+      type boolean;
+      default "false";
+      description
+        "Enable/disable the multi-channel low-latency switch.";
+    }
+    container channels {
+      description
+        "List of the channel of the port.";
+      list channel {
+        key "index";
+        description
+          "Configure the channel data.";
+        leaf index {
+          type uint8 {
+            range "0..2";
+          }
+          description
+            "Indicates the index of channel.";
+        }
+        leaf type {
+          type xpon-types:port-channel-type;
+          config false;
+          description
+            "Indicates the channel type of the PON port.";
+        }
+        leaf laser-switch {
+          type boolean;
+          default "true";
+          description
+            "Enable/disable the laser switch of channel.";
+        }
+        container tcont-groups {
+          description
+            "List of the tcont-groups of the channel.";
+          list tcont-group {
+            key "index";
+            description
+              "Configure the tcont-groups information of the channel.";
+            leaf index {
+              type uint8 {
+                range "0..7";
+              }
+              description
+                "Indicates the group index of tcont-groups.";
+            }
+            leaf traffic-descriptor-profile-ref {
+              type leafref {
+                path "/bbf-xpongemtcont:xpongemtcont/bbf-xpongemtcont:traffic-descriptor-profiles/bbf-xpongemtcont:traffic-descriptor-profile/bbf-xpongemtcont:name";
+              }
+              mandatory true;
+              description
+                "References an existing traffic descriptor profile.";
+            }
+            leaf left-fixed-bandwidth {
+              type uint64;
+              units "bit/s";
+              config false;
+              description
+                "Indicates the remaining fixed rate of a T-CONT group.";
+            }
+            leaf left-assured-bandwidth {
+              type uint64;
+              units "bit/s";
+              config false;
+              description
+                "Indicates the remaining assured rate of a T-CONT group.";
+            }
+            leaf left-guaranteed-bandwidth {
+              type uint64;
+              units "bit/s";
+              config false;
+              description
+                "Indicates the remaining guaranteed rate of a T-CONT group.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping port-oper-states {
+    description
+      "Indecates the port state data.";
+    container auto-find-onts {
+      description
+        "List of auto find ONT under PON port.";
+      list auto-find-ont {
+        key "index";
+        description
+          "Operational data of the auto find ONT list under PON port.";
+        leaf index {
+          type uint32;
+          description
+            "Index of the auto find ONT.";
+        }
+        leaf time {
+          type yang:date-and-time;
+          description
+            "The time when the ONT auto find.";
+        }
+        uses hwgponuni:ont-discovery-data;
+      }
+    }
+    container rogue-onts {
+      description
+        "List of rogue ONT under port.";
+      list rogue-ont {
+        key "index";
+        description
+          "Statistics of rogue ONT under port.";
+        leaf index {
+          type uint32;
+          description
+            "Index of the rogue ONT.";
+        }
+      }
+    }
+    container idle-sd-rssis {
+      config false;
+      description
+        "List of SD and RSSI information of idle timeslot.";
+      list idle-sd-rssi {
+        key "channel-index";
+        description
+          "Operational data of the SD and RSSI on the channel of PON port.";
+        leaf channel-index {
+          type uint8 {
+            range "0..2";
+          }
+          description
+            "Indicates the index of channel.";
+        }
+        leaf channel-type {
+          type enumeration {
+            enum "gpon" {
+              value 1;
+              description
+                "Indicates that the channel type of the PON port is GPON.";
+            }
+            enum "xgpon-or-xgspon-or-xgtpon" {
+              value 2;
+              description
+                "Indicates that the channel type of the PON port is XG-PON, XGS-PON or XGT-PON.";
+            }
+            enum "hspon" {
+              value 3;
+              description
+                "Indicates that the channel type of the PON port is 50G-PON.";
+            }
+          }
+          description
+            "Indicates the channel type of the PON port.";
+        }
+        leaf sd {
+          type boolean;
+          description
+            "Indicates the SD on the channel of PON port, 'true' indicates that the channel has optical signal transmission.";
+        }
+        leaf rssi {
+          type int32;
+          units "0.000001 dBm";
+          description
+            "RSSI on the channel of PON port.
+             Options:
+             1.0x7FFFFFFF - Indicates that the query fails or no information is detected.";
+        }
+      }
+    }
+    leaf rogue-ont-status {
+      type enumeration {
+        enum "inexistent" {
+          value 0;
+          description
+            "Indicates that there are not Illegal incursionary rogue ONTs under port.";
+        }
+        enum "existent" {
+          value 1;
+          description
+            "Indicates that there are Illegal incursionary rogue ONTs under port.";
+        }
+      }
+      description
+        "This object is used to query whether there are Illegal incursionary rogue ONTs under port.";
+    }
+    container channels {
+      config false;
+      description
+        "List of the channel of the port.";
+      list channel {
+        key "index";
+        description
+          "Operational data of the channel.";
+        leaf index {
+          type uint8 {
+            range "0..2";
+          }
+          description
+            "Indicates the index of channel.";
+        }
+        leaf type {
+          type xpon-types:port-channel-type;
+          description
+            "The channel type of the PON port.";
+        }
+        leaf available-bandwidth {
+          type uint32;
+          units "kbit/s";
+          description
+            "This object indicates the available bandwidth.";
+        }
+      }
+    }
+    leaf ont-num {
+      type uint32;
+      description
+        "This object indicates the number of ONTs that are added to the port.";
+    }
+    leaf last-up-time {
+      type yang:date-and-time;
+      description
+        "This object indicates the time when the port last went online.";
+    }
+    leaf last-down-time {
+      type yang:date-and-time;
+      description
+        "This object indicates the time when the port last went offline.";
+    }
+    leaf last-down-cause {
+      type enumeration {
+        enum "los" {
+          value 1;
+          description
+            "Loss of signal.";
+        }
+        enum "optic-module-absence" {
+          value 2;
+          description
+            "The optic module is absence.";
+        }
+        enum "optic-module-fault" {
+          value 3;
+          description
+            "The optic module is fault.";
+        }
+        enum "optic-port-closed" {
+          value 4;
+          description
+            "The optic port is closed.";
+        }
+        enum "other-cause" {
+          value 5;
+          description
+            "Other cause.";
+        }
+      }
+      description
+        "This object indicates the time when the port last went online.";
+    }
+    leaf energy-saving-state {
+      type enumeration {
+        enum "yes" {
+          value 1;
+          description
+            "The GPON port is in energy saving state.";
+        }
+        enum "no" {
+          value 2;
+          description
+            "The GPON port is not in energy saving state.";
+        }
+      }
+      description
+        "This object indicates the energy saving state of the GPON port.";
+    }
+    leaf signal-detect-state {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "Optical signals are detected.";
+        }
+        enum "fault" {
+          value 2;
+          description
+            "Optical signals are not detected.";
+        }
+      }
+      description
+        "Query the signal detect info of the port.";
+    }
+    leaf actual-multicast-encrypt {
+      type enumeration {
+        enum "off" {
+          value 1;
+          description
+            "The multicast gem port encypt switch is not encrypted.";
+        }
+        enum "on" {
+          value 2;
+          description
+            "The multicast gem port encypt switch is encrypted.";
+        }
+      }
+      description
+        "Query the multicast gem port encypt switch.";
+    }
+    leaf mac-chipset-state {
+      type enumeration {
+        enum "normal" {
+          value 1;
+          description
+            "The XPON mac chipset is normal.";
+        }
+        enum "fault" {
+          value 2;
+          description
+            "The XPON mac chipset is fault.";
+        }
+      }
+      description
+        "Query the mac chipset state info of the port.";
+    }
+  }
+
+  augment "/if:interfaces/if:interface/bbf-xpon:channel-termination" {
+    when "../if:type = 'bbf-xponift:channel-termination'";
+    description
+      "Huawei 50g channel termination config.";
+    container hspon {
+      description
+        "Configure huawei 50g channel termination.";
+      leaf hspon-pon-id {
+        when "../../bbf-xpon:channel-termination-type = 'xpon-types:hspon'";
+        type uint32;
+        description
+          "For 50G-PON, the PON-ID is entirely configurable and is
+           32 bits long. The PON-ID is also available as state data.";
+      }
+    }
+  }
+
+  rpc check-rogue-ont {
+    description
+      "Request the rogue ONT check.";
+
+    input {
+      leaf gpon-if-name {
+        type string {
+          length "1..32";
+        }
+        description
+          "The name of GPON interface.";
+      }
+    }
+  }
+  rpc detect-rogue-ont {
+    description
+      "Request the rogue ONT detect.";
+
+    input {
+      leaf gpon-if-name {
+        type string {
+          length "1..32";
+        }
+        description
+          "The name of GPON interface.";
+      }
+    }
+  }
+
+  notification rogue-ont-manual-detect-notify {
+    description
+      "This notification is sent when the ONT manual-detect is finished.";
+    leaf port-if-name {
+      type string {
+        length "1..32";
+      }
+      description
+        "The name of XPON port interface.";
+    }
+    leaf result {
+      type enumeration {
+        enum "finished" {
+          value 0;
+          description
+            "Indicates that the result of rogue ONU manual-detect is finished.";
+        }
+        enum "unknown-state" {
+          value 1;
+          description
+            "Indicates that the result of rogue ONU manual-detect is unknown state.";
+        }
+      }
+      description
+        "This leaf indicates the rogue ONU manual-detect result.";
+    }
+  }
+}

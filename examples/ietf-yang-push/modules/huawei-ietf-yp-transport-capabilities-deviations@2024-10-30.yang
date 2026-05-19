@@ -1,0 +1,38 @@
+module huawei-ietf-yp-transport-capabilities-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-yp-transport-capabilities-deviations";
+  prefix ntc-devs;
+
+  import ietf-system-capabilities {
+    prefix sysc;
+  }
+  import ietf-notification-capabilities {
+    prefix notc;
+  }
+  import ietf-yp-transport-capabilities {
+    prefix ntc;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-yp-transport-capabilities data
+     model set for Huawei devices.";
+
+  revision 2024-10-30 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sysc:system-capabilities/notc:subscription-capabilities/ntc:transport-capabilities/ntc:transport-capability/ntc:security-protocol" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,947 @@
+module huawei-net-slice {
+  namespace "urn:huawei:yang:huawei-net-slice";
+  prefix net-slice;
+
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import huawei-ip {
+    prefix ip;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This YANG module defines the essential types for the management of Net-Slice for IGP.";
+
+  revision 2025-09-10 {
+    description
+      "Add instance-statistics container, network-slice-interfaces container and interface-statistics container. Delete the must condition of instance-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-08-08 {
+    description
+      "Add sliceid-reserve-bit leaf under container network-slice-source-prefix. Modify must condition of leaf source-prefix in net-slice instance list. Add network-slice-id-mapping, network-slice-id-maps and mapping-statistics container. Add spfc slice instance type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2025-02-06 {
+    description
+      "Add spfc-enable leaf and spfc container of net-slice list.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-08-21 {
+    description
+      "Modify the must condition of network-slice source-prefix.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-13 {
+    description
+      "Add instance-type leaf and associated-private-line-slices container.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-08-24 {
+    description
+      "Add network-slice source-prefix.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-02-02 {
+    description
+      "Add net slice VLAN encapsulate.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-06-18 {
+    description
+      "Modify data-plane mode description.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-05-17 {
+    description
+      "Add flexe-channel-phy-port enum to slice-capability-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-04-21 {
+    description
+      "Add fg-client-slice-port enum to slice-capability-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-24 {
+    description
+      "Modify flex-channel-statistic status.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-23 {
+    description
+      "Modify flex-channel-mode description.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-21 {
+    description
+      "Add choice case exclusive-pir-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-02-16 {
+    description
+      "Modify net-slice-binding, net-slice, data-plane and flex-channel must condition.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-12-07 {
+    description
+      "Modify net-slice-binding must condition.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-09-24 {
+    description
+      "Add channelized-phy-port.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-08-18 {
+    description
+      "Modify slice-capability-type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-02-08 {
+    description
+      "Modify container net-slices.";
+    reference
+      "Huawei private.";
+  }
+  revision 2021-02-03 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  typedef net-af-type {
+    type enumeration {
+      enum "afipv4" {
+        value 1;
+        description
+          "IPv4 address family.";
+      }
+      enum "afipv6" {
+        value 2;
+        description
+          "IPv6 address family.";
+      }
+    }
+    description
+      "Net slice address family type.";
+  }
+
+  typedef slice-capability-type {
+    type enumeration {
+      enum "flex-phy-port" {
+        value 0;
+        description
+          "Flex phy port type.";
+      }
+      enum "flexe-port" {
+        value 1;
+        description
+          "FlexE port type.";
+      }
+      enum "channel-phy-port" {
+        value 2;
+        description
+          "Channel phy port type.";
+      }
+      enum "channelized-phy-port" {
+        value 3;
+        description
+          "Channelized phy port type.";
+      }
+      enum "fg-client-slice-port" {
+        value 4;
+        description
+          "FG client slice port type.";
+      }
+      enum "flexe-channel-phy-port" {
+        value 5;
+        description
+          "FlexE Channel phy port type.";
+      }
+    }
+    description
+      "Net slice capability type.";
+  }
+
+  typedef slice-service-class {
+    type enumeration {
+      enum "be" {
+        value 1;
+        description
+          "BE service-class.";
+      }
+      enum "af1" {
+        value 2;
+        description
+          "AF1 service-class.";
+      }
+      enum "af2" {
+        value 3;
+        description
+          "AF2 service-class.";
+      }
+      enum "af3" {
+        value 4;
+        description
+          "AF3 service-class.";
+      }
+      enum "af4" {
+        value 5;
+        description
+          "AF4 service-class.";
+      }
+      enum "ef" {
+        value 6;
+        description
+          "EF service-class.";
+      }
+      enum "cs6" {
+        value 7;
+        description
+          "CS6 service-class.";
+      }
+      enum "cs7" {
+        value 8;
+        description
+          "CS7 service-class.";
+      }
+    }
+    description
+      "Queue type.";
+  }
+
+  typedef slice-instance-type {
+    type enumeration {
+      enum "normal" {
+        value 0;
+        description
+          "Normal slice.";
+      }
+      enum "private-network" {
+        value 1;
+        description
+          "Private network slice.";
+      }
+      enum "private-line" {
+        value 2;
+        description
+          "Private line slice.";
+      }
+      enum "spfc" {
+        value 3;
+        description
+          "SPFC slice.";
+      }
+    }
+    description
+      "Network slice instance type.";
+  }
+
+  container net-slice {
+    description
+      "Configure net slice parameters.";
+    container instances {
+      description
+        "List of net slice instance information.";
+      list instance {
+        key "id";
+        description
+          "Configure net slice instance.";
+        leaf id {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Configure net slice instance identifier.";
+        }
+        leaf description {
+          type string {
+            length "1..80";
+          }
+          description
+            "Net slice instance description.";
+        }
+        leaf source-prefix {
+          type leafref {
+            path "/net-slice:net-slice/net-slice:network-slice-source-prefix/net-slice:prefixs/net-slice:prefix/net-slice:name";
+          }
+          must "(../../../network-slice-source-prefix/prefixs/prefix[net-slice:name=current()]/ipv6-prefix) and ((../id<=2147483647 and (not (../../../network-slice-source-prefix/sliceid-reserve-bit))) or (../id<=1073741823 and ../../../network-slice-source-prefix/sliceid-reserve-bit=2) or (../id<=536870911 and ../../../network-slice-source-prefix/sliceid-reserve-bit=3) or (../id<=268435455 and ../../../network-slice-source-prefix/sliceid-reserve-bit=4) or (../id<=134217727 and ../../../network-slice-source-prefix/sliceid-reserve-bit=5) or (../id<=67108863 and ../../../network-slice-source-prefix/sliceid-reserve-bit=6) or (../id<=33554431 and ../../../network-slice-source-prefix/sliceid-reserve-bit=7) or (../id<=16777215 and ../../../network-slice-source-prefix/sliceid-reserve-bit=8))";
+          description
+            "Enable network-slice source-prefix encapsulation with specified prefix.";
+        }
+        leaf strict-match {
+          when "../source-prefix";
+          type boolean;
+          default "false";
+          description
+            "Enable/disable strict mode.";
+        }
+        leaf instance-type {
+          type slice-instance-type;
+          default "normal";
+          description
+            "The global network slice instance type.";
+        }
+        container associated-private-line-slices {
+          when "../instance-type='private-network'";
+          description
+            "List of the associated private line instances.";
+          list associated-private-line-slice {
+            key "network-slice-id";
+            description
+              "Configure the associated private line instance.";
+            leaf network-slice-id {
+              type leafref {
+                path "/net-slice:net-slice/net-slice:instances/net-slice:instance/net-slice:id";
+              }
+              must "../../../id!=current() and ../../../../instance[net-slice:id=current()]/instance-type='private-line'";
+              description
+                "Network slice instance ID.";
+            }
+          }
+        }
+      }
+    }
+    container global {
+      description
+        "Configure net slice global information.";
+      leaf protocol-id {
+        type uint8 {
+          range "0|160..252";
+        }
+        default "0";
+        description
+          "Configure net slice protocol number.";
+      }
+      leaf vlan-encapsulate-enable {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable global slice VLAN mode.";
+      }
+    }
+    container network-slice-color-mapping {
+      presence "Enable network-slice-color-mapping.";
+      description
+        "Enable/disable network-slice color mapping.";
+      container network-slice-color-maps {
+        description
+          "List of network-slice color map information.";
+        list network-slice-color-map {
+          key "color-index";
+          description
+            "Configure network-slice color map.";
+          leaf color-index {
+            type uint32 {
+              range "0..4294967295";
+            }
+            description
+              "Color index.";
+          }
+          leaf network-slice-id {
+            type leafref {
+              path "/net-slice:net-slice/net-slice:instances/net-slice:instance/net-slice:id";
+            }
+            must "../network-slice-id!=0";
+            mandatory true;
+            description
+              "Network-slice instance Id.";
+          }
+        }
+      }
+    }
+    container network-slice-id-mapping {
+      presence "Enable network-slice-id-mapping.";
+      description
+        "Enable/disable network-slice id mapping.";
+      container network-slice-id-maps {
+        description
+          "List of network-slice id map information.";
+        list network-slice-id-map {
+          key "aggregate-slice-id";
+          description
+            "Configure network-slice id map.";
+          leaf aggregate-slice-id {
+            type leafref {
+              path "/net-slice:net-slice/net-slice:instances/net-slice:instance/net-slice:id";
+            }
+            must "count(/ifm:ifm/ifm:interfaces/ifm:interface/net-slice:net-slices/net-slice:net-slice[net-slice:slice-id=current()]/net-slice:spfc-enable)=0 and ../aggregate-slice-id!=0";
+            description
+              "Aggregate slice ID.";
+          }
+          leaf mapping-slice-id {
+            type string {
+              length "1..1000";
+            }
+            mandatory true;
+            description
+              "Sub slice IDs. For example, 1-10,20-30,80,100.";
+          }
+        }
+      }
+      container mapping-statistics {
+        config false;
+        description
+          "Statistics of network-slice id mapping.";
+        leaf remaining-mapping-id-num {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Remaining number of network-slice id mapping that can be configured.";
+        }
+        leaf total-mapping-id-num {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of network-slice id mapping that can be configured.";
+        }
+      }
+    }
+    container network-slice-source-prefix {
+      presence "Enable network-slice-source-prefix.";
+      description
+        "Enable/disable network-slice source-prefix.";
+      leaf sliceid-reserve-bit {
+        type uint8 {
+          range "2 .. 8";
+        }
+        description
+          "Reserve bit length for network-slice instance Id.";
+      }
+      container prefixs {
+        description
+          "List of network-slice source-prefix configuration.";
+        list prefix {
+          key "name";
+          unique "ipv6-prefix/address";
+          description
+            "Configure network-slice source-prefix configuration.";
+          leaf name {
+            type string {
+              length "1..31";
+            }
+            description
+              "Prefix name.";
+          }
+          container ipv6-prefix {
+            presence "Enable ipv6-prefix.";
+            description
+              "Configure IPv6 prefix.";
+            leaf address {
+              type inet:ipv6-address-no-zone;
+              mandatory true;
+              description
+                "IPv6 address. The specified IPv6 address cannot conflict with the SRv6 encapsulation source address, interface IPv6 address, or locator IPv6 address.";
+            }
+            leaf prefix-length {
+              type uint8 {
+                range "17..96";
+              }
+              must "(../prefix-length)-(../block-length)>=1";
+              mandatory true;
+              description
+                "Routable prefix length.";
+            }
+            leaf block-length {
+              type uint8 {
+                range "16..95";
+              }
+              must "(../prefix-length)-(../block-length)>=1";
+              mandatory true;
+              description
+                "The slice prefix length.";
+            }
+          }
+        }
+      }
+    }
+    container instance-statistics {
+      config false;
+      description
+        "Statistics of network slice instances, including normal, private network, private line and spfc slices.";
+      leaf total-number {
+        type uint32 {
+          range "0 .. 4294967295";
+        }
+        description
+          "Total number of network slice instances.";
+      }
+      leaf normal-number {
+        type uint32 {
+          range "0 .. 4294967295";
+        }
+        description
+          "Total number of normal slices.";
+      }
+      leaf private-network-number {
+        type uint32 {
+          range "0 .. 4294967295";
+        }
+        description
+          "Total number of private network slices.";
+      }
+      leaf private-line-number {
+        type uint32 {
+          range "0 .. 4294967295";
+        }
+        description
+          "Total number of private line slices.";
+      }
+      leaf spfc-number {
+        type uint32 {
+          range "0 .. 4294967295";
+        }
+        description
+          "Total number of spfc slices.";
+      }
+    }
+    container network-slice-interfaces {
+      config false;
+      description
+        "List of network slice ids used by interfaces.";
+      list network-slice-interface {
+        key "slice-id interface-name";
+        description
+          "Statistics of network slice ids used by interfaces.";
+        leaf slice-id {
+          type uint32;
+          description
+            "Value of slice ID.";
+        }
+        leaf interface-name {
+          type leafref {
+            path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+          }
+          description
+            "Interface name.";
+        }
+        leaf slice-type {
+          type string {
+            length "1..64";
+          }
+          description
+            "Slice type.";
+        }
+        leaf bandwidth {
+          when "../slice-type='Flex-Channel' or ../slice-type='SPFC'";
+          type uint32;
+          units "Mbit/s";
+          description
+            "Bandwidth.";
+        }
+      }
+    }
+    container interface-statistics {
+      config false;
+      description
+        "List of network slice interface statistics.";
+      list interface-statistic {
+        key "interface-name";
+        description
+          "Statistics of network slice interface.";
+        leaf interface-name {
+          type leafref {
+            path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+          }
+          description
+            "Interface name.";
+        }
+        leaf total-number {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of network slices.";
+        }
+        leaf data-plane-number {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of data plane slices.";
+        }
+        leaf flex-channel-number {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of flex channel slices.";
+        }
+        leaf spfc-number {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of SPFC slices.";
+        }
+        leaf affinity-number {
+          type uint32 {
+            range "0 .. 4294967295";
+          }
+          description
+            "Total number of affinity slices.";
+        }
+        container slice-infos {
+          description
+            "List of slice infos.";
+          list slice-info {
+            key "slice-id";
+            description
+              "Statistics of slice info.";
+            leaf slice-id {
+              type uint32;
+              description
+                "Value of slice ID.";
+            }
+            leaf slice-type {
+              type string {
+                length "1..64";
+              }
+              description
+                "Slice type.";
+            }
+            leaf bandwidth {
+              when "../slice-type='Flex-Channel' or ../slice-type='SPFC'";
+              type uint32 {
+                range "0 .. 4294967295";
+              }
+              units "Mbit/s";
+              description
+                "Bandwidth.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  augment "/ifm:ifm/ifm:interfaces/ifm:interface" {
+    description
+      "Net slice interface information.";
+    container slice-capabilitys {
+      config false;
+      description
+        "List of Capabilitys for a interface.";
+      list slice-capability {
+        key "capability";
+        description
+          "Statistics of net slice capability for a interface.";
+        leaf capability {
+          type slice-capability-type;
+          description
+            "Slice capability type.";
+        }
+      }
+    }
+    container net-slice-binding {
+      description
+        "Configure parameters for a net slice basic interface.";
+      leaf slice-id {
+        type leafref {
+          path "/net-slice:net-slice/net-slice:instances/net-slice:instance/net-slice:id";
+        }
+        must "../../ip:ipv6";
+        description
+          "Configure net slice basic instance identifier. When configuring a basic ID, ensure that a slice ID with the same value has been configured for the main interface or one of its sub-interfaces. If interface type is FLEXE, basic slice can't be enabled if the current interface has already enabled any of the following components:dot1q/qinq termination;ip binding vpn;IPv6 security rsakey-pair. Otherwise if the interface type is not FLEXE, basic slice can't be enabled only when the current interface has already enabled ip binding vpn. If the interface does not have a link-local address, traffic may fail to be forwarded.";
+      }
+    }
+    container net-slices {
+      description
+        "List of net slice interfaces.";
+      list net-slice {
+        key "slice-id";
+        description
+          "Configure parameters for a net slice interface. The slice IDs on the same main interface must be different.";
+        leaf slice-id {
+          type leafref {
+            path "/net-slice:net-slice/net-slice:instances/net-slice:instance/net-slice:id";
+          }
+          must "(../../../net-slice:net-slice-binding/net-slice:slice-id and count(../../net-slice:net-slice/net-slice:data-plane) <= 1) or not (../../../net-slice:net-slice-binding/net-slice:slice-id)";
+          description
+            "Configure net slice instance identifier.";
+        }
+        choice mode {
+          description
+            "Choose data plane mode, flex channel mode or SPFC mode.";
+          case data-plane-mode {
+            description
+              "Configure data plane mode.";
+            leaf data-plane {
+             
+              type boolean;
+              must "../../../ip:ipv6 and (../../../ip:ipv6/ip:addresses/ip:address/ip:ip or ../../../net-slice:net-slice-binding)";
+              description
+                "Configure data plane mode.";
+            }
+          }
+          case flex-channel-mode {
+            description
+              "Configure net slice flex channel.";
+            leaf flex-channel {
+             
+              type uint32 {
+                range "1 .. 4294967295";
+              }
+              units "Mbit/s";
+              must "../../../ip:ipv6 and (../../../ip:ipv6/ip:addresses/ip:address/ip:ip or ../../../net-slice:net-slice-binding)";
+              description
+                "Configure net slice flex channel.";
+            }
+            leaf end-mode {
+              type boolean;
+              must "../end-mode='false' or ../flex-channel";
+              default "false";
+              description
+                "Enable/disable end slice mode.";
+            }
+            choice exclusive-pir-mode {
+              when "flex-channel";
+              description
+                "Choose exclusive mode or flex channel PIR mode.";
+              case flex-channel-pir-mode {
+                description
+                  "Configure net slice flex channel PIR.";
+                leaf flex-channel-pir {
+                  type uint32 {
+                    range "1 .. 4294967295";
+                  }
+                  units "Mbit/s";
+                  must "../flex-channel-pir >= ../flex-channel";
+                  description
+                    "Configure net slice flex channel PIR value.";
+                }
+              }
+              case exclusive-mode {
+                description
+                  "Exclusive mode.";
+                leaf exclusive {
+                  type empty;
+                  description
+                    "Exclusive mode.";
+                }
+              }
+            }
+          }
+          case spfc-mode {
+            description
+              "Configure SPFC mode.";
+            leaf spfc-enable {
+              type empty;
+              must "(/net-slice:net-slice/net-slice:instances/net-slice:instance[net-slice:id=current()/../net-slice:slice-id]/net-slice:instance-type='spfc')";
+              description
+                "Configure SPFC mode.";
+            }
+            container spfc {
+              when "../spfc-enable";
+              must "(cir and pir) or (not(cir) and not(pir))";
+              description
+                "Configure parameters for the SPFC network slice.";
+              leaf cir {
+                when "../../../../ip:ipv6 and (../../../../ip:ipv6/ip:addresses/ip:address/ip:ip or ../../../../net-slice:net-slice-binding)";
+                type uint32 {
+                  range "0 .. 4294967295";
+                }
+                units "Mbit/s";
+                description
+                  "Configure the CIR of the SPFC network slice.";
+              }
+              leaf pir {
+                type uint32 {
+                  range "1 .. 4294967295";
+                }
+                units "Mbit/s";
+                must "../pir>=../cir";
+                description
+                  "Configure the PIR of the SPFC network slice.";
+              }
+              container spfc-paths {
+                description
+                  "List of SPFC backward paths.";
+                list spfc-path {
+                  key "index";
+                  unique "destination-ip interface-name next-hop";
+                  description
+                    "Configure SPFC backward path.";
+                  leaf index {
+                    type uint32;
+                    description
+                      "The index of the SPFC backward path.";
+                  }
+                  leaf destination-ip {
+                    type inet:ipv6-address-no-zone;
+                    mandatory true;
+                    description
+                      "The destination IPv6 address of the SPFC backward path.";
+                  }
+                  leaf interface-name {
+                    type leafref {
+                      path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+                    }
+                    mandatory true;
+                    description
+                      "Interface name.";
+                  }
+                  leaf next-hop {
+                    type inet:ipv6-address-no-zone;
+                    mandatory true;
+                    description
+                      "Nexthop address.";
+                  }
+                }
+              }
+              container pfc-interfaces {
+                description
+                  "List of PFC backward outbound interfaces.";
+                list pfc-interface {
+                  must "not(../../spfc-paths/spfc-path)";
+                  key "interface-name";
+                  max-elements 1;
+                  description
+                    "Configure PFC backward outbound interface.";
+                  leaf interface-name {
+                    type leafref {
+                      path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+                    }
+                    description
+                      "Interface name.";
+                  }
+                }
+              }
+            }
+          }
+        }
+        container flex-channel-statistics {
+          config false;
+          status deprecated;
+          description
+            "Statistics of flex-channel.";
+          leaf service-class {
+            type slice-service-class;
+            status deprecated;
+            description
+              "Class of service.";
+          }
+          leaf passed-packets {
+            type uint64;
+            units "packet";
+            status deprecated;
+            description
+              "Passed packets.";
+          }
+          leaf passed-bytes {
+            type uint64;
+            units "Byte";
+            status deprecated;
+            description
+              "Passed bytes.";
+          }
+          leaf dropped-packets {
+            type uint64;
+            units "packet";
+            status deprecated;
+            description
+              "Dropped packets.";
+          }
+          leaf dropped-bytes {
+            type uint64;
+            units "Byte";
+            status deprecated;
+            description
+              "Dropped bytes.";
+          }
+          leaf passed-pps {
+            type uint64;
+            units "pps";
+            status deprecated;
+            description
+              "Passed pps.";
+          }
+          leaf passed-bps {
+            type uint64;
+            units "bit/s";
+            status deprecated;
+            description
+              "Passed bps.";
+          }
+          leaf dropped-pps {
+            type uint64;
+            units "pps";
+            status deprecated;
+            description
+              "Dropped pps.";
+          }
+          leaf dropped-bps {
+            type uint64;
+            units "bit/s";
+            status deprecated;
+            description
+              "Dropped bps.";
+          }
+        }
+      }
+    }
+  }
+
+  rpc reset-flex-channel-statitic {
+   
+    status deprecated;
+    description
+      "Reset flex-channle statistic.";
+
+    input {
+      leaf slice-id {
+        type uint32 {
+          range "1 .. 4294967295";
+        }
+        status deprecated;
+        description
+          "Net-slice instance.";
+      }
+      leaf interface-name {
+        type leafref {
+          path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+        }
+        status deprecated;
+        description
+          "Interface name.";
+      }
+    }
+  }
+}

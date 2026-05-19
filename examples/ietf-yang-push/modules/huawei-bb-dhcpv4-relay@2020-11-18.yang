@@ -1,0 +1,303 @@
+module huawei-bb-dhcpv4-relay {
+  namespace "urn:huawei:yang:huawei-bb-dhcpv4-relay";
+  prefix hw-bb-dhcpv4-relay;
+
+  import huawei-extension {
+    prefix ext;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import huawei-network-instance {
+    prefix ni;
+  }
+  import huawei-bb-service-flow {
+    prefix hw-bb-srv-flow;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of definitions for configuring the information of DHCPv4 relay.";
+
+  revision 2020-11-18 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+ 
+
+  typedef dhcp-relay-mode-type {
+    type enumeration {
+      enum "layer2" {
+        value 1;
+        description
+          "Indicates the DHCP l2 forwarding mode.";
+      }
+      enum "layer3-standard" {
+        value 2;
+        description
+          "Indicates the standard mode of the DHCP L3 forwarding mode.";
+      }
+      enum "layer3-option60" {
+        value 3;
+        description
+          "Indicates the option60 mode of the DHCP L3 forwarding mode.";
+      }
+      enum "layer3-macrange" {
+        value 4;
+        description
+          "Indicates the macrange mode of the DHCP L3 forwarding mode.";
+      }
+    }
+    description
+      "The type of DHCP relay mode.";
+  }
+
+  container bb-dhcpv4-relay {
+    description
+      "DHCPv4 relay configurations in broadband area.";
+    container dhcp-option82 {
+      description
+        "Configure dhcp option82 function.";
+      leaf action {
+        type enumeration {
+          enum "enable" {
+            value 1;
+            description
+              "Indicates the dhcp-option82 global switch is enabled.";
+          }
+          enum "disable" {
+            value 2;
+            description
+              "Indicates the dhcp-opiton82 global switch is disabled.";
+          }
+          enum "forward" {
+            value 3;
+            description
+              "Indicates the dhcp-option82 service is enabled and working at forward mode.";
+          }
+          enum "rebuild" {
+            value 4;
+            description
+              "Indicates the dhcp-option82 service is enabled and working at rebuild mode.";
+          }
+        }
+        default "disable";
+        description
+          "Configure global DHCP option82.";
+      }
+      leaf permit-forwarding-default-policy {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the switch of default DHCP option82 forward policy of service-port.";
+      }
+      container transparent-user-vlan {
+        description
+          "Configure DHCP option82 transparent user VLAN.";
+        choice user-vlan {
+          description
+            "A choice on the value of DHCP option82 transparent user VLAN policy.";
+          case all {
+            description
+              "Indicates all or none DHCP packets with option82 can be transparently transmitted.";
+            leaf all {
+              type boolean;
+              description
+                "Enable/disable DHCP packets with option82 can be transparently transmitted.";
+            }
+          }
+          case other {
+            description
+              "Indicates the packets character with option82 can be transparently transmitted.";
+            leaf untag {
+              type boolean;
+              description
+                "Enable/disable the packets with option82 that does not contain VLANs can be transparently transmitted.";
+            }
+            leaf multitag {
+              type boolean;
+              description
+                "Enable/disable the packets with option82 that contain multi VLANs can be transparently transmitted.";
+            }
+            leaf single-vlan-list {
+              type bbf-dot1qt:vlan-id-range;
+              description
+                "Indicates the list of user single VLANs contained in the packets whose DHCP option82 is transparently transmitted.";
+            }
+          }
+        }
+      }
+    }
+    container dhcp-reverse {
+      description
+        "Configure DHCP reverse switch.";
+      leaf enable {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable DHCP reverse switch.";
+      }
+    }
+    container dhcp-relay-mode {
+      description
+        "Configure the global DHCP relay mode.";
+      leaf mode {
+        type dhcp-relay-mode-type;
+        default "layer2";
+        description
+          "Indicates the global DHCP relay mode.";
+      }
+    }
+    container dhcp-relay-interface {
+      description
+        "Configure the filling mode of the GIADDR or source IP of the DHCP-relay upstream packet.";
+      leaf giaddr-select-mode {
+        type enumeration {
+          enum "receive" {
+            value 1;
+            description
+              "Indicates that in the DHCP packet sent from the DHCP relay agent to the server,the gateway IP address is set to the IP address of the Rx interface (user-side interface).";
+          }
+          enum "send" {
+            value 2;
+            description
+              "Indicates that in the DHCP packet sent from the DHCP relay agent to the server,the gateway IP address is set to the IP address of the Tx interface (network-side interface).";
+          }
+        }
+        default "receive";
+        description
+          "Indicates the filling mode of the GIADDR field of the current DHCP-relay upstream packet.";
+      }
+      leaf source-ip-select-mode {
+        type enumeration {
+          enum "receive" {
+            value 1;
+            description
+              "Indicates that in the DHCP packet sent from the relay to the server, the source IP address is set to the IP address of the Rx interface (user-side interface).";
+          }
+          enum "send" {
+            value 2;
+            description
+              "Indicates that in the DHCP packet sent from the relay to the server, the source IP address is set to the IP address of the Tx interface (network-side interface).";
+          }
+        }
+        default "receive";
+        description
+          "Indicates the filling mode of the source IP of the current DHCP-relay upstream packet.";
+      }
+    }
+    container dhcp-server-groups {
+      description
+        "List of DHCP server groups.";
+      list dhcp-server-group {
+        key "group-id";
+        description
+          "Configure an dhcp server group.";
+        leaf group-id {
+          type uint8 {
+            range "0..19";
+          }
+          description
+            "Indicates the index of the DHCP server group.";
+        }
+        container server-addresses {
+          description
+            "List of configuring IP addresses for servers in a server group.";
+          list server-address {
+            key "server-address";
+            max-elements 4;
+            description
+              "Configure an IP address for a server in a server group.";
+            leaf server-address {
+              type inet:ipv4-address-no-zone;
+              description
+                "Server IP address.";
+            }
+          }
+        }
+        leaf vpn-name {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/ni:name";
+          }
+          description
+            "VPN name.";
+        }
+        leaf description {
+          type string {
+            length "1..32";
+          }
+          description
+            "DHCP server group description.";
+        }
+        leaf dscp-priority {
+          type uint32 {
+            range "0..63";
+          }
+          description
+            "Indicates tht DHCP server DSCP priority.";
+        }
+        leaf exp-priority {
+          type uint32 {
+            range "0..7";
+          }
+          description
+            "Indicates tht DHCP server EXP priority.";
+        }
+      }
+    }
+  }
+
+  augment "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow" {
+    description
+      "Indicates the parameters applying to the service flow.";
+    container dhcp-relay {
+      description
+        "Configure the DHCP relay under service-flow.";
+      leaf dhcp-option82-permit-forwarding {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable the switch of DHCP option82 forward policy of service-port.";
+      }
+    }
+  }
+  augment "/ifm:ifm/ifm:interfaces/ifm:interface" {
+    when "ifm:type='Vlanif'";
+    description
+      "Indicates the parameters applying to the VLAN interface.";
+    container dhcp-relay {
+      description
+        "Configure the DHCP relay under interface.";
+      leaf dhcp-server-group-id {
+        type leafref {
+          path "/hw-bb-dhcpv4-relay:bb-dhcpv4-relay/hw-bb-dhcpv4-relay:dhcp-server-groups/hw-bb-dhcpv4-relay:dhcp-server-group/hw-bb-dhcpv4-relay:group-id";
+        }
+        description
+          "Indicates the corresponding DHCP server group of the VLAN interface.";
+      }
+      leaf mode {
+        type dhcp-relay-mode-type;
+        default "layer2";
+        description
+          "Indicates the VLAN level DHCP relay mode.";
+      }
+    }
+  }
+}

@@ -1,0 +1,35 @@
+module huawei-ietf-yang-library-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-yang-library-deviations";
+  prefix yanglib-devs;
+
+  import ietf-yang-library {
+    prefix yanglib;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of IETF yang library data
+     model set for Huawei devices.";
+
+  revision 2024-06-20 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/yanglib:yang-library-update" {
+    deviate not-supported;
+  }
+  deviation "/yanglib:yang-library-change" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,79 @@
+module huawei-bbf-xpon-onu-state-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-xpon-onu-state-deviations-MA5800";
+  prefix bbf-xpon-onu-state-devs-MA5800;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpon-onu-authentication {
+    prefix bbf-xpon-onu-auth;
+  }
+  import bbf-xpon-onu-state {
+    prefix bbf-xpon-onu-s;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xpon-onu-state module.";
+
+  revision 2025-03-29 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:detected-serial-number" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:last-change" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:onu-presence-state" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:onu-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:detected-registration-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:v-ani-ref" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-s:previous-onu-presence-state" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:determined-onu-management-mode" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-loid" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-vendor-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-equipment-id" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-hardware-version" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-active-software-version" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/bbf-xpon:channel-termination/bbf-xpon-onu-s:onu-presence-state-change/bbf-xpon-onu-auth:detected-logical-password" {
+    deviate not-supported;
+  }
+}

@@ -1,0 +1,39 @@
+module huawei-ietf-sub-notif-recv-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-sub-notif-recv-deviations";
+  prefix snr-devs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-subscribed-notif-receivers {
+    prefix snr;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-subscribed-notif-receivers data
+     model set for Huawei devices.";
+
+  revision 2024-10-16 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sn:subscriptions/snr:receiver-instances/snr:receiver-instance/snr:name" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+}

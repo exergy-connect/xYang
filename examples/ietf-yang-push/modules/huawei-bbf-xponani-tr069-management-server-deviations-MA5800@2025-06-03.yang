@@ -1,0 +1,39 @@
+module huawei-bbf-xponani-tr069-management-server-deviations-MA5800 {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bbf-xponani-tr069-management-server-deviations-MA5800";
+  prefix hw-bbf-xponani-tr069-mgmt-srv-dev-MA5800;
+
+  import bbf-xpon {
+    prefix bbf-xpon;
+  }
+  import bbf-xponani-tr069-management-server {
+    prefix bbf-xponani-tr069-mgmt-srv;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-xponani-tr069-management-server.";
+
+  revision 2025-06-03 {
+    description
+      "Changed the length of the realm string from 25 to 24.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-xpon:xpon/bbf-xponani-tr069-mgmt-srv:ani-tr069-management-server-profiles/bbf-xponani-tr069-mgmt-srv:tr069-management-server-profile/bbf-xponani-tr069-mgmt-srv:realm" {
+    deviate replace {
+      type string {
+        length "0..24";
+      }
+    }
+  }
+}

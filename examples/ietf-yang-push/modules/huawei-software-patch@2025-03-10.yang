@@ -1,0 +1,226 @@
+submodule huawei-software-patch {
+  yang-version 1.1;
+  belongs-to huawei-software-management {
+    prefix hw-sm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     supporting software management.";
+
+  revision 2025-03-10 {
+    description
+      "Modify model version.";
+    reference
+      "";
+  }
+  revision 2020-12-23 {
+    description
+      "
+       Adjust the keyword identity order.
+       Modify the description of patch-info.";
+    reference
+      "Huawei private.";
+  }
+  revision 2018-04-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity patch-type {
+    description
+      "Base identity for patch type.
+       Vendors can define the type. For example: hot patch,cold patch.";
+  }
+
+  identity hot-patch {
+    base patch-type;
+    description
+      "Hot patch.";
+  }
+
+  identity cold-patch {
+    base patch-type;
+    description
+      "Cold patch.";
+  }
+
+  typedef patch-state {
+    type enumeration {
+      enum "deactive" {
+        value 0;
+        description
+          "Indicates the patch state is deactive.";
+      }
+      enum "active" {
+        value 1;
+        description
+          "Indicates the patch state is active.";
+      }
+      enum "running" {
+        value 2;
+        description
+          "Indicates the patch state is running.";
+      }
+    }
+    description
+      "This attribute depicts patch state.";
+  }
+
+  container software-patch {
+    description
+      "Patch management.";
+    container patch-info {
+      config false;
+      description
+        "Statistics of patch information.";
+      list patch-info {
+        key "name";
+        description
+          "Statistics of the list of query system patch information.";
+        leaf name {
+          type string {
+            length "1..7";
+          }
+          description
+            "Patch name.";
+        }
+        leaf type {
+          type identityref {
+            base patch-type;
+          }
+          description
+            "Patch type.";
+        }
+        leaf state {
+          type patch-state;
+          description
+            "Patch state.";
+        }
+        leaf rely {
+          type string {
+            length "0..255";
+          }
+          description
+            "The name of the patch on which the patch depends.";
+        }
+        leaf relied {
+          type string {
+            length "0..255";
+          }
+          description
+            "The patch name that depends on the patch.";
+        }
+      }
+    }
+  }
+
+  rpc activate-patch {
+    description
+      "Activate patch operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf name {
+        type string {
+          length "1..7";
+        }
+        mandatory true;
+        description
+          "Patch name.";
+      }
+    }
+  }
+  rpc deactivate-patch {
+    description
+      "Deactivate patch operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf name {
+        type string {
+          length "1..7";
+        }
+        mandatory true;
+        description
+          "Patch name.";
+      }
+    }
+  }
+  rpc run-patch {
+    description
+      "Run patch operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf name {
+        type string {
+          length "1..7";
+        }
+        mandatory true;
+        description
+          "Patch name.";
+      }
+    }
+  }
+  rpc delete-patch {
+    description
+      "Delete patch operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+      leaf name {
+        type string {
+          length "1..7";
+        }
+        mandatory true;
+        description
+          "Patch name.";
+      }
+    }
+  }
+  rpc rollback-patch {
+    description
+      "Rollback patch operation.";
+
+    input {
+      leaf request-id {
+        type uint32;
+        mandatory true;
+        description
+          "Request id.";
+      }
+    }
+  }
+}

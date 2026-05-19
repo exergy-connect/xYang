@@ -1,0 +1,379 @@
+module huawei-device-common {
+  namespace "urn:huawei:yang:huawei-device-common";
+  prefix dev-com;
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "The YANG module defines YANG objects which provide device management interfaces.";
+
+  revision 2024-04-20 {
+    description
+      "Add board-oper-status enum insufficient-rtu.";
+    reference
+      "";
+  }
+  revision 2021-11-24 {
+    description
+      "Add board-oper-status enum isolated.";
+    reference
+      "";
+  }
+  revision 2021-03-25 {
+    description
+      "Modify description format.";
+    reference
+      "";
+  }
+  revision 2019-11-06 {
+    description
+      "Modify reference.";
+    reference
+      "";
+  }
+  revision 2017-12-06 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity device-type {
+    description
+      "Base identity for device type.
+       Vendors can define physical type of the device.";
+  }
+
+  identity chassis-type {
+    description
+      "Base identity for chassis type.
+       vendors can define physical type of the chassis.";
+  }
+
+  identity board-type {
+    description
+      "Base identity for board type.
+       vendors can define physical type of the board.";
+  }
+
+  identity board-catagory {
+    description
+      "Base identity for board type.
+       Vendors can define board base type.";
+  }
+
+  identity device-capability-type {
+    description
+      "Base identity for board type.
+       Vendors can define device capability.";
+  }
+
+  identity chassis-capability-type {
+    description
+      "Base identity for board type.
+       Vendors can define chassis capability.";
+  }
+
+  identity board-capability-type {
+    description
+      "Base identity for board type.
+       Vendors can define board capability.";
+  }
+
+  typedef chassis-oper-status {
+    type enumeration {
+      enum "normal" {
+        value 1;
+        description
+          "Indicates that the chassis is running normally.";
+      }
+      enum "fault" {
+        value 2;
+        description
+          "Indicates that the chassis is faulty.";
+      }
+      enum "other" {
+        value 3;
+        description
+          "Indicates that the chassis is in a state other than the previous three states.";
+      }
+      enum "discovery" {
+        value 4;
+        description
+          "Indicates that the chassis is in the auto discovery state and is to be activated.";
+      }
+      enum "mismatch" {
+        value 5;
+        description
+          "Indicates that the chassis type is inconsistent with the configuration in the database of device.";
+      }
+      enum "offline" {
+        value 6;
+        description
+          "Indicates that the chassis is offline or the link of the chassis is down.";
+      }
+    }
+    description
+      "Chassis oper-status.";
+  }
+
+  typedef board-oper-status {
+    type enumeration {
+      enum "null" {
+        value 1;
+        description
+          "Indicates that the board is null.";
+      }
+      enum "normal" {
+        value 2;
+        description
+          "Indicates that the board is running normally.";
+      }
+      enum "fault" {
+        value 3;
+        description
+          "Indicates that the board is faulty but in position.";
+      }
+      enum "forbidden" {
+        value 4;
+        description
+          "Indicates that the board is in position but disabled.";
+      }
+      enum "autofind" {
+        value 5;
+        description
+          "Indicates that the board is in the autofind state. If a board is inserted in an idle slot,
+           after the report of automatic registration, the board is also in the autofind state.";
+      }
+      enum "config" {
+        value 6;
+        description
+          "Indicates that the board is in the configuration state.";
+      }
+      enum "offline" {
+        value 7;
+        description
+          "Indicates that the board is faulty and is not in position.";
+      }
+      enum "versionerr" {
+        value 8;
+        description
+          "Indicates that the board version is error.";
+      }
+      enum "autoload" {
+        value 9;
+        description
+          "Indicates that the board is in the auto loading state. If detecting a software update,
+           the board automatically loads the update. If a board is in the auto loading state,
+           resetting or disabling the board may fail.";
+      }
+      enum "outofservice" {
+        value 10;
+        description
+          "Indicates that the board is out of service.";
+      }
+      enum "graceful" {
+        value 11;
+        description
+          "Indicates that the board running state is graceful.";
+      }
+      enum "shutdown" {
+        value 12;
+        description
+          "Indicates that the board is in the shutdown state.";
+      }
+      enum "energysavingshutdown" {
+        value 13;
+        description
+          "Used for system energy saving.";
+      }
+      enum "hightempshutdown" {
+        value 14;
+        description
+          "When the temperature of a board exceeds the high temperature threshold,
+           the board is powered off in order to protect the board.";
+      }
+      enum "manualshutdown" {
+        value 15;
+        description
+          "Services on certain boards can be recovered only after restart of the board.
+           You can manually power off the board.
+           Then, the board is in the manual shutdown state.";
+      }
+      enum "mismatch" {
+        value 16;
+        description
+          "When a board inserted in a slot is inconsistent with the configuration saved in the system,
+           the board is in the mismatch state.";
+      }
+      enum "acoffshutdown" {
+        value 17;
+        description
+          "Used to protect system when there is no AC Power.";
+      }
+      enum "isolated" {
+        value 19;
+        description
+          "Indicates that the board is in the isolated state.";
+      }
+      enum "insufficient-rtu" {
+        value 20;
+        description
+          "When the RTU of a board is insufficient, the board is shut down and restricted to go online.";
+      }
+    }
+    description
+      "Board oper-status.";
+  }
+
+  typedef board-role {
+    type enumeration {
+      enum "master" {
+        value 1;
+        description
+          "Master role.";
+      }
+      enum "standby" {
+        value 2;
+        description
+          "Standby role.";
+      }
+      enum "slave" {
+        value 3;
+        description
+          "Slave role in cluster.";
+      }
+    }
+    description
+      "Board role.";
+  }
+
+  typedef port-oper-status {
+    type enumeration {
+      enum "normal" {
+        value 1;
+        description
+          "Indicates that the link is up or activated.";
+      }
+      enum "fault" {
+        value 2;
+        description
+          "Indicates that port failure.";
+      }
+      enum "local-loopback" {
+        value 3;
+        description
+          "Indicates that normal local loopback.";
+      }
+      enum "forbidden" {
+        value 4;
+        description
+          "Indicates that the port is disabled.";
+      }
+      enum "test" {
+        value 5;
+        description
+          "Indicates test start.";
+      }
+      enum "remote-loopback" {
+        value 6;
+        description
+          "Indicates normal remote loopback.";
+      }
+      enum "activated" {
+        value 10;
+        description
+          "Indicates that the port is being activated.";
+      }
+      enum "deactivated" {
+        value 11;
+        description
+          "Indicates that the link is down or deactivated.";
+      }
+      enum "block" {
+        value 12;
+        description
+          "Indicates port blocking.";
+      }
+      enum "nolight" {
+        value 13;
+        description
+          "Indicates no signal in ATM port.";
+      }
+      enum "inner-local-loopback" {
+        value 14;
+        description
+          "Indicates that inner local loopback toward inner system chipset.";
+      }
+      enum "inner-remote-loopback" {
+        value 15;
+        description
+          "Indicates that inner remote loopback toward inner system chipset.";
+      }
+      enum "locked" {
+        value 16;
+        description
+          "Indicates locked.";
+      }
+      enum "busy" {
+        value 17;
+        description
+          "Indicates locked.";
+      }
+      enum "maintain" {
+        value 18;
+        description
+          "Indicates maintenance.";
+      }
+      enum "standbynormal" {
+        value 19;
+        description
+          "Indicates that the port on the standby control board is activated.";
+      }
+      enum "standbyfault" {
+        value 20;
+        description
+          "Indicates that the port on the standby control board is faulty.";
+      }
+      enum "adslloopbackafe" {
+        value 21;
+        description
+          "Indicates that AFE loopback.";
+      }
+      enum "adslloopbackhybrid" {
+        value 22;
+        description
+          "Indicates that HYBRID loopback.";
+      }
+      enum "rtu-local-loopback" {
+        value 23;
+        description
+          "Indicates that RTU local loopback.";
+      }
+      enum "rtu-remote-loopback" {
+        value 24;
+        description
+          "Indicates that RTU remote loopback.";
+      }
+      enum "linkup" {
+        value 25;
+        description
+          "Indicates eth port up.";
+      }
+      enum "linkdown" {
+        value 26;
+        description
+          "Indicates eth port down.";
+      }
+    }
+    description
+      "Port oper-status.";
+  }
+}

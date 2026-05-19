@@ -1,0 +1,56 @@
+module huawei-ietf-yang-push-deviations {
+  namespace "urn:huawei:yang:huawei-ietf-yang-push-deviations";
+  prefix yp-devs;
+
+  import ietf-subscribed-notifications {
+    prefix sn;
+  }
+  import ietf-yang-push {
+    prefix yp;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a set of deviations of ietf-yang-push data
+     model set for Huawei devices.";
+
+  revision 2024-10-16 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/sn:filters/yp:selection-filter/yp:filter-id" {
+    deviate replace {
+      type string {
+        length "1..127";
+      }
+    }
+  }
+  deviation "/sn:filters/yp:selection-filter/yp:filter-spec/yp:datastore-xpath-filter/yp:datastore-xpath-filter" {
+    deviate replace {
+      type yang:xpath1.0 {
+        length "0..2560";
+      }
+    }
+  }
+  deviation "/sn:subscriptions/sn:subscription/sn:target/yp:datastore/yp:selection-filter/yp:within-subscription/yp:filter-spec/yp:datastore-xpath-filter/yp:datastore-xpath-filter" {
+    deviate replace {
+      type yang:xpath1.0 {
+        length "0..2560";
+      }
+    }
+  }
+}

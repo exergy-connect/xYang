@@ -1,0 +1,223 @@
+module huawei-gpon-uni {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-gpon-uni";
+  prefix hwgponuni;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+  import bbf-xpon-common-types {
+    prefix xpon-common-types;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide GPON UNI management.";
+
+  revision 2025-11-21 {
+    description
+      "Change type of serial-number.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989., G.9804";
+  }
+  revision 2023-12-07 {
+    description
+      "Add the enum value of nni-speed-type.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989., G.9804";
+  }
+  revision 2023-06-19 {
+    description
+      "Add the enum value of nni-speed-type.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989., G.9804";
+  }
+  revision 2021-05-27 {
+    description
+      "Modify type of password.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989.";
+  }
+  revision 2019-10-26 {
+    description
+      "Change the node discover-ont from list to container.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+  revision 2017-11-23 {
+    description
+      "Initial revision.";
+    reference
+      "ITU-T G.984, G.988, G.9807, G.987, G.989";
+  }
+
+  grouping ont-discovery-data {
+    description
+      "Data nodes for the infomation of discovery ONTs.";
+    leaf parent-ref {
+      type if:interface-ref;
+      must "/if:interfaces/if:interface[if:name=current()]/if:type='bbf-xponift:channel-partition'" {
+        error-message
+          "Must reference a channel partition";
+      }
+      description
+        "Reference to a channel partition.";
+    }
+    leaf nni-speed-type {
+      type enumeration {
+        enum "down-2.5-up-1.25" {
+          value 1;
+          description
+            "Means to denote an channelpair with DS:2.5Gbps and US:1.25Gbps line rates.";
+        }
+        enum "down-10-up-2.5" {
+          value 2;
+          description
+            "Means to denote an channelpair with DS:10Gbps and US:2.5Gbps line rates.";
+        }
+        enum "down-10-up-10" {
+          value 3;
+          description
+            "Means to denote an channelpair with DS:10Gbps and US:10Gbps line rates.";
+        }
+        enum "down-50-up-12.5" {
+          value 6;
+          description
+            "Means to denote an channelpair with DS:50Gbps and US:12.5Gbps line rates.";
+        }
+        enum "down-50-up-25" {
+          value 7;
+          description
+            "Means to denote an channelpair with DS:50Gbps and US:25Gbps line rates.";
+        }
+        enum "down-50-up-50" {
+          value 8;
+          description
+            "Means to denote an channelpair with DS:50Gbps and US:50Gbps line rates.";
+        }
+        enum "down-12.5-up-12.5" {
+          value 9;
+          description
+            "Means to denote an channelpair with DS:12.5Gbps and US:12.5Gbps line rates.";
+        }
+      }
+      description
+        "The line rates reported by the ONT.";
+      reference
+        "ITU-T G.984, G.988, G.9807, G.987, G.989, G.9804";
+    }
+    leaf serial-number {
+      type xpon-common-types:general-onu-serial-number;
+      description
+        "The serial number is unique for each ONT and contains
+         the vendor ID and version number. The first four
+         bytes are an ASCII-encoded vendor ID four letter
+         mnemonic. The second four bytes are a binary encoded
+         serial number under the control of the ONT vendor.";
+      reference
+        "ITU-T G.984, G.988, G.9807, G.987, G.989";
+    }
+    leaf password {
+      type string {
+        length "0..72";
+      }
+      description
+        "The registration ID of an Optical Network Unit (ONU) with each
+         octet represented as two hexadecimal characters.
+         For ITU-T G.984.3, the leaf can only be up to 20 characters
+         long (refer to 'password' 10 bytes long).
+         For ITU-T G.987.3, ITU-T G.9807.3 and ITU-T G.989.3 the
+         leaf can be up to 72 characters long (refer to
+         'registration id' 36 bytes long).";
+      reference
+        "ITU-T G.984, G.988, G.9807, G.987, G.989";
+    }
+    leaf loid {
+      type string {
+        length "0..24";
+      }
+      description
+        "The loid reported by the ONT.";
+      reference
+        "ITU-T G.988 and CTC";
+    }
+    leaf checkcode {
+      type string {
+        length "0..12";
+      }
+      description
+        "The checkcode reported by the ONT.";
+      reference
+        "ITU-T G.988 and CTC";
+    }
+    leaf vendor-id {
+      type binary {
+        length "4";
+      }
+      description
+        "Identifies the vendor of the ONT.";
+      reference
+        "ITU-T G.984, G.988, G.9807, G.987, G.989";
+    }
+    leaf equipment-id {
+      type binary {
+        length "20";
+      }
+      description
+        "This attribute may be used to identify the specific
+         type of ONT. In some environments, this attribute may
+         include the equipment CLEI code.";
+      reference
+        "ITU-T G.988";
+    }
+    leaf hardware-version {
+      type string {
+        length "0..16";
+      }
+      description
+        "This string attribute identifies the version of the hardware.";
+      reference
+        "ITU-T G.988";
+    }
+    leaf active-software-version {
+      type string {
+        length "0..14";
+      }
+      description
+        "This string attribute identifies the active software version.";
+      reference
+        "ITU-T G.988";
+    }
+    leaf customize-information {
+      type string {
+        length "0..24";
+      }
+      description
+        "This string attribute identifies the customize information.";
+      reference
+        ".";
+    }
+  }
+
+  notification new-ont-discovered {
+    description
+      "One or more new ONTs have been discovered on the specified channel partition.";
+    container discover-ont {
+      description
+        "List of the infomation of discovery ONTs.";
+      uses ont-discovery-data;
+    }
+  }
+}

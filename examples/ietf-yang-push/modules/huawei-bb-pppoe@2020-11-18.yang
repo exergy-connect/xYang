@@ -1,0 +1,138 @@
+module huawei-bb-pppoe {
+  namespace "urn:huawei:yang:huawei-bb-pppoe";
+  prefix hw-bb-pppoe;
+
+  import bbf-dot1q-types {
+    prefix bbf-dot1qt;
+  }
+  import huawei-bb-service-flow {
+    prefix hw-bb-srv-flow;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of definitions for configuring the information of PPPoE.";
+
+  revision 2020-11-18 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  container bb-pppoe {
+    description
+      "PPPoE configurations in broadband area.";
+    container pitp {
+      description
+        "Configure pitp global switch. Pitp can only work at pmode or vmode.";
+      leaf action {
+        type enumeration {
+          enum "disable" {
+            value 1;
+            description
+              "Indicates pitp feature is disabled.";
+          }
+          enum "vmode" {
+            value 2;
+            description
+              "Indicates pitp is working on vmode.";
+          }
+          enum "pmode" {
+            value 3;
+            description
+              "Indicates pitp is working on pmode.";
+          }
+          enum "forward-pmode" {
+            value 4;
+            description
+              "Indicates pitp is working on forward mode. Only pmode support forward mode.";
+          }
+          enum "rebuild-pmode" {
+            value 5;
+            description
+              "Indicates pitp is working on rebuild mode. Only pmode support rebuild mode.";
+          }
+        }
+        default "disable";
+        description
+          "PITP status configuration.";
+      }
+      container transparent-user-vlan {
+        description
+          "Configure pitp transparent user VLAN.";
+        choice user-vlan {
+          description
+            "A choice on the value of pitp transparent user VLAN policy.";
+          case all {
+            description
+              "Indicates all or none PPPoE packets with vendor tag can be transparently transmitted.";
+            leaf all {
+              type boolean;
+              description
+                "Enable/disable PPPoE packets with vendor tag can be transparently transmitted.";
+            }
+          }
+          case other {
+            description
+              "Indicates the packets character with vendor tag can be transparently transmitted.";
+            leaf untag {
+              type boolean;
+              description
+                "Enable/disable the packets with vendor tag that does not contain VLANs can be transparently transmitted.";
+            }
+            leaf multitag {
+              type boolean;
+              description
+                "Enable/disable the packets with vendor tag that contain multi VLANs can be transparently transmitted.";
+            }
+            leaf single-vlan-list {
+              type bbf-dot1qt:vlan-id-range;
+              description
+                "Indicates the list of user single VLANs contained in the packets whose PPPoE vendor tag is transparently transmitted.";
+            }
+          }
+        }
+      }
+    }
+    container pppoe-reverse {
+      description
+        "Configure PPPoE reverse switch.";
+      leaf enable {
+        type boolean;
+        default "false";
+        description
+          "Enable/disable PPPoE reverse switch.";
+      }
+    }
+  }
+
+  augment "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow" {
+    description
+      "Indicates the parameters applying to the service flow.";
+    container pitp {
+      description
+        "Configure the pitp policy.";
+      leaf permit-forwarding {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable the switch of pitp forward policy of service-port.";
+      }
+      leaf pitp-enable {
+        type boolean;
+        default "true";
+        description
+          "Enable/disable the switch of pitp of service-port.";
+      }
+    }
+  }
+}

@@ -1,0 +1,79 @@
+module huawei-bbf-qos-classifiers-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-bbf-qos-classifiers-deviations-MA5800";
+  prefix bbf-qos-cls-devs-MA5800;
+
+  import bbf-qos-classifiers {
+    prefix bbf-qos-cls;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for bbf-qos-classifiers module.";
+
+  revision 2024-04-08 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:name" {
+    deviate replace {
+      type string {
+        length "1..32";
+      }
+    }
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:system-default-actions" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:configurable-default-actions" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-operation" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:filter-method/bbf-qos-cls:inline" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-cls:dei-marking" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-cls:dscp-marking" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-cls:permit" {
+    deviate not-supported;
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-cls:pbit-marking/bbf-qos-cls:pbit-marking-cfg/bbf-qos-cls:pbit-marking-list/bbf-qos-cls:pbit-value" {
+    deviate add {
+      must "not(../bbf-qos-cls:pbit-from-frame-tag)" {
+        error-message
+          "Can only configure pbit-value or pbit-from-frame-tag.";
+        description
+          "Can only configure pbit-value or pbit-from-frame-tag.";
+      }
+    }
+  }
+  deviation "/bbf-qos-cls:classifiers/bbf-qos-cls:classifier-entry/bbf-qos-cls:classifier-action-entry-cfg/bbf-qos-cls:action-cfg-params/bbf-qos-cls:pbit-marking/bbf-qos-cls:pbit-marking-cfg/bbf-qos-cls:pbit-marking-list/bbf-qos-cls:pbit-from-frame-tag" {
+    deviate add {
+      must "not(../bbf-qos-cls:pbit-value)" {
+        error-message
+          "Can only configure pbit-value or pbit-from-frame-tag.";
+        description
+          "Can only configure pbit-value or pbit-from-frame-tag.";
+      }
+    }
+  }
+}

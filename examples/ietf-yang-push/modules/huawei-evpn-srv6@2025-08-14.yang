@@ -1,0 +1,620 @@
+module huawei-evpn-srv6 {
+  namespace "urn:huawei:yang:huawei-evpn-srv6";
+  prefix evpn-srv6;
+
+  import huawei-network-instance {
+    prefix ni;
+  }
+  import huawei-extension {
+    prefix ext;
+  }
+  import huawei-evpl {
+    prefix evpl;
+  }
+  import huawei-bgp {
+    prefix bgp;
+  }
+  import huawei-bgp-evpn {
+    prefix bgp-evpn;
+  }
+  import huawei-evpn {
+    prefix evpn;
+  }
+  import huawei-srv6 {
+    prefix srv6;
+  }
+  import ietf-inet-types {
+    prefix inet;
+  }
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import huawei-bgp-srv6 {
+    prefix bgp-srv6;
+  }
+  import huawei-l2vpn {
+    prefix l2vpn;
+  }
+  import huawei-bd {
+    prefix bd;
+  }
+  import huawei-pub-type {
+    prefix pub-type;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "EVPN SRv6 configuration.";
+
+  revision 2025-08-14 {
+    description
+      "Modify the must condition of the srv6 locator leaf.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-11-26 {
+    description
+      "Modify the must condition of the srv6 locator list.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-01-12 {
+    description
+      "Modify the must condition of the locators.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-11-09 {
+    description
+      "Add extend-compress leaf and extend-compress-type type.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-04-19 {
+    description
+      "Modify the must condition of the locators.";
+    reference
+      "Huawei private.";
+  }
+  revision 2023-03-22 {
+    description
+      "Modify the condition of the locators.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-11-17 {
+    description
+      "Add compress and flavor-type leaf.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-19 {
+    description
+      "Add the must condition of the locators.";
+    reference
+      "Huawei private.";
+  }
+  revision 2022-09-08 {
+    description
+      "The modifications is removing the leaf auto-sid-disable,changing the container name of apply-sid-specify-nexthop and adding the default value of apply-sid-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-12-17 {
+    description
+      "The modifications is removing the leaf auto-sid-disable,changing the container name of apply-sid-specify-nexthop and adding the default value of apply-sid-mode.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-12-16 {
+    description
+      "The modifications in the schema file are synchronized to the YANG file.";
+    reference
+      "Huawei private.";
+  }
+  revision 2019-03-22 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+ 
+
+  typedef apply-sid-mode {
+    type enumeration {
+      enum "per-instance" {
+        value 0;
+        description
+          "Set apply sid per instance mode.";
+      }
+      enum "per-nexthop-all" {
+        value 1;
+        description
+          "Set apply sid all nexthop mode.";
+      }
+      enum "per-nexthop-specify" {
+        value 2;
+        description
+          "Set apply sid specify nexthop mode.";
+      }
+    }
+    description
+      "Apply SID for segment-routing IPv6 in EVPN.";
+  }
+
+  typedef next-header-type {
+    type enumeration {
+      enum "exnh59" {
+        value 59;
+        description
+          "The value of SRv6 next header type is 59.";
+      }
+      enum "exnh143" {
+        value 143;
+        description
+          "The value of SRv6 next header type is 143.";
+      }
+    }
+    description
+      "The value of SRv6 next header type.";
+  }
+
+  typedef apply-sid-mode-import-vpn-rib {
+    type enumeration {
+      enum "per-route" {
+        value 1;
+        description
+          "Set apply sid per route mode.";
+      }
+      enum "per-nexthop" {
+        value 2;
+        description
+          "Set apply sid per nexthop mode.";
+      }
+    }
+    description
+      "Apply SID for imported vpn RIBs.";
+  }
+
+  typedef sid-compress-type {
+    type enumeration {
+      enum "common" {
+        value 0;
+        description
+          "Not Support sid compress.";
+      }
+      enum "compress" {
+        value 1;
+        description
+          "Support sid compress.";
+      }
+    }
+    description
+      "Sid mode type.";
+  }
+
+  typedef compress-flavor-type {
+    type enumeration {
+      enum "coc-next" {
+        value 1;
+        description
+          "Coc-next.";
+      }
+      enum "next" {
+        value 2;
+        description
+          "Next.";
+      }
+    }
+    description
+      "The flavor type of compression.";
+  }
+
+  typedef extend-compress-type {
+    type enumeration {
+      enum "dt2m" {
+        value 1;
+        description
+          "DT2M Compression.";
+      }
+    }
+    description
+      "The extension type of compression.";
+  }
+
+  container evpn-srv6 {
+    description
+      "EVPN SRv6 configuration.";
+    container base-process {
+      description
+        "Configure EVPN SRv6 base process.";
+      leaf srv6-next-header {
+        type next-header-type;
+        default "exnh143";
+        description
+          "The value of SRv6 next header type.";
+      }
+    }
+  }
+
+  augment "/evpl:evpl/evpl:instances/evpl:instance/evpn:evpn" {
+    description
+      "EVPN SRv6 configuration.";
+    container locators {
+      when "../../evpl:mode!='vxlan-mode' and ../evpn:name";
+      description
+        "List of locators used by segment-routing IPv6 for EVPN.";
+      list locator {
+        must "../../evpn:flow-label!='true' and ../../evpn:peer-traffic-statistics='false'";
+        key "name";
+        max-elements 1;
+        description
+          "Configure SRv6 locator.";
+        leaf name {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+          }
+          description
+            "Locator name.";
+        }
+        leaf compress {
+          when "../name";
+          type boolean;
+          default "false";
+          description
+            "Enable/disable vpn-sid compression function.";
+        }
+        leaf flavor-type {
+          when "../compress='true'";
+          type compress-flavor-type;
+          description
+            "Flavor type of vpn-sid compression.";
+        }
+      }
+    }
+  }
+  augment "/ni:network-instance/ni:instances/ni:instance/bgp:bgp/bgp:base-process/bgp:afs/bgp:af/bgp:ipv4-unicast/bgp-evpn:evpn" {
+    description
+      "EVPN SRv6 configuration.";
+    container locators {
+      when "../../../../../../../ni:name!='_public_'";
+      description
+        "List of locators used by segment-routing IPv6 for EVPN.";
+      list locator {
+        must "not (../../../../../../bgp-srv6:locator/bgp-srv6:name)";
+        key "name";
+        max-elements 1;
+        description
+          "Configure SRv6 locator.";
+        leaf name {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+          }
+          description
+            "Locator name.";
+        }
+        leaf advertise-sbfd-discriminator {
+          type empty;
+          description
+            "Enable SRv6 SBFD reflector discriminator in BGP.";
+        }
+        leaf apply-sid-compress-type {
+          type sid-compress-type;
+          must ".='common' or /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:locators/srv6:locator[srv6:name=current()/../name]/srv6:compress-16";
+          must "(.='common' and not(../apply-sid-flavor)) or .='compress'";
+          must "not(../apply-sid-flavor) or (../apply-sid-flavor and /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:compress-16-mode and ((../apply-sid-flavor='coc-next' and /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:compress-16-mode='default') or ../apply-sid-flavor!='coc-next'))";
+          default "common";
+          description
+            "Configure SID compress type.";
+        }
+        leaf-list apply-sid-flavor {
+          when "../apply-sid-compress-type!='common'";
+          type compress-flavor-type;
+          max-elements 1;
+          description
+            "Configure SID flavor.";
+        }
+      }
+    }
+    container apply-sid-mode {
+      when "../../../../../../../ni:name!='_public_' and ../../../bgp:type='ipv4uni'";
+      description
+        "Configure apply SID for segment-routing IPv6 in EVPN.";
+      leaf mode {
+        when "../../locators/locator/name";
+        type apply-sid-mode;
+        default "per-instance";
+        description
+          "Apply SID mode for segment-routing IPv6 in EVPN.";
+      }
+      container specify-nexthops {
+        when "../mode='per-nexthop-specify'";
+        description
+          "List of locators used by segment-routing IPv6 for EVPN.";
+        list specify-nexthop {
+          key "nexthop-address";
+          max-elements 128;
+          description
+            "Configure apply SID for segment-routing IPv6 in EVPN specify nexthop mode.";
+          leaf nexthop-address {
+            type inet:ip-address-no-zone;
+            description
+              "Specify the nexthop address.";
+          }
+          leaf interface-name {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            mandatory true;
+            description
+              "Out interface name of route.";
+          }
+        }
+      }
+    }
+  }
+  augment "/ni:network-instance/ni:instances/ni:instance/bgp:bgp/bgp:base-process/bgp:afs/bgp:af/bgp:ipv6-unicast/bgp-evpn:evpn" {
+    description
+      "EVPN SRv6 configuration.";
+    container locators {
+      when "../../../../../../../ni:name!='_public_'";
+      description
+        "List of locators used by segment-routing IPv6 for EVPN.";
+      list locator {
+        must "not (../../../../../../bgp-srv6:locator/bgp-srv6:name)";
+        key "name";
+        max-elements 1;
+        description
+          "Configure SRv6 locator.";
+        leaf name {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+          }
+          description
+            "Locator name.";
+        }
+        leaf advertise-sbfd-discriminator {
+          type empty;
+          description
+            "Enable SRv6 SBFD reflector discriminator in BGP.";
+        }
+        leaf apply-sid-compress-type {
+          type sid-compress-type;
+          must ".='common' or /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:locators/srv6:locator[srv6:name=current()/../name]/srv6:compress-16";
+          must "(.='common' and not(../apply-sid-flavor)) or .='compress'";
+          must "not(../apply-sid-flavor) or (../apply-sid-flavor and /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:compress-16-mode and ((../apply-sid-flavor='coc-next' and /ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:compress-16-mode='default') or ../apply-sid-flavor!='coc-next'))";
+          default "common";
+          description
+            "Configure SID compress type.";
+        }
+        leaf-list apply-sid-flavor {
+          when "../apply-sid-compress-type!='common'";
+          type compress-flavor-type;
+          max-elements 1;
+          description
+            "Configure SID flavor.";
+        }
+      }
+    }
+    container apply-sid-mode {
+      when "../../../../../../../ni:name!='_public_' and ../../../bgp:type='ipv6uni'";
+      description
+        "Configure apply SID for segment-routing IPv6 in EVPN.";
+      leaf mode {
+        when "../../locators/locator/name";
+        type apply-sid-mode;
+        default "per-instance";
+        description
+          "Apply SID mode for segment-routing IPv6 in EVPN.";
+      }
+      container specify-nexthops {
+        when "../mode='per-nexthop-specify'";
+        description
+          "List of locators used by segment-routing IPv6 for EVPN.";
+        list specify-nexthop {
+          key "nexthop-address";
+          max-elements 128;
+          description
+            "Configure apply SID for segment-routing IPv6 in EVPN specify nexthop mode.";
+          leaf nexthop-address {
+            type inet:ipv6-address-no-zone;
+            description
+              "Specify the nexthop IPv6 address.";
+          }
+          leaf interface-name {
+            type leafref {
+              path "/ifm:ifm/ifm:interfaces/ifm:interface/ifm:name";
+            }
+            mandatory true;
+            description
+              "Out interface name of route.";
+          }
+        }
+      }
+    }
+  }
+  augment "/evpn:evpn/evpn:instances/evpn:instance/evpn:bd-evpn" {
+    description
+      "EVPN SRv6 configuration.";
+    container locator {
+      description
+        "Configure segment-routing IPv6 locators to EVPN.";
+      leaf srv6-locator {
+        type leafref {
+          path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+        }
+        must "/ni:network-instance/ni:instances/ni:instance[ni:name='_public_']/srv6:srv6/srv6:locators/srv6:locator[srv6:name=current()]/srv6:args-length>0 and ../../evpn:peer-traffic-statistics!='true'";
+        description
+          "Locator that is used to generate a BUM (DT2M) SID. If unicast-locator is not configured, locator is used to generate a unicast (DT2U) SID.";
+      }
+      leaf unicast-locator {
+        when "../srv6-locator";
+        type leafref {
+          path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+        }
+        must "(../unicast-locator and ../unicast-locator!=../srv6-locator) or not(../unicast-locator)";
+        description
+          "Locator that is used to generate a unicast (DT2U) SID.";
+      }
+      leaf compress {
+        when "../srv6-locator";
+        type boolean;
+        default "false";
+        description
+          "Enable/disable vpn-sid compression function.";
+      }
+      leaf flavor-type {
+        when "../compress='true'";
+        type compress-flavor-type;
+        description
+          "Flavor type of vpn-sid compression.";
+      }
+      leaf no-args {
+        when "../srv6-locator";
+        type boolean;
+        default "false";
+        description
+          "Enable/disable advertise single-homing args function.";
+      }
+      leaf extend-compress {
+        when "../compress='true'";
+        type extend-compress-type;
+        description
+          "Enable/disable the extended compression function.";
+      }
+    }
+  }
+  augment "/ni:network-instance/ni:instances/ni:instance/bgp:bgp/bgp:base-process/bgp:afs/bgp:af/bgp-evpn:l2vpn-evpn" {
+    description
+      "L2VPN EVPN SRv6 configuration.";
+    container locators {
+      description
+        "List of locators used by segment-routing IPv6 for EVPN.";
+      list locator {
+        key "name";
+        max-elements 1;
+        description
+          "Configure SRv6 locator.";
+        leaf name {
+          type leafref {
+            path "/ni:network-instance/ni:instances/ni:instance/srv6:srv6/srv6:locators/srv6:locator/srv6:name";
+          }
+          description
+            "Locator name.";
+        }
+      }
+    }
+    container apply-sid-import-vpn-ribs {
+      description
+        "List of apply sid modes for imported VPN RIBs configuration.";
+      list apply-sid-import-vpn-rib {
+        key "source-address-family";
+        description
+          "Configure apply sid mode for imported VPN RIB configuration.";
+        leaf source-address-family {
+          type bgp-evpn:import-vpn-rib-afi-type;
+          description
+            "Source address family type for imported RIBs.";
+        }
+        leaf mode {
+          type apply-sid-mode-import-vpn-rib;
+          mandatory true;
+          description
+            "Apply SID for imported vpn RIBs.";
+        }
+      }
+    }
+  }
+  augment "/bd:bd/bd:instances/bd:instance/evpn:evpn" {
+    description
+      "Configure EVPN srv6 static routes.";
+    container srv6-static-macs {
+      when "(../evpn:name and /evpn:evpn/evpn:instances/evpn:instance[evpn:name=current()/../evpn:name]/evpn:bd-evpn/evpn-srv6:locator/evpn-srv6:srv6-locator)";
+      description
+        "List of static MAC routes.";
+      list srv6-static-mac {
+        must "not(../../evpn:tag)";
+        must "not(../../../evpn:evpl-upes/evpn:evpl-upe)";
+        must "not(/l2vpn:l2vpn/l2vpn:instances/l2vpn:instance/l2vpn:vpls/l2vpn:bds/l2vpn:bd[l2vpn:id=current()/../../../bd:id])";
+        must "count(/bd:bd/bd:instances/bd:instance/evpn:evpn/srv6-static-macs/srv6-static-mac)<=1024";
+        key "mac-address sid";
+        max-elements 128;
+        description
+          "Configure static MAC routes.";
+        leaf mac-address {
+          type pub-type:mac-address;
+          must "count(/bd:bd/bd:instances/bd:instance[bd:id=current()/../../../../bd:id]/evpn:evpn/srv6-static-macs/srv6-static-mac[mac-address=current()])<=1";
+          description
+            "MAC address.";
+        }
+        leaf sid {
+          type inet:ipv6-address-no-zone;
+          description
+            "SID attribute.";
+        }
+        leaf peer-ip {
+          type inet:ipv6-address-no-zone;
+          mandatory true;
+          description
+            "Peer IP address of remote peer.";
+        }
+        leaf color {
+          type uint32 {
+            range "0..4294967295";
+          }
+          mandatory true;
+          description
+            "Color information for tunnel.";
+        }
+      }
+    }
+    container srv6-static-imets {
+      when "(../evpn:name and /evpn:evpn/evpn:instances/evpn:instance[evpn:name=current()/../evpn:name]/evpn:bd-evpn/evpn-srv6:locator/evpn-srv6:srv6-locator)";
+      description
+        "List of static inclusive routes.";
+      list srv6-static-imet {
+        must "not(../../evpn:tag)";
+        must "not(../../../evpn:evpl-upes/evpn:evpl-upe)";
+        must "not(/l2vpn:l2vpn/l2vpn:instances/l2vpn:instance/l2vpn:vpls/l2vpn:bds/l2vpn:bd[l2vpn:id=current()/../../../bd:id])";
+        must "not(contains(./source,':'))";
+        key "source sid";
+        max-elements 1;
+        description
+          "Configure static inclusive routes.";
+        leaf source {
+          type inet:ip-address-no-zone;
+          description
+            "Source address.";
+        }
+        leaf sid {
+          type inet:ipv6-address-no-zone;
+          description
+            "SID attribute.";
+        }
+        leaf peer-ip {
+          type inet:ipv6-address-no-zone;
+          mandatory true;
+          description
+            "Peer IP address of remote peer.";
+        }
+        leaf color {
+          type uint32 {
+            range "0..4294967295";
+          }
+          mandatory true;
+          description
+            "Color information for tunnel.";
+        }
+      }
+    }
+  }
+}

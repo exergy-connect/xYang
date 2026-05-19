@@ -1,0 +1,2714 @@
+module huawei-bb-qos {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-bb-qos";
+  prefix hw-bb-qos;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import huawei-board {
+    prefix board;
+  }
+  import huawei-bb-vlan {
+    prefix huawei-vlan;
+  }
+  import huawei-bb-service-flow {
+    prefix hw-bb-srv-flow;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of yang definitions for
+     configuring the information of QOS for the broadband services.";
+
+  revision 2022-09-13 {
+    description
+      "Modify the maximum number of enqueuing policy profile is increased to 8.";
+    reference
+      "";
+  }
+  revision 2022-07-22 {
+    description
+      "Replace single quotation marks in when statements with double quotation marks.";
+    reference
+      "";
+  }
+  revision 2021-08-07 {
+    description
+      "Add the presence statement to container inner-pbit-remarking.
+       Add the presence statement to container e2e-priority-remarking-mode.";
+    reference
+      "";
+  }
+  revision 2020-12-15 {
+    description
+      "Add HQos config. Add Car-port config. Add early-drop config.
+       Add Car-group config. Add qos-policy-profile config. Add wred-profile config.";
+    reference
+      "";
+  }
+  revision 2020-09-27 {
+    description
+      "Modify the ranges of the leaf cir and pir.";
+    reference
+      "";
+  }
+  revision 2019-12-12 {
+    description
+      "Add packet-to-wred-colors to dscp-to-dscp-mapping-tables.";
+    reference
+      "";
+  }
+  revision 2019-06-29 {
+    description
+      "Modify the description of the leaf outer-pbit-to-pbit-mapping-table-index and
+       dscp-to-pbit-mapping-table-index.";
+    reference
+      "";
+  }
+  revision 2019-01-08 {
+    description
+      "Add a collection of functions for QoS traffic management (TM).";
+    reference
+      "";
+  }
+  revision 2018-09-26 {
+    description
+      "Modify some parameters to traffic-table profile.";
+    reference
+      "";
+  }
+  revision 2018-03-21 {
+    description
+      "Add some parameters to traffic-table profile.";
+    reference
+      "";
+  }
+  revision 2017-09-30 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+
+  identity pbit-remarking-type {
+    description
+      "Pbit remark type.";
+  }
+
+  identity local-setting-pbit {
+    base pbit-remarking-type;
+    description
+      "Remark specified PBIT bits in the tag.";
+  }
+
+  identity mapping-copy-pbit-from-outer-pbit {
+    base pbit-remarking-type;
+    description
+      "Mapping copy from input outer tag.";
+  }
+
+  identity mapping-copy-pbit-from-inner-pbit {
+    base pbit-remarking-type;
+    description
+      "Mapping copy from input inner tag.";
+  }
+
+  identity mapping-copy-pbit-from-ipprec {
+    base pbit-remarking-type;
+    description
+      "Mapping copy from the ipprec field of the IP header.";
+  }
+
+  identity mapping-copy-pbit-from-dscp {
+    base pbit-remarking-type;
+    description
+      "Mapping copy from the dscp or tc field of the IP header.";
+  }
+
+  identity e2e-priority-remarking-type {
+    description
+      "E2E priority remark type.";
+  }
+
+  identity e2e-mapping-copy-priority-from-outer-pbit {
+    base e2e-priority-remarking-type;
+    description
+      "Mapping copy from input outer tag.";
+  }
+
+  identity e2e-mapping-copy-priority-from-dscp {
+    base e2e-priority-remarking-type;
+    description
+      "Mapping copy from the dscp or tc field of the IP header.";
+  }
+
+  identity queue-scheduling-type {
+    description
+      "Base identity of queue scheduling types.";
+  }
+
+  identity strict-priority {
+    base queue-scheduling-type;
+    description
+      "Strict priority queue scheduling type.";
+  }
+
+  identity wrr {
+    base queue-scheduling-type;
+    description
+      "Weighted round robin queue scheduling type.";
+  }
+
+  typedef rate-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:rate-profiles/hw-bb-qos:rate-profile/hw-bb-qos:name";
+    }
+    description
+      "A reference to a rate profile.";
+  }
+
+  typedef pbit-to-pbit-mapping-table-ref {
+    type leafref {
+      path "/hw-bb-qos:pbit-to-pbit-mapping-tables/hw-bb-qos:pbit-to-pbit-mapping-table/hw-bb-qos:index";
+    }
+    description
+      "A reference to a pbit-to-pbit-mapping-table.";
+  }
+
+  typedef ipprec-to-pbit-mapping-table-ref {
+    type leafref {
+      path "/hw-bb-qos:ipprec-to-pbit-mapping-tables/hw-bb-qos:ipprec-to-pbit-mapping-table/hw-bb-qos:index";
+    }
+    description
+      "A reference to a ipprec-to-pbit-mapping-table.";
+  }
+
+  typedef dscp-to-pbit-mapping-table-ref {
+    type leafref {
+      path "/hw-bb-qos:dscp-to-pbit-mapping-tables/hw-bb-qos:dscp-to-pbit-mapping-table/hw-bb-qos:index";
+    }
+    description
+      "A reference to a dscp-to-pbit-mapping-table.";
+  }
+
+  typedef cos-group-table-ref {
+    type leafref {
+      path "/hw-bb-qos:cos-group-tables/hw-bb-qos:cos-group-table/hw-bb-qos:index";
+    }
+    description
+      "A reference to a cos-group-table.";
+  }
+
+  typedef car-threshold-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:car-threshold-profiles/hw-bb-qos:car-threshold-profile/hw-bb-qos:index";
+    }
+    description
+      "A reference to a car threshold profile.";
+  }
+
+  typedef traffic-table-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:traffic-tables/hw-bb-qos:traffic-table/hw-bb-qos:name";
+    }
+    description
+      "A reference to a traffic table profile.";
+  }
+
+  typedef wred-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:wred-profiles/hw-bb-qos:wred-profile/hw-bb-qos:index";
+    }
+    description
+      "A reference to a wred profile.";
+  }
+
+  typedef qos-policy-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:qos-policy-profiles/hw-bb-qos:qos-policy-profile/hw-bb-qos:name";
+    }
+    description
+      "A reference to a qos policy profile.";
+  }
+
+  typedef vlan-ref {
+    type leafref {
+      path "/huawei-vlan:vlans/huawei-vlan:vlan/huawei-vlan:id";
+    }
+    description
+      "A reference to VLAN.";
+  }
+
+  typedef service-flow-ref {
+    type leafref {
+      path "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow/hw-bb-srv-flow:index";
+    }
+    description
+      "A reference to service flow.";
+  }
+
+  typedef subscriber-profile-ref {
+    type leafref {
+      path "/hw-bb-qos:hqos/hw-bb-qos:subscriber-profiles/hw-bb-qos:subscriber-profile/hw-bb-qos:name";
+    }
+    description
+      "A reference to subscriber profile.";
+  }
+
+  typedef pbit {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "Priority Code Point. PCP is a 3-bit field that refers to the
+       class of service applied to a VLAN tagged frame. The
+       field specifies a priority value between 0 and 7, these values
+       can be used by quality of service (QoS) to prioritize
+       different classes of traffic.";
+    reference
+      "IEEE 802.1Q-2014: Virtual Bridged Local Area Networks";
+  }
+
+  typedef pbit-list {
+    type string {
+      pattern "([0-7](-[0-7])?(,[0-7](-[0-7])?)*)";
+    }
+    description
+      "A set of p-bit values.
+       A list of PBIT values, or non overlapping PBIT values
+       ranges, in ascending order, between 0 and 7.
+       Example: 0,2-4,7.";
+  }
+
+  typedef ipprec {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "Ipprec is the first 3 bit of TOS field when IPv4, or the first 3 bit of TC field when IPv6.";
+    reference
+      "RFC 791: INTERNET PROTOCOL";
+  }
+
+  typedef ipprec-list {
+    type string {
+      pattern "[0-7](-[0-7])?(,[0-7](-[0-7])?)*";
+    }
+    description
+      "A set of ipprec values.
+       A list of ipprec values, or non overlapping ipprec values
+       ranges, in ascending order, between 0 and 7.
+       Example: 0,2-4,7.";
+  }
+
+  typedef dscp {
+    type uint8 {
+      range "0..63";
+    }
+    description
+      "The dscp type represents a Differentiated Services Code-Point
+       that may be used for marking packets in a traffic stream.
+
+       In the value set and its semantics, this type is equivalent
+       to the Dscp textual convention of the SMIv2.";
+    reference
+      "RFC 3289: Management Information Base for the Differentiated
+                 Services Architecture
+       RFC 2474: Definition of the Differentiated Services Field
+                 (DS Field) in the IPv4 and IPv6 Headers
+       RFC 2780: IANA Allocation Guidelines For Values In
+                 the Internet Protocol and Related Headers";
+  }
+
+  typedef dscp-list {
+    type string {
+      pattern "(6[0-3]|[1-5][0-9]|[0-9])(-(6[0-3]|[1-5][0-9]|[0-9]))?(,(6[0-3]|[1-5][0-9]|[0-9])(-(6[0-3]|[1-5][0-9]|[0-9]))?)*";
+    }
+    description
+      "A set of dscp values.
+       A list of dscp values, or non overlapping dscp values
+       ranges, in ascending order, between 0 and 7.
+       Example: 1,5-8,23,30-39,63.";
+  }
+
+  typedef car-threshold {
+    type enumeration {
+      enum "percent-12" {
+        value 0;
+        description
+          "The first threshold.";
+      }
+      enum "percent-25" {
+        value 1;
+        description
+          "The second threshold.";
+      }
+      enum "percent-50" {
+        value 2;
+        description
+          "The third threshold.";
+      }
+      enum "percent-100" {
+        value 3;
+        description
+          "The fourth threshold.";
+      }
+    }
+    description
+      "Car-theshold, used by enhanced policing, packets with different priorities share one policing instance,
+       but different priorities have different car-thresholds of token bucket's depth.";
+  }
+
+  typedef queue-shaping-id {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "Indicates the ID of the HQoS subscriber queue.";
+  }
+
+  typedef queue-id {
+    type uint32 {
+      range "0..7";
+    }
+    description
+      "An integer number identifying a queue within the context from
+       which traffic will be scheduled. It is an abstract identifier:
+       its value does NOT represent the priority of the queue itself.
+       The scheduling priority of a queue is defined by scheduling-priority
+       or scheduling-weight.";
+  }
+
+  typedef scheduling-priority {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "This number represents the priority of the queue or a scheduler
+       competing with others in the context of scheduling traffic.
+       Value 7 means highest priority and 0 means lowest priority.";
+  }
+
+  typedef scheduling-weight {
+    type uint8 {
+      range "0..100|255";
+    }
+    description
+      "If scheduling is to be performed from multiple queues or
+       schedulers with the same priority, then the scheduling-weight
+       assigns a weight to each of them.";
+  }
+
+  typedef color {
+    type enumeration {
+      enum "green" {
+        value 1;
+        description
+          "Indicates the green.";
+      }
+      enum "yellow" {
+        value 2;
+        description
+          "Indicates the yellow.";
+      }
+    }
+    description
+      "Indicates the color.";
+  }
+
+  typedef wred-color {
+    type color;
+    description
+      "Indicates the wred color.";
+  }
+
+  typedef percentage {
+    type uint8 {
+      range "0..100";
+    }
+    description
+      "Percentage.";
+  }
+
+  typedef early-drop-class {
+    type enumeration {
+      enum "class0" {
+        value 1;
+        description
+          "Indicates class 0 of early-drop.";
+      }
+      enum "class1" {
+        value 2;
+        description
+          "Indicates class 1 of early-drop.";
+      }
+      enum "class2" {
+        value 3;
+        description
+          "Indicates class 2 of early-drop.";
+      }
+    }
+    description
+      "Indicates the pri-base early-drop mapping of cos.";
+  }
+
+  typedef early-drop-mode {
+    type enumeration {
+      enum "pri-base" {
+        value 1;
+        description
+          "Indicates priority-based early drop. If packets with a specified priority reach the preset
+           threshold (queue depth percentage) of their destination queue, subsequent packets of the same priority
+           will be dropped instead of entering the queue.";
+      }
+      enum "color-base" {
+        value 2;
+        description
+          "Indicates color-based early drop. In the case of color-based early drop, you can configure and
+           query early drop parameters of packets of different colors.";
+      }
+      enum "off" {
+        value 3;
+        description
+          "Indicates disable the early drop function.";
+      }
+      enum "color-wred" {
+        value 4;
+        description
+          "Indicates color-wred early drop. Packets with different colors will discard by WRED (weighted random early detection) strategy.
+           For example, you can configure and query the early drop lower threshold, early drop upper threshold, and early drop possibility of green packets or yellow packets.";
+      }
+    }
+    description
+      "In the case of priority-based early drop, if packets with a specified priority reach the preset threshold (queue depth percentage)
+       of their destination queue, subsequent packets of the same priority will be dropped instead of entering the queue.
+       In the case of color-based early drop, you can configure and query early drop parameters of packets of different colors.
+       In the case of off, the early drop function is disabled.
+       In the case of color-wred early drop, packets with different colors will discard by WRED (weighted random early detection) strategy.
+       For example, you can configure and query the early drop lower threshold, early drop upper threshold, and early drop possibility of
+       green packets or yellow packets.";
+  }
+
+  typedef queue-max-buffer-size {
+    type uint16 {
+      range "32..16384";
+    }
+    description
+      "Indicates the maximum depth of queue.";
+  }
+
+  typedef flow-end-point-type {
+    type enumeration {
+      enum "destination" {
+        value 1;
+        description
+          "Indicates the destination end-point of a connection-oriented service flow.";
+      }
+      enum "source" {
+        value 2;
+        description
+          "Indicates the source end-point of a connection-oriented service flow.";
+      }
+    }
+    description
+      "Indicates the end-point type of a connection-oriented service flow.";
+  }
+
+  typedef car-mode-type {
+    type enumeration {
+      enum "service-port" {
+        value 1;
+        description
+          "Indicates that rate limitation is carried out for specific traffic streams.
+           The rate of each traffic stream is limited according to its traffic profile.
+           A traffic stream is the smallest unit for limiting user service rate.
+           If you want to implement different rate limitation policies on different users, use this mode.";
+      }
+      enum "port-cos" {
+        value 2;
+        description
+          "Indicates that rate limitation is carried out based on ports and priorities.
+           If this mode is selected, the CAR value is determined by the traffic profile referenced by the port.
+           Other parameter values (including priority and scheduling policies) are determined by the traffic profile referenced by each traffic stream.";
+      }
+    }
+    default "service-port";
+    description
+      "When the service-port mode is used, packets with high priority may be dropped due to rate limitation. The port-cos mode resolves this issue.
+       When the port-cos mode is used, the car-port can be used to bind different traffic profiles to packets of different priorities.
+       This allows for more flexible traffic monitoring based on priority.";
+  }
+
+  typedef hqos-mode-type {
+    type enumeration {
+      enum "basic" {
+        value 1;
+        description
+          "Indicates the HQoS mode is basic.";
+      }
+      enum "bandwidth" {
+        value 2;
+        description
+          "Indicates the HQoS mode is bandwidth. In this mode, user bandwidth is preferentially guaranteed.";
+      }
+      enum "service" {
+        value 3;
+        description
+          "Indicates the HQoS mode is service. In this mode, services with higher priorities are guaranteed. Different services are scheduled according to their priorities.";
+      }
+      enum "slice" {
+        value 4;
+        description
+          "Indicates the HQoS mode is slice. In this mode, services with higher priorities are guaranteed. Different services are scheduled according to their priorities.";
+      }
+    }
+    default "basic";
+    description
+      "Indicates the HQoS mode of a board.";
+  }
+
+  typedef cos {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "Indicates the 802.1p priority in the specified packets. Range: 0-7.";
+  }
+
+  typedef cos-group-id {
+    type uint8 {
+      range "0..7";
+    }
+    description
+      "Indicates the index of the CoS group. Range: 0-7.";
+  }
+
+  typedef cos-group-prof-id {
+    type uint8 {
+      range "0..15";
+    }
+    description
+      "Indicates a CoS group profile. Range: 0-15.";
+  }
+
+  grouping scheduling-wrr-attr {
+    description
+      "Configuration data for wrr scheduling traffic from queues.
+       Queues or schedulers that are defined in a particular
+       context, e.g. queues defined to schedule outgoing traffic to
+       an interface, can have the same priority. The weight defines
+       the the portion of traffic that will be taken from this queue
+       or scheduler by comparing the weight of this queue or
+       scheduler against the sum of the weights of all queues or
+       schedulers with the same scope and the same priority.
+       The sum of queue-weight excluded the 255 ones must be 0 or 100.
+       Weight 255 indicates that the queue is unused.
+       Weight 0 indicates that the queue is strict priority scheduling,
+       and the strict priority must on high queue, alternation of SP
+       and WRR is forbidden.";
+    leaf queue0-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue zero.";
+    }
+    leaf queue1-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue one.";
+    }
+    leaf queue2-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue two.";
+    }
+    leaf queue3-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue three.";
+    }
+    leaf queue4-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue four.";
+    }
+    leaf queue5-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue five.";
+    }
+    leaf queue6-weight {
+      type scheduling-weight;
+      mandatory true;
+      description
+        "The identification of scheduling weight of queue six.";
+    }
+    leaf queue7-weight {
+      type scheduling-weight;
+      description
+        "The identification of scheduling weight of queue seven.";
+    }
+  }
+
+  grouping queue-scheduler {
+    description
+      "Indicates the queue scheduling mode.";
+    choice queue-scheduling-type {
+      default "strict-priority";
+      description
+        "Choice of queue scheduling types.";
+      case strict-priority {
+        description
+          "Strict priority queue scheduling type.";
+        leaf strict-priority {
+          type empty;
+          description
+            "Strict priority queue scheduling.";
+        }
+      }
+      case wrr {
+        description
+          "Weighted round robin queue scheduling type.";
+        uses scheduling-wrr-attr;
+      }
+    }
+  }
+
+  grouping cos-queue-map {
+    description
+      "Indicates the cos-queue-map. It is used by enchanced QoS traffic management.
+       The container most not be deleted.";
+    leaf cos0 {
+      type queue-id;
+      default "0";
+      description
+        "The identification of a mapping queue for packets of priority zero.";
+    }
+    leaf cos1 {
+      type queue-id;
+      default "1";
+      description
+        "The identification of a mapping queue for packets of priority one.";
+    }
+    leaf cos2 {
+      type queue-id;
+      default "2";
+      description
+        "The identification of a mapping queue for packets of priority two.";
+    }
+    leaf cos3 {
+      type queue-id;
+      default "3";
+      description
+        "The identification of a mapping queue for packets of priority three.";
+    }
+    leaf cos4 {
+      type queue-id;
+      default "4";
+      description
+        "The identification of a mapping queue for packets of priority four.";
+    }
+    leaf cos5 {
+      type queue-id;
+      default "5";
+      description
+        "The identification of a mapping queue for packets of priority five.";
+    }
+    leaf cos6 {
+      type queue-id;
+      default "6";
+      description
+        "The identification of a mapping queue for packets of priority six.";
+    }
+    leaf cos7 {
+      type queue-id;
+      default "7";
+      description
+        "The identification of a mapping queue for packets of priority seven.";
+    }
+  }
+
+  grouping queue-buffer-ratio {
+    description
+      "Indicates the depth rate of queue. The larger the percentage, the more packets can be buffered.
+       The sum of percentages must be 100%.";
+    leaf queue0-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 0, that is, percentage of the buffer exclusively occupied by queue zero.";
+    }
+    leaf queue1-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 1, that is, percentage of the buffer exclusively occupied by queue one.";
+    }
+    leaf queue2-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 2, that is, percentage of the buffer exclusively occupied by queue two.";
+    }
+    leaf queue3-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 3, that is, percentage of the buffer exclusively occupied by queue three.";
+    }
+    leaf queue4-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 4, that is, percentage of the buffer exclusively occupied by queue four.";
+    }
+    leaf queue5-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 5, that is, percentage of the buffer exclusively occupied by queue five.";
+    }
+    leaf queue6-ratio {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the depth of queue 6, that is, percentage of the buffer exclusively occupied by queue six.";
+    }
+    leaf queue7-ratio {
+      type percentage;
+      description
+        "Indicates the depth of queue 7, that is, percentage of the buffer exclusively occupied by queue seven.";
+    }
+  }
+
+  grouping queue-wred {
+    description
+      "Indicates the binding between queues and a WRED profile.";
+    leaf queue0 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue zero.";
+    }
+    leaf queue1 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue one.";
+    }
+    leaf queue2 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue two.";
+    }
+    leaf queue3 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue three.";
+    }
+    leaf queue4 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue four.";
+    }
+    leaf queue5 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue five.";
+    }
+    leaf queue6 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue six.";
+    }
+    leaf queue7 {
+      type wred-profile-ref;
+      description
+        "Indicates the index of a WRED profile to be bound of queue seven.";
+    }
+  }
+
+  grouping wred-profle-threshold {
+    description
+      "Indicates the early drop threshold.";
+    leaf low-limit {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the early drop low limit threshold of packets.";
+    }
+    leaf hight-limit {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the early drop high limit threshold of packets.";
+    }
+    leaf discard-probability {
+      type percentage;
+      mandatory true;
+      description
+        "Indicates the early drop probability of packets.";
+    }
+  }
+
+  grouping queue-buffer-max-size {
+    description
+      "Indicates the maximum depth of queue.";
+    leaf queue0 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue zero.";
+    }
+    leaf queue1 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue one.";
+    }
+    leaf queue2 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue two.";
+    }
+    leaf queue3 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue three.";
+    }
+    leaf queue4 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue four.";
+    }
+    leaf queue5 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue five.";
+    }
+    leaf queue6 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue six.";
+    }
+    leaf queue7 {
+      type queue-max-buffer-size;
+      description
+        "Indicates the maximum depth of queue seven.";
+    }
+  }
+
+  grouping car-port-traffic {
+    description
+      "Indicates the parameters applying to the interface.";
+    leaf inbound {
+      type traffic-table-profile-ref;
+      mandatory true;
+      description
+        "Indicates the name of IP traffic table applying to the interface in the inbound direction of the user port.";
+    }
+    leaf outbound {
+      type traffic-table-profile-ref;
+      mandatory true;
+      description
+        "Indicates the name of IP traffic table applying to the interface in the outbound direction of the user port.";
+    }
+  }
+
+  grouping rate-parameters {
+    description
+      "Rate parameters grouping.";
+    container rate-parameters {
+      description
+        "Configure the rate parameters.";
+      choice cir {
+        mandatory true;
+        description
+          "Cir OFF or ON can be chosen.";
+        case off {
+          description
+            "Rate limit is disable.";
+          leaf cir-off {
+            type empty;
+            description
+              "Indicates CIR is off.";
+          }
+        }
+        case on {
+          description
+            "Rate limit is on.";
+          container rate-value {
+            description
+              "Configure rate parameter if the cir is ON.";
+            leaf cir {
+              type uint32 {
+                range "0..102400000";
+              }
+              mandatory true;
+              description
+                "Committed Information Rate.";
+            }
+            leaf cbs {
+              type uint32 {
+                range "0..1024000000";
+              }
+              description
+                "Committed Burst Size.";
+            }
+            leaf pir {
+              type uint32 {
+                range "64..102400000";
+              }
+              must ". >= ../cir";
+              description
+                "Peak Information Rate.";
+            }
+            leaf pbs {
+              type uint32 {
+                range "2000..1024000000";
+              }
+              description
+                "Peak Burst Size.";
+            }
+            leaf fix-bandwidth {
+              type uint32 {
+                range "0..50000000";
+              }
+              must ". <= ../cir";
+              description
+                "Indicates the fixed allocated bandwidth. This parameter is used when a DBA profile is automatically generated for a GPON E2E service stream. It must be a multiple of 64. If an entered value is not a multiple of 64, the system rounds down to a closest integer. The minimum value is 0. When you do not specify this parameter, default value 0 is used.
+                 The value must be smaller or equal to cir.";
+            }
+            leaf color-mode {
+              type enumeration {
+                enum "color-blind" {
+                  value 0;
+                  description
+                    "Color blind.";
+                }
+                enum "color-aware" {
+                  value 1;
+                  description
+                    "Color aware.";
+                }
+              }
+              default "color-blind";
+              description
+                "Color mode.";
+            }
+            choice car-threshold {
+              description
+                "Car threshold.";
+              case off {
+                description
+                  "Car-threshold is disable.";
+                leaf car-threshold-off {
+                  type empty;
+                  description
+                    "Indicates car-threshold is off.";
+                }
+              }
+              case on {
+                description
+                  "Car-threshold is enable.";
+                leaf car-threshold-profile-index {
+                  type car-threshold-profile-ref;
+                  description
+                    "A reference to a car-threshold-profile.";
+                }
+              }
+            }
+            leaf coupling-flag {
+              type enumeration {
+                enum "disable" {
+                  value 0;
+                  description
+                    "Disable.";
+                }
+                enum "enable" {
+                  value 1;
+                  description
+                    "Enable.";
+                }
+              }
+              default "enable";
+              description
+                "Double-color flag, enable indicates srTCM or TrTCM mode, and disable indicates MEF CAR mode.";
+            }
+            leaf convergence-ratio {
+              type decimal64 {
+                range "0.70..1.00";
+                fraction-digits 2;
+              }
+              default "1.0";
+              description
+                "Configure the car convergence ratio.";
+            }
+          }
+        }
+      }
+    }
+  }
+
+  grouping pbit-remarking {
+    description
+      "Pbit remarking policy.";
+    choice pbit-remarking-cfg-params {
+      mandatory true;
+      description
+        "Defines how to remark the PBIT bits.";
+      case local-setting-pbit-cfg {
+        description
+          "Specified pbit.";
+        container local-setting-pbit {
+          when "derived-from-or-self(../remarking-type, 'local-setting-pbit')";
+          description
+            "Configure specified-pbit. Only applicable when the pbit-remarking-type is
+             local-setting-pbit.";
+          leaf specified-pbit {
+            type pbit;
+            description
+              "A specified pbit.";
+          }
+        }
+      }
+      case mapping-copy-pbit-from-outer-pbit-cfg {
+        description
+          "Remark pbit from outer pbit, a maping profile is used.";
+        container mapping-copy-pbit-from-outer-pbit {
+          when "derived-from-or-self(../remarking-type, 'mapping-copy-pbit-from-outer-pbit')";
+          description
+            "Configure mapping-copy-pbit. Only applicable when the pbit-remarking-type is
+             mapping-copy-pbit-from-outer-pbit.";
+          leaf outer-pbit-to-pbit-mapping-table-index {
+            type pbit-to-pbit-mapping-table-ref;
+            default "0";
+            description
+              "A reference to a pbit-to-pbit-mapping-table. Only profile 0-3 can be used.";
+          }
+          leaf default-pbit-value {
+            type pbit;
+            mandatory true;
+            description
+              "Default pbit remark value.";
+          }
+        }
+      }
+      case mapping-copy-pbit-from-inner-pbit-cfg {
+        description
+          "Remark pbit from inner pbit, a maping profile is used.";
+        container mapping-copy-pbit-from-inner-pbit {
+          when "derived-from-or-self(../remarking-type, 'mapping-copy-pbit-from-inner-pbit')";
+          description
+            "Configure mapping-copy-pbit. Only applicable when the pbit-remarking-type is
+             mapping-copy-pbit-from-inner-pbit.";
+          leaf inner-pbit-to-pbit-mapping-table-index {
+            type pbit-to-pbit-mapping-table-ref;
+            default "0";
+            description
+              "A reference to a pbit-to-pbit-mapping-table. Only profile 0-3 can be used.";
+          }
+          leaf default-pbit-value {
+            type pbit;
+            mandatory true;
+            description
+              "Default pbit remark value.";
+          }
+        }
+      }
+      case mapping-copy-pbit-from-ipprec-cfg {
+        description
+          "Remark pbit from ip precedence, a maping profile is used.";
+        container mapping-copy-pbit-from-ipprec {
+          when "derived-from-or-self(../remarking-type, 'mapping-copy-pbit-from-ipprec')";
+          description
+            "Configure mapping-copy-pbit. Only applicable when the pbit-remarking-type is
+             mapping-copy-pbit-from-ipprec.";
+          leaf ipprec-to-pbit-mapping-table-index {
+            type ipprec-to-pbit-mapping-table-ref;
+            default "0";
+            description
+              "A reference to a ipprec-to-pbit-mapping-table.";
+          }
+          leaf default-pbit-value {
+            type pbit;
+            mandatory true;
+            description
+              "Default pbit remark value.";
+          }
+        }
+      }
+      case mapping-copy-pbit-from-dscp-cfg {
+        description
+          "Remark pbit from dscp, a maping profile is used.";
+        container mapping-copy-pbit-from-dscp {
+          when "derived-from-or-self(../remarking-type, \"mapping-copy-pbit-from-dscp\")";
+          description
+            "Configure mapping-copy-pbit. Only applicable when the pbit-remarking-type is
+             mapping-copy-pbit-from-dscp.";
+          leaf dscp-to-pbit-mapping-table-index {
+            type dscp-to-pbit-mapping-table-ref;
+            default "0";
+            description
+              "A reference to a dscp-to-pbit-mapping-table. Profile 0-3 can be used.";
+          }
+          leaf default-pbit-value {
+            type pbit;
+            mandatory true;
+            description
+              "Default pbit remark value.";
+          }
+        }
+      }
+    }
+  }
+
+  container traffic-tables {
+    description
+      "List of the IP traffic profile.
+       It is used to add, query, modify, or delete an IP traffic profile.";
+    list traffic-table {
+      key "name";
+      description
+        "Configure the IP traffic profile.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Indicates the traffic table name.
+           Names with only one or more space characters are not supported,
+           for example, '', ' '.";
+      }
+      choice rate-mode {
+        mandatory true;
+        description
+          "Defines rate parameters mode.";
+        case inline {
+          description
+            "Inline mode.";
+          uses rate-parameters;
+        }
+        case by-reference {
+          description
+            "By reference mode.";
+          leaf rate-profile-name {
+            type rate-profile-ref;
+            description
+              "Reference a rate profile.";
+          }
+        }
+      }
+      container outer-pbit-remarking {
+        description
+          "Configure Outer pbit remarking policy, this parameter is necessary.";
+        leaf remarking-type {
+          type identityref {
+            base pbit-remarking-type;
+          }
+          mandatory true;
+          description
+            "Pbit remarking type.";
+        }
+        uses pbit-remarking;
+      }
+      container inner-pbit-remarking {
+        presence "Configure inner pbit remarking policy.";
+        description
+          "Configure inner pbit remarking policy.";
+        leaf remarking-type {
+          type identityref {
+            base pbit-remarking-type;
+          }
+          description
+            "Pbit remarking type.";
+        }
+        uses pbit-remarking;
+      }
+      container e2e-priority-remarking-mode {
+        presence "Configure E2E priority remarking.";
+        description
+          "Configure E2E priority remarking.";
+        leaf e2e-remarking-type {
+          type identityref {
+            base e2e-priority-remarking-type;
+          }
+          description
+            "E2E priority remarking type.";
+        }
+        choice e2e-priority-remarking-cfg-params {
+          mandatory true;
+          description
+            "
+             During E2E flow creation, an internal VLAN is allocated between the ONT and the OLT. This parameter is used to specify the source of VLAN 802.1p priority on the ONT. This parameter does not need to be specified if no E2E flow is created.";
+          case e2e-mapping-copy-pbit-from-outer-pbit-cfg {
+            description
+              "Maping from outer pbit.";
+            container e2e-mapping-copy-priority-from-outer-pbit {
+              when "derived-from-or-self(../e2e-remarking-type, 'e2e-mapping-copy-priority-from-outer-pbit')";
+              description
+                "Configure e2e-priority-remarking. Only applicable when the e2e-priority-remarking-type is
+                 e2e-mapping-copy-priority-from-outer-pbit.";
+              leaf outer-pbit-to-pbit-mapping-table-index {
+                type pbit-to-pbit-mapping-table-ref;
+                default "0";
+                description
+                  "A reference to a pbit-to-pbit-mapping-table.";
+              }
+              leaf default-e2e-pbit-value {
+                type pbit;
+                mandatory true;
+                description
+                  "Default e2e pbit remark value.";
+              }
+            }
+          }
+          case e2e-mapping-copy-pbit-from-dscp-cfg {
+            description
+              "Maping from dscp.";
+            container e2e-mapping-copy-priority-from-dscp {
+              when "derived-from-or-self(../e2e-remarking-type, 'e2e-mapping-copy-priority-from-dscp')";
+              description
+                "Configure e2e-priority-remarking. Only applicable when the e2e-priority-remarking-type is
+                 e2e-mapping-copy-priority-from-dscp.";
+              leaf dscp-to-pbit-mapping-table-index {
+                type dscp-to-pbit-mapping-table-ref;
+                default "0";
+                description
+                  "A reference to a dscp-to-pbit-mapping-table.";
+              }
+              leaf default-e2e-pbit-value {
+                type pbit;
+                mandatory true;
+                description
+                  "Default e2e pbit remark value.";
+              }
+            }
+          }
+        }
+      }
+      choice dscp-remark {
+        description
+          "DSCP or TC remark.";
+        case inline {
+          description
+            "Inline, specify a dscp.";
+          leaf specified-dscp-value {
+            type dscp;
+            description
+              "Specify a dscp.";
+          }
+        }
+        case by-reference {
+          description
+            "By reference, maping from dscp.";
+          leaf dscp-to-dscp-mapping-table-index {
+            type leafref {
+              path "/hw-bb-qos:dscp-to-dscp-mapping-tables/hw-bb-qos:dscp-to-dscp-mapping-table/hw-bb-qos:index";
+            }
+            default "0";
+            description
+              "A reference to a dscp-to-dscp-mapping-table.";
+          }
+        }
+      }
+      leaf color-source {
+        type enumeration {
+          enum "outer-dei" {
+            value 0;
+            description
+              "Use outer-dei as color source.";
+          }
+          enum "inner-dei" {
+            value 1;
+            description
+              "Use inner-dei as color source.";
+          }
+        }
+        default "outer-dei";
+        description
+          "Color source, used for policing or enqueuing.";
+      }
+      leaf color-dei {
+        type enumeration {
+          enum "unmark-dei" {
+            value 0;
+            description
+              "No color mark.";
+          }
+          enum "outer-dei" {
+            value 1;
+            description
+              "Color mark to outer dei.";
+          }
+          enum "inner-dei" {
+            value 2;
+            description
+              "Color mark to inner dei.";
+          }
+          enum "outer-inner-dei" {
+            value 3;
+            description
+              "Color mark to outer dei and inner dei.";
+          }
+        }
+        default "unmark-dei";
+        description
+          "Color to dei.";
+      }
+      choice queue-policy {
+        mandatory true;
+        description
+          "Enqueuing policy.";
+        case inline {
+          description
+            "Inline.";
+          leaf queue-policy-mode {
+            type enumeration {
+              enum "local-setting" {
+                value 0;
+                description
+                  "Specify a queue.";
+              }
+              enum "tag-in-package" {
+                value 1;
+                description
+                  "Enqueue based on remarked outer cos.";
+              }
+              enum "tag-in-ingress-package" {
+                value 2;
+                description
+                  "Enqueue based on inputing packet outer cos.";
+              }
+            }
+            description
+              "Enqueue mode.";
+          }
+        }
+        case by-reference {
+          description
+            "By reference, a queue-policy-profile is refered.";
+          leaf queue-policy-profile-index {
+            type leafref {
+              path "/hw-bb-qos:queue-policy-profiles/hw-bb-qos:queue-policy-profile/hw-bb-qos:index";
+            }
+            description
+              "Queue policy.";
+          }
+        }
+      }
+      leaf drop-precedence-policy {
+        type enumeration {
+          enum "remarked-outer-priority" {
+            value 0;
+            description
+              "Use remarked-outer-priority as drop precedence.";
+          }
+          enum "remarked-inner-priority" {
+            value 1;
+            description
+              "Use remarked-inner-priority as drop precedence.";
+          }
+        }
+        default "remarked-outer-priority";
+        description
+          "Used for multi-threshold CAR.";
+      }
+      choice priority-group {
+        default "off";
+        description
+          "A priority-group-profile can be chosen or not.";
+        case off {
+          description
+            "Priority group car is disable.";
+          leaf priority-group-car-disable {
+            type empty;
+            description
+              "No priority group car.";
+          }
+        }
+        case on {
+          description
+            "Priority group car is enable.";
+          leaf priority-group-profile-name {
+            type leafref {
+              path "/hw-bb-qos:priority-group-profiles/hw-bb-qos:priority-group-profile/hw-bb-qos:name";
+            }
+            description
+              "A reference to a priority-group-profile.";
+          }
+        }
+      }
+      choice yellow-wrr-weight-mode {
+        description
+          "Auto or a specified weight value can be chosen. Defalt is AUTO.";
+        case auto-generated {
+          description
+            "Generate a weight automatically.";
+          leaf yellow-wrr-weight-auto {
+            type empty;
+            description
+              "Automatically generate a weight value based on rate parameters.";
+          }
+        }
+        case specified {
+          description
+            "Specify a weight.";
+          leaf yellow-wrr-weight-value {
+            type uint32 {
+              range "1..12";
+            }
+            description
+              "Manually configue a weight value.";
+          }
+        }
+      }
+      choice green-wrr-weight-mode {
+        description
+          "Auto or a specified weight value can be chosen. Defalt is AUTO.";
+        case auto-generated {
+          description
+            "Generate a weight automatically.";
+          leaf green-wrr-weight-auto {
+            type empty;
+            description
+              "Automatically generate a weight value based on rate parameters.";
+          }
+        }
+        case specified {
+          description
+            "Specify a weight.";
+          leaf green-wrr-weight-value {
+            type uint32 {
+              range "1..12";
+            }
+            description
+              "Manually configue a weight value.";
+          }
+        }
+      }
+    }
+  }
+  container rate-profiles {
+    description
+      "List of the rate profile.
+       It is used to add, query, modify, or delete a rate profile.";
+    list rate-profile {
+      key "name";
+      description
+        "Configure the rate profile.";
+      leaf name {
+        type string {
+          length "1..32";
+          pattern "[ -~]*";
+        }
+        description
+          "Indicates the name of the rate profile.";
+      }
+      uses rate-parameters;
+    }
+  }
+  container cos-group-tables {
+    description
+      "List of Mapping between priorities and the CoS group.";
+    list cos-group-table {
+      key "index";
+      description
+        "Configure Cos to group mapping.";
+      leaf index {
+        type uint32 {
+          range "0..15";
+        }
+        description
+          "Cos-group-table index.";
+      }
+      list cos-group-mapping {
+        key "cos";
+        description
+          "Configure Cos to group mapping.";
+        leaf cos {
+          type uint32 {
+            range "0..7";
+          }
+          description
+            "Input cos value.";
+        }
+        leaf group-id {
+          type uint32 {
+            range "0..7";
+          }
+          description
+            "Output group id.";
+        }
+      }
+    }
+  }
+  container priority-group-profiles {
+    description
+      "List of priority group profile.
+       It is used to add, query, modify, or delete a priority group profile.";
+    list priority-group-profile {
+      key "name";
+      description
+        "Configure the priority-group-profile.";
+      leaf name {
+        type string {
+          length "1..32";
+          pattern "[ -~]*";
+        }
+        description
+          "Indicates the name of the priority group profile.";
+      }
+      leaf priority-source {
+        type enumeration {
+          enum "outer-8021p" {
+            value 1;
+            description
+              "Input packet outer 802.1 priority.";
+          }
+          enum "inner-8021p" {
+            value 2;
+            description
+              "Input packet inner 802.1 priority.";
+          }
+        }
+        default "outer-8021p";
+        description
+          "Priority source, used for priority grouping.";
+      }
+      leaf cos-group-table {
+        type cos-group-table-ref;
+        default "0";
+        description
+          "Only 0-7 cos-group-table can be used.";
+      }
+      leaf default-group-id {
+        type uint32 {
+          range "0..7";
+        }
+        default "0";
+        description
+          "When there is no input priorities, use this default-group-id.";
+      }
+      leaf car-group-0-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-1-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-2-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-3-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-4-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-5-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-6-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+      leaf car-group-7-rate-profile {
+        type rate-profile-ref;
+        description
+          "A reference to a rate-profile.";
+      }
+    }
+  }
+  container car-threshold-profiles {
+    description
+      "List of car-threshold-profile.
+       It is used by enchanced policing.";
+    list car-threshold-profile {
+      key "index";
+      description
+        "Configure the car-threshold-profile.";
+      leaf index {
+        type uint32 {
+          range "0..3";
+        }
+        description
+          "Indicates the index of the car-threshold-profile.";
+      }
+      leaf green-threshold-pri-0 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority zero.";
+      }
+      leaf green-threshold-pri-1 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority one.";
+      }
+      leaf green-threshold-pri-2 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority two.";
+      }
+      leaf green-threshold-pri-3 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority three.";
+      }
+      leaf green-threshold-pri-4 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority four.";
+      }
+      leaf green-threshold-pri-5 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority five.";
+      }
+      leaf green-threshold-pri-6 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority six.";
+      }
+      leaf green-threshold-pri-7 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for green packets of priority seven.";
+      }
+      leaf yellow-threshold-pri-0 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority zero.";
+      }
+      leaf yellow-threshold-pri-1 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority one.";
+      }
+      leaf yellow-threshold-pri-2 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority two.";
+      }
+      leaf yellow-threshold-pri-3 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority three.";
+      }
+      leaf yellow-threshold-pri-4 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority four.";
+      }
+      leaf yellow-threshold-pri-5 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority five.";
+      }
+      leaf yellow-threshold-pri-6 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority six.";
+      }
+      leaf yellow-threshold-pri-7 {
+        type car-threshold;
+        default "percent-100";
+        description
+          "Car-threshold for yellow packets of priority seven.";
+      }
+    }
+  }
+  container queue-policy-profiles {
+    description
+      "List of queue policy profile table. It is used to add, modify, query, or delete a queue policy profile.";
+    list queue-policy-profile {
+      key "index";
+      description
+        "Configure the queue-policy-profile.";
+      leaf index {
+        type uint32 {
+          range "1..8";
+        }
+        description
+          "Indicates the index of the queue policy profile.";
+      }
+      leaf pbit-source {
+        type enumeration {
+          enum "outer-8021p" {
+            value 1;
+            description
+              "Input packet outer 802.1 priority.";
+          }
+          enum "inner-8021p" {
+            value 2;
+            description
+              "Input packet inner 802.1 priority.";
+          }
+        }
+        default "outer-8021p";
+        description
+          "Indicates pbit is sourced from outer 802.1p tag or inner 802.1p.";
+      }
+      leaf mapping-profile {
+        type pbit-to-pbit-mapping-table-ref;
+        default "0";
+        description
+          "Profile 0-7 can be used.";
+      }
+      leaf default-pbit {
+        type pbit;
+        default "0";
+        description
+          "Specifies pbit for the input frame without any tags.";
+      }
+    }
+  }
+  container pbit-to-pbit-mapping-tables {
+    description
+      "List of pbit to pbit mapping profile.
+       It is used to modify and query the pbit to pbit mapping relationships.";
+    list pbit-to-pbit-mapping-table {
+      key "index";
+      description
+        "Configure the pbit-to-pbit-mapping-table.";
+      leaf index {
+        type uint32 {
+          range "0..15";
+        }
+        description
+          "Indicates the index of the pbit to pbit mapping table.";
+      }
+      leaf input-list-green {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf output-list-green {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf input-list-yellow {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf output-list-yellow {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+    }
+  }
+  container ipprec-to-pbit-mapping-tables {
+    description
+      "List of ipprec to pbit mapping profile.
+       It is used to modify and query the ipprec to pbit mapping relationships.";
+    list ipprec-to-pbit-mapping-table {
+      key "index";
+      description
+        "Configure the ipprec-to-pbit-mapping-table.";
+      leaf index {
+        type uint32 {
+          range "0..3";
+        }
+        description
+          "Indicates the index of the ipprec to pbit mapping table.";
+      }
+      leaf input-list-green {
+        type ipprec-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf output-list-green {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf input-list-yellow {
+        type ipprec-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf output-list-yellow {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+    }
+  }
+  container dscp-to-pbit-mapping-tables {
+    description
+      "List of dscp to pbit mapping profile.
+       It is used to modify and query the dscp to pbit mapping relationships.";
+    list dscp-to-pbit-mapping-table {
+      key "index";
+      description
+        "Configure the dscp-to-pbit-mapping-table.";
+      leaf index {
+        type uint32 {
+          range "0..49";
+        }
+        description
+          "Indicates the index of the dscp to pbit mapping table.";
+      }
+      leaf input-list-green {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      leaf output-list-green {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+      leaf input-list-yellow {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      leaf output-list-yellow {
+        type pbit-list;
+        description
+          "For example, 1,2-4,6.";
+      }
+    }
+  }
+  container dscp-to-dscp-mapping-tables {
+    description
+      "List of dscp to dscp mapping profile.
+       It is used to modify and query the dscp to dscp mapping relationships.";
+    list dscp-to-dscp-mapping-table {
+      key "index";
+      description
+        "Configure the dscp-to-dscp-mapping-table.";
+      leaf index {
+        type uint32 {
+          range "0..3";
+        }
+        description
+          "Indicates the index of the dscp to dscp mapping table.";
+      }
+      leaf input-list-green {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      leaf output-list-green {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      leaf input-list-yellow {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      leaf output-list-yellow {
+        type dscp-list;
+        description
+          "For example, 1,32-37,60.";
+      }
+      container packet-to-wred-colors {
+        description
+          "List of packets mapped to wred color.";
+        list packet-to-wred-color {
+          key "dscp";
+          description
+            "Configure packet-to-wred-color.";
+          leaf dscp {
+            type uint32 {
+              range "0..63";
+            }
+            description
+              "Indicates the index for the dscp field values of user packets.";
+          }
+          leaf green {
+            type wred-color;
+            description
+              "Green packets are mapped to wred color.";
+          }
+          leaf yellow {
+            type wred-color;
+            description
+              "Yellow packets are mapped to wred color.";
+          }
+        }
+      }
+    }
+  }
+  container cos-queue-map {
+    description
+      "It is used to configure the mapping between 802.1p priorities and queues.
+       A queue is a unit based on which packets are scheduled on a physical port.
+       Packets can be scheduled only after they are mapped to a specified queue based on priorities.
+       After successful configuration, user packets are forwarded in the corresponding queue based on the configured mapping.";
+    uses cos-queue-map;
+  }
+  container queue-scheduler {
+    description
+      "Indicates the queue-scheduler. It is used by enchanced QoS traffic management.
+       The container most not be deleted.";
+    uses queue-scheduler;
+  }
+  container queue-wred {
+    description
+      "It is used to bind the packet queue to the WRED profile.
+       After the WRED profile is bound, the color-based early discard is performed for packets according to the parameters in the WRED profile.";
+    uses queue-wred;
+  }
+  container qos-policy-profiles {
+    description
+      "List of qos policy profile.";
+    list qos-policy-profile {
+      key "name";
+      description
+        "Configure the qos-policy-profile.";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Indicates the name of the qos policy profile.";
+      }
+      container cos-queue-map {
+        description
+          "Configure the mapping between 802.1p priorities and queues.
+           A queue is a unit based on which packets are scheduled on a physical port.
+           Packets can be scheduled only after they are mapped to a specified queue based on priorities.
+           After successful configuration, user packets are forwarded in the corresponding queue based on the configured mapping.
+           The system supports eight scheduling queues. You can globally set the mapping between priorities and eight scheduling queues. The setting result takes effect on all physical ports.
+           You can map the 802.1p priority of the packet to any queue. That is, a queue can contain multiple 802.1p priorities or no 802.1p priorities.
+           The priority for forwarding packets increases with the queue ID. For the port that supports eight queues, queue 7 has the highest priority. For the port that supports four queues, queue 3 has the highest priority.
+           For the port that supports eight queues on a board, the system default mapping between priorities and queues is: Priorities 0-7 correspond to queues 0-7.
+           For the port that supports four queues on a board, the following fixed mapping between 802.1p priorities and queue IDs is used:
+           802.1p priorities 0 and 1 correspond to queue 0.
+           802.1p priorities 2 and 3 correspond to queue 1.
+           802.1p priorities 4 and 5 correspond to queue 2.
+           802.1p priorities 6 and 7 correspond to queue 3.";
+        uses cos-queue-map;
+      }
+      container queue-scheduler {
+        description
+          "Configure the queue scheduling mode of the system.
+           The queue scheduling refers that the system assigns packets sent out over a port to different queues and schedules them according to a rule that determine packets in which queue are preferentially sent.
+           To select different queue scheduling modes according to the service importance, and provide QoS guarantee for services in case of network congestion, configure this queue-scheduler.
+           The default queue scheduling mode is priority queue (PQ). After the queue scheduling mode is configured successfully, the system forwards the packets in the queues based on the new scheduling mode.
+           The queue weight 255 is supported only in the global config mode.
+           The system supports the following scheduling modes: PQ, WRR, WFQ, WFQ+PQ, and WRR+PQ. When a queue is empty, the next queue is scheduled immediately. In this way, the bandwidth resources are fully used.
+           The WRR+PQ mode is a combination of the WRR mode and the PQ mode. When a weight value of a queue is 0, the queue scheduling mode is PQ+WRR. In this mode, the system schedules the queue whose weight is 0 by the PQ mode, and then schedules other queues by the WRR mode; the PQ queue has a higher priority than the WRR queue.
+           The WFQ+PQ mode is a combination of the WFQ mode and the PQ mode. When a weight value of a queue is 0, the queue scheduling mode is PQ+WFQ. In this mode, the system schedules queue 0 in the PQ mode, and then schedules other queues in the WFQ mode.
+           When the scheduling mode of queue is WRR+PQ or WFQ+PQ, all queues in the PQ mode must be applied to the high-priority queue and alternation between PQ and WRR is forbidden.
+           The QoS policy profile configured with the WFQ queue scheduling mode is supported only by the boards on the extended subrack, but not supported by other boards.";
+        uses queue-scheduler;
+      }
+      container queue-wred {
+        description
+          "Configure the packet queue to the WRED profile.
+           After the WRED profile is bound, the color-based early discard is performed for packets according to the parameters in the WRED profile.
+           Different packet queues can be bound to the same WRED profile.
+           When you bind a specified queue to a WRED profile, the system requires you to configure all parameters of the WRED profile,
+           including the lower discard threshold for green packets, upper discard threshold for green packets, discard ratio for green packets,
+           lower discard threshold for yellow packets, upper discard threshold for yellow packets, and discard ratio for yellow packets.";
+        uses queue-wred;
+      }
+      container queue-buffer {
+        presence "config buffer size percentage for packet queues of the service boards in the system";
+        description
+          "Configure buffer size percentage for packet queues of the service boards in the system.
+           Properly set the buffer size of the physical port on each service board based on your service type and network planning.
+           After successful configuration, the buffer of the queue is allocated based on the preset value.
+           Also called queue depth, queue buffer indicates the buffer size of a queue and determines a queue's capability of processing burst packets. The capable of processing burst packets is enhanced with the increase of the queue buffer size.
+           The total buffer for all queues of physical ports includes two parts. One part is the buffer that can be shared by all queues. The other part is the assignable buffer (the queue buffer that is set in the queue-buffer configuration) that is independently used by each queue.
+           When the exclusive buffer of the queue is exhausted, the system automatically applies for the idle shared buffer to buffer the packets. When both exclusive buffer and shared buffer are exhausted, packets are discarded.
+           The buffer size of each queue is indicated by a percentage. The actual buffer size of each queue equals the multiplication product of the total buffer of the port and this percentage. The sum of percentages for all queues must be 100%.
+           When the buffer depth is 0, the queue does not have any buffer resources and packets cannot be added to the queue. In this case, generally, packets are discarded. In actual configuration, to improve the overall usage efficiency of queues, ensure that the queue buffer (especially for the queue with a high priority) is not 0.
+           It is recommended to use the default value of the system. If the buffer size of queues is set by board, the board-based configurations are valid and the global configurations are invalid. If the buffer size of queues is not set by board, the global configurations are valid.";
+        uses queue-buffer-ratio;
+      }
+      container queue-buffer-max-size {
+        description
+          "Configure the maximum depth for 8 priority queues in a QoS policy profile.
+           A queue depth indicates the buffer size of a queue and determines the queue's capability for processing burst packets.
+           A greater queue depth (buffer size) indicates a more powerful capability for processing burst packets.
+           The total buffer of all queues on a physical port consists of 2 parts: one is the buffer shared by all queues; the other is the dedicated buffer exclusively occupied by every queue.
+           When the dedicated buffer of a queue is used up, the system automatically applies for the idle shared buffer to buffer packets.
+           When both dedicated and shared buffers are used up, packets are discarded.";
+        uses queue-buffer-max-size;
+      }
+    }
+  }
+  container wred-profiles {
+    description
+      "List of the wred profile table.";
+    list wred-profile {
+      key "index";
+      description
+        "Configure the wred profile.";
+      leaf index {
+        type uint32 {
+          range "0..7";
+        }
+        description
+          "Indicates the index of the wred profile.";
+      }
+      container green {
+        description
+          "Configure the green packets.";
+        uses wred-profle-threshold;
+      }
+      container yellow {
+        description
+          "Configure the yellow packets.";
+        uses wred-profle-threshold;
+      }
+    }
+  }
+  container early-drop {
+    description
+      "Configure the early drop.";
+    container mode {
+      description
+        "Configure the early-discard mode for packets.
+         Early-discard can be based on the outer 802.1p priority or packet color, or can be weighted random early detection (WRED) early-discard based on packet color.
+         After the configuration is executed successfully, the system discards packets entering the queue when the system is congested.";
+      leaf mode {
+        type early-drop-mode;
+        default "color-base";
+        description
+          "The global early drop mode of the system.";
+      }
+    }
+    container priority {
+      description
+        "Configure the priority threshold of CoS queues, please make sure that early-drop be priBase.";
+      leaf threshold0 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 0.";
+      }
+      leaf threshold1 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 1.";
+      }
+      leaf threshold2 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 2.";
+      }
+      leaf threshold3 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 3.";
+      }
+      leaf threshold4 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 4.";
+      }
+      leaf threshold5 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 5.";
+      }
+      leaf threshold6 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 6.";
+      }
+      leaf threshold7 {
+        type percentage;
+        default "100";
+        description
+          "Indicates the early drop threshold of queue 7.";
+      }
+    }
+    container drop-level {
+      description
+        "Configure the priority threshold of CoS queues, please make sure that early-drop-mode be priBase.";
+      leaf cos0 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos0.";
+      }
+      leaf cos1 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos1.";
+      }
+      leaf cos2 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos2.";
+      }
+      leaf cos3 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos3.";
+      }
+      leaf cos4 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos4.";
+      }
+      leaf cos5 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos5.";
+      }
+      leaf cos6 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos6.";
+      }
+      leaf cos7 {
+        type early-drop-class;
+        default "class0";
+        description
+          "Indicates the pri-base early-drop mapping of cos7.";
+      }
+    }
+  }
+  container car-groups {
+    description
+      "Configure a CAR (committed access rate) group for service virtual ports or modify the traffic parameters of an existing CAR group.
+       In the current and actual applications, you need to create multiple service ports or flows to carry multiple services of a same user.
+       The QoS management can be performed separately for each service port. A CAR group is used to manage the total bandwidth of multiple services of a same user.";
+    list car-group {
+      key "index";
+      description
+        "Configure the service port CAR group.";
+      leaf index {
+        type uint32 {
+          range "0..32767";
+        }
+        description
+          "Indicates the index of the service port CAR group.";
+      }
+      leaf inbound {
+        type traffic-table-profile-ref;
+        mandatory true;
+        description
+          "Indicates the name of a IP traffic table used by upstream packets.";
+      }
+      leaf outbound {
+        type traffic-table-profile-ref;
+        mandatory true;
+        description
+          "Indicates the name of a IP traffic table used by downstream packets.";
+      }
+      container members {
+        description
+          "List of the member of a service port CAR group.";
+        list member {
+          key "index";
+          description
+            "Configure the member for a service port, and this index must exist.";
+          leaf index {
+            type leafref {
+              path "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow/hw-bb-srv-flow:index";
+            }
+            description
+              "In the xPON access mode, the service ports to be added to the same CAR group must belong to the same PON port.
+               In the case of type C or type D protection, the service ports to be added to the same CAR group must be on the same ONT.
+               The service port of the VLAN-range type cannot be added to a CAR group.";
+          }
+          leaf flow-end-point-type {
+            type flow-end-point-type;
+            default "destination";
+            description
+              "Indicates the end-point type of a connection-oriented service flow. Can not be used for switching-oriented service flow.";
+          }
+        }
+      }
+    }
+  }
+  container hqos {
+    description
+      "Indicates configuration of hqos.";
+    container subscriber-profiles {
+      description
+        "List of the subscriber-profile.";
+      list subscriber-profile {
+        key "name";
+        description
+          "Configure hierarchical quality of service (HQoS) subscribers and modify profiles bound to the HQoS subscribers.
+           After the configuration is successfully executed, the system uses the selected HQoS profile to restrict the total bandwidth consumed by all service flows of the HQoS subscribers.";
+        leaf name {
+          type string {
+            length "1..32";
+          }
+          description
+            "Indicates the HQoS subscriber profile name. To create an HQoS subscriber profile with name specified, use this parameter.";
+        }
+        container queue-shapings {
+          description
+            "List of the queue shaping. It is used to configure the traffic shaping of the hierarchical quality of service (HQoS) subscriber queue.
+             After queue-shapings is successfully executed, use the selected traffic profile to restrict the total bandwidth of all service flows for the HQoS subscriber queue.";
+          list queue-shaping {
+            key "queue-id";
+            description
+              "Configure the queue-shaping.";
+            leaf queue-id {
+              type queue-shaping-id;
+              description
+                "Indicates the ID of the HQoS subscriber queue.";
+            }
+            leaf outbound {
+              type traffic-table-profile-ref;
+              mandatory true;
+              description
+                "Indicates the name of an IP traffic profile. To add or modify a traffic profile referenced by the queue-shaping by traffic profile name, use this parameter.";
+            }
+          }
+        }
+        container shapings {
+          description
+            "Configure the traffic shaping for HQoS subscribers.
+             After the outbound-traffic is successfully configged, select a traffic profile to restrict the total bandwidth for all service flows of the HQoS subscribers.";
+          leaf outbound {
+            type traffic-table-profile-ref;
+            description
+              "Indicates the outbound direction of a port.
+               The direction is from the network side to the user access side in the case of user port or cascade port.
+               The direction is from the user access side to the network side in the case of network port.";
+          }
+        }
+      }
+    }
+    container subscribers {
+      description
+        "List of the subscriber. It is used to create hierarchical quality of service (HQoS) subscribers and modify profiles bound to the HQoS subscribers.
+         The system uses the selected HQoS profile to restrict the total bandwidth consumed by all service flows of the HQoS subscribers.";
+      list subscriber {
+        key "ifname id";
+        description
+          "Configure the subscriber. It is supported only when the board HQoS mode is bandwidth or service. You can run the hqos mode subscriber to configure the board HQoS mode.
+           Before adding service flows as HQoS subscriber members, configure subscriber to create an HQoS subscriber.
+           If members have been configured for the HQoS subscriber, before deleting the HQoS subscriber, you must delete configured members first.
+           For inter-board protection groups, if HQoS subscribers have been configured as protection group members, other protection group members may occupy HQoS subscriber resources on the board.
+           For PON boards, the ONT must be specified.";
+        leaf ifname {
+          type if:interface-ref;
+          must
+            "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+             or
+             /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+            error-message
+              "must reference an v-ani or ethernetCsmacd interface.";
+          }
+          description
+            "Name of an ONT or Ethernet port.";
+        }
+        leaf id {
+          type uint8 {
+            range "1..32";
+          }
+          description
+            "Indicates the ID of the HQoS subscriber.
+             This parameter identifies an HQoS subscriber in an ONT.
+             For PON boards, the subscriber ID is unique under one ONT.
+             For non-PON boards, the subscriber ID is unique under one port.";
+        }
+        leaf subscrber-profile-name {
+          type subscriber-profile-ref;
+          mandatory true;
+          description
+            "Indicates the name of the profile bound to the HQoS subscriber.";
+        }
+        container members {
+          description
+            "List of member for the HQoS subscriber.";
+          list member {
+            key "index";
+            description
+              "Configure the index of the service port and this index must exist.";
+            leaf index {
+              type leafref {
+                path "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow/hw-bb-srv-flow:index";
+              }
+              description
+                "Indicates the list of service port IDs.
+                 When a service port is added to the HQoS subscriber,
+                 For PON boards, the service port and the HQoS subscriber must be under the same ONT.
+                 For non-PON boards, the service port and the HQoS subscriber must be under the same port.
+                 The added service ports must be in the same ONT as that for the HQoS subscriber to whom the service ports are added.
+                 One service port cannot be added to multiple HQoS subscribers.
+                 Over-all streams cannot be added to the HQoS subscriber.
+                 A maximum of 256 members can be added once.
+                 You can add a certain service port to the HQoS subscriber as required. Failures will occur on service ports that are not added to the HQoS subscriber.";
+            }
+          }
+        }
+      }
+    }
+  }
+  container bind-qos-profiles {
+    description
+      "Bind a quality of service (QoS) policy profile to an ONT.";
+    list bind-qos-profile {
+      key "ifname";
+      description
+        "Configure the ONT or port bind to the qos policy.";
+      leaf ifname {
+        type if:interface-ref;
+        must "/if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+          error-message
+            "must reference an v-ani.";
+        }
+        description
+          "Name of an ONT.";
+      }
+      leaf profile-name {
+        type qos-policy-profile-ref;
+        description
+          "The profile name is case sensitive, supporting the combination of letters, digits, hyphen (-), and underscore (_).
+           Indicates binding or unbinding a qos policy profile to one port or ont.
+           When a board is replaced with another board of a different type, all the data of the port QoS policy profile is lost.";
+      }
+    }
+  }
+  container car-ports {
+    description
+      "It is used to configure the port rate limitation by using a traffic profile.
+       Operators prioritize user packets by CoS values based on service requirements.
+       To implement committed access rate (CAR) policies on the packets with CoS values to avoid traffic burst.";
+    list car-port {
+      key "ifname";
+      description
+        "Configure the rate limitions to the port.";
+      leaf ifname {
+        type if:interface-ref;
+        must
+          "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'
+           or
+           /if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:olt-v-enet'" {
+          error-message
+            "must reference an olt-v-enet, or ethernetCsmacd interface.";
+        }
+        description
+          "The name of the interface.";
+      }
+      container port-cos {
+        description
+          "Configure the port+CoS CAR. The port+CoS CAR can be set only when the port CAR mode is portCos.";
+        choice port-cos {
+          description
+            "Indicates the port+CoS CAR.";
+          case cos {
+            description
+              "Indicates the port+CoS CAR.";
+            container prioritys {
+              description
+                "List of the cos.";
+              list priority {
+                key "cos";
+                description
+                  "Configure the priority for the specified CoS field of packets.";
+                leaf cos {
+                  type cos;
+                  description
+                    "Indicates the 802.1p priority in the specified packets.
+                     After setting this parameter, specify the inbound or outbound parameter to further bind the packets with CoS values to the traffic profile.";
+                }
+                uses car-port-traffic;
+              }
+            }
+          }
+          case cos-group {
+            description
+              "Indicates the GEM port+CoS Group CAR.";
+            container cos-groups {
+              description
+                "List of the cos-group.";
+              list cos-group {
+                key "group-id";
+                description
+                  "Configure the index of the CoS group. Before rate limitation based on CoS group is performed, the CoS-group table must be bound.
+                   Only one of the two rate limitation modes can be selected at a time for a GEM port.";
+                leaf group-id {
+                  type cos-group-id;
+                  description
+                    "Indicates the index of the CoS group.";
+                }
+                uses car-port-traffic;
+              }
+            }
+            container cos-group-prof {
+              description
+                "Configure the index of the CoS-group table to the GEM port.";
+              leaf cos-group-prof {
+                type cos-group-prof-id;
+                description
+                  "Indicates the index of the CoS-group table bound to the GEM port.";
+              }
+            }
+          }
+        }
+      }
+      container vlans {
+        description
+          "List of the port+VLAN CAR.";
+        list vlan {
+          key "vlan";
+          description
+            "Configure the port+VLAN CAR. The value unaware indicates that VLAN does not need to be specified when configuring a CAR-port.";
+          leaf vlan {
+            type union {
+              type vlan-ref;
+              type enumeration {
+                enum "unaware" {
+                  value 0;
+                  description
+                    "Indicates that VLAN does not need to be specified when configuring a CAR-port.";
+                }
+              }
+            }
+            description
+              "Indicates the VLAN.";
+          }
+          uses car-port-traffic;
+        }
+      }
+    }
+  }
+  container line-rates {
+    description
+      "List of to limit the traffic of Ethernet ports.";
+    list line-rate {
+      key "ifname";
+      description
+        "Configure the traffic rate of a specified Ethernet port. When the actual port rate exceeds the preset rate, the port directly discards the packets that exceed the limit.
+         The system only limits the rate of the outbound direction on the port, if the direction is not specified.
+         If only inbound is specified but inbound car is not specified, the rate is limited using the SHAPING mode.
+         The system calculates the traffic of the link layer data in Ethernet data frames, excluding the preamble code or frame gap. (Due to hardware differences, the H901OGHK calculates Ethernet line data, including frame gaps and preambles.)
+         If the protection and aggregation groups exist, only the master port in the protection or aggregation group can be configured.
+         H901OGHK supports line rate shaping in both the inbound and outbound directions for 24 even ports, or supports line rate shaping in the outbound direction for 48 ports.";
+      leaf ifname {
+        type if:interface-ref;
+        must "/if:interfaces/if:interface[if:name = current()]/if:type='ianaift:ethernetCsmacd'" {
+          error-message
+            "must reference an ethernetCsmacd interface.";
+        }
+        description
+          "Name of an Ethernet port.";
+      }
+      container inbound {
+        description
+          "Configure the inbound direction of a port.
+           The direction is from the user access side to the network side in the case of user port or cascade port; the direction is from the network side to the user access side in the case of network port.";
+        leaf car {
+          type empty;
+          description
+            "Indicates that the traffic rate is limited in committed access rate (CAR) mode.";
+        }
+        leaf rate {
+          type uint32 {
+            range "64..100000000";
+          }
+          units "kbit/s";
+          description
+            "Indicates the inbound maximum port rate. Packets that exceed this rate are discarded.
+             The value must be an integer multiple of 64.";
+        }
+      }
+      container outbound {
+        description
+          "Configure the outbound direction of a port.
+           The direction is from the network side to the user access side in the case of user port or cascade port; the direction is from the user access side to the network side in the case of network port.";
+        leaf rate {
+          type uint32 {
+            range "64..100000000";
+          }
+          units "kbit/s";
+          description
+            "Indicates the outbound maximum port rate. Packets that exceed this rate are discarded.
+             The value must be an integer multiple of 64.";
+        }
+      }
+    }
+  }
+  container traffic-limits {
+    description
+      "Configure the traffic limit on special ont, port or vs.";
+    list traffic-limit {
+      key "ifname";
+      description
+        "Configure the traffic limit on special interface.";
+      leaf ifname {
+        type if:interface-ref;
+        must "/if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+          error-message
+            "Must reference an ONT interface.";
+        }
+        description
+          "Name of an ONT.";
+      }
+      container ont {
+        description
+          "Configure the traffic limit of the downstream packets on a specified ONT.
+           After this Configuration is run successfully, the system limits the traffic of downstream packets on an ONT through traffic shaping.
+           The system buffers the packets that exceed the limit (that is, PIR in the traffic profile) and transmits them at a proper time (such as during periodic checks).
+           This reduces packet drop and at the same time complies with traffic features.
+           Traffic shaping is generally applied to ports with unstable traffic and therefore makes traffic even.
+           For example, traffic shaping can be used to ensure a stable download rate.
+           By default, a traffic profile is not bound to an ONT. That is, the system does not limit the traffic of downstream packets on the ONT.
+           The used traffic profile must exist in the system.
+           The system calculates the traffic of the link-layer (802.1q) data in Ethernet data frames, excluding the preamble code or inter-frame gap.";
+        container down-stream {
+          description
+            "Configure the downstream packets on an ONT.";
+          leaf name {
+            type traffic-table-profile-ref;
+            must "/if:interfaces/if:interface[if:name = current()]/if:type='bbf-xponift:v-ani'" {
+              error-message
+                "Must reference an ONT interface.";
+            }
+            description
+              "Indicates the name of a traffic profile.";
+          }
+        }
+      }
+    }
+  }
+
+  augment "/hw-bb-srv-flow:service-flows/hw-bb-srv-flow:service-flow" {
+    description
+      "Indicates the parameters applying to the service flow.";
+    leaf inbound-traffic-table {
+      type traffic-table-profile-ref;
+      description
+        "Indicates the name of IP traffic table
+         applying to the service flow in the inbound direction of the user port.";
+    }
+    leaf outbound-traffic-table {
+      type traffic-table-profile-ref;
+      description
+        "Indicates the name of IP traffic table
+         applying to the service flow in the outbound direction of the user port.";
+    }
+  }
+  augment "/board:boards/board:board" {
+    description
+      "Indicates the parameters applying to the board.";
+    container qos {
+      description
+        "Configure the QoS parameters applying to the board.";
+      container car-modes {
+        description
+          "Configure the CAR mode for a service board.";
+        leaf car-mode {
+          type car-mode-type;
+          default "service-port";
+          description
+            "It is used to set the CAR mode for GPON board.
+             When changing the CAR mode, pay attention to the following restrictions:
+             When the mode is changed to port-cos, the board or port cannot have any traffic stream.
+             When the mode is changed to service-port, the board or port cannot have any traffic stream.";
+        }
+      }
+      container hqos-modes {
+        description
+          "Configure the hierarchical quality of service (HQoS) mode for a service board.
+           When modifying the HQoS mode, pay attention to the following restrictions:
+           The slice mode can only switch from basic mode, and can only switch back to basic mode.
+           After you switch from basic mode to bandwidth or service mode or slice mode, all queue traffic shaping configurations are deleted.
+           After you switch from basic mode to bandwidth or service mode, default HQoS subscriber will be added to all ONTs that have service ports and are connected to this board.
+           For ETH : Before switching from bandwidth or service mode to basic mode, ensure that the number of HQoS subscribers under each port is not more than one. The switching deletes all HQoS subscriber configurations.
+           After you switch the HQoS mode from basic to bandwidth or service or slice, QoS policy profiles bound to the xPON ports are all deleted.
+           Switching between the non-service mode and service mode will reset the board.
+           If the HQoS mode of a board is not basic or slice, service flows on this board must be added to the subscriber group. Otherwise, services fail.";
+        leaf hqos-mode {
+          type hqos-mode-type;
+          default "basic";
+          description
+            "Indicates the HQoS mode of a board.
+             basic: It is the default mode.
+             bandwidth: In this mode, user bandwidth is preferentially guaranteed.
+             service: In this mode, services with higher priorities are guaranteed.
+             slice: In this mode, slice with higher priorities are guaranteed.
+             Different services are scheduled according to their priorities.";
+        }
+      }
+    }
+  }
+  augment "/if:interfaces/if:interface" {
+    description
+      "Configure the parameters applying to the interface.";
+    container qos {
+      description
+        "Configure the QoS parameters applying to the interface.";
+      container car-modes {
+        description
+          "Configure the CAR mode for a port.";
+        leaf car-mode {
+          type car-mode-type;
+          must "/if:interfaces/if:interface/if:type='ianaift:ethernetCsmacd'" {
+            error-message
+              "Must reference an ethernetCsmacd interface.";
+          }
+          description
+            "It is used to set the CAR mode for a ethernetCsmacd port.";
+        }
+      }
+    }
+  }
+}

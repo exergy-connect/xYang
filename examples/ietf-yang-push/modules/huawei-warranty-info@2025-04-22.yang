@@ -1,0 +1,126 @@
+module huawei-warranty-info {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-warranty-info";
+  prefix hw-warranty-info;
+
+  import ietf-hardware {
+    prefix hw;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import huawei-pub-type {
+    prefix pub-type;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com
+     ";
+  description
+    "The YANG module defines YANG objects which provide warranty information.";
+
+  revision 2025-04-22 {
+    description
+      "Modify leaf nodes first-activate-date and mfg-date config to false, add action nodes
+       set-warranty-start-point-date and set-warranty-service-session.";
+    reference
+      "Huawei private.";
+  }
+  revision 2024-03-14 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  typedef capability-state {
+    type enumeration {
+      enum "support" {
+        value 0;
+        description
+          "Indicates that the product is support.";
+      }
+      enum "not-support" {
+        value 1;
+        description
+          "Indicates that the product is notsupport.";
+      }
+    }
+    description
+      "Whether the current product supports specific feature.";
+  }
+
+  grouping warranty-info {
+    description
+      "Information about a particular physical warranty information.";
+    leaf support-info {
+      type capability-state;
+      description
+        "Whether the current product supports for warranty information.";
+    }
+    leaf warranty-serialnum {
+      type string {
+        length "1..32";
+      }
+      description
+        "The object specifies the serial number in warranty information.";
+    }
+    leaf start-point-date {
+      type pub-type:date;
+      description
+        "The object specifies the start point date in warranty information.";
+    }
+    leaf service-session {
+      type uint32;
+      default "0";
+      description
+        "The object specifies the service session in warranty information.";
+    }
+    leaf first-activate-date {
+      type yang:date-and-time;
+      default "2000-01-01T00:00:00Z";
+      description
+        "The object specifies the first activation date in warranty information.";
+    }
+    leaf mfg-date {
+      type yang:date-and-time;
+      description
+        "The object specifies the manufacture date in warranty information.";
+    }
+  }
+
+  augment "/hw:hardware/hw:component" {
+    description
+      "Extended node for ietf-hardware.";
+    container warranty {
+      config false;
+      description
+        "Operational data of DFLC.";
+      uses warranty-info;
+    }
+    action set-warranty-info {
+      description
+        "Request operation of the warranty.";
+
+      input {
+        leaf start-point-date {
+          type pub-type:date;
+          description
+            "Modify the start point date in warranty information.";
+        }
+        leaf service-session {
+          type uint32;
+          description
+            "Modify the service session in warranty information.";
+        }
+      }
+    }
+  }
+}

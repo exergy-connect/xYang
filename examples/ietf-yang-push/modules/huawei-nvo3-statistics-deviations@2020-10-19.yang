@@ -1,0 +1,40 @@
+module huawei-nvo3-statistics-deviations {
+  yang-version 1;
+  namespace "urn:huawei:yang:huawei-nvo3-statistics-deviations";
+  prefix nvo3-statistics-devs;
+
+  import huawei-nvo3-statistics {
+    prefix nvo3-statistics;
+  }
+  import huawei-ifm {
+    prefix ifm;
+  }
+  import huawei-nvo3 {
+    prefix nvo3;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "Management of NVO3 statistics.";
+
+  revision 2020-10-19 {
+    description
+      "Init revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/ifm:ifm/ifm:interfaces/ifm:interface/nvo3-statistics:nvo3-vtep-statistics/nvo3-statistics:nvo3-vtep-statistic" {
+    deviate add {
+      must "/nvo3:nvo3/nvo3:vni-instances/nvo3:vni-instance[nvo3:vni = current()/vni]/nvo3:static-peers/nvo3:static-peer[nvo3:address = current()/peer]";
+    }
+  }
+}

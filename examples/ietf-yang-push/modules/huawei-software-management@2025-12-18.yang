@@ -1,0 +1,72 @@
+module huawei-software-management {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-software-management";
+  prefix hw-sm;
+
+
+  include "huawei-software-operation";
+
+  include "huawei-software-base";
+
+  include "huawei-software-patch";
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions for
+     supporting software management.";
+
+  revision 2025-12-18 {
+    description
+      "Modify the content of huawei-software-operation.
+       Delete system-data-info.
+       Modify model version.
+       Modify the software-info model.";
+    reference
+      "";
+  }
+  revision 2025-05-24 {
+    description
+      "Add the loading and backup content.
+       Modify model version.";
+    reference
+      "";
+  }
+  revision 2024-08-29 {
+    description
+      "Change is-can-load-software to a non-configuration node.";
+    reference
+      "";
+  }
+  revision 2024-05-20 {
+    description
+      "Add leaf is-can-load-software to huawei-software-operation.";
+    reference
+      "";
+  }
+  revision 2023-11-27 {
+    description
+      "Modify the content of huawei-software-operation.";
+    reference
+      "";
+  }
+  revision 2023-05-10 {
+    description
+      "Modify the content of huawei-software-operation.";
+    reference
+      "";
+  }
+  revision 2020-12-23 {
+    description
+      "Initial revision.";
+    reference
+      "";
+  }
+}

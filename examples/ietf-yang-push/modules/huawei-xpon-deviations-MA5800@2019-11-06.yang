@@ -1,0 +1,37 @@
+module huawei-xpon-deviations-MA5800 {
+  namespace "urn:huawei:yang:huawei-xpon-deviations-MA5800";
+  prefix hwxpon-devs-MA5800;
+
+  import huawei-xpon {
+    prefix hwxpon;
+  }
+  import ietf-interfaces {
+    prefix if;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module defines deviation statements for huawei-xpon module.";
+
+  revision 2019-11-06 {
+    description
+      "Initial revision.";
+    reference
+      "Huawei private.";
+  }
+
+  deviation "/if:interfaces/if:interface/hwxpon:xpon-port-configs/hwxpon:rogue-ont-weak-light-detect-enable" {
+    deviate not-supported;
+  }
+  deviation "/if:interfaces-state/if:interface/hwxpon:xpon-port-opers/hwxpon:rogue-onts/hwxpon:rogue-ont" {
+    deviate not-supported;
+  }
+}

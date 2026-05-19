@@ -1,0 +1,125 @@
+module bbf-application {
+  yang-version 1.1;
+  namespace "urn:bbf:yang:bbf-application";
+  prefix bbf-app;
+
+  import bbf-application-type {
+    prefix bbf-app-type;
+  }
+
+  organization
+    "Broadband Forum <https://www.broadband-forum.org>
+     Common YANG Work Area";
+  contact
+    "Comments or questions about this Broadband Forum YANG module
+     should be directed to <mailto:help@broadband-forum.org>.
+
+     Editor:      Cai Yuhang, Huawei
+
+     Editor:      Mo Zhancong, Huawei
+
+     Editor:      He Wenzhong, Huawei
+
+     PS Leader:
+
+     WA Director:
+
+     WA Director:";
+  description
+    "This module contains application configurations.";
+
+  revision 2025-05-15 {
+    description
+      "Modify the type of the 'name' node to 'string' and
+       specified its valid range; Modify app-identify-by-config to
+       auto-identify-enable, app-identify-by-config to
+       auto-identify-disable, app-tuple-match-mode-high-priority to
+       app-tuple-match-mode-first-priority,  and
+       app-tuple-match-mode-low-priority to
+       app-tuple-match-mode-second-priority.";
+  }
+  revision 2025-01-31 {
+    description
+      "Initial revision.";
+  }
+
+  identity app-identify-mode {
+    description
+      "Indicates the application identification mode.";
+  }
+
+  identity auto-identify-disable {
+    base app-identify-mode;
+    description
+      "Indicates the application-tuples is identified by static
+       configuration.";
+  }
+
+  identity auto-identify-enable {
+    base app-identify-mode;
+    description
+      "Indicates the application-tuples are automatically
+       identified by the device and cannot be manually configured.";
+  }
+
+  container applications {
+    description
+      "Application Configuration List";
+    list application {
+      key "name";
+      description
+        "Application Configuration";
+      leaf name {
+        type string {
+          length "1..32";
+        }
+        description
+          "Indicates the application configuration name.";
+      }
+      leaf identify-mode {
+        type identityref {
+          base bbf-app:app-identify-mode;
+        }
+        description
+          "Indicates the application identification mode.";
+      }
+      leaf app-tuple-match-mode-first-priority {
+        type identityref {
+          base bbf-app-type:app-tuple-mode-type;
+        }
+        description
+          "Indicates the application 5-tuple high-priority matching
+           mode.";
+      }
+      leaf app-tuple-match-mode-second-priority {
+        type identityref {
+          base bbf-app-type:app-tuple-mode-type;
+        }
+        description
+          "Indicates the application 5-tuple low-priority matching
+           mode.";
+      }
+      list application-id {
+        key "application-maintype application-subtype";
+        description
+          "The application maintype and subtype";
+        leaf application-maintype {
+          type uint16;
+          description
+            "the application maintype";
+        }
+        leaf application-subtype {
+          type uint16;
+          description
+            "the application subtype";
+        }
+      }
+      list application-tuples {
+        key "server-ip-address client-ip-address server-port client-port protocol-type";
+        description
+          "Application tuple information";
+        uses bbf-app-type:app-ip-tuple;
+      }
+    }
+  }
+}

@@ -1,0 +1,388 @@
+module huawei-interface-statistics-mgt {
+  yang-version 1.1;
+  namespace "urn:huawei:yang:huawei-interface-statistics-mgt";
+  prefix hw-if-sm;
+
+  import ietf-interfaces {
+    prefix if;
+  }
+  import iana-if-type {
+    prefix ianaift;
+  }
+  import bbf-xpon-if-type {
+    prefix bbf-xponift;
+  }
+  import bbf-if-type {
+    prefix bbfift;
+  }
+  import ietf-yang-types {
+    prefix yang;
+  }
+  import bbf-xpon-statistics-management {
+    prefix bbf-xpon-sm;
+  }
+
+  organization
+    "Huawei Technologies Co., Ltd.";
+  contact
+    "Huawei Industrial Base
+     Bantian, Longgang
+     Shenzhen 518129
+     People's Republic of China
+     Website: http://www.huawei.com
+     Email: support@huawei.com";
+  description
+    "This module contains a collection of YANG definitions
+     for interface statistic parameters.";
+  reference
+    "ietf-interface.";
+
+  revision 2025-08-14 {
+    description
+      "Change the type of the out-rate node.";
+    reference
+      "";
+  }
+  revision 2025-04-07 {
+    description
+      "Add gem-frame-hec-errors node.";
+    reference
+      "";
+  }
+  revision 2025-03-31 {
+    description
+      "Add Ethernet frame extended PM 64 bit statistics.";
+    reference
+      "G.988 9.3.34 Ethernet frame extended PM 64 bit";
+  }
+  revision 2025-01-15 {
+    description
+      "Add ont-counter-by-state node and ont-offline-times node.";
+    reference
+      "";
+  }
+  revision 2024-07-01 {
+    description
+      "Initial revision.";
+    reference
+      "ietf-interface.";
+  }
+
+  grouping interface-statistic {
+    description
+      "The statistics of a interface.";
+    leaf in-alignment-errors {
+      type yang:counter64;
+      description
+        "The recieved alignment errors packets of interface.";
+    }
+    leaf out-crc-errors {
+      type yang:counter64;
+      description
+        "The recieved CRC errors packets of interface.";
+    }
+    leaf in-crc-errors {
+      type yang:counter64;
+      description
+        "The transmitted CRC errors packets of interface.";
+    }
+    leaf out-oversized-pkts {
+      type yang:counter64;
+      description
+        "The transmitted oversized packets of interface.";
+    }
+    leaf in-oversized-pkts {
+      type yang:counter64;
+      description
+        "The recieved oversized packets of interface.";
+    }
+    leaf out-undersized-pkts {
+      type yang:counter64;
+      description
+        "The transmitted undersized packets of interface.";
+    }
+    leaf in-undersized-pkts {
+      type yang:counter64;
+      description
+        "The recieved undersized packets of interface.";
+    }
+    leaf out-fragment-pkts {
+      type yang:counter64;
+      description
+        "The transmitted fragment packets of interface.";
+    }
+    leaf in-fragment-pkts {
+      type yang:counter64;
+      description
+        "The recieved fragment packets of interface.";
+    }
+    leaf out-jabber-pkts {
+      type yang:counter64;
+      description
+        "The transmitted jabber packets of interface.";
+    }
+    leaf in-jabber-pkts {
+      type yang:counter64;
+      description
+        "The recieved jabber packets of interface.";
+    }
+    leaf out-discards-max {
+      type yang:counter32;
+      description
+        "Maximum lost packets of interface.";
+    }
+    leaf out-discards-min {
+      type yang:counter32;
+      description
+        "Minimum lost packets of interface.";
+    }
+    leaf in-pkts {
+      type yang:counter64;
+      units "frames";
+      description
+        "The total number of frames received on the interface.";
+    }
+    leaf out-pkts {
+      type yang:counter64;
+      units "frames";
+      description
+        "The total number of frames transmitted out of the
+         interface.";
+    }
+    container traffic {
+      description
+        "Statistics of the traffic for interface.";
+      leaf out-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "The transmitted rate of interface.";
+      }
+      leaf in-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "The recieved rate of interface.";
+      }
+      leaf out-peak-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "The peak transmitted rate of interface.";
+      }
+      leaf in-peak-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "The peak recieved rate of interface.";
+      }
+      leaf out-multicast-rate {
+        type uint32;
+        units "kbit/s";
+        description
+          "The multicast peak recieved rate of interface.";
+      }
+    }
+  }
+
+  grouping interface-state-changed-statistics {
+    description
+      "The state changed statistics of a interface.";
+    leaf change-times {
+      type yang:counter64;
+      description
+        "The total number of counts the interface state changed.";
+    }
+  }
+
+  grouping ont-counter-by-state {
+    description
+      "The online or offline counter statistics of ONT on this channel-pair interface.";
+    leaf ont-online-counter {
+      type uint32;
+      description
+        "The online counter statistic of ONT on this channel-pair interface.";
+    }
+    leaf ont-offline-counter {
+      type uint32;
+      description
+        "The offline counter statistic of ONT on this channel-pair interface.";
+    }
+  }
+
+  grouping ont-offline-times {
+    description
+      "The offline times of v-ani interface.";
+    leaf ont-offline-times {
+      type uint32;
+      description
+        "The offline times statistic of v-ani interface.";
+    }
+  }
+
+  grouping byte-frames-statistics {
+    description
+      "A collection of interface-related statistics objects.";
+    reference
+      "G.988 9.3.34 Ethernet frame extended PM 64 bit";
+    leaf in-64-pkts {
+      type yang:counter64;
+      description
+        "The total number of 64-octet packets received on the interface.";
+    }
+    leaf in-65-127-pkts {
+      type yang:counter64;
+      description
+        "The total number of 65-octet~127-octet packets received on the interface.";
+    }
+    leaf in-128-255-pkts {
+      type yang:counter64;
+      description
+        "The total number of 128-octet~255-octet packets received on the interface.";
+    }
+    leaf in-256-511-pkts {
+      type yang:counter64;
+      description
+        "The total number of 256-octet~511-octet packets received on the interface.";
+    }
+    leaf in-512-1023-pkts {
+      type yang:counter64;
+      description
+        "The total number of 512-octet~1023-octet packets received on the interface.";
+    }
+    leaf in-1024-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of 1024-octet~1518-octet packets received on the interface.";
+    }
+    leaf in-over-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of over 1518-octet packets received on the interface.";
+    }
+    leaf in-oversize-discard-pkts {
+      type yang:counter64;
+      description
+        "The total number of over oversize discard packets received on the interface.";
+    }
+    leaf out-64-pkts {
+      type yang:counter64;
+      description
+        "The total number of 64-octet packets transmitted out of the interface.";
+    }
+    leaf out-65-127-pkts {
+      type yang:counter64;
+      description
+        "The total number of 65-octet~127-octet packets transmitted out of the interface.";
+    }
+    leaf out-128-255-pkts {
+      type yang:counter64;
+      description
+        "The total number of 128-octet~255-octet packets transmitted out of the interface.";
+    }
+    leaf out-256-511-pkts {
+      type yang:counter64;
+      description
+        "The total number of 256-octet~511-octet packets transmitted out of the interface.";
+    }
+    leaf out-512-1023-pkts {
+      type yang:counter64;
+      description
+        "The total number of 512-octet~1023-octet packets transmitted out of the interface.";
+    }
+    leaf out-1024-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of 1024-octet~1518-octet packets transmitted out of the interface.";
+    }
+    leaf out-over-1518-pkts {
+      type yang:counter64;
+      description
+        "The total number of over 1518-octet packets transmitted out of the interface.";
+    }
+    leaf in-crc-errors {
+      type yang:counter64;
+      description
+        "The transmitted CRC errors packets of interface.";
+    }
+    leaf in-oversized-pkts {
+      type yang:counter64;
+      description
+        "The recieved oversized packets of interface.";
+    }
+    leaf in-undersized-pkts {
+      type yang:counter64;
+      description
+        "The recieved undersized packets of interface.";
+    }
+  }
+
+  grouping gem-frame-hec-errors {
+    description
+      "The GEM HEC error counter of v-ani interface.";
+    leaf gem-frame-hec-errors {
+      type yang:counter32;
+      description
+        "The GEM HEC error counter of v-ani interface.";
+    }
+  }
+
+  augment "/if:interfaces-state/if:interface/if:statistics" {
+    when "derived-from-or-self(../if:type, 'ianaift:gpon')";
+    description
+      "A collection of interface-related
+       different byte frame statistics objects.";
+    uses byte-frames-statistics;
+  }
+  augment "/if:interfaces/if:interface/if:statistics" {
+    when "derived-from-or-self(../if:type, 'ianaift:ethernetCsmacd') or derived-from-or-self(../if:type, 'ianaift:gpon') or derived-from-or-self(../if:type, 'bbfift:vlan-sub-interface') or derived-from-or-self(../if:type, 'bbf-xponift:channel-pair') or derived-from-or-self(../if:type, 'bbf-xponift:v-ani') " {
+      description
+        "Interface statistic for which is a type equal to or derived from
+         'ianaift:ethernetCsmacd', 'ianaift:gpon', 'bbfift:vlan-sub-interface',
+         'bbf-xponift:channel-pair' or 'bbf-xponift:v-ani'.";
+    }
+    description
+      "Augment the statistics of interface.";
+    uses interface-statistic;
+  }
+  augment "/if:interfaces/if:interface/if:statistics" {
+    when "derived-from-or-self(../if:type, 'ianaift:ethernetCsmacd') " {
+      description
+        "Interface statistic for which is a type equal to or derived from
+         'ianaift:ethernetCsmacd'";
+    }
+    description
+      "Augment the state changed statistics of interface.";
+    uses interface-state-changed-statistics;
+  }
+  augment "/if:interfaces/if:interface/if:statistics" {
+    when "derived-from-or-self(../if:type, 'bbf-xponift:channel-pair') " {
+      description
+        "Interface statistic for which is a type equal to or derived from
+         'bbf-xponift:channel-pair'";
+    }
+    description
+      "Augment online or offline numbers statistics of ONT on this channel-pair interface.";
+    uses ont-counter-by-state;
+  }
+  augment "/if:interfaces/if:interface/if:statistics" {
+    when "derived-from-or-self(../if:type, 'bbf-xponift:v-ani') " {
+      description
+        "Interface statistic for which is a type equal to or derived from
+         'bbf-xponift:v-ani'";
+    }
+    description
+      "Augment the offline times statistics of v-ani interface.";
+    uses ont-offline-times;
+  }
+  augment "/if:interfaces-state/if:interface/if:statistics/bbf-xpon-sm:xpon/bbf-xpon-sm:phy" {
+    when "derived-from-or-self(../../../if:type, 'bbf-xponift:v-ani') " {
+      description
+        "Interface statistic for which is a type equal to or derived from
+         'bbf-xponift:v-ani'";
+    }
+    description
+      "Augment the GEM HEC error counter of v-ani interface.";
+    uses gem-frame-hec-errors;
+  }
+}
