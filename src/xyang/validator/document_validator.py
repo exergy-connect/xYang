@@ -93,6 +93,11 @@ class DocumentValidator:
             self._if_feature_module = None
             self._enabled_features = {}
         self._anydata_validation: Optional[Dict[str, Any]] = None
+        self._leafref_severity = Severity.ERROR
+        self._root_data: Any = None
+        self._errors: List[ValidationError] = []
+        self._case_stack: list[YangCaseStmt] = []
+        self._case_level_data_stack: list[dict[str, Any]] = []
 
     def validate(
         self,
@@ -123,8 +128,8 @@ class DocumentValidator:
         self._leafref_severity = leafref_severity
         self._root_data = leafref_root_data if leafref_root_data is not None else data
         self._errors = []
-        self._case_stack: list[YangCaseStmt] = []
-        self._case_level_data_stack: list[dict[str, Any]] = []
+        self._case_stack = []
+        self._case_level_data_stack = []
         self._evaluator.clear_cache_stats()
         path_cache: Dict[Any, Any] | None = {} if cache else None
         node = Node(data, self._root_schema, None)
@@ -142,7 +147,7 @@ class DocumentValidator:
     def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
         """Enable an optional validation extension (see ``ValidatorExtension``)."""
         if extension is ValidatorExtension.ANYDATA_VALIDATION:
-            from ..ext.anydata_validation import AnydataValidationMode, parse_anydata_extension_kwargs
+            from ..ext.anydata_validation import parse_anydata_extension_kwargs
 
             modules, mode = parse_anydata_extension_kwargs(kwargs)
             self._anydata_validation = {"modules": modules, "mode": mode}
@@ -175,7 +180,9 @@ class DocumentValidator:
             return val
         return SchemaNav.default(stmt)
 
-    def _child_enforce_mandatory_choice(self, owner: YangStatementList, parent_enforce: bool) -> bool:
+    def _child_enforce_mandatory_choice(
+        self, owner: YangStatementList, parent_enforce: bool
+    ) -> bool:
         """RFC 7950 §7.9.4: whether mandatory ``choice`` is enforced without case-sibling deferral.
 
         When ``False``, the innermost ``case`` on ``_case_stack`` (with data from

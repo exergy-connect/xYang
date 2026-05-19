@@ -244,8 +244,7 @@ def _resolve_leafref_target_leaf(
                 return None
             current = parent
             continue
-        stmts = getattr(current, "statements", [])
-        nxt = SchemaNav._find(stmts, seg.step)
+        nxt = SchemaNav.child(current, seg.step)
         if nxt is None:
             return None
         current = nxt
@@ -1108,7 +1107,7 @@ def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) 
     }
 
 
-def _typedef_to_def(name: str, typedef: YangTypedefStmt, module: YangModule) -> dict[str, Any]:
+def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, Any]:
     """Convert YangTypedefStmt to a $defs entry."""
     type_stmt = typedef.type
     schema = _type_to_schema(
@@ -1165,7 +1164,7 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     defs: dict[str, Any] = {}
     for name, typedef in schema_module.typedefs.items():
         if isinstance(typedef, YangTypedefStmt):
-            defs[name] = _typedef_to_def(name, typedef, schema_module)
+            defs[name] = _typedef_to_def(typedef, schema_module)
     for name, identity in schema_module.identities.items():
         if isinstance(identity, YangIdentityStmt):
             defs[name] = _identity_to_def(name, identity, schema_module)
