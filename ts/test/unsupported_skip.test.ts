@@ -12,7 +12,7 @@ describe("python parity: test_unsupported_skip", () => {
     warnSpy.mockRestore();
   });
 
-  it("skips deviation, rpc, action, notification, input, output and still parses leaf a", () => {
+  it("skips deviation, action, and top-level input/output; parses notification and leaf a", () => {
     const yang = `
 module ex {
   yang-version 1.1;
@@ -35,9 +35,13 @@ module ex {
 `;
     const mod = parseYangString(yang);
     const joined = warnSpy.mock.calls.map((c) => String(c[0])).join(" ").toLowerCase();
-    for (const kw of ["deviation", "rpc", "action", "notification", "input", "output"]) {
+    // rpc and nested input/output are skipped in TS (Python parses rpc); action and top-level input/output warn.
+    for (const kw of ["deviation", "rpc", "action", "input", "output"]) {
       expect(joined).toContain(kw);
     }
+    expect(joined).not.toContain("notification");
+    const done = mod.findStatement("done");
+    expect(done?.name).toBe("done");
     const leaf = mod.findStatement("a");
     expect(leaf?.name).toBe("a");
   });
