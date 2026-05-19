@@ -8,14 +8,14 @@ The same feature set is implemented twice:
 
 | | **Python** (`xyang`) | **TypeScript** (`@exergy-connect/xyang`) |
 |---|----------------------|------------------------------|
-| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | npm `@exergy-connect/xyang` |
+| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | [npm](https://www.npmjs.com/package/@exergy-connect/xyang) `@exergy-connect/xyang` |
 | **CLI** | `xyang` | `xyang-ts` |
 | **Runtime** | Python ≥ 3.9, zero required deps | Node ≥ 24 |
 | **Source** | [`src/xyang/`](src/xyang/) | [`ts/src/`](ts/src/) |
 
 Not every YANG statement is modeled; unsupported constructs are skipped with a warning so mixed modules still load. See [**FEATURES.md**](FEATURES.md) for the full matrix, JSON hybrid format, and known gaps.
 
-**Repository:** [github.com/exergy-connect/xYang](https://github.com/exergy-connect/xYang) · **Issues:** [github.com/exergy-connect/xYang/issues](https://github.com/exergy-connect/xYang/issues)
+**Repository:** [github.com/exergy-connect/xYang](https://github.com/exergy-connect/xYang) · **npm:** [`@exergy-connect/xyang`](https://www.npmjs.com/package/@exergy-connect/xyang) · **Issues:** [github.com/exergy-connect/xYang/issues](https://github.com/exergy-connect/xYang/issues)
 
 MIT licensed.
 
