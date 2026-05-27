@@ -1,3 +1,4 @@
+import { YANG_INTEGER_BOUNDS } from "./json/integer-bounds";
 import { YangTokenType } from "./parser/parser-context";
 
 export type TypeConstraintInput = {
@@ -104,6 +105,35 @@ function decimalLike(value: unknown): number | null {
     return Number(value);
   }
   return null;
+}
+
+function validateIntegerBuiltin(
+  typeName: string,
+  value: unknown,
+  range?: string
+): [boolean, string | null] {
+  const bounds = YANG_INTEGER_BOUNDS[typeName];
+  if (!bounds) {
+    return [false, `Unsupported integer type '${typeName}'`];
+  }
+  const n = integerLike(value);
+  if (n === null) {
+    return [false, `Expected ${typeName}`];
+  }
+  if (range) {
+    if (!matchesRange(n, range)) {
+      return [false, `Integer ${n} does not match ${range}`];
+    }
+    return [true, null];
+  }
+  const [lo, hi] = bounds;
+  if (n < lo) {
+    return [false, `Value ${n} is less than minimum ${lo}`];
+  }
+  if (n > hi) {
+    return [false, `Value ${n} exceeds maximum ${hi}`];
+  }
+  return [true, null];
 }
 
 function validateBinary(value: unknown, length?: string): [boolean, string | null] {
@@ -220,37 +250,8 @@ export class TypeSystem {
       return [false, "Expected empty (null)"];
     }
 
-    if (normalizedType === YangTokenType.INT32) {
-      const n = integerLike(value);
-      if (n === null || n < -2147483648 || n > 2147483647) {
-        return [false, "Expected int32"]; 
-      }
-      if (c.range && !matchesRange(n, c.range)) {
-        return [false, `Integer ${n} does not match ${c.range}`];
-      }
-      return [true, null];
-    }
-
-    if (normalizedType === YangTokenType.UINT8) {
-      const n = integerLike(value);
-      if (n === null || n < 0 || n > 255) {
-        return [false, "Expected uint8"]; 
-      }
-      if (c.range && !matchesRange(n, c.range)) {
-        return [false, `Integer ${n} does not match ${c.range}`];
-      }
-      return [true, null];
-    }
-
-    if (normalizedType === YangTokenType.UINT64) {
-      const n = integerLike(value);
-      if (n === null || n < 0) {
-        return [false, "Expected uint64"]; 
-      }
-      if (c.range && !matchesRange(n, c.range)) {
-        return [false, `Integer ${n} does not match ${c.range}`];
-      }
-      return [true, null];
+    if (normalizedType in YANG_INTEGER_BOUNDS) {
+      return validateIntegerBuiltin(normalizedType, value, c.range);
     }
 
     if (normalizedType === YangTokenType.BINARY) {
@@ -289,8 +290,8 @@ export class TypeSystem {
       return [true, null];
     }
 
-    // Treat unknown/custom type names as string-compatible in this baseline implementation.
-    if (typeof value === "string" || typeof value === "number" || typeof value === "boolean") {
+    // Unknown typedef names without a resolver: accept strings only (baseline).
+    if (typeof value === "string") {
       return [true, null];
     }
     return [false, `Unsupported type '${normalizedType}'`];
