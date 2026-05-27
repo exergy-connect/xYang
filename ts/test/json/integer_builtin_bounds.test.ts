@@ -25,4 +25,26 @@ module m {
     expect((leaf?.data.type as { name?: string })?.name).toBe("uint16");
     expect((leaf?.data.type as { range?: string })?.range).toBeUndefined();
   });
+
+  it("int32 range 0..max round-trips", () => {
+    const mod = parseYangString(`
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  typedef t { type int32 { range "0..max"; } }
+  leaf x { type t; }
+}
+`);
+    const schema = generateJsonSchema(mod);
+    const tdef = (schema.$defs as Record<string, Record<string, unknown>>).t;
+    const hi = YANG_INTEGER_BOUNDS.int32[1];
+    expect(tdef.minimum).toBe(0);
+    expect(tdef.maximum).toBe(hi);
+
+    const mod2 = parseJsonSchema(schema);
+    const td = mod2.typedefs["t"] as { type?: { name?: string; range?: string } };
+    expect(td?.type?.name).toBe("int32");
+    expect(td?.type?.range).toBe("0..max");
+  });
 });

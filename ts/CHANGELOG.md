@@ -13,6 +13,11 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 - **Integer built-in yang.json:** emit canonical JSON Schema `minimum` / `maximum` instead of `x-yang.builtin-type`; `parseJsonSchema` infers the YANG type from bounds (`integer-bounds.ts`, `tests/json/integer_builtin_bounds.test.ts`).
 
+### Fixed
+
+- **Integer bounds round-trip:** resolve `min`/`max` when emitting bounds; infer `int32 { range "0..max"; }` and unconstrained `integer` correctly when parsing (`integer-bounds.ts`).
+- **JSON default values:** coerce numeric leaf defaults on `$ref` typedefs to YANG string lexemes (`default-values.ts`).
+
 ### Added
 
 - **Parser `rpc` / `input` / `output`:** module-level `rpc` with I/O blocks (`YangRpcStmt`, `YangInputStmt`, `YangOutputStmt` in `src/core/ast.ts`; `src/parser/statements/rpc.ts`); tests in `test/rpc_input_output.test.ts`.

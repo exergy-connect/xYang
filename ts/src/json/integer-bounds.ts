@@ -43,18 +43,25 @@ export function jsonIntegerBoundsForBuiltin(
   if (!bounds) {
     return {};
   }
-  if (rangeStr) {
-    const { lo, hi } = parseRange(rangeStr);
-    const out: { minimum?: number; maximum?: number } = {};
-    if (lo !== undefined) {
-      out.minimum = lo;
-    }
-    if (hi !== undefined) {
-      out.maximum = hi;
-    }
-    return out;
+  if (!rangeStr) {
+    return { minimum: bounds[0], maximum: bounds[1] };
   }
-  return { minimum: bounds[0], maximum: bounds[1] };
+  const { lo, hi } = parseRange(rangeStr);
+  const parts = rangeStr.split("..");
+  const loS = (parts[0] ?? "").trim();
+  const hiS = (parts[1] ?? "").trim();
+  const out: { minimum?: number; maximum?: number } = {};
+  if (loS.toLowerCase() === "min") {
+    out.minimum = bounds[0];
+  } else if (lo !== undefined) {
+    out.minimum = lo;
+  }
+  if (rangeStr.includes("..") && hiS.toLowerCase() === "max") {
+    out.maximum = bounds[1];
+  } else if (hi !== undefined) {
+    out.maximum = hi;
+  }
+  return out;
 }
 
 function coerceInt(value: unknown): number | undefined {
@@ -90,6 +97,18 @@ export function yangIntegerFromJsonBounds(
 ): { name: string; range?: string } {
   const lo = coerceInt(minVal);
   const hi = coerceInt(maxVal);
+
+  if (lo === undefined && hi === undefined) {
+    return { name: "integer" };
+  }
+
+  if (lo === 0 && hi !== undefined) {
+    for (const name of ["int8", "int16", "int32", "int64"] as const) {
+      if (hi === YANG_INTEGER_BOUNDS[name][1]) {
+        return { name, range: "0..max" };
+      }
+    }
+  }
 
   if (lo !== undefined && hi !== undefined) {
     for (const [name, [blo, bhi]] of Object.entries(YANG_INTEGER_BOUNDS)) {

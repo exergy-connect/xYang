@@ -124,5 +124,8 @@ export function yangDefaultFromJsonSchema(
   if (typeof defaultValue === "boolean") {
     return defaultValue ? "true" : "false";
   }
+  if (typeof defaultValue === "number" && Number.isInteger(defaultValue)) {
+    return String(Math.trunc(defaultValue));
+  }
   return defaultValue;
 }

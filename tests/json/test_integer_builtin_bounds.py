@@ -57,3 +57,28 @@ module m {
     b_type = mod2.find_statement("b").type
     assert b_type.name == "uint8"
     assert b_type.range == "0..100"
+
+
+def test_int32_zero_to_max_round_trips():
+    yang = """
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  typedef t {
+    type int32 { range "0..max"; }
+  }
+  leaf x { type t; }
+}
+"""
+    mod = parse_yang_string(yang)
+    schema = generate_json_schema(mod)
+    tdef = schema["$defs"]["t"]
+    _, hi = YANG_INTEGER_BOUNDS["int32"]
+    assert tdef["minimum"] == 0
+    assert tdef["maximum"] == hi
+
+    mod2 = parse_json_schema(schema)
+    td = mod2.typedefs["t"]
+    assert td.type.name == "int32"
+    assert td.type.range == "0..max"

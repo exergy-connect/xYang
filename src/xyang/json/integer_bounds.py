@@ -45,9 +45,17 @@ def json_integer_bounds_for_builtin(
     """Return JSON Schema ``minimum`` / ``maximum`` for a YANG integer built-in."""
     if yang_type not in YANG_INTEGER_BOUNDS:
         return None, None
-    if range_str:
-        return _parse_range(range_str)
-    lo, hi = YANG_INTEGER_BOUNDS[yang_type]
+    blo, bhi = YANG_INTEGER_BOUNDS[yang_type]
+    if not range_str:
+        return blo, bhi
+    lo, hi = _parse_range(range_str)
+    parts = range_str.split("..", 1)
+    lo_s = parts[0].strip()
+    hi_s = parts[1].strip() if len(parts) > 1 else ""
+    if lo_s.lower() == "min":
+        lo = blo
+    if ".." in range_str and hi_s.lower() == "max":
+        hi = bhi
     return lo, hi
 
 
@@ -63,10 +71,19 @@ def yang_integer_from_json_bounds(
     lo = _coerce_int(min_val)
     hi = _coerce_int(max_val)
 
+    if lo is None and hi is None:
+        return "integer", None
+
     if lo is not None and hi is not None:
         for name, (blo, bhi) in YANG_INTEGER_BOUNDS.items():
             if lo == blo and hi == bhi:
                 return name, None
+
+    # ``int32 { range "0..max"; }`` and similar signed subranges.
+    if lo == 0 and hi is not None:
+        for name in ("int8", "int16", "int32", "int64"):
+            if hi == YANG_INTEGER_BOUNDS[name][1]:
+                return name, "0..max"
 
     range_str: Optional[str] = None
     if lo is not None or hi is not None:

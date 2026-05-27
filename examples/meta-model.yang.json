@@ -2,10 +2,22 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:xframe:meta-model",
   "description": "YANG schema for the xFrame meta-model. This schema validates data model definition files (YAML/JSON) that define entities, fields, and relationships. Foreign keys reference the primary key of the referenced entity by default; optional ``field`` names a different target field that must be marked ``unique`` (alternate key).",
+  "x-yang": {
+    "module": "meta-model",
+    "yang-version": "1.1",
+    "namespace": "urn:xframe:meta-model",
+    "prefix": "mm",
+    "organization": "Exergy LLC",
+    "contact": "Exergy.connect@gmail.com"
+  },
   "type": "object",
   "properties": {
     "data-model": {
       "type": "object",
+      "description": "Root container for data model definition",
+      "x-yang": {
+        "type": "container"
+      },
       "properties": {
         "consolidated": {
           "type": "boolean",
@@ -57,7 +69,7 @@
           "x-yang": {
             "type": "leaf"
           },
-          "default": "3"
+          "default": 3
         },
         "include_x_fields": {
           "type": "boolean",
@@ -238,6 +250,22 @@
                     },
                     "type": {
                       "type": "object",
+                      "description": "Field type: primitive, array or composite.",
+                      "x-yang": {
+                        "type": "container",
+                        "must": [
+                          {
+                            "must": "not(./definition)",
+                            "error-message": "A reusable field_definition cannot reference another field_definition; define the type with primitive, array, or composite only.",
+                            "description": "Disallows the definition leafref case under type so field_definitions do not chain or recurse via name references."
+                          }
+                        ],
+                        "choice": {
+                          "name": "choice-type",
+                          "description": "Primitive, array of elements, or composite object.",
+                          "mandatory": true
+                        }
+                      },
                       "oneOf": [
                         {
                           "type": "object",
@@ -428,6 +456,8 @@
                                     },
                                     "min": {
                                       "type": "integer",
+                                      "minimum": -2147483648,
+                                      "maximum": 2147483647,
                                       "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
@@ -435,6 +465,8 @@
                                     },
                                     "max": {
                                       "type": "integer",
+                                      "minimum": -2147483648,
+                                      "maximum": 2147483647,
                                       "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
@@ -482,7 +514,7 @@
                                       "type": "number",
                                       "multipleOf": 0.1,
                                       "minimum": 0.1,
-                                      "maximum": 4,
+                                      "maximum": 4.0,
                                       "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                       "x-yang": {
                                         "type": "leaf",
@@ -517,7 +549,9 @@
                                             "type": "string"
                                           },
                                           {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "minimum": -2147483648,
+                                            "maximum": 2147483647
                                           },
                                           {
                                             "type": "number",
@@ -719,6 +753,15 @@
                             },
                             "array": {
                               "type": "object",
+                              "description": "Array field: homogeneous elements, each primitive or composite.",
+                              "x-yang": {
+                                "type": "container",
+                                "choice": {
+                                  "name": "choice-type",
+                                  "description": "Primitive, array of elements, or composite object.",
+                                  "mandatory": true
+                                }
+                              },
                               "oneOf": [
                                 {
                                   "type": "object",
@@ -746,6 +789,8 @@
                                             },
                                             "min": {
                                               "type": "integer",
+                                              "minimum": -2147483648,
+                                              "maximum": 2147483647,
                                               "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                               "x-yang": {
                                                 "type": "leaf"
@@ -753,6 +798,8 @@
                                             },
                                             "max": {
                                               "type": "integer",
+                                              "minimum": -2147483648,
+                                              "maximum": 2147483647,
                                               "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                               "x-yang": {
                                                 "type": "leaf"
@@ -800,7 +847,7 @@
                                               "type": "number",
                                               "multipleOf": 0.1,
                                               "minimum": 0.1,
-                                              "maximum": 4,
+                                              "maximum": 4.0,
                                               "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                               "x-yang": {
                                                 "type": "leaf",
@@ -835,7 +882,9 @@
                                                     "type": "string"
                                                   },
                                                   {
-                                                    "type": "integer"
+                                                    "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647
                                                   },
                                                   {
                                                     "type": "number",
@@ -935,6 +984,15 @@
                                           },
                                           "type": {
                                             "type": "object",
+                                            "description": "",
+                                            "x-yang": {
+                                              "type": "container",
+                                              "choice": {
+                                                "name": "composite-subfield-type",
+                                                "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
+                                                "mandatory": true
+                                              }
+                                            },
                                             "oneOf": [
                                               {
                                                 "type": "object",
@@ -1031,6 +1089,8 @@
                                                           },
                                                           "min": {
                                                             "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647,
                                                             "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                             "x-yang": {
                                                               "type": "leaf"
@@ -1038,6 +1098,8 @@
                                                           },
                                                           "max": {
                                                             "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647,
                                                             "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                             "x-yang": {
                                                               "type": "leaf"
@@ -1085,7 +1147,7 @@
                                                             "type": "number",
                                                             "multipleOf": 0.1,
                                                             "minimum": 0.1,
-                                                            "maximum": 4,
+                                                            "maximum": 4.0,
                                                             "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                                             "x-yang": {
                                                               "type": "leaf",
@@ -1120,7 +1182,9 @@
                                                                   "type": "string"
                                                                 },
                                                                 {
-                                                                  "type": "integer"
+                                                                  "type": "integer",
+                                                                  "minimum": -2147483648,
+                                                                  "maximum": 2147483647
                                                                 },
                                                                 {
                                                                   "type": "number",
@@ -1247,16 +1311,7 @@
                                                   "name": "entity-type"
                                                 }
                                               }
-                                            ],
-                                            "description": "",
-                                            "x-yang": {
-                                              "type": "container",
-                                              "choice": {
-                                                "name": "composite-subfield-type",
-                                                "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
-                                                "mandatory": true
-                                              }
-                                            }
+                                            ]
                                           },
                                           "default": {
                                             "oneOf": [
@@ -1264,7 +1319,9 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "type": "integer"
+                                                "type": "integer",
+                                                "minimum": -2147483648,
+                                                "maximum": 2147483647
                                               },
                                               {
                                                 "type": "number",
@@ -1277,16 +1334,16 @@
                                             "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                             "x-yang": {
                                               "type": "leaf",
-                                              "when": {
-                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                                              },
                                               "must": [
                                                 {
                                                   "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                                                   "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                                                   "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                                                 }
-                                              ]
+                                              ],
+                                              "when": {
+                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                                              }
                                             }
                                           }
                                         },
@@ -1312,16 +1369,7 @@
                                     "name": "case-composite"
                                   }
                                 }
-                              ],
-                              "description": "Array field: homogeneous elements, each primitive or composite.",
-                              "x-yang": {
-                                "type": "container",
-                                "choice": {
-                                  "name": "choice-type",
-                                  "description": "Primitive, array of elements, or composite object.",
-                                  "mandatory": true
-                                }
-                              }
+                              ]
                             }
                           },
                           "required": [
@@ -1444,6 +1492,15 @@
                                   },
                                   "type": {
                                     "type": "object",
+                                    "description": "",
+                                    "x-yang": {
+                                      "type": "container",
+                                      "choice": {
+                                        "name": "composite-subfield-type",
+                                        "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
+                                        "mandatory": true
+                                      }
+                                    },
                                     "oneOf": [
                                       {
                                         "type": "object",
@@ -1540,6 +1597,8 @@
                                                   },
                                                   "min": {
                                                     "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647,
                                                     "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                     "x-yang": {
                                                       "type": "leaf"
@@ -1547,6 +1606,8 @@
                                                   },
                                                   "max": {
                                                     "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647,
                                                     "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                     "x-yang": {
                                                       "type": "leaf"
@@ -1594,7 +1655,7 @@
                                                     "type": "number",
                                                     "multipleOf": 0.1,
                                                     "minimum": 0.1,
-                                                    "maximum": 4,
+                                                    "maximum": 4.0,
                                                     "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                                     "x-yang": {
                                                       "type": "leaf",
@@ -1629,7 +1690,9 @@
                                                           "type": "string"
                                                         },
                                                         {
-                                                          "type": "integer"
+                                                          "type": "integer",
+                                                          "minimum": -2147483648,
+                                                          "maximum": 2147483647
                                                         },
                                                         {
                                                           "type": "number",
@@ -1756,16 +1819,7 @@
                                           "name": "entity-type"
                                         }
                                       }
-                                    ],
-                                    "description": "",
-                                    "x-yang": {
-                                      "type": "container",
-                                      "choice": {
-                                        "name": "composite-subfield-type",
-                                        "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
-                                        "mandatory": true
-                                      }
-                                    }
+                                    ]
                                   },
                                   "default": {
                                     "oneOf": [
@@ -1773,7 +1827,9 @@
                                         "type": "string"
                                       },
                                       {
-                                        "type": "integer"
+                                        "type": "integer",
+                                        "minimum": -2147483648,
+                                        "maximum": 2147483647
                                       },
                                       {
                                         "type": "number",
@@ -1786,16 +1842,16 @@
                                     "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                     "x-yang": {
                                       "type": "leaf",
-                                      "when": {
-                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                                      },
                                       "must": [
                                         {
                                           "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                                           "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                                           "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                                         }
-                                      ]
+                                      ],
+                                      "when": {
+                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                                      }
                                     }
                                   }
                                 },
@@ -1822,23 +1878,7 @@
                             "name": "case-composite"
                           }
                         }
-                      ],
-                      "description": "Field type: primitive, array or composite.",
-                      "x-yang": {
-                        "type": "container",
-                        "must": [
-                          {
-                            "must": "not(./definition)",
-                            "error-message": "A reusable field_definition cannot reference another field_definition; define the type with primitive, array, or composite only.",
-                            "description": "Disallows the definition leafref case under type so field_definitions do not chain or recurse via name references."
-                          }
-                        ],
-                        "choice": {
-                          "name": "choice-type",
-                          "description": "Primitive, array of elements, or composite object.",
-                          "mandatory": true
-                        }
-                      }
+                      ]
                     },
                     "default": {
                       "oneOf": [
@@ -1846,7 +1886,9 @@
                           "type": "string"
                         },
                         {
-                          "type": "integer"
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
                         },
                         {
                           "type": "number",
@@ -1859,16 +1901,16 @@
                       "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                       "x-yang": {
                         "type": "leaf",
-                        "when": {
-                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                        },
                         "must": [
                           {
                             "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                             "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                             "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                           }
-                        ]
+                        ],
+                        "when": {
+                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                        }
                       }
                     },
                     "unique": {
@@ -1892,6 +1934,23 @@
                     },
                     "computed": {
                       "type": "object",
+                      "description": "When present, the field value is derived from referenced fields using the given operation.\n         Computed fields are read-only in JSON Schema and excluded from required_fields.",
+                      "x-yang": {
+                        "type": "container",
+                        "must": [
+                          {
+                            "must": "(operation != 'add' and operation != 'subtraction') or count(fields) = 2",
+                            "error-message": "Binary operations (add, subtraction) require exactly 2 fields",
+                            "description": "Validates that binary operations have exactly 2 field references"
+                          },
+                          {
+                            "must": "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2",
+                            "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
+                            "description": "Validates that aggregation operations have at least 2 field references"
+                          }
+                        ],
+                        "presence": "Computed field is defined"
+                      },
                       "properties": {
                         "operation": {
                           "type": "string",
@@ -1971,24 +2030,7 @@
                       "additionalProperties": false,
                       "required": [
                         "operation"
-                      ],
-                      "description": "When present, the field value is derived from referenced fields using the given operation.\n         Computed fields are read-only in JSON Schema and excluded from required_fields.",
-                      "x-yang": {
-                        "type": "container",
-                        "presence": "Computed field is defined",
-                        "must": [
-                          {
-                            "must": "(operation != 'add' and operation != 'subtraction') or count(fields) = 2",
-                            "error-message": "Binary operations (add, subtraction) require exactly 2 fields",
-                            "description": "Validates that binary operations have exactly 2 field references"
-                          },
-                          {
-                            "must": "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2",
-                            "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
-                            "description": "Validates that aggregation operations have at least 2 field references"
-                          }
-                        ]
-                      }
+                      ]
                     }
                   },
                   "additionalProperties": false,
@@ -2057,6 +2099,15 @@
                     },
                     "type": {
                       "type": "object",
+                      "description": "Field type: primitive, array or composite.",
+                      "x-yang": {
+                        "type": "container",
+                        "choice": {
+                          "name": "choice-type",
+                          "description": "Primitive, array of elements, or composite object.",
+                          "mandatory": true
+                        }
+                      },
                       "oneOf": [
                         {
                           "type": "object",
@@ -2247,6 +2298,8 @@
                                     },
                                     "min": {
                                       "type": "integer",
+                                      "minimum": -2147483648,
+                                      "maximum": 2147483647,
                                       "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
@@ -2254,6 +2307,8 @@
                                     },
                                     "max": {
                                       "type": "integer",
+                                      "minimum": -2147483648,
+                                      "maximum": 2147483647,
                                       "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                       "x-yang": {
                                         "type": "leaf"
@@ -2301,7 +2356,7 @@
                                       "type": "number",
                                       "multipleOf": 0.1,
                                       "minimum": 0.1,
-                                      "maximum": 4,
+                                      "maximum": 4.0,
                                       "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                       "x-yang": {
                                         "type": "leaf",
@@ -2336,7 +2391,9 @@
                                             "type": "string"
                                           },
                                           {
-                                            "type": "integer"
+                                            "type": "integer",
+                                            "minimum": -2147483648,
+                                            "maximum": 2147483647
                                           },
                                           {
                                             "type": "number",
@@ -2538,6 +2595,15 @@
                             },
                             "array": {
                               "type": "object",
+                              "description": "Array field: homogeneous elements, each primitive or composite.",
+                              "x-yang": {
+                                "type": "container",
+                                "choice": {
+                                  "name": "choice-type",
+                                  "description": "Primitive, array of elements, or composite object.",
+                                  "mandatory": true
+                                }
+                              },
                               "oneOf": [
                                 {
                                   "type": "object",
@@ -2565,6 +2631,8 @@
                                             },
                                             "min": {
                                               "type": "integer",
+                                              "minimum": -2147483648,
+                                              "maximum": 2147483647,
                                               "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                               "x-yang": {
                                                 "type": "leaf"
@@ -2572,6 +2640,8 @@
                                             },
                                             "max": {
                                               "type": "integer",
+                                              "minimum": -2147483648,
+                                              "maximum": 2147483647,
                                               "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                               "x-yang": {
                                                 "type": "leaf"
@@ -2619,7 +2689,7 @@
                                               "type": "number",
                                               "multipleOf": 0.1,
                                               "minimum": 0.1,
-                                              "maximum": 4,
+                                              "maximum": 4.0,
                                               "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                               "x-yang": {
                                                 "type": "leaf",
@@ -2654,7 +2724,9 @@
                                                     "type": "string"
                                                   },
                                                   {
-                                                    "type": "integer"
+                                                    "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647
                                                   },
                                                   {
                                                     "type": "number",
@@ -2754,6 +2826,15 @@
                                           },
                                           "type": {
                                             "type": "object",
+                                            "description": "",
+                                            "x-yang": {
+                                              "type": "container",
+                                              "choice": {
+                                                "name": "composite-subfield-type",
+                                                "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
+                                                "mandatory": true
+                                              }
+                                            },
                                             "oneOf": [
                                               {
                                                 "type": "object",
@@ -2850,6 +2931,8 @@
                                                           },
                                                           "min": {
                                                             "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647,
                                                             "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                             "x-yang": {
                                                               "type": "leaf"
@@ -2857,6 +2940,8 @@
                                                           },
                                                           "max": {
                                                             "type": "integer",
+                                                            "minimum": -2147483648,
+                                                            "maximum": 2147483647,
                                                             "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                             "x-yang": {
                                                               "type": "leaf"
@@ -2904,7 +2989,7 @@
                                                             "type": "number",
                                                             "multipleOf": 0.1,
                                                             "minimum": 0.1,
-                                                            "maximum": 4,
+                                                            "maximum": 4.0,
                                                             "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                                             "x-yang": {
                                                               "type": "leaf",
@@ -2939,7 +3024,9 @@
                                                                   "type": "string"
                                                                 },
                                                                 {
-                                                                  "type": "integer"
+                                                                  "type": "integer",
+                                                                  "minimum": -2147483648,
+                                                                  "maximum": 2147483647
                                                                 },
                                                                 {
                                                                   "type": "number",
@@ -3066,16 +3153,7 @@
                                                   "name": "entity-type"
                                                 }
                                               }
-                                            ],
-                                            "description": "",
-                                            "x-yang": {
-                                              "type": "container",
-                                              "choice": {
-                                                "name": "composite-subfield-type",
-                                                "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
-                                                "mandatory": true
-                                              }
-                                            }
+                                            ]
                                           },
                                           "default": {
                                             "oneOf": [
@@ -3083,7 +3161,9 @@
                                                 "type": "string"
                                               },
                                               {
-                                                "type": "integer"
+                                                "type": "integer",
+                                                "minimum": -2147483648,
+                                                "maximum": 2147483647
                                               },
                                               {
                                                 "type": "number",
@@ -3096,16 +3176,16 @@
                                             "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                             "x-yang": {
                                               "type": "leaf",
-                                              "when": {
-                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                                              },
                                               "must": [
                                                 {
                                                   "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                                                   "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                                                   "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                                                 }
-                                              ]
+                                              ],
+                                              "when": {
+                                                "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                                              }
                                             }
                                           }
                                         },
@@ -3131,16 +3211,7 @@
                                     "name": "case-composite"
                                   }
                                 }
-                              ],
-                              "description": "Array field: homogeneous elements, each primitive or composite.",
-                              "x-yang": {
-                                "type": "container",
-                                "choice": {
-                                  "name": "choice-type",
-                                  "description": "Primitive, array of elements, or composite object.",
-                                  "mandatory": true
-                                }
-                              }
+                              ]
                             }
                           },
                           "required": [
@@ -3263,6 +3334,15 @@
                                   },
                                   "type": {
                                     "type": "object",
+                                    "description": "",
+                                    "x-yang": {
+                                      "type": "container",
+                                      "choice": {
+                                        "name": "composite-subfield-type",
+                                        "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
+                                        "mandatory": true
+                                      }
+                                    },
                                     "oneOf": [
                                       {
                                         "type": "object",
@@ -3359,6 +3439,8 @@
                                                   },
                                                   "min": {
                                                     "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647,
                                                     "description": "Minimum string length, or minimum value for integer, number, or year primitives.",
                                                     "x-yang": {
                                                       "type": "leaf"
@@ -3366,6 +3448,8 @@
                                                   },
                                                   "max": {
                                                     "type": "integer",
+                                                    "minimum": -2147483648,
+                                                    "maximum": 2147483647,
                                                     "description": "Maximum string length, or maximum value for integer, number, or year primitives.",
                                                     "x-yang": {
                                                       "type": "leaf"
@@ -3413,7 +3497,7 @@
                                                     "type": "number",
                                                     "multipleOf": 0.1,
                                                     "minimum": 0.1,
-                                                    "maximum": 4,
+                                                    "maximum": 4.0,
                                                     "description": "Optional sigma multiplier for outlier flagging on numeric or date/datetime primitives.\n             Omit to disable sigma-based outlier detection.",
                                                     "x-yang": {
                                                       "type": "leaf",
@@ -3448,7 +3532,9 @@
                                                           "type": "string"
                                                         },
                                                         {
-                                                          "type": "integer"
+                                                          "type": "integer",
+                                                          "minimum": -2147483648,
+                                                          "maximum": 2147483647
                                                         },
                                                         {
                                                           "type": "number",
@@ -3575,16 +3661,7 @@
                                           "name": "entity-type"
                                         }
                                       }
-                                    ],
-                                    "description": "",
-                                    "x-yang": {
-                                      "type": "container",
-                                      "choice": {
-                                        "name": "composite-subfield-type",
-                                        "description": "Primitive/closed enum or scalar entity reference (same shape as generic-field entity-type).",
-                                        "mandatory": true
-                                      }
-                                    }
+                                    ]
                                   },
                                   "default": {
                                     "oneOf": [
@@ -3592,7 +3669,9 @@
                                         "type": "string"
                                       },
                                       {
-                                        "type": "integer"
+                                        "type": "integer",
+                                        "minimum": -2147483648,
+                                        "maximum": 2147483647
                                       },
                                       {
                                         "type": "number",
@@ -3605,16 +3684,16 @@
                                     "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                                     "x-yang": {
                                       "type": "leaf",
-                                      "when": {
-                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                                      },
                                       "must": [
                                         {
                                           "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                                           "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                                           "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                                         }
-                                      ]
+                                      ],
+                                      "when": {
+                                        "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                                      }
                                     }
                                   }
                                 },
@@ -3641,16 +3720,7 @@
                             "name": "case-composite"
                           }
                         }
-                      ],
-                      "description": "Field type: primitive, array or composite.",
-                      "x-yang": {
-                        "type": "container",
-                        "choice": {
-                          "name": "choice-type",
-                          "description": "Primitive, array of elements, or composite object.",
-                          "mandatory": true
-                        }
-                      }
+                      ]
                     },
                     "default": {
                       "oneOf": [
@@ -3658,7 +3728,9 @@
                           "type": "string"
                         },
                         {
-                          "type": "integer"
+                          "type": "integer",
+                          "minimum": -2147483648,
+                          "maximum": 2147483647
                         },
                         {
                           "type": "number",
@@ -3671,16 +3743,16 @@
                       "description": "Default value when the field is omitted in instance data. Valid for open primitive, closed enum,\n         or type/definition when the referenced field_definition is itself primitive or enum.",
                       "x-yang": {
                         "type": "leaf",
-                        "when": {
-                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
-                        },
                         "must": [
                           {
                             "must": "not(boolean(../type/definition)) or boolean(deref(../type/definition)/../type/primitive) or boolean(deref(../type/definition)/../type/enum)",
                             "error-message": "When type references a field_definition, default is only allowed if that definition uses an open primitive or closed enum (not array, composite, or entity).",
                             "description": "Site-specific default at a definition reference is valid only for scalar reusable types."
                           }
-                        ]
+                        ],
+                        "when": {
+                          "condition": "boolean(../type/primitive) or boolean(../type/enum) or boolean(../type/definition)"
+                        }
                       }
                     },
                     "unique": {
@@ -3704,6 +3776,23 @@
                     },
                     "computed": {
                       "type": "object",
+                      "description": "When present, the field value is derived from referenced fields using the given operation.\n         Computed fields are read-only in JSON Schema and excluded from required_fields.",
+                      "x-yang": {
+                        "type": "container",
+                        "must": [
+                          {
+                            "must": "(operation != 'add' and operation != 'subtraction') or count(fields) = 2",
+                            "error-message": "Binary operations (add, subtraction) require exactly 2 fields",
+                            "description": "Validates that binary operations have exactly 2 field references"
+                          },
+                          {
+                            "must": "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2",
+                            "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
+                            "description": "Validates that aggregation operations have at least 2 field references"
+                          }
+                        ],
+                        "presence": "Computed field is defined"
+                      },
                       "properties": {
                         "operation": {
                           "type": "string",
@@ -3783,24 +3872,7 @@
                       "additionalProperties": false,
                       "required": [
                         "operation"
-                      ],
-                      "description": "When present, the field value is derived from referenced fields using the given operation.\n         Computed fields are read-only in JSON Schema and excluded from required_fields.",
-                      "x-yang": {
-                        "type": "container",
-                        "presence": "Computed field is defined",
-                        "must": [
-                          {
-                            "must": "(operation != 'add' and operation != 'subtraction') or count(fields) = 2",
-                            "error-message": "Binary operations (add, subtraction) require exactly 2 fields",
-                            "description": "Validates that binary operations have exactly 2 field references"
-                          },
-                          {
-                            "must": "(operation != 'min' and operation != 'max' and operation != 'average') or count(fields) >= 2",
-                            "error-message": "Aggregation operations (min, max, average) require at least 2 fields",
-                            "description": "Validates that aggregation operations have at least 2 field references"
-                          }
-                        ]
-                      }
+                      ]
                     }
                   },
                   "additionalProperties": false,
@@ -3839,6 +3911,8 @@
               },
               "c": {
                 "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Change ID when this entity was created. NOTE: This field is automatically added during consolidation and should NOT be included in source YAML files.",
                 "x-yang": {
                   "type": "leaf",
@@ -3854,7 +3928,9 @@
               "m": {
                 "type": "array",
                 "items": {
-                  "type": "integer"
+                  "type": "integer",
+                  "minimum": -2147483648,
+                  "maximum": 2147483647
                 },
                 "description": "List of change IDs when this entity was modified (history). The size of this list is controlled by the change_history policy.\n                     NOTE: This field is automatically added during consolidation and should NOT be included in source YAML files.",
                 "x-yang": {
@@ -3929,6 +4005,8 @@
             "properties": {
               "id": {
                 "type": "integer",
+                "minimum": -2147483648,
+                "maximum": 2147483647,
                 "description": "Unique change identifier, monotonically increasing",
                 "x-yang": {
                   "type": "leaf",
@@ -3981,22 +4059,10 @@
       "additionalProperties": false,
       "required": [
         "description"
-      ],
-      "description": "Root container for data model definition",
-      "x-yang": {
-        "type": "container"
-      }
+      ]
     }
   },
   "additionalProperties": false,
-  "x-yang": {
-    "module": "meta-model",
-    "yang-version": "1.1",
-    "namespace": "urn:xframe:meta-model",
-    "prefix": "mm",
-    "organization": "Exergy LLC",
-    "contact": "Exergy.connect@gmail.com"
-  },
   "$defs": {
     "primitive-type-name": {
       "type": "string",
@@ -4045,6 +4111,8 @@
     "entity-name": {
       "type": "string",
       "pattern": "^[a-z_][a-z0-9_]*$",
+      "minLength": 1,
+      "maxLength": 64,
       "x-yang": {
         "string-patterns": [
           {
@@ -4053,8 +4121,6 @@
           }
         ]
       },
-      "minLength": 1,
-      "maxLength": 64,
       "description": "Entity name (letters, digits, underscores only, lowercase). The underscore count limit is configurable via max_name_underscores property (default: 2)."
     },
     "version-string": {
@@ -4105,7 +4171,8 @@
       "oneOf": [
         {
           "type": "integer",
-          "minimum": 0
+          "minimum": 0,
+          "maximum": 2147483647
         },
         {
           "type": "string",
@@ -4125,6 +4192,8 @@
     "field-name": {
       "type": "string",
       "pattern": "^[a-z_][a-z0-9_]*$",
+      "minLength": 1,
+      "maxLength": 128,
       "x-yang": {
         "string-patterns": [
           {
@@ -4133,8 +4202,6 @@
           }
         ]
       },
-      "minLength": 1,
-      "maxLength": 128,
       "description": "Field name for computed references and leafrefs (same rules as entity fields)."
     },
     "field-validation-mode": {
