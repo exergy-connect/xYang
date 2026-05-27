@@ -166,7 +166,11 @@ module example-rfc8343-shape {
 
     expect(result.isValid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
-    expect(result.errors.some((e) => e.includes("in-octets") && e.includes("Expected uint64"))).toBe(true);
+    expect(
+      result.errors.some(
+        (e) => e.includes("in-octets") && (e.includes("less than minimum") || e.includes("Expected uint64"))
+      )
+    ).toBe(true);
   });
 
   it("enable extension rejects duplicate YangModule.name in modules list", () => {

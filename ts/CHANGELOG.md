@@ -15,6 +15,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **Validator integer built-ins:** `TypeSystem` enforces RFC 7950 bounds for all int/uint built-ins (e.g. reject negative `uint32`); union members no longer accept arbitrary numbers via unknown-type fallback (`types.ts`).
 - **Integer bounds round-trip:** resolve `min`/`max` when emitting bounds; infer `int32 { range "0..max"; }` and unconstrained `integer` correctly when parsing (`integer-bounds.ts`).
 - **JSON default values:** coerce numeric leaf defaults on `$ref` typedefs to YANG string lexemes (`default-values.ts`).
 
