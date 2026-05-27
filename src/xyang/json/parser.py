@@ -22,9 +22,12 @@ from ..ast import (
     YangChoiceStmt,
     YangContainerStmt,
     YangIdentityStmt,
+    YangInputStmt,
     YangListStmt,
     YangLeafStmt,
     YangLeafListStmt,
+    YangOutputStmt,
+    YangRpcStmt,
     YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
@@ -215,6 +218,18 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
 
 
 def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
+    builtin = xyang.get(XYangKey.BUILTIN_TYPE)
+    if isinstance(builtin, str) and builtin in (
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+    ):
+        return YangTypeStmt(name=builtin)
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
         bases = xyang.get(XYangKey.BASES)
         if not isinstance(bases, list):
@@ -926,6 +941,75 @@ def _convert_choice(
     return choice_stmt
 
 
+def _convert_io_block(
+    schema: dict[str, Any],
+    defs: dict[str, Any],
+    parent_path: str,
+    *,
+    io_type: str,
+) -> YangInputStmt | YangOutputStmt | None:
+    """Convert RPC ``input`` / ``output`` JSON to AST."""
+    xyang = _get_xyang(schema)
+    if xyang.get(XYangKey.TYPE) != io_type:
+        return None
+    must_list = _build_must_list(xyang)
+    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    child_statements: list[YangStatement] = []
+    props_raw = schema.get(JsonSchemaKey.PROPERTIES) or {}
+    block_required = set(schema.get(JsonSchemaKey.REQUIRED) or [])
+    for child_name, child_val in props_raw.items():
+        if not isinstance(child_val, dict):
+            continue
+        child = _convert_property(
+            child_name,
+            child_val,
+            defs,
+            f"{parent_path}/{child_name}",
+            mandatory_override=child_name in block_required,
+        )
+        if child is not None:
+            child_statements.append(child)
+    if io_type == XYangTypeValue.INPUT:
+        stmt = YangInputStmt(name=io_type, description=description, statements=child_statements)
+    else:
+        stmt = YangOutputStmt(name=io_type, description=description, statements=child_statements)
+    stmt.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        stmt.when = when_stmt
+    _set_if_features_from_xyang(stmt, xyang)
+    return stmt
+
+
+def _convert_rpc(
+    name: str,
+    rpc_value: dict[str, Any],
+    defs: dict[str, Any],
+) -> YangRpcStmt | None:
+    """Convert one ``x-yang.rpcs`` entry to ``YangRpcStmt``."""
+    xyang = _get_xyang(rpc_value)
+    if xyang.get(XYangKey.TYPE) != XYangTypeValue.RPC:
+        return None
+    must_list = _build_must_list(xyang)
+    statements: list[YangStatement] = []
+    for io_key, io_type in (
+        ("input", XYangTypeValue.INPUT),
+        ("output", XYangTypeValue.OUTPUT),
+    ):
+        io_raw = rpc_value.get(io_key)
+        if isinstance(io_raw, dict):
+            io_stmt = _convert_io_block(io_raw, defs, f"/{name}/{io_key}", io_type=io_type)
+            if io_stmt is not None:
+                statements.append(io_stmt)
+    rpc = YangRpcStmt(name=name, statements=statements)
+    rpc.must_statements = must_list
+    when_stmt = _when_from_xyang(xyang)
+    if when_stmt is not None:
+        rpc.when = when_stmt
+    _set_if_features_from_xyang(rpc, xyang)
+    return rpc
+
+
 def _convert_property(
     name: str,
     prop_value: dict[str, Any],
@@ -1038,5 +1122,14 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
         stmt = _convert_property(root_name, root_val, defs, f"/{root_name}")
         if stmt is not None:
             module.statements.append(stmt)
+
+    rpcs_raw = root_xyang.get(XYangKey.RPCS) or {}
+    if isinstance(rpcs_raw, dict):
+        for rpc_name, rpc_val in rpcs_raw.items():
+            if not isinstance(rpc_val, dict):
+                continue
+            rpc_stmt = _convert_rpc(str(rpc_name), rpc_val, defs)
+            if rpc_stmt is not None:
+                module.statements.append(rpc_stmt)
 
     return module

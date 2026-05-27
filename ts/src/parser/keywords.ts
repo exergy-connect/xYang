@@ -87,9 +87,7 @@ export const OUTPUT = "output";
 
 export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>([
   DEVIATION,
-  RPC,
   ACTION,
-  NOTIFICATION,
   INPUT,
   OUTPUT
 ]);

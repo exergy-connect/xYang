@@ -13,6 +13,7 @@ export { LeafListStatementParser } from "./leaf_list";
 export { ListStatementParser } from "./list";
 export { ModuleStatementParser } from "./module";
 export { NotificationStatementParser } from "./notification";
+export { RpcStatementParser } from "./rpc";
 export { MustStatementParser } from "./must";
 export { RefineStatementParser } from "./refine";
 export { RevisionStatementParser } from "./revision";

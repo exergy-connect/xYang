@@ -18,7 +18,7 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 - ✅ `submodule` / `belongs-to` - Submodule files parsed and merged via `include`
 - ✅ `feature` - Feature declarations; optional braced body with `description`, `reference`, and `if-feature` (per-feature conditions stored on the module)
 - ✅ `notification` - Notification statements (RFC 7950 §7.16); parsed into `YangNotificationStmt` at module/submodule level and under `container`, `list`, `grouping`, and `augment` (YANG 1.1 `*notification-stmt` in those bodies)
-- ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **Not yet:** instance validation or JSON Schema for RPC I/O.
+- ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **JSON Schema:** module RPCs live under root `x-yang.rpcs` (round-trip via `parse_json_schema`; `tests/json/test_rpc_json.py`). **Not yet:** RPC/action instance validation.
 
 ### Type Definitions
 - ✅ `typedef` - Type definitions at **module** level and **nested** under `container`, `list`, `choice`, `case`, `grouping`, `notification`, and `rpc` `input`/`output` (RFC 7950 §7.3; YANG 1.1). Each name is registered on `module.typedefs` so leaves can reference it (e.g. `type notification-support` inside the same container). Typedefs are **not** copied into the data tree by `uses` expansion. **Limitation:** one flat typedef map per module (duplicate names in different scopes are rejected; scoped shadowing is not modeled).
@@ -109,6 +109,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
   - `generate_json_schema(module)`, `schema_to_yang_json(module, output_path=...)`
   - Parse with `YangParser(expand_uses=False)` so the AST keeps original `uses` and `augment` structure; the generator expands `uses` when emitting. That split keeps **YANG ↔ JSON Schema** conversion reversible where `x-yang` carries the source shape.
   - Round-trip: parse YANG → generate JSON → parse JSON schema → equivalent AST where supported
+  - **RPC:** `x-yang.rpcs` maps RPC name → `{ "x-yang": { "type": "rpc" }, "input": {…}, "output": {…} }` (I/O blocks use `x-yang.type` `input` / `output`; config data stays in root `properties`)
 
 ## Features NOT Implemented
 
@@ -220,7 +221,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 
 ### Structure
 
-- **Root**: Standard `$schema`, `$id`, `description`, `type`, `properties`, `additionalProperties`, and optional `$defs` (typedefs). A root **`x-yang`** object holds module metadata: `module`, `yang-version`, `namespace`, `prefix`, `organization`, `contact`.
+- **Root**: Standard `$schema`, `$id`, `description`, `type`, `properties`, `additionalProperties`, and optional `$defs` (typedefs). A root **`x-yang`** object holds module metadata: `module`, `yang-version`, `namespace`, `prefix`, `organization`, `contact`, and optional **`rpcs`** (module-level RPC definitions; not mixed into `properties`).
 - **Nodes**: Each schema node (container, list, leaf, leaf-list) has an **`x-yang`** object alongside the JSON Schema keywords. It always includes `type` (e.g. `"container"`, `"leaf"`, `"list"`, `"leaf-list"`). Lists include `key`; nodes with `must` constraints include a **`must`** array of `{ "must", "error-message", "description" }`.
 - **Typedefs**: In `$defs`, each typedef has `"x-yang": { "type": "typedef" }` plus the usual JSON Schema type/pattern/enum/etc.
 
@@ -238,6 +239,8 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | When conditions | — | ✅ `when`: object `{ "condition": "<xpath>" }` with optional `"description"` (RFC-style substatement text) |
 | If-feature | — | `if-features`: array of strings (one per `if-feature` substatement, AND in YANG order) on data nodes, hoisted `choice` metadata, choice `oneOf` case branches, and identity `$defs` |
 | Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
+| RPC / input / output | — | ✅ Root `x-yang.rpcs`; per-RPC `input` / `output` objects with data-node `properties` |
+| Integer built-in (leaf) | ✅ `type: "integer"` | ✅ `builtin-type`: YANG name (`uint16`, …) when JSON Schema type is coarse |
 
 ### Leafref in hybrid form
 
@@ -509,18 +512,20 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
 - **Import / include / submodule** patterns (`tests/test_yangson_ex3_import.py` and related fixtures under `tests/data/yangson-ex3/`)
 - **If-feature** parsing, evaluation, and validation (`tests/test_if_feature.py`)
 - JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
-- **RPC `input` / `output`** minimal parse coverage (`tests/test_rpc_input_output.py`)
+- **RPC `input` / `output`** parse and yang.json round-trip (`tests/test_rpc_input_output.py`, `tests/json/test_rpc_json.py`)
 
 ## Recent Improvements
 
 ### RPC and notification parsing (2026-05)
 - ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
-- ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes; see `tests/test_rpc_input_output.py`.
+- ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes (`tests/test_rpc_input_output.py`).
+- ✅ **RPC in yang.json**: `generate_json_schema` / `parse_json_schema` round-trip via `x-yang.rpcs` (`tests/json/test_rpc_json.py`); integer leaves may carry `x-yang.builtin-type`.
 
 ### TypeScript CLI and parser (2026-05)
 - ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).
 - ✅ **`augment` body**: `case`, `notification`, and other data-node substatements under `augment` (and `augment` under `uses` via `YangUsesStmt.augmentations`).
 - ✅ **`status` on typedefs**: Ignored at parse time (RFC 7950 §7.21.2) so standard modules with `status deprecated` parse cleanly.
+- ✅ **`rpc` / `input` / `output`**: Parser and yang.json parity with Python (`ts/test/rpc_input_output.test.ts`, `ts/test/json/rpc_json.test.ts`); `rpc` not in unsupported-skip; `rpc` inside `container` rejected (syntax error).
 
 
 ### String patterns: modifiers and multiple substatements (2026-04)

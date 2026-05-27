@@ -20,11 +20,14 @@ from ..ast import (
     YangChoiceStmt,
     YangContainerStmt,
     YangIdentityStmt,
+    YangInputStmt,
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
     YangMustStmt,
+    YangOutputStmt,
     YangRefineStmt,
+    YangRpcStmt,
     YangStatement,
     YangTypeStmt,
     YangTypedefStmt,
@@ -956,6 +959,13 @@ def _leaf_stmt_to_property(
             units=stmt.units or None,
             config=_explicit_config(stmt),
         )
+        if (
+            type_stmt is not None
+            and type_stmt.name not in typedef_names
+            and type_stmt.name
+            in ("int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64")
+        ):
+            leaf_xyang[XYangKey.BUILTIN_TYPE] = type_stmt.name
         # Preserve leafref (type, path, require-instance) from type_schema x-yang
         if type_schema.get(JsonSchemaKey.X_YANG):
             leaf_xyang = {**leaf_xyang, **type_schema.get(JsonSchemaKey.X_YANG, {})}
@@ -1065,6 +1075,58 @@ def _choice_stmt_to_property(
     return out
 
 
+def _io_block_to_property(
+    stmt: YangInputStmt | YangOutputStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
+    """Encode RPC/action ``input`` or ``output`` as a JSON Schema object."""
+    io_type = (
+        XYangTypeValue.INPUT if isinstance(stmt, YangInputStmt) else XYangTypeValue.OUTPUT
+    )
+    children = _expand_uses_for_json(stmt.statements, module)
+    props, required = _child_property_map(children, typedef_names, module, stmt)
+    out: dict[str, Any] = {
+        JsonSchemaKey.TYPE: "object",
+        JsonSchemaKey.DESCRIPTION: stmt.description or "",
+        JsonSchemaKey.X_YANG: _build_xyang(
+            io_type,
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=getattr(stmt, "when", None),
+            if_features=_if_features_for_xyang(stmt),
+        ),
+        JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
+    }
+    if props:
+        out[JsonSchemaKey.PROPERTIES] = props
+    if required:
+        out[JsonSchemaKey.REQUIRED] = required
+    return out
+
+
+def _rpc_to_json(
+    stmt: YangRpcStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
+    """Encode one module-level ``rpc`` for ``x-yang.rpcs``."""
+    out: dict[str, Any] = {
+        JsonSchemaKey.X_YANG: _build_xyang(
+            XYangTypeValue.RPC,
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=getattr(stmt, "when", None),
+            if_features=_if_features_for_xyang(stmt),
+        ),
+    }
+    inp = stmt.find_statement("input")
+    if isinstance(inp, YangInputStmt):
+        out["input"] = _io_block_to_property(inp, typedef_names, module)
+    outp = stmt.find_statement("output")
+    if isinstance(outp, YangOutputStmt):
+        out["output"] = _io_block_to_property(outp, typedef_names, module)
+    return out
+
+
 def _statement_to_property(
     stmt: YangStatement,
     typedef_names: set[str],
@@ -1168,6 +1230,13 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     for name, identity in schema_module.identities.items():
         if isinstance(identity, YangIdentityStmt):
             defs[name] = _identity_to_def(name, identity, schema_module)
+
+    rpcs: dict[str, Any] = {}
+    for stmt in schema_module.statements:
+        if isinstance(stmt, YangRpcStmt) and stmt.name:
+            rpcs[stmt.name] = _rpc_to_json(stmt, typedef_names, schema_module)
+    if rpcs:
+        root_xyang[XYangKey.RPCS] = rpcs
 
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",
