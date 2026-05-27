@@ -210,6 +210,33 @@ export class YangNotificationStmt extends YangContainerStmt {
   }
 }
 
+/** RPC/action ``input`` block (RFC 7950 §7.14.2); no statement argument. */
+export class YangInputStmt extends YangContainerStmt {
+  constructor(init: Partial<YangInputStmt> = {}) {
+    super({ name: "input", ...init });
+    this.keyword = "input";
+  }
+}
+
+/** RPC/action ``output`` block (RFC 7950 §7.14.3); no statement argument. */
+export class YangOutputStmt extends YangContainerStmt {
+  constructor(init: Partial<YangOutputStmt> = {}) {
+    super({ name: "output", ...init });
+    this.keyword = "output";
+  }
+}
+
+/** RPC statement (RFC 7950 §7.14). Data nodes appear only under ``input`` / ``output``. */
+export class YangRpcStmt extends YangStatementWithWhen {
+  must_statements: YangMustStmt[];
+
+  constructor(init: Partial<YangRpcStmt> = {}) {
+    super(init);
+    this.keyword = "rpc";
+    this.must_statements = init.must_statements ?? [];
+  }
+}
+
 export class YangListStmt extends YangStatementWithWhen {
   must_statements: YangMustStmt[];
   key?: string;

@@ -35,18 +35,21 @@ module ex {
 `;
     const mod = parseYangString(yang);
     const joined = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(" ").toLowerCase();
-    // rpc and nested input/output are skipped in TS (Python parses rpc); action and top-level input/output warn.
-    for (const kw of ["deviation", "rpc", "action", "input", "output"]) {
+    for (const kw of ["deviation", "action", "input", "output"]) {
       expect(joined).toContain(kw);
     }
+    expect(joined).not.toContain("rpc");
     expect(joined).not.toContain("notification");
+    const reset = mod.findStatement("reset");
+    expect(reset?.keyword).toBe("rpc");
+    expect(reset?.name).toBe("reset");
     const done = mod.findStatement("done");
     expect(done?.name).toBe("done");
     const leaf = mod.findStatement("a");
     expect(leaf?.name).toBe("a");
   });
 
-  it("skips rpc inside container and still parses sibling leaf x", () => {
+  it("rejects rpc inside container", () => {
     const yang = `
 module ex {
   yang-version 1.1;
@@ -58,11 +61,6 @@ module ex {
   }
 }
 `;
-    const mod = parseYangString(yang);
-    expect(warnSpy.mock.calls.some((c: unknown[]) => String(c[0]).toLowerCase().includes("rpc"))).toBe(true);
-    const c = mod.findStatement("c");
-    expect(c).toBeDefined();
-    const names = new Set(c?.statements.map((s) => s.name).filter(Boolean));
-    expect(names.has("x")).toBe(true);
+    expect(() => parseYangString(yang)).toThrow(/rpc/i);
   });
 });

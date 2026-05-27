@@ -9,6 +9,17 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- **Parser `rpc` / `input` / `output`:** module-level `rpc` with I/O blocks (`YangRpcStmt`, `YangInputStmt`, `YangOutputStmt` in `src/core/ast.ts`; `src/parser/statements/rpc.ts`); tests in `test/rpc_input_output.test.ts`.
+- **Container substatement dispatch:** explicit data-node dispatch (parity with Python); `rpc` inside `container` is rejected.
+
+### Changed
+
+- **Unsupported-skip:** `rpc` and nested `input` / `output` under `rpc` are parsed; only top-level stray `input` / `output` and `action` remain skipped (`test/unsupported_skip.test.ts` updated).
+
+**Note:** RPC → yang.json (`x-yang.rpcs`) is implemented in Python only; TypeScript `generateJsonSchema` does not emit RPCs yet.
+
 ## [0.1.2] — 2026-05-19
 
 First npm publish as **`@exergy-connect/xyang`** (renamed from `@xyang/ts`).

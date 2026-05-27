@@ -17,10 +17,13 @@ from .ast import (
     YangContainerStmt,
     YangExtensionInvocationStmt,
     YangExtensionStmt,
+    YangInputStmt,
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
+    YangOutputStmt,
     YangRefineStmt,
+    YangRpcStmt,
     YangStatement,
     YangStatementWithMust,
     YangStatementWithWhen,
@@ -234,10 +237,11 @@ def apply_refine_to_node(stmt: YangStatement, refine: YangRefineStmt) -> None:
 def _copy_with_if_features(
     stmt: YangStatement, statements: list[YangStatement], **extra: object
 ) -> YangStatement:
+    if_features = list(stmt.if_features) if isinstance(stmt, YangStatementWithWhen) else []
     return replace(
         stmt,
         statements=statements,
-        if_features=list(stmt.if_features),
+        if_features=if_features,
         **extra,
     )
 
@@ -272,7 +276,11 @@ def _copy_typedef_stmt(
 def _copy_with_must(
     stmt: YangStatement, statements: list[YangStatement]
 ) -> YangStatement:
-    must = list(stmt.must_statements) if stmt.must_statements else []
+    must = (
+        list(stmt.must_statements)
+        if isinstance(stmt, YangStatementWithMust) and stmt.must_statements
+        else []
+    )
     return _copy_with_if_features(stmt, statements, must_statements=must)
 
 
@@ -283,11 +291,15 @@ def copy_yang_statement(stmt: YangStatement) -> YangStatement:
     substitutes containers that must be independent after expansion.
     """
     statements = [copy_yang_statement(s) for s in stmt.statements]
-    copiers: dict[type, Callable[[YangStatement, list[YangStatement]], YangStatement]] = {
+    # Per-type copiers use narrower stmt types or **extra; ``...`` matches at dispatch.
+    copiers: dict[type, Callable[..., YangStatement]] = {
         YangChoiceStmt: _copy_choice,
         YangCaseStmt: _copy_with_if_features,
         YangUsesStmt: _copy_uses,
         YangContainerStmt: _copy_with_must,
+        YangInputStmt: _copy_with_must,
+        YangOutputStmt: _copy_with_must,
+        YangRpcStmt: _copy_with_must,
         YangListStmt: _copy_with_must,
         YangLeafStmt: _copy_with_must,
         YangLeafListStmt: _copy_with_must,

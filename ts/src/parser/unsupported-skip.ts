@@ -3,8 +3,8 @@ import { TokenStream, YangTokenType } from "./parser-context";
 
 export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([
   kw.DEVIATION,
-  kw.RPC,
   kw.ACTION,
+  // Top-level ``input`` / ``output`` only (valid under ``rpc`` / ``action``).
   kw.INPUT,
   kw.OUTPUT
 ]);

@@ -29,6 +29,7 @@ import {
   ListStatementParser,
   ModuleStatementParser,
   NotificationStatementParser,
+  RpcStatementParser,
   MustStatementParser,
   RefineStatementParser,
   RevisionStatementParser,
@@ -105,6 +106,7 @@ export class StatementParsers {
   readonly list_parser = new ListStatementParser(this);
   private readonly module_parser = new ModuleStatementParser(this);
   readonly notification_parser = new NotificationStatementParser(this);
+  readonly rpc_parser = new RpcStatementParser(this);
   readonly must_parser = new MustStatementParser(this);
   private readonly refine_parser = new RefineStatementParser(this);
   readonly revision_parser = new RevisionStatementParser(this);
@@ -123,6 +125,7 @@ export class StatementParsers {
     [kw.LIST]: (tokens, context) => this.fromAst(this.list_parser.parse_list(tokens, context)),
     [kw.NOTIFICATION]: (tokens, context) =>
       this.fromAst(this.notification_parser.parse_notification(tokens, context)),
+    [kw.RPC]: (tokens, context) => this.fromAst(this.rpc_parser.parse_rpc(tokens, context)),
     [kw.ANYDATA]: (tokens, context) => this.fromAst(this.anydata_parser.parse_anydata(tokens, context)),
     [kw.ANYXML]: (tokens, context) => this.fromAst(this.anyxml_parser.parse_anyxml(tokens, context)),
     [kw.CHOICE]: (tokens, context) => this.fromAst(this.choice_parser.parse_choice(tokens, context)),
