@@ -5,7 +5,7 @@ from __future__ import annotations
 from xyang import parse_yang_string
 from xyang.ast import YangInputStmt, YangLeafStmt, YangOutputStmt, YangRpcStmt
 from xyang.json import generate_json_schema, parse_json_schema, schema_to_yang_json
-from xyang.json.schema_keys import XYangKey, XYangTypeValue
+from xyang.json.schema_keys import XYangTypeValue
 
 
 _RPC_YANG = """
@@ -41,8 +41,10 @@ def test_rpc_emitted_under_x_yang_rpcs_and_round_trips():
 
     delay = reboot["input"]["properties"]["delay-seconds"]
     assert delay["x-yang"]["type"] == "leaf"
-    assert delay["x-yang"][XYangKey.BUILTIN_TYPE] == "uint16"
+    assert "builtin-type" not in delay["x-yang"]
     assert delay["type"] == "integer"
+    assert delay["minimum"] == 0
+    assert delay["maximum"] == 65535
 
     msg = reboot["output"]["properties"]["status-message"]
     assert msg["x-yang"]["type"] == "leaf"
@@ -73,6 +75,6 @@ def test_schema_to_yang_json_includes_rpcs(tmp_path):
     out_file = tmp_path / "example-rpc.yang.json"
     text = schema_to_yang_json(mod, output_path=out_file)
     assert out_file.exists()
-    assert XYangKey.RPCS in text
+    assert '"rpcs"' in text
     loaded = parse_json_schema(out_file.read_text())
     assert loaded.find_statement("reboot") is not None

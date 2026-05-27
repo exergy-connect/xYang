@@ -37,6 +37,7 @@ from ..ast import (
 )
 from ..xpath import XPathParser
 
+from .integer_bounds import yang_integer_from_json_bounds
 from .schema_keys import (
     JSON_SCHEMA_DEFS_URI_PREFIX,
     JsonSchemaKey,
@@ -218,18 +219,6 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
 
 
 def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
-    builtin = xyang.get(XYangKey.BUILTIN_TYPE)
-    if isinstance(builtin, str) and builtin in (
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "uint8",
-        "uint16",
-        "uint32",
-        "uint64",
-    ):
-        return YangTypeStmt(name=builtin)
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
         bases = xyang.get(XYangKey.BASES)
         if not isinstance(bases, list):
@@ -347,19 +336,13 @@ def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: 
             ]
         return type_stmt
     if t == "integer":
-        min_val = schema.get(JsonSchemaKey.MINIMUM)
-        max_val = schema.get(JsonSchemaKey.MAXIMUM)
-        if min_val == 0 and max_val == 255:
-            type_stmt = YangTypeStmt(name="uint8")
-            # Leave range unset to match YANG (built-in uint8 has no range on leaf type)
-        else:
-            type_stmt = YangTypeStmt(name="int32")
-            if min_val is not None and max_val is not None:
-                type_stmt.range = f"{min_val}..{max_val}"
-            elif max_val is not None:
-                type_stmt.range = f"0..{max_val}"
-            elif min_val is not None:
-                type_stmt.range = f"{min_val}..max"
+        yang_name, range_str = yang_integer_from_json_bounds(
+            schema.get(JsonSchemaKey.MINIMUM),
+            schema.get(JsonSchemaKey.MAXIMUM),
+        )
+        type_stmt = YangTypeStmt(name=yang_name)
+        if range_str:
+            type_stmt.range = range_str
         return type_stmt
     if t == "number":
         type_stmt = YangTypeStmt(name="decimal64")

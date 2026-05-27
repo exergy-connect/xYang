@@ -41,6 +41,7 @@ from ..xpath.ast import PathNode
 from ..xpath.schema_nav import SchemaNav
 from ..xpath.utils import coerce_default_value
 
+from .integer_bounds import json_integer_bounds_for_builtin, YANG_INTEGER_BOUNDS
 from .schema_keys import (
     JsonSchemaKey,
     XYangKey,
@@ -455,23 +456,13 @@ def _type_to_schema_impl(
         }
     if name == "boolean":
         return {JsonSchemaKey.TYPE: "boolean"}
-    if name in ("int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"):
+    if name in YANG_INTEGER_BOUNDS:
         out = {JsonSchemaKey.TYPE: "integer"}
-        if name == "uint8":
-            out[JsonSchemaKey.MINIMUM] = 0
-            out[JsonSchemaKey.MAXIMUM] = 255
-        elif type_stmt.range:
-            parts = type_stmt.range.split("..")
-            if len(parts) >= 1 and parts[0].strip():
-                try:
-                    out[JsonSchemaKey.MINIMUM] = int(parts[0].strip())
-                except ValueError:
-                    pass
-            if len(parts) >= 2 and parts[1].strip().lower() != "max":
-                try:
-                    out[JsonSchemaKey.MAXIMUM] = int(parts[1].strip())
-                except ValueError:
-                    pass
+        min_v, max_v = json_integer_bounds_for_builtin(name, type_stmt.range or None)
+        if min_v is not None:
+            out[JsonSchemaKey.MINIMUM] = min_v
+        if max_v is not None:
+            out[JsonSchemaKey.MAXIMUM] = max_v
         return out
     if name == "decimal64":
         out = {JsonSchemaKey.TYPE: "number"}
@@ -959,13 +950,6 @@ def _leaf_stmt_to_property(
             units=stmt.units or None,
             config=_explicit_config(stmt),
         )
-        if (
-            type_stmt is not None
-            and type_stmt.name not in typedef_names
-            and type_stmt.name
-            in ("int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64")
-        ):
-            leaf_xyang[XYangKey.BUILTIN_TYPE] = type_stmt.name
         # Preserve leafref (type, path, require-instance) from type_schema x-yang
         if type_schema.get(JsonSchemaKey.X_YANG):
             leaf_xyang = {**leaf_xyang, **type_schema.get(JsonSchemaKey.X_YANG, {})}
