@@ -240,7 +240,7 @@ The **`.yang.json`** output (from `xyang convert` or `schema_to_yang_json()`) is
 | If-feature | — | `if-features`: array of strings (one per `if-feature` substatement, AND in YANG order) on data nodes, hoisted `choice` metadata, choice `oneOf` case branches, and identity `$defs` |
 | Module metadata | — | ✅ Root `x-yang`: module name, namespace, prefix, etc. |
 | RPC / input / output | — | ✅ Root `x-yang.rpcs`; per-RPC `input` / `output` objects with data-node `properties` |
-| Integer built-in (leaf) | ✅ `type: "integer"` | ✅ `builtin-type`: YANG name (`uint16`, …) when JSON Schema type is coarse |
+| Integer built-in (leaf) | ✅ `type: "integer"` with `minimum` / `maximum` (canonical bounds per built-in, e.g. `uint8` → 0..255) | — |
 
 ### Leafref in hybrid form
 
@@ -519,7 +519,7 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
 ### RPC and notification parsing (2026-05)
 - ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
 - ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes (`tests/test_rpc_input_output.py`).
-- ✅ **RPC in yang.json**: `generate_json_schema` / `parse_json_schema` round-trip via `x-yang.rpcs` (`tests/json/test_rpc_json.py`); integer leaves may carry `x-yang.builtin-type`.
+- ✅ **RPC in yang.json**: `generate_json_schema` / `parse_json_schema` round-trip via `x-yang.rpcs` (`tests/json/test_rpc_json.py`); integer built-ins round-trip via JSON Schema `minimum` / `maximum`.
 
 ### TypeScript CLI and parser (2026-05)
 - ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).

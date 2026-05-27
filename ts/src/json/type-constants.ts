@@ -1,4 +1,5 @@
 import { YangTokenType } from "../parser/parser-context";
+import { jsonIntegerBoundsForBuiltin, yangIntegerFromJsonBounds, YANG_INTEGER_BOUNDS } from "./integer-bounds";
 
 export const JSON_SCHEMA_DRAFT_2020_12 = "https://json-schema.org/draft/2020-12/schema";
 
@@ -89,36 +90,15 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
     return out;
   }
 
-  if (
-    [
-      YangTokenType.INT8,
-      YangTokenType.INT16,
-      YangTokenType.INT32,
-      YangTokenType.INT64,
-      JSON_TYPE_INTEGER,
-      YangTokenType.UINT8,
-      YangTokenType.UINT16,
-      YangTokenType.UINT32,
-      YangTokenType.UINT64
-    ].includes(typeName)
-  ) {
+  if (typeName in YANG_INTEGER_BOUNDS) {
     const out: Record<string, unknown> = { type: JSON_TYPE_INTEGER };
-    if (typeName === YangTokenType.UINT8) {
-      out.minimum = 0;
-      out.maximum = 255;
-      return out;
+    const rangeStr = typeof typeShape.range === "string" ? typeShape.range : undefined;
+    const { minimum, maximum } = jsonIntegerBoundsForBuiltin(typeName, rangeStr);
+    if (minimum !== undefined) {
+      out.minimum = minimum;
     }
-    if (typeof typeShape.range === "string") {
-      const [rawMin, rawMax] = typeShape.range.split("..");
-      const min = Number.parseInt((rawMin ?? "").trim(), 10);
-      const maxRaw = (rawMax ?? "").trim().toLowerCase();
-      const max = Number.parseInt((rawMax ?? "").trim(), 10);
-      if (!Number.isNaN(min) && (rawMin ?? "").trim().toLowerCase() !== "min") {
-        out.minimum = min;
-      }
-      if (!Number.isNaN(max) && maxRaw !== "max") {
-        out.maximum = max;
-      }
+    if (maximum !== undefined) {
+      out.maximum = maximum;
     }
     return out;
   }
@@ -187,19 +167,8 @@ export function schemaTypeToYangType(schema: Record<string, unknown>): string {
     return YangTokenType.STRING_KW;
   }
   if (type === JSON_TYPE_INTEGER) {
-    const min = typeof schema.minimum === "number" ? schema.minimum : undefined;
-    const max = typeof schema.maximum === "number" ? schema.maximum : undefined;
-    if (
-      min !== undefined &&
-      max !== undefined &&
-      Number.isInteger(min) &&
-      Number.isInteger(max) &&
-      min >= 0 &&
-      max <= 255
-    ) {
-      return YangTokenType.UINT8;
-    }
-    return YangTokenType.INT32;
+    const { name } = yangIntegerFromJsonBounds(schema.minimum, schema.maximum);
+    return name;
   }
   if (type === JSON_TYPE_NUMBER) {
     return YangTokenType.DECIMAL64;

@@ -2,7 +2,7 @@ import { YangModule, YangStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { expandUses } from "../transform/uses-expand";
 import { jsonSchemaDefaultValue } from "./default-values";
-import { XYANG_KEYS, YANG_INTEGER_BUILTINS, YANG_SCHEMA_KEYS } from "./schema-keys";
+import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   JSON_SCHEMA_DRAFT_2020_12,
   JSON_TYPE_ARRAY,
@@ -549,10 +549,6 @@ function statementToSchema(
       xYang.type = YangTokenType.INSTANCE_IDENTIFIER;
       xYang["require-instance"] = typeShape.require_instance !== false;
     }
-    if (YANG_INTEGER_BUILTINS.has(typeName) && !typedefNames.has(typeName)) {
-      xYang[XYANG_KEYS.builtinType] = typeName;
-    }
-
     const schemaXy = asRecord(leafSchema[YANG_SCHEMA_KEYS.xYang]);
     const out: Record<string, unknown> = {
       ...leafSchema,

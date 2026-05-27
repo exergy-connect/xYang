@@ -82,8 +82,6 @@ class XYangKey:
     STRING_PATTERNS = "string-patterns"
     #: RFC 7950 §7.21.4 ``units`` (e.g. ``"kbit/s"``).
     UNITS = "units"
-    #: Built-in YANG type name on a leaf (e.g. ``uint16``), when JSON Schema ``type`` is coarser.
-    BUILTIN_TYPE = "builtin-type"
 
 
 class XYangTypeValue:

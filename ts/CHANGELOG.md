@@ -9,11 +9,15 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- **Integer built-in yang.json:** emit canonical JSON Schema `minimum` / `maximum` instead of `x-yang.builtin-type`; `parseJsonSchema` infers the YANG type from bounds (`integer-bounds.ts`, `tests/json/integer_builtin_bounds.test.ts`).
+
 ### Added
 
 - **Parser `rpc` / `input` / `output`:** module-level `rpc` with I/O blocks (`YangRpcStmt`, `YangInputStmt`, `YangOutputStmt` in `src/core/ast.ts`; `src/parser/statements/rpc.ts`); tests in `test/rpc_input_output.test.ts`.
 - **Container substatement dispatch:** explicit data-node dispatch (parity with Python); `rpc` inside `container` is rejected.
-- **JSON Schema `rpc`:** module-level RPCs under `x-yang.rpcs` with `input` / `output` blocks; round-trip via `parseJsonSchema` (`test/json/rpc_json.test.ts`). Integer built-ins use `x-yang.builtin-type` on leaves.
+- **JSON Schema `rpc`:** module-level RPCs under `x-yang.rpcs` with `input` / `output` blocks; round-trip via `parseJsonSchema` (`test/json/rpc_json.test.ts`). Integer built-ins round-trip via JSON Schema `minimum` / `maximum`.
 
 ### Changed
 

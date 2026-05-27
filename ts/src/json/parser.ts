@@ -2,10 +2,12 @@ import { YangModule, type ModuleSource, type SerializedStatement } from "../core
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
 import { yangDefaultFromJsonSchema } from "./default-values";
-import { XYANG_KEYS, YANG_INTEGER_BUILTINS, YANG_SCHEMA_KEYS } from "./schema-keys";
+import { yangIntegerFromJsonBounds } from "./integer-bounds";
+import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   decimal64FractionDigitsFromSchema,
   JSON_TYPE_ARRAY,
+  JSON_TYPE_INTEGER,
   JSON_TYPE_OBJECT,
   JSON_TYPE_STRING,
   schemaTypeToYangType
@@ -105,10 +107,6 @@ function applyStatementMetaFromXyang(stmt: SerializedStatement, xy: Record<strin
 }
 
 function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
-  const builtin = xy[XYANG_KEYS.builtinType];
-  if (typeof builtin === "string" && YANG_INTEGER_BUILTINS.has(builtin)) {
-    return { name: builtin };
-  }
   if (xy.type === YangTokenType.LEAFREF) {
     const path = typeof xy.path === "string" ? xy.path : "";
     if (path) {
@@ -139,8 +137,17 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     return { name: YangTokenType.EMPTY };
   }
   const hasStringEnum = schema.type === JSON_TYPE_STRING && Array.isArray(schema.enum);
-  const name = hasStringEnum ? YangTokenType.ENUMERATION : schemaTypeToYangType(schema);
-  const shape: Record<string, unknown> = { name };
+  const shape: Record<string, unknown> = {};
+  if (schema.type === JSON_TYPE_INTEGER) {
+    const inferred = yangIntegerFromJsonBounds(schema.minimum, schema.maximum);
+    shape.name = inferred.name;
+    if (inferred.range) {
+      shape.range = inferred.range;
+    }
+  } else {
+    shape.name = hasStringEnum ? YangTokenType.ENUMERATION : schemaTypeToYangType(schema);
+  }
+  const name = shape.name as string;
   if (name === YangTokenType.DECIMAL64) {
     const fd = decimal64FractionDigitsFromSchema(schema);
     if (typeof fd === "number") {
@@ -152,7 +159,7 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     const max = typeof schema.maxLength === "number" ? `${schema.maxLength}` : "max";
     shape.length = `${min}..${max}`;
   }
-  if (typeof schema.minimum === "number" || typeof schema.maximum === "number") {
+  if (schema.type !== JSON_TYPE_INTEGER && (typeof schema.minimum === "number" || typeof schema.maximum === "number")) {
     const minNum = typeof schema.minimum === "number" ? schema.minimum : undefined;
     const maxNum = typeof schema.maximum === "number" ? schema.maximum : undefined;
     const decimalContext =
@@ -164,12 +171,9 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
       }
       return `${n}`;
     };
-    // Avoid redundant explicit range for full-width uint8.
-    if (!(name === YangTokenType.UINT8 && minNum === 0 && maxNum === 255)) {
-      const min = minNum !== undefined ? fmt(minNum) : "min";
-      const max = maxNum !== undefined ? fmt(maxNum) : "max";
-      shape.range = `${min}..${max}`;
-    }
+    const min = minNum !== undefined ? fmt(minNum) : "min";
+    const max = maxNum !== undefined ? fmt(maxNum) : "max";
+    shape.range = `${min}..${max}`;
   }
   const rawPatternEntries = Array.isArray(xy["string-patterns"]) ? xy["string-patterns"] : [];
   const parsedPatternEntries = rawPatternEntries

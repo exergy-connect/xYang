@@ -39,8 +39,10 @@ describe("python parity: json/test_rpc_json", () => {
       "delay-seconds"
     ] as Record<string, unknown>;
     expect((delay["x-yang"] as Record<string, unknown>).type).toBe(YangTokenType.LEAF);
-    expect((delay["x-yang"] as Record<string, unknown>)[XYANG_KEYS.builtinType]).toBe("uint16");
+    expect("builtin-type" in (delay["x-yang"] as Record<string, unknown>)).toBe(false);
     expect(delay.type).toBe("integer");
+    expect(delay.minimum).toBe(0);
+    expect(delay.maximum).toBe(65535);
 
     const msg = ((reboot.output as Record<string, unknown>).properties as Record<string, unknown>)[
       "status-message"
