@@ -12,6 +12,7 @@ import sys
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
+from ..json.integer_bounds import YANG_INTEGER_BOUNDS
 from ..errors import XPathSyntaxError
 from ..identity_graph import (
     identityref_value_valid,
@@ -352,10 +353,13 @@ class TypeChecker:
             return [f"Value {value!r} is not a valid integer"]
         if type_stmt.range:
             lo, hi = self._parse_range(type_stmt.range)
-            if lo is not None and n < lo:
-                return [f"Value {n} is less than minimum {lo}"]
-            if hi is not None and n > hi:
-                return [f"Value {n} exceeds maximum {hi}"]
+        else:
+            bounds = YANG_INTEGER_BOUNDS.get(type_stmt.name or "")
+            lo, hi = (bounds[0], bounds[1]) if bounds else (None, None)
+        if lo is not None and n < lo:
+            return [f"Value {n} is less than minimum {lo}"]
+        if hi is not None and n > hi:
+            return [f"Value {n} exceeds maximum {hi}"]
         return []
 
     def _check_decimal(

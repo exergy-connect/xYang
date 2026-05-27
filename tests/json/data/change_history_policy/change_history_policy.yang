@@ -5,9 +5,7 @@ module change-history-policy-test {
 
   typedef change-history-policy {
     type union {
-      type int32 {
-        range "0..max";
-      }
+      type uint32;
       type string {
         pattern '\*';
       }

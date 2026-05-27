@@ -1,5 +1,5 @@
 """
-Standalone test for change-history-policy typedef: union of int32 (0..max) and string '*'.
+Standalone test for change-history-policy typedef: union of uint32 and string '*'.
 
 Uses a minimal model with only this typedef. Asserts that both parsers produce
 an identical AST and that both validate the same data documents (valid and invalid) alike.
