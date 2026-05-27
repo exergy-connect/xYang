@@ -112,7 +112,7 @@ export class StatementParsers {
   readonly revision_parser = new RevisionStatementParser(this);
   private readonly submodule_parser = new SubmoduleStatementParser(this, this.module_parser);
   readonly type_parser = new TypeStatementParser(this);
-  private readonly typedef_parser = new TypedefStatementParser(this);
+  readonly typedef_parser = new TypedefStatementParser(this);
   readonly uses_parser = new UsesStatementParser(this);
   readonly when_parser = new WhenStatementParser(this);
 

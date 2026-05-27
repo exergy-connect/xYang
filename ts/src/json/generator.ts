@@ -2,7 +2,7 @@ import { YangModule, YangStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { expandUses } from "../transform/uses-expand";
 import { jsonSchemaDefaultValue } from "./default-values";
-import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
+import { XYANG_KEYS, YANG_INTEGER_BUILTINS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   JSON_SCHEMA_DRAFT_2020_12,
   JSON_TYPE_ARRAY,
@@ -278,6 +278,39 @@ function buildSoleChoiceObjectSchema(
   };
 }
 
+function ioBlockToSchema(
+  stmt: YangStatement,
+  module: YangModule,
+  typedefNames: Set<string>,
+  ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
+): Record<string, unknown> {
+  const body = buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
+  return {
+    ...body,
+    description: typeof stmt.data.description === "string" ? stmt.data.description : "",
+    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: ioType })
+  };
+}
+
+function rpcToJson(
+  stmt: YangStatement,
+  module: YangModule,
+  typedefNames: Set<string>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {
+    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: YangTokenType.RPC })
+  };
+  const inp = stmt.findStatement("input");
+  if (inp?.keyword === YangTokenType.INPUT) {
+    out.input = ioBlockToSchema(inp, module, typedefNames, YangTokenType.INPUT);
+  }
+  const outp = stmt.findStatement("output");
+  if (outp?.keyword === YangTokenType.OUTPUT) {
+    out.output = ioBlockToSchema(outp, module, typedefNames, YangTokenType.OUTPUT);
+  }
+  return out;
+}
+
 function buildMultiChildObjectSchema(
   statements: YangStatement[],
   module: YangModule,
@@ -516,6 +549,9 @@ function statementToSchema(
       xYang.type = YangTokenType.INSTANCE_IDENTIFIER;
       xYang["require-instance"] = typeShape.require_instance !== false;
     }
+    if (YANG_INTEGER_BUILTINS.has(typeName) && !typedefNames.has(typeName)) {
+      xYang[XYANG_KEYS.builtinType] = typeName;
+    }
 
     const schemaXy = asRecord(leafSchema[YANG_SCHEMA_KEYS.xYang]);
     const out: Record<string, unknown> = {
@@ -658,6 +694,24 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
     }
   }
 
+  const rootXYang: Record<string, unknown> = {
+    module: effectiveModule.name,
+    "yang-version": effectiveModule.yangVersion ?? "1.1",
+    namespace: effectiveModule.namespace,
+    prefix: effectiveModule.prefix,
+    organization: effectiveModule.organization ?? "",
+    contact: effectiveModule.contact ?? ""
+  };
+  const rpcs: Record<string, unknown> = {};
+  for (const stmt of effectiveModule.statements) {
+    if (stmt.keyword === YangTokenType.RPC && stmt.name) {
+      rpcs[stmt.name] = rpcToJson(stmt, effectiveModule, typedefNames);
+    }
+  }
+  if (Object.keys(rpcs).length > 0) {
+    rootXYang[XYANG_KEYS.rpcs] = rpcs;
+  }
+
   const schema: Record<string, unknown> = {
     $schema: JSON_SCHEMA_DRAFT_2020_12,
     $id: effectiveModule.namespace ? effectiveModule.namespace : (effectiveModule.name ? `urn:${effectiveModule.name}` : "urn:module"),
@@ -665,14 +719,7 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
     type: JSON_TYPE_OBJECT,
     properties,
     additionalProperties: false,
-    [YANG_SCHEMA_KEYS.xYang]: {
-      module: effectiveModule.name,
-      "yang-version": effectiveModule.yangVersion ?? "1.1",
-      namespace: effectiveModule.namespace,
-      prefix: effectiveModule.prefix,
-      organization: effectiveModule.organization ?? "",
-      contact: effectiveModule.contact ?? ""
-    }
+    [YANG_SCHEMA_KEYS.xYang]: rootXYang
   };
 
   if (required.length > 0) {

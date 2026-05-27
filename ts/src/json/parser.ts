@@ -2,7 +2,7 @@ import { YangModule, type ModuleSource, type SerializedStatement } from "../core
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
 import { yangDefaultFromJsonSchema } from "./default-values";
-import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
+import { XYANG_KEYS, YANG_INTEGER_BUILTINS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   decimal64FractionDigitsFromSchema,
   JSON_TYPE_ARRAY,
@@ -93,7 +93,22 @@ function mustStatementsFromXyang(xy: Record<string, unknown>): SerializedStateme
   return out;
 }
 
+function applyStatementMetaFromXyang(stmt: SerializedStatement, xy: Record<string, unknown>): void {
+  const when = whenFromXyang(xy);
+  if (when) {
+    stmt.when = when;
+  }
+  setConfigFromXyang(stmt, xy);
+  if (Array.isArray(xy["if-features"])) {
+    stmt.if_features = xy["if-features"].filter((x): x is string => typeof x === "string");
+  }
+}
+
 function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
+  const builtin = xy[XYANG_KEYS.builtinType];
+  if (typeof builtin === "string" && YANG_INTEGER_BUILTINS.has(builtin)) {
+    return { name: builtin };
+  }
   if (xy.type === YangTokenType.LEAFREF) {
     const path = typeof xy.path === "string" ? xy.path : "";
     if (path) {
@@ -664,6 +679,46 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
   return out;
 }
 
+function parseIoBlock(
+  schema: Record<string, unknown>,
+  defs: Record<string, unknown>,
+  ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
+): SerializedStatement {
+  const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
+  const parsed = parseContainer(ioType, schema, defs);
+  parsed.keyword = ioType;
+  parsed.name = ioType;
+  parsed.argument = ioType;
+  applyStatementMetaFromXyang(parsed, xy);
+  if (typeof schema.description === "string" && schema.description.length > 0) {
+    parsed.description = schema.description;
+  }
+  return parsed;
+}
+
+function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement | null {
+  const xy = asRecord(rpcValue[YANG_SCHEMA_KEYS.xYang]);
+  if (xy.type !== YangTokenType.RPC) {
+    return null;
+  }
+  const statements: SerializedStatement[] = [...mustStatementsFromXyang(xy)];
+  for (const ioKey of [YangTokenType.INPUT, YangTokenType.OUTPUT] as const) {
+    const block = rpcValue[ioKey];
+    if (block && typeof block === "object") {
+      statements.push(parseIoBlock(block as Record<string, unknown>, defs, ioKey));
+    }
+  }
+  const out: SerializedStatement = {
+    __class__: "YangStatement",
+    keyword: YangTokenType.RPC,
+    name,
+    argument: name,
+    statements
+  };
+  applyStatementMetaFromXyang(out, xy);
+  return out;
+}
+
 function jsonSchemaPropertyToStatement(
   name: string,
   schema: Record<string, unknown>,
@@ -740,6 +795,19 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   for (const stmt of statements) {
     if (typeof stmt.name === "string" && rootRequired.includes(stmt.name)) {
       stmt.mandatory = true;
+    }
+  }
+
+  const rpcsRaw = rootXy[XYANG_KEYS.rpcs];
+  if (rpcsRaw && typeof rpcsRaw === "object" && !Array.isArray(rpcsRaw)) {
+    for (const [rpcName, rpcVal] of Object.entries(rpcsRaw as Record<string, unknown>)) {
+      if (!rpcVal || typeof rpcVal !== "object") {
+        continue;
+      }
+      const rpcStmt = parseRpc(String(rpcName), rpcVal as Record<string, unknown>, defs);
+      if (rpcStmt) {
+        statements.push(rpcStmt);
+      }
     }
   }
 

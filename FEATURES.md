@@ -525,7 +525,7 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
 - ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).
 - ✅ **`augment` body**: `case`, `notification`, and other data-node substatements under `augment` (and `augment` under `uses` via `YangUsesStmt.augmentations`).
 - ✅ **`status` on typedefs**: Ignored at parse time (RFC 7950 §7.21.2) so standard modules with `status deprecated` parse cleanly.
-- ✅ **`rpc` / `input` / `output`**: Parser parity with Python (`ts/test/rpc_input_output.test.ts`); `rpc` not in unsupported-skip; `rpc` inside `container` rejected (syntax error).
+- ✅ **`rpc` / `input` / `output`**: Parser and yang.json parity with Python (`ts/test/rpc_input_output.test.ts`, `ts/test/json/rpc_json.test.ts`); `rpc` not in unsupported-skip; `rpc` inside `container` rejected (syntax error).
 
 
 ### String patterns: modifiers and multiple substatements (2026-04)
