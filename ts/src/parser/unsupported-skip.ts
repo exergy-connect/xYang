@@ -1,13 +1,7 @@
 import * as kw from "./keywords";
 import { TokenStream, YangTokenType } from "./parser-context";
 
-export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([
-  kw.DEVIATION,
-  kw.ACTION,
-  // Top-level ``input`` / ``output`` only (valid under ``rpc`` / ``action``).
-  kw.INPUT,
-  kw.OUTPUT
-]);
+export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([kw.DEVIATION, kw.ACTION]);
 
 export function _consume_balanced_braces(tokens: TokenStream): void {
   let depth = 0;

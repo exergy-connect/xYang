@@ -132,6 +132,12 @@ export class StatementParsers {
     [kw.CASE]: () => {
       throw new YangSyntaxError("'case' is only valid as a substatement of 'choice' (RFC 7950)");
     },
+    [kw.INPUT]: () => {
+      throw new YangSyntaxError("'input' is only valid as a substatement of 'rpc' or 'action' (RFC 7950)");
+    },
+    [kw.OUTPUT]: () => {
+      throw new YangSyntaxError("'output' is only valid as a substatement of 'rpc' or 'action' (RFC 7950)");
+    },
     [kw.TYPEDEF]: (tokens, context) => this.fromAst(this.typedef_parser.parse_typedef(tokens, context)),
     [kw.TYPE]: (tokens, context) => this.fromType(this.type_parser.parse_type(tokens, context)),
     [kw.USES]: (tokens, context) => this.fromAst(this.uses_parser.parse_uses(tokens, context)),
@@ -346,6 +352,13 @@ export class StatementParsers {
       return { __class__: "YangStatement", keyword: "unsupported", statements: [] };
     }
 
+    const peek = tokens.peek();
+    if (peek === kw.INPUT || peek === kw.OUTPUT) {
+      tokens.syntaxError(
+        `'${peek}' is only valid as a substatement of 'rpc' or 'action' (RFC 7950)`
+      );
+    }
+
     const first = tokens.consume();
     let keyword = first;
     if (tokens.peek_type() === YangTokenType.COLON) {
@@ -418,6 +431,12 @@ export class StatementParsers {
   }
 
   skip_unsupported_or_raise_unknown(tokens: TokenStream, context: string): boolean {
+    const peek = tokens.peek();
+    if (peek === kw.INPUT || peek === kw.OUTPUT) {
+      tokens.syntaxError(
+        `'${peek}' is only valid as a substatement of 'rpc' or 'action' (RFC 7950)`
+      );
+    }
     if (this.skip_unsupported_if_present(tokens, context)) {
       return true;
     }

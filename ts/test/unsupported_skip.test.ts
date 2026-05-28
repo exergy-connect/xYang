@@ -12,7 +12,7 @@ describe("python parity: test_unsupported_skip", () => {
     warnSpy.mockRestore();
   });
 
-  it("skips deviation, action, and top-level input/output; parses notification and leaf a", () => {
+  it("skips deviation and action; parses rpc notification and leaf a", () => {
     const yang = `
 module ex {
   yang-version 1.1;
@@ -28,17 +28,17 @@ module ex {
     input { leaf x { type empty; } }
   }
   notification done { leaf msg { type string; } }
-  input { leaf in-top { type empty; } }
-  output { leaf out-top { type empty; } }
   leaf a { type string; }
 }
 `;
     const mod = parseYangString(yang);
     const joined = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(" ").toLowerCase();
-    for (const kw of ["deviation", "action", "input", "output"]) {
+    for (const kw of ["deviation", "action"]) {
       expect(joined).toContain(kw);
     }
     expect(joined).not.toContain("rpc");
+    expect(joined).not.toContain("input");
+    expect(joined).not.toContain("output");
     expect(joined).not.toContain("notification");
     const reset = mod.findStatement("reset");
     expect(reset?.keyword).toBe("rpc");
@@ -47,6 +47,18 @@ module ex {
     expect(done?.name).toBe("done");
     const leaf = mod.findStatement("a");
     expect(leaf?.name).toBe("a");
+  });
+
+  it.each(["input", "output"])("rejects top-level %s", (keyword) => {
+    const yang = `
+module ex {
+  yang-version 1.1;
+  namespace "urn:ex";
+  prefix ex;
+  ${keyword} { leaf x { type empty; } }
+}
+`;
+    expect(() => parseYangString(yang)).toThrow(new RegExp(`${keyword}.*rpc.*action`, "i"));
   });
 
   it("rejects rpc inside container", () => {

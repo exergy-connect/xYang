@@ -155,6 +155,11 @@ class StatementParsers:
         self, tokens: TokenStream, context: str
     ) -> bool:
         """Skip unsupported constructs when applicable; otherwise raise ``Unknown statement in {context}: …``."""
+        peek = tokens.peek()
+        if peek in (kw.INPUT, kw.OUTPUT):
+            raise tokens.make_error(
+                f"{peek!r} is only valid as a substatement of 'rpc' or 'action' (RFC 7950)"
+            )
         if self._skip_unsupported_if_present(tokens, context):
             return True
         raise tokens.make_error(
@@ -176,7 +181,7 @@ class StatementParsers:
         elif tt == YangTokenType.IDENTIFIER:
             tokens.consume_type(YangTokenType.IDENTIFIER)
         else:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
             )
 
@@ -247,7 +252,7 @@ class StatementParsers:
         used for the prefix token (only ``identifier`` … ``:`` commits to an extension).
         """
         if not self.is_prefixed_extension_start(tokens):
-            raise tokens._make_error(
+            raise tokens.make_error(
                 "Expected prefixed extension invocation 'prefix:name'"
             )
         prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
@@ -255,12 +260,12 @@ class StatementParsers:
         ext_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         resolved_module = context.module.resolve_prefixed_module(prefix)
         if resolved_module is None:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Unknown extension prefix {prefix!r} in invocation {prefix}:{ext_name}"
             )
         resolved_extension = resolved_module.get_extension(ext_name)
         if resolved_extension is None:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Unknown extension {ext_name!r} in module {resolved_module.name!r} "
                 f"for invocation {prefix}:{ext_name}"
             )
@@ -447,7 +452,7 @@ class StatementParsers:
         tokens.consume(kw.ORDERED_BY)
         arg = tokens.consume()
         if arg not in ("user", "system"):
-            raise tokens._make_error(f"ordered-by must be 'user' or 'system', got {arg!r}")
+            raise tokens.make_error(f"ordered-by must be 'user' or 'system', got {arg!r}")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -468,7 +473,7 @@ class StatementParsers:
             return tokens.consume_type(YangTokenType.INTEGER)
         if tt == YangTokenType.IDENTIFIER:
             return tokens.consume_type(YangTokenType.IDENTIFIER)
-        raise tokens._make_error(
+        raise tokens.make_error(
             f"Expected default value (string, integer, identifier, or true/false), "
             f"got {tt.name if tt else 'end'}"
         )

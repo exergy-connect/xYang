@@ -106,11 +106,11 @@ class TokenStream:
     def consume(self, expected: Optional[str] = None) -> str:
         """Consume current token, optionally checking it matches expected."""
         if self.index >= len(self.tokens):
-            raise self._make_error("Unexpected end of input")
+            raise self.make_error("Unexpected end of input")
 
         token_val = self.tokens[self.index]
         if expected is not None and token_val != expected:
-            raise self._make_error(f"Expected {expected!r}, got {token_val!r}")
+            raise self.make_error(f"Expected {expected!r}, got {token_val!r}")
 
         self.index += 1
         return token_val
@@ -125,7 +125,7 @@ class TokenStream:
     def peek_type(self) -> YangTokenType:
         """Peek at current token type without consuming. Raises at end of input."""
         if self.index >= len(self._token_list):
-            raise self._make_error("Unexpected end of input")
+            raise self.make_error("Unexpected end of input")
         return self._token_list[self.index].type
 
     def peek_type_at(self, offset: int = 0) -> Optional[YangTokenType]:
@@ -138,14 +138,14 @@ class TokenStream:
     def consume_type(self, expected: Union[YangTokenType, str]) -> str:
         """Consume current token if token kind matches ``expected``; return value."""
         if self.index >= len(self._token_list):
-            raise self._make_error("Unexpected end of input")
+            raise self.make_error("Unexpected end of input")
         tok = self._token_list[self.index]
         if isinstance(expected, str):
             if tok.type != YangTokenType.IDENTIFIER or tok.value != expected:
                 got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
-                raise self._make_error(f"Expected {expected!r}, got {got!r}")
+                raise self.make_error(f"Expected {expected!r}, got {got!r}")
         elif tok.type != expected:
-            raise self._make_error(
+            raise self.make_error(
                 f"Expected {expected.name}, got {tok.type.name} ({tok.value!r})"
             )
         self.index += 1
@@ -169,7 +169,7 @@ class TokenStream:
     ) -> Tuple[str, Union[YangTokenType, str]]:
         """Consume current token if it matches one of allowed kinds; return (value, matched)."""
         if self.index >= len(self._token_list):
-            raise self._make_error("Unexpected end of input")
+            raise self.make_error("Unexpected end of input")
         tok = self._token_list[self.index]
         for allowed in allowed_types:
             if isinstance(allowed, str):
@@ -181,7 +181,7 @@ class TokenStream:
                 return (tok.value, allowed)
         names = ", ".join(t if isinstance(t, str) else t.name for t in allowed_types)
         got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
-        raise self._make_error(f"Expected one of ({names}), got {got!r}")
+        raise self.make_error(f"Expected one of ({names}), got {got!r}")
 
     def has_more(self) -> bool:
         """Check if there are more tokens."""
@@ -194,7 +194,7 @@ class TokenStream:
         if self.positions:
             return self.positions[-1]
         return (1, 0)
-    
+
     def _diagnostic_lines_once(self) -> List[str]:
         """Build per-line source text for errors (lazy, at most once per stream)."""
         if self._diagnostic_lines is None:
@@ -203,10 +203,6 @@ class TokenStream:
 
     def make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
         """Create a syntax error at current position."""
-        return self._make_error(message, context_lines)
-
-    def _make_error(self, message: str, context_lines: int = 3) -> YangSyntaxError:
-        """Create a syntax error at current position (internal; prefer :meth:`make_error`)."""
         line_num, _ = self.position()
         lines = self._diagnostic_lines_once()
 
@@ -219,7 +215,7 @@ class TokenStream:
                 context.append((ctx_line_num, lines[ctx_line_num - 1]))
 
         line = lines[line_num - 1] if line_num <= len(lines) else ""
-        
+
         return YangSyntaxError(
             message=message,
             line_num=line_num,
