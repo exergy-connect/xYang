@@ -1,6 +1,0 @@
-# xYang has no runtime dependencies
-# Pure Python implementation
-
-# Optional development dependencies:
-# pytest>=7.0.0
-# black>=23.0.0
