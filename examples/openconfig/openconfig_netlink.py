@@ -6,6 +6,7 @@ This example intentionally supports a narrow RFC 7951 JSON shape: interface MTU,
 VLAN subinterfaces, Linux bonding interfaces, and bond membership. It uses
 ``pyroute2`` only when it needs to talk to Netlink.
 """
+# pylint: disable=import-outside-toplevel
 
 from __future__ import annotations
 
@@ -32,6 +33,8 @@ BOND_MODES = {
 
 @dataclass(frozen=True)
 class LinkOperation:
+    """A normalized Linux link operation derived from OpenConfig-shaped input."""
+
     kind: str
     name: str
     attrs: dict[str, object]
@@ -42,12 +45,16 @@ class ConfigError(ValueError):
 
 
 def validate_namespace_name(namespace: str) -> str:
+    """Reject path-like namespace values before passing a name to pyroute2."""
+
     if not namespace or "/" in namespace or "\0" in namespace:
         raise ConfigError("--ns must be a non-empty network namespace name, not a path")
     return namespace
 
 
 def load_json(path: Path) -> dict[str, Any]:
+    """Load an RFC 7951 JSON object from disk."""
+
     with path.open("r", encoding="utf-8") as f:
         value = json.load(f)
     if not isinstance(value, dict):
@@ -56,12 +63,16 @@ def load_json(path: Path) -> dict[str, Any]:
 
 
 def write_json(path: Path, data: dict[str, Any]) -> None:
+    """Write readback data as stable, pretty-printed JSON."""
+
     with path.open("w", encoding="utf-8") as f:
         json.dump(data, f, indent=2, sort_keys=True)
         f.write("\n")
 
 
 def local_name(key: str) -> str:
+    """Return the local identifier from an RFC 7951 ``module:name`` key."""
+
     return key.split(":", 1)[1] if ":" in key else key
 
 
@@ -75,6 +86,8 @@ def localize_keys(value: Any) -> Any:
 
 
 def get_child(data: dict[str, Any], name: str, default: Any = None) -> Any:
+    """Look up a child by local name, accepting qualified or unqualified keys."""
+
     if name in data:
         return data[name]
     for key, value in data.items():
@@ -84,18 +97,24 @@ def get_child(data: dict[str, Any], name: str, default: Any = None) -> Any:
 
 
 def require_dict(value: Any, path: str) -> dict[str, Any]:
+    """Return *value* as a dict or raise a path-qualified config error."""
+
     if not isinstance(value, dict):
         raise ConfigError(f"{path} must be an object")
     return value
 
 
 def optional_dict(value: Any, path: str) -> dict[str, Any]:
+    """Return an optional object value, treating a missing node as empty."""
+
     if value is None:
         return {}
     return require_dict(value, path)
 
 
 def optional_list(value: Any, path: str) -> list[Any]:
+    """Return an optional list value, treating a missing node as empty."""
+
     if value is None:
         return []
     if not isinstance(value, list):
@@ -104,24 +123,30 @@ def optional_list(value: Any, path: str) -> list[Any]:
 
 
 def as_int(value: Any, path: str) -> int:
+    """Coerce a parsed JSON value to int, excluding bool."""
+
     if isinstance(value, bool) or not isinstance(value, int):
         raise ConfigError(f"{path} must be an integer")
     return value
 
 
 def as_str(value: Any, path: str) -> str:
+    """Coerce a parsed JSON value to a non-empty string."""
+
     if not isinstance(value, str) or not value:
         raise ConfigError(f"{path} must be a non-empty string")
     return value
 
 
 def validate_with_xyang(data: dict[str, Any], schema: Path) -> None:
+    """Validate the supported OpenConfig subset with xYang."""
+
     try:
         from xyang import YangValidator, parse_yang_file
     except ImportError as exc:
         raise ConfigError(
             "xYang is not importable; run from the repository with PYTHONPATH=src "
-            "or install the package before using --validate"
+            "or install the package before using validation"
         ) from exc
 
     module = parse_yang_file(str(schema))
@@ -137,6 +162,8 @@ def validate_with_xyang(data: dict[str, Any], schema: Path) -> None:
 
 
 def interfaces_root(data: dict[str, Any]) -> dict[str, Any]:
+    """Return the OpenConfig interfaces root container."""
+
     root = get_child(data, "interfaces")
     if root is None:
         raise ConfigError(f"missing {ROOT_KEY}")
@@ -144,18 +171,27 @@ def interfaces_root(data: dict[str, Any]) -> dict[str, Any]:
 
 
 def interface_entries(data: dict[str, Any]) -> list[dict[str, Any]]:
+    """Return validated interface list entries from the input document."""
+
     root = interfaces_root(data)
     entries = optional_list(get_child(root, "interface"), f"{ROOT_KEY}/interface")
-    return [require_dict(entry, f"{ROOT_KEY}/interface[{idx}]") for idx, entry in enumerate(entries)]
+    return [
+        require_dict(entry, f"{ROOT_KEY}/interface[{idx}]")
+        for idx, entry in enumerate(entries)
+    ]
 
 
 def interface_name(entry: dict[str, Any], idx: int) -> str:
+    """Return the list key for an interface entry."""
+
     config = optional_dict(get_child(entry, "config"), f"interface[{idx}]/config")
     name = get_child(entry, "name", get_child(config, "name"))
     return as_str(name, f"interface[{idx}]/name")
 
 
 def is_bond_interface(name: str, entry: dict[str, Any]) -> bool:
+    """Infer whether an interface entry should create a Linux bond link."""
+
     config = optional_dict(get_child(entry, "config"), f"interface[{name}]/config")
     iface_type = str(get_child(config, "type", ""))
     return (
@@ -167,6 +203,8 @@ def is_bond_interface(name: str, entry: dict[str, Any]) -> bool:
 
 
 def bond_mode(entry: dict[str, Any]) -> str | None:
+    """Translate the supported OpenConfig LAG type values to Linux mode names."""
+
     aggregation = optional_dict(get_child(entry, "aggregation"), "aggregation")
     config = optional_dict(get_child(aggregation, "config"), "aggregation/config")
     lag_type = get_child(config, "lag-type")
@@ -181,6 +219,8 @@ def bond_mode(entry: dict[str, Any]) -> str | None:
 
 
 def enabled_value(entry: dict[str, Any]) -> bool | None:
+    """Return the requested administrative enabled state, if present."""
+
     config = optional_dict(get_child(entry, "config"), "config")
     enabled = get_child(config, "enabled")
     if enabled is None:
@@ -191,6 +231,8 @@ def enabled_value(entry: dict[str, Any]) -> bool | None:
 
 
 def mtu_value(entry: dict[str, Any], path: str) -> int | None:
+    """Return the requested interface MTU, if present."""
+
     config = optional_dict(get_child(entry, "config"), f"{path}/config")
     mtu = get_child(config, "mtu")
     if mtu is None:
@@ -199,6 +241,8 @@ def mtu_value(entry: dict[str, Any], path: str) -> int | None:
 
 
 def bond_membership(entry: dict[str, Any]) -> str | None:
+    """Return the aggregate interface name referenced by an Ethernet member."""
+
     ethernet = optional_dict(get_child(entry, "ethernet"), "ethernet")
     config = optional_dict(get_child(ethernet, "config"), "ethernet/config")
     aggregate_id = get_child(config, "aggregate-id")
@@ -208,27 +252,49 @@ def bond_membership(entry: dict[str, Any]) -> str | None:
 
 
 def vlan_subinterfaces(parent: str, entry: dict[str, Any]) -> Iterable[LinkOperation]:
+    """Yield VLAN creation operations for subinterfaces under *parent*."""
+
     subinterfaces = optional_dict(get_child(entry, "subinterfaces"), f"{parent}/subinterfaces")
-    for idx, raw_subinterface in enumerate(optional_list(get_child(subinterfaces, "subinterface"), f"{parent}/subinterfaces/subinterface")):
-        subinterface = require_dict(raw_subinterface, f"{parent}/subinterfaces/subinterface[{idx}]")
-        vlan = optional_dict(get_child(subinterface, "vlan"), f"{parent}/subinterfaces/subinterface[{idx}]/vlan")
-        vlan_config = optional_dict(get_child(vlan, "config"), f"{parent}/subinterfaces/subinterface[{idx}]/vlan/config")
-        vlan_id = get_child(vlan_config, "vlan-id")
-        if vlan_id is None:
-            continue
-        vlan_id_int = as_int(vlan_id, f"{parent}/subinterfaces/subinterface[{idx}]/vlan/config/vlan-id")
-        if not 1 <= vlan_id_int <= 4094:
-            raise ConfigError("vlan-id must be between 1 and 4094")
-        config = optional_dict(get_child(subinterface, "config"), f"{parent}/subinterfaces/subinterface[{idx}]/config")
-        name = get_child(config, "name", f"{parent}.{vlan_id_int}")
-        attrs: dict[str, object] = {"parent": parent, "vlan_id": vlan_id_int}
-        sub_mtu = get_child(config, "mtu")
-        if sub_mtu is not None:
-            attrs["mtu"] = as_int(sub_mtu, f"{parent}/subinterfaces/subinterface[{idx}]/config/mtu")
-        yield LinkOperation("create_vlan", as_str(name, f"{parent}/subinterfaces/subinterface[{idx}]/config/name"), attrs)
+    raw_subinterfaces = optional_list(
+        get_child(subinterfaces, "subinterface"),
+        f"{parent}/subinterfaces/subinterface",
+    )
+    for idx, raw_subinterface in enumerate(raw_subinterfaces):
+        op = vlan_subinterface(parent, idx, raw_subinterface)
+        if op is not None:
+            yield op
+
+
+def vlan_subinterface(parent: str, idx: int, raw_subinterface: Any) -> LinkOperation | None:
+    """Convert one OpenConfig subinterface entry to a VLAN operation."""
+
+    subinterface_path = f"{parent}/subinterfaces/subinterface[{idx}]"
+    subinterface = require_dict(raw_subinterface, subinterface_path)
+    vlan = optional_dict(get_child(subinterface, "vlan"), f"{subinterface_path}/vlan")
+    vlan_config = optional_dict(get_child(vlan, "config"), f"{subinterface_path}/vlan/config")
+    vlan_id = get_child(vlan_config, "vlan-id")
+    if vlan_id is None:
+        return None
+
+    vlan_id_int = as_int(vlan_id, f"{subinterface_path}/vlan/config/vlan-id")
+
+    config = optional_dict(get_child(subinterface, "config"), f"{subinterface_path}/config")
+    name = get_child(config, "name", f"{parent}.{vlan_id_int}")
+    attrs: dict[str, object] = {"parent": parent, "vlan_id": vlan_id_int}
+    sub_mtu = get_child(config, "mtu")
+    if sub_mtu is not None:
+        attrs["mtu"] = as_int(sub_mtu, f"{subinterface_path}/config/mtu")
+
+    return LinkOperation(
+        "create_vlan",
+        as_str(name, f"{subinterface_path}/config/name"),
+        attrs,
+    )
 
 
 def plan_operations(data: dict[str, Any]) -> list[LinkOperation]:
+    """Translate supported OpenConfig interface config into ordered link operations."""
+
     entries = interface_entries(data)
     operations: list[LinkOperation] = []
     mtu_operations: list[LinkOperation] = []
@@ -255,7 +321,9 @@ def plan_operations(data: dict[str, Any]) -> list[LinkOperation]:
 
         enabled = enabled_value(entry)
         if enabled is not None:
-            state_operations.append(LinkOperation("set_state", name, {"state": "up" if enabled else "down"}))
+            state_operations.append(
+                LinkOperation("set_state", name, {"state": "up" if enabled else "down"})
+            )
 
         if master is not None:
             enslave_operations.append(LinkOperation("enslave", name, {"master": master}))
@@ -271,19 +339,30 @@ def plan_operations(data: dict[str, Any]) -> list[LinkOperation]:
 
 
 def operation_dict(op: LinkOperation) -> dict[str, object]:
+    """Convert an operation to a JSON-serializable dictionary."""
+
     return {"kind": op.kind, "name": op.name, "attrs": op.attrs}
 
 
 def print_operations(operations: list[LinkOperation]) -> None:
+    """Print planned or applied operations for dry-run and verbose output."""
+
     print(json.dumps([operation_dict(op) for op in operations], indent=2, sort_keys=True))
 
 
 class NetlinkBackend:
+    """Small pyroute2 wrapper for applying and reading Linux link state."""
+
     def __init__(self, namespace: str | None = None) -> None:
+        """Open Netlink in the host namespace or a named network namespace."""
+
         try:
-            from pyroute2 import IPRoute, NetNS, netns
+            from pyroute2 import IPRoute, NetNS, netns  # pyright: ignore[reportMissingImports]
         except ImportError as exc:
-            raise ConfigError("pyroute2 is required for Netlink operations; install it with `pip install pyroute2`") from exc
+            raise ConfigError(
+                "pyroute2 is required for Netlink operations; "
+                "install it with `pip install pyroute2`"
+            ) from exc
 
         if namespace is None:
             self.ipr = IPRoute()
@@ -295,23 +374,33 @@ class NetlinkBackend:
         self.ipr = NetNS(namespace)
 
     def close(self) -> None:
+        """Close the underlying pyroute2 socket."""
+
         self.ipr.close()
 
     def link_index(self, name: str) -> int | None:
+        """Return a Linux interface index by name, or ``None`` if absent."""
+
         matches = self.ipr.link_lookup(ifname=name)
         return int(matches[0]) if matches else None
 
     def require_link_index(self, name: str) -> int:
+        """Return a Linux interface index or raise a configuration error."""
+
         index = self.link_index(name)
         if index is None:
             raise ConfigError(f"Linux link {name!r} does not exist")
         return index
 
     def apply(self, operations: list[LinkOperation]) -> None:
+        """Apply normalized link operations in order."""
+
         for op in operations:
             getattr(self, f"apply_{op.kind}")(op)
 
     def apply_create_bond(self, op: LinkOperation) -> None:
+        """Create a Linux bond link if it does not already exist."""
+
         if self.link_index(op.name) is not None:
             return
         kwargs: dict[str, object] = {"ifname": op.name, "kind": "bond"}
@@ -320,6 +409,8 @@ class NetlinkBackend:
         self.ipr.link("add", **kwargs)
 
     def apply_create_vlan(self, op: LinkOperation) -> None:
+        """Create a Linux VLAN link if it does not already exist."""
+
         if self.link_index(op.name) is not None:
             return
         parent = as_str(op.attrs.get("parent"), f"{op.name}/parent")
@@ -328,16 +419,22 @@ class NetlinkBackend:
         self.ipr.link("add", ifname=op.name, kind="vlan", link=parent_index, vlan_id=vlan_id)
 
     def apply_set_mtu(self, op: LinkOperation) -> None:
+        """Set MTU on an existing Linux link."""
+
         index = self.require_link_index(op.name)
         mtu = as_int(op.attrs.get("mtu"), f"{op.name}/mtu")
         self.ipr.link("set", index=index, mtu=mtu)
 
     def apply_set_state(self, op: LinkOperation) -> None:
+        """Set administrative link state on an existing Linux link."""
+
         index = self.require_link_index(op.name)
         state = as_str(op.attrs.get("state"), f"{op.name}/state")
         self.ipr.link("set", index=index, state=state)
 
     def apply_enslave(self, op: LinkOperation) -> None:
+        """Attach an interface to a bond master."""
+
         index = self.require_link_index(op.name)
         master = as_str(op.attrs.get("master"), f"{op.name}/master")
         master_index = self.require_link_index(master)
@@ -345,6 +442,8 @@ class NetlinkBackend:
         self.ipr.link("set", index=index, master=master_index)
 
     def read_config(self) -> dict[str, Any]:
+        """Read Linux link state and return the supported OpenConfig-shaped JSON."""
+
         links = self.ipr.get_links()
         by_index = {int(link["index"]): link for link in links}
         entries: dict[str, dict[str, Any]] = {}
@@ -381,7 +480,11 @@ class NetlinkBackend:
             parent_name = attr(by_index[int(parent_index)], "IFLA_IFNAME")
             if not parent_name:
                 continue
-            parent_entry = entries.setdefault(parent_name, link_entry(by_index[int(parent_index)], link_kind(by_index[int(parent_index)])))
+            parent_link = by_index[int(parent_index)]
+            parent_entry = entries.setdefault(
+                parent_name,
+                link_entry(parent_link, link_kind(parent_link)),
+            )
             subinterfaces = parent_entry.setdefault("subinterfaces", {"subinterface": []})
             subinterfaces["subinterface"].append(
                 {
@@ -391,10 +494,14 @@ class NetlinkBackend:
                 }
             )
 
-        return {ROOT_KEY: {"interface": sorted(entries.values(), key=lambda item: item["name"])}}
+        return {
+            ROOT_KEY: {"interface": sorted(entries.values(), key=lambda item: item["name"])}
+        }
 
 
 def attr(link: Any, name: str) -> Any:
+    """Read a top-level pyroute2 netlink attribute from a link message."""
+
     if hasattr(link, "get_attr"):
         return link.get_attr(name)
     attrs = link.get("attrs", []) if isinstance(link, dict) else []
@@ -402,6 +509,8 @@ def attr(link: Any, name: str) -> Any:
 
 
 def nested_attr(value: Any, name: str) -> Any:
+    """Read a nested pyroute2 netlink attribute from a decoded value."""
+
     if hasattr(value, "get_attr"):
         return value.get_attr(name)
     attrs = value.get("attrs", []) if isinstance(value, dict) else []
@@ -409,20 +518,28 @@ def nested_attr(value: Any, name: str) -> Any:
 
 
 def link_info(link: Any) -> Any:
+    """Return the ``IFLA_LINKINFO`` payload for a link message."""
+
     return attr(link, "IFLA_LINKINFO") or {}
 
 
 def link_kind(link: Any) -> str | None:
+    """Return the Linux link kind, such as ``bond`` or ``vlan``."""
+
     return nested_attr(link_info(link), "IFLA_INFO_KIND")
 
 
 def vlan_id_from_link(link: Any) -> int | None:
+    """Return the VLAN ID from a Linux VLAN link message."""
+
     info_data = nested_attr(link_info(link), "IFLA_INFO_DATA")
     vlan_id = nested_attr(info_data or {}, "IFLA_VLAN_ID")
     return int(vlan_id) if vlan_id is not None else None
 
 
 def link_entry(link: Any, kind: str | None) -> dict[str, Any]:
+    """Convert one non-VLAN Linux link into an OpenConfig interface entry."""
+
     name = attr(link, "IFLA_IFNAME")
     mtu = attr(link, "IFLA_MTU")
     flags = int(link.get("flags", 0))
@@ -440,6 +557,8 @@ def link_entry(link: Any, kind: str | None) -> dict[str, Any]:
 
 
 def interface_type(name: str, kind: str | None) -> str:
+    """Map a Linux link kind to the example's OpenConfig interface type string."""
+
     if name == "lo":
         return "iana-if-type:softwareLoopback"
     if kind == "bond":
@@ -448,6 +567,8 @@ def interface_type(name: str, kind: str | None) -> str:
 
 
 def bond_mode_id(mode: str) -> int:
+    """Map a Linux bond mode name to the numeric value expected by pyroute2."""
+
     try:
         return BOND_MODES[mode]
     except KeyError as exc:
@@ -455,8 +576,10 @@ def bond_mode_id(mode: str) -> int:
 
 
 def apply_command(args: argparse.Namespace) -> int:
+    """Handle the ``apply`` subcommand."""
+
     data = load_json(args.input_json)
-    if args.validate:
+    if not args.no_validate:
         validate_with_xyang(data, args.schema)
     operations = plan_operations(data)
     if args.dry_run:
@@ -474,12 +597,14 @@ def apply_command(args: argparse.Namespace) -> int:
 
 
 def read_command(args: argparse.Namespace) -> int:
+    """Handle the ``read`` subcommand."""
+
     backend = NetlinkBackend(args.ns)
     try:
         data = backend.read_config()
     finally:
         backend.close()
-    if args.validate:
+    if not args.no_validate:
         validate_with_xyang(data, args.schema)
     write_json(args.output_json, data)
     if args.verbose:
@@ -488,23 +613,59 @@ def read_command(args: argparse.Namespace) -> int:
 
 
 def build_parser() -> argparse.ArgumentParser:
+    """Build the command-line parser for the example."""
+
     parser = argparse.ArgumentParser(description=__doc__)
     subparsers = parser.add_subparsers(dest="command", required=True)
 
-    apply_parser = subparsers.add_parser("apply", help="configure Linux links from OpenConfig-shaped JSON")
+    apply_parser = subparsers.add_parser(
+        "apply",
+        help="configure Linux links from OpenConfig-shaped JSON",
+    )
     apply_parser.add_argument("input_json", type=Path)
-    apply_parser.add_argument("--validate", action="store_true", help="validate the input with xYang before applying")
-    apply_parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA, help="YANG schema used with --validate")
-    apply_parser.add_argument("--dry-run", action="store_true", help="print planned operations without sending Netlink messages")
-    apply_parser.add_argument("--ns", help="operate in this network namespace, creating it if it does not exist")
+    apply_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="skip xYang validation before planning or applying",
+    )
+    apply_parser.add_argument(
+        "--schema",
+        type=Path,
+        default=DEFAULT_SCHEMA,
+        help="YANG schema used for default validation",
+    )
+    apply_parser.add_argument(
+        "--dry-run",
+        action="store_true",
+        help="print planned operations without sending Netlink messages",
+    )
+    apply_parser.add_argument(
+        "--ns",
+        help="operate in this network namespace, creating it if it does not exist",
+    )
     apply_parser.add_argument("--verbose", action="store_true", help="print applied operations")
     apply_parser.set_defaults(func=apply_command)
 
-    read_parser = subparsers.add_parser("read", help="write current Linux link state as OpenConfig-shaped JSON")
+    read_parser = subparsers.add_parser(
+        "read",
+        help="write current Linux link state as OpenConfig-shaped JSON",
+    )
     read_parser.add_argument("output_json", type=Path)
-    read_parser.add_argument("--validate", action="store_true", help="validate generated JSON with xYang before writing")
-    read_parser.add_argument("--schema", type=Path, default=DEFAULT_SCHEMA, help="YANG schema used with --validate")
-    read_parser.add_argument("--ns", help="operate in this network namespace, creating it if it does not exist")
+    read_parser.add_argument(
+        "--no-validate",
+        action="store_true",
+        help="skip xYang validation before writing generated JSON",
+    )
+    read_parser.add_argument(
+        "--schema",
+        type=Path,
+        default=DEFAULT_SCHEMA,
+        help="YANG schema used for default validation",
+    )
+    read_parser.add_argument(
+        "--ns",
+        help="operate in this network namespace, creating it if it does not exist",
+    )
     read_parser.add_argument("--verbose", action="store_true", help="print the output path")
     read_parser.set_defaults(func=read_command)
 
@@ -512,6 +673,8 @@ def build_parser() -> argparse.ArgumentParser:
 
 
 def main(argv: list[str] | None = None) -> int:
+    """Run the command-line program and convert config errors to exit status."""
+
     parser = build_parser()
     args = parser.parse_args(argv)
     try:

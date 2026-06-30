@@ -26,7 +26,7 @@ The script accepts RFC 7951 module-qualified JSON keys such as
 
 ## Requirements
 
-Dry-run planning and xYang validation use only this repository.
+Dry-run planning and default xYang validation use only this repository.
 
 Real Netlink operations require Linux, root or `CAP_NET_ADMIN`, and `pyroute2`:
 
@@ -50,12 +50,20 @@ python3 examples/openconfig/openconfig_netlink.py \
   --dry-run
 ```
 
-Validate with xYang before planning:
+Validation runs by default before planning or applying:
 
 ```bash
 PYTHONPATH=src python3 examples/openconfig/openconfig_netlink.py \
   apply examples/openconfig/sample_interfaces.json \
-  --validate \
+  --dry-run
+```
+
+Skip schema validation only when intentionally testing parser or Netlink behavior:
+
+```bash
+python3 examples/openconfig/openconfig_netlink.py \
+  apply examples/openconfig/sample_interfaces.json \
+  --no-validate \
   --dry-run
 ```
 
@@ -63,8 +71,7 @@ Apply the configuration:
 
 ```bash
 sudo PYTHONPATH=src python3 examples/openconfig/openconfig_netlink.py \
-  apply examples/openconfig/sample_interfaces.json \
-  --validate
+  apply examples/openconfig/sample_interfaces.json
 ```
 
 `apply` is idempotent where practical: existing bonds and VLAN links are reused,
@@ -77,7 +84,6 @@ not create the namespace.
 ```bash
 sudo PYTHONPATH=src python3 examples/openconfig/openconfig_netlink.py \
   apply examples/openconfig/sample_interfaces.json \
-  --validate \
   --ns oc-demo
 ```
 
@@ -87,8 +93,7 @@ Write the current Linux link state as OpenConfig-shaped JSON:
 
 ```bash
 PYTHONPATH=src python3 examples/openconfig/openconfig_netlink.py \
-  read /tmp/openconfig-current.json \
-  --validate
+  read /tmp/openconfig-current.json
 ```
 
 Read from a network namespace, creating it first if needed:
@@ -96,7 +101,6 @@ Read from a network namespace, creating it first if needed:
 ```bash
 sudo PYTHONPATH=src python3 examples/openconfig/openconfig_netlink.py \
   read /tmp/openconfig-current.json \
-  --validate \
   --ns oc-demo
 ```
 

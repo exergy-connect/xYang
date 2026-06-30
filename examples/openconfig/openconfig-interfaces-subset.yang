@@ -21,7 +21,7 @@ module openconfig-interfaces {
   container interfaces {
     list interface {
       key "name";
-      must "count(ethernet/config/aggregate-id) = 0 or count(subinterfaces/subinterface[vlan/config/vlan-id]) = 0" {
+      must "not(ethernet/config/aggregate-id and subinterfaces/subinterface[vlan/config/vlan-id])" {
         description
           "xYang example-specific constraint: Linux VLAN subinterfaces should
            be configured on the bond interface rather than on member ports.
