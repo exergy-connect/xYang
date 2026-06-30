@@ -1,0 +1,67 @@
+{
+  "openconfig-interfaces:interfaces": {
+    "interface": [
+      {
+        "name": "bond0",
+        "config": {
+          "name": "bond0",
+          "type": "iana-if-type:ieee8023adLag",
+          "mtu": 9000,
+          "enabled": true
+        },
+        "openconfig-if-aggregate:aggregation": {
+          "config": {
+            "lag-type": "LACP",
+            "min-links": 1
+          }
+        },
+        "subinterfaces": {
+          "subinterface": [
+            {
+              "index": 100,
+              "config": {
+                "index": 100,
+                "name": "bond0.100",
+                "mtu": 9000,
+                "enabled": true
+              },
+              "openconfig-vlan:vlan": {
+                "config": {
+                  "vlan-id": 100
+                }
+              }
+            }
+          ]
+        }
+      },
+      {
+        "name": "eth1",
+        "config": {
+          "name": "eth1",
+          "type": "iana-if-type:ethernetCsmacd",
+          "mtu": 9000,
+          "enabled": true
+        },
+        "openconfig-if-ethernet:ethernet": {
+          "config": {
+            "aggregate-id": "bond0"
+          }
+        }
+      },
+      {
+        "name": "eth2",
+        "config": {
+          "name": "eth2",
+          "type": "iana-if-type:ethernetCsmacd",
+          "mtu": 9000,
+          "enabled": true
+        },
+        "openconfig-if-ethernet:ethernet": {
+          "config": {
+            "aggregate-id": "bond0"
+          }
+        }
+      }
+    ]
+  }
+}
