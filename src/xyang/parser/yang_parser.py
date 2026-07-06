@@ -68,18 +68,18 @@ class YangParser:
     ) -> None:
         """Load a submodule file and merge its definitions into *parent*."""
         if source_dir is None:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 "include requires a filesystem location for the submodule: "
                 "use parse_file(), or parse_string(..., source_path=Path('module.yang'))"
             )
         path = self._resolve_submodule_path(submodule_name, revision_date, source_dir, tokens)
         sub = self._parse_submodule_from_path(path)
         if sub.name != submodule_name:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"submodule file defines name {sub.name!r}, include expects {submodule_name!r}"
             )
         if sub.belongs_to_module and sub.belongs_to_module != parent.name:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"submodule belongs-to {sub.belongs_to_module!r} "
                 f"does not match module {parent.name!r}"
             )
@@ -97,22 +97,22 @@ class YangParser:
     ) -> None:
         """Load an imported module and record ``local_prefix`` → module on *parent*."""
         if source_dir is None:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 "import requires a filesystem location: "
                 "use parse_file(), or parse_string(..., source_path=Path('module.yang'))"
             )
         own = parent.own_prefix_stripped()
         if local_prefix == own:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Import prefix {local_prefix!r} must differ from this module's prefix"
             )
         if local_prefix in parent.import_prefixes:
-            raise tokens._make_error(f"Duplicate import prefix {local_prefix!r}")
+            raise tokens.make_error(f"Duplicate import prefix {local_prefix!r}")
         mod = self._load_imported_module(
             imported_module_name, revision_date, source_dir, tokens
         )
         if mod.name != imported_module_name:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"imported file defines module {mod.name!r}, import expects {imported_module_name!r}"
             )
         parent.import_prefixes[local_prefix] = mod
@@ -176,7 +176,7 @@ class YangParser:
             if matches:
                 return matches[-1].resolve()
         searched = ", ".join(str(d) for d in dirs)
-        raise tokens._make_error(
+        raise tokens.make_error(
             f"Could not find submodule {name!r} (tried filenames {candidates!r}) under [{searched}]"
         )
 
@@ -204,25 +204,25 @@ class YangParser:
     ) -> None:
         for n, td in sub.typedefs.items():
             if n in parent.typedefs:
-                raise tokens._make_error(f"Duplicate typedef {n!r} from include of {sub.name!r}")
+                raise tokens.make_error(f"Duplicate typedef {n!r} from include of {sub.name!r}")
             parent.typedefs[n] = td
         for n, ident in sub.identities.items():
             if n in parent.identities:
-                raise tokens._make_error(f"Duplicate identity {n!r} from include of {sub.name!r}")
+                raise tokens.make_error(f"Duplicate identity {n!r} from include of {sub.name!r}")
             parent.identities[n] = ident
         for n, grp in sub.groupings.items():
             if n in parent.groupings:
-                raise tokens._make_error(f"Duplicate grouping {n!r} from include of {sub.name!r}")
+                raise tokens.make_error(f"Duplicate grouping {n!r} from include of {sub.name!r}")
             parent.groupings[n] = grp
         for fname in sub.features:
             if fname in parent.features:
-                raise tokens._make_error(
+                raise tokens.make_error(
                     f"Duplicate feature {fname!r} from include of {sub.name!r}"
                 )
             parent.features.add(fname)
         for fname, ifs in sub.feature_if_features.items():
             if fname in parent.feature_if_features:
-                raise tokens._make_error(
+                raise tokens.make_error(
                     f"Duplicate feature if-feature for {fname!r} from include of {sub.name!r}"
                 )
             parent.feature_if_features[fname] = list(ifs)
@@ -232,7 +232,7 @@ class YangParser:
                 continue
             existing = parent.import_prefixes.get(pref)
             if existing is not None and existing.name != im.name:
-                raise tokens._make_error(
+                raise tokens.make_error(
                     f"Import prefix {pref!r} from include of {sub.name!r} "
                     f"conflicts with existing import of {existing.name!r}"
                 )
@@ -290,7 +290,7 @@ class YangParser:
         tokens = self.tokenizer.tokenize(content, filename)
 
         if not tokens.has_more():
-            raise tokens._make_error("Empty input")
+            raise tokens.make_error("Empty input")
         root = tokens.peek()
         context = ParserContext(
             module=module,
@@ -302,7 +302,7 @@ class YangParser:
         elif root == "submodule":
             self.parsers._submodule_parser.parse_submodule(tokens, context)
         else:
-            raise tokens._make_error("Expected 'module' or 'submodule' statement at start of file")
+            raise tokens.make_error("Expected 'module' or 'submodule' statement at start of file")
 
         if finalize:
             self._expand_and_augment(module)

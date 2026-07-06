@@ -84,7 +84,7 @@ class RefineStatementParser:
         try:
             path_node = XPathParser(path_arg).parse_path()
         except XPathSyntaxError as e:
-            raise tokens._make_error(str(e)) from e
+            raise tokens.make_error(str(e)) from e
         refine_stmt = YangRefineStmt(name="refine", target_path=path_node)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(refine_stmt)

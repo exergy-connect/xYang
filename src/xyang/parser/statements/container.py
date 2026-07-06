@@ -62,7 +62,7 @@ class ContainerStatementParser:
             prev_index = -1
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 if tokens.index == prev_index:
-                    raise tokens._make_error(
+                    raise tokens.make_error(
                         f"Infinite loop detected at token: {tokens.peek()}"
                     )
                 prev_index = tokens.index

@@ -1,0 +1,125 @@
+module openconfig-interfaces {
+  yang-version 1.1;
+  namespace "http://openconfig.net/yang/interfaces";
+  prefix oc-if;
+
+  organization "xYang example";
+  description
+    "A compact OpenConfig-shaped interfaces subset for the
+     examples/openconfig/openconfig_netlink.py script. It is not a replacement
+     for the full OpenConfig module set.
+
+     This subset includes an xYang example-specific validation rule, expressed
+     with a standard YANG must statement, that rejects VLAN subinterfaces on
+     bond member ports. That platform policy is not part of the upstream
+     OpenConfig interfaces models.";
+
+  revision "2026-06-29" {
+    description "Initial example subset.";
+  }
+
+  container interfaces {
+    list interface {
+      key "name";
+      must "not(ethernet/config/aggregate-id and subinterfaces/subinterface[vlan/config/vlan-id])" {
+        description
+          "xYang example-specific constraint: Linux VLAN subinterfaces should
+           be configured on the bond interface rather than on member ports.
+           Upstream OpenConfig does not define this validation rule.";
+        error-message "Configure VLAN subinterfaces on the bond interface, not on a bond member port.";
+      }
+
+      leaf name {
+        type string;
+      }
+
+      container config {
+        leaf name {
+          type string;
+          mandatory true;
+        }
+
+        leaf type {
+          type string;
+        }
+
+        leaf mtu {
+          type uint32 {
+            range "68..65535";
+          }
+        }
+
+        leaf enabled {
+          type boolean;
+          default true;
+        }
+      }
+
+      container ethernet {
+        container config {
+          leaf aggregate-id {
+            type string;
+          }
+        }
+      }
+
+      container aggregation {
+        container config {
+          leaf lag-type {
+            type enumeration {
+              enum STATIC;
+              enum LACP;
+            }
+          }
+
+          leaf min-links {
+            type uint16;
+          }
+        }
+      }
+
+      container subinterfaces {
+        list subinterface {
+          key "index";
+
+          leaf index {
+            type uint32;
+          }
+
+          container config {
+            leaf index {
+              type uint32;
+              mandatory true;
+            }
+
+            leaf name {
+              type string;
+            }
+
+            leaf mtu {
+              type uint32 {
+                range "68..65535";
+              }
+            }
+
+            leaf enabled {
+              type boolean;
+              default true;
+            }
+          }
+
+          container vlan {
+            container config {
+              leaf vlan-id {
+                type uint16 {
+                  range "1..4094";
+                }
+                mandatory true;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

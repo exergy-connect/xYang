@@ -67,7 +67,7 @@ class ExtensionStatementParser:
         elif tt == YangTokenType.IDENTIFIER:
             arg = tokens.consume_type(YangTokenType.IDENTIFIER)
         else:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Expected extension argument identifier/string, got {tt.name if tt else 'end'}"
             )
         parent = context.current_parent

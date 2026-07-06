@@ -7,7 +7,7 @@
 #   - Workflow: publish-pypi.yml
 #   - Environment name: leave empty unless you use the optional `environment:` block below
 #
-# Before each release: bump `version` in pyproject.toml (and setup.py if kept in sync).
+# Before each release: bump `version` in pyproject.toml.
 
 name: Publish to PyPI
 

@@ -18,7 +18,7 @@ This document lists the YANG features implemented in xYang. Primary usage is ref
 - ✅ `submodule` / `belongs-to` - Submodule files parsed and merged via `include`
 - ✅ `feature` - Feature declarations; optional braced body with `description`, `reference`, and `if-feature` (per-feature conditions stored on the module)
 - ✅ `notification` - Notification statements (RFC 7950 §7.16); parsed into `YangNotificationStmt` at module/submodule level and under `container`, `list`, `grouping`, and `augment` (YANG 1.1 `*notification-stmt` in those bodies)
-- ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Top-level stray `input`/`output` are still skipped with a warning. **JSON Schema:** module RPCs live under root `x-yang.rpcs` (round-trip via `parse_json_schema`; `tests/json/test_rpc_json.py`). **Not yet:** RPC/action instance validation.
+- ✅ `rpc` / `input` / `output` - RPC statements (RFC 7950 §7.14); module-level `rpc` with optional `input` and `output` blocks parsed into `YangRpcStmt`, `YangInputStmt`, and `YangOutputStmt`. Data definitions (leaves, containers, `uses`, etc.) are allowed inside `input`/`output`. Stray `input`/`output` outside `rpc` or `action` are a **parse error**. **JSON Schema:** module RPCs live under root `x-yang.rpcs` (round-trip via `parse_json_schema`; `tests/json/test_rpc_json.py`). **Not yet:** RPC/action instance validation.
 
 ### Type Definitions
 - ✅ `typedef` - Type definitions at **module** level and **nested** under `container`, `list`, `choice`, `case`, `grouping`, `notification`, and `rpc` `input`/`output` (RFC 7950 §7.3; YANG 1.1). Each name is registered on `module.typedefs` so leaves can reference it (e.g. `type notification-support` inside the same container). Typedefs are **not** copied into the data tree by `uses` expansion. **Limitation:** one flat typedef map per module (duplicate names in different scopes are rejected; scoped shadowing is not modeled).
@@ -120,7 +120,6 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 
 ### Not implemented (skipped when parsing)
 - ⚠️ `deviation`, `action` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
-- ⚠️ Top-level `input` / `output` — **Skipped** with a warning when not under `rpc` or `action` (RFC 7950: I/O blocks are only valid there).
 
 ### Dynamic extension framework
 - ✅ `extension` definitions are parsed into the AST and tracked on `YangModule.extensions`.

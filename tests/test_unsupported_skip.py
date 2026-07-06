@@ -25,23 +25,18 @@ module ex {
     input { leaf x { type empty; } }
   }
   notification done { leaf msg { type string; } }
-  input { leaf in-top { type empty; } }
-  output { leaf out-top { type empty; } }
   leaf a { type string; }
 }
 """
     with caplog.at_level(logging.WARNING, logger="xyang.parser.unsupported_skip"):
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
-    # ``rpc`` and nested ``input``/``output`` are parsed; ``action`` and top-level ``input``/``output`` warn.
-    for kw in (
-        "deviation",
-        "action",
-        "input",
-        "output",
-    ):
+    # ``rpc`` and nested ``input``/``output`` are parsed; ``action`` and ``deviation`` warn.
+    for kw in ("deviation", "action"):
         assert kw in warn_msgs.lower()
     assert "rpc" not in warn_msgs.lower()
+    assert "input" not in warn_msgs.lower()
+    assert "output" not in warn_msgs.lower()
     reset = mod.find_statement("reset")
     assert reset is not None
     assert getattr(reset, "name", None) == "reset"
@@ -51,6 +46,20 @@ module ex {
     leaf = mod.find_statement("a")
     assert leaf is not None
     assert getattr(leaf, "name", None) == "a"
+
+
+@pytest.mark.parametrize("keyword", ["input", "output"])
+def test_module_rejects_top_level_input_output(keyword: str) -> None:
+    yang = f"""
+module ex {{
+  yang-version 1.1;
+  namespace "urn:ex";
+  prefix ex;
+  {keyword} {{ leaf x {{ type empty; }} }}
+}}
+"""
+    with pytest.raises(Exception, match=rf"{keyword}.*rpc.*action"):
+        parse_yang_string(yang)
 
 
 def test_container_rejects_rpc() -> None:
