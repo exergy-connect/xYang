@@ -46,7 +46,7 @@ class FeatureStatementParser:
             tokens.consume_type(YangTokenType.RBRACE)
             if holder.if_features:
                 if name in context.module.feature_if_features:
-                    raise tokens._make_error(
+                    raise tokens.make_error(
                         f"Duplicate if-feature block for feature {name!r}"
                     )
                 context.module.feature_if_features[name] = list(holder.if_features)

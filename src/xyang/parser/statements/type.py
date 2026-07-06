@@ -68,17 +68,17 @@ class TypeStatementParser:
                 self._parse_type_substatement(tokens, type_context, type_stmt, type_name)
             tokens.consume_type(YangTokenType.RBRACE)
         if type_stmt.name == "enumeration" and not type_stmt.enums:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 'enumeration type requires at least one "enum" statement (RFC 7950)'
             )
         if type_stmt.name == "bits":
             if not type_stmt.bits:
-                raise tokens._make_error(
+                raise tokens.make_error(
                     'bits type requires at least one "bit" statement (RFC 7950)'
                 )
             self._parsers._bits_parser.finalize_bits_type(type_stmt, tokens)
         if type_stmt.name == "identityref" and not type_stmt.identityref_bases:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 'identityref type requires at least one "base" statement (RFC 7950)'
             )
 

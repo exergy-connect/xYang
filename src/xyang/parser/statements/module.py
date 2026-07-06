@@ -85,7 +85,7 @@ class ModuleStatementParser:
         if tokens.consume_if_type(YangTokenType.SEMICOLON):
             return
         if not tokens.consume_if_type(YangTokenType.LBRACE):
-            raise tokens._make_error("Expected '{' or ';' after import module name")
+            raise tokens.make_error("Expected '{' or ';' after import module name")
         acc = SimpleNamespace(local_prefix=None, revision_date=None)
         self._parsers._import_parse_state = acc
         try:
@@ -171,7 +171,7 @@ class ModuleStatementParser:
         """``prefix`` inside ``import { ... }``; updates ``_import_parse_state``."""
         acc = self._parsers._import_parse_state
         if acc is None:
-            raise tokens._make_error("internal: import prefix outside import block")
+            raise tokens.make_error("internal: import prefix outside import block")
         tokens.consume(kw.PREFIX)
         tt = tokens.peek_type()
         if tt == YangTokenType.STRING:
@@ -179,7 +179,7 @@ class ModuleStatementParser:
         elif tt == YangTokenType.IDENTIFIER:
             acc.local_prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
         else:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
             )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -190,7 +190,7 @@ class ModuleStatementParser:
         """``revision-date`` inside ``import { ... }``."""
         acc = self._parsers._import_parse_state
         if acc is None:
-            raise tokens._make_error("internal: revision-date outside import block")
+            raise tokens.make_error("internal: revision-date outside import block")
         acc.revision_date = self._parsers._revision_parser.parse_revision_date_statement(tokens)
 
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -218,7 +218,7 @@ class ModuleStatementParser:
         elif tt == YangTokenType.IDENTIFIER:
             context.module.prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
         else:
-            raise tokens._make_error(
+            raise tokens.make_error(
                 f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
             )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
