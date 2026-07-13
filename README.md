@@ -175,11 +175,16 @@ pytest
 cd ts && npm install && npm test
 ```
 
-Built output under `ts/dist/` is **committed to git** (synced by the [build-ts-dist](.github/workflows/build-ts-dist.yml) workflow) so consumers can run `xyang-ts` without a local npm build.
+Built CI artifacts are **committed to git** (synced by [build-ts-dist](.github/workflows/build-ts-dist.yml)):
+
+- `artifacts/xyang-ts.mjs` — single-file `xyang-ts` CLI bundle
+- `docs/xyang.umd.min.js` — browser bundle
+
+Source: `ts/scripts/build-ci-artifacts.mjs` (`npm run build:ci` in `ts/`). The full npm `ts/dist/` package output remains local-only (not committed).
 
 ### Using xyang-ts in other repositories
 
-Use the composite action [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed `ts/dist`:
+Use the composite action [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed artifacts:
 
 ```yaml
 - uses: actions/checkout@v6
@@ -191,7 +196,7 @@ Use the composite action [`.github/actions/xyang-ts`](.github/actions/xyang-ts/a
     args: path/to/module.yang path/to/data.json --include-path path/to/modules
 ```
 
-Omit `command` to only install `xyang-ts` on `PATH` and use the `cli` / `xyang-root` outputs in later steps. Pin `ref` to a branch, tag, or SHA that includes committed `ts/dist`.
+Omit `command` to only install `xyang-ts` on `PATH` and use the `cli` / `xyang-root` outputs in later steps. Pin `ref` to a branch, tag, or SHA that includes committed `artifacts/xyang-ts.mjs`.
 
 ---
 

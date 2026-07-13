@@ -1,7 +1,7 @@
 name: xyang-ts
 description: >-
-  Check out xYang and run the xyang-ts CLI from committed ts/dist (no npm install or build).
-  Use from other repositories to validate YANG modules in CI.
+  Check out xYang and run the xyang-ts CLI from committed artifacts/xyang-ts.mjs
+  (no npm install or build). Use from other repositories to validate YANG modules in CI.
 
 inputs:
   repository:
@@ -31,7 +31,7 @@ inputs:
 
 outputs:
   cli:
-    description: Absolute path to ts/dist/cli.js
+    description: Absolute path to artifacts/xyang-ts.mjs
     value: ${{ steps.setup.outputs.cli }}
   xyang-root:
     description: Absolute path to the xYang repository root
@@ -57,9 +57,9 @@ runs:
       shell: bash
       run: |
         XYANG_ROOT="${{ github.workspace }}/${{ inputs.path }}"
-        CLI="${XYANG_ROOT}/ts/dist/cli.js"
+        CLI="${XYANG_ROOT}/artifacts/xyang-ts.mjs"
         if [ ! -f "$CLI" ]; then
-          echo "::error::Missing ${CLI}. Use an xYang ref with committed ts/dist (main after the build-ts-dist workflow runs)."
+          echo "::error::Missing ${CLI}. Use an xYang ref with committed CI artifacts (main after the build-ts-dist workflow runs)."
           exit 1
         fi
         chmod +x "$CLI"
