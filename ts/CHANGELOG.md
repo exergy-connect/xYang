@@ -11,7 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Changed
 
-- **Dev dependencies:** bump `vitest` to `^4.1.8` (other npm dev deps already at current releases).
+- **Dev dependencies:** bump `@types/node`, `esbuild`, and `vitest` to current releases; keep `typescript` on `^6.0.3` because `tsup` 8.5.1's bundled `rollup-plugin-dts` breaks `.d.ts` generation on TypeScript 7 ([tsup#1405](https://github.com/egoist/tsup/issues/1405)).
 - **Integer built-in yang.json:** emit canonical JSON Schema `minimum` / `maximum` instead of `x-yang.builtin-type`; `parseJsonSchema` infers the YANG type from bounds (`integer-bounds.ts`, `tests/json/integer_builtin_bounds.test.ts`).
 
 ### Fixed
