@@ -1,4 +1,5 @@
 # Lint, build, and test TypeScript.
+# Required Checks (TypeScript) always reports on pull requests (skipped when no TS paths changed).
 
 name: Tests (TypeScript)
 
@@ -9,11 +10,8 @@ on:
       - "ts/**"
       - "docs/**"
       - ".github/workflows/tests-ts.yml"
+      - ".github/workflows/build-docs-bundle.yml"
   pull_request:
-    paths:
-      - "ts/**"
-      - "docs/**"
-      - ".github/workflows/tests-ts.yml"
   workflow_dispatch:
 
 permissions:
@@ -24,9 +22,35 @@ concurrency:
   cancel-in-progress: true
 
 jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      typescript: ${{ steps.detect.outputs.typescript }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          fetch-depth: 0
+
+      - name: Detect TypeScript-relevant changes
+        id: detect
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "typescript=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(ts/|docs/|\.github/workflows/tests-ts\.yml$|\.github/workflows/build-docs-bundle\.yml$)'; then
+            echo "typescript=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "typescript=false" >> "$GITHUB_OUTPUT"
+          fi
+
   test:
     name: Node 24
     runs-on: ubuntu-latest
+    needs: changes
+    if: needs.changes.outputs.typescript == 'true'
 
     steps:
       - uses: actions/checkout@v6
@@ -59,12 +83,17 @@ jobs:
   required-check:
     name: Required Checks (TypeScript)
     runs-on: ubuntu-latest
-    needs: test
+    needs: [changes, test]
     if: always()
 
     steps:
-      - name: Fail if tests failed
+      - name: Report required status
+        shell: bash
         run: |
+          if [ "${{ needs.changes.outputs.typescript }}" != "true" ]; then
+            echo "No TypeScript changes in this pull request."
+            exit 0
+          fi
           if [[ "${{ needs.test.result }}" != "success" ]]; then
             exit 1
           fi
