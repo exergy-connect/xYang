@@ -227,7 +227,9 @@ jobs:
         with:
           ref: main
           command: validate
-          args: model/example.yang data/instance.json --include-path model/
+          yang-file: model/example.yang
+          data-file: data/instance.json
+          include-path: model/
 ```
 
 **Inputs**
@@ -238,7 +240,9 @@ jobs:
 | `ref` | `main` | Branch, tag, or SHA (must include committed `artifacts/xyang-ts.mjs`) |
 | `path` | `.xyang` | Checkout directory under the workflow workspace |
 | `command` | *(empty)* | `parse`, `validate`, or `convert`. Omit to only expose `xyang-ts` on `PATH` |
-| `args` | *(empty)* | Remaining CLI arguments (space-separated) |
+| `yang-file` | *(empty)* | YANG module path (required when `command` is set) |
+| `data-file` | *(empty)* | JSON instance path for `validate` |
+| `include-path` | *(empty)* | Module search directories (`--include-path`, one per line) |
 | `working-directory` | *(empty)* | Directory for the `xyang-ts` invocation |
 
 **Outputs:** `cli` (path to `artifacts/xyang-ts.mjs`), `xyang-root` (xYang repo root).
@@ -255,16 +259,17 @@ jobs:
 - run: xyang-ts convert model/example.yang
 ```
 
-**Anydata validation** (same flags as the CLI):
+**Anydata validation** (use setup-only mode; flags are CLI-only):
 
 ```yaml
 - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
   with:
-    command: validate
-    args: >-
-      modules/host.yang data/envelope.json
-      --include-path modules/
-      --anydata-validation complete
+    ref: main
+
+- run: |
+    xyang-ts validate modules/host.yang data/envelope.json \
+      --include-path modules/ \
+      --anydata-validation complete \
       --anydata-module modules/payload.yang
 ```
 
