@@ -175,28 +175,98 @@ pytest
 cd ts && npm install && npm test
 ```
 
-Built CI artifacts are **committed to git** (synced by [build-ts-dist](.github/workflows/build-ts-dist.yml)):
+---
 
-- `artifacts/xyang-ts.mjs` — single-file `xyang-ts` CLI bundle
-- `docs/xyang.umd.min.js` — browser bundle
+## GitHub Actions
 
-Source: `ts/scripts/build-ci-artifacts.mjs` (`npm run build:ci` in `ts/`). The full npm `ts/dist/` package output remains local-only (not committed).
+### Workflows in this repository
 
-### Using xyang-ts in other repositories
+| Workflow | File | Purpose |
+|----------|------|---------|
+| **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on Node 24 |
+| **Build TypeScript CI artifacts** | [`.github/workflows/build-ts-dist.yml`](.github/workflows/build-ts-dist.yml) | Runs `npm run build:ci` and keeps committed build artifacts in sync |
 
-Use the composite action [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed artifacts:
+Both workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths).
 
-```yaml
-- uses: actions/checkout@v6
+### Committed CI artifacts
 
-- uses: exergy-connect/xYang/.github/actions/xyang-ts@main
-  with:
-    ref: main
-    command: validate
-    args: path/to/module.yang path/to/data.json --include-path path/to/modules
+The **Build TypeScript CI artifacts** workflow commits two bundled outputs produced by [`ts/scripts/build-ci-artifacts.mjs`](ts/scripts/build-ci-artifacts.mjs):
+
+| File | Role |
+|------|------|
+| [`artifacts/xyang-ts.mjs`](artifacts/xyang-ts.mjs) | Single-file Node CLI (`parse`, `validate`, `convert`) |
+| [`docs/xyang.umd.min.js`](docs/xyang.umd.min.js) | Browser IIFE library bundle |
+
+Regenerate locally:
+
+```bash
+cd ts && npm install && npm run build:ci
+git add -f artifacts/xyang-ts.mjs docs/xyang.umd.min.js
 ```
 
-Omit `command` to only install `xyang-ts` on `PATH` and use the `cli` / `xyang-root` outputs in later steps. Pin `ref` to a branch, tag, or SHA that includes committed `artifacts/xyang-ts.mjs`.
+On **same-repo** PRs and pushes to `main`, the workflow auto-commits when artifacts drift. On **fork** PRs, the check fails instead (no write access to the contributor branch).
+
+The full npm package under `ts/dist/` is **not** committed; use `npm run build:check` for publish-style validation.
+
+### `xyang-ts` composite action (other repositories)
+
+Reuse [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed `artifacts/xyang-ts.mjs` — no `npm install` or build step in the consumer workflow.
+
+**Minimal validate job:**
+
+```yaml
+jobs:
+  validate-yang:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v6
+
+      - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
+        with:
+          ref: main
+          command: validate
+          args: model/example.yang data/instance.json --include-path model/
+```
+
+**Inputs**
+
+| Input | Default | Description |
+|-------|---------|-------------|
+| `repository` | `exergy-connect/xYang` | xYang GitHub repository |
+| `ref` | `main` | Branch, tag, or SHA (must include committed `artifacts/xyang-ts.mjs`) |
+| `path` | `.xyang` | Checkout directory under the workflow workspace |
+| `command` | *(empty)* | `parse`, `validate`, or `convert`. Omit to only expose `xyang-ts` on `PATH` |
+| `args` | *(empty)* | Remaining CLI arguments (space-separated) |
+| `working-directory` | *(empty)* | Directory for the `xyang-ts` invocation |
+
+**Outputs:** `cli` (path to `artifacts/xyang-ts.mjs`), `xyang-root` (xYang repo root).
+
+**Setup only** (run multiple commands in later steps):
+
+```yaml
+- uses: exergy-connect/xYang/.github/actions/xyang-ts@main
+  id: xyang
+  with:
+    ref: v0.1.2
+
+- run: xyang-ts parse model/example.yang
+- run: xyang-ts convert model/example.yang
+```
+
+**Anydata validation** (same flags as the CLI):
+
+```yaml
+- uses: exergy-connect/xYang/.github/actions/xyang-ts@main
+  with:
+    command: validate
+    args: >-
+      modules/host.yang data/envelope.json
+      --include-path modules/
+      --anydata-validation complete
+      --anydata-module modules/payload.yang
+```
+
+Pin `ref` to a release tag or SHA once this workflow is on `main`.
 
 ---
 
