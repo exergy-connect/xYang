@@ -20,8 +20,16 @@ inputs:
     description: xyang-ts subcommand (parse, validate, convert). Omit to only expose xyang-ts on PATH.
     required: false
     default: ""
-  args:
-    description: Additional CLI arguments (space-separated)
+  yang-file:
+    description: YANG module file path (required when command is set)
+    required: false
+    default: ""
+  data-file:
+    description: JSON instance file for validate (optional for parse and convert)
+    required: false
+    default: ""
+  include-path:
+    description: Module search directories mapped to --include-path (one path per line)
     required: false
     default: ""
   working-directory:
@@ -80,4 +88,29 @@ runs:
       if: inputs.command != ''
       shell: bash
       working-directory: ${{ inputs.working-directory }}
-      run: xyang-ts ${{ inputs.command }} ${{ inputs.args }}
+      env:
+        INCLUDE_PATHS: ${{ inputs.include-path }}
+      run: |
+        set -euo pipefail
+
+        if [ -z "${{ inputs.yang-file }}" ]; then
+          echo "::error::yang-file is required when command is set"
+          exit 1
+        fi
+
+        cmd_args=()
+
+        if [ -n "$INCLUDE_PATHS" ]; then
+          while IFS= read -r dir || [ -n "$dir" ]; do
+            [ -z "$dir" ] && continue
+            cmd_args+=(--include-path "$dir")
+          done <<< "$INCLUDE_PATHS"
+        fi
+
+        cmd_args+=("${{ inputs.yang-file }}")
+
+        if [ -n "${{ inputs.data-file }}" ]; then
+          cmd_args+=("${{ inputs.data-file }}")
+        fi
+
+        xyang-ts ${{ inputs.command }} "${cmd_args[@]}"
