@@ -1,0 +1,83 @@
+name: xyang-ts
+description: >-
+  Check out xYang and run the xyang-ts CLI from committed ts/dist (no npm install or build).
+  Use from other repositories to validate YANG modules in CI.
+
+inputs:
+  repository:
+    description: GitHub repository that hosts xYang
+    required: false
+    default: exergy-connect/xYang
+  ref:
+    description: Branch, tag, or SHA of xYang to use
+    required: false
+    default: main
+  path:
+    description: Directory to check out xYang into (relative to the workflow workspace)
+    required: false
+    default: .xyang
+  command:
+    description: xyang-ts subcommand (parse, validate, convert). Omit to only expose xyang-ts on PATH.
+    required: false
+    default: ""
+  args:
+    description: Additional CLI arguments (space-separated)
+    required: false
+    default: ""
+  working-directory:
+    description: Working directory for the xyang-ts command
+    required: false
+    default: ""
+
+outputs:
+  cli:
+    description: Absolute path to ts/dist/cli.js
+    value: ${{ steps.setup.outputs.cli }}
+  xyang-root:
+    description: Absolute path to the xYang repository root
+    value: ${{ steps.setup.outputs.xyang-root }}
+
+runs:
+  using: composite
+  steps:
+    - name: Check out xYang
+      uses: actions/checkout@v6
+      with:
+        repository: ${{ inputs.repository }}
+        ref: ${{ inputs.ref }}
+        path: ${{ inputs.path }}
+
+    - name: Set up Node.js
+      uses: actions/setup-node@v6
+      with:
+        node-version: "24"
+
+    - id: setup
+      name: Configure xyang-ts
+      shell: bash
+      run: |
+        XYANG_ROOT="${{ github.workspace }}/${{ inputs.path }}"
+        CLI="${XYANG_ROOT}/ts/dist/cli.js"
+        if [ ! -f "$CLI" ]; then
+          echo "::error::Missing ${CLI}. Use an xYang ref with committed ts/dist (main after the build-ts-dist workflow runs)."
+          exit 1
+        fi
+        chmod +x "$CLI"
+
+        BIN_DIR="${RUNNER_TEMP}/xyang-ts-bin"
+        mkdir -p "$BIN_DIR"
+        {
+          echo '#!/usr/bin/env bash'
+          echo "exec node \"${CLI}\" \"\$@\""
+        } > "${BIN_DIR}/xyang-ts"
+        chmod +x "${BIN_DIR}/xyang-ts"
+        echo "${BIN_DIR}" >> "$GITHUB_PATH"
+
+        echo "cli=${CLI}" >> "$GITHUB_OUTPUT"
+        echo "xyang-root=${XYANG_ROOT}" >> "$GITHUB_OUTPUT"
+
+    - name: Run xyang-ts
+      if: inputs.command != ''
+      shell: bash
+      working-directory: ${{ inputs.working-directory }}
+      run: xyang-ts ${{ inputs.command }} ${{ inputs.args }}

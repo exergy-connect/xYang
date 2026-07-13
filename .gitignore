@@ -58,3 +58,6 @@ pnpm-debug.log*
 
 # Docs — browser bundle produced by `npm run build:check` in ts/
 docs/xyang.umd.min.js
+
+# TypeScript build output — committed by the build-ts-dist workflow (git add -f)
+ts/dist/

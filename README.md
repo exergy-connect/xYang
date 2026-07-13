@@ -175,6 +175,24 @@ pytest
 cd ts && npm install && npm test
 ```
 
+Built output under `ts/dist/` is **committed to git** (synced by the [build-ts-dist](.github/workflows/build-ts-dist.yml) workflow) so consumers can run `xyang-ts` without a local npm build.
+
+### Using xyang-ts in other repositories
+
+Use the composite action [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed `ts/dist`:
+
+```yaml
+- uses: actions/checkout@v6
+
+- uses: exergy-connect/xYang/.github/actions/xyang-ts@main
+  with:
+    ref: main
+    command: validate
+    args: path/to/module.yang path/to/data.json --include-path path/to/modules
+```
+
+Omit `command` to only install `xyang-ts` on `PATH` and use the `cli` / `xyang-root` outputs in later steps. Pin `ref` to a branch, tag, or SHA that includes committed `ts/dist`.
+
 ---
 
 ## License

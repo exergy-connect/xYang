@@ -9,11 +9,13 @@ on:
       - "ts/**"
       - "docs/**"
       - ".github/workflows/tests-ts.yml"
+      - ".github/workflows/build-ts-dist.yml"
   pull_request:
     paths:
       - "ts/**"
       - "docs/**"
       - ".github/workflows/tests-ts.yml"
+      - ".github/workflows/build-ts-dist.yml"
   workflow_dispatch:
 
 permissions:

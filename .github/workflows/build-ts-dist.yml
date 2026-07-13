@@ -1,0 +1,74 @@
+# Build ts/dist from the TypeScript package and keep committed artifacts in sync.
+# Also syncs docs/xyang.umd.min.js (same npm run build:check pipeline).
+# On main/master pushes and same-repo PRs, out-of-date artifacts are committed by the bot.
+# Fork PRs fail if artifacts are stale (no write access to contributor branches).
+
+name: Build TypeScript dist
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "ts/**"
+      - ".github/workflows/build-ts-dist.yml"
+      - ".github/actions/xyang-ts/**"
+  pull_request:
+    paths:
+      - "ts/**"
+      - ".github/workflows/build-ts-dist.yml"
+      - ".github/actions/xyang-ts/**"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: build-ts-dist-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: ts/dist
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          ref: ${{ github.event_name == 'pull_request' && github.head_ref || github.ref_name }}
+
+      - name: Set up Node 24
+        uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Build and verify artifacts
+        working-directory: ts
+        run: npm run build:check
+
+      - name: Commit updated build artifacts
+        env:
+          AUTO_COMMIT_DIST: ${{ ((github.event_name == 'push' || github.event_name == 'workflow_dispatch') && (github.ref == 'refs/heads/main' || github.ref == 'refs/heads/master')) || (github.event_name == 'pull_request' && github.event.pull_request.head.repo.full_name == github.repository) }}
+        run: |
+          git add -f ts/dist docs/xyang.umd.min.js
+          if git diff --cached --quiet HEAD -- ts/dist docs/xyang.umd.min.js; then
+            echo "ts/dist and docs/xyang.umd.min.js are up to date."
+            exit 0
+          fi
+          if [ "$AUTO_COMMIT_DIST" = "true" ]; then
+            git config user.name "github-actions[bot]"
+            git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+            git commit -m "chore(ts): sync committed dist and docs browser bundle"
+            git push
+            exit 0
+          fi
+          echo "::error::Committed TypeScript build artifacts are out of date."
+          echo "From the repo root: (cd ts && npm run build:check)"
+          echo "Then: git add -f ts/dist docs/xyang.umd.min.js && commit."
+          git diff --cached --stat HEAD -- ts/dist docs/xyang.umd.min.js
+          exit 1
