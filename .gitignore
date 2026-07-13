@@ -56,5 +56,8 @@ pnpm-debug.log*
 # Distribution
 *.whl
 
-# Docs — browser bundle produced by `npm run build:check` in ts/
+# Docs — browser bundle produced by `npm run build:ci` in ts/
 docs/xyang.umd.min.js
+
+# CI CLI bundle — single-file output from ts/scripts/build-ci-artifacts.mjs (git add -f)
+artifacts/xyang-ts.mjs

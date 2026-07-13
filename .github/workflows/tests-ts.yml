@@ -10,7 +10,7 @@ on:
       - "ts/**"
       - "docs/**"
       - ".github/workflows/tests-ts.yml"
-      - ".github/workflows/build-docs-bundle.yml"
+      - ".github/workflows/build-ts-dist.yml"
   pull_request:
   workflow_dispatch:
 
@@ -40,7 +40,7 @@ jobs:
             echo "typescript=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(ts/|docs/|\.github/workflows/tests-ts\.yml$|\.github/workflows/build-docs-bundle\.yml$)'; then
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(ts/|docs/|\.github/workflows/tests-ts\.yml$|\.github/workflows/build-ts-dist\.yml$)'; then
             echo "typescript=true" >> "$GITHUB_OUTPUT"
           else
             echo "typescript=false" >> "$GITHUB_OUTPUT"

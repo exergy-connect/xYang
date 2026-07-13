@@ -50,6 +50,7 @@
   "scripts": {
     "build": "tsup && node ./scripts/build-browser-iife.mjs",
     "build:check": "npm run build && node ./scripts/check-artifacts.mjs && node ./scripts/sync-docs-browser-bundle.mjs",
+    "build:ci": "node ./scripts/build-ci-artifacts.mjs && node ./scripts/check-ci-artifacts.mjs",
     "test": "vitest run",
     "test:coverage": "vitest run --coverage",
     "lint": "tsc --noEmit",
