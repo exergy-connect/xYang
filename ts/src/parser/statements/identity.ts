@@ -27,7 +27,7 @@ export class IdentityStatementParser {
 
   parse_identity_base(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.BASE);
-    const base = this.parsers.consume_qname_from_identifier(tokens);
+    const base = this.parsers.consume_identifier_ref(tokens);
     const parent = context.current_parent as YangIdentityStmt;
     if (parent instanceof YangIdentityStmt) {
       parent.bases.push(base);

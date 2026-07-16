@@ -97,12 +97,12 @@ export class YangModule {
   }
 
   /** Identity names → `{ bases }` from parsed `identity` / `base` statements (RFC 7950). */
-  get identities(): Record<string, { bases: string[] }> {
+  get identities(): Record<string, { bases: Array<{ prefix?: string; name: string }> }> {
     const raw = this.data.identities;
     if (!raw || typeof raw !== "object") {
       return {};
     }
-    return raw as Record<string, { bases: string[] }>;
+    return raw as Record<string, { bases: Array<{ prefix?: string; name: string }> }>;
   }
 
   get statements(): YangStatement[] {

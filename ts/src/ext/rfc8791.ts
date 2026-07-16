@@ -1,4 +1,5 @@
 import { YangSemanticError } from "../core/errors";
+import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import type { SerializedStatement } from "../core/model";
 
 type ModuleShape = Record<string, unknown>;
@@ -48,27 +49,13 @@ function mergeRootWhen(stmt: SerializedStatement, inheritedWhen?: Record<string,
   };
 }
 
-function parsePrefixedPath(path: string, kind: string): Array<{ prefix: string; name: string }> {
-  const raw = String(path ?? "").trim();
-  if (!raw.startsWith("/")) {
-    throw new YangSemanticError(`${kind} requires an absolute path argument`);
+function parsePrefixedPath(path: string, kind: string): YangIdentifierRef[] {
+  try {
+    return parseAbsoluteSchemaPath(path);
+  } catch (err) {
+    const msg = err instanceof Error ? err.message : String(err);
+    throw new YangSemanticError(`${kind}: ${msg}`);
   }
-  const segments = raw
-    .slice(1)
-    .split("/")
-    .map((part) => part.trim())
-    .filter((part) => part.length > 0);
-  if (segments.length === 0) {
-    throw new YangSemanticError(`${kind} path cannot be empty`);
-  }
-
-  return segments.map((segment) => {
-    const idx = segment.indexOf(":");
-    if (idx <= 0 || idx === segment.length - 1) {
-      throw new YangSemanticError(`${kind}: invalid path segment '${segment}', expected 'prefix:identifier'`);
-    }
-    return { prefix: segment.slice(0, idx), name: segment.slice(idx + 1) };
-  });
 }
 
 function resolvePrefixedModule(ctxModule: ModuleShape, prefix: string, fullPath: string, kind: string): ModuleShape {
@@ -106,14 +93,15 @@ function findTopLevelStructure(moduleData: ModuleShape, name: string): Serialize
 
 function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): SerializedStatement {
   const segments = parsePrefixedPath(path, "augment-structure");
-  const first = segments[0];
-  const firstModule = resolvePrefixedModule(ctxModule, first.prefix, path, "augment-structure");
+  const first = segments[0]!;
+  const pref0 = first.prefix!;
+  const firstModule = resolvePrefixedModule(ctxModule, pref0, path, "augment-structure");
   let current = findTopLevelStructure(firstModule, first.name);
   if (!current) {
     throw new YangSemanticError(`augment-structure: no top-level structure '${first.name}' in path '${path}'`);
   }
   for (const segment of segments.slice(1)) {
-    resolvePrefixedModule(ctxModule, segment.prefix, path, "augment-structure");
+    resolvePrefixedModule(ctxModule, segment.prefix!, path, "augment-structure");
     const next = findNamedChild(current, segment.name);
     if (!next) {
       throw new YangSemanticError(`augment-structure: no child '${segment.name}' in path '${path}'`);

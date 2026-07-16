@@ -8,6 +8,7 @@ from typing import TYPE_CHECKING, Any, Callable, List, Optional
 from dataclasses import dataclass, field
 
 from .errors import YangSemanticError
+from .identifier_ref import YangIdentifierRef
 
 if TYPE_CHECKING:
     from .xpath.ast import ASTNode, PathNode
@@ -116,7 +117,7 @@ class YangTypedefStmt(YangStatement):
 class YangIdentityStmt(YangStatement):
     """Identity statement (RFC 7950); may have multiple ``base`` substatements (YANG 1.1)."""
 
-    bases: List[str] = field(default_factory=list)
+    bases: List[YangIdentifierRef] = field(default_factory=list)
     if_features: List[str] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
@@ -158,6 +159,7 @@ class YangTypeStmt:
     """
 
     name: str
+    prefix: Optional[str] = None
     units: str = ""
     patterns: List[YangPatternSpec] = field(default_factory=list)
     length: Optional[str] = None
@@ -168,7 +170,7 @@ class YangTypeStmt:
     types: List['YangTypeStmt'] = field(default_factory=list)  # For union types
     path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
     require_instance: bool = True  # For leafref
-    identityref_bases: List[str] = field(default_factory=list)  # For identityref: one per ``base`` substatement
+    identityref_bases: List[YangIdentifierRef] = field(default_factory=list)
 
 
 @dataclass
@@ -341,10 +343,19 @@ class YangGroupingStmt(YangStatement):
 class YangUsesStmt(YangStatementWithWhen):
     """Uses statement - incorporates a grouping."""
 
+    # Local grouping identifier (never ``prefix:name``). Optional import prefix
+    # is stored separately so expanders do not re-split qname strings.
     grouping_name: str = ""
+    grouping_prefix: Optional[str] = None
     refines: List['YangRefineStmt'] = field(default_factory=list)
     # RFC 7950 §7.17: ``augment`` substatements (relative descendant paths).
     augmentations: List['YangAugmentStmt'] = field(default_factory=list)
+
+    def grouping_qname(self) -> str:
+        """Display / cycle-key form ``name`` or ``prefix:name``."""
+        if self.grouping_prefix:
+            return f"{self.grouping_prefix}:{self.grouping_name}"
+        return self.grouping_name
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -355,6 +366,7 @@ class YangAugmentStmt(YangStatementWithWhen):
     """Augment statement (RFC 7950). After parse, children are merged into the target node (see ``augment_expand``)."""
 
     augment_path: str = ""
+    augment_path_segments: List[YangIdentifierRef] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None

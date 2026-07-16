@@ -4,6 +4,7 @@ from pathlib import Path
 
 import pytest
 
+from xyang.identifier_ref import identifier_ref
 from xyang.json import generate_json_schema, parse_json_schema
 
 _EXAMPLES = Path(__file__).resolve().parent.parent.parent / "examples"
@@ -35,10 +36,10 @@ def test_parse_json_schema_roundtrip_restores_identities(identity_module):
     back = parse_json_schema(data)
     assert "animal" in back.identities
     assert "dog" in back.identities
-    assert back.identities["mammal"].bases == ["animal"]
+    assert back.identities["mammal"].bases == [identifier_ref("animal")]
     data_leaf = back.find_statement("data")
     assert data_leaf is not None
     kind = data_leaf.find_statement("kind")
     assert kind is not None and kind.type is not None
     assert kind.type.name == "identityref"
-    assert kind.type.identityref_bases == ["animal"]
+    assert kind.type.identityref_bases == [identifier_ref("animal")]

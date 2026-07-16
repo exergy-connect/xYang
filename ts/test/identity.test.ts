@@ -120,7 +120,7 @@ describe("python parity: test_identity", () => {
     const module = parseYangString(MINIMAL_IDENTITY_YANG);
     expect(module.name).toBe("identity-test");
     expect("animal" in module.identities).toBe(true);
-    expect(module.identities.dog?.bases).toEqual(["mammal"]);
+    expect(module.identities.dog?.bases).toEqual([{ name: "mammal" }]);
   });
 
   it("parses must using derived-from(identityref, identity) (RFC 7950)", () => {

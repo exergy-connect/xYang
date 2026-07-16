@@ -1,9 +1,87 @@
 import { YangCircularUsesError, YangRefineTargetNotFoundError, YangSemanticError } from "../core/errors";
+import {
+  formatIdentifierRef,
+  type YangIdentifierRef
+} from "../core/identifier-ref";
 import { SerializedStatement, YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 
 function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
+}
+
+/** Scope for resolving `uses` names (local module or defining module of an imported grouping). */
+type GroupingScope = {
+  groupings: Record<string, SerializedStatement>;
+  import_prefixes: Record<string, Record<string, unknown>>;
+};
+
+function asGroupingMap(value: unknown): Record<string, SerializedStatement> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return value as Record<string, SerializedStatement>;
+}
+
+function asImportMap(value: unknown): Record<string, Record<string, unknown>> {
+  if (!value || typeof value !== "object") {
+    return {};
+  }
+  return value as Record<string, Record<string, unknown>>;
+}
+
+/**
+ * Read the identifier-ref written by the parser onto a serialized ``uses`` node.
+ * Values are already normalized at parse time (no trim / no string splitting here).
+ */
+function usesGroupingRef(usesStmt: SerializedStatement): YangIdentifierRef | undefined {
+  if (typeof usesStmt.grouping_name !== "string" || !usesStmt.grouping_name) {
+    return undefined;
+  }
+  const name = usesStmt.grouping_name;
+  const prefix =
+    typeof usesStmt.grouping_prefix === "string" && usesStmt.grouping_prefix
+      ? usesStmt.grouping_prefix
+      : undefined;
+  return prefix ? { prefix, name } : { name };
+}
+
+/**
+ * Resolve a grouping from a parse-time identifier-ref (Python ``_resolve_uses_grouping``).
+ * Nested ``uses`` inside an imported grouping resolve against that module's scope.
+ */
+function resolveGrouping(
+  ref: YangIdentifierRef,
+  scope: GroupingScope
+): { key: string; grouping: SerializedStatement; nestedScope: GroupingScope } {
+  const key = formatIdentifierRef(ref);
+  if (!ref.name) {
+    throw new YangSemanticError("Empty grouping name in uses");
+  }
+  if (ref.prefix) {
+    const imp = scope.import_prefixes[ref.prefix];
+    if (!imp) {
+      throw new YangSemanticError(`Unknown import prefix '${ref.prefix}' in uses '${key}'`);
+    }
+    const groupings = asGroupingMap(imp.groupings);
+    const grouping = groupings[ref.name];
+    if (!grouping) {
+      throw new YangSemanticError(`Unknown grouping '${key}'`);
+    }
+    return {
+      key,
+      grouping,
+      nestedScope: {
+        groupings,
+        import_prefixes: asImportMap(imp.import_prefixes)
+      }
+    };
+  }
+  const grouping = scope.groupings[ref.name];
+  if (!grouping) {
+    throw new YangSemanticError(`Unknown grouping '${key}'`);
+  }
+  return { key, grouping, nestedScope: scope };
 }
 
 /** RFC 7950: `if-feature` on `uses` applies to expanded nodes (conjunction with any existing if-features). */
@@ -121,73 +199,113 @@ function applyRefinesFromUses(usesStmt: SerializedStatement, expanded: Serialize
   }
 }
 
-function expandGroupingBody(
-  groupingName: string,
-  groupings: Record<string, SerializedStatement>,
-  stack: string[]
+/** Register a typedef statement onto the importing module (RFC 7950 scoping). */
+function registerOneTypedef(hostTypedefs: Record<string, unknown>, child: SerializedStatement): void {
+  const name =
+    (typeof child.argument === "string" && child.argument) ||
+    (typeof child.name === "string" && child.name) ||
+    "";
+  if (!name || name in hostTypedefs) {
+    return;
+  }
+  const typeStmt = child.statements?.find((c) => c.keyword === "type");
+  hostTypedefs[name] = {
+    name,
+    description: typeof child.description === "string" ? child.description : "",
+    reference: typeof child.reference === "string" ? child.reference : "",
+    default: child.default,
+    type: child.type ?? typeStmt?.type,
+    statements: child.statements ?? []
+  };
+}
+
+/** Register typedefs from an expanded grouping onto the importing module; omit them from the body. */
+function registerGroupingTypedefs(
+  hostTypedefs: Record<string, unknown>,
+  body: SerializedStatement[]
 ): SerializedStatement[] {
-  if (stack.includes(groupingName)) {
-    throw new YangCircularUsesError(stack, groupingName);
+  const dataNodes: SerializedStatement[] = [];
+  for (const child of body) {
+    if (child.keyword === "typedef") {
+      registerOneTypedef(hostTypedefs, child);
+      continue;
+    }
+    dataNodes.push(child);
   }
-  const g = groupings[groupingName];
-  if (!g) {
-    throw new YangSemanticError(`Unknown grouping '${groupingName}'`);
+  return dataNodes;
+}
+
+function expandGroupingBody(
+  ref: YangIdentifierRef,
+  scope: GroupingScope,
+  stack: string[],
+  hostTypedefs: Record<string, unknown>
+): SerializedStatement[] {
+  const resolved = resolveGrouping(ref, scope);
+  if (stack.includes(resolved.key)) {
+    throw new YangCircularUsesError(stack, resolved.key);
   }
-  const nextStack = [...stack, groupingName];
-  const rawChildren = (g.statements ?? []) as SerializedStatement[];
+  const nextStack = [...stack, resolved.key];
+  const rawChildren = (resolved.grouping.statements ?? []) as SerializedStatement[];
   const flattened: SerializedStatement[] = [];
   for (const child of rawChildren) {
     if (child.keyword === "uses") {
-      const gn = String(child.grouping_name ?? child.argument ?? "").trim();
-      if (!gn) {
+      const childRef = usesGroupingRef(child);
+      if (!childRef) {
         continue;
       }
-      const body = expandGroupingBody(gn, groupings, nextStack);
+      const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack, hostTypedefs);
       applyRefinesFromUses(child, body);
       for (const stmt of body) {
         mergeIfFeaturesFromParentUses(child, stmt);
         mergeWhenFromParentUses(child, stmt);
         flattened.push(deepClone(stmt));
       }
+    } else if (child.keyword === "typedef") {
+      // Handled via registerGroupingTypedefs on the collected body.
+      flattened.push(deepClone(child));
     } else {
       flattened.push(deepClone(child));
     }
   }
-  return flattened.map((stmt) => expandUsesUnderStatement(stmt, groupings, nextStack));
+  const withoutTypedefs = registerGroupingTypedefs(hostTypedefs, flattened);
+  return withoutTypedefs.map((stmt) => expandUsesUnderStatement(stmt, resolved.nestedScope, nextStack, hostTypedefs));
 }
 
 function expandUsesUnderStatement(
   stmt: SerializedStatement,
-  groupings: Record<string, SerializedStatement>,
-  stack: string[]
+  scope: GroupingScope,
+  stack: string[],
+  hostTypedefs: Record<string, unknown>
 ): SerializedStatement {
   if (stmt.statements?.length) {
-    stmt.statements = expandStatementList(stmt.statements, groupings, stack);
+    stmt.statements = expandStatementList(stmt.statements, scope, stack, hostTypedefs);
   }
   return stmt;
 }
 
 function expandStatementList(
   statements: SerializedStatement[],
-  groupings: Record<string, SerializedStatement>,
-  stack: string[]
+  scope: GroupingScope,
+  stack: string[],
+  hostTypedefs: Record<string, unknown>
 ): SerializedStatement[] {
   const out: SerializedStatement[] = [];
   for (const stmt of statements) {
     if (stmt.keyword === "uses") {
-      const gn = String(stmt.grouping_name ?? stmt.argument ?? "").trim();
-      if (!gn) {
+      const ref = usesGroupingRef(stmt);
+      if (!ref) {
         continue;
       }
-      const expanded = expandGroupingBody(gn, groupings, stack);
+      const expanded = expandGroupingBody(ref, scope, stack, hostTypedefs);
       applyRefinesFromUses(stmt, expanded);
       for (const e of expanded) {
         mergeIfFeaturesFromParentUses(stmt, e);
         mergeWhenFromParentUses(stmt, e);
-        out.push(expandUsesUnderStatement(e, groupings, stack));
+        out.push(expandUsesUnderStatement(e, scope, stack, hostTypedefs));
       }
     } else {
-      out.push(expandUsesUnderStatement(deepClone(stmt), groupings, stack));
+      out.push(expandUsesUnderStatement(deepClone(stmt), scope, stack, hostTypedefs));
     }
   }
   return out;
@@ -195,14 +313,13 @@ function expandStatementList(
 
 /**
  * Expand all `uses` statements by inlining grouping definitions (RFC 7950 compile-time view).
+ * Resolves local and ``prefix:name`` groupings via ``import_prefixes`` (Python parity).
  * Detects circular `uses` chains between groupings and throws {@link YangCircularUsesError}.
+ *
+ * Groupings are retained on the module so importers can still ``uses prefix:grouping``.
  */
 export function expandUses(module: YangModule): YangModule {
   const data = module.data as Record<string, unknown>;
-  const groupings = data.groupings as Record<string, SerializedStatement> | undefined;
-  if (!groupings || Object.keys(groupings).length === 0) {
-    return module;
-  }
 
   // Preserve shared import module data references so cross-module ``augment``
   // can mutate the same objects held in the parser cache.
@@ -217,9 +334,27 @@ export function expandUses(module: YangModule): YangModule {
   if (data.feature_if_features && typeof data.feature_if_features === "object") {
     cloned.feature_if_features = { ...(data.feature_if_features as Record<string, string[]>) };
   }
-  const g = cloned.groupings as Record<string, SerializedStatement>;
+
+  // Keep a live view of imported modules' groupings (shared, not deep-cloned away).
+  const expandScope: GroupingScope = {
+    groupings: asGroupingMap(cloned.groupings),
+    import_prefixes: asImportMap(cloned.import_prefixes)
+  };
+
+  const hostTypedefs =
+    cloned.typedefs && typeof cloned.typedefs === "object"
+      ? (cloned.typedefs as Record<string, unknown>)
+      : {};
+  cloned.typedefs = hostTypedefs;
+
   const top = (cloned.statements as SerializedStatement[]) ?? [];
-  cloned.statements = expandStatementList(top, g, []);
-  delete cloned.groupings;
+  cloned.statements = expandStatementList(top, expandScope, [], hostTypedefs);
+
+  // Expand nested uses inside grouping bodies (Python expand_all_uses_in_module).
+  for (const g of Object.values(expandScope.groupings)) {
+    if (!g.statements?.length) continue;
+    g.statements = expandStatementList(g.statements, expandScope, [], hostTypedefs);
+  }
+
   return new YangModule(cloned, module.source);
 }

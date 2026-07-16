@@ -56,15 +56,21 @@ class UsesStatementParser:
         have been parsed. A YangUsesStmt node is created as a placeholder.
         """
         tokens.consume(kw.USES)
+        grouping_prefix: Optional[str] = None
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            grouping_name = self._parsers.consume_qname_from_identifier(tokens)
+            grouping_prefix, grouping_name = self._parsers.consume_identifier_ref(tokens)
         else:
-            grouping_name = tokens.consume()
-        uses_stmt = YangUsesStmt(name="uses", grouping_name=grouping_name)
+            grouping_name = tokens.consume().strip()
+        uses_stmt = YangUsesStmt(
+            name="uses",
+            grouping_name=grouping_name,
+            grouping_prefix=grouping_prefix,
+        )
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)
+            label = uses_stmt.grouping_qname()
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_uses_substatement(tokens, new_context, grouping_name)
+                self._parse_uses_substatement(tokens, new_context, label)
             tokens.consume_type(YangTokenType.RBRACE)
         self._parsers.add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -80,7 +86,15 @@ class UsesStatementParser:
         expanded = []
         for stmt in grouping.statements:
             if isinstance(stmt, YangUsesStmt):
-                nested_grouping = module.get_grouping(stmt.grouping_name) if module else None
+                nested_grouping = None
+                if module is not None:
+                    if stmt.grouping_prefix:
+                        gmod = module.resolve_prefixed_module(stmt.grouping_prefix)
+                        nested_grouping = (
+                            gmod.get_grouping(stmt.grouping_name) if gmod is not None else None
+                        )
+                    else:
+                        nested_grouping = module.get_grouping(stmt.grouping_name)
                 if nested_grouping:
                     body = [copy_yang_statement(s) for s in nested_grouping.statements]
                     nested_expanded = self._expand_uses(

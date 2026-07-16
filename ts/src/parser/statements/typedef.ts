@@ -36,6 +36,9 @@ export class TypedefStatementParser {
       tokens.consume_type(YangTokenType.RBRACE);
     }
     (context.module as any).typedefs[name] = stmt;
+    // Keep nested typedefs on the parent (grouping/container/…) so ``uses``
+    // expansion can re-register them on the importing module (RFC 7950 §7.13).
+    this.parsers.add_to_parent_or_module(context, stmt);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     return stmt;
   }

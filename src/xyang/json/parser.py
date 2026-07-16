@@ -14,6 +14,7 @@ from pathlib import Path
 from typing import Any
 
 from ..module import YangModule
+from ..identifier_ref import YangIdentifierRef, coerce_identifier_ref
 from ..ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
@@ -148,6 +149,17 @@ def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     return YangWhenStmt(expression=cond, description=desc)
 
 
+def _bases_from_json(raw: Any) -> list[YangIdentifierRef]:
+    if not isinstance(raw, list):
+        return []
+    out: list[YangIdentifierRef] = []
+    for item in raw:
+        ref = coerce_identifier_ref(item)
+        if ref is not None:
+            out.append(ref)
+    return out
+
+
 def _ref_to_typedef_name(ref: str) -> str | None:
     """Return typedef name from $ref like '#/$defs/entity-name' or None."""
     if not ref or not ref.startswith(JSON_SCHEMA_DEFS_URI_PREFIX):
@@ -220,14 +232,14 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
 
 def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
-        bases = xyang.get(XYangKey.BASES)
-        if not isinstance(bases, list):
-            bases = []
+        bases = _bases_from_json(xyang.get(XYangKey.BASES))
         if not bases:
             b = xyang.get(XYangKey.BASE)
             if isinstance(b, str):
-                bases = [b]
-        return YangTypeStmt(name="identityref", identityref_bases=list(bases))
+                ref = coerce_identifier_ref(b)
+                if ref is not None:
+                    bases = [ref]
+        return YangTypeStmt(name="identityref", identityref_bases=bases)
     if xyang.get(XYangKey.TYPE) == XYangTypeValue.INSTANCE_IDENTIFIER:
         require = xyang.get(XYangKey.REQUIRE_INSTANCE, True)
         return YangTypeStmt(
@@ -430,11 +442,9 @@ def _build_identity(def_name: str, def_schema: dict[str, Any]) -> YangIdentitySt
     if not _is_identity_def_schema(def_schema):
         return None
     xyang = _get_xyang(def_schema)
-    bases = xyang.get(XYangKey.BASES) or []
-    if not isinstance(bases, list):
-        bases = []
+    bases = _bases_from_json(xyang.get(XYangKey.BASES))
     desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
-    ident = YangIdentityStmt(name=def_name, description=desc, bases=list(bases))
+    ident = YangIdentityStmt(name=def_name, description=desc, bases=bases)
     _set_if_features_from_xyang(ident, xyang)
     return ident
 

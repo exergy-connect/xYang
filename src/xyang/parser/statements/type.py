@@ -10,6 +10,7 @@ from typing import TYPE_CHECKING, cast
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangPatternSpec, YangTypeStmt
+from ...identifier_ref import identifier_ref
 from ...xpath import PathNode, XPathParser
 
 if TYPE_CHECKING:
@@ -57,11 +58,12 @@ class TypeStatementParser:
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
         tokens.consume(kw.TYPE)
+        type_prefix: str | None = None
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            type_name = self._parsers.consume_qname_from_identifier(tokens)
+            type_prefix, type_name = self._parsers.consume_identifier_ref(tokens)
         else:
             type_name = tokens.consume()
-        type_stmt = YangTypeStmt(name=type_name)
+        type_stmt = YangTypeStmt(name=type_name, prefix=type_prefix)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             type_context = context.push_parent(type_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
@@ -102,8 +104,8 @@ class TypeStatementParser:
     def parse_type_base(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse base substatement inside identityref type (RFC 7950 §9.10)."""
         tokens.consume(kw.BASE)
-        base_name = self._parsers.consume_qname_from_identifier(tokens)
-        type_stmt.identityref_bases.append(base_name)
+        base_prefix, base_name = self._parsers.consume_identifier_ref(tokens)
+        type_stmt.identityref_bases.append(identifier_ref(base_name, base_prefix))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_pattern(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:

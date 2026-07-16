@@ -1,3 +1,8 @@
+import {
+  coerceIdentifierRef,
+  formatIdentifierRef,
+  parseIdentifierRefAtom
+} from "../core/identifier-ref";
 import { YangModule, YangStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { expandUses } from "../transform/uses-expand";
@@ -150,7 +155,7 @@ function resolveAbsoluteLeafTypePath(module: YangModule, path: unknown): Record<
   let level = module.statements;
   let current: YangStatement | undefined;
   for (const seg of segments) {
-    const name = seg.includes(":") ? seg.split(":")[1] : seg;
+    const name = parseIdentifierRefAtom(seg).name;
     current = level.find((stmt) => stmt.name === name);
     if (!current) {
       return undefined;
@@ -539,7 +544,10 @@ function statementToSchema(
     if (typeName === YangTokenType.IDENTITYREF) {
       xYang.type = YangTokenType.IDENTITYREF;
       const bases = Array.isArray(typeShape.identityref_bases)
-        ? typeShape.identityref_bases.filter((x): x is string => typeof x === "string")
+        ? typeShape.identityref_bases
+            .map((b) => coerceIdentifierRef(b))
+            .filter((b): b is NonNullable<typeof b> => Boolean(b))
+            .map((b) => formatIdentifierRef(b))
         : [];
       if (bases.length > 0) {
         xYang.bases = bases;
@@ -610,8 +618,18 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
   return out;
 }
 
+function identityBaseStrings(bases: unknown): string[] {
+  if (!Array.isArray(bases)) {
+    return [];
+  }
+  return bases
+    .map((b) => coerceIdentifierRef(b))
+    .filter((b): b is NonNullable<typeof b> => Boolean(b))
+    .map((b) => formatIdentifierRef(b));
+}
+
 function identityToSchema(module: YangModule): Record<string, unknown> {
-  const raw = module.identities as Record<string, { bases?: string[] }>;
+  const raw = module.identities as Record<string, { bases?: unknown }>;
   const identityNames = Object.keys(raw);
   if (identityNames.length === 0) {
     return {};
@@ -619,8 +637,7 @@ function identityToSchema(module: YangModule): Record<string, unknown> {
 
   const childrenByBase: Record<string, string[]> = {};
   for (const [identityName, info] of Object.entries(raw)) {
-    const bases = Array.isArray(info?.bases) ? info.bases.filter((x): x is string => typeof x === "string") : [];
-    for (const base of bases) {
+    for (const base of identityBaseStrings(info?.bases)) {
       if (!childrenByBase[base]) {
         childrenByBase[base] = [];
       }
@@ -644,7 +661,7 @@ function identityToSchema(module: YangModule): Record<string, unknown> {
 
   const defs: Record<string, unknown> = {};
   for (const [identityName, info] of Object.entries(raw)) {
-    const bases = Array.isArray(info?.bases) ? info.bases.filter((x): x is string => typeof x === "string") : [];
+    const bases = identityBaseStrings(info?.bases);
     defs[identityName] = {
       type: "string",
       enum: descendants(identityName),

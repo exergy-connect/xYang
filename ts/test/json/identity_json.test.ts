@@ -31,12 +31,12 @@ describe("python parity: json/test_identity_json", () => {
 
     expect(round.identities.animal).toBeDefined();
     expect(round.identities.dog).toBeDefined();
-    expect(round.identities.mammal.bases).toEqual(["animal"]);
+    expect(round.identities.mammal.bases).toEqual([{ name: "animal" }]);
 
     const data = round.findStatement("data");
     const kind = data?.findStatement("kind");
     const type = (kind?.data.type as Record<string, unknown> | undefined) ?? {};
     expect(type.name).toBe("identityref");
-    expect(type.identityref_bases).toEqual(["animal"]);
+    expect(type.identityref_bases).toEqual([{ name: "animal" }]);
   });
 });

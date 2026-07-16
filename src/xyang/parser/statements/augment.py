@@ -11,6 +11,8 @@ from typing import TYPE_CHECKING
 from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangAugmentStmt, YangUsesStmt
+from ...errors import YangSyntaxError
+from ...identifier_ref import parse_absolute_schema_path
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -44,7 +46,18 @@ class AugmentStatementParser:
         """Parse augment statement."""
         tokens.consume(kw.AUGMENT)
         path = self._parsers.parse_string_concatenation(tokens)
-        aug = YangAugmentStmt(name="augment", augment_path=path)
+        augment_path_segments: list = []
+        raw = path.strip().strip('"').strip("'")
+        if raw.startswith("/"):
+            try:
+                augment_path_segments = parse_absolute_schema_path(path)
+            except ValueError as exc:
+                raise YangSyntaxError(str(exc)) from exc
+        aug = YangAugmentStmt(
+            name="augment",
+            augment_path=path,
+            augment_path_segments=augment_path_segments,
+        )
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(aug)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:

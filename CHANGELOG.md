@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-07-16
+
+### Changed
+
+- **Identifier-ref:** parse-time structured refs for ``identity`` ``base``, ``identityref`` ``base``, ``augment`` path segments, typedef ``type`` prefix, and ``uses`` grouping names; expanders/validators consume ``YangIdentifierRef`` / structured fields and do not re-split ``prefix:name`` strings (Python + TypeScript).
+
+### Fixed
+
+- **TypeScript `expandUses`:** resolve ``uses prefix:grouping`` via `import_prefixes` (Python `_resolve_uses_grouping` parity); keep groupings after expansion so importers can still reference them; nested `uses` inside an imported grouping resolve in the defining module's scope; register grouping typedefs onto the importing module; `typedef` under `grouping` is retained on the parent AST.
+
 ## [0.1.5] — 2026-07-16
 
 ### Fixed
@@ -126,7 +136,9 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.4...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.6...HEAD
+[0.1.6]: https://github.com/exergy-connect/xYang/compare/v0.1.5...v0.1.6
+[0.1.5]: https://github.com/exergy-connect/xYang/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/exergy-connect/xYang/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/exergy-connect/xYang/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
