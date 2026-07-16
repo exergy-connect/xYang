@@ -2,6 +2,10 @@ import { existsSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import type { YangModule } from "../core/model";
 import { YangParser, type ParseYangFileOptions } from "../parser";
+import {
+  applyAugmentationsAcrossModuleMap,
+  registerModuleClosure
+} from "../transform/augment-expand";
 
 function yangFilesInDirs(dirs: string[]): string[] {
   const seen = new Set<string>();
@@ -25,19 +29,6 @@ function yangFilesInDirs(dirs: string[]): string[] {
   return out;
 }
 
-function registerModuleClosure(modules: Map<string, YangModule>, mod: YangModule): void {
-  const name = mod.name;
-  if (!name) {
-    return;
-  }
-  modules.set(name, mod);
-  const imports =
-    (mod.data.import_prefixes as Record<string, YangModule> | undefined) ?? {};
-  for (const imported of Object.values(imports)) {
-    registerModuleClosure(modules, imported);
-  }
-}
-
 export type LoadAnydataModulesOptions = {
   hostPath: string;
   hostModule: YangModule;
@@ -48,7 +39,9 @@ export type LoadAnydataModulesOptions = {
 
 /**
  * Build the module set for anydata subtree validation (parity with Python
- * ``_load_anydata_module_map``; augment merging across modules is not applied yet).
+ * ``_load_anydata_module_map``). Uses one parser cache so cross-file ``augment``
+ * merges into shared imported module data; runs a final across-map pass for any
+ * remaining top-level ``augment`` statements.
  */
 export function loadAnydataModules(options: LoadAnydataModulesOptions): YangModule[] {
   const { hostPath, hostModule, includePaths, extraModulePaths, parseOpts = {} } = options;
@@ -79,6 +72,7 @@ export function loadAnydataModules(options: LoadAnydataModulesOptions): YangModu
     }
   }
 
+  applyAugmentationsAcrossModuleMap(modules);
   return [...modules.values()];
 }
 

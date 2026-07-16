@@ -204,7 +204,13 @@ export function expandUses(module: YangModule): YangModule {
     return module;
   }
 
+  // Preserve shared import module data references so cross-module ``augment``
+  // can mutate the same objects held in the parser cache.
+  const sharedImports = data.import_prefixes;
   const cloned = deepClone(data) as Record<string, unknown>;
+  if (sharedImports && typeof sharedImports === "object") {
+    cloned.import_prefixes = sharedImports;
+  }
   if (data.features instanceof Set) {
     cloned.features = new Set(data.features as Set<string>);
   }
