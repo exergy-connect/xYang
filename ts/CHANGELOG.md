@@ -9,10 +9,13 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-16
+
 ### Changed
 
 - **Dev dependencies:** bump `@types/node`, `esbuild`, and `vitest` to current releases; keep `typescript` on `^6.0.3` because `tsup` 8.5.1's bundled `rollup-plugin-dts` breaks `.d.ts` generation on TypeScript 7 ([tsup#1405](https://github.com/egoist/tsup/issues/1405)).
 - **Integer built-in yang.json:** emit canonical JSON Schema `minimum` / `maximum` instead of `x-yang.builtin-type`; `parseJsonSchema` infers the YANG type from bounds (`integer-bounds.ts`, `tests/json/integer_builtin_bounds.test.ts`).
+- **Unsupported-skip:** `rpc` and nested `input` / `output` under `rpc` are parsed; only top-level stray `input` / `output` and `action` remain skipped (`test/unsupported_skip.test.ts` updated).
 
 ### Fixed
 
@@ -25,10 +28,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 - **Parser `rpc` / `input` / `output`:** module-level `rpc` with I/O blocks (`YangRpcStmt`, `YangInputStmt`, `YangOutputStmt` in `src/core/ast.ts`; `src/parser/statements/rpc.ts`); tests in `test/rpc_input_output.test.ts`.
 - **Container substatement dispatch:** explicit data-node dispatch (parity with Python); `rpc` inside `container` is rejected.
 - **JSON Schema `rpc`:** module-level RPCs under `x-yang.rpcs` with `input` / `output` blocks; round-trip via `parseJsonSchema` (`test/json/rpc_json.test.ts`). Integer built-ins round-trip via JSON Schema `minimum` / `maximum`.
-
-### Changed
-
-- **Unsupported-skip:** `rpc` and nested `input` / `output` under `rpc` are parsed; only top-level stray `input` / `output` and `action` remain skipped (`test/unsupported_skip.test.ts` updated).
+- **GitHub Action `xyang-ts`:** reusable composite action and committed single-file CI artifact (`artifacts/xyang-ts.mjs`) for workflow consumers.
 
 ## [0.1.2] — 2026-05-19
 
@@ -80,6 +80,7 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
-[0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
-[0.1.0]: https://github.com/exergy-connect/xYang/tree/v0.1.2/ts
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/exergy-connect/xYang/compare/v0.1.2...v0.1.3
+[0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
+[0.1.0]: https://github.com/exergy-connect/xYang/tree/v0.1.0/ts
