@@ -7,11 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.3] — 2026-07-16
+
 ### Changed
 
 - **Packaging:** project metadata and builds use **`pyproject.toml` only** (PEP 517/621); build requires `setuptools>=82` and `wheel>=0.47`; dev extras pin current minimums (`pytest>=9`, `black>=26.5.1`, `PyYAML>=6.0.3`); CI installs with `pip install -e ".[dev]"`.
 - **Python:** minimum supported version is **3.10** (PyPI `requires-python`, classifiers, CI matrix 3.10–3.14, Black targets); **3.9 is no longer supported**.
 - **Integer built-in yang.json:** use JSON Schema `minimum` / `maximum` (canonical RFC 7950 bounds) instead of `x-yang.builtin-type`; reverse mapping in `parse_json_schema` (`integer_bounds.py`, `tests/json/test_integer_builtin_bounds.py`).
+- **XPath tokenizer:** normalize YANG-style `\"` / `\'` in must/when expressions before lexing; fix in-string escape handling.
+- **Parser metadata:** `status` accepted on `grouping`, `uses`, `typedef`, and other nodes using `with_metadata_substatements` (consumed, not stored on AST).
+- **Parser `grouping`:** nested `grouping` allowed inside `grouping` bodies.
 
 ### Added
 
@@ -28,12 +33,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Parser `config`:** RFC 7950 §7.21.1 `config true` / `config false` stored on data nodes (`config: Optional[bool]` on `YangStatementWithWhen`, `refined_config` on `refine`); echoed in JSON Schema `x-yang.config`; tests in `tests/test_config.py`.
 - **Cross-module `augment` + RFC 7951:** CLI anydata module map uses one `YangParser` cache and import closure registration so augments merge into shared targets; augmented nodes carry `defining_module` and validate under `module:identifier` JSON keys (`tests/test_anydata_augment_merge.py`).
 - **RFC 7950 quoted strings:** decode `\\`, `\"`, `\'`, `\\n`, `\\t`, and line continuation in the tokenizer so double-quoted patterns (e.g. `ietf-yang-types` `date-and-time`) compile as intended (`tests/test_yang_string_unescape.py`).
-
-### Changed
-
-- **XPath tokenizer:** normalize YANG-style `\"` / `\'` in must/when expressions before lexing; fix in-string escape handling.
-- **Parser metadata:** `status` accepted on `grouping`, `uses`, `typedef`, and other nodes using `with_metadata_substatements` (consumed, not stored on AST).
-- **Parser `grouping`:** nested `grouping` allowed inside `grouping` bodies.
+- **GitHub Action `xyang-ts`:** reusable composite action under [`.github/actions/xyang-ts`](.github/actions/xyang-ts) with committed CI artifact `artifacts/xyang-ts.mjs`; documented in [README.md](README.md).
+- **Examples:** OpenConfig netlink example under [`examples/`](examples/).
 
 ### Fixed
 
@@ -113,7 +114,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.2...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.3...HEAD
+[0.1.3]: https://github.com/exergy-connect/xYang/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/exergy-connect/xYang/compare/v0.1.0...v0.1.1
 [0.1.0]: https://github.com/exergy-connect/xYang/releases/tag/v0.1.0

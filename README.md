@@ -253,7 +253,7 @@ jobs:
 - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
   id: xyang
   with:
-    ref: v0.1.2
+    ref: v0.1.3
 
 - run: xyang-ts parse model/example.yang
 - run: xyang-ts convert model/example.yang

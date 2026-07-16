@@ -128,7 +128,7 @@ def main() -> int:
         "-V",
         "--version",
         action="version",
-        version="%(prog)s 0.1.2",
+        version="%(prog)s 0.1.3",
     )
     subparsers = parser.add_subparsers(dest="cmd", help="Commands")
     path_parent = argparse.ArgumentParser(add_help=False)
