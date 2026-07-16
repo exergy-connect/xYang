@@ -1,3 +1,4 @@
+import { formatIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem } from "../types";
@@ -9,6 +10,14 @@ export type TypeCheckerOptions = {
 };
 
 type TypedefShape = { type?: Record<string, unknown> };
+
+function asTypeRef(name: string, constraint?: Record<string, unknown>): YangIdentifierRef {
+  const prefix =
+    constraint && typeof constraint.prefix === "string" && constraint.prefix
+      ? constraint.prefix
+      : undefined;
+  return prefix ? { prefix, name } : { name };
+}
 
 export class TypeChecker {
   private readonly system = new TypeSystem();
@@ -22,26 +31,23 @@ export class TypeChecker {
   }
 
   /**
-   * Resolve a local or ``prefix:name`` typedef via the host module and its imports.
+   * Resolve a local or prefixed typedef via the host module and its imports.
    */
-  private lookupTypedef(typeName: string): TypedefShape | undefined {
-    const own = this.module.typedefs[typeName] as TypedefShape | undefined;
+  private lookupTypedef(ref: YangIdentifierRef): TypedefShape | undefined {
+    if (ref.prefix) {
+      const target = resolvePrefixedModule(this.module.data as ModuleData, ref.prefix);
+      if (!target) {
+        return undefined;
+      }
+      const imported = (target.typedefs as Record<string, TypedefShape> | undefined)?.[ref.name];
+      if (imported?.type && typeof imported.type.name === "string") {
+        return imported;
+      }
+      return undefined;
+    }
+    const own = this.module.typedefs[ref.name] as TypedefShape | undefined;
     if (own?.type && typeof own.type.name === "string") {
       return own;
-    }
-    const idx = typeName.indexOf(":");
-    if (idx <= 0 || idx === typeName.length - 1) {
-      return undefined;
-    }
-    const prefix = typeName.slice(0, idx);
-    const local = typeName.slice(idx + 1);
-    const target = resolvePrefixedModule(this.module.data as ModuleData, prefix);
-    if (!target) {
-      return undefined;
-    }
-    const imported = (target.typedefs as Record<string, TypedefShape> | undefined)?.[local];
-    if (imported?.type && typeof imported.type.name === "string") {
-      return imported;
     }
     return undefined;
   }
@@ -49,40 +55,42 @@ export class TypeChecker {
   /**
    * Follow a typedef chain to the underlying builtin type name (stops at unions or unknown).
    */
-  resolveUnderlyingBuiltinName(typeName: string): string {
+  resolveUnderlyingBuiltinName(typeName: string, constraint?: Record<string, unknown>): string {
     const seen = new Set<string>();
-    let name = typeName;
+    let ref = asTypeRef(typeName, constraint);
     while (seen.size < 64) {
-      const typedef = this.lookupTypedef(name);
+      const typedef = this.lookupTypedef(ref);
       if (!typedef?.type || typeof typedef.type.name !== "string") {
-        return name;
+        return ref.name;
       }
       if (typedef.type.name === YangTokenType.UNION) {
-        return name;
+        return formatIdentifierRef(ref);
       }
-      seen.add(name);
-      const next = typedef.type.name;
-      if (next === name) {
-        return name;
+      const key = formatIdentifierRef(ref);
+      seen.add(key);
+      const next = asTypeRef(typedef.type.name, typedef.type as Record<string, unknown>);
+      if (formatIdentifierRef(next) === key) {
+        return ref.name;
       }
-      name = next;
+      ref = next;
     }
-    return name;
+    return ref.name;
   }
 
   validate(value: unknown, typeName: string, constraint?: Record<string, unknown>): [boolean, string | null] {
     let via: "typedef" | "typedef-union" | "inline-union" | "direct";
     let result: [boolean, string | null];
 
-    const typedef = this.lookupTypedef(typeName);
+    const ref = asTypeRef(typeName, constraint);
+    const typedef = this.lookupTypedef(ref);
     if (typedef?.type && typeof typedef.type.name === "string") {
       const typedefConstraint = new TypeConstraint(typedef.type as Record<string, unknown>);
       if (typedef.type.name === YangTokenType.UNION) {
         via = "typedef-union";
         result = this.validateUnion(value, typedefConstraint);
-      } else if (this.lookupTypedef(typedef.type.name)) {
+      } else if (this.lookupTypedef(asTypeRef(typedef.type.name, typedef.type as Record<string, unknown>))) {
         via = "typedef";
-        result = this.validate(value, typedef.type.name);
+        result = this.validate(value, typedef.type.name, typedef.type as Record<string, unknown>);
       } else {
         via = "typedef";
         result = this.system.validate(value, typedef.type.name, typedefConstraint);

@@ -1,5 +1,6 @@
 import * as kw from "./keywords";
 import {
+  YangAugmentStmt,
   YangExtensionInvocationStmt,
   YangExtensionStmt,
   YangLeafListStmt,
@@ -10,6 +11,7 @@ import {
   YangTypeStmt,
   YangUsesStmt
 } from "../core/ast";
+import { formatIdentifierRef } from "../core/identifier-ref";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { SerializedStatement } from "../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
@@ -65,6 +67,7 @@ function serializedKeywordFromAstStatement(stmt: { keyword?: unknown }): string 
 
 type TypeShape = {
   name: string;
+  prefix?: string;
   patterns?: Array<{
     pattern: string;
     invert_match?: boolean;
@@ -76,7 +79,7 @@ type TypeShape = {
   fraction_digits?: number;
   path?: unknown;
   require_instance?: boolean;
-  identityref_bases?: string[];
+  identityref_bases?: Array<{ prefix?: string; name: string }>;
   enums?: string[];
   bits?: Array<{ name: string; position: number }>;
   types?: TypeShape[];
@@ -448,12 +451,22 @@ export class StatementParsers {
     this.parse_prefixed_extension_statement(tokens, context);
   }
 
-  consume_qname_from_identifier(tokens: TokenStream): string {
-    const parts = [tokens.consume_type(YangTokenType.IDENTIFIER)];
-    while (tokens.consume_if_type(YangTokenType.COLON)) {
-      parts.push(tokens.consume_type(YangTokenType.IDENTIFIER));
+  /**
+   * Consume ``name`` or ``prefix:name`` into a structured identifier-ref.
+   * Prefix splitting and identifier normalization happen here once.
+   */
+  consume_identifier_ref(tokens: TokenStream): { prefix?: string; name: string } {
+    const first = tokens.consume_type(YangTokenType.IDENTIFIER).trim();
+    if (!tokens.consume_if_type(YangTokenType.COLON)) {
+      return { name: first };
     }
-    return parts.join(":");
+    return { prefix: first, name: tokens.consume_type(YangTokenType.IDENTIFIER).trim() };
+  }
+
+  /** Joined ``prefix:name`` form; prefer {@link consume_identifier_ref} for new code. */
+  consume_qname_from_identifier(tokens: TokenStream): string {
+    const ref = this.consume_identifier_ref(tokens);
+    return ref.prefix ? `${ref.prefix}:${ref.name}` : ref.name;
   }
 
   add_to_parent_or_module(context: ParserContext, stmt: unknown): void {
@@ -589,6 +602,12 @@ export class StatementParsers {
     if (keyword === "augment" && typeof stmt.augment_path === "string") {
       out.argument = stmt.augment_path;
       out.augment_path = stmt.augment_path;
+      const segs = (stmt as YangAugmentStmt).augment_path_segments;
+      if (Array.isArray(segs) && segs.length > 0) {
+        out.augment_path_segments = segs.map((s) =>
+          s.prefix ? { prefix: s.prefix, name: s.name } : { name: s.name }
+        );
+      }
     }
     if (keyword === "extension-invocation") {
       out.keyword = stmt.name ?? "extension-invocation";
@@ -614,7 +633,10 @@ export class StatementParsers {
       const u = stmt as YangUsesStmt;
       if (typeof u.grouping_name === "string" && u.grouping_name.length > 0) {
         out.grouping_name = u.grouping_name;
-        out.argument = u.grouping_name;
+        if (typeof u.grouping_prefix === "string" && u.grouping_prefix.length > 0) {
+          out.grouping_prefix = u.grouping_prefix;
+        }
+        out.argument = u.grouping_qname();
       }
       if (Array.isArray(u.refines) && u.refines.length > 0) {
         out.refines = u.refines.map((r) => this.serializeRefineStmt(r as YangRefineStmt));
@@ -676,11 +698,12 @@ export class StatementParsers {
   }
 
   private fromType(type_stmt: YangTypeStmt): SerializedStatement {
+    const qname = formatIdentifierRef({ name: type_stmt.name, prefix: type_stmt.prefix });
     return {
       __class__: "YangStatement",
       keyword: "type",
       name: type_stmt.name,
-      argument: type_stmt.name,
+      argument: qname,
       type: this.fromTypeShape(type_stmt),
       statements: []
     };
@@ -699,7 +722,7 @@ export class StatementParsers {
   }
 
   private fromTypeShape(type_stmt: YangTypeStmt): TypeShape {
-    return {
+    const shape: TypeShape = {
       name: type_stmt.name,
       patterns: type_stmt.patterns.map((p) => ({
         pattern: p.pattern,
@@ -712,11 +735,17 @@ export class StatementParsers {
       fraction_digits: type_stmt.fraction_digits,
       path: type_stmt.path,
       require_instance: type_stmt.require_instance,
-      identityref_bases: [...type_stmt.identityref_bases],
+      identityref_bases: type_stmt.identityref_bases.map((b) =>
+        b.prefix ? { prefix: b.prefix, name: b.name } : { name: b.name }
+      ),
       enums: [...type_stmt.enums],
       bits: type_stmt.bits.map((b) => ({ name: b.name, position: b.position ?? 0 })),
       types: type_stmt.types.map((t) => this.fromTypeShape(t))
     };
+    if (type_stmt.prefix) {
+      shape.prefix = type_stmt.prefix;
+    }
+    return shape;
   }
 
   private extract_type_shape(typeStmt: SerializedStatement): TypeShape {

@@ -1,6 +1,7 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { YangSemanticError } from "../core/errors";
+import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { ModuleSource, SerializedStatement, YangModule } from "../core/model";
 import { ParserContext, TokenStream } from "./parser-context";
 import { StatementParsers } from "./statement-parsers";
@@ -16,14 +17,19 @@ type ParserOptions = {
 };
 
 function serializeIdentities(
-  raw: Record<string, { bases?: string[] }> | undefined
-): Record<string, { bases: string[] }> {
-  const out: Record<string, { bases: string[] }> = {};
+  raw: Record<string, { bases?: unknown }> | undefined
+): Record<string, { bases: YangIdentifierRef[] }> {
+  const out: Record<string, { bases: YangIdentifierRef[] }> = {};
   if (!raw) {
     return out;
   }
   for (const [name, stmt] of Object.entries(raw)) {
-    out[name] = { bases: Array.isArray(stmt.bases) ? [...stmt.bases] : [] };
+    const bases = Array.isArray(stmt.bases)
+      ? stmt.bases
+          .map((b) => coerceIdentifierRef(b))
+          .filter((b): b is YangIdentifierRef => Boolean(b))
+      : [];
+    out[name] = { bases };
   }
   return out;
 }

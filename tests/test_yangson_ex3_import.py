@@ -92,7 +92,8 @@ def test_example_3_a_merges_submodule_import_prefixes() -> None:
     baz = top.find_statement("baz")
     assert isinstance(baz, YangLeafStmt)
     assert baz.type is not None
-    assert baz.type.name == "inet:ipv4-address-no-zone"
+    assert baz.type.name == "ipv4-address-no-zone"
+    assert baz.type.prefix == "inet"
 
 
 def test_example_3_suba_parses_submodule(parse_ex3: YangParser) -> None:

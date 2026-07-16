@@ -1,4 +1,5 @@
 import { YangSemanticError } from "./errors";
+import type { YangIdentifierRef } from "./identifier-ref";
 import { parseXPath } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
 import type { YangModule } from "./module";
@@ -123,7 +124,7 @@ export class YangTypedefStmt extends YangStatement {
 }
 
 export class YangIdentityStmt extends YangStatement {
-  bases: string[];
+  bases: YangIdentifierRef[];
   if_features: string[];
 
   constructor(init: Partial<YangIdentityStmt> = {}) {
@@ -163,7 +164,10 @@ export class YangPatternSpec {
 }
 
 export class YangTypeStmt {
+  /** Local type / typedef name (never ``prefix:name``). */
   name: string;
+  /** Import prefix when the type names a typedef from another module. */
+  prefix?: string;
   patterns: YangPatternSpec[];
   length?: string;
   range?: string;
@@ -173,10 +177,11 @@ export class YangTypeStmt {
   types: YangTypeStmt[];
   path?: PathNode;
   require_instance: boolean;
-  identityref_bases: string[];
+  identityref_bases: YangIdentifierRef[];
 
   constructor(init: Partial<YangTypeStmt> = {}) {
     this.name = init.name ?? "";
+    this.prefix = init.prefix;
     this.patterns = init.patterns ?? [];
     this.length = init.length;
     this.range = init.range;
@@ -432,7 +437,13 @@ export class YangGroupingStmt extends YangStatement {
 }
 
 export class YangUsesStmt extends YangStatementWithWhen {
+  /**
+   * Local grouping identifier (never ``prefix:name``).
+   * Optional import prefix is in {@link grouping_prefix}.
+   */
   grouping_name: string;
+  /** Import prefix when ``uses`` names a grouping from another module. */
+  grouping_prefix?: string;
   refines: YangRefineStmt[];
   augmentations: YangAugmentStmt[];
 
@@ -440,8 +451,16 @@ export class YangUsesStmt extends YangStatementWithWhen {
     super(init);
     this.keyword = "uses";
     this.grouping_name = init.grouping_name ?? "";
+    this.grouping_prefix = init.grouping_prefix;
     this.refines = init.refines ?? [];
     this.augmentations = init.augmentations ?? [];
+  }
+
+  /** Display / cycle-key form ``name`` or ``prefix:name``. */
+  grouping_qname(): string {
+    return this.grouping_prefix
+      ? `${this.grouping_prefix}:${this.grouping_name}`
+      : this.grouping_name;
   }
 
   override get_schema_node(): string | undefined {
@@ -450,12 +469,16 @@ export class YangUsesStmt extends YangStatementWithWhen {
 }
 
 export class YangAugmentStmt extends YangStatementWithWhen {
+  /** Original path string (display / round-trip). */
   augment_path: string;
+  /** Path segments parsed once from {@link augment_path}. */
+  augment_path_segments: YangIdentifierRef[];
 
   constructor(init: Partial<YangAugmentStmt> = {}) {
     super(init);
     this.keyword = "augment";
     this.augment_path = init.augment_path ?? "";
+    this.augment_path_segments = init.augment_path_segments ?? [];
   }
 
   override get_schema_node(): string | undefined {

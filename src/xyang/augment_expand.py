@@ -7,7 +7,7 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 
 from __future__ import annotations
 
-from typing import Callable, Dict, List, Optional, Tuple
+from typing import Callable, Dict, List, Optional
 
 from .ast import (
     YangAugmentStmt,
@@ -18,6 +18,7 @@ from .ast import (
 )
 from .module import YangModule
 from .errors import YangSyntaxError
+from .identifier_ref import YangIdentifierRef, parse_absolute_schema_path
 from .refine_expand import copy_yang_statement
 from .uses_expand import (
     _merge_uses_if_features_into_grouping_roots,
@@ -25,30 +26,14 @@ from .uses_expand import (
 )
 
 
-def _split_prefixed_identifier(segment: str) -> Tuple[str, str]:
-    segment = segment.strip()
-    if ":" not in segment:
-        raise YangSyntaxError(
-            f"Invalid augment path segment {segment!r}: expected 'prefix:identifier'"
-        )
-    pref, _, ident = segment.partition(":")
-    if not pref or not ident:
-        raise YangSyntaxError(
-            f"Invalid augment path segment {segment!r}: expected 'prefix:identifier'"
-        )
-    return pref, ident
-
-
-def _parse_augment_path(path: str) -> List[str]:
-    raw = (path or "").strip().strip('"').strip("'")
-    if not raw.startswith("/"):
-        raise YangSyntaxError(
-            f"Augment path must be an absolute schema node identifier, got {path!r}"
-        )
-    parts = [p for p in raw[1:].split("/") if p.strip()]
-    if not parts:
-        raise YangSyntaxError(f"Empty augment path: {path!r}")
-    return parts
+def _path_segments_from_augment(aug: YangAugmentStmt, path: str) -> List[YangIdentifierRef]:
+    stored = aug.augment_path_segments
+    if stored:
+        return stored
+    try:
+        return parse_absolute_schema_path(path)
+    except ValueError as exc:
+        raise YangSyntaxError(str(exc)) from exc
 
 
 def _find_named_schema_child(parent: YangStatement, name: str) -> Optional[YangStatement]:
@@ -73,7 +58,9 @@ def _find_toplevel_schema_child(module: YangModule, name: str) -> Optional[YangS
     return None
 
 
-def resolve_augment_target(ctx_module: YangModule, path: str) -> YangStatement:
+def resolve_augment_target(
+    ctx_module: YangModule, path: str, aug: YangAugmentStmt | None = None
+) -> YangStatement:
     """
     Resolve an absolute augment path to the **target schema node** that receives new children.
 
@@ -82,6 +69,7 @@ def resolve_augment_target(ctx_module: YangModule, path: str) -> YangStatement:
     return resolve_absolute_schema_path(
         ctx_module=ctx_module,
         path=path,
+        segments=_path_segments_from_augment(aug, path) if aug is not None else None,
         kind="augment",
         find_toplevel=_find_toplevel_schema_child,
     )
@@ -93,6 +81,7 @@ def resolve_absolute_schema_path(
     path: str,
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
+    segments: List[YangIdentifierRef] | None = None,
 ) -> YangStatement:
     """Resolve absolute ``/prefix:name/...`` path into a target schema node.
 
@@ -100,8 +89,19 @@ def resolve_absolute_schema_path(
     Child traversal semantics are shared (choice/case aware) via
     ``_find_named_schema_child``.
     """
-    segments = _parse_augment_path(path)
-    pref0, name0 = _split_prefixed_identifier(segments[0])
+    if not segments:
+        try:
+            segments = parse_absolute_schema_path(path)
+        except ValueError as exc:
+            raise YangSyntaxError(str(exc)) from exc
+    first = segments[0]
+    pref0 = first.prefix
+    name0 = first.name
+    if not pref0:
+        raise YangSyntaxError(
+            f"{kind}: invalid first segment in path {path!r} "
+            "(expected 'prefix:identifier')"
+        )
     mod0 = ctx_module.resolve_prefixed_module(pref0)
     if mod0 is None:
         raise YangSyntaxError(
@@ -115,7 +115,13 @@ def resolve_absolute_schema_path(
             f"(path {path!r})"
         )
     for seg in segments[1:]:
-        pref, nm = _split_prefixed_identifier(seg)
+        pref = seg.prefix
+        nm = seg.name
+        if not pref:
+            raise YangSyntaxError(
+                f"{kind}: invalid path segment {nm!r} in path {path!r} "
+                "(expected 'prefix:identifier')"
+            )
         if ctx_module.resolve_prefixed_module(pref) is None:
             raise YangSyntaxError(
                 f"{kind}: unknown prefix {pref!r} in path {path!r}"
@@ -194,7 +200,7 @@ def apply_augmentations_across_module_map(modules: Dict[str, YangModule]) -> Non
             if isinstance(stmt, YangAugmentStmt):
                 pending.append((mod, stmt))
     for aug_module, aug in pending:
-        target = resolve_augment_target(aug_module, aug.augment_path)
+        target = resolve_augment_target(aug_module, aug.augment_path, aug)
         _merge_augment_into_target(aug, target, source_module=aug_module)
     for mod in modules.values():
         mod.statements = [
@@ -210,6 +216,6 @@ def apply_augmentations(root: YangModule) -> None:
     """
     augments = [s for s in root.statements if isinstance(s, YangAugmentStmt)]
     for aug in augments:
-        target = resolve_augment_target(root, aug.augment_path)
+        target = resolve_augment_target(root, aug.augment_path, aug)
         _merge_augment_into_target(aug, target, source_module=root)
     root.statements = [s for s in root.statements if not isinstance(s, YangAugmentStmt)]

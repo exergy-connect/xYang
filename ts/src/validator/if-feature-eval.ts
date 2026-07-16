@@ -1,7 +1,15 @@
 /**
  * YANG 1.1 if-feature boolean expressions (RFC 7950 §7.20.2, §14).
  * Multiple if-feature substatements on one node are combined with logical AND.
+ *
+ * Feature names arrive as opaque expression tokens; each atom is converted once
+ * via {@link parseIdentifierRefAtom} (not re-split elsewhere).
  */
+
+import {
+  parseIdentifierRefAtom,
+  type YangIdentifierRef
+} from "../core/identifier-ref";
 
 export type ModuleData = Record<string, unknown>;
 
@@ -63,23 +71,20 @@ export function reachableModuleData(root: ModuleData): ModuleData[] {
 export function featureIsSupported(
   ctxModule: ModuleData,
   enabledByModule: Readonly<Record<string, ReadonlySet<string>>>,
-  ref: string
+  ref: string | YangIdentifierRef
 ): boolean {
+  const id = typeof ref === "string" ? parseIdentifierRefAtom(ref) : ref;
   let mod: ModuleData;
-  let fname: string;
-  const idx = ref.indexOf(":");
-  if (idx !== -1) {
-    const pref = ref.slice(0, idx);
-    fname = ref.slice(idx + 1);
-    const resolved = resolvePrefixedModule(ctxModule, pref);
+  if (id.prefix) {
+    const resolved = resolvePrefixedModule(ctxModule, id.prefix);
     if (!resolved) {
       return false;
     }
     mod = resolved;
   } else {
     mod = ctxModule;
-    fname = ref;
   }
+  const fname = id.name;
   if (!declaredFeatures(mod).has(fname)) {
     return false;
   }

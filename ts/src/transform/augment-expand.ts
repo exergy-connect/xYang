@@ -7,6 +7,7 @@
  */
 
 import { YangSyntaxError } from "../core/errors";
+import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import { SerializedStatement, YangModule } from "../core/model";
 
 type ModuleData = Record<string, unknown>;
@@ -48,33 +49,16 @@ function resolvePrefixedModule(ctxModule: ModuleData, prefix: string): ModuleDat
   return resolved && typeof resolved === "object" ? resolved : undefined;
 }
 
-function splitPrefixedIdentifier(segment: string): [string, string] {
-  const trimmed = segment.trim();
-  const idx = trimmed.indexOf(":");
-  if (idx <= 0 || idx === trimmed.length - 1) {
-    throw new YangSyntaxError(
-      `Invalid augment path segment '${segment}': expected 'prefix:identifier'`
-    );
+function pathSegmentsFromAugment(aug: SerializedStatement, path: string): YangIdentifierRef[] {
+  const stored = aug.augment_path_segments;
+  if (Array.isArray(stored) && stored.length > 0) {
+    return stored as YangIdentifierRef[];
   }
-  return [trimmed.slice(0, idx), trimmed.slice(idx + 1)];
-}
-
-function parseAugmentPath(path: string): string[] {
-  const raw = (path || "").trim().replace(/^["']|["']$/g, "");
-  if (!raw.startsWith("/")) {
-    throw new YangSyntaxError(
-      `Augment path must be an absolute schema node identifier, got '${path}'`
-    );
+  try {
+    return parseAbsoluteSchemaPath(path);
+  } catch (err) {
+    throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
   }
-  const parts = raw
-    .slice(1)
-    .split("/")
-    .map((p) => p.trim())
-    .filter((p) => p.length > 0);
-  if (parts.length === 0) {
-    throw new YangSyntaxError(`Empty augment path: '${path}'`);
-  }
-  return parts;
 }
 
 function isSchemaNode(stmt: SerializedStatement): boolean {
@@ -102,12 +86,17 @@ function findToplevelSchemaChild(module: ModuleData, name: string): SerializedSt
 
 /**
  * Resolve an absolute augment path to the target schema node that receives new children.
- * Each path segment is ``prefix:identifier`` (RFC 7950 absolute schema node identifier).
+ * Prefers parse-time ``augment_path_segments``; falls back to parsing ``path`` once.
  */
-export function resolveAugmentTarget(ctxModule: ModuleData, path: string): SerializedStatement {
+export function resolveAugmentTarget(
+  ctxModule: ModuleData,
+  path: string,
+  aug?: SerializedStatement
+): SerializedStatement {
   return resolveAbsoluteSchemaPath({
     ctxModule,
     path,
+    segments: aug ? pathSegmentsFromAugment(aug, path) : undefined,
     kind: "augment",
     findToplevel: findToplevelSchemaChild
   });
@@ -116,12 +105,22 @@ export function resolveAugmentTarget(ctxModule: ModuleData, path: string): Seria
 export function resolveAbsoluteSchemaPath(options: {
   ctxModule: ModuleData;
   path: string;
+  segments?: YangIdentifierRef[];
   kind: string;
   findToplevel: (module: ModuleData, name: string) => SerializedStatement | undefined;
 }): SerializedStatement {
   const { ctxModule, path, kind, findToplevel } = options;
-  const segments = parseAugmentPath(path);
-  const [pref0, name0] = splitPrefixedIdentifier(segments[0]!);
+  let segments = options.segments;
+  if (!segments || segments.length === 0) {
+    try {
+      segments = parseAbsoluteSchemaPath(path);
+    } catch (err) {
+      throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
+    }
+  }
+  const first = segments[0]!;
+  const pref0 = first.prefix!;
+  const name0 = first.name;
   const mod0 = resolvePrefixedModule(ctxModule, pref0);
   if (!mod0) {
     throw new YangSyntaxError(
@@ -137,7 +136,8 @@ export function resolveAbsoluteSchemaPath(options: {
     );
   }
   for (const seg of segments.slice(1)) {
-    const [pref, nm] = splitPrefixedIdentifier(seg);
+    const pref = seg.prefix!;
+    const nm = seg.name;
     if (!resolvePrefixedModule(ctxModule, pref)) {
       throw new YangSyntaxError(`${kind}: unknown prefix '${pref}' in path '${path}'`);
     }
@@ -265,7 +265,7 @@ export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModul
   }
   for (const { mod, aug } of pending) {
     const path = String(aug.augment_path ?? aug.argument ?? "");
-    const target = resolveAugmentTarget(mod.data, path);
+    const target = resolveAugmentTarget(mod.data, path, aug);
     mergeAugmentIntoTarget(aug, target, String(mod.name ?? ""));
   }
   for (const mod of list) {
@@ -289,7 +289,7 @@ export function applyAugments(module: YangModule): YangModule {
   const sourceName = String(data.name ?? "");
   for (const aug of augments) {
     const path = String(aug.augment_path ?? aug.argument ?? "");
-    const target = resolveAugmentTarget(data, path);
+    const target = resolveAugmentTarget(data, path, aug);
     mergeAugmentIntoTarget(aug, target, sourceName);
   }
   data.statements = statements.filter((s) => s.keyword !== "augment");

@@ -9,6 +9,7 @@ from __future__ import annotations
 from typing import AbstractSet, Dict, List, Mapping, Optional, Set
 
 from ..module import YangModule
+from ..identifier_ref import YangIdentifierRef, parse_identifier_ref_atom
 
 
 class IfFeatureEvalError(Exception):
@@ -56,20 +57,21 @@ def build_enabled_features_map(
 def feature_is_supported(
     ctx_module: YangModule,
     enabled_by_module: Mapping[str, AbstractSet[str]],
-    ref: str,
+    ref: str | YangIdentifierRef,
 ) -> bool:
     """
     Whether feature reference *ref* (``name`` or ``prefix:name``) is supported
     in the context of *ctx_module* (the module where the ``if-feature`` appears).
     """
-    if ":" in ref:
-        pref, _, fname = ref.partition(":")
-        mod = ctx_module.resolve_prefixed_module(pref)
+    id_ref = parse_identifier_ref_atom(ref) if isinstance(ref, str) else ref
+    if id_ref.prefix:
+        mod = ctx_module.resolve_prefixed_module(id_ref.prefix)
         if mod is None:
             return False
+        fname = id_ref.name
     else:
         mod = ctx_module
-        fname = ref
+        fname = id_ref.name
     if fname not in mod.features:
         return False
     enabled = enabled_by_module.get(mod.name)

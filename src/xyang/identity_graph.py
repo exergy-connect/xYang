@@ -4,12 +4,19 @@ Identity derivation graph (RFC 7950) for YANG modules, including ``import`` pref
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Set, Tuple
+from typing import TYPE_CHECKING, List, Optional, Set, Tuple, Union
+
+from .identifier_ref import (
+    YangIdentifierRef,
+    format_identifier_ref,
+    parse_identifier_ref_atom,
+)
 
 if TYPE_CHECKING:
     from .module import YangModule
 
 IdentityPair = Tuple["YangModule", str]
+BaseRef = Union[str, YangIdentifierRef]
 
 
 def qualified_identity_name(module: "YangModule", local_name: str) -> str:
@@ -18,17 +25,20 @@ def qualified_identity_name(module: "YangModule", local_name: str) -> str:
     return f"{p}:{local_name}"
 
 
+def _as_base_ref(base: BaseRef) -> YangIdentifierRef:
+    if isinstance(base, YangIdentifierRef):
+        return base
+    return parse_identifier_ref_atom(base)
+
+
 def resolve_identity_qname_pair(importer: "YangModule", qname: str) -> Optional[IdentityPair]:
     """
     Resolve ``prefix:name`` to (defining module, local identity name), using ``import`` map.
     """
-    if ":" not in qname:
+    ref = parse_identifier_ref_atom(qname)
+    if not ref.prefix:
         return None
-    pref, local = qname.split(":", 1)
-    m = importer.resolve_prefixed_module(pref)
-    if m is None or local not in m.identities:
-        return None
-    return (m, local)
+    return resolve_identity_base_ref(importer, ref)
 
 
 def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
@@ -37,16 +47,18 @@ def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
     return pair[1] if pair else None
 
 
-def resolve_identity_base_ref(from_mod: "YangModule", base: str) -> Optional[IdentityPair]:
+def resolve_identity_base_ref(
+    from_mod: "YangModule", base: BaseRef
+) -> Optional[IdentityPair]:
     """Resolve a ``base`` substatement (possibly prefixed) to (module, local identity)."""
-    if ":" in base:
-        pref, local = base.split(":", 1)
-        m = from_mod.resolve_prefixed_module(pref)
-        if m is None or local not in m.identities:
+    ref = _as_base_ref(base)
+    if ref.prefix:
+        m = from_mod.resolve_prefixed_module(ref.prefix)
+        if m is None or ref.name not in m.identities:
             return None
-        return (m, local)
-    if base in from_mod.identities:
-        return (from_mod, base)
+        return (m, ref.name)
+    if ref.name in from_mod.identities:
+        return (from_mod, ref.name)
     return None
 
 
@@ -98,11 +110,12 @@ def strict_ancestors(module: "YangModule", local_name: str) -> Set[str]:
         if not stmt:
             continue
         for b in stmt.bases:
-            if ":" in b:
+            ref = _as_base_ref(b)
+            if ref.prefix:
                 continue
-            if b not in seen:
-                seen.add(b)
-                stack.append(b)
+            if ref.name not in seen:
+                seen.add(ref.name)
+                stack.append(ref.name)
     return seen
 
 
@@ -110,14 +123,15 @@ def descendant_closure(module: "YangModule", base_local: str) -> Set[str]:
     """
     Identities in *module* that derive from ``base_local`` (same-module ``bases`` edges only).
 
-    Used by JSON Schema generation; cross-module ``base`` strings are treated as opaque edge labels.
+    Used by JSON Schema generation; cross-module ``base`` refs are treated as opaque edge labels.
     """
     children: dict[str, Set[str]] = {}
     for name, stmt in module.identities.items():
         for b in stmt.bases:
-            if ":" in b:
+            ref = _as_base_ref(b)
+            if ref.prefix:
                 continue
-            children.setdefault(b, set()).add(name)
+            children.setdefault(ref.name, set()).add(name)
 
     out: Set[str] = {base_local}
     stack = [base_local]
@@ -168,7 +182,9 @@ def is_derived_from_or_self(
 
 
 def identityref_value_valid(
-    importer: "YangModule", value_qname: str, identityref_bases: list[str]
+    importer: "YangModule",
+    value_qname: str,
+    identityref_bases: list[YangIdentifierRef],
 ) -> bool:
     """
     RFC 7950: instance value must be derived from **every** ``identityref`` ``base``.

@@ -34,6 +34,7 @@ from ..ast import (
     YangWhenStmt,
 )
 from ..identity_graph import descendant_closure, qualified_identity_name
+from ..identifier_ref import coerce_identifier_ref, format_identifier_ref
 from ..module import YangModule
 from ..refine_expand import copy_yang_statement
 from ..uses_expand import ExpandUsesContext, expand_uses_in_statements
@@ -51,7 +52,6 @@ from .schema_keys import (
     json_schema_defs_uri,
 )
 
-# Open JSON value: anydata / anyxml carry no fixed type in YANG (RFC 7950 §7.11–7.12).
 _ANY_JSON_INSTANCE_SCHEMA: dict[str, Any] = {
     JsonSchemaKey.TYPE: [
         "array",
@@ -109,6 +109,15 @@ def _json_schema_default_value(
         if numeric is not None:
             return numeric
     return default
+
+
+def _format_bases_for_json(bases: list[Any]) -> list[str]:
+    out: list[str] = []
+    for item in bases:
+        ref = coerce_identifier_ref(item)
+        if ref is not None:
+            out.append(format_identifier_ref(ref))
+    return out
 
 
 def _leaf_yang_type_name(
@@ -290,7 +299,7 @@ def _type_to_schema_impl(
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
 
     if name == "identityref":
-        bases = list(type_stmt.identityref_bases or [])
+        bases = _format_bases_for_json(list(type_stmt.identityref_bases or []))
         if not bases:
             return {JsonSchemaKey.TYPE: "string"}
         xy = {
@@ -1143,7 +1152,7 @@ def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) 
         JsonSchemaKey.DESCRIPTION: identity.description or "",
         JsonSchemaKey.X_YANG: {
             XYangKey.TYPE: XYangTypeValue.IDENTITY,
-            XYangKey.BASES: list(identity.bases),
+            XYangKey.BASES: _format_bases_for_json(list(identity.bases)),
             **(
                 {XYangKey.IF_FEATURES: list(identity.if_features)}
                 if identity.if_features

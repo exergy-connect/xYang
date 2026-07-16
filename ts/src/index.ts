@@ -13,6 +13,14 @@ export { ValidatorExtension } from "./validator/validator-extension";
 export type { AnydataValidationConfigInput } from "./ext/anydata_validation";
 export { parseAnydataExtensionConfig } from "./ext/anydata_validation";
 export { YangModule, YangStatement } from "./core/model";
+export type { YangIdentifierRef } from "./core/identifier-ref";
+export {
+  coerceIdentifierRef,
+  formatIdentifierRef,
+  identifierRef,
+  parseAbsoluteSchemaPath,
+  parseIdentifierRefAtom
+} from "./core/identifier-ref";
 export {
   YangCircularUsesError,
   YangRefineTargetNotFoundError,

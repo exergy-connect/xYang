@@ -11,6 +11,7 @@ from typing import TYPE_CHECKING
 from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangIdentityStmt
+from ...identifier_ref import identifier_ref
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -58,8 +59,8 @@ class IdentityStatementParser:
     def _parse_identity_base(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse base substatement inside identity."""
         tokens.consume(kw.BASE)
-        base_name = self._parsers.consume_qname_from_identifier(tokens)
+        base_prefix, base_name = self._parsers.consume_identifier_ref(tokens)
         parent = context.current_parent
         if isinstance(parent, YangIdentityStmt):
-            parent.bases.append(base_name)
+            parent.bases.append(identifier_ref(base_name, base_prefix))
         tokens.consume_if_type(YangTokenType.SEMICOLON)

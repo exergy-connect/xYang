@@ -121,17 +121,19 @@ module identity-must-sibling {
 def test_parse_minimal_identity_module():
     """Parse a module with ``identity`` statements and an ``identityref`` leaf."""
     from xyang import parse_yang_string
+    from xyang.identifier_ref import identifier_ref
 
     module = parse_yang_string(MINIMAL_IDENTITY_YANG)
     assert module.name == "identity-test"
     assert "animal" in module.identities
-    assert module.identities["dog"].bases == ["mammal"]
+    assert module.identities["dog"].bases == [identifier_ref("mammal")]
 
 
 def test_identityref_base_accepts_prefixed_qname():
     """``base sn:foo`` inside identityref (ietf-yang-push yang-data pattern)."""
     from xyang import parse_yang_string
     from xyang.ast import YangLeafStmt
+    from xyang.identifier_ref import identifier_ref
 
     yang = """
 module m {
@@ -156,7 +158,7 @@ module m {
     reason = leaf.find_statement("reason")
     assert isinstance(reason, YangLeafStmt)
     assert reason.type is not None
-    assert reason.type.identityref_bases == ["m:error"]
+    assert reason.type.identityref_bases == [identifier_ref("error", "m")]
 
 
 def test_parse_identity_module_with_must_derived_from():

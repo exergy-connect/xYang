@@ -1,5 +1,7 @@
 import * as kw from "../keywords";
 import { YangAugmentStmt, YangUsesStmt } from "../../core/ast";
+import { parseAbsoluteSchemaPath } from "../../core/identifier-ref";
+import { YangSyntaxError } from "../../core/errors";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { withDataNodeSubstatements } from "../metadata-substatements";
 import type { StatementParsers } from "../statement-parsers";
@@ -54,7 +56,18 @@ export class AugmentStatementParser {
   parse_augment(tokens: TokenStream, context: ParserContext): YangAugmentStmt {
     tokens.consume(kw.AUGMENT);
     const augment_path = this.parsers.parse_string_concatenation(tokens);
-    const stmt = new YangAugmentStmt({ name: "augment", augment_path });
+    // Absolute schema paths are segmented at parse time; relative paths under
+    // ``uses`` stay as the path string until uses-expand resolves them.
+    let augment_path_segments: ReturnType<typeof parseAbsoluteSchemaPath> = [];
+    const raw = augment_path.replace(/^["']|["']$/g, "");
+    if (raw.startsWith("/")) {
+      try {
+        augment_path_segments = parseAbsoluteSchemaPath(augment_path);
+      } catch (err) {
+        throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
+      }
+    }
+    const stmt = new YangAugmentStmt({ name: "augment", augment_path, augment_path_segments });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {

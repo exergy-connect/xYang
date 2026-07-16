@@ -18,6 +18,7 @@ from ..identity_graph import (
     identityref_value_valid,
     resolve_identity_qname_pair,
 )
+from ..identifier_ref import format_identifier_ref
 from ..module import YangModule
 from ..xpath import XPathParser
 from ..xpath.ast import ASTNode, PathNode
@@ -90,14 +91,13 @@ class TypeChecker:
         """
         name = type_stmt.name
 
-        if ":" in name:
+        if type_stmt.prefix:
             if not isinstance(root_schema, YangModule):
                 return []
-            pref, _, local = name.partition(":")
-            ext = root_schema.resolve_prefixed_module(pref)
+            ext = root_schema.resolve_prefixed_module(type_stmt.prefix)
             if ext is None:
-                return [f"unknown type prefix {pref!r} in type {name!r}"]
-            typedef = ext.get_typedef(local)
+                return [f"unknown type prefix {type_stmt.prefix!r} in type {name!r}"]
+            typedef = ext.get_typedef(name)
             if typedef is not None and typedef.type is not None:
                 return self.check(
                     value,
@@ -109,7 +109,7 @@ class TypeChecker:
                     evaluator,
                     leafref_current,
                 )
-            return [f"unknown typedef {local!r} in imported module {pref!r}"]
+            return [f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}"]
 
         if name == "union":
             return self._check_union(
@@ -203,8 +203,9 @@ class TypeChecker:
                 f"identityref value {value!r} does not resolve to a known identity"
             ]
         if not identityref_value_valid(root_schema, value, bases):
+            bases_fmt = [format_identifier_ref(b) for b in bases]
             return [
-                f"identityref value {value!r} is not derived from all bases {bases!r}"
+                f"identityref value {value!r} is not derived from all bases {bases_fmt!r}"
             ]
         return []
 

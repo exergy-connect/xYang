@@ -206,20 +206,20 @@ def _apply_uses_augmentations(
 def _resolve_uses_grouping(
     stmt: YangUsesStmt, module: YangModule
 ) -> tuple[str, YangModule, YangStatement] | None:
-    gname = stmt.grouping_name
-    if ":" in gname:
-        pref, _, local = gname.partition(":")
-        gmod = module.resolve_prefixed_module(pref)
-        lookup_name = local
+    """Resolve using parse-time ``grouping_prefix`` + ``grouping_name`` (no string split)."""
+    qname = stmt.grouping_qname()
+    if stmt.grouping_prefix:
+        gmod = module.resolve_prefixed_module(stmt.grouping_prefix)
+        lookup_name = stmt.grouping_name
     else:
         gmod = module
-        lookup_name = gname
+        lookup_name = stmt.grouping_name
     if gmod is None:
         return None
     grouping = gmod.get_grouping(lookup_name)
     if grouping is None:
         return None
-    return gname, gmod, grouping
+    return qname, gmod, grouping
 
 
 def _expand_one_uses_stmt(
@@ -229,7 +229,7 @@ def _expand_one_uses_stmt(
     if resolved is None:
         logger.warning(
             "Grouping '%s' not found when expanding uses statement",
-            stmt.grouping_name,
+            stmt.grouping_qname(),
         )
         return []
     gname, gmod, grouping = resolved

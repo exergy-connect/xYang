@@ -7,6 +7,17 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Identifier-ref (Python):** parse-time structured refs for ``identity`` ``base``, ``identityref`` ``base``, ``augment`` path segments, and typedef ``type`` prefix; expanders/validators consume ``YangIdentifierRef`` objects and do not re-split ``prefix:name`` strings (parity with TypeScript).
+
+## [0.1.6] — 2026-07-16
+
+### Fixed
+
+- **TypeScript `expandUses`:** resolve ``uses prefix:grouping`` via `import_prefixes` (Python `_resolve_uses_grouping` parity); keep groupings after expansion so importers can still reference them; nested `uses` inside an imported grouping resolve in the defining module's scope; register grouping typedefs onto the importing module; `typedef` under `grouping` is retained on the parent AST.
+- **`uses` identifier-ref:** parser stores structured `grouping_prefix` + local `grouping_name` (via `consume_identifier_ref`, normalized at parse time); expanders resolve those fields and do not re-split or trim ``prefix:name`` strings (TS + Python).
+
 ## [0.1.5] — 2026-07-16
 
 ### Fixed

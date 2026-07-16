@@ -9,6 +9,16 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.6] — 2026-07-16
+
+### Changed
+
+- **Identifier-refs at parse time:** `type`, `identity`/`base`, `identityref`/`base`, `uses`, and absolute `augment` paths store structured `{ prefix?, name }` refs (and `augment_path_segments`) instead of opaque `prefix:name` strings. Expanders and validators resolve those fields directly; `parseIdentifierRefAtom` is reserved for opaque boundaries (JSON Schema, RFC 7951 instance values, if-feature tokens). JSON Schema `x-yang.bases` still emits formatted strings for round-trip compatibility (`identifier-ref.ts`, parsers, `identity-graph.ts`, `augment-expand.ts`, `if-feature-eval.ts`, `json/*`).
+
+### Added
+
+- **Imported grouping expansion:** `expandUses` resolves `prefix:grouping` via `import_prefixes` (parity with Python); groupings retained after expand (`uses-expand.ts`, `imported_grouping.test.ts`).
+
 ## [0.1.5] — 2026-07-16
 
 ### Fixed

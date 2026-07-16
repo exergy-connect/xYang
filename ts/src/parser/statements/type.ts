@@ -9,10 +9,16 @@ export class TypeStatementParser {
 
   parse_type(tokens: TokenStream, context: ParserContext): YangTypeStmt {
     tokens.consume(kw.TYPE);
-    const name = tokens.peek_type() === YangTokenType.IDENTIFIER
-      ? this.parsers.consume_qname_from_identifier(tokens)
-      : tokens.consume();
-    const type_stmt = new YangTypeStmt({ name });
+    let prefix: string | undefined;
+    let name: string;
+    if (tokens.peek_type() === YangTokenType.IDENTIFIER) {
+      const ref = this.parsers.consume_identifier_ref(tokens);
+      prefix = ref.prefix;
+      name = ref.name;
+    } else {
+      name = tokens.consume().trim();
+    }
+    const type_stmt = new YangTypeStmt({ name, prefix });
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(type_stmt);
@@ -60,7 +66,7 @@ export class TypeStatementParser {
 
   parse_type_base(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.BASE);
-    type_stmt.identityref_bases.push(this.parsers.consume_qname_from_identifier(tokens));
+    type_stmt.identityref_bases.push(this.parsers.consume_identifier_ref(tokens));
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

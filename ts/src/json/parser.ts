@@ -1,3 +1,4 @@
+import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangModule, type ModuleSource, type SerializedStatement } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
@@ -15,6 +16,15 @@ import {
 
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value) ? (value as Record<string, unknown>) : {};
+}
+
+function basesFromJson(raw: unknown): YangIdentifierRef[] {
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw
+    .map((b) => coerceIdentifierRef(b))
+    .filter((b): b is YangIdentifierRef => Boolean(b));
 }
 
 function setConfigFromXyang(stmt: SerializedStatement, xyang: Record<string, unknown>): void {
@@ -126,8 +136,7 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
     };
   }
   if (xy.type === YangTokenType.IDENTITYREF) {
-    const bases = Array.isArray(xy.bases) ? xy.bases.filter((x): x is string => typeof x === "string") : [];
-    return { name: YangTokenType.IDENTITYREF, identityref_bases: bases };
+    return { name: YangTokenType.IDENTITYREF, identityref_bases: basesFromJson(xy.bases) };
   }
   const typedefRef = refToTypedefName(schema.$ref);
   if (typedefRef) {
@@ -816,7 +825,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   }
 
   const typedefs: Record<string, unknown> = {};
-  const identities: Record<string, { bases: string[] }> = {};
+  const identities: Record<string, { bases: YangIdentifierRef[] }> = {};
   for (const [defName, defSchema] of Object.entries(defs)) {
     if (!defSchema || typeof defSchema !== "object") {
       continue;
@@ -824,8 +833,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     const d = defSchema as Record<string, unknown>;
     const dxy = asRecord(d[YANG_SCHEMA_KEYS.xYang]);
     if (dxy.type === YangTokenType.IDENTITY) {
-      const bases = Array.isArray(dxy.bases) ? dxy.bases.filter((x): x is string => typeof x === "string") : [];
-      identities[defName] = { bases };
+      identities[defName] = { bases: basesFromJson(dxy.bases) };
       continue;
     }
     // Legacy schemas may omit x-yang typedef metadata in $defs.

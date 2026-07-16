@@ -166,12 +166,21 @@ class StatementParsers:
             f"Invalid or unknown statement in {context}: {tokens.peek()!r}"
         )
 
+    def consume_identifier_ref(self, tokens: TokenStream) -> tuple[Optional[str], str]:
+        """Consume ``name`` or ``prefix:name`` into ``(prefix|None, local_name)``.
+
+        Prefix splitting and identifier normalization happen here once.
+        Current token must be IDENTIFIER.
+        """
+        first = tokens.consume_type(YangTokenType.IDENTIFIER).strip()
+        if not tokens.consume_if_type(YangTokenType.COLON):
+            return None, first
+        return first, tokens.consume_type(YangTokenType.IDENTIFIER).strip()
+
     def consume_qname_from_identifier(self, tokens: TokenStream) -> str:
-        """Consume ``name`` or ``prefix:name`` (``prefix:...`` chain). Current token must be IDENTIFIER."""
-        parts = [tokens.consume_type(YangTokenType.IDENTIFIER)]
-        while tokens.consume_if_type(YangTokenType.COLON):
-            parts.append(tokens.consume_type(YangTokenType.IDENTIFIER))
-        return ":".join(parts)
+        """Joined ``prefix:name`` form; prefer :meth:`consume_identifier_ref` for new code."""
+        prefix, name = self.consume_identifier_ref(tokens)
+        return f"{prefix}:{name}" if prefix else name
 
     def _consume_prefix_argument(self, tokens: TokenStream) -> None:
         """Prefix argument as string or bare identifier (common in example modules)."""
