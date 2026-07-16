@@ -9,6 +9,12 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-07-16
+
+### Fixed
+
+- **`augment` expansion:** when `expandUses` is true, merge `augment` children into target schema nodes (parity with Python `apply_augmentations`), including same-module, cross-file `import`, choice/`case`, and list targets; preserve shared `import_prefixes` across `expandUses` cloning so cross-module merges hit the parser cache (`augment-expand.ts`, `augment.test.ts`).
+
 ## [0.1.3] — 2026-07-16
 
 ### Changed
@@ -80,7 +86,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/exergy-connect/xYang/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/exergy-connect/xYang/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
 [0.1.0]: https://github.com/exergy-connect/xYang/tree/v0.1.0/ts

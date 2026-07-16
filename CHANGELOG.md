@@ -120,7 +120,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.3...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.4...HEAD
+[0.1.4]: https://github.com/exergy-connect/xYang/compare/v0.1.3...v0.1.4
 [0.1.3]: https://github.com/exergy-connect/xYang/compare/v0.1.2...v0.1.3
 [0.1.2]: https://github.com/exergy-connect/xYang/compare/v0.1.1...v0.1.2
 [0.1.1]: https://github.com/exergy-connect/xYang/compare/v0.1.0...v0.1.1
