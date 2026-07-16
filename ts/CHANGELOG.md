@@ -9,6 +9,12 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-07-16
+
+### Fixed
+
+- **Imported typedef validation:** `TypeChecker` resolves `prefix:typedef` names via `import_prefixes` (e.g. `ntype:ipv4-prefix`), so non-string values no longer fail with `Unsupported type 'prefix:name'` (`type-checker.ts`, `imported_typedef.test.ts`).
+
 ## [0.1.4] — 2026-07-16
 
 ### Fixed

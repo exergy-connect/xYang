@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.5] — 2026-07-16
+
+### Fixed
+
+- **TypeScript:** `TypeChecker` resolves imported `prefix:typedef` names via `import_prefixes` (e.g. `ntype:ipv4-prefix`), so non-string instance values no longer fail with `Unsupported type 'prefix:name'`.
+
 ## [0.1.4] — 2026-07-16
 
 ### Fixed
