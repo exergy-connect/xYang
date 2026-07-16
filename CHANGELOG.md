@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.4] — 2026-07-16
+
+### Fixed
+
+- **TypeScript:** `augment` statements are merged into target schema nodes when `expandUses` is true (parity with Python `apply_augmentations`), including same-module, cross-file `import`, choice/`case`, and list targets; `expandUses` preserves shared `import_prefixes` references so cross-module merges hit the parser cache.
+
 ## [0.1.3] — 2026-07-16
 
 ### Changed

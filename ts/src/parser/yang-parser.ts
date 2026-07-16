@@ -6,6 +6,7 @@ import { ParserContext, TokenStream } from "./parser-context";
 import { StatementParsers } from "./statement-parsers";
 import { YangTokenizer } from "./tokenizer";
 import { applyBuiltinExtensionInvocations } from "../ext";
+import { applyAugments } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
 import { validateSemantics } from "../validator/semantic-validation";
 
@@ -192,6 +193,7 @@ export class YangParser {
     let mod = new YangModule(data, source);
     if (this.expandUses) {
       mod = expandUses(mod);
+      mod = applyAugments(mod);
       validateSemantics(mod);
     }
     return mod;
