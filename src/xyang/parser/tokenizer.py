@@ -98,13 +98,24 @@ class YangTokenizer:
                         advance()
                     else:
                         advance()
-                add_token(
-                    YangTokenType.STRING,
-                    unescape_yang_quoted_string(content[start:i], quote),
-                    token_start,
-                    token_line,
-                    token_line_start,
-                )
+                value = unescape_yang_quoted_string(content[start:i], quote)
+                # RFC 7950 §6.1.3 permits concatenation only between quoted
+                # strings. Check for it here, where quoted strings are lexed.
+                if (
+                    len(token_list) >= 2
+                    and token_list[-1].type == YangTokenType.PLUS
+                    and token_list[-2].type == YangTokenType.STRING
+                ):
+                    token_list[-2].value += value
+                    token_list.pop()
+                else:
+                    add_token(
+                        YangTokenType.STRING,
+                        value,
+                        token_start,
+                        token_line,
+                        token_line_start,
+                    )
                 advance()
                 continue
 
