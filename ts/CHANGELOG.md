@@ -9,6 +9,14 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- **Tokenizer:** replace RegExp whitespace/digit/identifier checks with range helpers; emit single-char punctuation via a `Map` lookup instead of an if/else chain (`tokenizer.ts`).
+
+### Fixed
+
+- **Tokenizer:** normalize RFC 7950 quoted-string concatenation while lexing quoted strings, including descriptions in imported modules (`tokenizer.ts`, `imported_string_concatenation.test.ts`).
+
 ## [0.1.6] — 2026-07-16
 
 ### Changed
