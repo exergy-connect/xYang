@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.7] — 2026-07-20
+
 ### Changed
 
 - **Tokenizer:** replace RegExp whitespace/digit/identifier checks with range helpers; emit single-char punctuation via a `Map` lookup instead of an if/else chain (`tokenizer.ts`).
@@ -110,7 +112,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.6...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.7...HEAD
+[0.1.7]: https://github.com/exergy-connect/xYang/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/exergy-connect/xYang/compare/v0.1.5...v0.1.6
 [0.1.5]: https://github.com/exergy-connect/xYang/compare/v0.1.4...v0.1.5
 [0.1.4]: https://github.com/exergy-connect/xYang/compare/v0.1.3...v0.1.4
