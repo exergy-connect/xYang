@@ -14,6 +14,9 @@ from .yang_strings import unescape_yang_quoted_string
 class YangTokenizer:
     """Tokenizer for YANG content. Emits YangToken with grammar-aligned types."""
 
+    # Single-char punctuation; // and /* are skipped before this lookup.
+    _PUNCTUATION = {t.value: t for t in YangTokenType if len(t.value) == 1}
+
     def tokenize(self, content: str, filename: Optional[str] = None) -> TokenStream:
         """
         Tokenize YANG content and return a TokenStream.
@@ -95,16 +98,25 @@ class YangTokenizer:
                         break
                     if content[i] == "\\" and i + 1 < content_len:
                         advance()
-                        advance()
-                    else:
-                        advance()
-                add_token(
-                    YangTokenType.STRING,
-                    unescape_yang_quoted_string(content[start:i], quote),
-                    token_start,
-                    token_line,
-                    token_line_start,
-                )
+                    advance()
+                value = unescape_yang_quoted_string(content[start:i], quote)
+                # RFC 7950 §6.1.3 permits concatenation only between quoted
+                # strings. Check for it here, where quoted strings are lexed.
+                if (
+                    len(token_list) >= 2
+                    and token_list[-1].type == YangTokenType.PLUS
+                    and token_list[-2].type == YangTokenType.STRING
+                ):
+                    token_list[-2].value += value
+                    token_list.pop()
+                else:
+                    add_token(
+                        YangTokenType.STRING,
+                        value,
+                        token_start,
+                        token_line,
+                        token_line_start,
+                    )
                 advance()
                 continue
 
@@ -121,7 +133,8 @@ class YangTokenizer:
                 add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
                 continue
 
-            # Unsigned integer or dotted decimal (e.g. yang-version 1.1 — not an identifier in RFC 7950)
+            # Unsigned integer or dotted decimal
+            # (e.g. yang-version 1.1 — not an identifier in RFC 7950)
             if char.isdigit():
                 token_start = i
                 token_line = current_line
@@ -148,7 +161,13 @@ class YangTokenizer:
                     )
                 else:
                     lexeme = content[start:i]
-                    add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
+                    add_token(
+                        YangTokenType.INTEGER,
+                        lexeme,
+                        token_start,
+                        token_line,
+                        token_line_start,
+                    )
                 continue
 
             # Identifier: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
@@ -173,30 +192,10 @@ class YangTokenizer:
                 )
                 continue
 
-            # Punctuation (grammar: { } ; = + /)
-            if char == "{":
-                add_token(YangTokenType.LBRACE, "{", i, current_line, line_start)
-                advance()
-            elif char == "}":
-                add_token(YangTokenType.RBRACE, "}", i, current_line, line_start)
-                advance()
-            elif char == ";":
-                add_token(YangTokenType.SEMICOLON, ";", i, current_line, line_start)
-                advance()
-            elif char == ":":
-                add_token(YangTokenType.COLON, ":", i, current_line, line_start)
-                advance()
-            elif char == "=":
-                add_token(YangTokenType.EQUALS, "=", i, current_line, line_start)
-                advance()
-            elif char == "+":
-                add_token(YangTokenType.PLUS, "+", i, current_line, line_start)
-                advance()
-            elif char == "/":
-                # Not // or /* (handled above)
-                add_token(YangTokenType.SLASH, "/", i, current_line, line_start)
-                advance()
-            else:
-                advance()
+            # Punctuation (grammar: { } ; : = + /)
+            tok_type = self._PUNCTUATION.get(char)
+            if tok_type is not None:
+                add_token(tok_type, char, i, current_line, line_start)
+            advance()
 
         return TokenStream(token_list=token_list, source=content, filename=filename)

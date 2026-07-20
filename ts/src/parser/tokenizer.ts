@@ -1,8 +1,25 @@
 import { makeYangToken, TokenStream, YangToken, YangTokenType } from "./parser-context";
 import { unescapeYangQuotedString } from "./yang-strings";
 
-const IDENTIFIER_START = /[A-Za-z_]/;
-const IDENTIFIER_CONT = /[A-Za-z0-9_.-]/;
+// RFC 7950 §6.1.1: space, tab, carriage return, line feed
+const isWhitespace = (ch: string): boolean =>
+  ch === " " || ch === "\t" || ch === "\n" || ch === "\r";
+
+const isDigit = (ch: string): boolean => ch >= "0" && ch <= "9";
+
+// Identifier: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
+const isIdentifierStart = (ch: string): boolean =>
+  (ch >= "A" && ch <= "Z") || (ch >= "a" && ch <= "z") || ch === "_";
+
+const isIdentifierCont = (ch: string): boolean =>
+  isIdentifierStart(ch) || isDigit(ch) || ch === "-" || ch === ".";
+
+// Single-char punctuation; // and /* are skipped before this lookup.
+const PUNCTUATION = new Map<string, YangTokenType>(
+  (Object.values(YangTokenType) as YangTokenType[])
+    .filter((v) => v.length === 1)
+    .map((v) => [v, v])
+);
 
 export class YangTokenizer {
   tokenize(content: string, filename?: string): TokenStream {
@@ -32,12 +49,15 @@ export class YangTokenizer {
     };
 
     while (i < content_len) {
-      if (/\s/.test(content[i])) {
+      const ch = content[i];
+
+      if (isWhitespace(ch)) {
         advance();
         continue;
       }
 
-      if (content[i] === "/" && i + 1 < content_len && content[i + 1] === "*") {
+      // Block comment: /* ... */ — recognize and skip (do not emit tokens)
+      if (ch === "/" && i + 1 < content_len && content[i + 1] === "*") {
         advance();
         advance();
         while (i < content_len) {
@@ -51,7 +71,8 @@ export class YangTokenizer {
         continue;
       }
 
-      if (content[i] === "/" && i + 1 < content_len && content[i + 1] === "/") {
+      // Line comment: // ... EOL (only here — never inside quoted-string lexing)
+      if (ch === "/" && i + 1 < content_len && content[i + 1] === "/") {
         advance();
         advance();
         while (i < content_len && content[i] !== "\n") {
@@ -59,8 +80,6 @@ export class YangTokenizer {
         }
         continue;
       }
-
-      const ch = content[i];
 
       if (ch === '"' || ch === "'") {
         const quote = ch;
@@ -75,29 +94,38 @@ export class YangTokenizer {
           }
           if (content[i] === "\\" && i + 1 < content_len) {
             advance();
-            advance();
-          } else {
-            advance();
           }
+          advance();
         }
-        add_token(
-          YangTokenType.STRING,
-          unescapeYangQuotedString(content.slice(start, i), quote as "'" | '"'),
-          token_start,
-          token_line,
-          token_line_start
-        );
+        const value = unescapeYangQuotedString(content.slice(start, i), quote as "'" | '"');
+        // RFC 7950 §6.1.3 permits concatenation only between quoted strings.
+        // Check for it here, where quoted strings are lexed.
+        if (
+          token_list.at(-1)?.type === YangTokenType.PLUS
+          && token_list.at(-2)?.type === YangTokenType.STRING
+        ) {
+          token_list[token_list.length - 2]!.value += value;
+          token_list.pop();
+        } else {
+          add_token(
+            YangTokenType.STRING,
+            value,
+            token_start,
+            token_line,
+            token_line_start
+          );
+        }
         advance();
         continue;
       }
 
-      if (ch === "-" && i + 1 < content_len && /\d/.test(content[i + 1])) {
+      if (ch === "-" && i + 1 < content_len && isDigit(content[i + 1])) {
         const token_start = i;
         const token_line = current_line;
         const token_line_start = line_start;
         advance();
         const start = i;
-        while (i < content_len && /\d/.test(content[i])) {
+        while (i < content_len && isDigit(content[i])) {
           advance();
         }
         add_token(
@@ -110,17 +138,17 @@ export class YangTokenizer {
         continue;
       }
 
-      if (/\d/.test(ch)) {
+      if (isDigit(ch)) {
         const token_start = i;
         const token_line = current_line;
         const token_line_start = line_start;
         const start = i;
-        while (i < content_len && /\d/.test(content[i])) {
+        while (i < content_len && isDigit(content[i])) {
           advance();
         }
-        if (i < content_len && content[i] === "." && i + 1 < content_len && /\d/.test(content[i + 1])) {
+        if (i < content_len && content[i] === "." && i + 1 < content_len && isDigit(content[i + 1])) {
           advance();
-          while (i < content_len && /\d/.test(content[i])) {
+          while (i < content_len && isDigit(content[i])) {
             advance();
           }
           add_token(
@@ -142,13 +170,13 @@ export class YangTokenizer {
         continue;
       }
 
-      if (IDENTIFIER_START.test(ch)) {
+      if (isIdentifierStart(ch)) {
         const token_start = i;
         const token_line = current_line;
         const token_line_start = line_start;
         const start = i;
         advance();
-        while (i < content_len && IDENTIFIER_CONT.test(content[i])) {
+        while (i < content_len && isIdentifierCont(content[i])) {
           advance();
         }
         const lexeme = content.slice(start, i);
@@ -156,30 +184,11 @@ export class YangTokenizer {
         continue;
       }
 
-      if (ch === "{") {
-        add_token(YangTokenType.LBRACE, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === "}") {
-        add_token(YangTokenType.RBRACE, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === ";") {
-        add_token(YangTokenType.SEMICOLON, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === ":") {
-        add_token(YangTokenType.COLON, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === "=") {
-        add_token(YangTokenType.EQUALS, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === "+") {
-        add_token(YangTokenType.PLUS, ch, i, current_line, line_start);
-        advance();
-      } else if (ch === "/") {
-        add_token(YangTokenType.SLASH, ch, i, current_line, line_start);
-        advance();
-      } else {
-        advance();
+      const tok_type = PUNCTUATION.get(ch);
+      if (tok_type !== undefined) {
+        add_token(tok_type, ch, i, current_line, line_start);
       }
+      advance();
     }
 
     return new TokenStream(token_list, content, filename);

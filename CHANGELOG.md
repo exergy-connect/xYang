@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Tokenizer (Python + TypeScript):** collapse single-char punctuation into a lookup map; simplify quoted-string escape advancement; TypeScript also replaces RegExp whitespace/digit/identifier checks with range helpers on the hot path.
+
+### Fixed
+
+- **Python tokenizer:** normalize RFC 7950 quoted-string concatenation while lexing quoted strings, including descriptions in imported modules, so individual statement parsers do not need concatenation handling.
+- **TypeScript tokenizer:** same quoted-string concatenation normalization while lexing (parity with Python), including descriptions in imported modules.
+
 ## [0.1.6] — 2026-07-16
 
 ### Changed
