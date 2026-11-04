@@ -1,5 +1,5 @@
 # Run the test suite on pushes and PRs that touch library code.
-# Matrix: one parallel job per Python version (3.10–3.14).
+# Matrix: one parallel job per Python version (3.11–3.15).
 # Required Checks always reports on pull requests (skipped when no Python paths changed).
 
 name: Tests
@@ -29,7 +29,7 @@ jobs:
     outputs:
       python: ${{ steps.detect.outputs.python }}
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
         with:
           fetch-depth: 0
 
@@ -55,13 +55,13 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        python-version: ["3.10", "3.11", "3.12", "3.13", "3.14"]
+        python-version: ["3.11", "3.12", "3.13", "3.14", "3.15"]
 
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - name: Set up Python ${{ matrix.python-version }}
-        uses: actions/setup-python@v6
+        uses: actions/setup-python@v7
         with:
           python-version: ${{ matrix.python-version }}
           cache: pip

@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- **Packaging:** declare Python **3.15** support (PyPI classifiers, CI matrix, Black `py315` target).
+- **Python:** minimum supported version is **3.11** (PyPI `requires-python`, classifiers, CI matrix 3.11–3.15, Black targets); **3.10 is no longer supported**. Binary values always use `base64.b64decode(..., validate=True)`.
+- **CI:** `actions/checkout`, `actions/setup-python`, and `actions/setup-node` use major version **v7**.
+
 ## [0.1.7] — 2026-07-20
 
 ### Changed

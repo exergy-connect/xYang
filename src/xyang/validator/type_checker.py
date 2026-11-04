@@ -8,7 +8,6 @@ import base64
 import binascii
 import logging
 import re
-import sys
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
@@ -446,10 +445,8 @@ class TypeChecker:
         try:
             if not s:
                 decoded = b""
-            elif sys.version_info >= (3, 11):
-                decoded = base64.b64decode(s, validate=True)
             else:
-                decoded = base64.b64decode(s)
+                decoded = base64.b64decode(s, validate=True)
         except binascii.Error:
             return ["binary value is not valid base64"]
         if type_stmt.length:
