@@ -1,4 +1,4 @@
-import { defineConfig } from "tsup";
+import { defineConfig } from "tsdown";
 
 export default defineConfig({
   entry: {
@@ -8,8 +8,9 @@ export default defineConfig({
     "types-entry": "src/types-entry.ts"
   },
   format: ["esm"],
-  // Declaration bundling uses tsup's bundled rollup-plugin-dts, which is not
-  // compatible with TypeScript 7 yet. Keep typescript on 6.x until tsup catches up.
+  // Package exports and the CLI bin point at .js / .d.ts. With "type": "module"
+  // those extensions are still ESM; skip tsdown's default .mjs / .d.mts names.
+  fixedExtension: false,
   dts: true,
   sourcemap: true,
   clean: true,

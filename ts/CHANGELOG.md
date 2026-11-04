@@ -9,6 +9,11 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- **Build:** replace `tsup` with `tsdown` for the library, CLI, and declaration bundles (`tsdown.config.ts`). The browser IIFE is still built with esbuild.
+- **TypeScript 7:** move the dev dependency from 6.x to 7.x and drop `ignoreDeprecations`. Declaration emit now goes through tsdown, which works with TypeScript 7.
+
 ## [0.1.8] — 2026-11-04
 
 ### Changed

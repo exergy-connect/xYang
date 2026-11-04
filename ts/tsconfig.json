@@ -6,7 +6,6 @@
     "strict": true,
     "esModuleInterop": true,
     "skipLibCheck": true,
-    "ignoreDeprecations": "6.0",
     "declaration": true,
     "declarationMap": true,
     "sourceMap": true,
@@ -20,7 +19,7 @@
   "include": [
     "src",
     "test",
-    "tsup.config.ts",
+    "tsdown.config.ts",
     "vitest.config.ts"
   ]
 }

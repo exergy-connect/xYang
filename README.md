@@ -175,7 +175,7 @@ pytest
 cd ts && npm install && npm test
 ```
 
-`typescript` is pinned to **6.x** (not 7) because `tsup` 8.5.1 bundles `rollup-plugin-dts` for `dts: true` builds, and that toolchain fails under TypeScript 7 with `useCaseSensitiveFileNames` errors during `.d.ts` generation. Revisit when [tsup#1405](https://github.com/egoist/tsup/issues/1405) is resolved or `tsup` ships a compatible `rollup-plugin-dts`.
+Library and CLI bundles are produced with `tsdown` (`npm run build`). The browser IIFE is a separate esbuild step.
 
 ---
 
