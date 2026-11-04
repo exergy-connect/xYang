@@ -10,7 +10,7 @@ The same feature set is implemented twice:
 |---|----------------------|------------------------------|
 | **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | [npm](https://www.npmjs.com/package/@exergy-connect/xyang) `@exergy-connect/xyang` |
 | **CLI** | `xyang` | `xyang-ts` |
-| **Runtime** | Python ≥ 3.10, zero required deps | Node ≥ 24 |
+| **Runtime** | Python ≥ 3.11, zero required deps | Node ≥ 24 |
 | **Source** | [`src/xyang/`](src/xyang/) | [`ts/src/`](ts/src/) |
 
 Not every YANG statement is modeled; unsupported constructs are skipped with a warning so mixed modules still load. See [**FEATURES.md**](FEATURES.md) for the full matrix, JSON hybrid format, and known gaps.
@@ -221,7 +221,7 @@ jobs:
   validate-yang:
     runs-on: ubuntu-latest
     steps:
-      - uses: actions/checkout@v6
+      - uses: actions/checkout@v7
 
       - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
         with:
