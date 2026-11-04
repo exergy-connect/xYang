@@ -7,6 +7,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-11-04
+
+### Changed
+
+- **TypeScript:** replace `tsup` with `tsdown` and build on TypeScript 7. No Python behavior changes; the PyPI version stays aligned with `@exergy-connect/xyang` **0.1.9**.
+
 ## [0.1.8] — 2026-11-04
 
 ### Changed
@@ -155,7 +161,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/exergy-connect/xYang/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/exergy-connect/xYang/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/exergy-connect/xYang/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/exergy-connect/xYang/compare/v0.1.5...v0.1.6

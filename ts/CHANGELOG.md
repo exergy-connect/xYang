@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.9] — 2026-11-04
+
 ### Changed
 
 - **Build:** replace `tsup` with `tsdown` for the library, CLI, and declaration bundles (`tsdown.config.ts`). The browser IIFE is still built with esbuild.
@@ -123,7 +125,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.8...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.9...HEAD
+[0.1.9]: https://github.com/exergy-connect/xYang/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/exergy-connect/xYang/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/exergy-connect/xYang/compare/v0.1.6...v0.1.7
 [0.1.6]: https://github.com/exergy-connect/xYang/compare/v0.1.5...v0.1.6
