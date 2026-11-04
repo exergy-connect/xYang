@@ -48,7 +48,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsup && node ./scripts/build-browser-iife.mjs",
+    "build": "tsdown && node ./scripts/build-browser-iife.mjs",
     "build:check": "npm run build && node ./scripts/check-artifacts.mjs && node ./scripts/sync-docs-browser-bundle.mjs",
     "build:ci": "node ./scripts/build-ci-artifacts.mjs && node ./scripts/check-ci-artifacts.mjs",
     "test": "vitest run",
@@ -59,8 +59,8 @@
   "devDependencies": {
     "@types/node": "^26.1.1",
     "esbuild": "^0.28.1",
-    "tsup": "^8.5.1",
-    "typescript": "^6.0.3",
+    "tsdown": "^0.23.5",
+    "typescript": "^7.0.2",
     "vitest": "^4.1.10",
     "yaml": "^2.9.0"
   }
