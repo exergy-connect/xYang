@@ -130,6 +130,9 @@ export class DocumentValidator {
         this.validateStatement(stmt, root[stmt.name], stmt.name, errors, rootNode, rootNode);
       }
 
+      if (ctx.constraintChecks) {
+        this.rejectUnknownListItemKeys(ctx.module, root, "", errors);
+      }
       return [errors.length === 0, errors, warnings];
     } finally {
       this.contextStack.pop();
@@ -348,84 +351,20 @@ export class DocumentValidator {
     }
   }
 
-  private collectSchemaInstanceKeys(stmt: YangStatement | undefined, keys: Set<string>): void {
-    if (!stmt) {
-      return;
-    }
-    const kw = this.effectiveKeyword(stmt);
-    if (kw === YangTokenType.CHOICE) {
-      for (const c of stmt.statements ?? []) {
-        if (c.keyword !== YangTokenType.CASE) {
-          continue;
-        }
-        for (const br of c.statements ?? []) {
-          this.collectSchemaInstanceKeys(br, keys);
-        }
-      }
-      return;
-    }
-    if (kw === YangTokenType.LIST) {
-      if (stmt.name) {
-        keys.add(stmt.name);
-      }
-      return;
-    }
-    if (kw === YangTokenType.CONTAINER) {
-      const ch = stmt.statements ?? [];
-      const onlyChoice = ch.length === 1 && this.effectiveKeyword(ch[0]) === YangTokenType.CHOICE;
-      if (!onlyChoice && stmt.name) {
-        keys.add(stmt.name);
-      }
-      for (const c of ch) {
-        this.collectSchemaInstanceKeys(c, keys);
-      }
-      return;
-    }
-    if (stmt.name) {
-      keys.add(stmt.name);
-    }
-  }
-
-  /**
-   * Reject extra JSON keys under the meta-model `array` container (array element shape).
-   * A general unknown-key pass breaks nested choice wrappers (e.g. `inner_wrap` around a choice).
-   */
   private rejectUnknownContainerKeys(stmt: YangStatement, obj: Record<string, unknown>, path: string, errors: string[]): void {
-    if (stmt.data.presence) {
-      return;
-    }
-    if (stmt.name !== "array") {
-      return;
-    }
-    const children = stmt.statements ?? [];
-    if (children.length !== 1 || this.effectiveKeyword(children[0]) !== YangTokenType.CHOICE) {
-      return;
-    }
-    const allowed = new Set<string>();
-    this.collectSchemaInstanceKeys(children[0], allowed);
-    if (allowed.size === 0) {
-      return;
-    }
-    for (const key of Object.keys(obj)) {
-      if (!allowed.has(key)) {
-        errors.push(`${path}: Unknown field '${key}'`);
-      }
-    }
+    this.rejectUnknownListItemKeys(stmt, obj, path, errors);
   }
 
-  private rejectUnknownListItemKeys(stmt: YangStatement, row: Record<string, unknown>, path: string, errors: string[]): void {
+  private rejectUnknownListItemKeys(stmt: YangStatement | YangModule, row: Record<string, unknown>, path: string, errors: string[]): void {
     const allowed = this.collectDirectChildKeys(stmt);
-    if (allowed.size === 0) {
-      return;
-    }
     for (const key of Object.keys(row)) {
       if (!allowed.has(key)) {
-        errors.push(`${path}: Unknown field '${key}'`);
+        errors.push(`${path ? path + ": " : ""}Unknown field '${key}'`);
       }
     }
   }
 
-  private collectDirectChildKeys(parent: YangStatement): Set<string> {
+  private collectDirectChildKeys(parent: YangStatement | YangModule): Set<string> {
     const keys = new Set<string>();
     const walk = (stmt: YangStatement): void => {
       const kw = this.effectiveKeyword(stmt);
@@ -435,7 +374,10 @@ export class DocumentValidator {
         }
         return;
       }
-      if (stmt.name) {
+      if (stmt.name && [
+        YangTokenType.CONTAINER, YangTokenType.LIST, YangTokenType.LEAF,
+        YangTokenType.LEAF_LIST, YangTokenType.ANYDATA, YangTokenType.ANYXML
+      ].includes(kw as YangTokenType)) {
         keys.add(stmt.name);
       }
     };

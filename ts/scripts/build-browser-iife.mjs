@@ -1,3 +1,4 @@
+import { readFile } from "node:fs/promises";
 import { build } from "esbuild";
 import { dirname, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
@@ -17,7 +18,9 @@ const browserBuiltinShims = {
   }
 };
 
-await build({
+const license = await readFile(resolve(tsRoot, "../LICENSE"), "utf8");
+
+const options = {
   absWorkingDir: tsRoot,
   entryPoints: [resolve(tsRoot, "src/index.ts")],
   bundle: true,
@@ -31,7 +34,11 @@ await build({
   outfile: resolve(tsRoot, "dist/index.umd.min.global.js"),
   sourcemap: true,
   logLevel: "info",
-  plugins: [browserBuiltinShims]
-});
+  plugins: [browserBuiltinShims],
+  banner: { js: `/*!\n${license}*/` }
+};
+
+await build(options);
+await build({ ...options, format: "esm", globalName: undefined, outfile: resolve(tsRoot, "dist/index.browser.js") });
 
 console.log("Browser IIFE written to dist/index.umd.min.global.js");

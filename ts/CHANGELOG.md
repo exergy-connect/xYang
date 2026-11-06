@@ -9,6 +9,16 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-11-05
+
+### Changed
+
+- TypeScript validation rejects unknown fields at the document root and in all containers by default, matching the existing list-item and Python behavior. Choice/case nodes remain transparent; anydata/anyxml payload contents remain opaque unless separately validated.
+
+### Added
+
+- Public `@exergy-connect/xyang/browser` export: a self-contained browser ESM bundle with named exports, source map, and MIT license banner. The existing global IIFE remains available.
+
 ## [0.1.9] — 2026-11-04
 
 ### Changed

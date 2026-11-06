@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-11-05
+
+### Changed
+
+- **TypeScript validation:** reject unknown fields at the document root and in all containers by default, matching existing list-item and Python validation. Choice/case nodes remain transparent, and `anydata`/`anyxml` payload contents remain opaque unless separately validated. Previously accepted data containing unknown fields now fails validation.
+
+### Added
+
+- **Browser ESM bundle:** public `@exergy-connect/xyang/browser` npm export with named exports, a source map, and an MIT license banner. The existing global IIFE bundle remains available.
+
 ## [0.1.9] — 2026-11-04
 
 ### Changed
