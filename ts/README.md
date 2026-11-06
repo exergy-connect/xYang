@@ -61,3 +61,34 @@ The browser entry point parses YANG source strings without filesystem access.
 Unsupported YANG constructs may be skipped with a warning. See the [feature matrix and known gaps](https://github.com/exergy-connect/xYang/blob/main/FEATURES.md) for details.
 
 [Source and documentation](https://github.com/exergy-connect/xYang) · [Report an issue](https://github.com/exergy-connect/xYang/issues)
+
+## Infer required YANG features
+
+For models gated by feature names or positive `and` conjunctions, infer the
+minimum feature requirements from the elements present in an instance:
+
+```typescript
+import { parseYangString, inferRequiredFeatures } from "@exergy-connect/xyang";
+
+const module = parseYangString(`module example {
+  namespace "urn:example"; prefix ex;
+  feature statistics;
+  leaf count { if-feature "statistics"; type uint32; }
+}`);
+const features = inferRequiredFeatures(module, { "example:count": 3 });
+// ["example:statistics"]
+```
+
+The result is a sorted, deduplicated list of `module-name:feature` strings (not
+import prefixes). It includes gates on enclosing containers, lists, choices and
+cases, gates carried by expanded uses/augments, and transitive feature
+prerequisites. Absent nodes contribute nothing; an empty document returns `[]`.
+Parse with uses expansion enabled (the default). Both unqualified members in the
+current module and module-qualified members are accepted.
+
+This API infers requirements from member presence; it does not validate values,
+mandatory nodes, or other constraints. `anydata` and `anyxml` contents are opaque.
+It throws for unknown or ambiguous instance members, unknown features, cyclic
+prerequisites, malformed container/list structure, and encountered expressions
+outside simple feature atoms or `and` conjunctions (`or`, `not`, and parentheses
+are unsupported). Unsupported conditions on absent branches are not evaluated.

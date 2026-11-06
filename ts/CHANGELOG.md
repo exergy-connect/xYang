@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- Export `inferRequiredFeatures(module, instance)` to infer a sorted, deduplicated list of module-qualified feature requirements from present instance elements, enclosing schema gates, and transitive prerequisites. Supports feature atoms and positive `and` conjunctions; rejects unknown members/features and unsupported expressions. Includes API documentation and tests.
+
 ## [0.1.10] — 2026-11-05
 
 ### Changed

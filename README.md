@@ -298,3 +298,54 @@ const result = validator.validate(data);
 Validation rejects unknown fields at the document root, in containers, and in
 list entries. Arbitrary payloads belong in modeled `anydata` or `anyxml` nodes.
 The browser bundle supports string parsing; filesystem parsing requires Node.js.
+
+## Infer required YANG features (API)
+
+For models gated by feature names or positive `and` conjunctions, infer the
+minimum feature requirements from the elements present in an instance:
+
+```typescript
+import { parseYangString, inferRequiredFeatures } from "@exergy-connect/xyang";
+
+const module = parseYangString(`module example {
+  namespace "urn:example"; prefix ex;
+  feature statistics;
+  leaf count { if-feature "statistics"; type uint32; }
+}`);
+const features = inferRequiredFeatures(module, { "example:count": 3 });
+// ["example:statistics"]
+```
+
+The result is a sorted, deduplicated list of `module-name:feature` strings (not
+import prefixes). It includes gates on enclosing containers, lists, choices and
+cases, gates carried by expanded uses/augments, and transitive feature
+prerequisites. Absent nodes contribute nothing; an empty document returns `[]`.
+Parse with uses expansion enabled (the default). Both unqualified members in the
+current module and module-qualified members are accepted.
+
+This API infers requirements from member presence; it does not validate values,
+mandatory nodes, or other constraints. `anydata` and `anyxml` contents are opaque.
+It throws for unknown or ambiguous instance members, unknown features, cyclic
+prerequisites, malformed container/list structure, and encountered expressions
+outside simple feature atoms or `and` conjunctions (`or`, `not`, and parentheses
+are unsupported). Unsupported conditions on absent branches are not evaluated.
+
+Python exposes the same workflow:
+
+```python
+from xyang import parse_yang_string, infer_required_features
+
+module = parse_yang_string('''module example {
+  namespace "urn:example"; prefix ex;
+  feature statistics;
+  leaf count { if-feature "statistics"; type uint32; }
+}''')
+features = infer_required_features(module, {"example:count": 3})
+# ["example:statistics"]
+```
+
+Python raises `ValueError` for the inference errors described above. TypeScript
+throws `Error`. The returned list contains requirements only; when configuring a
+validator, group these names by module and explicitly supply empty sets for
+modules with no required features, since omitted modules otherwise default to
+all features enabled.
