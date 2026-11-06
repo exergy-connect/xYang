@@ -28,3 +28,5 @@ export {
   YangSyntaxError
 } from "./core/errors";
 export { generateJsonSchema, parseJsonSchema } from "./json";
+
+export { inferRequiredFeatures } from "./validator/infer-required-features";
