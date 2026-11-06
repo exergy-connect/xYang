@@ -280,3 +280,21 @@ Pin `ref` to a release tag or SHA once this workflow is on `main`.
 ## License
 
 MIT License
+
+
+### Browser ES modules
+
+The npm package includes a self-contained browser ESM bundle at
+`@exergy-connect/xyang/browser`. Resolve that export in your build tool or copy
+the resolved file and its adjacent source map to your static assets:
+
+```js
+import { parseYangString, YangValidator } from "@exergy-connect/xyang/browser";
+
+const validator = new YangValidator(parseYangString(source));
+const result = validator.validate(data);
+```
+
+Validation rejects unknown fields at the document root, in containers, and in
+list entries. Arbitrary payloads belong in modeled `anydata` or `anyxml` nodes.
+The browser bundle supports string parsing; filesystem parsing requires Node.js.
