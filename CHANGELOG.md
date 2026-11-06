@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.11] — 2026-11-06
+
 ### Added
 
 - **Feature inference (Python + TypeScript):** add `infer_required_features(module, instance)` and `inferRequiredFeatures(module, instance)` APIs returning a sorted, deduplicated list of module-qualified feature requirements from present instance elements, enclosing schema gates, and transitive prerequisites. Support feature atoms and positive `and` conjunctions; reject unknown members/features and unsupported expressions. Includes API documentation and tests.
