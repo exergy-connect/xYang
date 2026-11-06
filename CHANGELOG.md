@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [0.1.10] — 2026-11-05
+
 ### Changed
 
 - **TypeScript validation:** reject unknown fields at the document root and in all containers by default, matching existing list-item and Python validation. Choice/case nodes remain transparent, and `anydata`/`anyxml` payload contents remain opaque unless separately validated. Previously accepted data containing unknown fields now fails validation.
