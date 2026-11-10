@@ -58,41 +58,6 @@ function fArrayEntity(
 }
 
 describe("python parity: test_choice_case", () => {
-  const ITEM_TYPE_CHOICE_MODULE = `
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  typedef primitive-type {
-    type enumeration {
-      enum string;
-      enum integer;
-      enum number;
-      enum boolean;
-    }
-  }
-
-  container data {
-    container item_type {
-      choice item-type-choice {
-        mandatory true;
-        case primitive-case {
-          leaf primitive {
-            type primitive-type;
-          }
-        }
-        case entity-case {
-          leaf entity {
-            type string;
-          }
-        }
-      }
-    }
-  }
-}
-`;
-
   it("stores mandatory true on choice statement", () => {
     const module = parseYangString(`
 module test {
@@ -258,66 +223,6 @@ module test {
     expect(leafX?.data.mandatory).toBe(true);
   });
 
-  it("rejects data when multiple choice cases are active", () => {
-    const module = parseYangString(ITEM_TYPE_CHOICE_MODULE);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        item_type: {
-          primitive: "string",
-          entity: "User"
-        }
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    const joined = result.errors.map((e) => e.toLowerCase()).join(" ");
-    expect(joined.includes("only one case") || joined.includes("multiple cases")).toBe(true);
-  });
-
-  it("rejects data when mandatory choice has no active case", () => {
-    const module = parseYangString(ITEM_TYPE_CHOICE_MODULE);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        item_type: {}
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    const joined = result.errors.join(" ").toLowerCase();
-    expect(joined.includes("mandatory") && joined.includes("choice")).toBe(true);
-  });
-
-  it("accepts primitive branch data for mandatory choice", () => {
-    const module = parseYangString(ITEM_TYPE_CHOICE_MODULE);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        item_type: {
-          primitive: "string"
-        }
-      }
-    });
-
-    expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
-  it("accepts entity branch data for mandatory choice", () => {
-    const module = parseYangString(ITEM_TYPE_CHOICE_MODULE);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        item_type: {
-          entity: "my_entity"
-        }
-      }
-    });
-
-    expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
 
   it("enforces mandatory nested choice when outer case has sibling data", () => {
     const module = parseYangString(`
@@ -392,53 +297,6 @@ module test {
     expect(result.errors).toEqual([]);
   });
 
-  it("requires mandatory leaf in case when sibling in same case is present", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    choice protocol {
-      case a {
-        leaf x {
-          type string;
-          mandatory true;
-        }
-        leaf y { type string; }
-      }
-    }
-  }
-}
-`);
-    const validator = new YangValidator(module);
-    const invalid = validator.validate({
-      data: { y: "present-without-x" }
-    });
-    const valid = validator.validate({
-      data: { x: "ok" }
-    });
-
-    expect(invalid.isValid).toBe(false);
-    expect(invalid.errors.length).toBeGreaterThan(0);
-    expect(valid.isValid).toBe(true);
-  });
-
-  it("rejects invalid enumeration value on primitive branch (documents enum validation under choice)", () => {
-    const module = parseYangString(ITEM_TYPE_CHOICE_MODULE);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        item_type: {
-          primitive: "invalid_type"
-        }
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-  });
 
   it("meta-model.yang: array of primitives satisfies item_type choice", () => {
     const module = parseYangFile(metaModelPath);

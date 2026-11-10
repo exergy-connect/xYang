@@ -11,5 +11,10 @@ module m {
     leaf b { if-feature "f or g"; type string; }
     leaf c { if-feature "not f"; type string; }
     leaf d { if-feature "f and g"; type string; }
+    list items {
+      if-feature "f";
+      key id;
+      leaf id { type string; }
+    }
   }
 }

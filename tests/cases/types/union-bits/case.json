@@ -1,0 +1,10 @@
+{
+  "description": "A union member may be bits; the value is valid when any member accepts it.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "integer member", "data": { "top": { "limit": 42 } }, "valid": true },
+    { "name": "bits member", "data": { "top": { "limit": "a b" } }, "valid": true },
+    { "name": "no member matches", "data": { "top": { "limit": "not-a-bit" } }, "valid": false,
+      "errors": [{ "path": "/top/limit", "code": "union" }] }
+  ]
+}

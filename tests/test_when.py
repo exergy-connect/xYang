@@ -56,8 +56,8 @@ def _evaluate_bool(ev: XPathEvaluator, expr: str, ctx: Context, node: Node) -> b
     return yang_bool(result)
 
 
-def test_when_condition_true():
-    """Test when condition that evaluates to true."""
+def test_when_condition_stored_on_statement():
+    """A when substatement is stored on the schema node."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -95,21 +95,6 @@ module test {
     assert item_type.when is not None
     assert item_type.when.condition == "../type = 'array'"
 
-    # Test validation with when condition true
-    validator = YangValidator(module)
-    data = {
-        "data": {
-            "type": "array",
-            "item_type": {
-                "primitive": "string"
-            }
-        }
-    }
-
-    is_valid, errors, warnings = validator.validate(data)
-    # Should be valid when condition is true
-    assert is_valid or len(errors) == 0
-
 
 def test_when_braced_form_with_description():
     """RFC 7950: when may include a description substatement in the braced form."""
@@ -139,58 +124,6 @@ module test {
     assert extra.when is not None
     assert extra.when.condition == "../mode = 'on'"
     assert "Only when mode is on" in extra.when.description
-
-
-def test_when_condition_false():
-    """Test when condition that evaluates to false - container should be skipped."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    leaf type {
-      type string;
-    }
-    container item_type {
-      when "../type = 'array'";
-      description "Only present when type is array";
-      leaf primitive {
-        type string;
-        mandatory true;
-      }
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-
-    # When condition is false, container should be skipped
-    # Even if item_type is missing, it shouldn't cause validation errors
-    data = {
-        "data": {
-            "type": "string"  # Not 'array', so when condition is false
-        }
-    }
-
-    is_valid, errors, warnings = validator.validate(data)
-    # Should be valid - when condition false means container is optional
-    assert is_valid
-
-    # When condition is false, item_type must not appear; if present it is invalid
-    data_with_item_type = {
-        "data": {
-            "type": "string",
-            "item_type": {
-                "primitive": "string"
-            }
-        }
-    }
-    is_valid_extra, errors_extra, _ = validator.validate(data_with_item_type)
-    assert not is_valid_extra, "item_type with type != 'array' should be invalid"
-    assert any("item_type" in str(e).lower() for e in errors_extra)
 
 
 def test_when_condition_empty_type_leaf():

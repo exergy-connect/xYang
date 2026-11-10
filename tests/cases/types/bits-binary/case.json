@@ -1,9 +1,14 @@
 {
-  "description": "bits is a space-separated string of bit names; binary is base64 and length counts decoded octets.",
+  "description": "bits is a space-separated string of bit names (empty, duplicate tokens, and non-strings are checked); binary is base64 and length counts decoded octets.",
   "module": "m.yang",
   "instances": [
     { "name": "valid", "data": { "top": { "perms": "read write", "blob": "AAEC" } }, "valid": true },
+    { "name": "empty bits", "data": { "top": { "perms": "" } }, "valid": true },
     { "name": "unknown bit", "data": { "top": { "perms": "read exec" } }, "valid": false,
+      "errors": [{ "path": "/top/perms", "code": "bits" }] },
+    { "name": "duplicate bit", "data": { "top": { "perms": "read read" } }, "valid": false,
+      "errors": [{ "path": "/top/perms", "code": "bits" }] },
+    { "name": "bits not a string", "data": { "top": { "perms": 1 } }, "valid": false,
       "errors": [{ "path": "/top/perms", "code": "bits" }] },
     { "name": "not base64", "data": { "top": { "blob": "!!" } }, "valid": false,
       "errors": [{ "path": "/top/blob", "code": "type" }] },

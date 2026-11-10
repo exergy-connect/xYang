@@ -1,4 +1,4 @@
-"""Tests for ``if-feature``: parsing (RFC 7950 §7.18.2), evaluation (§7.20.2), and validation."""
+"""Tests for ``if-feature``: parsing (RFC 7950 §7.18.2) and evaluation (§7.20.2)."""
 
 from __future__ import annotations
 
@@ -16,7 +16,6 @@ from xyang.ast import (
 )
 from xyang.module import YangModule
 from xyang.parser import YangParser
-from xyang.validator.document_validator import DocumentValidator
 from xyang.validator.if_feature_eval import (
     build_enabled_features_map,
     evaluate_if_feature_expression,
@@ -432,105 +431,6 @@ module main {
     m = build_enabled_features_map(mod, {"main": frozenset()})
     assert m["lib"] == frozenset({"x"})
     assert m["main"] == frozenset()
-
-
-# -- document validation --
-
-
-def test_validate_inactive_leaf_present_is_error(yang_source: Path) -> None:
-    yang = """
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature f;
-  container root {
-    leaf a {
-      if-feature "f";
-      type string;
-    }
-  }
-}
-"""
-    mod = _parse(yang, yang_source)
-    v = DocumentValidator(
-        mod, enabled_features_by_module={"m": frozenset()}
-    )
-    errors = v.validate({"root": {"a": "hi"}})
-    assert len(errors) == 1
-    assert "if-feature" in errors[0].message
-
-
-def test_validate_inactive_leaf_absent_ok(yang_source: Path) -> None:
-    yang = """
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature f;
-  container root {
-    leaf a {
-      if-feature "f";
-      type string;
-    }
-  }
-}
-"""
-    mod = _parse(yang, yang_source)
-    v = DocumentValidator(
-        mod, enabled_features_by_module={"m": frozenset()}
-    )
-    assert v.validate({"root": {}}) == []
-
-
-def test_validate_feature_enabled_allows_data(yang_source: Path) -> None:
-    yang = """
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature f;
-  container root {
-    leaf a {
-      if-feature "f";
-      type string;
-    }
-  }
-}
-"""
-    mod = _parse(yang, yang_source)
-    v = DocumentValidator(
-        mod, enabled_features_by_module={"m": frozenset({"f"})}
-    )
-    assert v.validate({"root": {"a": "ok"}}) == []
-
-
-def test_validate_inactive_list_present_is_error(yang_source: Path) -> None:
-    yang = """
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature lst;
-  container root {
-    list items {
-      if-feature "lst";
-      key "id";
-      leaf id { type string; }
-    }
-  }
-}
-"""
-    mod = _parse(yang, yang_source)
-    v = DocumentValidator(
-        mod, enabled_features_by_module={"m": frozenset()}
-    )
-    errors = v.validate({"root": {"items": [{"id": "1"}]}})
-    assert len(errors) >= 1
-    assert any("if-feature" in e.message for e in errors)
-
-
-# -- RFC 7950 §7.20.2: additional parent statements (choice, case, uses, refine, feature) --
 
 
 def test_if_feature_on_choice_and_case(yang_source: Path) -> None:

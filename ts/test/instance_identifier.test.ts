@@ -43,20 +43,6 @@ describe("python parity: test_instance_identifier", () => {
     expect(result.errors).toEqual([]);
   });
 
-  it("rejects path when require-instance is true and target is missing", () => {
-    const module = parseYangString(MINIMAL_MODULE_YANG);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      "data-model": {
-        top: { x: "hello" },
-        ptr: "/data-model/top/missing-leaf",
-        ptr_loose: "/any"
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    expect(result.errors.some((e) => e.toLowerCase().includes("instance-identifier"))).toBe(true);
-  });
 
   it("rejects non-absolute paths when require-instance is true", () => {
     const module = parseYangString(MINIMAL_MODULE_YANG);

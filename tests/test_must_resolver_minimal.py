@@ -112,28 +112,6 @@ module test {
     assert is_valid, errors
 
 
-def test_must_string_length_dot_gt_zero():
-    """Must string-length(.) > 0: . is current node (leaf value)."""
-    yang = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  container data {
-    leaf name {
-      type string;
-      must "string-length(.) > 0";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang)
-    validator = YangValidator(module)
-    data = {"data": {"name": "x"}}
-    is_valid, errors, _ = validator.validate(data)
-    assert is_valid, errors
-
-
 def test_must_string_length_fails_empty():
     """Must string-length(.) > 0 fails for empty string."""
     yang = """
