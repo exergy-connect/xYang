@@ -63,6 +63,12 @@ function firstValue(value: unknown): unknown {
   return values[0];
 }
 
+/** XPath 1.0 string conversion, the same as `string()` for one argument. */
+function asXPathString(value: unknown): string {
+  const first = firstValue(value);
+  return first == null ? "" : String(first);
+}
+
 function coercePair(left: unknown, right: unknown): [unknown, unknown] {
   if (typeof left === "boolean" || typeof right === "boolean") {
     return [toYangBool(left), toYangBool(right)];
@@ -397,6 +403,46 @@ export class XPathEvaluator {
     }
     if (fn === "concat") {
       return args.map((arg) => String(firstValue(this.eval(arg, context, node)) ?? "")).join("");
+    }
+    if (fn === "contains") {
+      if (args.length !== 2) {
+        return false;
+      }
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      return source.includes(needle);
+    }
+    if (fn === "starts-with") {
+      if (args.length !== 2) {
+        return false;
+      }
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      return source.startsWith(needle);
+    }
+    if (fn === "substring-before") {
+      if (args.length !== 2) {
+        return "";
+      }
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      const index = source.indexOf(needle);
+      if (index < 0) {
+        return "";
+      }
+      return source.slice(0, index);
+    }
+    if (fn === "substring-after") {
+      if (args.length !== 2) {
+        return "";
+      }
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      const index = source.indexOf(needle);
+      if (index < 0) {
+        return "";
+      }
+      return source.slice(index + needle.length);
     }
     if (fn === "translate") {
       if (args.length !== 3) {
