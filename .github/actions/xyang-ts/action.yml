@@ -58,7 +58,7 @@ runs:
     - name: Set up Node.js
       uses: actions/setup-node@v7
       with:
-        node-version: "24"
+        node-version-file: ${{ inputs.path }}/.nvmrc
 
     - id: setup
       name: Configure xyang-ts

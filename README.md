@@ -169,13 +169,13 @@ pip install -e ".[dev]"
 pytest
 ```
 
-**TypeScript**
+**TypeScript** (Node.js 24 or newer; `.nvmrc` / `.node-version` pin the version local tools and CI use)
 
 ```bash
 cd ts && npm install && npm test
 ```
 
-Library and CLI bundles are produced with `tsdown` (`npm run build`). The browser IIFE is a separate esbuild step.
+`npm test` does not require a prior build. Library and CLI bundles are produced with `tsdown` (`npm run build`). The browser IIFE is a separate esbuild step.
 
 ---
 
@@ -185,7 +185,7 @@ Library and CLI bundles are produced with `tsdown` (`npm run build`). The browse
 
 | Workflow | File | Purpose |
 |----------|------|---------|
-| **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on Node 24 |
+| **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS |
 | **Build TypeScript CI artifacts** | [`.github/workflows/build-ts-dist.yml`](.github/workflows/build-ts-dist.yml) | Runs `npm run build:ci` and keeps committed build artifacts in sync |
 
 Both workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths).
