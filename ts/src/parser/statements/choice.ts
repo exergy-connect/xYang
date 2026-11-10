@@ -88,10 +88,10 @@ export class ChoiceStatementParser {
 
   parse_choice_mandatory(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.MANDATORY);
-    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
+    const value = this.parsers.parse_boolean_argument(tokens, "mandatory");
     const parent = context.current_parent as YangChoiceStmt;
     if (parent instanceof YangChoiceStmt) {
-      parent.mandatory = tt === kw.TRUE;
+      parent.mandatory = value;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

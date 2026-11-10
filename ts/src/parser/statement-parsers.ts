@@ -504,6 +504,27 @@ export class StatementParsers {
     return this.read_unquoted_argument(tokens);
   }
 
+  /** Exact lexical `true` or `false`, quoted or unquoted. */
+  parse_boolean_argument(tokens: TokenStream, statement: string): boolean {
+    const tt = tokens.peek_type();
+    if (
+      !tokens.has_more() ||
+      tt === YangTokenType.SEMICOLON ||
+      tt === YangTokenType.LBRACE ||
+      tt === YangTokenType.RBRACE
+    ) {
+      tokens.syntaxError(`${statement} argument must be 'true' or 'false', got ''`);
+    }
+    const raw = this.parse_string_argument(tokens);
+    if (raw === kw.TRUE) {
+      return true;
+    }
+    if (raw === kw.FALSE) {
+      return false;
+    }
+    tokens.syntaxError(`${statement} argument must be 'true' or 'false', got '${raw}'`);
+  }
+
   /** Adjacent lexemes up to whitespace, `;`, or `{` (RFC 7950 §6.1.3). */
   read_unquoted_argument(tokens: TokenStream): string {
     const stop = new Set<YangTokenType>([
@@ -1383,12 +1404,12 @@ export class StatementParsers {
 
   parse_config(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.CONFIG);
-    const value = tokens.consume_oneof([kw.TRUE, kw.FALSE])[1];
+    const value = this.parse_boolean_argument(tokens, "config");
     const parent = context.current_parent;
     if (parent instanceof YangRefineStmt) {
-      parent.refined_config = value === kw.TRUE;
+      parent.refined_config = value;
     } else if (parent && typeof parent === "object" && "config" in parent) {
-      (parent as { config?: boolean }).config = value === kw.TRUE;
+      (parent as { config?: boolean }).config = value;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
@@ -1494,15 +1515,15 @@ export class StatementParsers {
 
   parse_leaf_mandatory(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.MANDATORY);
-    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
+    const value = this.parse_boolean_argument(tokens, "mandatory");
     const parent: unknown = context.current_parent;
     if (parent instanceof YangRefineStmt) {
-      parent.refined_mandatory = tt === kw.TRUE;
+      parent.refined_mandatory = value;
       tokens.consume_if_type(YangTokenType.SEMICOLON);
       return;
     }
     if (parent && typeof parent === "object" && "mandatory" in parent) {
-      (parent as { mandatory?: boolean }).mandatory = tt === kw.TRUE;
+      (parent as { mandatory?: boolean }).mandatory = value;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

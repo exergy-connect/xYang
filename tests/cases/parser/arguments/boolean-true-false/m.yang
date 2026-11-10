@@ -1,0 +1,60 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  extension mark {
+    argument arg {
+      yin-element "true";
+    }
+  }
+
+  extension other {
+    argument arg {
+      yin-element false;
+    }
+  }
+
+  grouping g {
+    leaf inner {
+      type string;
+      mandatory true;
+    }
+  }
+
+  container top {
+    leaf quoted-true {
+      type string;
+      mandatory "true";
+      config "false";
+    }
+    leaf unquoted-false {
+      type string;
+      mandatory false;
+      config true;
+    }
+    leaf ref-quoted {
+      type leafref {
+        path "../quoted-true";
+        require-instance "false";
+      }
+    }
+    leaf ref-plain {
+      type leafref {
+        path "../quoted-true";
+        require-instance false;
+      }
+    }
+    choice pick {
+      mandatory "false";
+      leaf chosen {
+        type string;
+      }
+    }
+    uses g {
+      refine inner {
+        mandatory "false";
+      }
+    }
+  }
+}

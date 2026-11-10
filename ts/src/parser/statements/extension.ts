@@ -39,10 +39,10 @@ export class ExtensionStatementParser {
 
   parse_yin_element(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.YIN_ELEMENT);
-    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
+    const value = this.parsers.parse_boolean_argument(tokens, "yin-element");
     const parent = context.current_parent;
     if (parent instanceof YangExtensionStmt) {
-      parent.argument_yin_element = tt === kw.TRUE;
+      parent.argument_yin_element = value;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

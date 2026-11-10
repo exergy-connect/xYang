@@ -27,10 +27,10 @@ class RefineStatementParser:
     def _parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in refine (RFC 7950 section 7.13.2: leaf / choice target)."""
         tokens.consume(kw.MANDATORY)
-        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
+        value = self._parsers.parse_boolean_argument(tokens, "mandatory")
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
-            parent.refined_mandatory = tt == kw.TRUE
+            parent.refined_mandatory = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def _parse_refine_default(self, tokens: TokenStream, context: ParserContext) -> None:

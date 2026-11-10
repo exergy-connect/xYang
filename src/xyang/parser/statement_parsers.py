@@ -658,10 +658,10 @@ class StatementParsers:
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in leaf / anydata / anyxml."""
         tokens.consume(kw.MANDATORY)
+        value = self.parse_boolean_argument(tokens, "mandatory")
         parent = context.current_parent
         if isinstance(parent, (YangLeafStmt, YangAnydataStmt, YangAnyxmlStmt)):
-            _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
-            parent.mandatory = tt == kw.TRUE
+            parent.mandatory = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
     def parse_default_value_tokens(self, tokens: TokenStream) -> str | int:
@@ -705,12 +705,12 @@ class StatementParsers:
         from ..ast import YangRefineStmt, YangStatementWithWhen
 
         tokens.consume(kw.CONFIG)
-        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
+        value = self.parse_boolean_argument(tokens, "config")
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
-            parent.refined_config = tt == kw.TRUE
+            parent.refined_config = value
         elif isinstance(parent, YangStatementWithWhen):
-            parent.config = tt == kw.TRUE
+            parent.config = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_status_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -780,6 +780,29 @@ class StatementParsers:
             got = tokens.peek() if tokens.has_more() else "end"
             raise tokens.make_error(f"Expected statement argument, got {got!r}")
         return "".join(parts)
+
+    def parse_boolean_argument(self, tokens: TokenStream, statement: str) -> bool:
+        """Exact lexical ``true`` or ``false``, quoted or unquoted.
+
+        ``"true"`` and ``true`` are the same value. ``TRUE``, ``yes``, ``1``,
+        and a missing argument are syntax errors naming the statement.
+        """
+        if not tokens.has_more() or tokens.peek_type() in (
+            YangTokenType.SEMICOLON,
+            YangTokenType.LBRACE,
+            YangTokenType.RBRACE,
+        ):
+            raise tokens.make_error(
+                f"{statement} argument must be 'true' or 'false', got ''"
+            )
+        raw = self.parse_string_argument(tokens)
+        if raw == kw.TRUE:
+            return True
+        if raw == kw.FALSE:
+            return False
+        raise tokens.make_error(
+            f"{statement} argument must be 'true' or 'false', got {raw!r}"
+        )
 
     def parse_integer_or_unbounded(self, tokens: TokenStream, statement: str) -> int | None:
         """``min-elements`` / ``max-elements``: an integer or ``unbounded``.

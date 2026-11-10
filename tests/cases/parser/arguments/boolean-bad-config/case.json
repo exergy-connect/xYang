@@ -1,0 +1,6 @@
+{
+  "description": "config \"yes\" is a syntax error naming config and the value.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "config argument must be 'true' or 'false', got 'yes'"
+}
