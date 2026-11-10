@@ -11,11 +11,13 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **Shared conformance cases:** language-neutral cases in `tests/cases/` (YANG modules, JSON instances, expected `(JSON Pointer, code)` errors) run by both `tests/test_cases.py` and `ts/test/cases.test.ts`; known Python/TypeScript divergences are recorded as per-implementation expected failures. A new CI workflow runs both runners on every change.
 - **Python `YangValidator(module, enabled_features_by_module=...)`:** configure enabled features without dropping to `DocumentValidator`, matching TypeScript `enabledFeaturesByModule`.
+- **QuickJS-ng executable:** `qjs/build.sh` builds the TypeScript CLI as a self-contained `xyang-ts` binary with QuickJS-ng 0.18.0 (static musl on Linux; macOS and Windows cross-compiled with Zig). A published GitHub Release builds all five binaries, smoke-tests the Linux ones against the Node CLI, and attaches them. Pull-request CI does not build the binaries.
 
 ### Fixed
 
 - **TypeScript validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python. Data that violates these bounds now fails validation.
 - **TypeScript tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first. Node.js 24 is pinned in `.nvmrc` and `.node-version`; CI reads `.nvmrc` and also tests the latest LTS.
+- **TypeScript CLI:** piped stdout is no longer truncated at Node's 64 KiB pipe buffer. `xyang-ts` flushes stdout and stderr before exiting, including large `convert` JSON Schemas.
 
 ## [0.1.11] — 2026-11-06
 

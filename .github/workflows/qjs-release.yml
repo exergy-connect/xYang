@@ -1,0 +1,73 @@
+# Build the QuickJS-ng xyang-ts executables and attach them to a GitHub Release.
+# Not part of pull-request CI. Runs when a release is published, and on a
+# manual workflow_dispatch (build and smoke test only; nothing is attached
+# unless this run is a published release).
+
+name: Release QuickJS binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: qjs-release-${{ github.workflow }}-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  release:
+    name: Build, smoke-test, and attach
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Build the Node CLI used as the smoke-test reference
+        working-directory: ts
+        run: npm run build
+
+      - name: Install Zig 0.14.1
+        run: python3 -m pip install --user --break-system-packages 'ziglang==0.14.1'
+
+      - name: Install qemu-user-static
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static
+
+      - name: Build all five platform binaries
+        run: ./build.sh all
+        working-directory: qjs
+
+      - name: Smoke-test linux-x64 against the Node CLI
+        run: ./smoke.sh dist/xyang-ts-linux-x64
+        working-directory: qjs
+
+      - name: Smoke-test linux-arm64 under qemu
+        run: ./smoke.sh dist/xyang-ts-linux-arm64
+        working-directory: qjs
+
+      - name: Upload binaries
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: xyang-ts-binaries
+          path: qjs/dist/xyang-ts-*
+          if-no-files-found: error
+
+      - name: Attach binaries to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" qjs/dist/xyang-ts-* --clobber

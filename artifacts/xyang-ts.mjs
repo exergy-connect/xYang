@@ -19,5 +19,5 @@ Expression: ${context}`,`           ${" ".repeat(pointerPos)}^`];position<expres
 `);for(let line of result.errors)process.stderr.write(`  ${line}
 `);return 1}return process.stdout.write(`Valid.
 `),0}if(command==="convert"){let{includePaths,positional}=parseCommonArgs(rest),file=positional[0];if(!file)throw new Error("Missing <file.yang>");let module=new YangParser({expand_uses:!1,include_path:includePaths}).parseFile(file),schema=generateJsonSchema(module);return process.stdout.write(`${JSON.stringify(schema,null,2)}
-`),0}throw new Error(`Unknown command: ${command}`)}try{process.exit(main(process.argv))}catch(error){process.stderr.write(`${error.message}
-`),process.exit(1)}
+`),0}throw new Error(`Unknown command: ${command}`)}function finish(code){let streams=[process.stdout,process.stderr].filter(stream=>typeof stream.end=="function");if(streams.length===0){process.exit(code);return}let pending=streams.length,exited=!1,exit=()=>{exited||(exited=!0,process.exit(code))};for(let stream of streams){let settled=!1,done=()=>{settled||(settled=!0,pending-=1,pending===0&&exit())};stream.once("error",done),stream.end(done)}}try{finish(main(process.argv))}catch(error){process.stderr.write(`${error.message}
+`),finish(1)}
