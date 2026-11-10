@@ -40,6 +40,44 @@ npm install @exergy-connect/xyang
 cd ts && npm install && npm run build
 ```
 
+### Standalone binary
+
+The TypeScript CLI is also built as a single executable with [QuickJS-ng](https://github.com/quickjs-ng/quickjs) 0.18.0. It is the same `parse` / `validate` / `convert` commands, with no Node.js or Python install. The linux-x64 build is about 1 MB and starts in a few milliseconds, so an agent or a small CI image can shell out to it directly.
+
+This does not replace the Python package or the npm package. Those stay the supported library APIs.
+
+GitHub Release assets, and the **QuickJS binary** workflow artifacts, publish:
+
+| File | Platform |
+| --- | --- |
+| `xyang-ts-linux-x64` | Linux x64, fully static |
+| `xyang-ts-linux-arm64` | Linux arm64, fully static |
+| `xyang-ts-macos-arm64` | macOS Apple silicon |
+| `xyang-ts-macos-x64` | macOS Intel |
+| `xyang-ts-windows-x64.exe` | Windows x64 |
+
+```bash
+chmod +x xyang-ts-linux-x64
+./xyang-ts-linux-x64 parse examples/meta-model.yang
+./xyang-ts-linux-x64 validate examples/openconfig/openconfig-interfaces-subset.yang \
+  examples/openconfig/sample_interfaces.json
+./xyang-ts-linux-x64 convert examples/meta-model.yang
+```
+
+Flags match `xyang-ts`. Piped output is flushed before exit, including JSON Schema documents larger than Node's 64 KiB pipe buffer.
+
+Build it from a checkout (Zig 0.14.1 and the TypeScript dependencies; details in [`qjs/README.md`](qjs/README.md)):
+
+```bash
+cd ts && npm ci && npm run build
+cd ../qjs && ./build.sh linux-x64
+./smoke.sh dist/xyang-ts-linux-x64
+```
+
+`./build.sh all` also cross-compiles linux-arm64, macOS, and Windows. Linux binaries are static musl. macOS binaries link libSystem.
+
+A `--format json` mode and an MCP server are follow-ups. This binary does not add either.
+
 ---
 
 ## Quick start
@@ -152,6 +190,7 @@ Use `candidate` instead of `complete` for structural checks only (no `must` / `w
 xYang/
 ├── src/xyang/          # Python library + xyang CLI
 ├── ts/                 # TypeScript package (@exergy-connect/xyang) + xyang-ts CLI
+├── qjs/                # QuickJS-ng static executable of the TypeScript CLI
 ├── examples/           # meta-model.yang, ietf-yang-push/, samples
 ├── tests/              # Python tests
 ├── FEATURES.md         # Authoritative feature list
@@ -187,8 +226,10 @@ cd ts && npm install && npm test
 |----------|------|---------|
 | **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS |
 | **Build TypeScript CI artifacts** | [`.github/workflows/build-ts-dist.yml`](.github/workflows/build-ts-dist.yml) | Runs `npm run build:ci` and keeps committed build artifacts in sync |
+| **QuickJS binary** | [`.github/workflows/qjs-binary.yml`](.github/workflows/qjs-binary.yml) | Builds the QuickJS-ng `xyang-ts` executable (linux-x64, linux-arm64, macOS, Windows), smoke-tests it against the Node CLI, and uploads the binaries |
+| **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | Attaches those binaries to a published GitHub Release |
 
-Both workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths).
+The TypeScript test and CI-artifact workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths). The QuickJS workflow also runs when `qjs/**` or `examples/**` change.
 
 ### Committed CI artifacts
 

@@ -128,9 +128,56 @@ function main(argv: string[]): number {
   throw new Error(`Unknown command: ${command}`);
 }
 
+/**
+ * Exit only after stdout and stderr have been handed to the OS.
+ *
+ * `process.stdout.write` of a large JSON Schema fills the pipe buffer and
+ * returns while the rest sits in the stream (Node's pipe highWaterMark is
+ * 64 KiB). `process.exit` right after that drops the tail, so piped
+ * `convert` output is truncated. `stream.end` runs its callback once that
+ * buffer has been written.
+ *
+ * The QuickJS process shim writes with synchronous stdio and does not
+ * implement stream `.end()`. `process.exit` there flushes and sets the
+ * static binary's status.
+ */
+function finish(code: number): void {
+  const streams = [process.stdout, process.stderr].filter((stream) => typeof stream.end === "function");
+  if (streams.length === 0) {
+    process.exit(code);
+    return;
+  }
+
+  let pending = streams.length;
+  let exited = false;
+  const exit = (): void => {
+    if (exited) {
+      return;
+    }
+    exited = true;
+    process.exit(code);
+  };
+
+  for (const stream of streams) {
+    let settled = false;
+    const done = (): void => {
+      if (settled) {
+        return;
+      }
+      settled = true;
+      pending -= 1;
+      if (pending === 0) {
+        exit();
+      }
+    };
+    stream.once("error", done);
+    stream.end(done);
+  }
+}
+
 try {
-  process.exit(main(process.argv));
+  finish(main(process.argv));
 } catch (error) {
   process.stderr.write(`${(error as Error).message}\n`);
-  process.exit(1);
+  finish(1);
 }

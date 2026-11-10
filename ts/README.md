@@ -43,6 +43,8 @@ npx xyang-ts convert module.yang
 
 Add `--include-path DIR` for imported modules. See the [project documentation](https://github.com/exergy-connect/xYang#readme) for additional flags and examples.
 
+The same CLI is also built as a single QuickJS-ng executable (about 1 MB, no Node.js install), which is what you want when an agent or a minimal image shells out to `xyang-ts`. Build and download instructions are in the [project README](https://github.com/exergy-connect/xYang#standalone-binary).
+
 ## Browser
 
 ```typescript

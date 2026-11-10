@@ -1,0 +1,58 @@
+# Attach QuickJS-ng xyang-ts binaries to a published GitHub Release.
+# The same build as the pull-request workflow; linux-x64 and linux-arm64 are
+# smoke-tested against the Node CLI before the files are uploaded.
+
+name: Release QuickJS binaries
+
+on:
+  release:
+    types: [published]
+
+permissions:
+  contents: write
+
+jobs:
+  attach:
+    name: Build and upload
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Build the Node CLI used as the smoke-test reference
+        working-directory: ts
+        run: npm run build
+
+      - name: Install Zig 0.14.1
+        run: python3 -m pip install --user --break-system-packages 'ziglang==0.14.1'
+
+      - name: Install qemu-user-static
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static
+
+      - name: Build QuickJS binaries
+        run: ./build.sh all
+        working-directory: qjs
+
+      - name: Smoke-test linux-x64 against the Node CLI
+        run: ./smoke.sh dist/xyang-ts-linux-x64
+        working-directory: qjs
+
+      - name: Smoke-test linux-arm64 under qemu
+        run: ./smoke.sh dist/xyang-ts-linux-arm64
+        working-directory: qjs
+
+      - name: Upload binaries to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" qjs/dist/xyang-ts-* --clobber

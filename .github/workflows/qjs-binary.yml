@@ -1,0 +1,77 @@
+# Build the QuickJS-ng xyang-ts executable and compare it with the Node CLI.
+# Linux binaries are static musl builds. macOS and Windows are cross-compiled
+# with Zig from the same bytecode.
+
+name: QuickJS binary
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "qjs/**"
+      - "ts/**"
+      - "examples/**"
+      - ".github/workflows/qjs-binary.yml"
+  pull_request:
+    paths:
+      - "qjs/**"
+      - "ts/**"
+      - "examples/**"
+      - ".github/workflows/qjs-binary.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: qjs-binary-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  build:
+    name: Build and smoke-test
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+
+      - name: Build the Node CLI used as the smoke-test reference
+        working-directory: ts
+        run: npm run build
+
+      - name: Install Zig 0.14.1
+        run: python3 -m pip install --user --break-system-packages 'ziglang==0.14.1'
+
+      - name: Install qemu-user-static
+        run: sudo apt-get update && sudo apt-get install -y qemu-user-static
+
+      - name: Build QuickJS binaries
+        run: ./build.sh all
+        working-directory: qjs
+
+      - name: Smoke-test linux-x64 against the Node CLI
+        run: ./smoke.sh dist/xyang-ts-linux-x64
+        working-directory: qjs
+
+      - name: Smoke-test linux-arm64 under qemu
+        run: ./smoke.sh dist/xyang-ts-linux-arm64
+        working-directory: qjs
+
+      - name: Upload binaries
+        uses: actions/upload-artifact@v7
+        with:
+          name: xyang-ts-binaries
+          path: qjs/dist/*
+          if-no-files-found: error
+          retention-days: 14
