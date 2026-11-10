@@ -14,6 +14,10 @@ export type TypeConstraintInput = {
   }>;
   length?: string;
   range?: string;
+  length_error_message?: string;
+  length_error_app_tag?: string;
+  range_error_message?: string;
+  range_error_app_tag?: string;
   fraction_digits?: number;
   enums?: string[];
   bits?: Array<{ name: string; position: number }>;
@@ -29,6 +33,10 @@ export class TypeConstraint {
   }>;
   length?: string;
   range?: string;
+  length_error_message?: string;
+  length_error_app_tag?: string;
+  range_error_message?: string;
+  range_error_app_tag?: string;
   fraction_digits?: number;
   enums?: string[];
   bits?: Array<{ name: string; position: number }>;
@@ -37,6 +45,10 @@ export class TypeConstraint {
   constructor(input: TypeConstraintInput = {}) {
     Object.assign(this, input);
   }
+}
+
+function restrictionMessage(defaultMsg: string, message?: string, tag?: string): string {
+  return patternEntryViolationMessage({ error_message: message, error_app_tag: tag }, defaultMsg);
 }
 
 function patternEntryViolationMessage(
@@ -117,7 +129,12 @@ function decimalLike(value: unknown): number | null {
   return null;
 }
 
-function validateIntegerBuiltin(typeName: string, value: unknown, range?: string): TypeIssue[] {
+function validateIntegerBuiltin(
+  typeName: string,
+  value: unknown,
+  range?: string,
+  diag?: { error_message?: string; error_app_tag?: string }
+): TypeIssue[] {
   const bounds = YANG_INTEGER_BOUNDS[typeName];
   if (!bounds) {
     return [["type", `Unsupported integer type '${typeName}'`]];
@@ -140,7 +157,7 @@ function validateIntegerBuiltin(typeName: string, value: unknown, range?: string
         if (!Number.isSafeInteger(asNumber)) {
           return [];
         }
-        return [["range", `Integer ${value} does not match ${range}`]];
+        return [["range", restrictionMessage(`Integer ${value} does not match ${range}`, diag?.error_message, diag?.error_app_tag)]];
       }
     }
     return [];
@@ -151,7 +168,7 @@ function validateIntegerBuiltin(typeName: string, value: unknown, range?: string
   }
   if (range) {
     if (!matchesRange(n, range)) {
-      return [["range", `Integer ${n} does not match ${range}`]];
+      return [["range", restrictionMessage(`Integer ${n} does not match ${range}`, diag?.error_message, diag?.error_app_tag)]];
     }
     return [];
   }
@@ -165,7 +182,11 @@ function validateIntegerBuiltin(typeName: string, value: unknown, range?: string
   return [];
 }
 
-function validateBinary(value: unknown, length?: string): TypeIssue[] {
+function validateBinary(
+  value: unknown,
+  length?: string,
+  diag?: { error_message?: string; error_app_tag?: string }
+): TypeIssue[] {
   if (typeof value !== "string") {
     return [["type", "Expected base64 string"]];
   }
@@ -178,7 +199,7 @@ function validateBinary(value: unknown, length?: string): TypeIssue[] {
     const bytes = Buffer.from(value, "base64");
     if (length && !matchesRange(bytes.length, length)) {
       // A length miss stops here. Pattern is not also reported (same as Python).
-      return [["length", `Binary length ${bytes.length} does not match ${length}`]];
+      return [["length", restrictionMessage(`Binary length ${bytes.length} does not match ${length}`, diag?.error_message, diag?.error_app_tag)]];
     }
   } catch {
     return [["type", "Expected valid base64 string"]];
@@ -214,7 +235,14 @@ function stringIssues(value: unknown, c: TypeConstraint): TypeIssue[] {
   }
   const errors: TypeIssue[] = [];
   if (c.length && !matchesRange(value.length, c.length)) {
-    errors.push(["length", `String length ${value.length} does not match ${c.length}`]);
+    errors.push([
+      "length",
+      restrictionMessage(
+        `String length ${value.length} does not match ${c.length}`,
+        c.length_error_message,
+        c.length_error_app_tag
+      )
+    ]);
   }
   const patterns = Array.isArray(c.patterns) ? c.patterns : [];
   for (const p of patterns) {
@@ -289,11 +317,17 @@ export class TypeSystem {
     }
 
     if (normalizedType in YANG_INTEGER_BOUNDS) {
-      return validateIntegerBuiltin(normalizedType, value, c.range);
+      return validateIntegerBuiltin(normalizedType, value, c.range, {
+        error_message: c.range_error_message,
+        error_app_tag: c.range_error_app_tag
+      });
     }
 
     if (normalizedType === YangTokenType.BINARY) {
-      return validateBinary(value, c.length);
+      return validateBinary(value, c.length, {
+        error_message: c.length_error_message,
+        error_app_tag: c.length_error_app_tag
+      });
     }
 
     if (normalizedType === YangTokenType.BITS) {
@@ -311,7 +345,7 @@ export class TypeSystem {
           return [["type", "Expected number"]];
         }
         if (c.range && !matchesRange(n, c.range)) {
-          return [["range", `Number ${n} does not match ${c.range}`]];
+          return [["range", restrictionMessage(`Number ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
         }
         if (typeof c.fraction_digits === "number" && text.includes(".")) {
           const decimals = text.split(".")[1]?.length ?? 0;
@@ -326,7 +360,7 @@ export class TypeSystem {
         return [["type", "Expected number"]];
       }
       if (c.range && !matchesRange(n, c.range)) {
-        return [["range", `Number ${n} does not match ${c.range}`]];
+        return [["range", restrictionMessage(`Number ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
       }
       if (typeof c.fraction_digits === "number") {
         const decimals = `${n}`.split(".")[1]?.length ?? 0;
@@ -346,7 +380,7 @@ export class TypeSystem {
         return [["type", "Expected integer"]];
       }
       if (c.range && !matchesRange(n, c.range)) {
-        return [["range", `Integer ${n} does not match ${c.range}`]];
+        return [["range", restrictionMessage(`Integer ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
       }
       return [];
     }

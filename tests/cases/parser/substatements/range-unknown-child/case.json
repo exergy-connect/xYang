@@ -1,0 +1,6 @@
+{
+  "description": "An unknown range child is a syntax error naming range and the keyword.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Invalid or unknown statement in range: 'units'"
+}

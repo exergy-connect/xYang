@@ -1,0 +1,13 @@
+{
+  "description": "range and length accept description, reference, error-message, error-app-tag, and a prefixed extension (RFC 7950 §9.2.4, §9.4.4). The constraint string is unchanged. A semicolon-only range stays a range.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "range in bounds", "data": { "top": { "id": 20, "name": "ab", "plain": 5 } }, "valid": true },
+    { "name": "range error-message", "data": { "top": { "id": 200, "name": "ab", "plain": 5 } }, "valid": false,
+      "errors": [{ "path": "/top/id", "code": "range", "message": "id out of range (error-app-tag: bad-id)" }] },
+    { "name": "length error-message", "data": { "top": { "id": 1, "name": "abcd", "plain": 1 } }, "valid": false,
+      "errors": [{ "path": "/top/name", "code": "length", "message": "bad length (error-app-tag: bad-len)" }] },
+    { "name": "semicolon range still rejects", "data": { "top": { "id": 1, "name": "a", "plain": 11 } }, "valid": false,
+      "errors": [{ "path": "/top/plain", "code": "range" }] }
+  ]
+}

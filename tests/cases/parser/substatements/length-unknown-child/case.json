@@ -1,0 +1,6 @@
+{
+  "description": "An unknown length child is a syntax error naming length and the keyword.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Invalid or unknown statement in length: 'default'"
+}

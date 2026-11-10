@@ -26,6 +26,7 @@ class TypeStatementParser:
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
         self._pattern_stack: list[SimpleNamespace] = []
+        self._restriction_stack: list[SimpleNamespace] = []
 
     def _parse_type_substatement(
         self,
@@ -121,15 +122,53 @@ class TypeStatementParser:
         type_stmt.patterns.append(spec)
 
     def parse_type_length(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
-        """Parse ``length`` as one string (``1..127`` or ``"1..127"``)."""
+        """Parse ``length`` as one string, then optional ``;`` or a restriction body."""
         tokens.consume(kw.LENGTH)
         type_stmt.length = self._parsers.parse_string_argument(tokens)
+        meta = self._parse_restriction_body(tokens, context, "length")
+        type_stmt.length_error_message = meta.error_message
+        type_stmt.length_error_app_tag = meta.error_app_tag
+        type_stmt.length_description = meta.description or ""
+        type_stmt.length_reference = meta.reference or ""
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_range(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
-        """Parse range constraint."""
+        """Parse ``range`` as one string, then optional ``;`` or a restriction body."""
         tokens.consume(kw.RANGE)
         type_stmt.range = self._parsers.parse_string_argument(tokens)
+        meta = self._parse_restriction_body(tokens, context, "range")
+        type_stmt.range_error_message = meta.error_message
+        type_stmt.range_error_app_tag = meta.error_app_tag
+        type_stmt.range_description = meta.description or ""
+        type_stmt.range_reference = meta.reference or ""
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def _parse_restriction_body(
+        self, tokens: TokenStream, context: ParserContext, parent: str
+    ) -> SimpleNamespace:
+        """RFC 7950 range/length body: description, reference, error-message, error-app-tag."""
+        holder = SimpleNamespace(
+            description="", reference="", error_message=None, error_app_tag=None
+        )
+        if not tokens.consume_if_type(YangTokenType.LBRACE):
+            return holder
+        body = context.push_parent(holder)
+        self._restriction_stack.append(holder)
+        try:
+            self._parsers.parse_body(tokens, body, parent, error_context=parent)
+        finally:
+            self._restriction_stack.pop()
+        tokens.consume_type(YangTokenType.RBRACE)
+        return holder
+
+    def parse_restriction_error_message(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.ERROR_MESSAGE)
+        self._restriction_stack[-1].error_message = self._parsers.parse_string_concatenation(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_restriction_error_app_tag(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.ERROR_APP_TAG)
+        self._restriction_stack[-1].error_app_tag = self._parsers.parse_string_concatenation(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_fraction_digits(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:

@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`range` and `length` bodies:** `range` and `length` accept `description`, `reference`, `error-message`, and `error-app-tag` (RFC 7950 §9.2.4, §9.4.4), plus a prefixed extension. An unknown child is a `YangSyntaxError` naming the parent and the keyword. The constraint string is unchanged. `error-message` and `error-app-tag` are reported on a range or length miss, the same way as `pattern`.
 - **`enum` names:** an unquoted enum name such as `enum 100GE` or `enum 50|100GE` (`huawei-ifm.yang`) is read as one argument. `100GE` was split into `100` and `GE`, and `GE` was rejected as an unknown statement in the `type` body. The tokenizer also dropped characters it did not recognize, such as `|`. They are now part of an unquoted argument, and a parse error anywhere else. Python and TypeScript match.
 - **TypeScript:** `tsc --noEmit` passes again. `YangTokenType` is a const object whose type includes punctuation, so `Array.includes` and `YangTokenType.INPUT` in a type position failed. `hasTokenType` does the same membership check, and input/output parameters use `typeof YangTokenType.INPUT`. Validation and schema behavior are unchanged.
 

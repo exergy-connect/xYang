@@ -81,6 +81,10 @@ type TypeShape = {
   }>;
   length?: string;
   range?: string;
+  length_error_message?: string;
+  length_error_app_tag?: string;
+  range_error_message?: string;
+  range_error_app_tag?: string;
   fraction_digits?: number;
   path?: unknown;
   require_instance?: boolean;
@@ -871,6 +875,22 @@ export class StatementParsers {
           bits.parse_bit_position(t, c);
         }
       },
+      length: {
+        [kw.ERROR_MESSAGE]: (t, c) => {
+          typ.parse_restriction_error_message(t, c);
+        },
+        [kw.ERROR_APP_TAG]: (t, c) => {
+          typ.parse_restriction_error_app_tag(t, c);
+        }
+      },
+      range: {
+        [kw.ERROR_MESSAGE]: (t, c) => {
+          typ.parse_restriction_error_message(t, c);
+        },
+        [kw.ERROR_APP_TAG]: (t, c) => {
+          typ.parse_restriction_error_app_tag(t, c);
+        }
+      },
       type: {
         [kw.TYPE]: (t, c, typeStmt: YangTypeStmt) => {
           const nested = typ.parse_type(t, c);
@@ -1261,6 +1281,10 @@ export class StatementParsers {
       })),
       length: type_stmt.length,
       range: type_stmt.range,
+      length_error_message: type_stmt.length_error_message,
+      length_error_app_tag: type_stmt.length_error_app_tag,
+      range_error_message: type_stmt.range_error_message,
+      range_error_app_tag: type_stmt.range_error_app_tag,
       fraction_digits: type_stmt.fraction_digits,
       path: type_stmt.path,
       require_instance: type_stmt.require_instance,

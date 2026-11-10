@@ -412,9 +412,20 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
             ),
         ),
     ),
-    # Argument only. A braced body is not dispatched (known drift).
-    ("length", DispatchParent("9.4.4", frozenset())),
-    ("range", DispatchParent("9.2.4", frozenset())),
+    (
+        "length",
+        _parent(
+            "9.4.4",
+            frozenset({kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE}),
+        ),
+    ),
+    (
+        "range",
+        _parent(
+            "9.2.4",
+            frozenset({kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE}),
+        ),
+    ),
 )
 
 DISPATCH_REGISTRY: Mapping[str, DispatchParent] = MappingProxyType(dict(_PARENTS))
