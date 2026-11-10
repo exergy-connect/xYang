@@ -29,6 +29,10 @@ describe("minified browser bundle (IIFE)", () => {
     const mod = x.parseYangString(yang);
     const v = new x.YangValidator(mod);
     expect(v.validate({ n: -1 }).isValid).toBe(false);
-    expect(v.validate({ n: 42 }).isValid).toBe(true);
+    expect(v.validate({ n: "42" }).isValid).toBe(true);
+    const rfcNumber = v.validateDetailed({ n: 42 });
+    expect(rfcNumber.valid).toBe(false);
+    expect(rfcNumber.errors.some((error) => error.code === "type")).toBe(true);
+    expect(v.validate({ n: 42 }, { nativeJson: true }).isValid).toBe(true);
   });
 });

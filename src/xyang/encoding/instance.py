@@ -214,13 +214,11 @@ def _decode_scalar(value: Any, type_stmt: YangTypeStmt, module: Optional[YangMod
             return _NO
         return value
     if name in _INT64:
-        if not native and _is_int_text(value):
+        if native:
+            number = _native_number(value)
+            return number if isinstance(number, int) else _NO
+        if _is_int_text(value):
             return int(value.strip())
-        # A safe JSON integer is exact. The minified browser bundle validates
-        # uint64 with a JSON number; a native-mode string stays a type error.
-        number = _native_number(value)
-        if isinstance(number, int):
-            return number
         return _NO
     if name in _DECIMAL:
         if native:
