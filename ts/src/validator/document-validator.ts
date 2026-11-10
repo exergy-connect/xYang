@@ -225,6 +225,7 @@ export class DocumentValidator {
         errors.push(`${path}: list must be an array`);
         return;
       }
+      this.checkElementCount(stmt, value.length, path, errors);
       const keyRaw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
       const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).map((k) => k.trim()).filter(Boolean) : [];
       if (this.ctx.constraintChecks && keyNames.length > 0 && this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors)) {
@@ -304,6 +305,7 @@ export class DocumentValidator {
         errors.push(`${path}: leaf-list must be an array`);
         return;
       }
+      this.checkElementCount(stmt, value.length, path, errors);
       if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
         const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
@@ -348,6 +350,19 @@ export class DocumentValidator {
       if (keyword === YangTokenType.ANYDATA) {
         this.runAnydataSubtreeValidation(stmt, value, path, errors);
       }
+    }
+  }
+
+  /** min-elements / max-elements for a present list or leaf-list (absent ones are not checked, as in Python). */
+  private checkElementCount(stmt: YangStatement, count: number, path: string, errors: string[]): void {
+    const name = stmt.name ?? "node";
+    const min = stmt.data.min_elements;
+    const max = stmt.data.max_elements;
+    if (typeof min === "number" && count < min) {
+      errors.push(`${path}: '${name}' has ${count} element(s) but requires at least ${min}`);
+    }
+    if (typeof max === "number" && count > max) {
+      errors.push(`${path}: '${name}' has ${count} element(s) but allows at most ${max}`);
     }
   }
 
