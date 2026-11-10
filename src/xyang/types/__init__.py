@@ -62,7 +62,7 @@ class TypeSystem:
 
     def _get_compiled_pattern(self, pattern: str) -> re.Pattern:
         """Translated XSD regex (cached); raises ``YangSemanticError`` for an unsupported pattern."""
-        from .xsd_regex import translate
+        from ..xsd_regex import translate
 
         return translate(pattern)
 

@@ -29,11 +29,11 @@ import re
 from decimal import Decimal, InvalidOperation
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
+from ..types.registry import DECIMAL64, INTEGER_TYPE_NAMES
+
 _INT_DEFAULT = re.compile(r"-?\d+")
 _DEC_DEFAULT = re.compile(r"-?\d+(\.\d+)?")
-_INT_NAMES = frozenset(
-    {"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "integer"}
-)
+_INT_NAMES = INTEGER_TYPE_NAMES
 
 from ..ast import (
     YangAnydataStmt,
@@ -283,7 +283,7 @@ class DocumentValidator:
             if self._default_accepted(number, type_stmt):
                 return number
             return value
-        if not prefix and name in ("decimal64", "number") and _DEC_DEFAULT.fullmatch(value):
+        if not prefix and name in (DECIMAL64, "number") and _DEC_DEFAULT.fullmatch(value):
             try:
                 number = Decimal(value)
             except InvalidOperation:

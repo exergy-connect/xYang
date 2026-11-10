@@ -18,7 +18,6 @@ from ..identifier_ref import YangIdentifierRef, coerce_identifier_ref
 from ..ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
-    YangBitStmt,
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
@@ -36,9 +35,7 @@ from ..ast import (
     YangMustStmt,
     YangWhenStmt,
 )
-from ..xpath import XPathParser
-
-from .integer_bounds import yang_integer_from_json_bounds
+from ..types.registry import is_string_number, type_stmt_from_schema
 from .schema_keys import (
     JSON_SCHEMA_DEFS_URI_PREFIX,
     JsonSchemaKey,
@@ -221,193 +218,13 @@ def _resolve_schema(schema: dict[str, Any], defs: dict[str, Any]) -> dict[str, A
 
 def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
     """Build YangTypeStmt from JSON schema (+ $ref) and x-yang (e.g. leafref)."""
-    stmt = _type_from_schema_impl(defs, schema, xyang)
+    stmt = type_stmt_from_schema(defs, schema, xyang)
     if stmt is not None:
         merged_xy = _merge_schema_xyang(schema, xyang)
         units = _units_from_xyang(merged_xy)
         if units:
             stmt.units = units
     return stmt
-
-
-def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[str, Any]) -> YangTypeStmt | None:
-    if xyang.get(XYangKey.TYPE) == XYangTypeValue.IDENTITYREF:
-        bases = _bases_from_json(xyang.get(XYangKey.BASES))
-        if not bases:
-            b = xyang.get(XYangKey.BASE)
-            if isinstance(b, str):
-                ref = coerce_identifier_ref(b)
-                if ref is not None:
-                    bases = [ref]
-        return YangTypeStmt(name="identityref", identityref_bases=bases)
-    if xyang.get(XYangKey.TYPE) == XYangTypeValue.INSTANCE_IDENTIFIER:
-        require = xyang.get(XYangKey.REQUIRE_INSTANCE, True)
-        return YangTypeStmt(
-            name="instance-identifier",
-            require_instance=bool(require),
-        )
-    if xyang.get(XYangKey.TYPE) == XYangTypeValue.BITS:
-        raw = xyang.get(XYangKey.BITS)
-        bits: list[YangBitStmt] = []
-        if isinstance(raw, dict):
-            for name, pos in raw.items():
-                if not isinstance(name, str) or not name:
-                    continue
-                try:
-                    p = int(pos)
-                except (TypeError, ValueError):
-                    continue
-                bits.append(YangBitStmt(name=name, position=p))
-            bits.sort(key=lambda b: (b.position if b.position is not None else 0, b.name))
-        elif isinstance(raw, list):
-            # Legacy: [{ "name", "position" }, …] or bare names with index as position
-            for i, item in enumerate(raw):
-                if isinstance(item, dict):
-                    nm = item.get("name")
-                    if not isinstance(nm, str) or not nm:
-                        continue
-                    pos = item.get("position", i)
-                    try:
-                        p = int(pos)
-                    except (TypeError, ValueError):
-                        p = i
-                    bits.append(YangBitStmt(name=nm, position=p))
-                elif isinstance(item, str) and item:
-                    bits.append(YangBitStmt(name=item, position=i))
-        if bits:
-            return YangTypeStmt(name="bits", bits=bits)
-    # Leafref from x-yang: path must be parsed to PathNode (same as YANG parser)
-    if xyang.get(XYangKey.TYPE) == "leafref":
-        path_val = xyang.get(XYangKey.PATH)
-        require = xyang.get(XYangKey.REQUIRE_INSTANCE, True)
-        path_node = None
-        if path_val is not None and isinstance(path_val, str) and path_val.strip():
-            # Let XPathParser errors surface: invalid leafref paths from JSON
-            # schema are programmer / schema bugs and should abort parsing.
-            path_node = XPathParser(path_val.strip()).parse_path()
-        type_stmt = YangTypeStmt(name=XYangTypeValue.LEAFREF, path=path_node, require_instance=bool(require))
-        return type_stmt
-    # $ref to typedef: preserve typedef name only (no range/pattern; matches YANG leaf type reference)
-    ref = schema.get(JsonSchemaKey.REF)
-    if ref:
-        name = _ref_to_typedef_name(ref)
-        if name:
-            return YangTypeStmt(name=name)
-    # Inline type
-    t = schema.get(JsonSchemaKey.TYPE)
-    if JsonSchemaKey.ENUM in schema:
-        enums = list(schema[JsonSchemaKey.ENUM]) if isinstance(schema[JsonSchemaKey.ENUM], list) else []
-        if len(enums) > 1:
-            type_stmt = YangTypeStmt(name="enumeration")
-            type_stmt.enums = enums
-            return type_stmt
-        if len(enums) == 1 and t == "string" and isinstance(enums[0], str):
-            type_stmt = YangTypeStmt(name="string")
-            pat = "\\*" if enums[0] == "*" else enums[0]
-            merged_xy = _merge_schema_xyang(schema, xyang)
-            pem, pet = _pattern_metadata_from_xyang(merged_xy)
-            _apply_string_pattern_entries(type_stmt, merged_xy)
-            if not type_stmt.patterns:
-                type_stmt.patterns = [
-                    YangPatternSpec(
-                        pattern=pat,
-                        invert_match=False,
-                        error_message=pem,
-                        error_app_tag=pet,
-                    )
-                ]
-            return type_stmt
-    if t == "string":
-        numeric = xyang.get(XYangKey.TYPE)
-        if numeric in ("int64", "uint64", "decimal64"):
-            type_stmt = YangTypeStmt(name=numeric)
-            rng = xyang.get("range")
-            if isinstance(rng, str) and rng:
-                type_stmt.range = rng
-            if numeric == "decimal64":
-                fd = xyang.get("fraction-digits")
-                if isinstance(fd, int) and not isinstance(fd, bool):
-                    type_stmt.fraction_digits = fd
-            return type_stmt
-        type_stmt = YangTypeStmt(name="string")
-        raw_pat: str | None = None
-        if JsonSchemaKey.PATTERN in schema:
-            p = schema[JsonSchemaKey.PATTERN]
-            if isinstance(p, str):
-                if p.startswith("^") and p.endswith("$"):
-                    p = p[1:-1]
-                raw_pat = p
-        min_len = schema.get(JsonSchemaKey.MIN_LENGTH)
-        max_len = schema.get(JsonSchemaKey.MAX_LENGTH)
-        if min_len is not None and max_len is not None:
-            type_stmt.length = f"{min_len}..{max_len}"
-        elif max_len is not None:
-            type_stmt.length = f"0..{max_len}"
-        elif min_len is not None:
-            type_stmt.length = f"{min_len}.."
-        merged_xy = _merge_schema_xyang(schema, xyang)
-        pem, pet = _pattern_metadata_from_xyang(merged_xy)
-        _apply_string_pattern_entries(type_stmt, merged_xy)
-        if not type_stmt.patterns and raw_pat is not None:
-            type_stmt.patterns = [
-                YangPatternSpec(
-                    pattern=raw_pat,
-                    invert_match=False,
-                    error_message=pem,
-                    error_app_tag=pet,
-                )
-            ]
-        return type_stmt
-    if t == "integer":
-        yang_name, range_str = yang_integer_from_json_bounds(
-            schema.get(JsonSchemaKey.MINIMUM),
-            schema.get(JsonSchemaKey.MAXIMUM),
-        )
-        type_stmt = YangTypeStmt(name=yang_name)
-        if range_str:
-            type_stmt.range = range_str
-        return type_stmt
-    if t == "number":
-        type_stmt = YangTypeStmt(name="decimal64")
-        legacy_fd = schema.get(JsonSchemaKey.X_FRACTION_DIGITS)
-        if isinstance(legacy_fd, int) and legacy_fd > 0:
-            type_stmt.fraction_digits = legacy_fd
-        else:
-            mo = schema.get(JsonSchemaKey.MULTIPLE_OF)
-            fd = _fraction_digits_from_multiple_of(mo)
-            if fd is not None:
-                type_stmt.fraction_digits = fd
-        min_val = schema.get(JsonSchemaKey.MINIMUM)
-        max_val = schema.get(JsonSchemaKey.MAXIMUM)
-        if min_val is not None or max_val is not None:
-            fd = type_stmt.fraction_digits
-            lo = (
-                "min"
-                if min_val is None
-                else _format_decimal64_bound(min_val, fd)
-            )
-            hi = (
-                "max"
-                if max_val is None
-                else _format_decimal64_bound(max_val, fd)
-            )
-            type_stmt.range = f"{lo}..{hi}"
-        return type_stmt
-    if t == "boolean":
-        return YangTypeStmt(name="boolean")
-    if t == "object" and schema.get(JsonSchemaKey.MAX_PROPERTIES) == 0:
-        return YangTypeStmt(name="empty")
-    if JsonSchemaKey.ONE_OF in schema:
-        union_types = []
-        for branch in schema.get(JsonSchemaKey.ONE_OF) or []:
-            if isinstance(branch, dict):
-                branch_xyang = branch.get(JsonSchemaKey.X_YANG) or {}
-                bt = _type_from_schema(defs, branch, branch_xyang)
-                if bt:
-                    union_types.append(bt)
-        if union_types:
-            return YangTypeStmt(name="union", types=union_types)
-    return None
 
 
 def _is_identity_def_schema(def_schema: dict[str, Any]) -> bool:
@@ -1051,7 +868,7 @@ def _convert_property(
         node_type = "leaf"
     if node_type == XYangTypeValue.INSTANCE_IDENTIFIER:
         node_type = "leaf"
-    if node_type in ("int64", "uint64", "decimal64") and schema.get(JsonSchemaKey.TYPE) == "string":
+    if is_string_number(node_type) and schema.get(JsonSchemaKey.TYPE) == "string":
         node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in (
         "leaf",

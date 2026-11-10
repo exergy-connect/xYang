@@ -3,15 +3,19 @@ import { YangModule, type ModuleSource, type SerializedStatement } from "../core
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
 import { yangDefaultFromJsonSchema } from "./default-values";
-import { yangIntegerFromJsonBounds } from "./integer-bounds";
-import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   decimal64FractionDigitsFromSchema,
+  isStringNumberBuiltin,
+  quotedNumericTypeShape,
+  schemaTypeToYangType,
+  yangIntegerFromJsonBounds
+} from "../types/registry";
+import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
+import {
   JSON_TYPE_ARRAY,
   JSON_TYPE_INTEGER,
   JSON_TYPE_OBJECT,
-  JSON_TYPE_STRING,
-  schemaTypeToYangType
+  JSON_TYPE_STRING
 } from "./type-constants";
 
 function asRecord(value: unknown): Record<string, unknown> {
@@ -132,18 +136,11 @@ function applyStatementMetaFromXyang(stmt: SerializedStatement, xy: Record<strin
 }
 
 function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
-  if (
-    schema.type === JSON_TYPE_STRING &&
-    (xy.type === YangTokenType.INT64 || xy.type === YangTokenType.UINT64 || xy.type === YangTokenType.DECIMAL64)
-  ) {
-    const shape: Record<string, unknown> = { name: xy.type };
-    if (typeof xy.range === "string" && xy.range) {
-      shape.range = xy.range;
+  if (schema.type === JSON_TYPE_STRING) {
+    const quoted = quotedNumericTypeShape(xy);
+    if (quoted) {
+      return quoted;
     }
-    if (xy.type === YangTokenType.DECIMAL64 && typeof xy["fraction-digits"] === "number") {
-      shape.fraction_digits = xy["fraction-digits"];
-    }
-    return shape;
   }
   if (xy.type === YangTokenType.LEAFREF) {
     const path = typeof xy.path === "string" ? xy.path : "";
@@ -786,10 +783,7 @@ function jsonSchemaPropertyToStatement(
   ) {
     return parseLeaf(name, resolved, defs);
   }
-  if (
-    resolved.type === JSON_TYPE_STRING &&
-    (xyType === YangTokenType.INT64 || xyType === YangTokenType.UINT64 || xyType === YangTokenType.DECIMAL64)
-  ) {
+  if (resolved.type === JSON_TYPE_STRING && isStringNumberBuiltin(xyType)) {
     return parseLeaf(name, resolved, defs);
   }
   if (xyType === YangTokenType.ANYDATA) {

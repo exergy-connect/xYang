@@ -1,4 +1,4 @@
-import { YANG_INTEGER_BOUNDS } from "./json/integer-bounds";
+import { isQuotedInteger, REGISTRY, YANG_INTEGER_BOUNDS } from "./types/registry";
 import { YangTokenType } from "./parser/parser-context";
 import { translateXsdRegex } from "./xsd-regex";
 
@@ -124,16 +124,14 @@ function validateIntegerBuiltin(
     return [false, `Unsupported integer type '${typeName}'`];
   }
   if (typeof value === "string") {
-    // int64/uint64 lexical strings are decoded to bigint by the instance iterator.
+    // Quoted 64-bit integers are decoded to bigint by the instance iterator.
     // A string that reaches this check is not a JSON integer.
-    if (typeName === "int64" || typeName === "uint64") {
-      return [false, `Expected ${typeName}`];
-    }
-    return [false, "Expected integer, got string"];
+    return [false, REGISTRY[typeName].checkValue(value, null) ?? "Expected integer, got string"];
   }
-  if (typeof value === "bigint" && (typeName === "int64" || typeName === "uint64")) {
-    const lo = typeName === "uint64" ? BigInt(0) : INT64_MIN;
-    const hi = typeName === "uint64" ? UINT64_MAX : INT64_MAX;
+  if (typeof value === "bigint" && isQuotedInteger(typeName)) {
+    const unsigned = YANG_INTEGER_BOUNDS[typeName]?.[0] === 0;
+    const lo = unsigned ? BigInt(0) : INT64_MIN;
+    const hi = unsigned ? UINT64_MAX : INT64_MAX;
     if (value < lo || value > hi) {
       return [false, `Value ${value} is outside ${typeName}`];
     }

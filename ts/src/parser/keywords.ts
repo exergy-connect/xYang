@@ -21,7 +21,7 @@ export const INSTANCE_IDENTIFIER = "instance-identifier";
 export const INT8 = "int8";
 export const INT16 = "int16";
 export const INT32 = "int32";
-export const INT64 = "int64";
+export { INT64 } from "../types/registry";
 export const LEAFREF = "leafref";
 export const STRING_KW = "string";
 export const UINT8 = "uint8";

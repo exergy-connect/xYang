@@ -4,14 +4,13 @@ Utilities for xpath: YANG boolean coercion, node-set helpers, comparisons.
 
 from typing import Any, List, Optional
 
+from ..types.registry import BOOLEAN, DECIMAL_TYPE_NAMES, YANG_INTEGER_NAMES
 from .node import Node
 
 # Built-in YANG type names that need default value coercion for XPath comparison
-_YANG_BOOL_TYPE = "boolean"
-_YANG_INT_TYPES = frozenset(
-    {"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64"}
-)
-_YANG_FLOAT_TYPES = frozenset({"decimal64", "number"})
+_YANG_BOOL_TYPE = BOOLEAN
+_YANG_INT_TYPES = YANG_INTEGER_NAMES
+_YANG_FLOAT_TYPES = DECIMAL_TYPE_NAMES
 
 
 def coerce_default_value(value: Any, type_name: Optional[str]) -> Any:
