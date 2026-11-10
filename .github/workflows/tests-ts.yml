@@ -11,7 +11,6 @@ on:
       - "docs/**"
       - "tests/cases/**"
       - ".github/workflows/tests-ts.yml"
-      - ".github/workflows/build-ts-dist.yml"
       - ".nvmrc"
       - ".node-version"
   pull_request:
@@ -43,7 +42,7 @@ jobs:
             echo "typescript=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(ts/|docs/|tests/cases/|\.github/workflows/tests-ts\.yml$|\.github/workflows/build-ts-dist\.yml$|\.nvmrc$|\.node-version$)'; then
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(ts/|docs/|tests/cases/|\.github/workflows/tests-ts\.yml$|\.nvmrc$|\.node-version$)'; then
             echo "typescript=true" >> "$GITHUB_OUTPUT"
           else
             echo "typescript=false" >> "$GITHUB_OUTPUT"
@@ -98,6 +97,10 @@ jobs:
       - name: Build
         working-directory: ts
         run: npm run build:check
+
+      - name: Build CI artifacts
+        working-directory: ts
+        run: npm run build:ci
 
       - name: Test
         working-directory: ts

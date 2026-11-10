@@ -1,6 +1,6 @@
 name: xyang-ts
 description: >-
-  Check out xYang and run the xyang-ts CLI from committed artifacts/xyang-ts.mjs
+  Download xyang-ts.mjs from a GitHub Release and run the CLI
   (no npm install or build). Use from other repositories to validate YANG modules in CI.
 
 inputs:
@@ -8,14 +8,10 @@ inputs:
     description: GitHub repository that hosts xYang
     required: false
     default: exergy-connect/xYang
-  ref:
-    description: Branch, tag, or SHA of xYang to use
+  version:
+    description: Release tag whose xyang-ts.mjs asset to download, or latest
     required: false
-    default: main
-  path:
-    description: Directory to check out xYang into (relative to the workflow workspace)
-    required: false
-    default: .xyang
+    default: latest
   command:
     description: xyang-ts subcommand (parse, validate, convert). Omit to only expose xyang-ts on PATH.
     required: false
@@ -39,37 +35,58 @@ inputs:
 
 outputs:
   cli:
-    description: Absolute path to artifacts/xyang-ts.mjs
+    description: Absolute path to the downloaded xyang-ts.mjs
     value: ${{ steps.setup.outputs.cli }}
-  xyang-root:
-    description: Absolute path to the xYang repository root
-    value: ${{ steps.setup.outputs.xyang-root }}
 
 runs:
   using: composite
   steps:
-    - name: Check out xYang
-      uses: actions/checkout@v7
-      with:
-        repository: ${{ inputs.repository }}
-        ref: ${{ inputs.ref }}
-        path: ${{ inputs.path }}
-
     - name: Set up Node.js
       uses: actions/setup-node@v7
       with:
-        node-version-file: ${{ inputs.path }}/.nvmrc
+        node-version: "24"
 
     - id: setup
-      name: Configure xyang-ts
+      name: Download xyang-ts
       shell: bash
+      env:
+        GH_TOKEN: ${{ github.token }}
+        XYANG_REPOSITORY: ${{ inputs.repository }}
+        XYANG_VERSION: ${{ inputs.version }}
       run: |
-        XYANG_ROOT="${{ github.workspace }}/${{ inputs.path }}"
-        CLI="${XYANG_ROOT}/artifacts/xyang-ts.mjs"
-        if [ ! -f "$CLI" ]; then
-          echo "::error::Missing ${CLI}. Use an xYang ref with committed CI artifacts (main after the build-ts-dist workflow runs)."
+        set -euo pipefail
+
+        REPO="${XYANG_REPOSITORY}"
+        TAG="${XYANG_VERSION}"
+        CLI="${RUNNER_TEMP}/xyang-ts.mjs"
+
+        if [ -z "$REPO" ] || [ -z "$TAG" ]; then
+          echo "::error::Failed to download xyang-ts.mjs from release ${TAG} of ${REPO}: repository and version are required."
           exit 1
         fi
+
+        if ! command -v gh >/dev/null 2>&1; then
+          echo "::error::Failed to download xyang-ts.mjs from release ${TAG} of ${REPO}: gh is not installed."
+          exit 1
+        fi
+
+        if [ "$TAG" = "latest" ]; then
+          if ! gh release download --repo "$REPO" --pattern "xyang-ts.mjs" --dir "${RUNNER_TEMP}" --clobber; then
+            echo "::error::Failed to download xyang-ts.mjs from release ${TAG} of ${REPO}."
+            exit 1
+          fi
+        else
+          if ! gh release download "$TAG" --repo "$REPO" --pattern "xyang-ts.mjs" --dir "${RUNNER_TEMP}" --clobber; then
+            echo "::error::Failed to download xyang-ts.mjs from release ${TAG} of ${REPO}."
+            exit 1
+          fi
+        fi
+
+        if [ ! -f "$CLI" ]; then
+          echo "::error::Failed to download xyang-ts.mjs from release ${TAG} of ${REPO}: asset missing after download."
+          exit 1
+        fi
+
         chmod +x "$CLI"
 
         BIN_DIR="${RUNNER_TEMP}/xyang-ts-bin"
@@ -82,7 +99,6 @@ runs:
         echo "${BIN_DIR}" >> "$GITHUB_PATH"
 
         echo "cli=${CLI}" >> "$GITHUB_OUTPUT"
-        echo "xyang-root=${XYANG_ROOT}" >> "$GITHUB_OUTPUT"
 
     - name: Run xyang-ts
       if: inputs.command != ''

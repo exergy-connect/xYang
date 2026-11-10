@@ -396,7 +396,7 @@
     function getXyang() {
       if (typeof xYang === "undefined") {
         throw new Error(
-          "xYang global missing — ensure docs/xyang.umd.min.js exists (run `(cd ts && npm run build:check)` from the repo root; the bundle is not checked in)."
+          "xYang global missing — build docs/xyang.umd.min.js locally with `(cd ts && npm run build:ci)` or download it from the release assets."
         );
       }
       return xYang;

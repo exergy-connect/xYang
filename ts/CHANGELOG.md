@@ -20,6 +20,11 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 - **Shared conformance cases:** `test/cases.test.ts` runs the language-neutral cases in [`tests/cases/`](../tests/cases/README.md).
 
+### Changed
+
+- **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads the `xyang-ts.mjs` release asset instead of a committed bundle. The `path` input and `xyang-root` output are removed (#89).
+- `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js` are no longer committed. `npm run build:ci` still writes them locally; a published release attaches them (#89).
+
 ## [0.1.11] — 2026-11-06
 
 ### Added
