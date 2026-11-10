@@ -77,11 +77,35 @@ def test_changed_generator_is_an_error(tmp_path: Path, monkeypatch: pytest.Monke
 def test_smoke_results_match_schema(smoke_results: dict) -> None:
     rb.validate_results(smoke_results)
     phase = smoke_results["results"]["python"]["workloads"]["small"]["validate"]
-    assert phase["iterations"] == 1
+    assert phase["timing"]["iterations"] == 1
+    assert "peak_rss_mib" not in phase["timing"]
     assert phase["check"] == {"valid": True}
-    assert phase["rss_source"] in {"VmHWM", "ru_maxrss"}
-    assert phase["peak_rss_mib"]["median"] > 1
+    memory = phase["memory"]
+    assert memory["operations_per_process"] == 1 and memory["warmup_per_process"] == 0
+    assert memory["rss_source"] in {"VmHWM", "ru_maxrss"}
+    assert memory["peak_rss_mib"]["median"] > 1
     json.dumps(smoke_results)
+
+
+def test_memory_processes_are_separate_from_timing(monkeypatch: pytest.MonkeyPatch) -> None:
+    specs: list[dict] = []
+
+    def fake_spawn(cmd: list[str]) -> dict:
+        spec = json.loads(cmd[-1])
+        specs.append(spec)
+        return {
+            "result": {"samples_ms": [1.0] * spec["iterations"], "check": {}, "peak_rss_bytes": 2**20, "rss_source": "VmHWM"},
+            "wall_ms": 1.0,
+        }
+
+    monkeypatch.setattr(rb, "_spawn", fake_spawn)
+    out = rb.measure_phase("python", None, {"parse": [], "validate": {}}, "parse", 3, 40, 2, 5)
+    timing_runs = [s for s in specs if s["iterations"] == 40]
+    memory_runs = [s for s in specs if s["iterations"] == 1]
+    assert len(timing_runs) == 2 and all(s["warmup"] == 3 for s in timing_runs)
+    assert len(memory_runs) == 5 and all(s["warmup"] == 0 for s in memory_runs)
+    assert out["timing"]["iterations"] == 80
+    assert out["memory"]["processes"] == 5
 
 
 @pytest.mark.parametrize(
@@ -89,8 +113,12 @@ def test_smoke_results_match_schema(smoke_results: dict) -> None:
     [
         lambda d: d.pop("code_size"),
         lambda d: d.__setitem__("schema_version", 99),
-        lambda d: d["results"]["python"]["workloads"]["small"]["parse"].__setitem__("iterations", 7),
-        lambda d: d["results"]["python"]["workloads"]["small"]["validate"]["time_ms"].__setitem__("median", -1),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["timing"].__setitem__("iterations", 7),
+        lambda d: d["results"]["python"]["workloads"]["small"]["validate"]["timing"]["time_ms"].__setitem__("median", -1),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["memory"].__setitem__("operations_per_process", 30),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["memory"].__setitem__("warmup_per_process", 5),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["timing"].__setitem__("peak_rss_mib", {}),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"].pop("memory"),
         lambda d: d["results"]["python"]["workloads"].pop("small"),
         lambda d: d["results"].__setitem__("rust", {}),
     ],
@@ -108,7 +136,7 @@ def test_invalid_instance_fails_the_run(tmp_path: Path) -> None:
     module = str(ROOT / "benchmarks" / "workloads" / "interface-inventory.yang")
     spec = {"parse": [], "validate": {"module": {"path": module, "include": []}, "instance": str(bad)}}
     with pytest.raises(rb.BenchmarkError, match="invalid"):
-        rb.measure_phase("python", None, spec, "validate", 0, 1, 1)
+        rb.measure_phase("python", None, spec, "validate", 0, 1, 1, 1)
 
 
 def test_replace_section_is_idempotent() -> None:
@@ -135,6 +163,7 @@ def test_update_readme_writes_then_is_stable(smoke_results: dict, tmp_path: Path
     first = readme.read_text()
     assert data["environment"]["git"]["commit"][:12] in first
     assert "| small | validate |" in first
+    assert "one operation, no warmup" in first
     assert rb.update_readme(results, readme, check=False, allow_dirty=False) == 0
     assert readme.read_text() == first
     assert rb.update_readme(results, readme, check=True, allow_dirty=False) == 0

@@ -56,37 +56,61 @@ Every timed validation must return valid; an invalid result fails the run.
 
 ## What is measured
 
-Each (language, workload, phase) runs in fresh processes: `python
+Every measurement runs in fresh processes: `python
 benchmarks/worker.py SPEC` or `node <bundle> SPEC`. The TypeScript worker
 (`ts/bench/worker.ts`) and the library sources in `ts/src` are bundled with the
 pinned esbuild from `ts/package-lock.json` (`ts/scripts/build-bench-worker.mjs`).
 
+Three kinds of process are used, and no process serves two purposes:
+
+| Kind | Per (language, workload, phase) | What it does | What is reported |
+|---|---|---|---|
+| Timing | 3 processes | setup, warmup iterations, timed iterations | median time over all timed iterations |
+| Memory | 5 processes | setup, exactly one operation, no warmup | median peak RSS |
+| Startup | 10 per language | loads the library and exits | wall time from spawn to exit, peak RSS |
+
 **Time.** In-process, around the measured call only: `time.perf_counter_ns` in
 Python, `process.hrtime.bigint` in Node.js. Not timed: runtime startup, module
 imports and bundle load, reading files, JSON decoding of the instance, parsing the
-schema module for validation, and constructing the validator. Each process runs
-the warmup iterations and then the timed iterations. The reported figure is the
-median over all timed iterations from all processes, and the iteration count is
-reported with it. Defaults (warmup, iterations per process, 3 processes):
+schema module for validation, and constructing the validator. The reported
+figure is the median over all timed iterations from all timing processes, and
+the iteration count is reported with it. Defaults (warmup, iterations per
+process):
 
 | Workload | parse | validate |
 |---|---|---|
 | small | 5, 30 | 10, 50 |
 | large | 2, 10 | 1, 5 |
 
-**Process startup.** The startup row runs 10 processes that only load the
-library (Python `from xyang import ...`; Node loads the bundle) and exit. Its time
-is wall clock from spawn to exit, measured by the parent. It is the fixed cost the
-other rows exclude.
+The memory of timing processes is not reported. In a warmed loop the peak grows
+with the iteration count because garbage accumulates between collections (Node's
+V8 heap grows before it collects). For example, a TypeScript small parse peaked
+at about 68 MiB after one iteration and about 110 MiB after 35, while the live
+data was about 7 MiB.
 
-**Peak memory.** Each child reads its own `VmHWM` from `/proc/self/status` just
-before it prints its result: the high-water mark of the process's resident set
-size, reset by `exec`, covering all threads (including Node's libuv and V8
-helper threads). Reported in MiB (2^20 bytes) as the median over processes. It
-includes the runtime itself, the loaded library, the inputs, and garbage not yet
-collected, so it is the memory a process doing this work needs, not the size of
-the data structures. Python's `tracemalloc` and Node's `heapUsed` measure
-different things and are not reported.
+**Peak memory.** Separate memory processes each do the full setup and then the
+operation exactly once:
+
+- parse: start the runtime, load the library, parse the workload's modules once.
+- validate: start the runtime, load the library, parse the schema module, read
+  and decode the instance JSON, construct the validator, validate once.
+
+Just before it prints its result, the child reads its own `VmHWM` from
+`/proc/self/status`. That is the high-water mark of the process's resident set
+size, reset by `exec`, and it covers all threads (including Node's libuv and V8
+helper threads). It is reported in MiB (2^20 bytes) as the median over the
+memory processes, with the process and operation counts in the results.
+
+This is the whole process peak: the runtime itself, the loaded library, the
+setup (schema parse, decoded instance, validator), the operation, and garbage not
+yet collected. No startup baseline is subtracted. Garbage collection is not
+forced, and no runtime flags (such as `--expose-gc` or heap limits) are set. The
+startup rows give the fixed part for comparison. Python's `tracemalloc` and
+Node's `heapUsed` measure different things and are not reported.
+
+**Process startup.** 10 processes per language only load the library (Python
+`from xyang import ...`; Node loads the bundle) and exit. The parent measures wall
+clock from spawn to exit.
 
 The workers start no child processes, so there is nothing to account for below
 them. The parent does not use `wait4`/`getrusage(RUSAGE_CHILDREN)` because on

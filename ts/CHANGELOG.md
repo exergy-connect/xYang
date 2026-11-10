@@ -11,7 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
-- **Release benchmark:** `bench/worker.ts` (bundled by `scripts/build-bench-worker.mjs`) is the TypeScript side of the repository benchmark `benchmarks/release_bench.py`, which measures parse and validation time, peak RSS, and source lines for both implementations on the same inputs and refreshes the README benchmark section on release. See [`benchmarks/README.md`](../benchmarks/README.md).
+- **Release benchmark:** `bench/worker.ts` (bundled by `scripts/build-bench-worker.mjs`) is the TypeScript side of the repository benchmark `benchmarks/release_bench.py`, which measures warm parse and validation time, peak RSS (from separate fresh processes that run one operation each), and source lines for both implementations on the same inputs and refreshes the README benchmark section on release. See [`benchmarks/README.md`](../benchmarks/README.md).
 
 ### Changed
 

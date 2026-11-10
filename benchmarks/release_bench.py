@@ -7,9 +7,10 @@ Usage from the repository root (TypeScript needs ``cd ts && npm ci`` first)::
     python benchmarks/release_bench.py update-readme benchmarks/results/latest.json --check
     python benchmarks/release_bench.py run --smoke --out /tmp/smoke.json   # CI smoke, 1 iteration
 
-Each (language, workload, phase) runs in fresh child processes. Each child
-reports its own peak RSS (Linux ``VmHWM`` from /proc/self/status), so Python
-and Node are measured the same way. See benchmarks/README.md for the methodology.
+Each (language, workload, phase) runs in fresh child processes: warm repeated
+timing processes, and separate memory processes that run the operation once and
+report their own peak RSS (Linux ``VmHWM`` from /proc/self/status), so memory
+does not depend on the timing iteration count. See benchmarks/README.md for the methodology.
 """
 
 from __future__ import annotations
@@ -35,7 +36,7 @@ import loc  # noqa: E402
 from workloads import WORKLOADS, materialize  # noqa: E402
 
 ROOT = Path(__file__).resolve().parent.parent
-SCHEMA_VERSION = 1
+SCHEMA_VERSION = 2
 LANGUAGES = ("python", "typescript")
 PHASES = ("parse", "validate")
 README_START = "<!-- xyang-benchmark:start -->"
@@ -53,6 +54,11 @@ PLAN: dict[tuple[str, str], tuple[int, int]] = {
     ("large", "validate"): (1, 5),
 }
 STARTUP_PROCESSES = 10
+MEMORY_OPERATION = {
+    "parse": "import + parse workload modules once",
+    "validate": "import + parse schema + decode JSON + build validator + validate once",
+}
+MEMORY_PROCESSES = 5
 
 
 class BenchmarkError(RuntimeError):
@@ -110,12 +116,11 @@ def _summary(values: list[float]) -> dict[str, float]:
     return {"median": statistics.median(values), "min": min(values), "max": max(values)}
 
 
-def measure_phase(
+def measure_timing(
     lang: str, ts_bundle: Path | None, spec: dict[str, Any], phase: str, warmup: int, iterations: int, processes: int
-) -> dict[str, Any]:
+) -> tuple[dict[str, Any], dict[str, Any]]:
+    """Warm repeated timing. These processes' memory is not reported (it grows with the iteration count)."""
     samples: list[float] = []
-    rss: list[int] = []
-    sources: set[str] = set()
     check: dict[str, Any] = {}
     for _ in range(processes):
         run = _spawn(_worker_cmd(lang, ts_bundle, {**spec, "phase": phase, "warmup": warmup, "iterations": iterations}))
@@ -123,19 +128,48 @@ def measure_phase(
         if len(got) != iterations:
             raise BenchmarkError(f"{lang} {phase}: expected {iterations} samples, got {len(got)}")
         samples.extend(got)
-        rss.append(run["result"]["peak_rss_bytes"])
-        sources.add(run["result"]["rss_source"])
         check = run["result"]["check"]
-    return {
+    timing = {
         "processes": processes,
         "warmup_per_process": warmup,
         "iterations_per_process": iterations,
         "iterations": len(samples),
         "time_ms": _summary(samples),
+    }
+    return timing, check
+
+
+def measure_memory(lang: str, ts_bundle: Path | None, spec: dict[str, Any], phase: str, processes: int) -> dict[str, Any]:
+    """Peak RSS of fresh processes that each do the setup and exactly one operation (no warmup)."""
+    rss: list[int] = []
+    sources: set[str] = set()
+    for _ in range(processes):
+        run = _spawn(_worker_cmd(lang, ts_bundle, {**spec, "phase": phase, "warmup": 0, "iterations": 1}))
+        if len(run["result"]["samples_ms"]) != 1:
+            raise BenchmarkError(f"{lang} {phase}: memory process must run exactly one operation")
+        rss.append(run["result"]["peak_rss_bytes"])
+        sources.add(run["result"]["rss_source"])
+    return {
+        "processes": processes,
+        "operations_per_process": 1,
+        "warmup_per_process": 0,
         "peak_rss_mib": _summary([b / 2**20 for b in rss]),
         "rss_source": ",".join(sorted(sources)),
-        "check": check,
     }
+
+
+def measure_phase(
+    lang: str,
+    ts_bundle: Path | None,
+    spec: dict[str, Any],
+    phase: str,
+    warmup: int,
+    iterations: int,
+    processes: int,
+    memory_processes: int,
+) -> dict[str, Any]:
+    timing, check = measure_timing(lang, ts_bundle, spec, phase, warmup, iterations, processes)
+    return {"timing": timing, "memory": measure_memory(lang, ts_bundle, spec, phase, memory_processes), "check": check}
 
 
 def measure_startup(lang: str, ts_bundle: Path | None, spec: dict[str, Any], processes: int) -> dict[str, Any]:
@@ -227,7 +261,12 @@ def environment(release_tag: str | None) -> dict[str, Any]:
 
 
 def run(
-    languages: list[str], workload_names: list[str], processes: int, smoke: bool, release_tag: str | None
+    languages: list[str],
+    workload_names: list[str],
+    processes: int,
+    smoke: bool,
+    release_tag: str | None,
+    memory_processes: int = MEMORY_PROCESSES,
 ) -> dict[str, Any]:
     with tempfile.TemporaryDirectory(prefix="xyang-bench-") as tmp:
         tmpdir = Path(tmp)
@@ -235,6 +274,7 @@ def run(
         resolved = {name: materialize(WORKLOADS[name], tmpdir) for name in workload_names}
         startup_procs = 1 if smoke else STARTUP_PROCESSES
         procs = 1 if smoke else processes
+        mem_procs = 1 if smoke else memory_processes
         results: dict[str, Any] = {}
         any_spec = next(iter(resolved.values()))["spec"]
         for lang in languages:
@@ -245,7 +285,7 @@ def run(
                     warmup, iterations = (0, 1) if smoke else PLAN[(name, phase)]
                     print(f"[bench] {lang} {name} {phase}", file=sys.stderr, flush=True)
                     entry["workloads"][name][phase] = measure_phase(
-                        lang, ts_bundle, wl["spec"], phase, warmup, iterations, procs
+                        lang, ts_bundle, wl["spec"], phase, warmup, iterations, procs, mem_procs
                     )
             results[lang] = entry
     return {
@@ -314,12 +354,20 @@ def validate_results(data: Any) -> None:
             for phase in PHASES:
                 p = _require(phases.get(phase), f"results.{lang}.workloads.{name}.{phase}", dict)
                 base = f"results.{lang}.workloads.{name}.{phase}"
-                iterations = _require(p.get("iterations"), f"{base}.iterations", int)
-                if iterations < 1 or iterations != p.get("processes", 0) * p.get("iterations_per_process", 0):
-                    raise BenchmarkError(f"results: {base}.iterations inconsistent")
-                _require_stats(p.get("time_ms"), f"{base}.time_ms")
-                _require_stats(p.get("peak_rss_mib"), f"{base}.peak_rss_mib")
-                _require(p.get("rss_source"), f"{base}.rss_source", str)
+                t = _require(p.get("timing"), f"{base}.timing", dict)
+                iterations = _require(t.get("iterations"), f"{base}.timing.iterations", int)
+                if iterations < 1 or iterations != t.get("processes", 0) * t.get("iterations_per_process", 0):
+                    raise BenchmarkError(f"results: {base}.timing.iterations inconsistent")
+                _require_stats(t.get("time_ms"), f"{base}.timing.time_ms")
+                if "peak_rss_mib" in t:
+                    raise BenchmarkError(f"results: {base}.timing must not report memory")
+                m = _require(p.get("memory"), f"{base}.memory", dict)
+                if _require(m.get("processes"), f"{base}.memory.processes", int) < 1:
+                    raise BenchmarkError(f"results: {base}.memory.processes must be at least 1")
+                if m.get("operations_per_process") != 1 or m.get("warmup_per_process") != 0:
+                    raise BenchmarkError(f"results: {base}.memory must be one operation per process, no warmup")
+                _require_stats(m.get("peak_rss_mib"), f"{base}.memory.peak_rss_mib")
+                _require(m.get("rss_source"), f"{base}.memory.rss_source", str)
     code = _require(data.get("code_size"), "code_size", dict)
     langs = _require(code.get("languages"), "code_size.languages", dict)
     for lang in LANGUAGES:
@@ -361,32 +409,43 @@ def render_markdown(data: dict[str, Any]) -> str:
         f"({mach['cpu_count']} logical CPUs{mem})",
         "",
     ]
-    header = "| Workload | Phase | " + " | ".join(
-        f"{label[lang]} median | {label[lang]} peak RSS" for lang in langs
-    ) + " | Iterations per language |"
-    lines += [header, "|" + "---|" * (3 + 2 * len(langs))]
     first = data["results"][langs[0]]
+    header = "| Workload | Phase | " + " | ".join(f"{label[lang]} median" for lang in langs) + " | Timed iterations |"
+    lines += ["Time (warm, in-process, measured call only):", "", header, "|" + "---|" * (3 + len(langs))]
     for name in data["workloads"]:
         for phase in PHASES:
-            ref = first["workloads"][name][phase]
-            cells = []
-            for lang in langs:
-                p = data["results"][lang]["workloads"][name][phase]
-                cells += [_ms(p["time_ms"]["median"]), _mib(p["peak_rss_mib"]["median"])]
+            ref = first["workloads"][name][phase]["timing"]
+            cells = [_ms(data["results"][lang]["workloads"][name][phase]["timing"]["time_ms"]["median"]) for lang in langs]
             iters = (
                 f"{ref['iterations']} ({ref['processes']} processes × {ref['iterations_per_process']}, "
                 f"{ref['warmup_per_process']} warmup each)"
             )
             lines.append(f"| {name} | {phase} | " + " | ".join(cells) + f" | {iters} |")
-    cells = []
-    for lang in langs:
-        s = data["results"][lang]["startup"]
-        cells += [_ms(s["wall_ms"]["median"]) + " wall", _mib(s["peak_rss_mib"]["median"])]
+    cells = [_ms(data["results"][lang]["startup"]["wall_ms"]["median"]) + " wall" for lang in langs]
     lines.append(f"| none | process startup | " + " | ".join(cells) + f" | {first['startup']['processes']} processes |")
+
+    header = "| Workload | Operation | " + " | ".join(f"{label[lang]} peak RSS" for lang in langs) + " | Processes |"
+    lines += [
+        "",
+        "Peak process memory (fresh process, one operation, no warmup; total process peak):",
+        "",
+        header,
+        "|" + "---|" * (3 + len(langs)),
+    ]
+    for name in data["workloads"]:
+        for phase in PHASES:
+            ref = first["workloads"][name][phase]["memory"]
+            cells = [_mib(data["results"][lang]["workloads"][name][phase]["memory"]["peak_rss_mib"]["median"]) for lang in langs]
+            lines.append(
+                f"| {name} | {MEMORY_OPERATION[phase]} | " + " | ".join(cells)
+                + f" | {ref['processes']} × {ref['operations_per_process']} operation |"
+            )
+    cells = [_mib(data["results"][lang]["startup"]["peak_rss_mib"]["median"]) for lang in langs]
+    lines.append(f"| none | process startup (library loaded) | " + " | ".join(cells) + f" | {first['startup']['processes']} |")
     rss_sources = ", ".join(
         sorted(
             {
-                p["rss_source"]
+                p["memory"]["rss_source"]
                 for lang in langs
                 for phases in data["results"][lang]["workloads"].values()
                 for p in phases.values()
@@ -406,10 +465,13 @@ def render_markdown(data: dict[str, Any]) -> str:
         )
     lines += [
         "",
-        "Median is over all timed iterations in the measured call only (no startup, imports, or file reads). "
-        "Peak RSS is the median over processes of each child's own high-water resident set size "
-        f"({rss_sources}), 1 MiB = 2^20 bytes; it includes the runtime, the library, the inputs, and the work. "
-        "The startup row times a whole process that only loads the library.",
+        "Time is the median over all timed iterations of the measured call only (no startup, imports, file "
+        "reads, or setup). Memory comes from separate fresh processes, not the timing processes: each loads the "
+        "runtime and library, does the setup, runs the operation once, and reports its own high-water resident "
+        f"set size ({rss_sources}). The figure is the median over processes in MiB (2^20 bytes) and is the whole "
+        "process peak: runtime, library, setup, inputs, the operation, and garbage not yet collected. No startup "
+        "baseline is subtracted, no garbage collection is forced, and no runtime flags are set. The startup rows "
+        "are processes that only load the library.",
         "",
         "Code size (separate from performance; nonblank, noncomment lines, docstrings excluded):",
         "",
@@ -460,7 +522,8 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--out", type=Path, required=True)
     p_run.add_argument("--languages", default=",".join(LANGUAGES))
     p_run.add_argument("--workloads", default=",".join(WORKLOADS))
-    p_run.add_argument("--processes", type=int, default=3)
+    p_run.add_argument("--processes", type=int, default=3, help="timing processes per phase")
+    p_run.add_argument("--memory-processes", type=int, default=MEMORY_PROCESSES, help="one-operation memory processes per phase")
     p_run.add_argument("--smoke", action="store_true", help="1 process, 1 iteration, no warmup (not for README)")
     p_run.add_argument("--release-tag", default=None)
     p_render = sub.add_parser("render", help="print the Markdown section for a results file")
@@ -484,7 +547,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in names:
                 if x not in WORKLOADS:
                     raise BenchmarkError(f"unknown workload {x!r}")
-            data = run(languages, names, args.processes, args.smoke, args.release_tag)
+            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes)
             validate_results(data)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
