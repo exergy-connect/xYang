@@ -1,5 +1,5 @@
 {
-  "description": "XPath 1.0 starts-with() (#85). Empty needle is true. Wrong arity is false. Non-strings use the same conversion as string().",
+  "description": "XPath 1.0 starts-with() (#85). Empty needle is true. A wrong argument count is xpath-error. Non-strings use the same conversion as string().",
   "module": "m.yang",
   "instances": [
     { "name": "starts with z", "data": { "top": { "name": "zz" } }, "valid": true },
@@ -11,11 +11,11 @@
     { "name": "empty needle", "data": { "top": { "empty-needle": "" } }, "valid": true },
     { "name": "empty needle on text", "data": { "top": { "empty-needle": "az" } }, "valid": true },
     { "name": "missing args", "data": { "top": { "missing": "zz" } }, "valid": false,
-      "errors": [{ "path": "/top/missing", "code": "must" }] },
+      "errors": [{ "path": "/top/missing", "code": "xpath-error" }] },
     { "name": "one arg", "data": { "top": { "one-arg": "zz" } }, "valid": false,
-      "errors": [{ "path": "/top/one-arg", "code": "must" }] },
+      "errors": [{ "path": "/top/one-arg", "code": "xpath-error" }] },
     { "name": "extra arg", "data": { "top": { "extra": "zz" } }, "valid": false,
-      "errors": [{ "path": "/top/extra", "code": "must" }] },
+      "errors": [{ "path": "/top/extra", "code": "xpath-error" }] },
     { "name": "non-string", "data": { "top": { "qty": 12 } }, "valid": true },
     { "name": "non-string miss", "data": { "top": { "qty": 3 } }, "valid": false,
       "errors": [{ "path": "/top/qty", "code": "must" }] },

@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from ..errors import UnsupportedXPathError
+from ..errors import UnsupportedXPathError, XPathEvaluationError
 from .ast import FunctionCallNode
 from .node import Context, Node
 
@@ -58,10 +58,15 @@ def _as_xpath_string(ev: "XPathEvaluator", arg: Any, ctx: Context, node: Node) -
     return "" if v is None else str(v)
 
 
+def _require_arity(ast: FunctionCallNode, expected: int) -> None:
+    """Wrong arity raises ``XPathEvaluationError``. Validation reports that as ``xpath-error``."""
+    if len(ast.args) != expected:
+        raise XPathEvaluationError(f"{ast.name.lower()}() expects {expected} arguments, got {len(ast.args)}")
+
+
 def f_contains(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """contains(source, needle): true when needle occurs in source. Empty needle is true."""
-    if len(ast.args) != 2:
-        return False
+    _require_arity(ast, 2)
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
     return needle in source
@@ -69,8 +74,7 @@ def f_contains(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: 
 
 def f_starts_with(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """starts-with(source, needle): true when source begins with needle. Empty needle is true."""
-    if len(ast.args) != 2:
-        return False
+    _require_arity(ast, 2)
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
     return source.startswith(needle)
@@ -78,8 +82,7 @@ def f_starts_with(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, nod
 
 def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """Substring preceding the first needle. Empty when needle is empty or absent."""
-    if len(ast.args) != 2:
-        return ""
+    _require_arity(ast, 2)
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
     index = source.find(needle)
@@ -90,8 +93,7 @@ def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context
 
 def f_substring_after(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """Substring following the first needle. Empty needle returns the whole source."""
-    if len(ast.args) != 2:
-        return ""
+    _require_arity(ast, 2)
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
     index = source.find(needle)

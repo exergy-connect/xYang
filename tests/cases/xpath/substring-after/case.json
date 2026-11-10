@@ -1,5 +1,5 @@
 {
-  "description": "XPath 1.0 substring-after() (#85). Empty needle is the whole source. A missing needle is \"\". Wrong arity is \"\". Non-strings use the same conversion as string().",
+  "description": "XPath 1.0 substring-after() (#85). Empty needle is the whole source. A missing needle is \"\". A wrong argument count is xpath-error. Non-strings use the same conversion as string().",
   "module": "m.yang",
   "instances": [
     { "name": "after dash", "data": { "top": { "name": "a-b" } }, "valid": true },
@@ -16,9 +16,12 @@
     { "name": "empty needle on text", "data": { "top": { "empty-needle": "a-b" } }, "valid": true },
     { "name": "needle absent", "data": { "top": { "no-match": "abc" } }, "valid": true },
     { "name": "needle absent on empty", "data": { "top": { "no-match": "" } }, "valid": true },
-    { "name": "missing args", "data": { "top": { "missing": "a-b" } }, "valid": true },
-    { "name": "one arg", "data": { "top": { "one-arg": "a-b" } }, "valid": true },
-    { "name": "extra arg", "data": { "top": { "extra": "a-b" } }, "valid": true },
+    { "name": "missing args", "data": { "top": { "missing": "a-b" } }, "valid": false,
+      "errors": [{ "path": "/top/missing", "code": "xpath-error" }] },
+    { "name": "one arg", "data": { "top": { "one-arg": "a-b" } }, "valid": false,
+      "errors": [{ "path": "/top/one-arg", "code": "xpath-error" }] },
+    { "name": "extra arg", "data": { "top": { "extra": "a-b" } }, "valid": false,
+      "errors": [{ "path": "/top/extra", "code": "xpath-error" }] },
     { "name": "non-string", "data": { "top": { "qty": 123 } }, "valid": true },
     { "name": "non-string miss", "data": { "top": { "qty": 12 } }, "valid": false,
       "errors": [{ "path": "/top/qty", "code": "must" }] },
