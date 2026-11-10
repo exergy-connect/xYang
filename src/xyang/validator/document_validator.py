@@ -25,7 +25,15 @@ from __future__ import annotations
 
 import json
 import logging
+import re
+from decimal import Decimal, InvalidOperation
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
+
+_INT_DEFAULT = re.compile(r"-?\d+")
+_DEC_DEFAULT = re.compile(r"-?\d+(\.\d+)?")
+_INT_NAMES = frozenset(
+    {"int8", "int16", "int32", "int64", "uint8", "uint16", "uint32", "uint64", "integer"}
+)
 
 from ..ast import (
     YangAnydataStmt,
@@ -241,7 +249,90 @@ class DocumentValidator:
         val, _key = instance_member_lookup(data, stmt, self._encoding_parent_module())
         if _key is not None:
             return val
-        return SchemaNav.default(stmt)
+        # Schema defaults are YANG lexical text. Integer typedefs and unions
+        # (``default 3``) become numbers here so the type check does not see a
+        # JSON string. Instance strings are unchanged.
+        return self._decode_schema_default(getattr(stmt, "type", None), SchemaNav.default(stmt))
+
+    def _typedef_module(self) -> Optional[YangModule]:
+        if isinstance(self._if_feature_module, YangModule):
+            return self._if_feature_module
+        if isinstance(self._root_schema, YangModule):
+            return self._root_schema
+        return None
+
+    def _decode_schema_default(self, type_stmt: Any, value: Any) -> Any:
+        if isinstance(value, list):
+            return [self._decode_schema_default(type_stmt, item) for item in value]
+        if not isinstance(value, str) or type_stmt is None:
+            return value
+        return self._decode_lexical(type_stmt, value, set())
+
+    def _decode_lexical(self, type_stmt: Any, value: str, seen: set[tuple[Optional[str], str]]) -> Any:
+        name = getattr(type_stmt, "name", None) or ""
+        prefix = getattr(type_stmt, "prefix", None)
+        marker = (prefix, name)
+        if marker in seen:
+            return value
+        seen.add(marker)
+        if not prefix and name in _INT_NAMES and _INT_DEFAULT.fullmatch(value):
+            try:
+                number = int(value)
+            except ValueError:
+                return value
+            if self._default_accepted(number, type_stmt):
+                return number
+            return value
+        if not prefix and name in ("decimal64", "number") and _DEC_DEFAULT.fullmatch(value):
+            try:
+                number = Decimal(value)
+            except InvalidOperation:
+                return value
+            if self._default_accepted(number, type_stmt):
+                return number
+            return value
+        if not prefix and name == "union":
+            for member in getattr(type_stmt, "types", None) or []:
+                decoded = self._decode_lexical(member, value, set(seen))
+                if self._default_accepted(decoded, member):
+                    return decoded
+            return value
+        target = self._lookup_typedef(type_stmt)
+        if target is not None:
+            return self._decode_lexical(target, value, seen)
+        return value
+
+    def _lookup_typedef(self, type_stmt: Any) -> Any:
+        module = self._typedef_module()
+        if module is None:
+            return None
+        name = getattr(type_stmt, "name", None)
+        if not name:
+            return None
+        prefix = getattr(type_stmt, "prefix", None)
+        if prefix:
+            module = module.resolve_prefixed_module(prefix)
+            if module is None:
+                return None
+        getter = getattr(module, "get_typedef", None)
+        typedef = getter(name) if callable(getter) else None
+        if typedef is None:
+            return None
+        return getattr(typedef, "type", None)
+
+    def _default_accepted(self, value: Any, type_stmt: Any) -> bool:
+        module = self._typedef_module()
+        node = Node(value, type_stmt, None)
+        ctx = Context(current=node, root=node, path_cache={})
+        return not self._type_checker.check(
+            value,
+            type_stmt,
+            "",
+            None,
+            module,
+            ctx,
+            self._evaluator,
+        )
 
     def _child_enforce_mandatory_choice(self, owner: YangStatementList, parent_enforce: bool) -> bool:
         """RFC 7950 §7.9.4: whether mandatory ``choice`` is enforced without case-sibling deferral.

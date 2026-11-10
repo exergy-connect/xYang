@@ -1,0 +1,22 @@
+{
+  "description": "Generated JSON Schema and the validator agree. RFC 7951 encodes 8/16/32-bit integers as JSON numbers. int64 strings are validator-valid and are not listed: issue #63 left JSON Schema for int64, uint64, and decimal64 out of scope.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "uint8 in range", "data": { "top": { "u8": 5 } }, "valid": true },
+    { "name": "unsigned bounds", "data": { "top": { "u8": 0, "u16": 65535, "u32": 4294967295 } }, "valid": true },
+    { "name": "signed bounds", "data": { "top": { "i8": -128, "i16": 32767, "i32": -2147483648 } }, "valid": true },
+    { "name": "uint8 numeric string", "data": { "top": { "u8": "5" } }, "valid": false },
+    { "name": "uint16 numeric string", "data": { "top": { "u16": "5" } }, "valid": false },
+    { "name": "uint32 numeric string", "data": { "top": { "u32": "5" } }, "valid": false },
+    { "name": "int8 numeric string", "data": { "top": { "i8": "1" } }, "valid": false },
+    { "name": "int16 numeric string", "data": { "top": { "i16": "-2" } }, "valid": false },
+    { "name": "int32 numeric string", "data": { "top": { "i32": "3" } }, "valid": false },
+    { "name": "uint8 boolean", "data": { "top": { "u8": true } }, "valid": false },
+    { "name": "uint8 fraction", "data": { "top": { "u8": 1.5 } }, "valid": false },
+    { "name": "uint8 overflow", "data": { "top": { "u8": 256 } }, "valid": false },
+    { "name": "int8 below builtin", "data": { "top": { "i8": -129 } }, "valid": false },
+    { "name": "restricted in range", "data": { "top": { "small": -10 } }, "valid": true },
+    { "name": "restricted below range", "data": { "top": { "small": -11 } }, "valid": false },
+    { "name": "restricted numeric string", "data": { "top": { "small": "0" } }, "valid": false }
+  ]
+}

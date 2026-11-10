@@ -87,13 +87,10 @@ function matchesRange(value: number, raw: string): boolean {
   return false;
 }
 
-/** @internal Parse JSON integer scalars for built-in numeric type checks. */
+/** @internal JSON number that is an integer. Strings are not integers (RFC 7951 §6.1). */
 export function integerLike(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)) {
     return value;
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value)) {
-    return Number.parseInt(value, 10);
   }
   return null;
 }
@@ -126,8 +123,13 @@ function validateIntegerBuiltin(
   if (!bounds) {
     return [false, `Unsupported integer type '${typeName}'`];
   }
-  if ((typeName === "int64" || typeName === "uint64") && typeof value === "string") {
-    return [false, `Expected ${typeName}`];
+  if (typeof value === "string") {
+    // int64/uint64 lexical strings are decoded to bigint by the instance iterator.
+    // A string that reaches this check is not a JSON integer.
+    if (typeName === "int64" || typeName === "uint64") {
+      return [false, `Expected ${typeName}`];
+    }
+    return [false, "Expected integer, got string"];
   }
   if (typeof value === "bigint" && (typeName === "int64" || typeName === "uint64")) {
     const lo = typeName === "uint64" ? BigInt(0) : INT64_MIN;
@@ -330,6 +332,9 @@ export class TypeSystem {
     }
 
     if (normalizedType === YangTokenType.INT64 || normalizedType === "integer") {
+      if (typeof value === "string") {
+        return [false, "Expected integer, got string"];
+      }
       const n = integerLike(value);
       if (n === null) {
         return [false, "Expected integer"]; 
