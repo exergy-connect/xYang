@@ -5,7 +5,7 @@ xYang validator: uses xpath DocumentValidator for validation.
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
 from ..ast import YangStatementList
-from ..encoding import normalize_instance, resolve_structure_instance
+from ..encoding import resolve_structure_instance
 from ..module import YangModule
 from .document_validator import DocumentValidator
 from .validation_error import Severity, ValidationError
@@ -68,6 +68,7 @@ class YangValidator:
         data: Dict[str, Any],
         *,
         leafref_severity: Severity = Severity.ERROR,
+        native_json: bool = False,
     ) -> Tuple[bool, List[str], List[str]]:
         """
         Validate data against the YANG module.
@@ -75,7 +76,7 @@ class YangValidator:
         Returns:
             (is_valid, errors, warnings) as display strings ``"<path>: <message>"``.
         """
-        doc_errors = self._collect(data, leafref_severity=leafref_severity)
+        doc_errors = self._collect(data, leafref_severity=leafref_severity, native_json=native_json)
         errors = [self._format_error(e) for e in doc_errors if e.severity == Severity.ERROR]
         warnings = [self._format_error(e) for e in doc_errors if e.severity == Severity.WARNING]
         return len(errors) == 0, errors, warnings
@@ -85,6 +86,7 @@ class YangValidator:
         data: Dict[str, Any],
         *,
         leafref_severity: Severity = Severity.ERROR,
+        native_json: bool = False,
     ) -> Dict[str, Any]:
         """
         Validate data and return structured issues.
@@ -93,7 +95,7 @@ class YangValidator:
         JSON Pointer into ``data`` (list and leaf-list entries by position). ``validate``
         string output is unchanged.
         """
-        doc_errors = self._collect(data, leafref_severity=leafref_severity)
+        doc_errors = self._collect(data, leafref_severity=leafref_severity, native_json=native_json)
         errors = [self._issue(e) for e in doc_errors if e.severity == Severity.ERROR]
         warnings = [self._issue(e) for e in doc_errors if e.severity == Severity.WARNING]
         return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
@@ -103,19 +105,20 @@ class YangValidator:
         data: Dict[str, Any],
         *,
         leafref_severity: Severity,
+        native_json: bool = False,
     ) -> List[ValidationError]:
         root_schema: YangStatementList = self.module
         instance: Dict[str, Any] = data
         structure = resolve_structure_instance(data, self.module)
         if structure is not None:
             root_schema, instance = structure
-        normalized = normalize_instance(instance, self.module, schema=root_schema)
-        norm_errors = [
-            ValidationError(path=err.pointer or "/", message=err.message, code=err.code, pointer=err.pointer)
-            for err in getattr(normalized, "normalization_errors", [])
-        ]
-        doc_errors = self._document_validator(root_schema).validate(normalized, leafref_severity=leafref_severity)
-        return norm_errors + doc_errors
+        return self._document_validator(root_schema).validate(
+            instance,
+            leafref_severity=leafref_severity,
+            native_json=native_json,
+            module=self.module,
+            from_iterator=True,
+        )
 
     @staticmethod
     def _issue(e: ValidationError) -> Dict[str, Any]:

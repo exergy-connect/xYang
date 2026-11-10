@@ -1,6 +1,6 @@
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
-import { normalizationErrors, normalizeInstance } from "../encoding";
+import { encodingErrors, iterInstance, projectInstance, remapPointer } from "../encoding";
 import {
   DetailedValidationResult,
   DocumentValidator,
@@ -21,6 +21,8 @@ export type YangValidatorOptions = {
   enabledFeaturesByModule?: EnabledFeaturesByModule;
   /** When true, this instance emits `console.debug` for leaf type validation. */
   typeValidationDebug?: boolean;
+  /** Opt in to native dict-style JSON. Default is strict RFC 7951. */
+  nativeJson?: boolean;
 };
 
 export class YangValidator {
@@ -49,12 +51,10 @@ export class YangValidator {
     this.enableExtension(extension, config);
   }
 
-  validate(data: unknown): ValidationResult {
-    const normalized = normalizeInstance(data, this.module);
-    const [isValid, errors, warnings] = this.documentValidator.validate(normalized);
-    const encoding = normalizationErrors(normalized).map((issue) =>
-      issue.path ? `${issue.path}: ${issue.message}` : issue.message
-    );
+  validate(data: unknown, options: { nativeJson?: boolean } = {}): ValidationResult {
+    const prepared = this.prepare(data, options.nativeJson === true);
+    const [isValid, errors, warnings] = this.documentValidator.validate(prepared.data);
+    const encoding = prepared.errors.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message));
     const all = [...encoding, ...errors];
     return { isValid: isValid && encoding.length === 0, errors: all, warnings };
   }
@@ -63,10 +63,10 @@ export class YangValidator {
    * Structured issues. `validate()` string output is unchanged.
    * Each issue is `{ code, path, message, expression?, severity }` with `path` a JSON Pointer.
    */
-  validateDetailed(data: unknown): DetailedValidationResult {
-    const normalized = normalizeInstance(data, this.module);
-    const result = this.documentValidator.validateDetailed(normalized);
-    const encoding: ValidationIssue[] = normalizationErrors(normalized).map((issue) => ({
+  validateDetailed(data: unknown, options: { nativeJson?: boolean } = {}): DetailedValidationResult {
+    const prepared = this.prepare(data, options.nativeJson === true);
+    const result = this.documentValidator.validateDetailed(prepared.data);
+    const encoding: ValidationIssue[] = prepared.errors.map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
@@ -74,5 +74,15 @@ export class YangValidator {
     }));
     const errors = [...encoding, ...result.errors];
     return { valid: errors.length === 0, errors, warnings: result.warnings };
+  }
+
+  private prepare(data: unknown, nativeJson: boolean): {
+    data: unknown;
+    errors: Array<{ path: string; code: string; message: string }>;
+  } {
+    const nodes = [...iterInstance(data, this.module, { nativeJson })];
+    const projected = projectInstance(nodes, this.module.name ?? "");
+    this.documentValidator.setPointerMap(projected.pointerMap);
+    return { data: projected.data, errors: encodingErrors(nodes) };
   }
 }

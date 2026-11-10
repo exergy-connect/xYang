@@ -51,7 +51,7 @@ when they share the schema.
 | `features` | Optional. Module name -> enabled feature names. Omitted: every declared feature is enabled. A module missing from the map keeps all its features. |
 | `schema_error` | Optional. `true` means loading the module must fail; the case then has no `instances`. Optional `code` is a substring the load error must contain, the same in every implementation. |
 | `xfail` | Optional, on the case or on an instance (instance entries override case entries). Implementation id (`python`, `ts`, `cli`) -> reason. |
-| `instances[].data` | The JSON instance document (RFC 7951). |
+| `instances[].data` | The JSON instance document. |
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
 
@@ -59,14 +59,12 @@ when they share the schema.
 
 An error is `{ "path", "code", "message"? }`:
 
-- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the **normalized**
-  instance, not the spelling in the input. List entries and leaf-list items use array indexes
-  (`/top/items/1/v`, `/top/interface/0/mtu`) even when the input was a dict keyed by the list key.
-  Member names are the canonical ones: a local name when the node is defined in the host module
-  (`/top/a` for both `{"top": ...}` and `{"m:top": ...}`), and `module:name` when it is defined in
-  another module. The document root is `""`. Errors about a missing node point at where it would
-  be (`/top/name`). `choice` and `case` are not data nodes, so their errors point at the parent
-  data node (`/top`).
+- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the input as written.
+  RFC 7951 lists use array indexes (`/m:top/interface/0/mtu`). A native keyed list uses the dict
+  key (`/top/interface/eth0/mtu`). Member names are the ones in the JSON (`/m:top/a`, not a
+  rewritten `/top/a`). The document root is `""`. Errors about a missing node point at where it
+  would be (`/top/name`). `choice` and `case` are not data nodes, so their errors point at the
+  parent data node (`/top`).
 - **`code`** is one of `range`, `length`, `pattern`, `enum`, `union`, `type`, `must`, `when`,
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
   `max-elements`, `duplicate-key`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
@@ -96,12 +94,12 @@ not what one implementation happens to do.
    an `xfail` reason for the wrong one.
 4. When a shared case fully covers a per-language test, delete that test in both languages.
 
-Instance data may be RFC 7951 JSON or dict-style JSON (`encoding/dict-style`). Both encodings of
-one instance produce the same normalized tree and the same `(path, code)` set. Paths are always
-the normalized form. Other `module` files in the case directory (not `submodule` files) are
-parsed after the primary module so their `augment` statements merge into it.
+Instance data defaults to strict RFC 7951. Set `"encoding": "native"` on an instance for native
+JSON (`encoding/dict-style`). The two modes do not fall back to each other. Paths point into the
+input as written. Other `module` files in the case directory (not `submodule` files) are parsed
+after the primary module so their `augment` statements merge into it.
 
-`ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a dict-style
+`ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a native
 list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
 than one key was given as an object; multi-key lists are arrays only.
 

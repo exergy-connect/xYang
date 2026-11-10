@@ -1,2 +1,2 @@
-export { normalizeInstance, normalizationErrors, resolveQualifiedTopLevel } from "./encoding";
-export type { EncodingError } from "./encoding";
+export { encodingErrors, iterInstance, projectInstance, remapPointer, resolveQualifiedTopLevel } from "./encoding";
+export type { InstanceNode, IterInstanceOptions } from "./encoding";

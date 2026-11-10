@@ -15,9 +15,10 @@ function printUsage(): void {
     [
       "xyang-ts commands:",
       "  parse [--include-path DIR]... <file.yang>",
-      "  validate [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... <file.yang> [data.json|-]",
+      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... <file.yang> [data.json|-]",
       "  convert [--include-path DIR]... <file.yang>",
       "",
+      "  --native-json         native dict-style JSON (default: strict RFC 7951)",
       "  --format              text (default) or json ({valid, errors} on stdout)",
       "  --features            {\"module\": [\"feature\"]} or null (default: all features)",
       "  --anydata-validation  off | complete | candidate  (default: off)",
@@ -40,7 +41,8 @@ function writeJsonWarnings(warnings: ValidationIssue[]): void {
 }
 
 function runValidate(rest: string[]): number {
-  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features } = parseValidateArgs(rest);
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson } =
+    parseValidateArgs(rest);
   const yangFile = positional[0];
   if (!yangFile) {
     throw new Error("Missing <file.yang>");
@@ -89,7 +91,7 @@ function runValidate(rest: string[]): number {
     data = JSON.parse(readFileSync(0, "utf-8"));
   }
   if (format === "json") {
-    const detailed = validator.validateDetailed(data);
+    const detailed = validator.validateDetailed(data, { nativeJson });
     writeJsonWarnings(detailed.warnings);
     const report = {
       valid: detailed.valid,
@@ -103,7 +105,7 @@ function runValidate(rest: string[]): number {
     return detailed.valid ? 0 : 1;
   }
 
-  const result = validator.validate(data);
+  const result = validator.validate(data, { nativeJson });
   if (result.warnings?.length) {
     for (const line of result.warnings) {
       process.stderr.write(`Warning: ${line}\n`);

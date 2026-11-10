@@ -6,7 +6,14 @@ import { describe, expect, it } from "vitest";
 import { YangParser, YangValidator } from "../src";
 
 type Expected = { path: string; code: string; message?: string };
-type Instance = { name: string; data: unknown; valid: boolean; errors?: Expected[]; xfail?: Record<string, string> };
+type Instance = {
+  name: string;
+  data: unknown;
+  valid: boolean;
+  errors?: Expected[];
+  xfail?: Record<string, string>;
+  encoding?: string;
+};
 type Case = {
   module: string;
   features?: Record<string, string[]>;
@@ -39,7 +46,9 @@ function run(dir: string, c: Case, inst: Instance | undefined): void {
   const module = loadCaseModule(dir, c.module);
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
-  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data);
+  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data, {
+    nativeJson: inst.encoding === "native"
+  });
   const expected = inst.errors ?? [];
   const got = new Set(errors.map((e) => `${e.path} ${e.code}`));
   expect([...got].sort(), `raw errors: ${JSON.stringify(errors)}`).toEqual(

@@ -131,7 +131,7 @@ const validator = new YangValidator(module);
 const result = validator.validate({ "data-model": { name: "example", entities: [] } });
 ```
 
-Instance input (the JSON document, not the schema `.yang.json` file) may be RFC 7951 or plain dict-style JSON. Both are normalized to one tree before validation: a single-key list may be an object keyed by the key value, member names may omit the module qualifier, `int64` / `uint64` / `decimal64` accept a JSON number or the RFC 7951 string, and `empty` is `null` or `[null]`. Error paths are JSON Pointers into that normalized tree. In a union, a `string` member (or another string-typed member) wins over the RFC 7951 string encoding of `int64`, `uint64`, and `decimal64`, so `"5"` and `5` can select different members. That differs from strict RFC 7951 member-order resolution on purpose.
+Instance input (the JSON document, not the schema `.yang.json` file) is strict RFC 7951 unless you opt into native JSON. There is no fallback between the two. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. Native JSON (`--native-json`, Python `native_json=True`, TypeScript `{ nativeJson: true }`) allows a single-key list as an object keyed by the key value, JSON numbers for those 64-bit and decimal types, and `empty` as `null`. An iterator walks the input as written and yields one tree; error paths are JSON Pointers into that input (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
 
 ---
 

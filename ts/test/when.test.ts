@@ -104,7 +104,7 @@ module test {
 
     const enabledResult = validator.validate({
       data: {
-        enabled: null,
+        enabled: [null],
         optional_section: {
           note: "enabled is set"
         }

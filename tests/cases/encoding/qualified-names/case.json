@@ -1,10 +1,10 @@
 {
-  "description": "RFC 7951 section 4: top-level members are module-qualified (m:top). xYang also accepts the simple form, which the other cases use. Paths point at the normalized tree (m:top and top are both /top).",
+  "description": "RFC 7951 section 4: top-level members are module-qualified (m:top). xYang also accepts the simple form, which the other cases use. Paths address the input as written.",
   "module": "m.yang",
   "instances": [
     { "name": "qualified top-level member", "data": { "m:top": { "a": 1 } }, "valid": true },
     { "name": "qualified top-level member, child error", "data": { "m:top": { "a": 300 } }, "valid": false,
-      "errors": [{ "path": "/top/a", "code": "range" }] },
+      "errors": [{ "path": "/m:top/a", "code": "range" }] },
     { "name": "unknown module prefix", "data": { "x:top": { "a": 1 } }, "valid": false,
       "errors": [{ "path": "/x:top", "code": "unknown-field" }] }
   ]

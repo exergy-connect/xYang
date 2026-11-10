@@ -1,3 +1,3 @@
-export { normalizeInstance, normalizationErrors } from "./instance";
-export type { EncodingError } from "./instance";
+export { encodingErrors, iterInstance, projectInstance, remapPointer } from "./instance";
+export type { InstanceNode, IterInstanceOptions } from "./instance";
 export { resolveQualifiedTopLevel } from "./rfc7951";

@@ -21,20 +21,7 @@ module m {
     leaf num-or-str {
       type union {
         type int64;
-        type string;
-      }
-      must ". = 5";
-    }
-    leaf str-wins {
-      type union {
-        type int64 { range "10..20"; }
-        type string;
-      }
-    }
-    leaf num-or-bool {
-      type union {
-        type int64;
-        type boolean;
+        type string { pattern "[a-z]+"; }
       }
     }
     leaf extra { type string; }

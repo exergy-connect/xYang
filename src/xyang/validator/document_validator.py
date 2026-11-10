@@ -108,6 +108,9 @@ class DocumentValidator:
         cache: bool = True,
         leafref_root_data: Optional[Any] = None,
         path: Optional[PathBuilder] = None,
+        native_json: bool = False,
+        module: Optional[YangModule] = None,
+        from_iterator: bool = False,
     ) -> List[ValidationError]:
         """Validate data against the root schema.
 
@@ -126,6 +129,19 @@ class DocumentValidator:
         Returns:
             List of ValidationError (empty when valid).
         """
+        encoding: list[ValidationError] = []
+        pointer_map: dict[str, str] = {}
+        host = module if module is not None else self._if_feature_module
+        if from_iterator and host is not None and isinstance(data, dict):
+            from ..encoding.instance import encoding_errors, iter_instance, project_instance
+
+            nodes = list(iter_instance(data, host, native_json=native_json, schema=self._root_schema))
+            parent = host.name if isinstance(self._root_schema, YangModule) else ""
+            data, pointer_map = project_instance(nodes, parent)
+            encoding = [
+                ValidationError(path=ptr or "/", message=message, code=code, pointer=ptr)
+                for ptr, code, message in encoding_errors(nodes)
+            ]
         self._leafref_severity = leafref_severity
         self._root_data = leafref_root_data if leafref_root_data is not None else data
         self._errors = []
@@ -143,7 +159,12 @@ class DocumentValidator:
             path_builder,
             enforce_mandatory_choice=True,
         )
-        return self._errors
+        if pointer_map:
+            from ..encoding.instance import remap_pointer
+
+            for err in self._errors:
+                err.pointer = remap_pointer(err.pointer, pointer_map)
+        return encoding + self._errors
 
     def _add(
         self,

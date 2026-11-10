@@ -34,7 +34,7 @@ def _validate(meta_model, data: dict) -> tuple[bool, list]:
 def test_allow_unlimited_fields_valid(meta_model):
     """allow_unlimited_fields present only when at least one entity has >7 non-array fields."""
     data = dm(
-        allow_unlimited_fields=None,
+        allow_unlimited_fields=[None],
         entities=[
             ent(
                 "big",
@@ -50,7 +50,7 @@ def test_allow_unlimited_fields_valid(meta_model):
 def test_allow_unlimited_fields_invalid(meta_model):
     """allow_unlimited_fields present but no entity has >7 non-array fields."""
     data = dm(
-        allow_unlimited_fields=None,
+        allow_unlimited_fields=[None],
         entities=[
             ent(
                 "small",

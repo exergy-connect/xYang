@@ -3,7 +3,7 @@ import { YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
-import { resolveQualifiedTopLevel } from "../encoding";
+import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
 import {
   AnydataValidationConfig,
   AnydataValidationConfigInput,
@@ -208,6 +208,13 @@ export class DocumentValidator {
     return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
+  private pointerMap: Map<string, string> | null = null;
+
+  /** Map canonical walker pointers back to the input JSON as written. */
+  setPointerMap(pointerMap: Map<string, string> | null): void {
+    this.pointerMap = pointerMap;
+  }
+
   private collect(
     ctx: ValidationContext,
     data: unknown
@@ -247,6 +254,11 @@ export class DocumentValidator {
 
       if (ctx.constraintChecks) {
         this.rejectUnknownListItemKeys(ctx.module, root, "", errors);
+      }
+      if (this.pointerMap) {
+        for (const item of [...errors, ...warnings]) {
+          item.path = remapPointer(item.path, this.pointerMap);
+        }
       }
       return { errors, warnings };
     } finally {

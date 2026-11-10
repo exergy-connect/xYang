@@ -1,5 +1,5 @@
 {
-  "description": "boolean is a JSON literal; empty is encoded as [null] (RFC 7951 6.9) and normalized to null.",
+  "description": "boolean is a JSON literal; empty is [null] in RFC 7951 and null with --native-json.",
   "module": "m.yang",
   "instances": [
     { "name": "valid", "data": { "top": { "flag": false, "marker": [null] } }, "valid": true },

@@ -1,15 +1,10 @@
 /**
- * Normalize RFC 7951 and dict-style instance JSON into one tree.
- *
- * This is the only code that knows about either encoding. Validators see its
- * output: containers are objects, lists are arrays of objects with key leaves
- * filled in, member names follow the RFC 7951 local-or-qualified rule, `empty`
- * is `null`, and int64/uint64/decimal64 use one canonical value.
+ * Walk instance JSON as written and yield one node per schema instance node.
+ * The input is never modified. RFC 7951 is the default; native JSON is opt-in.
  */
 import { YangModule, YangStatement } from "../core/model";
+import { ExactDecimal } from "../types";
 import { TypeChecker } from "../validator/type-checker";
-
-const NORMALIZATION_ERRORS = Symbol.for("xyang.normalizationErrors");
 
 const INT64 = new Set(["int64", "uint64"]);
 const DECIMAL = new Set(["decimal64", "number"]);
@@ -22,144 +17,79 @@ const STRINGISH = new Set([
   "instance-identifier",
   "leafref"
 ]);
-const INTEGER_KEY = new Set([
-  "int8",
-  "int16",
-  "int32",
-  "int64",
-  "uint8",
-  "uint16",
-  "uint32",
-  "uint64",
-  "integer"
-]);
-const BUILTINS = new Set([
-  ...INT64,
-  ...DECIMAL,
-  ...STRINGISH,
-  ...INTEGER_KEY,
-  "boolean",
-  "empty",
-  "union"
-]);
-const DATA_KEYWORDS = new Set(["container", "list", "leaf", "leaf-list", "anydata", "anyxml"]);
-const SKIP_KEYWORDS = new Set(["notification", "rpc", "action", "input", "output"]);
+const SMALL_INT = new Set(["int8", "int16", "int32", "uint8", "uint16", "uint32", "integer"]);
+const BUILTINS = new Set([...INT64, ...DECIMAL, ...STRINGISH, ...SMALL_INT, "boolean", "empty", "union"]);
+const DATA = new Set(["container", "list", "leaf", "leaf-list", "anydata", "anyxml", "notification"]);
+const SKIP = new Set(["rpc", "action", "input", "output"]);
+const NO = Symbol("no-decode");
 
-export type EncodingError = { code: string; path: string; message: string };
+export type InstanceNode = {
+  stmt: YangStatement | null;
+  value: unknown;
+  pointer: string;
+  children: InstanceNode[];
+  kind: string;
+  errors: Array<[string, string]>;
+  include: boolean;
+  /** Value placed in the validator tree when it differs from `value` (decimal64). */
+  projected?: unknown;
+  inputKey?: string;
+};
 
 type TypeShape = Record<string, unknown>;
 
-type NormCtx = {
-  module: YangModule;
-  parent: string;
-  checker: TypeChecker;
-  errors: EncodingError[];
-};
-
 function pointer(tokens: string[]): string {
-  if (tokens.length === 0) {
-    return "";
-  }
+  if (tokens.length === 0) return "";
   return "/" + tokens.map((token) => token.replace(/~/g, "~0").replace(/\//g, "~1")).join("/");
 }
 
-function clone<T>(value: T): T {
-  if (Array.isArray(value)) {
-    return value.map((item) => clone(item)) as T;
+function keywordOf(stmt: YangStatement): string {
+  const raw = stmt.keyword ?? "";
+  if (raw === "notification") return "container";
+  if (raw.includes(":")) {
+    const kind = stmt.data.data_node_kind;
+    if (kind === "container" || kind === "list") return kind;
   }
-  if (value && typeof value === "object") {
-    const out: Record<string, unknown> = {};
-    for (const [key, item] of Object.entries(value as Record<string, unknown>)) {
-      out[key] = clone(item);
-    }
-    return out as T;
-  }
-  return value;
-}
-
-function isObject(value: unknown): value is Record<string, unknown> {
-  return Boolean(value) && typeof value === "object" && !Array.isArray(value);
-}
-
-export function normalizationErrors(data: unknown): EncodingError[] {
-  if (data && typeof data === "object" && NORMALIZATION_ERRORS in data) {
-    return (data as { [NORMALIZATION_ERRORS]?: EncodingError[] })[NORMALIZATION_ERRORS] ?? [];
-  }
-  return [];
-}
-
-function tag(tree: Record<string, unknown>, errors: EncodingError[]): Record<string, unknown> {
-  Object.defineProperty(tree, NORMALIZATION_ERRORS, { value: errors, enumerable: false });
-  return tree;
+  return raw;
 }
 
 function definingModule(stmt: YangStatement, parent: string): string {
   const explicit = stmt.data.defining_module;
-  if (typeof explicit === "string" && explicit.length > 0) {
-    return explicit;
-  }
+  if (typeof explicit === "string" && explicit.length > 0) return explicit;
   return parent;
 }
 
-function canonicalKey(stmt: YangStatement, parent: string): string {
+function memberKey(stmt: YangStatement, parent: string): string {
   const name = stmt.name ?? "";
-  if (!name) {
-    return "";
-  }
+  if (!name) return "";
   const owner = definingModule(stmt, parent);
-  return owner === parent ? name : `${owner}:${name}`;
+  return !parent || owner === parent ? name : `${owner}:${name}`;
 }
 
 function dataNodes(schema: { statements?: YangStatement[] }): YangStatement[] {
   const out: YangStatement[] = [];
   for (const stmt of schema.statements ?? []) {
-    const keyword = stmt.keyword ?? "";
-    if (SKIP_KEYWORDS.has(keyword)) {
-      continue;
-    }
+    const keyword = keywordOf(stmt);
+    if (SKIP.has(stmt.keyword ?? "")) continue;
     if (keyword === "choice" || keyword === "case") {
       out.push(...dataNodes(stmt));
       continue;
     }
-    if (DATA_KEYWORDS.has(keyword)) {
-      out.push(stmt);
-    }
+    if (DATA.has(keyword)) out.push(stmt);
   }
   return out;
 }
 
-function resolveName(key: string, children: YangStatement[], parent: string): YangStatement[] {
-  if (key.includes(":")) {
-    const colon = key.indexOf(":");
-    const moduleName = key.slice(0, colon);
-    const local = key.slice(colon + 1);
-    if (!moduleName || !local) {
-      return [];
-    }
-    return children.filter((child) => child.name === local && definingModule(child, parent) === moduleName);
-  }
-  return children.filter((child) => child.name === key);
-}
-
 function leafType(stmt: YangStatement): TypeShape | undefined {
   const type = stmt.data.type;
-  if (type && typeof type === "object") {
-    return type as TypeShape;
-  }
-  return undefined;
+  return type && typeof type === "object" ? (type as TypeShape) : undefined;
 }
 
 function unwrap(module: YangModule, type: TypeShape | undefined, seen = new Set<string>()): TypeShape | undefined {
-  if (!type || typeof type.name !== "string") {
-    return type;
-  }
-  if (typeof type.prefix === "string" && type.prefix.length > 0) {
-    return type;
-  }
+  if (!type || typeof type.name !== "string") return type;
+  if (typeof type.prefix === "string" && type.prefix) return type;
   const name = type.name;
-  if (BUILTINS.has(name) || seen.has(name)) {
-    return type;
-  }
+  if (BUILTINS.has(name) || seen.has(name)) return type;
   const typedefs = module.typedefs as Record<string, { type?: TypeShape }>;
   const typedef = typedefs[name];
   if (typedef?.type && typeof typedef.type.name === "string") {
@@ -169,337 +99,388 @@ function unwrap(module: YangModule, type: TypeShape | undefined, seen = new Set<
   return type;
 }
 
-function accepts(ctx: NormCtx, value: unknown, type: TypeShape): boolean {
+function accepts(checker: TypeChecker, value: unknown, type: TypeShape): boolean {
   const name = typeof type.name === "string" ? type.name : "string";
-  const [ok] = ctx.checker.validate(value, name, type);
-  return ok;
+  return checker.validate(value, name, type)[0];
 }
 
-function stringMemberAccepts(ctx: NormCtx, value: string, members: TypeShape[]): boolean {
-  for (const member of members) {
-    const eff = unwrap(ctx.module, member);
-    if (!eff || typeof eff.name !== "string") {
-      continue;
-    }
-    if (eff.name === "union") {
-      const nested = Array.isArray(eff.types) ? (eff.types as TypeShape[]) : [];
-      if (stringMemberAccepts(ctx, value, nested)) {
-        return true;
-      }
-      continue;
-    }
-    if (STRINGISH.has(eff.name) && accepts(ctx, value, member)) {
-      return true;
-    }
-  }
-  return false;
+function isIntText(value: unknown): value is string {
+  return typeof value === "string" && /^-?\d+$/.test(value.trim());
 }
 
-function canonInt64(value: unknown, tokens: string[], errors: EncodingError[]): unknown {
-  if (typeof value === "number") {
-    if (!Number.isSafeInteger(value)) {
-      errors.push({
-        code: "type",
-        path: pointer(tokens),
-        message: "integer is outside the safe JSON number range; use the RFC 7951 string form"
-      });
-      return value;
-    }
-    return value;
-  }
-  if (typeof value === "string" && /^-?\d+$/.test(value.trim())) {
-    const text = value.trim();
-    const parsed = Number(text);
-    if (Number.isSafeInteger(parsed)) {
-      return parsed;
-    }
-    return value;
-  }
-  return value;
+function isDecText(value: unknown): value is string {
+  return typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim());
 }
 
-function canonDecimal(value: unknown): unknown {
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "number" && Number.isFinite(value)) {
-    return String(value);
-  }
-  if (typeof value === "string") {
-    return value;
-  }
-  return value;
+function hint(native: boolean, kind: string): string {
+  return native
+    ? `${kind} is a JSON number in native mode; the default is RFC 7951`
+    : `${kind} is a string in RFC 7951; pass --native-json for a JSON number`;
 }
 
-function memberList(type: TypeShape): TypeShape[] {
-  return Array.isArray(type.types) ? (type.types as TypeShape[]) : [];
-}
-
-function normalizeUnion(value: unknown, unionType: TypeShape, ctx: NormCtx, tokens: string[]): unknown {
-  const members = memberList(unionType);
-  if (typeof value === "string") {
-    if (stringMemberAccepts(ctx, value, members)) {
-      return value;
-    }
-    const text = value.trim();
+function decodeScalar(
+  value: unknown,
+  type: TypeShape,
+  module: YangModule,
+  checker: TypeChecker,
+  native: boolean
+): unknown {
+  const eff = unwrap(module, type);
+  if (!eff || typeof eff.name !== "string") return value;
+  const name = eff.name;
+  if (name === "union") {
+    const members = Array.isArray(eff.types) ? (eff.types as TypeShape[]) : [];
     for (const member of members) {
-      const eff = unwrap(ctx.module, member);
-      if (!eff || typeof eff.name !== "string") {
-        continue;
-      }
-      if (eff.name === "union") {
-        const nested = normalizeUnion(value, eff, ctx, tokens);
-        if (nested !== value || stringMemberAccepts(ctx, value, memberList(eff))) {
-          return nested;
-        }
-        continue;
-      }
-      if (INT64.has(eff.name) && /^-?\d+$/.test(text)) {
-        const parsed = Number(text);
-        if (Number.isSafeInteger(parsed) && accepts(ctx, parsed, member)) {
-          return parsed;
-        }
-        if (!Number.isSafeInteger(parsed)) {
-          return value;
-        }
-      }
-      if (DECIMAL.has(eff.name) && /^-?\d+(\.\d+)?$/.test(text) && accepts(ctx, text, member)) {
-        return text;
-      }
+      const decoded = decodeScalar(value, member, module, checker, native);
+      if (decoded === NO) continue;
+      if (accepts(checker, decoded, member)) return decoded;
     }
     return value;
-  }
-  if (typeof value === "boolean") {
-    return value;
-  }
-  if (typeof value === "number") {
-    for (const member of members) {
-      const eff = unwrap(ctx.module, member);
-      if (!eff || typeof eff.name !== "string") {
-        continue;
-      }
-      if (INT64.has(eff.name) && accepts(ctx, value, member)) {
-        return canonInt64(value, tokens, ctx.errors);
-      }
-      if (DECIMAL.has(eff.name) && accepts(ctx, value, member)) {
-        return canonDecimal(value);
-      }
-      if (eff.name === "union") {
-        const nested = normalizeUnion(value, eff, ctx, tokens);
-        if (accepts(ctx, nested, member)) {
-          return nested;
-        }
-        continue;
-      }
-      if (accepts(ctx, value, member)) {
-        return value;
-      }
-    }
-    return value;
-  }
-  if (Array.isArray(value) && value.length === 1 && value[0] === null) {
-    for (const member of members) {
-      const eff = unwrap(ctx.module, member);
-      if (eff?.name === "empty") {
-        return null;
-      }
-    }
-  }
-  return value;
-}
-
-function normalizeLeaf(value: unknown, type: TypeShape | undefined, ctx: NormCtx, tokens: string[]): unknown {
-  const eff = unwrap(ctx.module, type);
-  if (!eff || typeof eff.name !== "string") {
-    return value;
-  }
-  if (eff.name === "empty") {
-    if (Array.isArray(value) && value.length === 1 && value[0] === null) {
-      return null;
-    }
-    return value;
-  }
-  if (eff.name === "union") {
-    return normalizeUnion(value, eff, ctx, tokens);
-  }
-  if (INT64.has(eff.name)) {
-    return canonInt64(value, tokens, ctx.errors);
-  }
-  if (DECIMAL.has(eff.name)) {
-    return canonDecimal(value);
-  }
-  return value;
-}
-
-function convertKey(text: string, leaf: YangStatement, ctx: NormCtx): { value: unknown; ok: boolean } {
-  const eff = unwrap(ctx.module, leafType(leaf));
-  const name = typeof eff?.name === "string" ? eff.name : "";
-  if (name === "boolean") {
-    if (text === "true") return { value: true, ok: true };
-    if (text === "false") return { value: false, ok: true };
-    return { value: text, ok: false };
   }
   if (name === "empty") {
-    return { value: text, ok: false };
+    if (native && value === null) return null;
+    if (!native && Array.isArray(value) && value.length === 1 && value[0] === null) return null;
+    if ((native && Array.isArray(value) && value.length === 1 && value[0] === null) || (!native && value === null)) {
+      return NO;
+    }
+    return value;
   }
-  if (INTEGER_KEY.has(name)) {
-    if (!/^-?\d+$/.test(text)) {
-      return { value: text, ok: false };
+  if (INT64.has(name)) {
+    if (native) {
+      if (typeof value !== "number" || !Number.isSafeInteger(value)) return NO;
+      return BigInt(value);
     }
-    const parsed = Number(text);
-    if (!Number.isSafeInteger(parsed)) {
-      return { value: text, ok: false };
-    }
-    return { value: parsed, ok: true };
+    if (isIntText(value)) return BigInt(value.trim());
+    return NO;
   }
   if (DECIMAL.has(name)) {
-    if (!/^-?\d+(\.\d+)?$/.test(text)) {
-      return { value: text, ok: false };
+    if (native) {
+      if (typeof value !== "number" || !Number.isFinite(value)) return NO;
+      return new ExactDecimal(String(value));
     }
-    return { value: text, ok: true };
+    if (isDecText(value)) return new ExactDecimal(value.trim());
+    return NO;
   }
-  if (name === "union" && eff) {
-    return { value: normalizeUnion(text, eff, ctx, []), ok: true };
+  if (name === "leafref" || STRINGISH.has(name)) return value;
+  if (name === "boolean") {
+    if (typeof value === "boolean" || value === "true" || value === "false") return value;
+    return NO;
   }
-  return { value: text, ok: true };
+  return value;
 }
 
-function findNamed(schema: YangStatement, name: string): YangStatement | undefined {
-  return dataNodes(schema).find((child) => child.name === name);
+function resolveName(
+  key: string,
+  children: YangStatement[],
+  parent: string,
+  native: boolean,
+  atRoot: boolean
+): YangStatement[] {
+  if (native) {
+    if (key.includes(":")) {
+      const colon = key.indexOf(":");
+      const moduleName = key.slice(0, colon);
+      const local = key.slice(colon + 1);
+      if (!moduleName || !local) return [];
+      return children.filter((child) => child.name === local && definingModule(child, parent) === moduleName);
+    }
+    return children.filter((child) => child.name === key);
+  }
+  const canonical = children.filter((child) => memberKey(child, parent) === key);
+  if (canonical.length > 0 || !atRoot || !key.includes(":")) return canonical;
+  const colon = key.indexOf(":");
+  const moduleName = key.slice(0, colon);
+  const local = key.slice(colon + 1);
+  if (!moduleName || !local) return [];
+  return children.filter((child) => child.name === local && definingModule(child, parent) === moduleName);
 }
 
-function sameValue(left: unknown, right: unknown): boolean {
-  return left === right;
+function node(
+  stmt: YangStatement | null,
+  value: unknown,
+  ptr: string,
+  kind: string,
+  extra: Partial<InstanceNode> = {}
+): InstanceNode {
+  return { stmt, value, pointer: ptr, children: [], kind, errors: [], include: true, ...extra };
 }
 
-function normalizeObject(
+function walkObject(
   data: Record<string, unknown>,
   schema: { statements?: YangStatement[] },
-  ctx: NormCtx,
-  tokens: string[]
-): Record<string, unknown> {
+  module: YangModule,
+  checker: TypeChecker,
+  parent: string,
+  tokens: string[],
+  native: boolean,
+  atRoot: boolean
+): InstanceNode[] {
   const children = dataNodes(schema);
-  const out: Record<string, unknown> = {};
+  const nodes: InstanceNode[] = [];
   const claimed = new Set<YangStatement>();
-  for (const [key, value] of Object.entries(data)) {
-    const hits = resolveName(key, children, ctx.parent);
+  for (const [key, raw] of Object.entries(data)) {
+    const here = [...tokens, key];
+    const hits = resolveName(key, children, parent, native, atRoot);
     if (hits.length === 0) {
-      out[key] = clone(value);
+      nodes.push(node(null, raw, pointer(here), "unknown", { inputKey: key }));
       continue;
     }
     if (hits.length > 1) {
-      ctx.errors.push({
-        code: "ambiguous-name",
-        path: pointer([...tokens, key]),
-        message: `member name '${key}' matches more than one node`
-      });
+      nodes.push(
+        node(null, null, pointer(here), "ambiguous", {
+          errors: [["ambiguous-name", `member name '${key}' matches more than one node`]],
+          include: false
+        })
+      );
       continue;
     }
     const stmt = hits[0];
-    if (claimed.has(stmt)) {
+    if (claimed.has(stmt)) continue;
+    claimed.add(stmt);
+    nodes.push(walkNode(raw, stmt, module, checker, parent, here, native));
+  }
+  return nodes;
+}
+
+function walkLeaf(
+  raw: unknown,
+  stmt: YangStatement,
+  module: YangModule,
+  checker: TypeChecker,
+  ptr: string,
+  native: boolean
+): InstanceNode {
+  const type = leafType(stmt);
+  if (!type) return node(stmt, raw, ptr, "leaf");
+  const eff = unwrap(module, type);
+  const decoded = decodeScalar(raw, type, module, checker, native);
+  if (decoded instanceof ExactDecimal) {
+    return node(stmt, decoded.text, ptr, "leaf", { projected: decoded });
+  }
+  if (decoded === NO) {
+    const name = typeof eff?.name === "string" ? eff.name : "value";
+    if (name === "empty" || INT64.has(name) || DECIMAL.has(name)) {
+      const message =
+        name === "empty"
+          ? native
+            ? "empty is null in native mode; RFC 7951 encodes empty as [null]"
+            : "empty is [null] in RFC 7951; pass --native-json for null"
+          : hint(native, name);
+      return node(stmt, null, ptr, "leaf", { errors: [["type", message]], include: false });
+    }
+    return node(stmt, raw, ptr, "leaf");
+  }
+  return node(stmt, decoded, ptr, "leaf");
+}
+
+function walkNode(
+  raw: unknown,
+  stmt: YangStatement,
+  module: YangModule,
+  checker: TypeChecker,
+  parent: string,
+  tokens: string[],
+  native: boolean
+): InstanceNode {
+  const ptr = pointer(tokens);
+  const keyword = keywordOf(stmt);
+  if (keyword === "anydata" || keyword === "anyxml") return node(stmt, raw, ptr, "anydata");
+  if (keyword === "container") {
+    if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+      return node(stmt, null, ptr, "container", { errors: [["type", "container must be an object"]], include: false });
+    }
+    return node(stmt, null, ptr, "container", {
+      children: walkObject(raw as Record<string, unknown>, stmt, module, checker, parent, tokens, native, false)
+    });
+  }
+  if (keyword === "list") return walkList(raw, stmt, module, checker, parent, tokens, native);
+  if (keyword === "leaf-list") {
+    if (!Array.isArray(raw)) {
+      return node(stmt, null, ptr, "leaf-list", { errors: [["type", "leaf-list must be an array"]], include: false });
+    }
+    const children = raw.map((item, index) => {
+      const child = walkLeaf(item, stmt, module, checker, pointer([...tokens, String(index)]), native);
+      child.kind = "leaf-list-item";
+      return child;
+    });
+    return node(stmt, null, ptr, "leaf-list", { children });
+  }
+  if (keyword === "leaf") return walkLeaf(raw, stmt, module, checker, ptr, native);
+  return node(stmt, raw, ptr, "opaque");
+}
+
+function keyNames(stmt: YangStatement): string[] {
+  const raw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
+  return raw ? raw.split(/\s+/).filter(Boolean) : [];
+}
+
+function convertKey(text: string, leaf: YangStatement, module: YangModule, checker: TypeChecker, native: boolean): unknown {
+  const type = leafType(leaf);
+  if (!type) return text;
+  const eff = unwrap(module, type);
+  const name = typeof eff?.name === "string" ? eff.name : "";
+  let candidate: unknown = text;
+  if (INT64.has(name) || SMALL_INT.has(name)) {
+    if (!/^-?\d+$/.test(text)) return NO;
+    candidate = INT64.has(name) ? BigInt(text) : Number(text);
+    if (typeof candidate === "number" && !Number.isSafeInteger(candidate)) return NO;
+  } else if (DECIMAL.has(name)) {
+    if (!isDecText(text)) return NO;
+    candidate = new ExactDecimal(text.trim());
+  } else if (name === "boolean") {
+    if (text !== "true" && text !== "false") return NO;
+    candidate = text === "true";
+  }
+  const decoded = decodeScalar(candidate, type, module, checker, native);
+  return decoded === NO ? candidate : decoded;
+}
+
+function walkList(
+  raw: unknown,
+  stmt: YangStatement,
+  module: YangModule,
+  checker: TypeChecker,
+  parent: string,
+  tokens: string[],
+  native: boolean
+): InstanceNode {
+  const ptr = pointer(tokens);
+  const keys = keyNames(stmt);
+  let entries: Array<[string, unknown]> = [];
+  let keyed = false;
+  if (Array.isArray(raw)) {
+    entries = raw.map((item, index) => [String(index), item]);
+  } else if (
+    native &&
+    raw &&
+    typeof raw === "object" &&
+    !Array.isArray(raw) &&
+    keys.length === 1 &&
+    Object.values(raw as object).every((item) => item && typeof item === "object" && !Array.isArray(item))
+  ) {
+    entries = Object.entries(raw as Record<string, unknown>);
+    keyed = true;
+  } else if (native && raw && typeof raw === "object" && !Array.isArray(raw) && keys.length !== 1) {
+    return node(stmt, null, ptr, "list", {
+      errors: [["list-encoding", "a list with more than one key must be a JSON array (--native-json)"]],
+      include: false
+    });
+  } else {
+    return node(stmt, null, ptr, "list", {
+      errors: [["type", native ? "list must be an array or a single-key object" : "list must be an array"]],
+      include: false
+    });
+  }
+  const keyLeaf = keys.length === 1 ? dataNodes(stmt).find((child) => child.name === keys[0]) : undefined;
+  const children = entries.map(([token, item], index) => {
+    const entryTokens = [...tokens, token];
+    const entryPointer = pointer(entryTokens);
+    if (!item || typeof item !== "object" || Array.isArray(item)) {
+      return node(stmt, null, entryPointer, "entry", {
+        errors: [["type", "list item must be an object"]],
+        include: false
+      });
+    }
+    const body = walkObject(item as Record<string, unknown>, stmt, module, checker, parent, entryTokens, native, false);
+    if (keyed && keyLeaf?.keyword === "leaf") {
+      const converted = convertKey(token, keyLeaf, module, checker, native);
+      const present = body.find((child) => child.kind === "leaf" && child.stmt?.name === keyLeaf.name && child.include);
+      if (converted === NO) {
+        body.push(
+          node(keyLeaf, null, pointer([...entryTokens, keyLeaf.name ?? keys[0]]), "leaf", {
+            errors: [["type", `dict key '${token}' cannot be converted to the key type`]],
+            include: false
+          })
+        );
+      } else if (!present) {
+        body.unshift(node(keyLeaf, converted, pointer([...entryTokens, keyLeaf.name ?? keys[0]]), "leaf"));
+      } else if (present.value !== converted && String(present.value) !== String(converted)) {
+        present.errors.push(["key-mismatch", `key leaf does not match dict key '${token}'`]);
+      }
+    }
+    return node(stmt, null, entryPointer, "entry", { children: body });
+  });
+  return node(stmt, null, ptr, "list", { children });
+}
+
+export type IterInstanceOptions = { nativeJson?: boolean; schema?: { statements?: YangStatement[] } };
+
+/** Yield a node for each top-level instance node in `data` as written. */
+export function* iterInstance(data: unknown, module: YangModule, options: IterInstanceOptions = {}): Generator<InstanceNode> {
+  if (!data || typeof data !== "object" || Array.isArray(data)) return;
+  const native = options.nativeJson === true;
+  const schema = options.schema ?? module;
+  const parent = schema === module ? (module.name ?? "") : "";
+  const checker = new TypeChecker(module);
+  yield* walkObject(data as Record<string, unknown>, schema, module, checker, parent, [], native, true);
+}
+
+export function encodingErrors(nodes: InstanceNode[]): Array<{ path: string; code: string; message: string }> {
+  const found: Array<{ path: string; code: string; message: string }> = [];
+  const walk = (item: InstanceNode): void => {
+    for (const [code, message] of item.errors) found.push({ path: item.pointer, code, message });
+    for (const child of item.children) walk(child);
+  };
+  for (const item of nodes) walk(item);
+  return found;
+}
+
+export function projectInstance(
+  nodes: InstanceNode[],
+  parent = ""
+): { data: Record<string, unknown>; pointerMap: Map<string, string> } {
+  const pointerMap = new Map<string, string>();
+  return { data: projectLevel(nodes, parent, [], pointerMap), pointerMap };
+}
+
+function projectLevel(
+  nodes: InstanceNode[],
+  parent: string,
+  tokens: string[],
+  pointerMap: Map<string, string>
+): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const item of nodes) {
+    if (item.kind === "unknown" && item.inputKey) {
+      out[item.inputKey] = item.value;
       continue;
     }
-    claimed.add(stmt);
-    const canon = canonicalKey(stmt, ctx.parent);
-    out[canon] = normalizeNode(value, stmt, ctx, [...tokens, canon]);
+    if (!item.include || !item.stmt) continue;
+    const key = memberKey(item.stmt, parent);
+    const canon = [...tokens, key];
+    pointerMap.set(pointer(canon), item.pointer);
+    if (item.kind === "container") {
+      out[key] = projectLevel(item.children, parent, canon, pointerMap);
+    } else if (item.kind === "list") {
+      const rows = item.children.filter((child) => child.include);
+      out[key] = rows.map((entry, index) => {
+        const entryCanon = [...canon, String(index)];
+        pointerMap.set(pointer(entryCanon), entry.pointer);
+        return projectLevel(entry.children, parent, entryCanon, pointerMap);
+      });
+    } else if (item.kind === "leaf-list") {
+      const items = item.children.filter((child) => child.include);
+      out[key] = items.map((child, index) => {
+        pointerMap.set(pointer([...canon, String(index)]), child.pointer);
+        return child.projected !== undefined ? child.projected : child.value;
+      });
+    } else if (item.kind === "leaf" || item.kind === "anydata") {
+      out[key] = item.projected !== undefined ? item.projected : item.value;
+    }
   }
   return out;
 }
 
-function normalizeList(value: unknown, stmt: YangStatement, ctx: NormCtx, tokens: string[]): unknown {
-  const keyRaw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
-  const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).filter(Boolean) : [];
-  if (Array.isArray(value)) {
-    return value.map((entry, index) =>
-      isObject(entry) ? normalizeObject(entry, stmt, ctx, [...tokens, String(index)]) : clone(entry)
-    );
-  }
-  if (!isObject(value)) {
-    return clone(value);
-  }
-  if (keyNames.length !== 1) {
-    ctx.errors.push({
-      code: "list-encoding",
-      path: pointer(tokens),
-      message: "a list with more than one key must be a JSON array"
-    });
-    return [];
-  }
-  if (!Object.values(value).every((entry) => isObject(entry))) {
-    return clone(value);
-  }
-  const keyLeaf = findNamed(stmt, keyNames[0]);
-  return Object.entries(value).map(([dictKey, entry], index) => {
-    const entryTokens = [...tokens, String(index)];
-    const normalized = normalizeObject(entry as Record<string, unknown>, stmt, ctx, entryTokens);
-    if (keyLeaf?.keyword === "leaf") {
-      const canonName = canonicalKey(keyLeaf, ctx.parent);
-      const converted = convertKey(dictKey, keyLeaf, ctx);
-      const keyPath = pointer([...entryTokens, canonName]);
-      if (!converted.ok) {
-        ctx.errors.push({
-          code: "type",
-          path: keyPath,
-          message: `dict key '${dictKey}' cannot be converted to the key type`
-        });
-        if (!(canonName in normalized)) {
-          normalized[canonName] = dictKey;
-        }
-      } else if (canonName in normalized) {
-        if (!sameValue(normalized[canonName], converted.value)) {
-          ctx.errors.push({
-            code: "key-mismatch",
-            path: keyPath,
-            message: `key leaf does not match dict key '${dictKey}'`
-          });
-        } else {
-          normalized[canonName] = converted.value;
-        }
-      } else {
-        normalized[canonName] = converted.value;
-      }
+export function remapPointer(path: string, pointerMap: Map<string, string>): string {
+  if (pointerMap.size === 0 || pointerMap.has(path)) return pointerMap.get(path) ?? path;
+  const parts = path.split("/");
+  for (let index = parts.length; index > 1; index -= 1) {
+    const prefix = parts.slice(0, index).join("/");
+    if (pointerMap.has(prefix)) {
+      const rest = parts.slice(index).join("/");
+      const base = pointerMap.get(prefix) ?? prefix;
+      return rest ? `${base}/${rest}` : base;
     }
-    return normalized;
-  });
-}
-
-function normalizeNode(value: unknown, stmt: YangStatement, ctx: NormCtx, tokens: string[]): unknown {
-  const keyword = stmt.keyword ?? "";
-  if (keyword === "anydata" || keyword === "anyxml") {
-    return clone(value);
   }
-  if (keyword === "list") {
-    return normalizeList(value, stmt, ctx, tokens);
-  }
-  if (keyword === "container") {
-    if (!isObject(value)) {
-      return clone(value);
-    }
-    return normalizeObject(value, stmt, ctx, tokens);
-  }
-  if (keyword === "leaf-list") {
-    if (!Array.isArray(value)) {
-      return clone(value);
-    }
-    return value.map((item) => normalizeLeaf(item, leafType(stmt), ctx, tokens));
-  }
-  if (keyword === "leaf") {
-    return normalizeLeaf(value, leafType(stmt), ctx, tokens);
-  }
-  return clone(value);
-}
-
-/** Normalize *data* to the canonical instance tree for *module*. */
-export function normalizeInstance(data: unknown, module: YangModule): unknown {
-  if (!isObject(data)) {
-    return data;
-  }
-  const ctx: NormCtx = {
-    module,
-    parent: module.name ?? "",
-    checker: new TypeChecker(module),
-    errors: []
-  };
-  const tree = normalizeObject(data, module, ctx, []);
-  return tag(tree, ctx.errors);
+  return path;
 }
