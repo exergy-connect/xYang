@@ -112,6 +112,11 @@ class XPathParser {
         this.consume("operator");
         const right = this.parseUnary();
         left = { kind: "binary", operator: "*", left, right };
+      } else if (this.isKeyword("div") || this.isKeyword("mod")) {
+        // XPath 1.0 §3.7: div/mod after an operand are multiplicative operators.
+        const op = this.consume().value.toLowerCase();
+        const right = this.parseUnary();
+        left = { kind: "binary", operator: op, left, right };
       } else {
         return left;
       }
@@ -286,7 +291,12 @@ class XPathParser {
     };
 
     if (firstStep !== undefined) {
-      pushStep(firstStep);
+      // Stop when '.' is not followed by '/', so `. div 2` leaves div for
+      // the multiplicative operator instead of treating it as a step name.
+      if (!pushStep(firstStep)) {
+        const node: XPathPathNode = { kind: "path", segments, isAbsolute };
+        return node;
+      }
     }
 
     while (this.current().kind === "dot" || this.current().kind === "dotdot" || this.current().kind === "identifier") {

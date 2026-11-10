@@ -9,6 +9,7 @@ node is replaced on every path step.
 from __future__ import annotations
 
 import logging
+import math
 from typing import Any, Callable, List
 
 from .ast import (
@@ -50,6 +51,39 @@ def _bin_minus(left: Any, right: Any) -> Any:
         return float("nan")
 
 
+def _bin_mul(left: Any, right: Any) -> Any:
+    lv, rv = first_value(left), first_value(right)
+    try:
+        return float(lv) * float(rv)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _bin_div(left: Any, right: Any) -> Any:
+    lv, rv = first_value(left), first_value(right)
+    try:
+        dividend = float(lv)
+        divisor = float(rv)
+    except (TypeError, ValueError):
+        return float("nan")
+    try:
+        return dividend / divisor
+    except ZeroDivisionError:
+        # XPath 1.0 div is IEEE 754: ±Infinity, and NaN for 0/0.
+        if dividend == 0.0 or math.isnan(dividend):
+            return float("nan")
+        return math.copysign(float("inf"), dividend * math.copysign(1.0, divisor))
+
+
+def _bin_mod(left: Any, right: Any) -> Any:
+    """Truncating remainder, same as JavaScript `%` (XPath 1.0 mod)."""
+    lv, rv = first_value(left), first_value(right)
+    try:
+        return math.fmod(float(lv), float(rv))
+    except (TypeError, ValueError):
+        return float("nan")
+
+
 _BINARY_OP_HANDLERS: dict[str, Callable[[Any, Any], Any]] = {
     "=": compare_eq,
     "!=": lambda l, r: not compare_eq(l, r),
@@ -59,6 +93,9 @@ _BINARY_OP_HANDLERS: dict[str, Callable[[Any, Any], Any]] = {
     ">=": lambda l, r: compare_eq(l, r) or compare_gt(l, r),
     "+": _bin_plus,
     "-": _bin_minus,
+    "*": _bin_mul,
+    "div": _bin_div,
+    "mod": _bin_mod,
 }
 
 

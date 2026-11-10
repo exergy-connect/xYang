@@ -330,6 +330,14 @@ export class XPathEvaluator {
       const product = Number(firstValue(left)) * Number(firstValue(right));
       return Number.isNaN(product) ? Number.NaN : product;
     }
+    if (op === "div") {
+      const quotient = Number(firstValue(left)) / Number(firstValue(right));
+      return Number.isNaN(quotient) ? Number.NaN : quotient;
+    }
+    if (op === "mod") {
+      const remainder = Number(firstValue(left)) % Number(firstValue(right));
+      return Number.isNaN(remainder) ? Number.NaN : remainder;
+    }
 
     return null;
   }

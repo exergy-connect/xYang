@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **XPath:** `+`, `-`, `*`, `div`, and `mod` are numeric operators (XPath 1.0). Python evaluates `*`, and both languages parse and evaluate `div` and `mod` (`mod` is a truncating remainder, the same as JavaScript `%`). `+` does not concatenate strings ([#48](https://github.com/exergy-connect/xYang/issues/48)).
 - **FEATURES.md:** dropped the contradictory lines on augment merging, `if-feature` in JSON Schema, and path caching, removed the usage-statistics section and the stale test-count list, and moved "Recent Improvements" to [History (moved from FEATURES.md)](#history-moved-from-featuresmd) ([#68](https://github.com/exergy-connect/xYang/issues/68)).
 - **Agent skill:** `skills/xyang-model/SKILL.md` documents `import`, `include`/`submodule`, and `augment`, points at `design/` for the JSON Schema profile and grammar, and includes the TypeScript CLI ([#69](https://github.com/exergy-connect/xYang/issues/69)).
 - **Version and descriptions:** `xyang --version` reads the installed package version (or `unknown` when that metadata is missing). The CLI, `pyproject.toml` description, and package docstring share one description. `PERFORMANCE.md` cites the current source paths ([#70](https://github.com/exergy-connect/xYang/issues/70)).
