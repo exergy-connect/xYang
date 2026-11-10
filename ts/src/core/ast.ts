@@ -67,6 +67,7 @@ export class YangStatement extends YangStatementList {
   name: string;
   description: string;
   reference: string;
+  units: string;
 
   constructor(init: Partial<YangStatement> = {}) {
     super(init.statements ?? []);
@@ -74,6 +75,7 @@ export class YangStatement extends YangStatementList {
     this.name = init.name ?? "";
     this.description = init.description ?? "";
     this.reference = init.reference ?? "";
+    this.units = init.units ?? "";
   }
 
   get_schema_node(): string | undefined {
@@ -215,12 +217,15 @@ export class YangTypeStmt {
 export class YangContainerStmt extends YangStatementWithWhen {
   must_statements: YangMustStmt[];
   presence?: string;
+  /** Groupings declared in this container. Visible here and in descendants only. */
+  groupings: Record<string, YangGroupingStmt>;
 
   constructor(init: Partial<YangContainerStmt> = {}) {
     super(init);
     this.keyword = "container";
     this.must_statements = init.must_statements ?? [];
     this.presence = init.presence;
+    this.groupings = init.groupings ?? {};
   }
 }
 
@@ -533,12 +538,15 @@ export class YangRefineStmt extends YangStatementWithMust {
 export class YangChoiceStmt extends YangStatementWithWhen {
   mandatory: boolean;
   cases: YangCaseStmt[];
+  /** RFC 7950 §7.9.3 case name. */
+  default?: string;
 
   constructor(init: Partial<YangChoiceStmt> = {}) {
     super(init);
     this.keyword = "choice";
     this.mandatory = init.mandatory ?? false;
     this.cases = init.cases ?? [];
+    this.default = init.default;
   }
 
   override child_names(data: Record<string, unknown>): Set<string> {

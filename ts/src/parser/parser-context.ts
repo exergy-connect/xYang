@@ -29,6 +29,9 @@ export const YangTokenType = {
   EQUALS: "=",
   PLUS: "+",
   SLASH: "/",
+  // Unquoted arguments keep '.' (`1..127`, `../foo`). Identifier and
+  // dotted-number lexers still consume a dot that belongs to them.
+  DOT: ".",
 
   STRING: "STRING",
   IDENTIFIER: "IDENTIFIER",
@@ -132,7 +135,8 @@ const PUNCTUATION = new Set<YangTokenType>([
   YangTokenType.COLON,
   YangTokenType.EQUALS,
   YangTokenType.PLUS,
-  YangTokenType.SLASH
+  YangTokenType.SLASH,
+  YangTokenType.DOT
 ]);
 
 const LITERAL_TYPES = new Set<YangTokenType>([
@@ -187,6 +191,7 @@ const LEXICAL_TOKEN_TYPES = new Set<string>([
   YangTokenType.EQUALS,
   YangTokenType.PLUS,
   YangTokenType.SLASH,
+  YangTokenType.DOT,
   YangTokenType.STRING,
   YangTokenType.IDENTIFIER,
   YangTokenType.INTEGER,

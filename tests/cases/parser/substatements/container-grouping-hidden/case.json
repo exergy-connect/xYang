@@ -1,0 +1,7 @@
+{
+  "description": "A grouping inside a container is not visible to uses outside that container (RFC 7950 §7.5) (#116).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Unknown grouping",
+  "xfail": { "python": "an unresolved uses is dropped with a warning instead of failing the load" }
+}

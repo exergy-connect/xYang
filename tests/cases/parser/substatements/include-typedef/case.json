@@ -1,0 +1,7 @@
+{
+  "description": "The same typedef reached through two includes is one definition, not a duplicate (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "shared typedef", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

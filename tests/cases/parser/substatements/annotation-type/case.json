@@ -1,0 +1,7 @@
+{
+  "description": "type is legal inside an extension invocation such as md:annotation (RFC 7952) (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "module loads", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

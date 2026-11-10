@@ -10,7 +10,17 @@ from .. import keywords as kw
 
 from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
-from ...ast import YangGroupingStmt, YangStatementList, YangTypedefStmt
+from ...ast import (
+    YangChoiceStmt,
+    YangContainerStmt,
+    YangGroupingStmt,
+    YangLeafListStmt,
+    YangLeafStmt,
+    YangStatement,
+    YangStatementList,
+    YangTypedefStmt,
+    YangTypeStmt,
+)
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -25,6 +35,7 @@ class TypedefStatementParser:
             self._parsers,
             {
                 kw.TYPE: self._parsers.parse_type,
+                kw.UNITS: self._parsers.parse_units,
                 kw.DEFAULT: self._parsers.parse_typedef_default,
             },
         )
@@ -62,3 +73,48 @@ class TypedefStatementParser:
             parent.statements.append(typedef_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         return typedef_stmt
+
+
+def propagate_typedef_units(module: object) -> None:
+    """Copy typedef ``units`` onto leafs that use the typedef and set none of their own."""
+
+    def lookup(type_stmt: YangTypeStmt | None, mod: object, seen: set[tuple[int, str, str]]) -> str:
+        if type_stmt is None:
+            return ""
+        key = (id(mod), type_stmt.prefix or "", type_stmt.name)
+        if key in seen:
+            return ""
+        seen.add(key)
+        target = mod
+        if type_stmt.prefix and hasattr(mod, "resolve_prefixed_module"):
+            target = mod.resolve_prefixed_module(type_stmt.prefix)  # type: ignore[attr-defined]
+            if target is None:
+                return ""
+        typedefs = getattr(target, "typedefs", None)
+        td = typedefs.get(type_stmt.name) if isinstance(typedefs, dict) else None
+        if td is None:
+            return ""
+        own = getattr(td, "units", "") or ""
+        if own:
+            return own
+        return lookup(getattr(td, "type", None), target, seen)
+
+    def walk(statements: list[YangStatement], mod: object) -> None:
+        for stmt in statements:
+            if isinstance(stmt, (YangLeafStmt, YangLeafListStmt)) and not stmt.units and stmt.type is not None:
+                found = lookup(stmt.type, mod, set())
+                if found:
+                    stmt.units = found
+            if isinstance(stmt, YangChoiceStmt):
+                for case in stmt.cases:
+                    walk(case.statements, mod)
+            if isinstance(stmt, YangContainerStmt):
+                for grouping in stmt.groupings.values():
+                    walk(grouping.statements, mod)
+            nested = getattr(stmt, "statements", None)
+            if isinstance(nested, list) and nested is not statements:
+                walk(nested, mod)
+
+    walk(list(getattr(module, "statements", []) or []), module)
+    for grouping in getattr(module, "groupings", {}).values():
+        walk(getattr(grouping, "statements", []) or [], module)

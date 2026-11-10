@@ -10,7 +10,7 @@ from .. import keywords as kw
 
 from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
-from ...ast import YangGroupingStmt
+from ...ast import YangContainerStmt, YangGroupingStmt
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -63,5 +63,9 @@ class GroupingStatementParser:
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
                 self._parse_grouping_substatement(tokens, new_context, grouping_name)
             tokens.consume_type(YangTokenType.RBRACE)
-        context.module.groupings[grouping_name] = grouping_stmt
+        parent = context.current_parent
+        if isinstance(parent, YangContainerStmt):
+            parent.groupings[grouping_name] = grouping_stmt
+        else:
+            context.module.groupings[grouping_name] = grouping_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)

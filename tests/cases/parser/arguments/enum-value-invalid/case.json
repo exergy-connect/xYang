@@ -1,0 +1,6 @@
+{
+  "description": "enum value \"x\" is a syntax error naming the statement and the value (#115).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "value argument must be an integer"
+}

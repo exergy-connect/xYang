@@ -39,6 +39,7 @@ class ChoiceStatementParser:
                 kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
                 kw.CASE: self.parse_case,
                 kw.MANDATORY: self.parse_choice_mandatory,
+                kw.DEFAULT: self.parse_choice_default,
             },
         )
         self._case_substatement_dispatch = with_data_node_substatements(
@@ -154,4 +155,12 @@ class ChoiceStatementParser:
         _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.mandatory = tt == kw.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_choice_default(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``default`` in a choice (RFC 7950 §7.9.3)."""
+        tokens.consume(kw.DEFAULT)
+        name = self._parsers.parse_string_argument(tokens)
+        if isinstance(context.current_parent, YangChoiceStmt):
+            context.current_parent.default = name
         tokens.consume_if_type(YangTokenType.SEMICOLON)

@@ -54,6 +54,7 @@ function buildModuleData(root: SerializedStatement, moduleState: Record<string, 
         name: stmt.argument,
         description: typeof stmt.description === "string" ? stmt.description : "",
         reference: typeof stmt.reference === "string" ? stmt.reference : "",
+        units: typeof stmt.units === "string" ? stmt.units : "",
         default: stmt.default,
         type: stmt.type ?? typeStmt?.type,
         statements: stmt.statements ?? []
@@ -256,9 +257,10 @@ export class YangParser {
       );
     }
     const parentName = String(saved.name ?? "");
-    if (belongs && belongs !== parentName) {
+    const owner = String(saved.belongs_to_module ?? "") || parentName;
+    if (belongs && belongs !== owner) {
       throw new YangSemanticError(
-        `submodule belongs-to '${belongs}' does not match module '${parentName}'`
+        `submodule belongs-to '${belongs}' does not match module '${owner}'`
       );
     }
   }
@@ -293,6 +295,7 @@ export class YangParser {
     const root = this.parsers.parseModule(stream, context);
     const data = buildModuleData(root, moduleState);
     mergeNestedTypedefs(data, moduleState, (stmt) => this.parsers.serializeAstStatement(stmt));
+    propagateTypedefUnits(data);
     const rawGroupings = (moduleState.groupings as Record<string, unknown>) ?? {};
     const serializedGroupings: Record<string, SerializedStatement> = {};
     for (const [key, val] of Object.entries(rawGroupings)) {
@@ -421,6 +424,7 @@ function mergeNestedTypedefs(
       name,
       description: typeof serialized.description === "string" ? serialized.description : "",
       reference: typeof serialized.reference === "string" ? serialized.reference : "",
+      units: typeof serialized.units === "string" ? serialized.units : "",
       default: serialized.default,
       type: serialized.type,
       statements: serialized.statements ?? []
@@ -428,22 +432,116 @@ function mergeNestedTypedefs(
   }
 }
 
+function propagateTypedefUnits(data: Record<string, unknown>): void {
+  const typedefs = (data.typedefs ?? {}) as Record<string, { units?: string; type?: { name?: string; prefix?: string } }>;
+
+  const unitsOf = (type: { name?: string; prefix?: string } | undefined, seen: Set<string>): string => {
+    if (!type || typeof type.name !== "string" || !type.name) {
+      return "";
+    }
+    const key = `${type.prefix ?? ""}:${type.name}`;
+    if (seen.has(key)) {
+      return "";
+    }
+    seen.add(key);
+    const td = typedefs[type.name];
+    if (!td) {
+      return "";
+    }
+    if (typeof td.units === "string" && td.units) {
+      return td.units;
+    }
+    return unitsOf(td.type, seen);
+  };
+
+  const walk = (statements: Array<Record<string, unknown>> | undefined): void => {
+    for (const stmt of statements ?? []) {
+      const keyword = stmt.keyword;
+      if ((keyword === "leaf" || keyword === "leaf-list") && !stmt.units && stmt.type) {
+        const found = unitsOf(stmt.type as { name?: string }, new Set());
+        if (found) {
+          stmt.units = found;
+        }
+      }
+      if (Array.isArray(stmt.statements)) {
+        walk(stmt.statements as Array<Record<string, unknown>>);
+      }
+      const local = stmt.local_groupings as Record<string, { statements?: Array<Record<string, unknown>> }> | undefined;
+      if (local) {
+        for (const grouping of Object.values(local)) {
+          walk(grouping.statements);
+        }
+      }
+    }
+  };
+
+  walk(data.statements as Array<Record<string, unknown>> | undefined);
+  const groupings = data.groupings as Record<string, { statements?: Array<Record<string, unknown>> }> | undefined;
+  if (groupings) {
+    for (const grouping of Object.values(groupings)) {
+      walk(grouping.statements);
+    }
+  }
+}
+
 function duplicateFromInclude(kind: string, name: string, subName: string): YangSemanticError {
   return new YangSemanticError(`Duplicate ${kind} '${name}' from include of '${subName}'`);
 }
 
+type IncludeSources = {
+  typedefs: Record<string, string>;
+  identities: Record<string, string>;
+  groupings: Record<string, string>;
+  feature_if_features: Record<string, string>;
+  features: Record<string, string>;
+};
+
+function includeSources(module: Record<string, unknown>): IncludeSources {
+  const existing = module.__included_def_sources as IncludeSources | undefined;
+  if (existing) {
+    return existing;
+  }
+  const created: IncludeSources = {
+    typedefs: {},
+    identities: {},
+    groupings: {},
+    feature_if_features: {},
+    features: {}
+  };
+  module.__included_def_sources = created;
+  return created;
+}
+
 /** Reject names the parent already defined, with Python's include messages. */
 function guardIncludeDefinitions(module: Record<string, unknown>, subName: string): () => void {
+  const sources = includeSources(module);
   const typedefs = (module.typedefs ?? {}) as Record<string, unknown>;
   const identities = (module.identities ?? {}) as Record<string, unknown>;
   const groupings = (module.groupings ?? {}) as Record<string, unknown>;
   const featureIfFeatures = (module.feature_if_features ?? {}) as Record<string, string[]>;
-  module.typedefs = guardRecord(typedefs, (name) => duplicateFromInclude("typedef", name, subName));
-  module.identities = guardRecord(identities, (name) => duplicateFromInclude("identity", name, subName));
-  module.groupings = guardRecord(groupings, (name) => duplicateFromInclude("grouping", name, subName));
+  module.typedefs = guardRecord(
+    typedefs,
+    (name) => duplicateFromInclude("typedef", name, subName),
+    subName,
+    sources.typedefs
+  );
+  module.identities = guardRecord(
+    identities,
+    (name) => duplicateFromInclude("identity", name, subName),
+    subName,
+    sources.identities
+  );
+  module.groupings = guardRecord(
+    groupings,
+    (name) => duplicateFromInclude("grouping", name, subName),
+    subName,
+    sources.groupings
+  );
   module.feature_if_features = guardRecord(
     featureIfFeatures,
-    (name) => duplicateFromInclude("feature if-feature for", name, subName)
+    (name) => duplicateFromInclude("feature if-feature for", name, subName),
+    subName,
+    sources.feature_if_features
   );
 
   const features = module.features instanceof Set ? (module.features as Set<string>) : new Set<string>();
@@ -451,7 +549,13 @@ function guardIncludeDefinitions(module: Record<string, unknown>, subName: strin
   const originalAdd = features.add;
   features.add = ((value: string) => {
     if (features.has(value)) {
+      if (sources.features[value] === subName) {
+        return features;
+      }
       throw duplicateFromInclude("feature", value, subName);
+    }
+    if (sources.features[value] === undefined) {
+      sources.features[value] = subName;
     }
     return originalAdd.call(features, value);
   }) as Set<string>["add"];
@@ -467,12 +571,21 @@ function guardIncludeDefinitions(module: Record<string, unknown>, subName: strin
 
 function guardRecord<T extends Record<string, unknown>>(
   record: T,
-  duplicate: (name: string) => YangSemanticError
+  duplicate: (name: string) => YangSemanticError,
+  subName: string,
+  sources: Record<string, string>
 ): T {
   return new Proxy(record, {
     set(target, prop, value) {
       if (typeof prop === "string" && Object.hasOwn(target, prop)) {
+        // The same definition reached again through this include is not a second typedef.
+        if (sources[prop] === subName) {
+          return true;
+        }
         throw duplicate(prop);
+      }
+      if (typeof prop === "string" && sources[prop] === undefined) {
+        sources[prop] = subName;
       }
       target[prop as keyof T] = value as T[keyof T];
       return true;

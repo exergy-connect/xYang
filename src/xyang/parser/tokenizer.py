@@ -168,7 +168,10 @@ class YangTokenizer:
                 i = j
                 continue
 
-            # Punctuation (grammar: { } ; : = + /)
+            # Punctuation (grammar: { } ; : = + / .)
+            # '.' stays a token so an unquoted argument can be reassembled
+            # (``length 1..127``, ``path ../x``). Identifier and dotted-number
+            # lexers still consume a dot that belongs to them.
             tok_type = punctuation.get(char)
             if tok_type is not None:
                 append(YangToken(type=tok_type, value=char, line_num=current_line, char_pos=i - line_start))

@@ -4,6 +4,8 @@ Parsing helpers for ``type`` statements and most type substatements.
 
 from __future__ import annotations
 
+import re
+
 from .. import keywords as kw
 
 from typing import TYPE_CHECKING, cast
@@ -49,6 +51,9 @@ class TypeStatementParser:
         handler = self._parsers.substatement_handler(tokens, self._type_substatement_dispatch)
         if handler:
             handler(tokens, context, type_stmt)
+            return
+        if self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
             return
         if self._parsers.skip_unsupported_or_raise_unknown_stmt(
             tokens, f"type '{type_name}'"
@@ -152,7 +157,7 @@ class TypeStatementParser:
         type_stmt.patterns.append(spec)
 
     def parse_type_length(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
-        """Parse length constraint."""
+        """Parse ``length`` as one string (``1..127`` or ``"1..127"``)."""
         tokens.consume(kw.LENGTH)
         type_stmt.length = self._parsers.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -185,7 +190,11 @@ class TypeStatementParser:
                     self._parsers.parse_if_feature_stmt(tokens, context)
                 elif pt == kw.VALUE:
                     tokens.consume(kw.VALUE)
-                    tokens.consume_type(YangTokenType.INTEGER)
+                    raw = self._parsers.parse_string_argument(tokens)
+                    if re.fullmatch(r"[+-]?\d+", raw) is None:
+                        raise tokens.make_error(
+                            f"value argument must be an integer, got {raw!r}"
+                        )
                     tokens.consume_if_type(YangTokenType.SEMICOLON)
                 elif pt == kw.STATUS:
                     tokens.consume(kw.STATUS)

@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef percent {
+    type uint8;
+    units "percent";
+  }
+
+  container top {
+    leaf p { type percent; }
+    leaf q {
+      type percent;
+      units "ratio";
+    }
+  }
+}

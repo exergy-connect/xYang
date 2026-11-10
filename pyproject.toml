@@ -59,6 +59,9 @@ testpaths = ["tests"]
 python_files = ["test_*.py"]
 python_classes = ["Test*"]
 python_functions = ["test_*"]
+markers = [
+    "slow: opt-in integration tests (XYANG_HUAWEI_DIR)",
+]
 
 [tool.black]
 line-length = 120

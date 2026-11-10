@@ -443,37 +443,82 @@ export class StatementParsers {
   }
 
   parse_argument(tokens: TokenStream): string {
-    const parts: string[] = [];
-    while (tokens.has_more()) {
-      const t = tokens.peek_type();
-      if (t === YangTokenType.SEMICOLON || t === YangTokenType.LBRACE) {
-        break;
-      }
-      if (t === YangTokenType.STRING) {
-        parts.push(this.parse_string_concatenation(tokens));
-      } else if (t === YangTokenType.PLUS) {
-        tokens.consume_type(YangTokenType.PLUS);
-      } else {
-        parts.push(tokens.consume());
-      }
+    if (!tokens.has_more()) {
+      return "";
     }
-    return parts.join("").trim();
+    const t = tokens.peek_type();
+    if (t === YangTokenType.SEMICOLON || t === YangTokenType.LBRACE || t === YangTokenType.RBRACE) {
+      return "";
+    }
+    return this.parse_string_argument(tokens);
   }
 
   parse_string_concatenation(tokens: TokenStream): string {
+    if (!tokens.has_more() || tokens.peek_type() !== YangTokenType.STRING) {
+      return this.parse_string_argument(tokens);
+    }
     const parts = [tokens.consume_type(YangTokenType.STRING)];
     while (tokens.has_more() && tokens.peek_type() === YangTokenType.PLUS) {
       tokens.consume_type(YangTokenType.PLUS);
+      if (!tokens.has_more() || tokens.peek_type() !== YangTokenType.STRING) {
+        tokens.syntaxError("Expected quoted string after '+'");
+      }
       parts.push(tokens.consume_type(YangTokenType.STRING));
     }
     return parts.join("");
   }
 
   parse_string_argument(tokens: TokenStream): string {
+    if (!tokens.has_more()) {
+      tokens.syntaxError("Expected statement argument, got 'end'");
+    }
     if (tokens.peek_type() === YangTokenType.STRING) {
       return this.parse_string_concatenation(tokens);
     }
-    return tokens.consume().replace(/^['"]|['"]$/g, "");
+    return this.read_unquoted_argument(tokens);
+  }
+
+  /** Adjacent lexemes up to whitespace, `;`, or `{` (RFC 7950 §6.1.3). */
+  read_unquoted_argument(tokens: TokenStream): string {
+    const stop = new Set<YangTokenType>([
+      YangTokenType.SEMICOLON,
+      YangTokenType.LBRACE,
+      YangTokenType.RBRACE,
+      YangTokenType.STRING
+    ]);
+    const parts: string[] = [];
+    let prevLine: number | undefined;
+    let prevEnd: number | undefined;
+    while (tokens.has_more()) {
+      const tok = tokens.peek_token();
+      if (!tok || stop.has(tok.type)) {
+        break;
+      }
+      if (prevEnd !== undefined && (tok.line_num !== prevLine || tok.char_pos !== prevEnd)) {
+        break;
+      }
+      parts.push(tok.value);
+      prevLine = tok.line_num;
+      prevEnd = tok.char_pos + tok.value.length;
+      tokens.consume();
+    }
+    if (parts.length === 0) {
+      const got = tokens.has_more() ? tokens.peek() : "end";
+      tokens.syntaxError(`Expected statement argument, got '${got}'`);
+    }
+    return parts.join("");
+  }
+
+  /** `min-elements` / `max-elements`: an integer, or `unbounded` (no bound). */
+  parse_integer_or_unbounded(tokens: TokenStream, statement: string): number | undefined {
+    const raw = this.parse_string_argument(tokens);
+    if (raw === "unbounded") {
+      return undefined;
+    }
+    if (!/^[+-]?\d+$/.test(raw)) {
+      tokens.syntaxError(`${statement} argument must be an integer or 'unbounded', got '${raw}'`);
+    }
+    return Number.parseInt(raw, 10);
   }
 
   substatement_handler(
@@ -648,6 +693,20 @@ export class StatementParsers {
     }
     if (stmt.description) {
       out.description = stmt.description;
+    }
+    const units = (stmt as { units?: string }).units;
+    if (units) {
+      out.units = units;
+    }
+    if (keyword === "container") {
+      const groupings = (stmt as { groupings?: Record<string, { name?: string }> }).groupings;
+      if (groupings && Object.keys(groupings).length > 0) {
+        const local: Record<string, SerializedStatement> = {};
+        for (const [gname, grouping] of Object.entries(groupings)) {
+          local[gname] = this.fromAst(grouping as never);
+        }
+        out.local_groupings = local;
+      }
     }
     const reference = (stmt as { reference?: string }).reference;
     if (reference) {
@@ -872,6 +931,16 @@ export class StatementParsers {
     }
   }
 
+  parse_units(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.UNITS);
+    const units = this.parse_string_argument(tokens);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+    const parent = context.current_parent as { units?: string } | undefined;
+    if (parent && "units" in parent) {
+      parent.units = units;
+    }
+  }
+
   parse_reference(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.REFERENCE);
     const ref = tokens.consume_type(YangTokenType.STRING);
@@ -987,7 +1056,7 @@ export class StatementParsers {
 
   parse_min_elements(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.MIN_ELEMENTS);
-    const value = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
+    const value = this.parse_integer_or_unbounded(tokens, "min-elements");
     const parent: any = context.current_parent;
     if (parent && "min_elements" in parent) parent.min_elements = value;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -995,7 +1064,7 @@ export class StatementParsers {
 
   parse_max_elements(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.MAX_ELEMENTS);
-    const value = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
+    const value = this.parse_integer_or_unbounded(tokens, "max-elements");
     const parent: any = context.current_parent;
     if (parent && "max_elements" in parent) parent.max_elements = value;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -1098,22 +1167,10 @@ export class StatementParsers {
       return undefined;
     }
     const tt = tokens.peek_type();
-    if (tt === YangTokenType.LBRACE || tt === YangTokenType.SEMICOLON) {
+    if (tt === YangTokenType.LBRACE || tt === YangTokenType.SEMICOLON || tt === YangTokenType.RBRACE) {
       return undefined;
     }
-    if (tt === YangTokenType.STRING) {
-      return this.parse_string_concatenation(tokens);
-    }
-    if (
-      tt === YangTokenType.IDENTIFIER ||
-      tt === YangTokenType.INTEGER ||
-      tt === YangTokenType.DOTTED_NUMBER ||
-      tt === kw.TRUE ||
-      tt === kw.FALSE
-    ) {
-      return tokens.consume();
-    }
-    return undefined;
+    return this.parse_string_argument(tokens);
   }
 
   private resolve_prefixed_module(context: ParserContext, prefix: string): Record<string, unknown> | undefined {

@@ -1,0 +1,9 @@
+module m {
+  yang-version 1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf a { type string; }
+  }
+}

@@ -34,6 +34,7 @@ class ModuleStatementParser:
             kw.INCLUDE: self.parse_include_stmt,
             kw.REVISION: self._parsers.parse_revision,
             kw.DESCRIPTION: self._parsers.parse_description,
+            kw.REFERENCE: self._parsers.parse_reference,
             kw.FEATURE: self._parsers.parse_feature_stmt,
             kw.IDENTITY: self._parsers.parse_identity,
             kw.EXTENSION: self._parsers.parse_extension_stmt,
@@ -195,18 +196,20 @@ class ModuleStatementParser:
         acc.revision_date = self._parsers._revision_parser.parse_revision_date_statement(tokens)
 
     def parse_yang_version(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse yang-version statement."""
+        """Parse yang-version statement. Argument is ``1`` or ``1.1``."""
         tokens.consume(kw.YANG_VERSION)
-        version, _ = tokens.consume_oneof(
-            [YangTokenType.IDENTIFIER, YangTokenType.DOTTED_NUMBER]
-        )
+        version = self._parsers.parse_string_argument(tokens)
+        if version not in ("1", "1.1"):
+            raise tokens.make_error(
+                f"yang-version argument must be '1' or '1.1', got {version!r}"
+            )
         context.module.yang_version = version
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_namespace(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse namespace statement."""
+        """Parse namespace statement (quoted or unquoted)."""
         tokens.consume(kw.NAMESPACE)
-        namespace = tokens.consume_type(YangTokenType.STRING)
+        namespace = self._parsers.parse_string_argument(tokens)
         context.module.namespace = namespace
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

@@ -43,6 +43,9 @@ class YangTokenType(Enum):
     EQUALS = "="
     PLUS = "+"
     SLASH = "/"
+    # Unquoted arguments keep '.' (``1..127``, ``../foo``). Identifier and
+    # dotted-number lexers still consume a dot that belongs to them.
+    DOT = "."
 
     # Literals (value is lexeme)
     STRING = "STRING"

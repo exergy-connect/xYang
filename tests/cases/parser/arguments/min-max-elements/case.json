@@ -1,0 +1,29 @@
+{
+  "description": "min-elements and max-elements accept a quoted or unquoted integer, or unbounded (#115).",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "within quoted and unquoted bounds",
+      "data": { "top": { "plain": ["a"], "quoted": ["a"], "open": ["a", "b", "c"], "open-quoted": ["a", "b", "c"] } },
+      "valid": true
+    },
+    {
+      "name": "unquoted max-elements",
+      "data": { "top": { "plain": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u"], "quoted": ["a"], "open": ["a"], "open-quoted": ["a"] } },
+      "valid": false,
+      "errors": [{ "path": "/top/plain", "code": "max-elements" }]
+    },
+    {
+      "name": "quoted max-elements",
+      "data": { "top": { "plain": ["a"], "quoted": ["a", "b", "c", "d", "e", "f", "g", "h", "i", "j", "k", "l", "m", "n", "o", "p", "q", "r", "s", "t", "u"], "open": ["a"], "open-quoted": ["a"] } },
+      "valid": false,
+      "errors": [{ "path": "/top/quoted", "code": "max-elements" }]
+    },
+    {
+      "name": "quoted min-elements",
+      "data": { "top": { "plain": ["a"], "quoted": [] } },
+      "valid": false,
+      "errors": [{ "path": "/top/quoted", "code": "min-elements" }]
+    }
+  ]
+}

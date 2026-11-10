@@ -1,0 +1,7 @@
+{
+  "description": "grouping inside a container is in lexical scope for uses in that container (RFC 7950 §7.5) (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "uses the local grouping", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

@@ -17,7 +17,12 @@ export class GroupingStatementParser {
       }
       tokens.consume_type(YangTokenType.RBRACE);
     }
-    (context.module as any).groupings[name] = stmt;
+    const parent = context.current_parent as { keyword?: string; groupings?: Record<string, YangGroupingStmt> };
+    if (parent && parent.keyword === "container" && parent !== context.module) {
+      (parent.groupings ??= {})[name] = stmt;
+    } else {
+      (context.module as any).groupings[name] = stmt;
+    }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 }

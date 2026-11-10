@@ -1,0 +1,17 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    choice proto {
+      default tcp;
+      case tcp {
+        leaf tcp { type string; }
+      }
+      case udp {
+        leaf udp { type string; }
+      }
+    }
+  }
+}

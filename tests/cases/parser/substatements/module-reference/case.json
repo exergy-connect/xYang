@@ -1,0 +1,7 @@
+{
+  "description": "reference is legal in a module body (RFC 7950 §7.1) (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "module loads", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

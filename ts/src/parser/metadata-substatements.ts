@@ -12,6 +12,9 @@ export function withMetadataSubstatements(
   out[kw.DESCRIPTION] ??= (tokens, context) => {
     parsers.parse_description(tokens, context);
   };
+  out[kw.UNITS] ??= (tokens, context) => {
+    parsers.parse_units(tokens, context);
+  };
   out[kw.REFERENCE] ??= (tokens, context) => {
     parsers.parse_reference(tokens, context);
   };

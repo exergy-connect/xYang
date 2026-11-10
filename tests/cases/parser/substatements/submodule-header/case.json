@@ -1,0 +1,7 @@
+{
+  "description": "A submodule header may contain organization, contact, description, and reference (RFC 7950 §7.2) (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "parent loads the submodule", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

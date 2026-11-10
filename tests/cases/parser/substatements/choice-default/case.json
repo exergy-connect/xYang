@@ -1,0 +1,7 @@
+{
+  "description": "default is legal in a choice (RFC 7950 §7.9.3) (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "default case leaf", "data": { "top": { "tcp": "a" } }, "valid": true }
+  ]
+}
