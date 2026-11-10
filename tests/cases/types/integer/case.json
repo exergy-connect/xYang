@@ -11,8 +11,9 @@
       "errors": [{ "path": "/top/multi", "code": "range" }],
       "xfail": { "python": "_parse_range splits on the first '..' only, so multi-part ranges lose their upper bound" } },
     { "name": "fraction is not an integer", "data": { "top": { "u8": 1.5 } }, "valid": false,
-      "errors": [{ "path": "/top/u8", "code": "type" }],
-      "xfail": { "python": "int(1.5) truncates instead of rejecting a non-integer number" } },
+      "errors": [{ "path": "/top/u8", "code": "type" }] },
+    { "name": "boolean is not an integer", "data": { "top": { "u8": true } }, "valid": false,
+      "errors": [{ "path": "/top/u8", "code": "type" }] },
     { "name": "numeric string for uint8", "data": { "top": { "u8": "5" } }, "valid": false,
       "errors": [{ "path": "/top/u8", "code": "type" }],
       "xfail": {

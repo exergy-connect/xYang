@@ -33,6 +33,23 @@ def _issue(code: str, message: str) -> TypeIssue:
     return (code, message)
 
 
+def _json_type_name(value: Any) -> str:
+    """RFC 8259 type name of an instance value (``number``, ``boolean``, ``null``, ...)."""
+    if value is None:
+        return "null"
+    if isinstance(value, bool):
+        return "boolean"
+    if isinstance(value, (int, float)):
+        return "number"
+    if isinstance(value, str):
+        return "string"
+    if isinstance(value, (list, tuple)):
+        return "array"
+    if isinstance(value, dict):
+        return "object"
+    return type(value).__name__
+
+
 def _instance_identifier_path_errors(
     expr: ASTNode,
     value_repr: str,
@@ -327,8 +344,10 @@ class TypeChecker:
         return []
 
     def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+        if not isinstance(value, str):
+            return [_issue("type", f"Expected string, got {_json_type_name(value)}")]
         errors: List[TypeIssue] = []
-        s = str(value) if not isinstance(value, str) else value
+        s = value
         if type_stmt.length:
             lo, hi = self._parse_range(type_stmt.length)
             n = len(s)
@@ -362,10 +381,25 @@ class TypeChecker:
         return errors
 
     def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
-        try:
-            n = int(value)
-        except (TypeError, ValueError):
-            return [_issue("type", f"Value {value!r} is not a valid integer")]
+        # bool is a subclass of int; int(True) is 1 and must not pass as an integer.
+        # A non-integral float (1.5) must not be truncated by int().
+        # Numeric strings stay accepted here (see #63); this check does not add a lenient mode.
+        if isinstance(value, bool):
+            return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+        if isinstance(value, int):
+            n = value
+        elif isinstance(value, float):
+            if not value.is_integer():
+                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+            try:
+                n = int(value)
+            except (OverflowError, ValueError):
+                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+        else:
+            try:
+                n = int(value)
+            except (TypeError, ValueError):
+                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
         if type_stmt.range:
             lo, hi = self._parse_range(type_stmt.range)
         else:
@@ -378,6 +412,9 @@ class TypeChecker:
         return []
 
     def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+        # bool is a subclass of int; float(True) is 1.0 and must not pass as a number.
+        if isinstance(value, bool):
+            return [_issue("type", f"Expected number, got {_json_type_name(value)}")]
         try:
             n = float(value)
         except (TypeError, ValueError):
