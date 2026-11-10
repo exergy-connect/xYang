@@ -25,6 +25,10 @@ class SubmoduleStatementParser:
         self._module_parser = module_parser
         self._submodule_dispatch = {
             kw.YANG_VERSION: self._module_parser.parse_yang_version,
+            kw.ORGANIZATION: self._module_parser.parse_organization,
+            kw.CONTACT: self._module_parser.parse_contact,
+            kw.DESCRIPTION: self._parsers.parse_description,
+            kw.REFERENCE: self._parsers.parse_reference,
             kw.IMPORT: self._module_parser.parse_import_stmt,
             kw.INCLUDE: self._module_parser.parse_include_stmt,
             kw.REVISION: self._parsers.parse_revision,

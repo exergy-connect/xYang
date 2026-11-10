@@ -32,6 +32,7 @@ class ContainerStatementParser:
             kw.LIST: self._parsers.parse_list,
             kw.LEAF_LIST: self._parsers.parse_leaf_list,
             kw.USES: self._parsers.parse_uses,
+            kw.GROUPING: self._parsers.parse_grouping,
             kw.CHOICE: self._parsers.parse_choice,
             kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
             kw.ANYDATA: self._parsers.parse_anydata,

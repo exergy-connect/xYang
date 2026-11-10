@@ -24,6 +24,7 @@ class YangModule(YangStatementList):
     organization: str = ""
     contact: str = ""
     description: str = ""
+    reference: str = ""
     revisions: List[Dict[str, str]] = field(default_factory=list)
     # Set when this tree was parsed from a submodule (belongs-to argument).
     belongs_to_module: str = ""

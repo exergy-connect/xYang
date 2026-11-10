@@ -489,14 +489,23 @@ function expandGroupingBody(
   return withoutTypedefs.map((stmt) => expandUsesUnderStatement(stmt, resolved.nestedScope, nextStack, hostTypedefs));
 }
 
+function scopeWithLocalGroupings(stmt: SerializedStatement, scope: GroupingScope): GroupingScope {
+  const local = stmt.local_groupings as Record<string, SerializedStatement> | undefined;
+  if (!local || Object.keys(local).length === 0) {
+    return scope;
+  }
+  return { ...scope, groupings: { ...scope.groupings, ...local } };
+}
+
 function expandUsesUnderStatement(
   stmt: SerializedStatement,
   scope: GroupingScope,
   stack: string[],
   hostTypedefs: Record<string, unknown>
 ): SerializedStatement {
+  const next = scopeWithLocalGroupings(stmt, scope);
   if (stmt.statements?.length) {
-    stmt.statements = expandStatementList(stmt.statements, scope, stack, hostTypedefs);
+    stmt.statements = expandStatementList(stmt.statements, next, stack, hostTypedefs);
   }
   return stmt;
 }

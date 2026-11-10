@@ -52,6 +52,9 @@ class TypeStatementParser:
         if handler:
             handler(tokens, context, type_stmt)
             return
+        if self._parsers.is_prefixed_extension_start(tokens):
+            self._parsers.parse_prefixed_extension_statement(tokens, context)
+            return
         if self._parsers.skip_unsupported_or_raise_unknown_stmt(
             tokens, f"type '{type_name}'"
         ):

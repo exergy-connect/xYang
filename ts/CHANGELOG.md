@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **Substatements:** a prefixed extension in a `type` body, `units` on a `typedef` (copied onto leafs that do not set their own), module `reference`, submodule `organization` / `contact` / `description` / `reference`, `type` in an extension invocation, `default` in a `choice`, and `grouping` in a `container` (lexical scope) match Python. The same typedef reached again through an include is one definition, not a duplicate. ([#116](https://github.com/exergy-connect/xYang/issues/116))
 - **Statement arguments:** a statement argument is one string: a quoted string (with `+` concatenation) or an unquoted run up to whitespace, `;`, or `{`, including `:`, `/`, `.`, and digits. `yang-version` must be `1` or `1.1`, `value` must be an integer, and `min-elements` / `max-elements` must be an integer or `unbounded`. Any other value is a `YangSyntaxError` naming the statement and the value, matching Python ([#115](https://github.com/exergy-connect/xYang/issues/115)).
 - JSON Schema export types int64/uint64/decimal64 as RFC 7951 strings (#63).
 - **Numeric strings for 8/16/32-bit integers:** `int8`, `int16`, `int32`, `uint8`, `uint16`, and `uint32` reject a JSON string with `Expected integer, got string`, matching Python and the exported `"type": "integer"` schema. The shared cross-check requires the generated schema and the validator to agree ([#63](https://github.com/exergy-connect/xYang/issues/63)).

@@ -101,6 +101,7 @@ class StatementParsers:
             kw.MUST: self.parse_must,
             kw.DESCRIPTION: self.parse_description,
             kw.REFERENCE: self.parse_reference,
+            kw.TYPE: self.parse_type,
             kw.USES: self.parse_uses,
             kw.LEAF: self.parse_leaf,
             kw.LEAF_LIST: self.parse_leaf_list,

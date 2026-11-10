@@ -39,6 +39,7 @@ export const POSITION = "position";
 export const PATTERN = "pattern";
 export const MODIFIER = "modifier";
 export const LENGTH = "length";
+export const UNITS = "units";
 export const FRACTION_DIGITS = "fraction-digits";
 export const RANGE = "range";
 export const GROUPING = "grouping";

@@ -1,0 +1,5 @@
+submodule sub-b {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+  include common;
+}

@@ -36,6 +36,9 @@ export class ContainerStatementParser {
       [kw.USES]: (tokens, context) => {
         this.parsers.uses_parser.parse_uses(tokens, context);
       },
+      [kw.GROUPING]: (tokens, context) => {
+        this.parsers.grouping_parser.parse_grouping(tokens, context);
+      },
       [kw.CHOICE]: (tokens, context) => {
         this.parsers.choice_parser.parse_choice(tokens, context);
       },

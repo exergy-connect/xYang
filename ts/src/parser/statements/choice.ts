@@ -31,6 +31,9 @@ export class ChoiceStatementParser {
       },
       [kw.MANDATORY]: (tokens, context) => {
         this.parse_choice_mandatory(tokens, context);
+      },
+      [kw.DEFAULT]: (tokens, context) => {
+        this.parse_choice_default(tokens, context);
       }
     });
     this.caseSubstatementDispatch = withDataNodeSubstatements(this.parsers, {
@@ -171,6 +174,16 @@ export class ChoiceStatementParser {
     const parent = context.current_parent as YangChoiceStmt;
     if (parent instanceof YangChoiceStmt) {
       parent.mandatory = tt === kw.TRUE;
+    }
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_choice_default(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.DEFAULT);
+    const name = this.parsers.parse_string_argument(tokens);
+    const parent = context.current_parent;
+    if (parent instanceof YangChoiceStmt) {
+      parent.default = name;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

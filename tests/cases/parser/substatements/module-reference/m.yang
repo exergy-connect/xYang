@@ -1,0 +1,11 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  reference "RFC 7950";
+
+  container top {
+    leaf a { type string; }
+  }
+}

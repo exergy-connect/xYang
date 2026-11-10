@@ -12,6 +12,9 @@ export class TypedefStatementParser {
       [kw.TYPE]: (tokens, context) => {
         this.parsers.type_parser.parse_type(tokens, context);
       },
+      [kw.UNITS]: (tokens, context) => {
+        this.parsers.parse_units(tokens, context);
+      },
       [kw.DEFAULT]: (tokens, context) => {
         this.parsers.parse_typedef_default(tokens, context);
       }

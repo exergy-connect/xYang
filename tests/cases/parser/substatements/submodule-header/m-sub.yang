@@ -1,0 +1,9 @@
+submodule m-sub {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  organization "Example Org";
+  contact "admin@example";
+  description "Submodule header text.";
+  reference "RFC 7950";
+}

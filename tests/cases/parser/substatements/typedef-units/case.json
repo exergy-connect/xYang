@@ -1,0 +1,7 @@
+{
+  "description": "units is legal on a typedef (RFC 7950 §7.3) and the leaf that uses it still validates (#116).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "typedef units", "data": { "top": { "p": 1, "q": 2 } }, "valid": true }
+  ]
+}

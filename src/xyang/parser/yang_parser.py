@@ -84,10 +84,11 @@ class YangParser:
             raise tokens.make_error(
                 f"submodule file defines name {sub.name!r}, include expects {submodule_name!r}"
             )
-        if sub.belongs_to_module and sub.belongs_to_module != parent.name:
+        owner = parent.belongs_to_module or parent.name
+        if sub.belongs_to_module and sub.belongs_to_module != owner:
             raise tokens.make_error(
                 f"submodule belongs-to {sub.belongs_to_module!r} "
-                f"does not match module {parent.name!r}"
+                f"does not match module {owner!r}"
             )
         self._merge_submodule_definitions(parent, sub, tokens)
 
@@ -235,7 +236,13 @@ class YangParser:
         self, parent: YangModule, sub: YangModule, tokens: TokenStream
     ) -> None:
         for n, td in sub.typedefs.items():
-            if n in parent.typedefs:
+            origin = getattr(td, "included_from", None) or sub.name
+            setattr(td, "included_from", origin)
+            existing = parent.typedefs.get(n)
+            if existing is not None:
+                # The same typedef reached again through this include is one definition.
+                if existing is td or getattr(existing, "included_from", None) == origin:
+                    continue
                 raise tokens.make_error(f"Duplicate typedef {n!r} from include of {sub.name!r}")
             parent.typedefs[n] = td
         for n, ident in sub.identities.items():
@@ -343,6 +350,9 @@ class YangParser:
         else:
             raise tokens.make_error("Expected 'module' or 'submodule' statement at start of file")
 
+        from .statements.typedef import propagate_typedef_units
+
+        propagate_typedef_units(module)
         if finalize:
             self._expand_and_augment(module)
 

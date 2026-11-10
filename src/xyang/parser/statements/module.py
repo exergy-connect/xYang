@@ -34,6 +34,7 @@ class ModuleStatementParser:
             kw.INCLUDE: self.parse_include_stmt,
             kw.REVISION: self._parsers.parse_revision,
             kw.DESCRIPTION: self._parsers.parse_description,
+            kw.REFERENCE: self._parsers.parse_reference,
             kw.FEATURE: self._parsers.parse_feature_stmt,
             kw.IDENTITY: self._parsers.parse_identity,
             kw.EXTENSION: self._parsers.parse_extension_stmt,

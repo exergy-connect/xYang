@@ -694,6 +694,20 @@ export class StatementParsers {
     if (stmt.description) {
       out.description = stmt.description;
     }
+    const units = (stmt as { units?: string }).units;
+    if (units) {
+      out.units = units;
+    }
+    if (keyword === "container") {
+      const groupings = (stmt as { groupings?: Record<string, { name?: string }> }).groupings;
+      if (groupings && Object.keys(groupings).length > 0) {
+        const local: Record<string, SerializedStatement> = {};
+        for (const [gname, grouping] of Object.entries(groupings)) {
+          local[gname] = this.fromAst(grouping as never);
+        }
+        out.local_groupings = local;
+      }
+    }
     const reference = (stmt as { reference?: string }).reference;
     if (reference) {
       out.reference = reference;
@@ -914,6 +928,16 @@ export class StatementParsers {
   parse_optional_description(tokens: TokenStream, context: ParserContext): void {
     if (tokens.has_more() && tokens.peek() === kw.DESCRIPTION) {
       this.parse_description(tokens, context);
+    }
+  }
+
+  parse_units(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.UNITS);
+    const units = this.parse_string_argument(tokens);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+    const parent = context.current_parent as { units?: string } | undefined;
+    if (parent && "units" in parent) {
+      parent.units = units;
     }
   }
 

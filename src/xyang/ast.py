@@ -4,7 +4,7 @@ Abstract Syntax Tree (AST) nodes for YANG statements.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, List, Optional
+from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
 from dataclasses import dataclass, field
 
 from .errors import YangSemanticError
@@ -184,6 +184,8 @@ class YangTypeStmt:
 class YangContainerStmt(YangStatementWithMust, YangStatementWithWhen):
     """Container statement."""
     presence: Optional[str] = None
+    # Groupings declared in this container. Visible here and in descendants only.
+    groupings: Dict[str, "YangGroupingStmt"] = field(default_factory=dict)
 
 
 @dataclass
@@ -418,6 +420,8 @@ class YangChoiceStmt(YangStatementWithWhen):
     """Choice statement - defines mutually exclusive alternatives."""
 
     mandatory: bool = False
+    # RFC 7950 §7.9.3: name of the default case (or the shorthand child).
+    default: Optional[str] = None
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
     def child_names(self, data: dict) -> set[str]:

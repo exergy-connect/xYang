@@ -8,6 +8,7 @@ from typing import cast
 
 from .ast import (
     YangChoiceStmt,
+    YangContainerStmt,
     YangGroupingStmt,
     YangStatement,
     YangStatementList,
@@ -34,6 +35,8 @@ class ExpandUsesContext:
     refines: list | None = None
     refine_path_prefix: str = ""
     typedef_target: YangModule | None = None
+    # Groupings in lexical scope (container and its descendants), shadowing the module.
+    local_groupings: dict[str, YangStatement] | None = None
 
     def __post_init__(self) -> None:
         if self.refines is None:
@@ -204,20 +207,22 @@ def _apply_uses_augmentations(
 
 
 def _resolve_uses_grouping(
-    stmt: YangUsesStmt, module: YangModule
+    stmt: YangUsesStmt, ctx: ExpandUsesContext
 ) -> tuple[str, YangModule, YangStatement] | None:
     """Resolve using parse-time ``grouping_prefix`` + ``grouping_name`` (no string split)."""
+    module = ctx.module
     qname = stmt.grouping_qname()
     if stmt.grouping_prefix:
         gmod = module.resolve_prefixed_module(stmt.grouping_prefix)
         lookup_name = stmt.grouping_name
+        grouping = gmod.get_grouping(lookup_name) if gmod is not None else None
     else:
         gmod = module
         lookup_name = stmt.grouping_name
-    if gmod is None:
-        return None
-    grouping = gmod.get_grouping(lookup_name)
-    if grouping is None:
+        grouping = (ctx.local_groupings or {}).get(lookup_name)
+        if grouping is None and gmod is not None:
+            grouping = gmod.get_grouping(lookup_name)
+    if gmod is None or grouping is None:
         return None
     return qname, gmod, grouping
 
@@ -225,7 +230,7 @@ def _resolve_uses_grouping(
 def _expand_one_uses_stmt(
     stmt: YangUsesStmt, ctx: ExpandUsesContext
 ) -> list[YangStatement]:
-    resolved = _resolve_uses_grouping(stmt, ctx.module)
+    resolved = _resolve_uses_grouping(stmt, ctx)
     if resolved is None:
         logger.warning(
             "Grouping '%s' not found when expanding uses statement",
@@ -255,6 +260,7 @@ def _expand_one_uses_stmt(
         refines=pending_refines,
         refine_path_prefix=inner_prefix,
         typedef_target=ctx.module,
+        local_groupings=ctx.local_groupings,
     )
     out = expand_uses_in_statements(body, inner_ctx)
     if pending_refines:
@@ -304,6 +310,7 @@ def expand_uses_in_statements(
                 refines=refines,
                 refine_path_prefix=stmt_path,
                 typedef_target=ctx.reg_module,
+                local_groupings=ctx.local_groupings,
             )
             expanded.extend(expand_uses_in_statements(body, child_ctx))
         elif isinstance(stmt, YangTypedefStmt):
@@ -322,16 +329,21 @@ def expand_uses_in_statements(
                     refines=refines,
                     refine_path_prefix=case_prefix,
                     typedef_target=ctx.reg_module,
+                    local_groupings=ctx.local_groupings,
                 )
                 case.statements = expand_uses_in_statements(case.statements, case_ctx)
             expanded.append(stmt)
         elif hasattr(stmt, "statements"):
+            local = ctx.local_groupings
+            if isinstance(stmt, YangContainerStmt) and stmt.groupings:
+                local = {**(ctx.local_groupings or {}), **stmt.groupings}
             child_ctx = ExpandUsesContext(
                 module=ctx.module,
                 expanding_chain=ctx.expanding_chain,
                 refines=refines,
                 refine_path_prefix=stmt_path,
                 typedef_target=ctx.reg_module,
+                local_groupings=local,
             )
             stmt.statements = expand_uses_in_statements(stmt.statements, child_ctx)
             expanded.append(stmt)
