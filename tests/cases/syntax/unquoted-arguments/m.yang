@@ -10,5 +10,9 @@ module m {
       if-feature f;
       type string;
     }
+    leaf b {
+      if-feature m:f;
+      type string;
+    }
   }
 }

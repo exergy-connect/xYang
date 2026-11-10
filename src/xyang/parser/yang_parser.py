@@ -6,6 +6,7 @@ Parses YANG module files and builds an in-memory representation.
 
 from __future__ import annotations
 
+import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
@@ -18,6 +19,8 @@ from ..uses_expand import expand_all_uses_in_module
 from .tokenizer import YangTokenizer
 from .parser_context import ParserContext, TokenStream
 from .statement_parsers import StatementParsers
+
+logger = logging.getLogger(__name__)
 
 
 class YangParser:
@@ -72,7 +75,9 @@ class YangParser:
                 "include requires a filesystem location for the submodule: "
                 "use parse_file(), or parse_string(..., source_path=Path('module.yang'))"
             )
-        path = self._resolve_submodule_path(submodule_name, revision_date, source_dir, tokens)
+        path = self._resolve_module_file(
+            submodule_name, revision_date, source_dir, tokens, "submodule"
+        )
         sub = self._parse_submodule_from_path(path)
         if sub.name != submodule_name:
             raise tokens.make_error(
@@ -124,7 +129,9 @@ class YangParser:
         source_dir: Path,
         tokens: TokenStream,
     ) -> YangModule:
-        path = self._resolve_submodule_path(name, revision_date, source_dir, tokens)
+        path = self._resolve_module_file(
+            name, revision_date, source_dir, tokens, "module"
+        )
         cached = self._module_cache.get(path)
         if cached is not None:
             return cached
@@ -154,31 +161,55 @@ class YangParser:
         finally:
             self._import_pending.discard(path)
 
-    def _resolve_submodule_path(
+    def _resolve_module_file(
         self,
         name: str,
         revision_date: Optional[str],
         source_dir: Path,
         tokens: TokenStream,
+        kind: str,
     ) -> Path:
+        """Find ``name.yang`` or ``name@revision.yang``.
+
+        Exact candidates are tried in every directory before any ``name@*.yang``
+        glob. A requested revision that is not the file opened is a warning.
+        """
         dirs = (source_dir, *self.include_path)
         candidates: list[str] = []
         if revision_date:
             candidates.append(f"{name}@{revision_date}.yang")
         candidates.append(f"{name}.yang")
+        found: Optional[Path] = None
         for directory in dirs:
             for candidate in candidates:
                 path = (directory / candidate).resolve()
                 if path.is_file():
-                    return path
-        for directory in dirs:
-            matches = sorted(directory.glob(f"{name}@*.yang"))
-            if matches:
-                return matches[-1].resolve()
-        searched = ", ".join(str(d) for d in dirs)
-        raise tokens.make_error(
-            f"Could not find submodule {name!r} (tried filenames {candidates!r}) under [{searched}]"
-        )
+                    found = path
+                    break
+            if found is not None:
+                break
+        if found is None:
+            for directory in dirs:
+                matches = sorted(directory.glob(f"{name}@*.yang"))
+                if matches:
+                    found = matches[-1].resolve()
+                    break
+        if found is None:
+            searched = ", ".join(str(d) for d in dirs)
+            raise tokens.make_error(
+                f"Could not find {kind} {name!r} (tried filenames {candidates!r}) under [{searched}]"
+            )
+        expected = f"{name}@{revision_date}.yang" if revision_date else None
+        if expected is not None and found.name != expected:
+            statement = "import" if kind == "module" else "include"
+            logger.warning(
+                "%s %r revision-date %s not found; using %s",
+                statement,
+                name,
+                revision_date,
+                found.name,
+            )
+        return found
 
     def _parse_submodule_from_path(self, path: Path) -> YangModule:
         path = path.resolve()
