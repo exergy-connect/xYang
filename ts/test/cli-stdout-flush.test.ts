@@ -37,7 +37,7 @@ function convertStdout(yangPath: string): Buffer {
 }
 
 function expectedSchema(yangPath: string): string {
-  const module = new YangParser({ expand_uses: false }).parseFile(yangPath);
+  const module = new YangParser({ expandUses: false }).parseFile(yangPath);
   return `${JSON.stringify(generateJsonSchema(module), null, 2)}\n`;
 }
 

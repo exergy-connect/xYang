@@ -2,7 +2,15 @@ import { YangSemanticError } from "./errors";
 import type { YangIdentifierRef } from "./identifier-ref";
 import { parseXPath } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
-import type { YangModule } from "./module";
+import { warnDeprecatedOnce } from "./deprecation";
+
+/**
+ * Module object an extension invocation resolves against.
+ * This is the slice `ast.ts` uses; the runtime model lives in `./model`.
+ */
+export interface YangModule {
+  name?: string;
+}
 
 export type ASTNode = XPathAstNode;
 export type PathNode = XPathAstNode;
@@ -14,24 +22,28 @@ export class YangStatementList {
     this.statements = statements;
   }
 
+  /** @deprecated use findStatement */
   find_statement(name: string): YangStatement | undefined {
-    return this.statements.find((stmt) => stmt.name === name);
+    warnDeprecatedOnce("find_statement", "findStatement");
+    return this.findStatement(name);
   }
 
   findStatement(name: string): YangStatement | undefined {
-    return this.find_statement(name);
+    return this.statements.find((stmt) => stmt.name === name);
   }
 
+  /** @deprecated use getAllLeaves */
   get_all_leaves(): YangLeafStmt[] {
+    warnDeprecatedOnce("get_all_leaves", "getAllLeaves");
+    return this.getAllLeaves();
+  }
+
+  getAllLeaves(): YangLeafStmt[] {
     const leaves: YangLeafStmt[] = [];
     for (const stmt of this.statements) {
       leaves.push(...this.collectLeaves(stmt));
     }
     return leaves;
-  }
-
-  getAllLeaves(): YangLeafStmt[] {
-    return this.get_all_leaves();
   }
 
   private collectLeaves(stmt: YangStatement): YangLeafStmt[] {

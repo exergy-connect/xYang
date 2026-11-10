@@ -20,6 +20,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **TypeScript model:** `ts/src/core/model.ts` is the runtime model. `statements` returns the same wrapper objects when the underlying statement array is unchanged. The unused `ts/src/core/module.ts` class is removed ([#73](https://github.com/exergy-connect/xYang/issues/73)).
+- **TypeScript API:** public names are camelCase (`expandUses`, `includePath`, `findStatement`, `getAllLeaves`). The snake_case names still work and warn once per process ([#72](https://github.com/exergy-connect/xYang/issues/72)).
+- **TypeScript parsing:** `parseYangString(content, { filename, sourcePath, includePath, expandUses })` resolves imports from `dirname(sourcePath)` and `includePath`. `parseYangFile` builds a new parser on every call, so an edited file is read again ([#77](https://github.com/exergy-connect/xYang/issues/77)).
+- **Python package:** `xyang` exports `YangSyntaxError`, `generate_json_schema`, and `parse_json_schema` ([#76](https://github.com/exergy-connect/xYang/issues/76)).
+- **Python CLI:** `TypeError` and `ImportError` are no longer reported as user errors. Loading `.yaml` or `.yml` without PyYAML raises `ValueError` with the install hint ([#76](https://github.com/exergy-connect/xYang/issues/76)).
 - **Tests:** removed per-language tests whose valid/invalid outcome is already covered by a shared case in `tests/cases/`. Bits (empty, duplicate token, non-string), bits-in-union, duplicate bit names, empty enumerations, and `if-feature` on a list moved into shared cases.
 - **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads `xyang-ts.mjs` from GitHub Release assets instead of checking out a committed bundle. The `path` input and `xyang-root` output are removed (#89).
 - CI no longer commits `artifacts/xyang-ts.mjs` or `docs/xyang.umd.min.js`. A published release builds them with `npm run build:ci` and attaches them; pull-request CI only runs that build as a check and does not push commits (#89).

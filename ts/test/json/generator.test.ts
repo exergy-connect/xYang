@@ -164,7 +164,7 @@ module t {
   });
 
   it("expands uses at emit time when parser keeps uses in AST", () => {
-    const module = new YangParser({ expand_uses: false }).parseString(`
+    const module = new YangParser({ expandUses: false }).parseString(`
 module u {
   yang-version 1.1;
   namespace "urn:u";
