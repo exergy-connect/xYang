@@ -16,11 +16,7 @@
     { "name": "boolean is not an integer", "data": { "top": { "u8": true } }, "valid": false,
       "errors": [{ "path": "/top/u8", "code": "type" }] },
     { "name": "numeric string for uint8", "data": { "top": { "u8": "5" } }, "valid": false,
-      "errors": [{ "path": "/top/u8", "code": "type" }],
-      "xfail": {
-        "python": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8",
-        "cli": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8",
-        "ts": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8"
-      } }
+      "errors": [{ "path": "/top/u8", "code": "type", "message": "Expected integer, got string" }] },
+    { "name": "int64 lexical string", "data": { "top": { "big": "9007199254740993" } }, "valid": true }
   ]
 }

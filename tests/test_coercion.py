@@ -98,8 +98,8 @@ module test {
     assert is_valid2, f"Expected valid (non-empty string is truthy), got errors: {errors2}"
 
 
-def test_int32_coercion_string_digits():
-    """Test that string digits are coerced during XPath comparison."""
+def test_int32_numeric_string_is_a_type_error():
+    """RFC 7951 encodes int32 as a JSON number. A numeric string is a type error."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -119,16 +119,15 @@ module test {
     
     data = {"data": {"count": "123"}}
     is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as string (coercion happens inline during comparison)
+
     assert isinstance(data["data"]["count"], str)
     assert data["data"]["count"] == "123"
-    # But validation passes because coercion happens in comparison
-    assert is_valid
+    assert not is_valid
+    assert any("Expected integer, got string" in err for err in errors)
 
 
-def test_int32_coercion_negative_string():
-    """Test that negative string numbers are coerced during XPath comparison."""
+def test_int32_negative_numeric_string_is_a_type_error():
+    """A negative numeric string is not an int32."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -148,16 +147,15 @@ module test {
     
     data = {"data": {"count": "-5"}}
     is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as string (coercion happens inline during comparison)
+
     assert isinstance(data["data"]["count"], str)
     assert data["data"]["count"] == "-5"
-    # Validation fails because -5 <= 0 after coercion
     assert not is_valid
+    assert any("Expected integer, got string" in err for err in errors)
 
 
-def test_int32_coercion_with_must_constraint():
-    """Test that coerced int32 values work correctly in must constraints."""
+def test_int32_must_constraint_on_json_numbers():
+    """A JSON number is an int32, so must still sees the number."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -175,13 +173,11 @@ module test {
     module = parse_yang_string(yang_content)
     validator = YangValidator(module)
     
-    # Positive string should be coerced and pass
-    data1 = {"data": {"count": "123"}}
+    data1 = {"data": {"count": 123}}
     is_valid1, errors1, warnings1 = validator.validate(data1)
     assert is_valid1, f"Expected valid, got errors: {errors1}"
-    
-    # Negative string should be coerced and fail
-    data2 = {"data": {"count": "-5"}}
+
+    data2 = {"data": {"count": -5}}
     is_valid2, errors2, warnings2 = validator.validate(data2)
     assert not is_valid2, "Expected invalid (-5 <= 0)"
 
@@ -271,8 +267,8 @@ module test {
     assert is_valid
 
 
-def test_leaf_list_int32_coercion():
-    """Test that leaf-list int32 values are coerced during XPath comparison."""
+def test_leaf_list_int32_numeric_strings_are_type_errors():
+    """Each int32 leaf-list entry must be a JSON number."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -292,16 +288,14 @@ module test {
     
     data = {"data": {"counts": ["1", "2", "3"]}}
     is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as strings (coercion happens inline during comparison)
-    assert all(isinstance(count, str) for count in data["data"]["counts"])
+
     assert data["data"]["counts"] == ["1", "2", "3"]
-    # But validation passes because coercion happens in comparison
-    assert is_valid
+    assert not is_valid
+    assert any("Expected integer, got string" in err for err in errors)
 
 
-def test_nested_container_coercion():
-    """Test that coercion works in nested containers during XPath comparison."""
+def test_nested_container_boolean_string_and_int32_number():
+    """A boolean string is still accepted. The int32 leaf is a JSON number."""
     yang_content = """
 module test {
   yang-version 1.1;
@@ -329,19 +323,16 @@ module test {
         "data": {
             "inner": {
                 "enabled": "true",
-                "count": "42"
+                "count": 42
             }
         }
     }
     is_valid, errors, warnings = validator.validate(data)
     
-    # Data remains as strings (coercion happens inline during comparison)
     assert isinstance(data["data"]["inner"]["enabled"], str)
     assert data["data"]["inner"]["enabled"] == "true"
-    assert isinstance(data["data"]["inner"]["count"], str)
-    assert data["data"]["inner"]["count"] == "42"
-    # But validation passes because coercion happens in comparison
-    assert is_valid
+    assert data["data"]["inner"]["count"] == 42
+    assert is_valid, errors
 
 
 if __name__ == "__main__":

@@ -144,27 +144,25 @@ module test {
     expect(result2.isValid, result2.errors.join("; ")).toBe(true);
   });
 
-  it("int32 coercion: positive digit string passes current() > 0 and input is unchanged", () => {
+  it("int32 numeric string is a type error and the input is unchanged", () => {
     const data = { data: { count: "123" } };
     const result = validateWithYang(INT_GT_ZERO_YANG, data);
-    expect(result.isValid, result.errors.join("; ")).toBe(true);
-    expect(typeof data.data.count).toBe("string");
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((err) => err.includes("Expected integer, got string"))).toBe(true);
     expect(data.data.count).toBe("123");
   });
 
-  it("int32 coercion: negative digit string fails current() > 0 and input is unchanged", () => {
+  it("int32 negative numeric string is a type error and the input is unchanged", () => {
     const data = { data: { count: "-5" } };
     const result = validateWithYang(INT_GT_ZERO_YANG, data);
     expect(result.isValid).toBe(false);
-    expect(typeof data.data.count).toBe("string");
+    expect(result.errors.some((err) => err.includes("Expected integer, got string"))).toBe(true);
     expect(data.data.count).toBe("-5");
   });
 
-  it("int32 must constraint works for both passing and failing coerced string values", () => {
-    const passData = { data: { count: "123" } };
-    const failData = { data: { count: "-5" } };
-    expect(validateWithYang(INT_GT_ZERO_YANG, passData).isValid).toBe(true);
-    expect(validateWithYang(INT_GT_ZERO_YANG, failData).isValid).toBe(false);
+  it("int32 must constraint accepts a JSON number and rejects a non-positive one", () => {
+    expect(validateWithYang(INT_GT_ZERO_YANG, { data: { count: 123 } }).isValid).toBe(true);
+    expect(validateWithYang(INT_GT_ZERO_YANG, { data: { count: -5 } }).isValid).toBe(false);
   });
 
   it("already-typed boolean remains unchanged and validates", () => {
@@ -191,26 +189,26 @@ module test {
     expect(data.data.flags.every((v) => typeof v === "string")).toBe(true);
   });
 
-  it("leaf-list int32 coercion accepts string digit members without mutating them", () => {
+  it("leaf-list int32 numeric strings are type errors and the input is unchanged", () => {
     const data = { data: { counts: ["1", "2", "3"] } };
     const result = validateWithYang(LEAF_LIST_INT_YANG, data);
-    expect(result.isValid, result.errors.join("; ")).toBe(true);
+    expect(result.isValid).toBe(false);
+    expect(result.errors.some((err) => err.includes("Expected integer, got string"))).toBe(true);
     expect(data.data.counts).toEqual(["1", "2", "3"]);
-    expect(data.data.counts.every((v) => typeof v === "string")).toBe(true);
   });
 
-  it("nested container coercion works for boolean and int32 string values", () => {
+  it("nested container accepts a boolean string and an int32 JSON number", () => {
     const data = {
       data: {
         inner: {
           enabled: "true",
-          count: "42"
+          count: 42
         }
       }
     };
     const result = validateWithYang(NESTED_YANG, data);
     expect(result.isValid, result.errors.join("; ")).toBe(true);
     expect(data.data.inner.enabled).toBe("true");
-    expect(data.data.inner.count).toBe("42");
+    expect(data.data.inner.count).toBe(42);
   });
 });

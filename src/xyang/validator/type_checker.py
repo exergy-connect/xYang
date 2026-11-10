@@ -482,13 +482,10 @@ class TypeChecker:
     def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         # bool is a subclass of int; int(True) is 1 and must not pass as an integer.
         # A non-integral float (1.5) must not be truncated by int().
-        # Numeric strings stay accepted here (see #63); this check does not add a lenient mode.
-        if isinstance(value, bool):
-            return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
-        # int64/uint64 JSON strings are decoded by the instance iterator in RFC mode.
-        # A leftover string is a native-mode string, not an integer (#63 still allows
-        # numeric strings for the smaller integer types).
-        if type_stmt.name in ("int64", "uint64") and isinstance(value, str):
+        # RFC 7951 encodes int8..int32 and uint8..uint32 as JSON numbers (#63).
+        # int64/uint64 strings are decoded by the instance iterator before this check;
+        # a leftover string is the wrong JSON type in either mode.
+        if isinstance(value, bool) or isinstance(value, str):
             return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
         if isinstance(value, int):
             n = value
