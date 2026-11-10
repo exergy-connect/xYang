@@ -777,15 +777,28 @@ function jsonSchemaPropertyToStatement(
   return null;
 }
 
+const MISSING_ROOT_X_YANG =
+  'JSON Schema has no root "x-yang" annotation; xYang needs a .yang.json produced by "xyang convert" (see design/json-schema-xyang-profile.md)';
+
+function requireXYangObject(value: unknown, message: string): Record<string, unknown> {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new Error(message);
+  }
+  return value as Record<string, unknown>;
+}
+
 /**
  * Build a {@link YangModule} (serialized AST in `module.data`) from JSON Schema with `x-yang` annotations,
  * as produced by {@link generateJsonSchema}. Covers common data nodes used in tests; extend as needed for parity.
+ *
+ * Throws `Error` when the root schema, or a root `properties` member, has no `x-yang` object.
+ * Plain JSON Schema is not imported.
  */
 export function parseJsonSchema(source: string | Record<string, unknown>): YangModule {
   const root: Record<string, unknown> =
     typeof source === "string" ? (JSON.parse(source) as Record<string, unknown>) : { ...source };
 
-  const rootXy = asRecord(root[YANG_SCHEMA_KEYS.xYang]);
+  const rootXy = requireXYangObject(root[YANG_SCHEMA_KEYS.xYang], MISSING_ROOT_X_YANG);
   const moduleName = typeof rootXy.module === "string" ? rootXy.module : (typeof root.title === "string" ? root.title : "");
   const namespace = typeof rootXy.namespace === "string" ? rootXy.namespace : "";
   const prefix = typeof rootXy.prefix === "string" ? rootXy.prefix : "";
@@ -796,10 +809,15 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   const properties = asRecord(root.properties);
   const statements: SerializedStatement[] = [];
   for (const [propName, propSchema] of Object.entries(properties)) {
-    if (!propSchema || typeof propSchema !== "object") {
+    if (!propSchema || typeof propSchema !== "object" || Array.isArray(propSchema)) {
       continue;
     }
-    const stmt = jsonSchemaPropertyToStatement(propName, propSchema as Record<string, unknown>, defs);
+    const prop = propSchema as Record<string, unknown>;
+    requireXYangObject(
+      prop[YANG_SCHEMA_KEYS.xYang],
+      `JSON Schema property "${propName}" has no "x-yang" annotation`
+    );
+    const stmt = jsonSchemaPropertyToStatement(propName, prop, defs);
     if (stmt) {
       statements.push(stmt);
     }
