@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **XPath:** `+`, `-`, `*`, `div`, and `mod` are numeric operators (XPath 1.0). Python evaluates `*`, and both languages parse and evaluate `div` and `mod` (`mod` is a truncating remainder, the same as JavaScript `%`). `+` does not concatenate strings ([#48](https://github.com/exergy-connect/xYang/issues/48)).
 - **TypeScript parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set — the same gate and order as Python ([#75](https://github.com/exergy-connect/xYang/issues/75)).
 - **Python validation:** multi-part `range` and `length` restrictions keep every part. A value is accepted when it falls in at least one part, and an integer is still checked against its built-in minimum and maximum when a `range` is present (`range "1..3 | 10..max"` rejects `4` and `5`, and values above the type's maximum) ([#54](https://github.com/exergy-connect/xYang/issues/54)).
 - **Validation (Python + TypeScript):** a `range`, `length`, or `pattern` on a `type` that names a typedef is applied after that typedef's own restrictions, so a derived typedef or a leaf can narrow a range ([#56](https://github.com/exergy-connect/xYang/issues/56)).
