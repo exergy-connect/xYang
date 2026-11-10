@@ -15,7 +15,6 @@
     { "name": "second pattern fails", "data": { "top": { "two-patterns": "bc" } }, "valid": false,
       "errors": [{ "path": "/top/two-patterns", "code": "pattern" }] },
     { "name": "not a string", "data": { "top": { "code": 12 } }, "valid": false,
-      "errors": [{ "path": "/top/code", "code": "type" }],
-      "xfail": { "python": "non-string values are coerced with str() and then checked as strings" } }
+      "errors": [{ "path": "/top/code", "code": "type" }] }
   ]
 }
