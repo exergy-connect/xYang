@@ -21,6 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CI:** a head commit whose message contains the trailer line `Local-Tests: passed` skips the Python matrix, the Node minimum and latest LTS jobs, and the conformance cases on pull requests. Add the trailer only after `pytest -q`, `pytest tests/test_cases.py -q -rxX`, and `cd ts && npm test` have passed locally. Pushes to `main`, tags, and releases always run the full suite. Required Checks still succeed when those jobs were skipped for the trailer, and fail when a heavy job failed or was cancelled.
 - **TypeScript model:** `ts/src/core/model.ts` is the runtime model. `statements` returns the same wrapper objects when the underlying statement array is unchanged. The unused `ts/src/core/module.ts` class is removed ([#73](https://github.com/exergy-connect/xYang/issues/73)).
 - **TypeScript API:** public names are camelCase (`expandUses`, `includePath`, `findStatement`, `getAllLeaves`). The snake_case names still work and warn once per process ([#72](https://github.com/exergy-connect/xYang/issues/72)).
 - **TypeScript parsing:** `parseYangString(content, { filename, sourcePath, includePath, expandUses })` resolves imports from `dirname(sourcePath)` and `includePath`. `parseYangFile` builds a new parser on every call, so an edited file is read again ([#77](https://github.com/exergy-connect/xYang/issues/77)).

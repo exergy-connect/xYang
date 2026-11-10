@@ -40,4 +40,6 @@ Shared behavior lives in [`tests/cases/`](tests/cases/) ([README](tests/cases/RE
 
 Case runners: `pytest tests/test_cases.py` · `cd ts && npx vitest run test/cases.test.ts`
 
+A pull request head commit may carry the trailer line `Local-Tests: passed`. Add it only after `pytest -q`, `pytest tests/test_cases.py -q -rxX`, and `cd ts && npm test` have all passed locally. CI then skips the Python matrix, the Node minimum and latest LTS jobs, and the conformance cases. Pushes to `main`, tags, and releases always run the full suite. Do not use `[skip ci]`.
+
 Author models with [`skills/xyang-model/SKILL.md`](skills/xyang-model/SKILL.md).

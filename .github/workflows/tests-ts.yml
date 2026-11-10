@@ -1,5 +1,9 @@
 # Lint, build, and test TypeScript.
-# Required Checks (TypeScript) always reports on pull requests (skipped when no TS paths changed).
+# A head-commit trailer line `Local-Tests: passed` skips the Node matrix on
+# pull requests (and on pushes that are not main). Pushes to main, tags, and
+# releases always run the matrix.
+# Required Checks (TypeScript) always reports on pull requests (success when no
+# TS paths changed, or when the matrix was skipped because of that trailer).
 
 name: Tests (TypeScript)
 
@@ -29,10 +33,53 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       typescript: ${{ steps.detect.outputs.typescript }}
+      local_tests_passed: ${{ steps.trailer.outputs.local_tests_passed }}
+      head_sha: ${{ steps.trailer.outputs.head_sha }}
     steps:
       - uses: actions/checkout@v7
         with:
           fetch-depth: 0
+
+      - name: Read head commit message
+        id: trailer
+        shell: bash
+        env:
+          PR_HEAD_SHA: ${{ github.event.pull_request.head.sha }}
+          HEAD_COMMIT_MESSAGE: ${{ github.event.head_commit.message }}
+          HEAD_COMMIT_ID: ${{ github.event.head_commit.id }}
+        run: |
+          set -euo pipefail
+          head_sha="${GITHUB_SHA}"
+          local_tests_passed=false
+
+          # Never skip heavy CI on pushes to main, tags, or releases.
+          if [ "${GITHUB_EVENT_NAME}" = "release" ] || [[ "${GITHUB_REF}" == refs/tags/* ]] || { [ "${GITHUB_EVENT_NAME}" = "push" ] && [ "${GITHUB_REF}" = "refs/heads/main" ]; }; then
+            echo "local_tests_passed=false" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [ "${GITHUB_EVENT_NAME}" = "pull_request" ]; then
+            head_sha="${PR_HEAD_SHA}"
+            msg="$(git log -1 --format=%B "${PR_HEAD_SHA}")"
+          elif [ "${GITHUB_EVENT_NAME}" = "push" ]; then
+            head_sha="${HEAD_COMMIT_ID:-${GITHUB_SHA}}"
+            msg="${HEAD_COMMIT_MESSAGE}"
+          else
+            echo "local_tests_passed=false" >> "$GITHUB_OUTPUT"
+            echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          msg="${msg//$'\r'/}"
+          if printf '%s\n' "${msg}" | grep -qx 'Local-Tests: passed'; then
+            local_tests_passed=true
+          fi
+          echo "local_tests_passed=${local_tests_passed}" >> "$GITHUB_OUTPUT"
+          echo "head_sha=${head_sha}" >> "$GITHUB_OUTPUT"
+          if [ "${local_tests_passed}" = "true" ]; then
+            echo "Head ${head_sha} attests Local-Tests: passed; heavy jobs will be skipped."
+          fi
 
       - name: Detect TypeScript-relevant changes
         id: detect
@@ -52,7 +99,7 @@ jobs:
     name: Node ${{ matrix.name }}
     runs-on: ubuntu-latest
     needs: changes
-    if: needs.changes.outputs.typescript == 'true'
+    if: ${{ needs.changes.outputs.typescript == 'true' && needs.changes.outputs.local_tests_passed != 'true' }}
     strategy:
       fail-fast: false
       matrix:
@@ -115,11 +162,34 @@ jobs:
     steps:
       - name: Report required status
         shell: bash
+        env:
+          CHANGES_RESULT: ${{ needs.changes.result }}
+          TEST_RESULT: ${{ needs.test.result }}
+          TYPESCRIPT_CHANGES: ${{ needs.changes.outputs.typescript }}
+          LOCAL_TESTS_PASSED: ${{ needs.changes.outputs.local_tests_passed }}
+          HEAD_SHA: ${{ needs.changes.outputs.head_sha }}
         run: |
-          if [ "${{ needs.changes.outputs.typescript }}" != "true" ]; then
+          set -euo pipefail
+          if [[ "${CHANGES_RESULT}" == "failure" || "${CHANGES_RESULT}" == "cancelled" ]]; then
+            echo "Detect changes ${CHANGES_RESULT}."
+            exit 1
+          fi
+          if [[ "${TEST_RESULT}" == "failure" || "${TEST_RESULT}" == "cancelled" ]]; then
+            echo "Node tests ${TEST_RESULT}."
+            exit 1
+          fi
+          if [ "${LOCAL_TESTS_PASSED}" = "true" ] && [ "${TEST_RESULT}" = "skipped" ]; then
+            line="Heavy CI skipped: commit attests Local-Tests: passed (${HEAD_SHA})"
+            echo "============================================================"
+            echo "${line}"
+            echo "============================================================"
+            echo "${line}" >> "$GITHUB_STEP_SUMMARY"
+            exit 0
+          fi
+          if [ "${TYPESCRIPT_CHANGES}" != "true" ]; then
             echo "No TypeScript changes in this pull request."
             exit 0
           fi
-          if [[ "${{ needs.test.result }}" != "success" ]]; then
+          if [[ "${TEST_RESULT}" != "success" ]]; then
             exit 1
           fi
