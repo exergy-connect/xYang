@@ -98,6 +98,40 @@ def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
     return msg
 
 
+def _type_has_restrictions(type_stmt: YangTypeStmt) -> bool:
+    """True when this ``type`` statement adds range, length, or pattern restrictions."""
+    if type_stmt.range or type_stmt.length:
+        return True
+    return bool(type_stmt.patterns)
+
+
+_INTEGER_TYPE_NAMES = frozenset(
+    {
+        "int8",
+        "int16",
+        "int32",
+        "int64",
+        "uint8",
+        "uint16",
+        "uint32",
+        "uint64",
+        "integer",
+    }
+)
+_DECIMAL_TYPE_NAMES = frozenset({"decimal64", "number"})
+_STRING_TYPE_NAMES = frozenset(
+    {
+        "string",
+        "entity-name",
+        "field-name",
+        "identifier",
+        "date",
+        "date-and-time",
+        "qualified-source",
+    }
+)
+
+
 class TypeChecker:
     """
     Checks a data value against a YangTypeStmt.
@@ -129,8 +163,9 @@ class TypeChecker:
                 return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
             typedef = ext.get_typedef(name)
             if typedef is not None and typedef.type is not None:
-                return self.check(
+                return self._check_typedef_reference(
                     value,
+                    type_stmt,
                     typedef.type,
                     path,
                     root_data,
@@ -165,30 +200,12 @@ class TypeChecker:
                 evaluator=evaluator,
                 leafref_current=leafref_current,
             )
-        if name in (
-            "string",
-            "entity-name",
-            "field-name",
-            "identifier",
-            "date",
-            "date-and-time",
-            "qualified-source",
-        ):
+        if name in _STRING_TYPE_NAMES:
             return self._check_string(value, type_stmt)
         # version-string and other typedefs: resolve via get_typedef so pattern/constraints apply
-        if name in (
-            "int8",
-            "int16",
-            "int32",
-            "int64",
-            "uint8",
-            "uint16",
-            "uint32",
-            "uint64",
-            "integer",
-        ):
+        if name in _INTEGER_TYPE_NAMES:
             return self._check_integer(value, type_stmt)
-        if name in ("decimal64", "number"):
+        if name in _DECIMAL_TYPE_NAMES:
             return self._check_decimal(value, type_stmt)
         if name == "boolean":
             return self._check_boolean(value)
@@ -204,16 +221,95 @@ class TypeChecker:
         if getattr(root_schema, "get_typedef", None) is not None:
             typedef = root_schema.get_typedef(name)
             if typedef is not None and typedef.type is not None:
-                return self.check(
+                return self._check_typedef_reference(
                     value,
+                    type_stmt,
                     typedef.type,
                     path,
                     root_data,
                     root_schema,
-                    ctx=ctx,
-                    evaluator=evaluator,
-                    leafref_current=leafref_current,
+                    ctx,
+                    evaluator,
+                    leafref_current,
                 )
+        return []
+
+    def _check_typedef_reference(
+        self,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        typedef_type: YangTypeStmt,
+        path: str,
+        root_data: Any,
+        root_schema: Any,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node],
+    ) -> List[TypeIssue]:
+        """Validate the typedef chain, then restrictions on the referring ``type``.
+
+        Each level checks its own ``range`` / ``length`` / ``pattern`` after the
+        base type accepts the value (RFC 7950 §9.2.4).
+        """
+        errors = self.check(
+            value,
+            typedef_type,
+            path,
+            root_data,
+            root_schema,
+            ctx,
+            evaluator,
+            leafref_current,
+        )
+        if errors or not _type_has_restrictions(type_stmt):
+            return errors
+        return self._check_restrictions_on_builtin(value, type_stmt, root_schema)
+
+    def _builtin_name(self, type_stmt: YangTypeStmt, root_schema: Any) -> str:
+        """Follow ``type_stmt`` through typedefs to the underlying built-in name."""
+        seen: set[tuple[Optional[str], str]] = set()
+        current: Optional[YangTypeStmt] = type_stmt
+        schema: Any = root_schema
+        for _ in range(64):
+            if current is None:
+                return ""
+            name = current.name
+            prefix = current.prefix
+            key = (prefix, name)
+            if key in seen:
+                return name
+            seen.add(key)
+            lookup_schema = schema
+            if prefix:
+                if not isinstance(schema, YangModule):
+                    return name
+                lookup_schema = schema.resolve_prefixed_module(prefix)
+                if lookup_schema is None:
+                    return name
+            getter = getattr(lookup_schema, "get_typedef", None)
+            typedef = getter(name) if callable(getter) else None
+            if typedef is None or typedef.type is None:
+                return name
+            schema = lookup_schema
+            current = typedef.type
+        return current.name if current is not None else ""
+
+    def _check_restrictions_on_builtin(
+        self,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        root_schema: Any,
+    ) -> List[TypeIssue]:
+        """Apply ``type_stmt`` restrictions using the chain's built-in checker."""
+        builtin = self._builtin_name(type_stmt, root_schema)
+        if builtin in _INTEGER_TYPE_NAMES:
+            return self._check_integer(value, type_stmt)
+        if builtin in _DECIMAL_TYPE_NAMES:
+            return self._check_decimal(value, type_stmt)
+        if builtin == "binary":
+            return self._check_binary(value, type_stmt)
+        if builtin in _STRING_TYPE_NAMES:
+            return self._check_string(value, type_stmt)
         return []
 
     def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> List[TypeIssue]:
@@ -349,12 +445,9 @@ class TypeChecker:
         errors: List[TypeIssue] = []
         s = value
         if type_stmt.length:
-            lo, hi = self._parse_range(type_stmt.length)
-            n = len(s)
-            if lo is not None and n < lo:
-                errors.append(_issue("length", f"String length {n} is less than minimum {lo}"))
-            if hi is not None and n > hi:
-                errors.append(_issue("length", f"String length {n} exceeds maximum {hi}"))
+            issue = self._length_issue(len(s), type_stmt.length, binary=False)
+            if issue is not None:
+                errors.append(issue)
         patterns = list(getattr(type_stmt, "patterns", None) or [])
         if patterns:
             for p in patterns:
@@ -401,14 +494,16 @@ class TypeChecker:
             except (TypeError, ValueError):
                 return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
         if type_stmt.range:
-            lo, hi = self._parse_range(type_stmt.range)
-        else:
-            bounds = YANG_INTEGER_BOUNDS.get(type_stmt.name or "")
-            lo, hi = (bounds[0], bounds[1]) if bounds else (None, None)
-        if lo is not None and n < lo:
-            return [_issue("range", f"Value {n} is less than minimum {lo}")]
-        if hi is not None and n > hi:
-            return [_issue("range", f"Value {n} exceeds maximum {hi}")]
+            issue = self._numeric_range_issue(n, type_stmt.range)
+            if issue is not None:
+                return [issue]
+        bounds = YANG_INTEGER_BOUNDS.get(type_stmt.name or "")
+        if bounds:
+            lo, hi = bounds
+            if n < lo:
+                return [_issue("range", f"Value {n} is less than minimum {lo}")]
+            if n > hi:
+                return [_issue("range", f"Value {n} exceeds maximum {hi}")]
         return []
 
     def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
@@ -420,11 +515,9 @@ class TypeChecker:
         except (TypeError, ValueError):
             return [_issue("type", f"Value {value!r} is not a valid number")]
         if type_stmt.range:
-            lo, hi = self._parse_range(type_stmt.range)
-            if lo is not None and n < lo:
-                return [_issue("range", f"Value {n} is less than minimum {lo}")]
-            if hi is not None and n > hi:
-                return [_issue("range", f"Value {n} exceeds maximum {hi}")]
+            issue = self._numeric_range_issue(n, type_stmt.range)
+            if issue is not None:
+                return [issue]
         fd = getattr(type_stmt, "fraction_digits", None)
         if fd is not None and fd >= 0:
             s = str(value).strip()
@@ -508,12 +601,9 @@ class TypeChecker:
         except binascii.Error:
             return [_issue("type", "binary value is not valid base64")]
         if type_stmt.length:
-            lo, hi = self._parse_range(type_stmt.length)
-            n = len(decoded)
-            if lo is not None and n < lo:
-                return [_issue("length", f"binary decoded length {n} octets is less than minimum {int(lo)}")]
-            if hi is not None and n > hi:
-                return [_issue("length", f"binary decoded length {n} octets exceeds maximum {int(hi)}")]
+            issue = self._length_issue(len(decoded), type_stmt.length, binary=True)
+            if issue is not None:
+                return [issue]
         patterns = list(getattr(type_stmt, "patterns", None) or [])
         for p in patterns:
             patt = getattr(p, "pattern", None)
@@ -530,15 +620,76 @@ class TypeChecker:
                 return [_issue("pattern", _pattern_entry_violation_message(p, default=default_msg))]
         return []
 
-    def _parse_range(self, range_str: str) -> tuple[Optional[float], Optional[float]]:
-        range_str = range_str.strip()
-        if ".." in range_str:
-            lo_s, hi_s = range_str.split("..", 1)
-            lo = None if lo_s.strip() == "min" else self._to_num(lo_s.strip())
-            hi = None if hi_s.strip() == "max" else self._to_num(hi_s.strip())
-            return lo, hi
-        n = self._to_num(range_str)
-        return n, n
+    def _parse_ranges(self, text: str) -> list[tuple[Optional[float], Optional[float]]]:
+        """Split a YANG range or length on ``|``, then each part on ``..``.
+
+        ``min`` / ``max`` are open ends (``None``). A single value ``n`` is ``(n, n)``.
+        """
+        bands: list[tuple[Optional[float], Optional[float]]] = []
+        for raw in text.split("|"):
+            part = raw.strip()
+            if not part:
+                continue
+            if ".." in part:
+                lo_s, hi_s = part.split("..", 1)
+                lo_s = lo_s.strip()
+                hi_s = hi_s.strip()
+                lo = None if lo_s == "min" else self._to_num(lo_s)
+                hi = None if hi_s == "max" else self._to_num(hi_s)
+                bands.append((lo, hi))
+            else:
+                n = self._to_num(part)
+                bands.append((n, n))
+        return bands
+
+    def _range_miss(
+        self,
+        n: float,
+        bands: list[tuple[Optional[float], Optional[float]]],
+    ) -> Optional[tuple[str, float]]:
+        """When ``n`` misses every band, ``('min', lo)`` or ``('max', hi)``.
+
+        Below the first band's lower bound is a minimum violation. Any other miss
+        is reported against the greatest upper bound the value exceeds.
+        """
+        if not bands:
+            return None
+        for lo, hi in bands:
+            if (lo is None or n >= lo) and (hi is None or n <= hi):
+                return None
+        first_lo = bands[0][0]
+        if first_lo is not None and n < first_lo:
+            return ("min", first_lo)
+        exceeded = [hi for _lo, hi in bands if hi is not None and n > hi]
+        if exceeded:
+            return ("max", max(exceeded))
+        for _lo, hi in bands:
+            if hi is not None:
+                return ("max", hi)
+        return ("max", n)
+
+    def _numeric_range_issue(self, n: float, text: str) -> Optional[TypeIssue]:
+        miss = self._range_miss(n, self._parse_ranges(text))
+        if miss is None:
+            return None
+        kind, bound = miss
+        if kind == "min":
+            return _issue("range", f"Value {n} is less than minimum {bound}")
+        return _issue("range", f"Value {n} exceeds maximum {bound}")
+
+    def _length_issue(self, n: int, text: str, *, binary: bool) -> Optional[TypeIssue]:
+        miss = self._range_miss(n, self._parse_ranges(text))
+        if miss is None:
+            return None
+        kind, bound = miss
+        if binary:
+            shown = int(bound)
+            if kind == "min":
+                return _issue("length", f"binary decoded length {n} octets is less than minimum {shown}")
+            return _issue("length", f"binary decoded length {n} octets exceeds maximum {shown}")
+        if kind == "min":
+            return _issue("length", f"String length {n} is less than minimum {bound}")
+        return _issue("length", f"String length {n} exceeds maximum {bound}")
 
     def _to_num(self, s: str) -> Optional[float]:
         try:

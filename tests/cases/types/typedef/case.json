@@ -6,18 +6,10 @@
     { "name": "typedef range", "data": { "top": { "p": 101 } }, "valid": false,
       "errors": [{ "path": "/top/p", "code": "range" }] },
     { "name": "derived typedef narrows range", "data": { "top": { "sp": 60 } }, "valid": false,
-      "errors": [{ "path": "/top/sp", "code": "range" }],
-      "xfail": {
-        "python": "restrictions on a type that names a typedef are dropped; only the innermost typedef's range is checked",
-        "cli": "restrictions on a type that names a typedef are dropped; only the innermost typedef's range is checked",
-        "ts": "restrictions on a type that names a typedef are dropped; only the innermost typedef's range is checked"
-      } },
+      "errors": [{ "path": "/top/sp", "code": "range" }] },
+    { "name": "outer typedef bound still applies", "data": { "top": { "sp": 101 } }, "valid": false,
+      "errors": [{ "path": "/top/sp", "code": "range" }] },
     { "name": "leaf narrows typedef range", "data": { "top": { "inline": 30 } }, "valid": false,
-      "errors": [{ "path": "/top/inline", "code": "range" }],
-      "xfail": {
-        "python": "restrictions on a type that names a typedef are dropped; only the typedef's range is checked",
-        "cli": "restrictions on a type that names a typedef are dropped; only the typedef's range is checked",
-        "ts": "restrictions on a type that names a typedef are dropped; only the typedef's range is checked"
-      } }
+      "errors": [{ "path": "/top/inline", "code": "range" }] }
   ]
 }

@@ -21,5 +21,10 @@ module m {
         pattern "a.*";
       }
     }
+    leaf parts {
+      type string {
+        length "1..2 | 4..5";
+      }
+    }
   }
 }
