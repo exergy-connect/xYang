@@ -26,7 +26,6 @@
             "properties": {
               "name": {
                 "type": "string",
-                "description": "",
                 "x-yang": {
                   "type": "leaf"
                 }
@@ -54,14 +53,12 @@
             "properties": {
               "name": {
                 "type": "string",
-                "description": "",
                 "x-yang": {
                   "type": "leaf"
                 }
               },
               "source": {
                 "type": "string",
-                "description": "",
                 "x-yang": {
                   "type": "leafref",
                   "path": "/topology/nodes/name",
@@ -70,7 +67,6 @@
               },
               "target": {
                 "type": "string",
-                "description": "",
                 "x-yang": {
                   "type": "leafref",
                   "path": "/topology/nodes/name",
@@ -100,7 +96,6 @@
             "properties": {
               "name": {
                 "type": "string",
-                "description": "",
                 "x-yang": {
                   "type": "leaf"
                 }

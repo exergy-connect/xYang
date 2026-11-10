@@ -12,6 +12,7 @@ from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statements.anydata import AnydataStatementParser
 from .statements.anyxml import AnyxmlStatementParser
 from .statements.augment import AugmentStatementParser
+from .statements.deviation import DeviationStatementParser
 from .statements.extension import ExtensionStatementParser
 from .statements.feature import FeatureStatementParser
 from .statements.identity import IdentityStatementParser
@@ -88,6 +89,7 @@ class StatementParsers:
         self._leaf_parser = LeafStatementParser(self)
         self._leaf_list_parser = LeafListStatementParser(self)
         self._augment_parser = AugmentStatementParser(self)
+        self._deviation_parser = DeviationStatementParser(self)
         self._typedef_parser = TypedefStatementParser(self)
         ensure_builtin_extensions_loaded()
         # Substatements allowed inside ``prefix:extension { ... }`` (e.g. RFC 8791 ``structure``).
@@ -322,6 +324,9 @@ class StatementParsers:
 
     def parse_augment(self, tokens: TokenStream, context: ParserContext) -> None:
         self._augment_parser.parse_augment(tokens, context)
+
+    def parse_deviation(self, tokens: TokenStream, context: ParserContext) -> None:
+        self._deviation_parser.parse_deviation(tokens, context)
     
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement (optional braced extension substatements are skipped)."""

@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:test:change-history",
-  "description": "",
   "x-yang": {
     "module": "change-history-policy-test",
     "yang-version": "1.1",
@@ -25,7 +24,7 @@
           "x-yang": {
             "type": "leaf"
           },
-          "default": "3"
+          "default": 3
         }
       },
       "additionalProperties": false
@@ -42,13 +41,18 @@
         },
         {
           "type": "string",
-          "pattern": "^\\*$"
+          "pattern": "^\\*$",
+          "x-yang": {
+            "string-patterns": [
+              {
+                "pattern": "\\*",
+                "invert-match": false
+              }
+            ]
+          }
         }
       ],
-      "description": "Change history retention policy. Can be:\n       - An integer N: Keep last N modification change IDs (default: 3)\n       - '*': Keep infinite history\n       - 0: Disabled (no modification history tracked)",
-      "x-yang": {
-        "type": "typedef"
-      }
+      "description": "Change history retention policy. Can be:\n       - An integer N: Keep last N modification change IDs (default: 3)\n       - '*': Keep infinite history\n       - 0: Disabled (no modification history tracked)"
     }
   }
 }

@@ -64,6 +64,20 @@ function refToTypedefName(ref: unknown): string | undefined {
   return name.trim().length > 0 ? name : undefined;
 }
 
+/** Missing ``description`` is an empty string (generators omit the key when unset). */
+function descriptionOrEmpty(value: unknown): string {
+  return typeof value === "string" ? value : "";
+}
+
+function firstNonEmptyDescription(...values: unknown[]): string {
+  for (const value of values) {
+    if (typeof value === "string" && value.length > 0) {
+      return value;
+    }
+  }
+  return "";
+}
+
 function whenFromXyang(xy: Record<string, unknown>): SerializedStatement["when"] | undefined {
   const w = xy.when;
   if (!w || typeof w !== "object") {
@@ -99,6 +113,7 @@ function mustStatementsFromXyang(xy: Record<string, unknown>): SerializedStateme
       name: expr,
       argument: expr,
       error_message: typeof e["error-message"] === "string" ? e["error-message"] : "",
+      description: typeof e.description === "string" ? e.description : "",
       statements: []
     });
   }
@@ -289,9 +304,7 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
   if (xy.mandatory === true) {
     out.mandatory = true;
   }
-  if (typeof resolved.description === "string" && resolved.description.length > 0) {
-    out.description = resolved.description;
-  }
+  out.description = descriptionOrEmpty(resolved.description);
   if (resolved.default !== undefined) {
     const schemaType = typeof resolved.type === "string" ? resolved.type : undefined;
     const xyType = typeof xy.type === "string" ? xy.type : undefined;
@@ -417,11 +430,7 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
       choiceStmt.if_features = feats;
     }
   }
-  if (typeof xy.description === "string" && xy.description.length > 0) {
-    choiceStmt.description = xy.description;
-  } else if (typeof schema.description === "string" && schema.description.length > 0) {
-    choiceStmt.description = schema.description;
-  }
+  choiceStmt.description = firstNonEmptyDescription(xy.description, schema.description);
   setConfigFromXyang(choiceStmt, xy);
 
   let caseIndex = 0;
@@ -448,11 +457,7 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
         caseStmt.if_features = feats;
       }
     }
-    if (typeof branchXy.description === "string" && branchXy.description.length > 0) {
-      caseStmt.description = branchXy.description;
-    } else if (typeof branch.description === "string" && branch.description.length > 0) {
-      caseStmt.description = branch.description;
-    }
+    caseStmt.description = firstNonEmptyDescription(branchXy.description, branch.description);
 
     const branchProps = asRecord(branch.properties);
     for (const [childName, childSchema] of Object.entries(branchProps)) {
@@ -486,9 +491,7 @@ function parseAnydataOrAnyxml(name: string, schema: Record<string, unknown>, key
   if (xy.mandatory === true) {
     out.mandatory = true;
   }
-  if (typeof schema.description === "string" && schema.description.length > 0) {
-    out.description = schema.description;
-  }
+  out.description = descriptionOrEmpty(schema.description);
   if (when) {
     out.when = when;
   }
@@ -529,9 +532,7 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
   if (typeof xy.presence === "string" && xy.presence.length > 0) {
     out.presence = xy.presence;
   }
-  if (typeof schema.description === "string" && schema.description.length > 0) {
-    out.description = schema.description;
-  }
+  out.description = descriptionOrEmpty(schema.description);
   if (when) {
     out.when = when;
   }
@@ -554,7 +555,7 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
         name: typeof ch.name === "string" && ch.name.length > 0 ? ch.name : "choice",
         mandatory: ch.mandatory === true,
         ...(Array.isArray(ch["if-features"]) ? { "if-features": ch["if-features"] } : {}),
-        ...(typeof ch.description === "string" && ch.description.length > 0 ? { description: ch.description } : {})
+        description: descriptionOrEmpty(ch.description)
       }
     };
     const choiceStmt = parseChoice(
@@ -632,7 +633,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
         name: typeof ch.name === "string" && ch.name.length > 0 ? ch.name : "choice",
         mandatory: ch.mandatory === true,
         ...(Array.isArray(ch["if-features"]) ? { "if-features": ch["if-features"] } : {}),
-        ...(typeof ch.description === "string" && ch.description.length > 0 ? { description: ch.description } : {})
+        description: descriptionOrEmpty(ch.description)
       }
     };
     const choiceStmt = parseChoice(
@@ -644,9 +645,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       children.push(choiceStmt);
     }
   }
-  if (typeof schema.description === "string" && schema.description.length > 0) {
-    out.description = schema.description;
-  }
+  out.description = descriptionOrEmpty(schema.description);
   if (when) {
     out.when = when;
   }
@@ -678,9 +677,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
   } else if (typeof xy["max-elements"] === "number") {
     out.max_elements = xy["max-elements"] as number;
   }
-  if (typeof schema.description === "string" && schema.description.length > 0) {
-    out.description = schema.description;
-  }
+  out.description = descriptionOrEmpty(schema.description);
   if (schema.default !== undefined) {
     if (Array.isArray(schema.default)) {
       out.defaults = schema.default.filter((x) => x !== undefined);
@@ -703,9 +700,7 @@ function parseIoBlock(
   parsed.name = ioType;
   parsed.argument = ioType;
   applyStatementMetaFromXyang(parsed, xy);
-  if (typeof schema.description === "string" && schema.description.length > 0) {
-    parsed.description = schema.description;
-  }
+  parsed.description = descriptionOrEmpty(schema.description);
   return parsed;
 }
 
@@ -857,6 +852,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     // Legacy schemas may omit x-yang typedef metadata in $defs.
     typedefs[defName] = {
       name: defName,
+      description: descriptionOrEmpty(d.description),
       type: typeShapeFromJsonLeaf(d, dxy),
       statements: []
     };
@@ -868,6 +864,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     yang_version: "1.1",
     namespace,
     prefix,
+    description: descriptionOrEmpty(root.description),
     typedefs,
     identities,
     import_prefixes: {},

@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
-from ..augment_expand import apply_augmentations
+from ..augment_expand import apply_augmentations, apply_deviations
 from ..errors import YangSyntaxError
 from ..ext import apply_extension_invocations
 from ..module import YangModule
@@ -57,6 +57,7 @@ class YangParser:
         if self.expand_uses:
             expand_all_uses_in_module(module)
             apply_augmentations(module)
+            apply_deviations(module)
             apply_extension_invocations(module)
             validate_semantics(module)
 
@@ -279,8 +280,15 @@ class YangParser:
         sub.import_prefixes.clear()
 
     def parse_file(self, file_path: Path) -> YangModule:
-        """Parse a YANG file (resolves ``include`` relative to this file's directory)."""
+        """Parse a YANG file (resolves ``include`` relative to this file's directory).
+
+        A file already loaded into this parser's import cache is returned as that
+        object. Deviations applied for another module must not have changed it.
+        """
         path = file_path.resolve()
+        cached = self._module_cache.get(path)
+        if cached is not None:
+            return cached
         self._import_pending.clear()
         self._include_stack = [path]
         try:

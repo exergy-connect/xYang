@@ -12,13 +12,17 @@ describe("python parity: test_unsupported_skip", () => {
     warnSpy.mockRestore();
   });
 
-  it("skips deviation and action; parses rpc notification and leaf a", () => {
+  it("skips deviate add and action; parses rpc notification and leaf a", () => {
     const yang = `
 module ex {
   yang-version 1.1;
   namespace "urn:ex";
   prefix ex;
-  deviation /ex:foo { deviate not-supported; }
+  deviation "/ex:foo" {
+    deviate add {
+      leaf extra { type string; }
+    }
+  }
   extension ext { argument name; }
   rpc reset {
     input { leaf in-arg { type string; } }
@@ -33,9 +37,8 @@ module ex {
 `;
     const mod = parseYangString(yang);
     const joined = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(" ").toLowerCase();
-    for (const kw of ["deviation", "action"]) {
-      expect(joined).toContain(kw);
-    }
+    expect(joined).toContain("ignoring unsupported 'deviate add' for /ex:foo");
+    expect(joined).toContain("action");
     expect(joined).not.toContain("rpc");
     expect(joined).not.toContain("input");
     expect(joined).not.toContain("output");

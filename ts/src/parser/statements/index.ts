@@ -1,6 +1,7 @@
 export { AnydataStatementParser } from "./anydata";
 export { AnyxmlStatementParser } from "./anyxml";
 export { AugmentStatementParser } from "./augment";
+export { DeviationStatementParser } from "./deviation";
 export { BitsStatementParser } from "./bits";
 export { ChoiceStatementParser } from "./choice";
 export { ContainerStatementParser } from "./container";

@@ -373,6 +373,21 @@ class YangAugmentStmt(YangStatementWithWhen):
 
 
 @dataclass
+class YangDeviationStmt(YangStatement):
+    """``deviation`` (RFC 7950). ``deviate not-supported`` removes the target after augments."""
+
+    target_path: str = ""
+    target_path_segments: List[YangIdentifierRef] = field(default_factory=list)
+    not_supported: bool = False
+
+    def get_schema_node(self) -> Optional[str]:
+        return None
+
+    def child_names(self, _data: dict) -> set[str]:
+        return set()
+
+
+@dataclass
 class YangRefineStmt(YangStatementWithMust):
     """Refine statement - modifies nodes from a grouping when using it."""
     target_path: "PathNode" = field(default_factory=_empty_path_node)  # Descendant path (parsed; use .to_string() for display)
