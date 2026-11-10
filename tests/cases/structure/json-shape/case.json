@@ -1,16 +1,27 @@
 {
-  "description": "A container is a JSON object; list and leaf-list are JSON arrays (RFC 7951 5).",
+  "description": "A container is a JSON object; list and leaf-list are JSON arrays; each list entry is an object (RFC 7951 5). Issue #52.",
   "module": "m.yang",
   "instances": [
     { "name": "right shapes", "data": { "top": { "inner": { "a": "x" }, "items": [{ "id": "1" }], "tags": ["t"] } }, "valid": true },
     { "name": "container as scalar", "data": { "top": { "inner": 5 } }, "valid": false,
-      "errors": [{ "path": "/top/inner", "code": "type" }],
-      "xfail": { "python": "a non-object container value is skipped without an error", "cli": "a non-object container value is skipped without an error" } },
+      "errors": [{ "path": "/top/inner", "code": "type" }] },
+    { "name": "container as array", "data": { "top": { "inner": [] } }, "valid": false,
+      "errors": [{ "path": "/top/inner", "code": "type" }] },
     { "name": "list as object", "data": { "top": { "items": { "id": "1" } } }, "valid": false,
-      "errors": [{ "path": "/top/items", "code": "type" }],
-      "xfail": { "python": "a non-array list value is skipped without an error", "cli": "a non-array list value is skipped without an error" } },
+      "errors": [{ "path": "/top/items", "code": "type" }] },
+    { "name": "list as scalar", "data": { "top": { "items": "1" } }, "valid": false,
+      "errors": [{ "path": "/top/items", "code": "type" }] },
+    { "name": "list item as scalar", "data": { "top": { "items": ["1"] } }, "valid": false,
+      "errors": [{ "path": "/top/items/0", "code": "type" }] },
+    { "name": "list items not objects", "data": { "top": { "items": ["a", null, []] } }, "valid": false,
+      "errors": [
+        { "path": "/top/items/0", "code": "type" },
+        { "path": "/top/items/1", "code": "type" },
+        { "path": "/top/items/2", "code": "type" }
+      ] },
     { "name": "leaf-list as scalar", "data": { "top": { "tags": "t" } }, "valid": false,
-      "errors": [{ "path": "/top/tags", "code": "type" }],
-      "xfail": { "python": "a scalar leaf-list value is treated as a one-element list", "cli": "a scalar leaf-list value is treated as a one-element list" } }
+      "errors": [{ "path": "/top/tags", "code": "type" }] },
+    { "name": "leaf-list as object", "data": { "top": { "tags": { "t": true } } }, "valid": false,
+      "errors": [{ "path": "/top/tags", "code": "type" }] }
   ]
 }
