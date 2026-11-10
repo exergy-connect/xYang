@@ -9,6 +9,7 @@ as it descends.  At each evaluation point it calls evaluator.eval(ctx, node).
 
 At each node the order is (RFC 7950: when before structural):
     1. when   -- usually current node context; ``when`` merged from ``uses`` uses parent of ``uses`` (§7.21.5)
+    1b. JSON shape -- a present container is an object; a present list or leaf-list is an array (RFC 7951 §5)
     2. structural -- mandatory, min/max-elements, presence
     3. must   -- evaluated in current node context, per entry for lists
     4. type   -- pattern, range, length, enum, leafref require-instance
@@ -408,6 +409,43 @@ class DocumentValidator:
             if not when_ok:
                 return
 
+        # -- JSON shape (RFC 7951 §5), before structural checks. A wrong shape is an error;
+        #    do not skip the node or wrap a scalar leaf-list as a one-element list. --
+        if present:
+            if isinstance(stmt, YangContainerStmt) and not isinstance(val, dict):
+                self._add(
+                    path=child_path,
+                    pointer=child_pointer,
+                    code="type",
+                    message="container must be an object",
+                )
+                return
+            if isinstance(stmt, YangListStmt):
+                if not isinstance(val, list):
+                    self._add(
+                        path=child_path,
+                        pointer=child_pointer,
+                        code="type",
+                        message="list must be an array",
+                    )
+                    return
+                for i, entry in enumerate(val):
+                    if not isinstance(entry, dict):
+                        self._add(
+                            path=f"{child_path}[{i}]",
+                            pointer=f"{child_pointer}/{i}",
+                            code="type",
+                            message="list item must be an object",
+                        )
+            if isinstance(stmt, YangLeafListStmt) and not isinstance(val, list):
+                self._add(
+                    path=child_path,
+                    pointer=child_pointer,
+                    code="type",
+                    message="leaf-list must be an array",
+                )
+                return
+
         # -- 2. Structural (mandatory, min/max-elements, presence) —
         logger.debug("phase 2 structural path=%s", child_path)
         if not self._check_structural(stmt, name, data, child_path, child_pointer, enforce_mandatory_choice):
@@ -417,8 +455,9 @@ class DocumentValidator:
         logger.debug("phase 3 must path=%s", child_path)
         if self._constraint_checks and isinstance(stmt, YangStatementWithMust) and not isinstance(stmt, YangListStmt):
             if isinstance(stmt, YangLeafListStmt):
-                # Leaf-list: evaluate must per element; skip when empty
-                items = val if isinstance(val, list) else ([val] if val is not None else [])
+                # Leaf-list: evaluate must per element; skip when empty.
+                # A non-array value was already rejected above.
+                items = val if isinstance(val, list) else []
                 for i, item in enumerate(items):
                     item_node = parent_node.step(item, stmt)
                     item_ctx = parent_ctx_obj.child(item_node)
@@ -460,7 +499,8 @@ class DocumentValidator:
                     severity=severity,
                 )
         elif self._constraint_checks and isinstance(stmt, YangLeafListStmt) and stmt.type is not None:
-            items = val if isinstance(val, list) else ([val] if val is not None else [])
+            # A non-array value was already rejected above.
+            items = val if isinstance(val, list) else []
             leaf_list_leafref = getattr(stmt.type, "name", None) == "leafref"
             for i, item in enumerate(items):
                 item_node = parent_node.step(item, stmt)
@@ -498,6 +538,8 @@ class DocumentValidator:
             if self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer):
                 return  # duplicate key; skip per-entry validation
             for i, entry in enumerate(val):
+                if not isinstance(entry, dict):
+                    continue
                 path.push(
                     name,
                     self._entry_key_from_names(entry, key_names),
