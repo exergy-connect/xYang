@@ -141,7 +141,8 @@ class TypeStatementParser:
     def parse_type_enum(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse ``enum`` under ``type enumeration`` (RFC 7950 §9.6.4), with optional substatement block."""
         tokens.consume(kw.ENUM)
-        enum_name = tokens.consume()  # identifier or keyword (e.g. string, boolean)
+        # One argument: ``100GE`` lexes as INTEGER + IDENTIFIER (RFC 7950 §9.6.4).
+        enum_name = self._parsers.parse_string_argument(tokens)
         type_stmt.enums.append(enum_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             self._parsers.parse_body(

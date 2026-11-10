@@ -96,7 +96,8 @@ export class TypeStatementParser {
 
   parse_type_enum(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.ENUM);
-    const enumName = tokens.consume();
+    // One argument: ``100GE`` lexes as INTEGER + IDENTIFIER (RFC 7950 §9.6.4).
+    const enumName = this.parsers.parse_string_argument(tokens);
     type_stmt.enums.push(enumName);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       this.parsers.parseBody(tokens, context, "enum", `enum '${enumName}'`);

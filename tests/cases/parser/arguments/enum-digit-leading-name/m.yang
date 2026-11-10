@@ -1,0 +1,23 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  leaf top {
+    type enumeration {
+      enum Vlanif {
+        value 15;
+      }
+      enum 100GE {
+        value 20;
+        description
+          "100 GigabitEthernet interface.";
+      }
+      enum 50|100GE {
+        value 101;
+        description
+          "50|100 GigabitEthernet interface.";
+      }
+    }
+  }
+}

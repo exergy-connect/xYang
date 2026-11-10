@@ -37,6 +37,9 @@ export const YangTokenType = {
   IDENTIFIER: "IDENTIFIER",
   INTEGER: "INTEGER",
   DOTTED_NUMBER: "DOTTED_NUMBER",
+  // Any other non-whitespace character (`|`, `@`, `*`, …). Part of an
+  // unquoted argument (RFC 7950 §6.1.3); a parse error anywhere else.
+  OTHER: "OTHER",
 
   MODULE: "module",
   YANG_VERSION: "yang-version",
@@ -209,7 +212,8 @@ const LEXICAL_TOKEN_TYPES = new Set<string>([
   YangTokenType.STRING,
   YangTokenType.IDENTIFIER,
   YangTokenType.INTEGER,
-  YangTokenType.DOTTED_NUMBER
+  YangTokenType.DOTTED_NUMBER,
+  YangTokenType.OTHER
 ]);
 
 export function makeYangToken(type: YangTokenType, value: string, line_num: number, char_pos: number): YangToken {

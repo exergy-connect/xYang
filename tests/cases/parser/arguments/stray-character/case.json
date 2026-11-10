@@ -1,0 +1,6 @@
+{
+  "description": "A character outside an argument is a load error, not silently dropped.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "'|'"
+}
