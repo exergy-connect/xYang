@@ -5,7 +5,7 @@ build-backend = "setuptools.build_meta"
 [project]
 name = "xyang"
 version = "0.1.11"
-description = "A Python library implementing a subset of YANG features focused on constraint validation"
+description = "Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema"
 keywords = ["yang", "rfc7950", "rfc7951", "netconf", "restconf", "json-schema", "validation", "schema", "mcp", "agents"]
 readme = "README.md"
 requires-python = ">=3.11"
