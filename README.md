@@ -234,35 +234,32 @@ cd ts && npm install && npm test
 
 | Workflow | File | Purpose |
 |----------|------|---------|
-| **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS |
-| **Build TypeScript CI artifacts** | [`.github/workflows/build-ts-dist.yml`](.github/workflows/build-ts-dist.yml) | Runs `npm run build:ci` and keeps committed build artifacts in sync |
+| **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, `npm run build:ci`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS. The `build:ci` step is a check only: it does not commit or upload |
+| **Release TypeScript artifacts** | [`.github/workflows/release-artifacts.yml`](.github/workflows/release-artifacts.yml) | On a published release, runs `npm run build:ci` and attaches `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js`. On `workflow_dispatch`, uploads those files as workflow artifacts only |
 | **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | On a published release, builds all five `xyang-ts` executables, smoke-tests the Linux binaries against the Node CLI, and attaches the files. Also runnable by hand (`workflow_dispatch`) without attaching anything |
 
-The TypeScript test and CI-artifact workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths). The QuickJS binaries are not built on those runs. The stdout flush is covered by the TypeScript test suite.
+The TypeScript test workflow runs on pushes to `main` and on pull requests that touch `ts/**` (and related paths). It builds the release bundles and does not commit or upload them. The QuickJS binaries and the TypeScript bundles are attached only when a release is published. The stdout flush is covered by the TypeScript test suite.
 
-### Committed CI artifacts
+### Release artifacts
 
-The **Build TypeScript CI artifacts** workflow commits two bundled outputs produced by [`ts/scripts/build-ci-artifacts.mjs`](ts/scripts/build-ci-artifacts.mjs):
+[`ts/scripts/build-ci-artifacts.mjs`](ts/scripts/build-ci-artifacts.mjs) writes two bundles. They are gitignored and are not committed. A published GitHub Release attaches them (see **Release TypeScript artifacts** above). The same files can be downloaded from the release assets.
 
 | File | Role |
 |------|------|
-| [`artifacts/xyang-ts.mjs`](artifacts/xyang-ts.mjs) | Single-file Node CLI (`parse`, `validate`, `convert`) |
-| [`docs/xyang.umd.min.js`](docs/xyang.umd.min.js) | Browser IIFE library bundle |
+| `artifacts/xyang-ts.mjs` | Single-file Node CLI (`parse`, `validate`, `convert`), published as a release asset |
+| `docs/xyang.umd.min.js` | Browser IIFE library bundle, published as a release asset |
 
-Regenerate locally:
+Build them locally:
 
 ```bash
 cd ts && npm install && npm run build:ci
-git add -f artifacts/xyang-ts.mjs docs/xyang.umd.min.js
 ```
-
-On **same-repo** PRs and pushes to `main`, the workflow auto-commits when artifacts drift. On **fork** PRs, the check fails instead (no write access to the contributor branch).
 
 The full npm package under `ts/dist/` is **not** committed; use `npm run build:check` for publish-style validation.
 
 ### `xyang-ts` composite action (other repositories)
 
-Reuse [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to check out xYang and run the CLI from committed `artifacts/xyang-ts.mjs` — no `npm install` or build step in the consumer workflow.
+Reuse [`.github/actions/xyang-ts`](.github/actions/xyang-ts/action.yml) to download `xyang-ts.mjs` from a GitHub Release and run the CLI — no `npm install`, checkout, or build step in the consumer workflow.
 
 **Minimal validate job:**
 
@@ -275,7 +272,7 @@ jobs:
 
       - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
         with:
-          ref: main
+          version: latest
           command: validate
           yang-file: model/example.yang
           data-file: data/instance.json
@@ -287,15 +284,14 @@ jobs:
 | Input | Default | Description |
 |-------|---------|-------------|
 | `repository` | `exergy-connect/xYang` | xYang GitHub repository |
-| `ref` | `main` | Branch, tag, or SHA (must include committed `artifacts/xyang-ts.mjs`) |
-| `path` | `.xyang` | Checkout directory under the workflow workspace |
+| `version` | `latest` | Release tag whose `xyang-ts.mjs` asset to download, or `latest` |
 | `command` | *(empty)* | `parse`, `validate`, or `convert`. Omit to only expose `xyang-ts` on `PATH` |
 | `yang-file` | *(empty)* | YANG module path (required when `command` is set) |
 | `data-file` | *(empty)* | JSON instance path for `validate` |
 | `include-path` | *(empty)* | Module search directories (`--include-path`, one per line) |
 | `working-directory` | *(empty)* | Directory for the `xyang-ts` invocation |
 
-**Outputs:** `cli` (path to `artifacts/xyang-ts.mjs`), `xyang-root` (xYang repo root).
+**Outputs:** `cli` (absolute path to the downloaded `xyang-ts.mjs`).
 
 **Setup only** (run multiple commands in later steps):
 
@@ -303,7 +299,7 @@ jobs:
 - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
   id: xyang
   with:
-    ref: v0.1.4
+    version: v0.1.4
 
 - run: xyang-ts parse model/example.yang
 - run: xyang-ts convert model/example.yang
@@ -314,7 +310,7 @@ jobs:
 ```yaml
 - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
   with:
-    ref: main
+    version: latest
 
 - run: |
     xyang-ts validate modules/host.yang data/envelope.json \
@@ -323,7 +319,7 @@ jobs:
       --anydata-module modules/payload.yang
 ```
 
-Pin `ref` to a release tag or SHA once this workflow is on `main`.
+Pin `version` to a release tag that published the `xyang-ts.mjs` asset.
 
 ---
 

@@ -59,7 +59,7 @@ pnpm-debug.log*
 # Docs — browser bundle produced by `npm run build:ci` in ts/
 docs/xyang.umd.min.js
 
-# CI CLI bundle — single-file output from ts/scripts/build-ci-artifacts.mjs (git add -f)
+# CI CLI bundle — single-file output from ts/scripts/build-ci-artifacts.mjs
 artifacts/xyang-ts.mjs
 
 # QuickJS-ng CLI build (qjs/build.sh)

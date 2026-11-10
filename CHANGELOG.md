@@ -15,6 +15,11 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 - **Python `YangValidator(module, enabled_features_by_module=...)`:** configure enabled features without dropping to `DocumentValidator`, matching TypeScript `enabledFeaturesByModule`.
 - **QuickJS-ng executable:** `qjs/build.sh` builds the TypeScript CLI as a self-contained `xyang-ts` binary with QuickJS-ng 0.18.0 (static musl on Linux; macOS and Windows cross-compiled with Zig). A published GitHub Release builds all five binaries, smoke-tests the Linux ones against the Node CLI, and attaches them. Pull-request CI does not build the binaries.
 
+### Changed
+
+- **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads `xyang-ts.mjs` from GitHub Release assets instead of checking out a committed bundle. The `path` input and `xyang-root` output are removed (#89).
+- CI no longer commits `artifacts/xyang-ts.mjs` or `docs/xyang.umd.min.js`. A published release builds them with `npm run build:ci` and attaches them; pull-request CI only runs that build as a check and does not push commits (#89).
+
 ### Fixed
 
 - **XPath:** an unknown function name is a compile error (`xpath-unknown-function`) in Python and TypeScript. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).
