@@ -2,14 +2,11 @@
   "description": "identityref accepts identities derived from the base, plain or module-qualified (RFC 7951 6.8).",
   "module": "m.yang",
   "instances": [
-    { "name": "derived identity", "data": { "top": { "proto": "tcp" } }, "valid": true,
-      "xfail": { "python": "unprefixed identity names do not resolve, only module-qualified ones (m:tcp)", "cli": "unprefixed identity names do not resolve, only module-qualified ones (m:tcp)" } },
+    { "name": "derived identity", "data": { "top": { "proto": "tcp" } }, "valid": true },
     { "name": "module-qualified identity", "data": { "top": { "proto": "m:tcp" } }, "valid": true },
     { "name": "identity with another base", "data": { "top": { "proto": "m:color" } }, "valid": false,
-      "errors": [{ "path": "/top/proto", "code": "identityref" }],
-      "xfail": { "ts": "identityref values are not validated" } },
+      "errors": [{ "path": "/top/proto", "code": "identityref" }] },
     { "name": "unknown identity", "data": { "top": { "proto": "m:udp" } }, "valid": false,
-      "errors": [{ "path": "/top/proto", "code": "identityref" }],
-      "xfail": { "ts": "identityref values are not validated" } }
+      "errors": [{ "path": "/top/proto", "code": "identityref" }] }
   ]
 }

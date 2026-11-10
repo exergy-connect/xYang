@@ -3,6 +3,7 @@ import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem } from "../types";
 import { resolvePrefixedModule, type ModuleData } from "./if-feature-eval";
+import { identityrefValueValid, resolveIdentityValue } from "../identity-graph";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 
 export type TypeCheckerOptions = {
@@ -106,7 +107,7 @@ export class TypeChecker {
         result = this.validate(value, typedef.type.name, typedef.type as Record<string, unknown>);
       } else {
         via = "typedef";
-        result = this.system.validate(value, typedef.type.name, typedefConstraint);
+        result = this.validateBuiltin(value, typedef.type.name, typedef.type as Record<string, unknown>, typedefConstraint);
       }
     } else {
       const merged = new TypeConstraint(constraint as Record<string, unknown> | undefined);
@@ -115,7 +116,7 @@ export class TypeChecker {
         result = this.validateUnion(value, merged);
       } else {
         via = "direct";
-        result = this.system.validate(value, typeName, merged);
+        result = this.validateBuiltin(value, typeName, constraint, merged);
       }
     }
 
@@ -140,6 +141,38 @@ export class TypeChecker {
       });
     }
     return result;
+  }
+
+  private validateBuiltin(
+    value: unknown,
+    typeName: string,
+    shape: Record<string, unknown> | undefined,
+    constraint: TypeConstraint
+  ): [boolean, string | null] {
+    if (typeName === YangTokenType.IDENTITYREF) {
+      return this.checkIdentityref(value, shape ?? {});
+    }
+    return this.system.validate(value, typeName, constraint);
+  }
+
+  /** RFC 7951 §6.8 value, derived from every base (bases resolve in the host module, as in Python). */
+  private checkIdentityref(value: unknown, shape: Record<string, unknown>): [boolean, string | null] {
+    if (typeof value !== "string") {
+      return [false, `identityref value must be a string, got ${value === null ? "null" : typeof value}`];
+    }
+    const bases = Array.isArray(shape.identityref_bases) ? (shape.identityref_bases as YangIdentifierRef[]) : [];
+    if (bases.length === 0) {
+      return [false, "identityref type has no base identities"];
+    }
+    const moduleData = this.module.data as Record<string, unknown>;
+    if (!resolveIdentityValue(moduleData, value)) {
+      return [false, `identityref value '${value}' does not resolve to a known identity`];
+    }
+    if (!identityrefValueValid(moduleData, value, bases)) {
+      const shown = bases.map((b) => `'${formatIdentifierRef(b)}'`).join(", ");
+      return [false, `identityref value '${value}' is not derived from all bases [${shown}]`];
+    }
+    return [true, null];
   }
 
   /** Union members may name typedefs; validate through this checker so typedefs resolve. */

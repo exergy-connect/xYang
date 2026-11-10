@@ -41,6 +41,29 @@ def resolve_identity_qname_pair(importer: "YangModule", qname: str) -> Optional[
     return resolve_identity_base_ref(importer, ref)
 
 
+def resolve_identity_value(module: "YangModule", value: str) -> Optional[IdentityPair]:
+    """Resolve an RFC 7951 identityref instance value (§6.8).
+
+    ``name`` resolves in *module*. ``modname:name`` resolves where ``modname`` is the
+    *module name* (not the prefix) of *module* itself or of a module it imports.
+    """
+    if not isinstance(value, str) or not value:
+        return None
+    if ":" in value:
+        mod_name, name = value.split(":", 1)
+        if mod_name == module.name:
+            target: Optional["YangModule"] = module
+        else:
+            target = next((m for m in module.import_prefixes.values() if m.name == mod_name), None)
+        if target is None:
+            return None
+    else:
+        target, name = module, value
+    if name not in target.identities:
+        return None
+    return (target, name)
+
+
 def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
     """Local name of the identity if ``qname`` resolves in *importer* scope; else None."""
     pair = resolve_identity_qname_pair(importer, qname)
@@ -145,8 +168,11 @@ def descendant_closure(module: "YangModule", base_local: str) -> Set[str]:
 
 
 def is_derived_from_strict_qnames(importer: "YangModule", v_q: str, t_q: str) -> bool:
-    """True iff identity ``v_q`` is a strict descendant of ``t_q`` (RFC 7950 ``derived-from``)."""
-    pv = resolve_identity_qname_pair(importer, v_q)
+    """True iff identity ``v_q`` is a strict descendant of ``t_q`` (RFC 7950 ``derived-from``).
+
+    ``v_q`` is an instance value (RFC 7951 module name); ``t_q`` is a schema literal (prefix).
+    """
+    pv = resolve_identity_value(importer, v_q)
     pt = resolve_identity_qname_pair(importer, t_q)
     if not pv or not pt:
         return False
@@ -155,8 +181,8 @@ def is_derived_from_strict_qnames(importer: "YangModule", v_q: str, t_q: str) ->
 
 
 def is_derived_from_or_self_qnames(importer: "YangModule", v_q: str, t_q: str) -> bool:
-    """``derived-from-or-self`` for qualified identity names."""
-    pv = resolve_identity_qname_pair(importer, v_q)
+    """``derived-from-or-self``; same name rules as :func:`is_derived_from_strict_qnames`."""
+    pv = resolve_identity_value(importer, v_q)
     pt = resolve_identity_qname_pair(importer, t_q)
     if not pv or not pt:
         return False
@@ -188,10 +214,11 @@ def identityref_value_valid(
 ) -> bool:
     """
     RFC 7950: instance value must be derived from **every** ``identityref`` ``base``.
+    The value uses RFC 7951 module names; the bases use schema prefixes.
     """
     if not identityref_bases:
         return False
-    pair_v = resolve_identity_qname_pair(importer, value_qname)
+    pair_v = resolve_identity_value(importer, value_qname)
     if pair_v is None:
         return False
     closure = identity_ancestor_closure(pair_v[0], pair_v[1])

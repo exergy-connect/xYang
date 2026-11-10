@@ -15,7 +15,7 @@ from ..json.integer_bounds import YANG_INTEGER_BOUNDS
 from ..errors import XPathSyntaxError
 from ..identity_graph import (
     identityref_value_valid,
-    resolve_identity_qname_pair,
+    resolve_identity_value,
 )
 from ..identifier_ref import format_identifier_ref
 from ..module import YangModule
@@ -320,7 +320,7 @@ class TypeChecker:
         bases = getattr(type_stmt, "identityref_bases", None) or []
         if not bases:
             return [_issue("identityref", "identityref type has no base identities")]
-        if resolve_identity_qname_pair(root_schema, value) is None:
+        if resolve_identity_value(root_schema, value) is None:
             return [_issue("identityref", f"identityref value {value!r} does not resolve to a known identity")]
         if not identityref_value_valid(root_schema, value, bases):
             bases_fmt = [format_identifier_ref(b) for b in bases]

@@ -142,14 +142,14 @@ describe("python parity: test_identity", () => {
   it("validate must on sibling when identityref satisfies derived-from", () => {
     const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);
     const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "is:dog", label: "x" } });
+    const result = validator.validate({ data: { kind: "identity-must-sibling:dog", label: "x" } });
     expect(result.isValid, result.errors.join("\n")).toBe(true);
   });
 
   it("validate must on sibling fails when identityref not mammal lineage", () => {
     const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);
     const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "is:animal", label: "x" } });
+    const result = validator.validate({ data: { kind: "identity-must-sibling:animal", label: "x" } });
     expect(result.isValid).toBe(false);
     expect(result.errors.length).toBeGreaterThan(0);
   });
