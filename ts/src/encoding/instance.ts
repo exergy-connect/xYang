@@ -19,6 +19,10 @@ const STRINGISH = new Set([
 ]);
 const SMALL_INT = new Set(["int8", "int16", "int32", "uint8", "uint16", "uint32", "integer"]);
 const BUILTINS = new Set([...INT64, ...DECIMAL, ...STRINGISH, ...SMALL_INT, "boolean", "empty", "union"]);
+const INTEGER_KEY = new Set([...INT64, ...SMALL_INT]);
+const ENCODED = new Set([...INT64, ...DECIMAL, "empty"]);
+const INT_TEXT = /^-?\d+$/;
+const DEC_TEXT = /^-?\d+(\.\d+)?$/;
 const DATA = new Set(["container", "list", "leaf", "leaf-list", "anydata", "anyxml", "notification"]);
 const SKIP = new Set(["rpc", "action", "input", "output"]);
 const NO = Symbol("no-decode");
@@ -105,11 +109,11 @@ function accepts(checker: TypeChecker, value: unknown, type: TypeShape): boolean
 }
 
 function isIntText(value: unknown): value is string {
-  return typeof value === "string" && /^-?\d+$/.test(value.trim());
+  return typeof value === "string" && INT_TEXT.test(value.trim());
 }
 
 function isDecText(value: unknown): value is string {
-  return typeof value === "string" && /^-?\d+(\.\d+)?$/.test(value.trim());
+  return typeof value === "string" && DEC_TEXT.test(value.trim());
 }
 
 function hint(native: boolean, kind: string): string {
@@ -259,7 +263,7 @@ function walkLeaf(
   }
   if (decoded === NO) {
     const name = typeof eff?.name === "string" ? eff.name : "value";
-    if (name === "empty" || INT64.has(name) || DECIMAL.has(name)) {
+    if (ENCODED.has(name)) {
       const message =
         name === "empty"
           ? native
@@ -320,8 +324,8 @@ function convertKey(text: string, leaf: YangStatement, module: YangModule, check
   const eff = unwrap(module, type);
   const name = typeof eff?.name === "string" ? eff.name : "";
   let candidate: unknown = text;
-  if (INT64.has(name) || SMALL_INT.has(name)) {
-    if (!/^-?\d+$/.test(text)) return NO;
+  if (INTEGER_KEY.has(name)) {
+    if (!INT_TEXT.test(text)) return NO;
     candidate = INT64.has(name) ? BigInt(text) : Number(text);
     if (typeof candidate === "number" && !Number.isSafeInteger(candidate)) return NO;
   } else if (DECIMAL.has(name)) {

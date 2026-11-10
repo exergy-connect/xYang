@@ -5,10 +5,22 @@ Produces tokens according to the minimal YANG grammar (meta-model-grammar.ebnf),
 using YangTokenType enum for token kinds.
 """
 
+import re
+import sys
 from typing import Optional, List
 
 from .parser_context import TokenStream, YangToken, YangTokenType
 from .yang_strings import unescape_yang_quoted_string
+
+# Exactly the characters ``str.isspace`` accepts, so a run can be skipped in one match.
+_WHITESPACE_RUN = re.compile(
+    "[" + "".join(re.escape(chr(c)) for c in range(sys.maxunicode + 1) if chr(c).isspace()) + "]+"
+)
+# Quoted-string body: a backslash escapes the next character; a trailing backslash is kept.
+_QUOTED_BODY = {
+    '"': re.compile(r'(?:[^"\\]|\\[\s\S]|\\\Z)*'),
+    "'": re.compile(r"(?:[^'\\]|\\[\s\S]|\\\Z)*"),
+}
 
 
 class YangTokenizer:
@@ -29,77 +41,51 @@ class YangTokenizer:
             TokenStream with typed tokens and position information
         """
         token_list: List[YangToken] = []
+        append = token_list.append
+        punctuation = self._PUNCTUATION
+        whitespace_run = _WHITESPACE_RUN.match
         i = 0
         content_len = len(content)
         current_line = 1
         line_start = 0
 
-        def advance() -> None:
+        def skip_to(end: int) -> None:
+            """Move ``i`` to ``end``, counting newlines in the skipped span."""
             nonlocal i, current_line, line_start
-            if i < content_len and content[i] == "\n":
-                current_line += 1
-                line_start = i + 1
-            i += 1
-
-        def add_token(
-            tok_type: YangTokenType,
-            value: str,
-            token_start: int,
-            line_num: int,
-            line_start_pos: int,
-        ) -> None:
-            char_pos = token_start - line_start_pos
-            token_list.append(
-                YangToken(
-                    type=tok_type,
-                    value=value,
-                    line_num=line_num,
-                    char_pos=char_pos,
-                )
-            )
+            newlines = content.count("\n", i, end)
+            if newlines:
+                current_line += newlines
+                line_start = content.rindex("\n", i, end) + 1
+            i = end
 
         while i < content_len:
-            if content[i].isspace():
-                advance()
-                continue
-
-            # Block comment: /* ... */ — recognize and skip (do not emit tokens)
-            if content[i] == "/" and i + 1 < content_len and content[i + 1] == "*":
-                advance()
-                advance()
-                while i < content_len:
-                    if i + 1 < content_len and content[i] == "*" and content[i + 1] == "/":
-                        advance()
-                        advance()
-                        break
-                    advance()
-                continue
-
-            # Line comment: // ... EOL (only here — never inside quoted-string lexing)
-            if content[i] == "/" and i + 1 < content_len and content[i + 1] == "/":
-                advance()
-                advance()
-                while i < content_len and content[i] != "\n":
-                    advance()
-                continue
-
             char = content[i]
+            if char.isspace():
+                skip_to(whitespace_run(content, i).end())
+                continue
+
+            if char == "/" and i + 1 < content_len:
+                nxt = content[i + 1]
+                # Block comment: /* ... */ — recognize and skip (do not emit tokens)
+                if nxt == "*":
+                    close = content.find("*/", i + 2)
+                    skip_to(content_len if close < 0 else close + 2)
+                    continue
+                # Line comment: // ... EOL (only here — never inside quoted-string lexing)
+                if nxt == "/":
+                    eol = content.find("\n", i + 2)
+                    i = content_len if eol < 0 else eol
+                    continue
 
             # Quoted string (value = inner content, no quotes)
-            if char in ("\"", "'"):
-                quote = char
+            if char == '"' or char == "'":
                 token_start = i
                 token_line = current_line
                 token_line_start = line_start
-                advance()
-                start = i
-                while i < content_len:
-                    if content[i] == quote:
-                        break
-                    if content[i] == "\\" and i + 1 < content_len:
-                        advance()
-                    advance()
-                value = unescape_yang_quoted_string(content[start:i], quote)
+                start = i + 1
+                end = _QUOTED_BODY[char].match(content, start).end()
+                skip_to(end)
+                value = unescape_yang_quoted_string(content[start:end], char)
                 # RFC 7950 §6.1.3 permits concatenation only between quoted
                 # strings. Check for it here, where quoted strings are lexed.
                 if (
@@ -110,92 +96,82 @@ class YangTokenizer:
                     token_list[-2].value += value
                     token_list.pop()
                 else:
-                    add_token(
-                        YangTokenType.STRING,
-                        value,
-                        token_start,
-                        token_line,
-                        token_line_start,
+                    append(
+                        YangToken(
+                            type=YangTokenType.STRING,
+                            value=value,
+                            line_num=token_line,
+                            char_pos=token_start - token_line_start,
+                        )
                     )
-                advance()
+                i += 1
                 continue
 
             # Negative integer: - DIGIT+
             if char == "-" and i + 1 < content_len and content[i + 1].isdigit():
                 token_start = i
-                token_line = current_line
-                token_line_start = line_start
-                advance()
-                start = i
-                while i < content_len and content[i].isdigit():
-                    advance()
-                lexeme = "-" + content[start:i]
-                add_token(YangTokenType.INTEGER, lexeme, token_start, token_line, token_line_start)
+                j = i + 1
+                while j < content_len and content[j].isdigit():
+                    j += 1
+                append(
+                    YangToken(
+                        type=YangTokenType.INTEGER,
+                        value="-" + content[i + 1 : j],
+                        line_num=current_line,
+                        char_pos=token_start - line_start,
+                    )
+                )
+                i = j
                 continue
 
             # Unsigned integer or dotted decimal
             # (e.g. yang-version 1.1 — not an identifier in RFC 7950)
             if char.isdigit():
-                token_start = i
-                token_line = current_line
-                token_line_start = line_start
                 start = i
-                while i < content_len and content[i].isdigit():
-                    advance()
-                if (
-                    i < content_len
-                    and content[i] == "."
-                    and i + 1 < content_len
-                    and content[i + 1].isdigit()
-                ):
-                    advance()
-                    while i < content_len and content[i].isdigit():
-                        advance()
-                    lexeme = content[start:i]
-                    add_token(
-                        YangTokenType.DOTTED_NUMBER,
-                        lexeme,
-                        token_start,
-                        token_line,
-                        token_line_start,
+                j = i
+                while j < content_len and content[j].isdigit():
+                    j += 1
+                tok_type = YangTokenType.INTEGER
+                if j < content_len and content[j] == "." and j + 1 < content_len and content[j + 1].isdigit():
+                    j += 1
+                    while j < content_len and content[j].isdigit():
+                        j += 1
+                    tok_type = YangTokenType.DOTTED_NUMBER
+                append(
+                    YangToken(
+                        type=tok_type,
+                        value=content[start:j],
+                        line_num=current_line,
+                        char_pos=start - line_start,
                     )
-                else:
-                    lexeme = content[start:i]
-                    add_token(
-                        YangTokenType.INTEGER,
-                        lexeme,
-                        token_start,
-                        token_line,
-                        token_line_start,
-                    )
+                )
+                i = j
                 continue
 
             # Identifier: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
             if char.isalpha() or char == "_":
-                token_start = i
-                token_line = current_line
-                token_line_start = line_start
                 start = i
-                advance()
-                while i < content_len:
-                    c = content[i]
+                j = i + 1
+                while j < content_len:
+                    c = content[j]
                     if not (c.isalnum() or c in ("_", "-", ".")):
                         break
-                    advance()
-                lexeme = content[start:i]
-                add_token(
-                    YangTokenType.IDENTIFIER,
-                    lexeme,
-                    token_start,
-                    token_line,
-                    token_line_start,
+                    j += 1
+                append(
+                    YangToken(
+                        type=YangTokenType.IDENTIFIER,
+                        value=content[start:j],
+                        line_num=current_line,
+                        char_pos=start - line_start,
+                    )
                 )
+                i = j
                 continue
 
             # Punctuation (grammar: { } ; : = + /)
-            tok_type = self._PUNCTUATION.get(char)
+            tok_type = punctuation.get(char)
             if tok_type is not None:
-                add_token(tok_type, char, i, current_line, line_start)
-            advance()
+                append(YangToken(type=tok_type, value=char, line_num=current_line, char_pos=i - line_start))
+            i += 1
 
         return TokenStream(token_list=token_list, source=content, filename=filename)

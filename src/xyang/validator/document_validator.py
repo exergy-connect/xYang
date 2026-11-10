@@ -41,7 +41,7 @@ from ..ast import (
     YangStatementWithWhen,
 )
 from ..encoding.rfc7951 import (
-    instance_member_keys,
+    member_keys_cached,
     instance_member_lookup,
     instance_member_present,
 )
@@ -342,7 +342,7 @@ class DocumentValidator:
             if isinstance(stmt, YangChoiceStmt):
                 visited_names.update(self._choice_instance_keys(stmt, data))
             else:
-                visited_names.update(instance_member_keys(stmt, parent_mod))
+                visited_names.update(member_keys_cached(stmt, parent_mod))
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
         for key in data:
             if key not in visited_names:
@@ -361,7 +361,9 @@ class DocumentValidator:
         path: PathBuilder,
         enforce_mandatory_choice: bool,
     ) -> None:
-        logger.debug("_visit_stmt path=%s stmt=%s", path.current(), type(stmt).__name__)
+        debug = logger.isEnabledFor(logging.DEBUG)
+        if debug:
+            logger.debug("_visit_stmt path=%s stmt=%s", path.current(), type(stmt).__name__)
 
         if isinstance(stmt, YangChoiceStmt):
             self._visit_choice(stmt, data, parent_ctx, path, enforce_mandatory_choice)
@@ -406,7 +408,8 @@ class DocumentValidator:
         curr_ctx = parent_ctx_obj.child(curr_node)
 
         # -- 1. when (RFC 7950: applicability first; report when-false before structural) --
-        logger.debug("phase 1 when path=%s", child_path)
+        if debug:
+            logger.debug("phase 1 when path=%s", child_path)
         if self._constraint_checks and isinstance(stmt, YangStatementWithWhen) and stmt.when is not None:
             if getattr(stmt.when, "evaluate_with_parent_context", False):
                 when_ctx, when_node = parent_ctx_obj, parent_node
@@ -468,12 +471,14 @@ class DocumentValidator:
                 return
 
         # -- 2. Structural (mandatory, min/max-elements, presence) —
-        logger.debug("phase 2 structural path=%s", child_path)
+        if debug:
+            logger.debug("phase 2 structural path=%s", child_path)
         if not self._check_structural(stmt, name, data, child_path, child_pointer, enforce_mandatory_choice):
             return
 
         # -- 3. must (evaluated in current node context) --
-        logger.debug("phase 3 must path=%s", child_path)
+        if debug:
+            logger.debug("phase 3 must path=%s", child_path)
         if self._constraint_checks and isinstance(stmt, YangStatementWithMust) and not isinstance(stmt, YangListStmt):
             if isinstance(stmt, YangLeafListStmt):
                 # Leaf-list: evaluate must per element; skip when empty.
@@ -497,7 +502,8 @@ class DocumentValidator:
         # -- 4. Type check --
         type_stmt = getattr(stmt, "type", None)
         type_name = getattr(type_stmt, "name", None) if type_stmt else None
-        logger.debug("phase 4 type path=%s type=%s", child_path, type_name)
+        if debug:
+            logger.debug("phase 4 type path=%s type=%s", child_path, type_name)
         if self._constraint_checks and (isinstance(stmt, YangLeafStmt) and stmt.type is not None and val is not None):
             if type_name == "leafref":
                 logger.debug("phase 4 type: leafref require-instance check path=%s", child_path)
@@ -548,7 +554,8 @@ class DocumentValidator:
                     )
 
         # -- 5. Descend --
-        logger.debug("phase 5 descend path=%s", child_path)
+        if debug:
+            logger.debug("phase 5 descend path=%s", child_path)
         if isinstance(stmt, YangContainerStmt) and isinstance(val, dict):
             path.push(name, pointer_name=json_name)
             child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
@@ -582,7 +589,7 @@ class DocumentValidator:
     def _stmt_instance_keys_from_data(self, stmt: YangStatement, data: dict[str, Any]) -> set[str]:
         """Instance keys under ``data`` claimed by this statement (same nesting level)."""
         parent_mod = self._encoding_parent_module()
-        keys = instance_member_keys(stmt, parent_mod)
+        keys = member_keys_cached(stmt, parent_mod)
         if isinstance(stmt, YangChoiceStmt):
             if keys & data.keys():
                 return keys & data.keys()
