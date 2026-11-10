@@ -7,6 +7,7 @@ from __future__ import annotations
 import re
 
 from . import keywords as kw
+from .dispatch_registry import DISPATCH_REGISTRY
 
 from types import SimpleNamespace
 from typing import Any, Callable, Optional, TYPE_CHECKING, cast
@@ -94,24 +95,9 @@ class StatementParsers:
         self._deviation_parser = DeviationStatementParser(self)
         self._typedef_parser = TypedefStatementParser(self)
         ensure_builtin_extensions_loaded()
-        # Substatements allowed inside ``prefix:extension { ... }`` (e.g. RFC 8791 ``structure``).
-        self._extension_invocation_stmt = {
-            kw.IF_FEATURE: self.parse_if_feature_stmt,
-            kw.WHEN: self.parse_when,
-            kw.MUST: self.parse_must,
-            kw.DESCRIPTION: self.parse_description,
-            kw.REFERENCE: self.parse_reference,
-            kw.TYPE: self.parse_type,
-            kw.USES: self.parse_uses,
-            kw.LEAF: self.parse_leaf,
-            kw.LEAF_LIST: self.parse_leaf_list,
-            kw.CONTAINER: self.parse_container,
-            kw.LIST: self.parse_list,
-            kw.CHOICE: self.parse_choice,
-            kw.CASE: self.parse_case,
-            kw.ANYDATA: self.parse_anydata,
-            kw.ANYXML: self.parse_anyxml,
-        }
+        #: ``revision-date`` captured while parsing an ``include { ... }`` body.
+        self._include_revision_date: Optional[str] = None
+        self._runtime_dispatch = self._build_runtime_dispatch()
 
     # ------------------------------------------------------------------
     # Small helpers for common patterns
@@ -148,6 +134,206 @@ class StatementParsers:
         """Resolve a handler from a keyword-keyed map; non-identifier peek types never match."""
         key = self.dispatch_key(tokens)
         return dispatch.get(key) if isinstance(key, str) else None
+
+    def handler_for(self, parent: str, keyword: str) -> Optional[Callable[..., Any]]:
+        """Handler for *keyword* under *parent*, or ``None`` when the registry does not allow it."""
+        return self._runtime_dispatch[parent].get(keyword)
+
+    def dispatch_substatement(
+        self,
+        tokens: TokenStream,
+        context: ParserContext,
+        parent: str,
+        *handler_args: Any,
+        error_context: str | None = None,
+    ) -> None:
+        """One substatement of *parent*.
+
+        1. Call the handler when the keyword is in that parent's table.
+        2. Otherwise parse ``prefix:name`` as an extension invocation.
+        3. Otherwise skip an unsupported construct or raise ``YangSyntaxError``
+           naming the parent and the keyword.
+        """
+        label = parent if error_context is None else error_context
+        key = self.dispatch_key(tokens)
+        handler = self._runtime_dispatch[parent].get(key) if isinstance(key, str) else None
+        if handler is not None:
+            handler(tokens, context, *handler_args)
+            return
+        if self.is_prefixed_extension_start(tokens):
+            self.parse_prefixed_extension_statement(tokens, context)
+            return
+        self.skip_unsupported_or_raise_unknown_stmt(tokens, label)
+
+    def parse_body(
+        self,
+        tokens: TokenStream,
+        context: ParserContext,
+        parent: str,
+        *handler_args: Any,
+        error_context: str | None = None,
+    ) -> None:
+        """Parse every substatement until the closing ``}``."""
+        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
+            self.dispatch_substatement(
+                tokens,
+                context,
+                parent,
+                *handler_args,
+                error_context=error_context,
+            )
+
+    def _parse_discarded_description(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``description`` and drop it (import, include, if-feature)."""
+        self.parse_optional_description(tokens, context.push_parent(SimpleNamespace()))
+
+    def _parse_include_revision_date(self, tokens: TokenStream, _context: ParserContext) -> None:
+        self._include_revision_date = self._revision_parser.parse_revision_date_statement(tokens)
+
+    def _default_keyword_handlers(self) -> dict[str, Callable[..., Any]]:
+        mod = self._module_parser
+        return {
+            kw.LEAF: self.parse_leaf,
+            kw.LIST: self.parse_list,
+            kw.LEAF_LIST: self.parse_leaf_list,
+            kw.CONTAINER: self.parse_container,
+            kw.NOTIFICATION: self.parse_notification,
+            kw.RPC: self.parse_rpc,
+            kw.ANYDATA: self.parse_anydata,
+            kw.ANYXML: self.parse_anyxml,
+            kw.TYPEDEF: self.parse_typedef,
+            kw.GROUPING: self.parse_grouping,
+            kw.IMPORT: mod.parse_import_stmt,
+            kw.INCLUDE: mod.parse_include_stmt,
+            kw.REVISION: self.parse_revision,
+            kw.DESCRIPTION: self.parse_description,
+            kw.REFERENCE: self.parse_reference,
+            kw.FEATURE: self.parse_feature_stmt,
+            kw.IDENTITY: self.parse_identity,
+            kw.EXTENSION: self.parse_extension_stmt,
+            kw.AUGMENT: self.parse_augment,
+            kw.DEVIATION: self.parse_deviation,
+            kw.YANG_VERSION: mod.parse_yang_version,
+            kw.NAMESPACE: mod.parse_namespace,
+            kw.PREFIX: mod.parse_prefix,
+            kw.ORGANIZATION: mod.parse_organization,
+            kw.CONTACT: mod.parse_contact,
+            kw.TYPE: self.parse_type,
+            kw.UNITS: self.parse_units,
+            kw.DEFAULT: self.parse_leaf_default,
+            kw.STATUS: self.parse_status_ignored,
+            kw.CONFIG: self.parse_config,
+            kw.WHEN: self.parse_when,
+            kw.MUST: self.parse_must,
+            kw.IF_FEATURE: self.parse_if_feature_stmt,
+            kw.PRESENCE: self.parse_presence,
+            kw.USES: self.parse_uses,
+            kw.REFINE: self.parse_refine,
+            kw.CHOICE: self.parse_choice,
+            kw.CASE: self.parse_case,
+            kw.KEY: self.parse_list_key,
+            kw.UNIQUE: self.parse_list_unique,
+            kw.MIN_ELEMENTS: self.parse_min_elements,
+            kw.MAX_ELEMENTS: self.parse_max_elements,
+            kw.ORDERED_BY: self.parse_ordered_by,
+            kw.MANDATORY: self.parse_leaf_mandatory,
+            kw.INPUT: self.parse_input,
+            kw.OUTPUT: self.parse_output,
+        }
+
+    def _parent_handler_overrides(self) -> dict[str, dict[str, Callable[..., Any]]]:
+        mod = self._module_parser
+        typ = self._type_parser
+        bits = self._bits_parser
+        choice = self._choice_parser
+        refine = self._refine_parser
+        ident = self._identity_parser
+        ext = self._extension_parser
+        dev = self._deviation_parser
+
+        def drop_type_stmt(fn: Callable[..., Any]) -> Callable[..., Any]:
+            def wrapped(tokens: TokenStream, context: ParserContext, _type_stmt: Any) -> Any:
+                return fn(tokens, context)
+
+            return wrapped
+
+        return {
+            "import": {
+                kw.PREFIX: mod.parse_import_prefix_binding,
+                kw.DESCRIPTION: self._parse_discarded_description,
+                kw.REVISION_DATE: mod._parse_import_revision_date_binding,
+            },
+            "include": {
+                kw.PREFIX: mod.parse_prefix_value_stmt,
+                kw.DESCRIPTION: self._parse_discarded_description,
+                kw.REVISION_DATE: self._parse_include_revision_date,
+            },
+            "belongs-to": {kw.PREFIX: mod.parse_prefix_value_stmt},
+            "typedef": {kw.DEFAULT: self.parse_typedef_default},
+            "choice": {
+                kw.MANDATORY: choice.parse_choice_mandatory,
+                kw.DEFAULT: choice.parse_choice_default,
+            },
+            "refine": {
+                kw.MANDATORY: refine._parse_refine_mandatory,
+                kw.DEFAULT: refine._parse_refine_default,
+            },
+            "identity": {kw.BASE: ident._parse_identity_base},
+            "if-feature": {kw.DESCRIPTION: self._parse_discarded_description},
+            "must": {kw.ERROR_MESSAGE: self.parse_must_error_message},
+            "extension": {kw.ARGUMENT: ext._parse_extension_argument_stmt},
+            "argument": {kw.YIN_ELEMENT: ext._parse_extension_argument_yin_element},
+            "deviation": {kw.DEVIATE: dev.parse_deviate_substatement},
+            "pattern": {
+                kw.ERROR_MESSAGE: typ.parse_pattern_error_message,
+                kw.ERROR_APP_TAG: typ.parse_pattern_error_app_tag,
+                kw.MODIFIER: typ.parse_pattern_modifier,
+            },
+            "enum": {
+                kw.VALUE: typ.parse_enum_value,
+                kw.STATUS: typ.parse_enum_status,
+            },
+            "bit": {kw.POSITION: bits.parse_bit_position},
+            "type": {
+                kw.TYPE: drop_type_stmt(typ.parse_type),
+                kw.PATTERN: typ.parse_type_pattern,
+                kw.LENGTH: typ.parse_type_length,
+                kw.RANGE: typ.parse_type_range,
+                kw.FRACTION_DIGITS: typ.parse_type_fraction_digits,
+                kw.ENUM: typ.parse_type_enum,
+                kw.BIT: bits.parse_type_bit,
+                kw.PATH: typ.parse_type_path,
+                kw.REQUIRE_INSTANCE: typ.parse_type_require_instance,
+                kw.BASE: typ.parse_type_base,
+                kw.UNITS: drop_type_stmt(self.parse_units),
+                kw.DESCRIPTION: drop_type_stmt(self.parse_description),
+                kw.REFERENCE: drop_type_stmt(self.parse_reference),
+            },
+        }
+
+    def _build_runtime_dispatch(self) -> dict[str, dict[str, Callable[..., Any]]]:
+        defaults = self._default_keyword_handlers()
+        overrides = self._parent_handler_overrides()
+        runtime: dict[str, dict[str, Callable[..., Any]]] = {}
+        for parent, spec in DISPATCH_REGISTRY.items():
+            over = overrides.get(parent, {})
+            extra = set(over) - spec.keywords
+            if extra:
+                raise RuntimeError(
+                    f"handler override for keywords not allowed under {parent}: {sorted(extra)}"
+                )
+            table: dict[str, Callable[..., Any]] = {}
+            missing: list[str] = []
+            for keyword in spec.keywords:
+                handler = over.get(keyword, defaults.get(keyword))
+                if handler is None:
+                    missing.append(keyword)
+                else:
+                    table[keyword] = handler
+            if missing:
+                raise RuntimeError(f"no handler for {parent}: {sorted(missing)}")
+            runtime[parent] = table
+        return runtime
 
     def _skip_unsupported_if_present(self, tokens: TokenStream, context: str) -> bool:
         """If the next token starts deviation/extension/rpc/..., skip it and warn. Returns True if skipped."""
@@ -217,27 +403,12 @@ class StatementParsers:
         inv_name: str,
     ) -> None:
         """One substatement inside ``prefix:extension { ... }`` (after the opening ``{``)."""
-        unsupported = f"extension invocation '{inv_name}'"
-        if self.is_prefixed_extension_start(tokens):
-            self.parse_prefixed_extension_statement(tokens, context)
-            return
-        token_value = tokens.peek()
-        if token_value == kw.ANYDATA:
-            self.parse_anydata(tokens, context)
-            return
-        if token_value == kw.ANYXML:
-            self.parse_anyxml(tokens, context)
-            return
-        handler = (
-            self._extension_invocation_stmt.get(token_value)
-            if token_value is not None
-            else None
+        self.dispatch_substatement(
+            tokens,
+            context,
+            "extension-invocation",
+            error_context=f"extension invocation '{inv_name}'",
         )
-        if handler:
-            handler(tokens, context)
-            return
-        if self.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-            return
 
     def is_prefixed_extension_start(self, tokens: TokenStream) -> bool:
         """Return True only for ``IDENTIFIER ':' IDENTIFIER`` starts."""

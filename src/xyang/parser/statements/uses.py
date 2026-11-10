@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import Optional, TYPE_CHECKING
 
-from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangGroupingStmt, YangUsesStmt
 from ...refine_expand import apply_refines_by_path, copy_yang_statement
@@ -24,28 +23,6 @@ class UsesStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._uses_substatement_dispatch = with_metadata_substatements(
-            self._parsers,
-            {
-                kw.WHEN: self._parsers.parse_when,
-                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-                kw.REFINE: self._parsers.parse_refine,
-                kw.AUGMENT: self._parsers.parse_augment,
-            },
-        )
-
-    def _parse_uses_substatement(
-        self, tokens: TokenStream, context: ParserContext, grouping_name: str
-    ) -> None:
-        """One substatement inside ``uses { ... }``."""
-        unsupported = f"uses '{grouping_name}'"
-        handler = self._parsers.substatement_handler(tokens, self._uses_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-        elif self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-            return
 
     def parse_uses(
         self, tokens: TokenStream, context: ParserContext
@@ -69,8 +46,9 @@ class UsesStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(uses_stmt)
             label = uses_stmt.grouping_qname()
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_uses_substatement(tokens, new_context, label)
+            self._parsers.parse_body(
+                tokens, new_context, "uses", error_context=f"uses '{label}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         self._parsers.add_to_parent_or_module(context, uses_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

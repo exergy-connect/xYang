@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- **Parser keyword dispatch:** `parser/dispatch-registry` is the same parent → substatement table as Python. Statement bodies use it, so an unknown keyword under `typedef`, `leaf`, and the other parents raises `YangSyntaxError` naming the parent and the keyword. A prefixed extension under `typedef` parses. Import and include still skip an unknown body statement instead of raising ([#121](https://github.com/exergy-connect/xYang/issues/121)).
+
 ### Fixed
 
 - **Validation:** a string leaf or leaf-list entry reports every restriction violation, in Python's order: `length`, then each failing `pattern`, then `enum`. `TypeChecker.validate` returns `(code, message)` pairs and `DocumentValidator` records each pair, so those codes are not inferred with `codeForMessage`. `TypeSystem.validate` remains `[boolean, string | null]` and is a thin wrapper that returns the first message (`TypeSystem.issues` returns the full list). The shared case `length and pattern both violated` passes ([#119](https://github.com/exergy-connect/xYang/issues/119)).

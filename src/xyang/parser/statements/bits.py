@@ -26,28 +26,22 @@ class BitsStatementParser:
         tokens.consume(kw.BIT)
         bit_name = tokens.consume()
         bit_stmt = YangBitStmt(name=bit_name, position=None)
-        explicit_pos: Optional[int] = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
             bit_ctx = context.push_parent(bit_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                pt = self._parsers.dispatch_key(tokens)
-                if pt == kw.POSITION:
-                    tokens.consume(kw.POSITION)
-                    if explicit_pos is not None:
-                        raise tokens.make_error("Duplicate position in bit statement")
-                    explicit_pos = int(tokens.consume_type(YangTokenType.INTEGER))
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif pt == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, bit_ctx)
-                elif pt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, bit_ctx)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "bit"
-                ):
-                    pass
+            self._parsers.parse_body(tokens, bit_ctx, "bit", error_context="bit")
             tokens.consume_type(YangTokenType.RBRACE)
-        bit_stmt.position = explicit_pos
         type_stmt.bits.append(bit_stmt)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_bit_position(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``position`` under ``bit`` (RFC 7950 §9.7.4)."""
+        tokens.consume(kw.POSITION)
+        parent = context.current_parent
+        if isinstance(parent, YangBitStmt) and parent.position is not None:
+            raise tokens.make_error("Duplicate position in bit statement")
+        pos = int(tokens.consume_type(YangTokenType.INTEGER))
+        if isinstance(parent, YangBitStmt):
+            parent.position = pos
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def finalize_bits_type(self, type_stmt: YangTypeStmt, tokens: TokenStream) -> None:

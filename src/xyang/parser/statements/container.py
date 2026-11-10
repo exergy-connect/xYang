@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
-from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangContainerStmt
 
@@ -21,37 +20,6 @@ class ContainerStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._container_substatement_dispatch = with_data_node_substatements(
-            self._parsers,
-            {
-            kw.PRESENCE: self._parsers.parse_presence,
-            kw.WHEN: self._parsers.parse_when,
-            kw.MUST: self._parsers.parse_must,
-            kw.LEAF: self._parsers.parse_leaf,
-            kw.CONTAINER: self._parsers.parse_container,
-            kw.LIST: self._parsers.parse_list,
-            kw.LEAF_LIST: self._parsers.parse_leaf_list,
-            kw.USES: self._parsers.parse_uses,
-            kw.GROUPING: self._parsers.parse_grouping,
-            kw.CHOICE: self._parsers.parse_choice,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.ANYDATA: self._parsers.parse_anydata,
-            kw.ANYXML: self._parsers.parse_anyxml,
-            kw.NOTIFICATION: self._parsers.parse_notification,
-            },
-        )
-
-    def _parse_container_substatement(
-        self, tokens: TokenStream, context: ParserContext, container_name: str
-    ) -> None:
-        unsupported = f"container '{container_name}'"
-        handler = self._parsers.substatement_handler(tokens, self._container_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-        elif self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-            return
 
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
         """Parse container statement."""
@@ -67,7 +35,12 @@ class ContainerStatementParser:
                         f"Infinite loop detected at token: {tokens.peek()}"
                     )
                 prev_index = tokens.index
-                self._parse_container_substatement(tokens, new_context, container_name)
+                self._parsers.dispatch_substatement(
+                    tokens,
+                    new_context,
+                    "container",
+                    error_context=f"container '{container_name}'",
+                )
             if tokens.has_more() and tokens.peek_type() == YangTokenType.RBRACE:
                 tokens.consume_type(YangTokenType.RBRACE)
         self._parsers.add_to_parent_or_module(context, container_stmt)

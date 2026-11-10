@@ -9,7 +9,6 @@ from typing import TYPE_CHECKING
 
 from .. import keywords as kw
 from ..parser_context import TokenStream, ParserContext, YangTokenType
-from ..unsupported_skip import is_unsupported_construct_start, skip_unsupported_construct
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -51,19 +50,7 @@ class RevisionStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             body = SimpleNamespace(description="", reference="")
             body_ctx = context.push_parent(body)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek() == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, body_ctx)
-                    continue
-                if tokens.peek() == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, body_ctx)
-                    continue
-                if is_unsupported_construct_start(tokens):
-                    skip_unsupported_construct(tokens, context="revision")
-                    continue
-                raise tokens.make_error(
-                    f"Unknown statement in revision: {tokens.peek()!r}"
-                )
+            self._parsers.parse_body(tokens, body_ctx, "revision", error_context="revision")
             tokens.consume_type(YangTokenType.RBRACE)
             revision["description"] = body.description
             revision["reference"] = body.reference

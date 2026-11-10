@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
-from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangIdentityStmt
 from ...identifier_ref import identifier_ref
@@ -22,25 +21,6 @@ class IdentityStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._identity_substatement_dispatch = with_metadata_substatements(
-            self._parsers,
-            {
-                kw.BASE: self._parse_identity_base,
-                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            },
-        )
-
-    def _parse_identity_substatement(
-        self, tokens: TokenStream, context: ParserContext, identity_name: str
-    ) -> None:
-        unsupported = f"identity '{identity_name}'"
-        handler = self._parsers.substatement_handler(tokens, self._identity_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-        elif self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-            return
 
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse identity statement."""
@@ -50,8 +30,9 @@ class IdentityStatementParser:
         if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             tokens.consume_type(YangTokenType.LBRACE)
             new_context = context.push_parent(identity_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_identity_substatement(tokens, new_context, identity_name)
+            self._parsers.parse_body(
+                tokens, new_context, "identity", error_context=f"identity '{identity_name}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         context.module.identities[identity_name] = identity_stmt
         tokens.consume_if_type(YangTokenType.SEMICOLON)

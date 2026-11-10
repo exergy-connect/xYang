@@ -21,19 +21,11 @@ export class RevisionStatementParser {
       reference: "",
     };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek() === kw.DESCRIPTION) {
-          tokens.consume(kw.DESCRIPTION);
-          rev.description = tokens.consume_type(YangTokenType.STRING);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (tokens.peek() === kw.REFERENCE) {
-          tokens.consume(kw.REFERENCE);
-          rev.reference = this.parsers.parse_string_argument(tokens);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else {
-          this.parsers.parseStatement(tokens, context);
-        }
-      }
+      const body = { description: "", reference: "" };
+      const child = context.push_parent(body);
+      this.parsers.parseBody(tokens, child, "revision", "revision");
+      rev.description = body.description;
+      rev.reference = body.reference;
       tokens.consume_type(YangTokenType.RBRACE);
     }
     ((context.module as any).revisions ??= []).push(rev);

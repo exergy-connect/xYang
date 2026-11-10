@@ -29,20 +29,9 @@ class ExtensionStatementParser:
         ext = YangExtensionStmt(name=name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(ext)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers.dispatch_key(tokens)
-                if tt == kw.ARGUMENT:
-                    self._parse_extension_argument_stmt(tokens, new_context)
-                elif tt == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, new_context)
-                elif tt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, new_context)
-                elif tt == kw.IF_FEATURE:
-                    self._parsers.parse_if_feature_stmt(tokens, new_context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, f"extension '{name}'"
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, new_context, "extension", error_context=f"extension '{name}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         cb = get_extension_apply_callback(
@@ -74,13 +63,9 @@ class ExtensionStatementParser:
         if isinstance(parent, YangExtensionStmt):
             parent.argument_name = arg
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek() == kw.YIN_ELEMENT:
-                    self._parse_extension_argument_yin_element(tokens, context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "extension argument"
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, context, "argument", error_context="extension argument"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

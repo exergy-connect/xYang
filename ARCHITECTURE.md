@@ -6,6 +6,7 @@ Key learnings for agents: [`docs/KEY-LEARNINGS.md`](docs/KEY-LEARNINGS.md).
 
 | To change | Look in |
 |---|---|
+| Parser keyword dispatch | `parser/dispatch_registry` (Python) / `parser/dispatch-registry` (TS) |
 | Built-in type JSON encoding | `types/registry` |
 | JSON Schema export | `json/generator` |
 | JSON Schema import | `json/parser` |

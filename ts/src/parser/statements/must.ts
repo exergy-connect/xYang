@@ -13,13 +13,7 @@ export class MustStatementParser {
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek() === kw.ERROR_MESSAGE) {
-          this.parse_must_error_message(tokens, child);
-        } else {
-          this.parsers.parseStatement(tokens, child);
-        }
-      }
+      this.parsers.parseBody(tokens, child, "must", "must");
       tokens.consume_type(YangTokenType.RBRACE);
     }
 

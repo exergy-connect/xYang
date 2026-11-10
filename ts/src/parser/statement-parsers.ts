@@ -15,6 +15,7 @@ import {
 import { formatIdentifierRef } from "../core/identifier-ref";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { YangModule, YangStatement } from "../core/model";
+import { DISPATCH_REGISTRY } from "./dispatch-registry";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
 import {
   AnydataStatementParser,
@@ -48,6 +49,8 @@ import {
   skip_status_substatement,
   skip_unsupported_construct
 } from "./unsupported-skip";
+
+type DispatchFn = (tokens: TokenStream, context: ParserContext, ...args: any[]) => void;
 
 /** Options for {@link StatementParsers.parseStatement} to restrict valid statement starts in nested contexts (e.g. RFC 7950 `case-stmt`). */
 export type ParseStatementOptions = {
@@ -131,6 +134,12 @@ export class StatementParsers {
   readonly typedef_parser = new TypedefStatementParser(this);
   readonly uses_parser = new UsesStatementParser(this);
   readonly when_parser = new WhenStatementParser(this);
+
+  /** Captures ``prefix`` / ``revision-date`` while an ``import`` body is open. */
+  importAcc: { localPrefix?: string; revisionDate?: string } | undefined;
+  /** ``revision-date`` captured while an ``include`` body is open. */
+  includeRevisionDate: string | undefined;
+  private runtimeDispatch: Record<string, Record<string, DispatchFn>> = {};
 
   private readonly statementKeywordHandlers: Partial<
     Record<string | YangTokenType, (tokens: TokenStream, context: ParserContext) => YangStatement>
@@ -256,6 +265,7 @@ export class StatementParsers {
   } = {}) {
     this.importResolver = options.importResolver;
     this.includeResolver = options.includeResolver;
+    this.runtimeDispatch = this.buildRuntimeDispatch();
   }
 
   /** Parse a ``submodule`` file into *context* (the including module). */
@@ -332,13 +342,29 @@ export class StatementParsers {
     if (options?.allowedStatementStarts) {
       this.assertStatementStartAllowed(tokens, options.allowedStatementStarts, options.restrictionContext);
     }
-    const kw = this.dispatch_key(tokens);
+    const parent = context.dispatch_parent;
+    if (parent) {
+      const key = this.dispatch_key(tokens);
+      const allowed = DISPATCH_REGISTRY[parent]?.keywords;
+      if (typeof key === "string" && allowed?.has(key)) {
+        const allowedHandler = this.statementKeywordHandlers[key];
+        if (allowedHandler) {
+          return allowedHandler(tokens, context);
+        }
+        return this.parse_statement_generic(tokens, context);
+      }
+      if (this.is_prefixed_extension_start(tokens)) {
+        return this.parse_prefixed_extension_statement(tokens, context);
+      }
+      this.skip_unsupported_or_raise_unknown(tokens, context.dispatch_error ?? parent);
+    }
 
-    if (tokens.peek_type() === YangTokenType.IDENTIFIER && tokens.peek_type_at(1) === YangTokenType.COLON) {
+    if (this.is_prefixed_extension_start(tokens)) {
       return this.parse_prefixed_extension_statement(tokens, context);
     }
 
-    const handler = this.statementKeywordHandlers[kw];
+    const key = this.dispatch_key(tokens);
+    const handler = this.statementKeywordHandlers[key];
     if (handler) {
       return handler(tokens, context);
     }
@@ -406,6 +432,10 @@ export class StatementParsers {
       tokens.syntaxError(
         `'${peek}' is only valid as a substatement of 'rpc' or 'action' (RFC 7950)`
       );
+    }
+
+    if (context.dispatch_parent) {
+      this.skip_unsupported_or_raise_unknown(tokens, context.dispatch_error ?? context.dispatch_parent);
     }
 
     const first = tokens.consume();
@@ -524,6 +554,391 @@ export class StatementParsers {
     return undefined;
   }
 
+  is_prefixed_extension_start(tokens: TokenStream): boolean {
+    return (
+      tokens.peek_type_at(0) === YangTokenType.IDENTIFIER &&
+      tokens.peek_type_at(1) === YangTokenType.COLON &&
+      tokens.peek_type_at(2) === YangTokenType.IDENTIFIER
+    );
+  }
+
+  handlerFor(parent: string, keyword: string): DispatchFn | undefined {
+    return this.runtimeDispatch[parent]?.[keyword];
+  }
+
+  dispatchSubstatement(
+    tokens: TokenStream,
+    context: ParserContext,
+    parent: string,
+    errorContext: string,
+    ...handlerArgs: unknown[]
+  ): void {
+    const key = this.dispatch_key(tokens);
+    const handler = typeof key === "string" ? this.runtimeDispatch[parent]?.[key] : undefined;
+    if (handler) {
+      handler(tokens, context, ...handlerArgs);
+      return;
+    }
+    if (this.is_prefixed_extension_start(tokens)) {
+      this.parse_prefixed_extension_statement(tokens, context);
+      return;
+    }
+    this.skip_unsupported_or_raise_unknown(tokens, errorContext);
+  }
+
+  parseBody(
+    tokens: TokenStream,
+    context: ParserContext,
+    parent: string,
+    errorContext: string,
+    ...handlerArgs: unknown[]
+  ): void {
+    while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
+      this.dispatchSubstatement(tokens, context, parent, errorContext, ...handlerArgs);
+    }
+  }
+
+  private parseDiscardedDescription(tokens: TokenStream, context: ParserContext): void {
+    this.parse_optional_description(tokens, context.push_parent({}));
+  }
+
+  private buildRuntimeDispatch(): Record<string, Record<string, DispatchFn>> {
+    const drop = (fn: (tokens: TokenStream, context: ParserContext) => void): DispatchFn =>
+      (tokens, context) => {
+        fn(tokens, context);
+      };
+    const mod = this.module_parser;
+    const typ = this.type_parser;
+    const bits = this.bits_parser;
+    const choice = this.choice_parser;
+    const defaults: Record<string, DispatchFn> = {
+      [kw.LEAF]: (t, c) => {
+        this.leaf_parser.parse_leaf(t, c);
+      },
+      [kw.LIST]: (t, c) => {
+        this.list_parser.parse_list(t, c);
+      },
+      [kw.LEAF_LIST]: (t, c) => {
+        this.leaf_list_parser.parse_leaf_list(t, c);
+      },
+      [kw.CONTAINER]: (t, c) => {
+        this.container_parser.parse_container(t, c);
+      },
+      [kw.NOTIFICATION]: (t, c) => {
+        this.notification_parser.parse_notification(t, c);
+      },
+      [kw.RPC]: (t, c) => {
+        this.rpc_parser.parse_rpc(t, c);
+      },
+      [kw.ANYDATA]: (t, c) => {
+        this.anydata_parser.parse_anydata(t, c);
+      },
+      [kw.ANYXML]: (t, c) => {
+        this.anyxml_parser.parse_anyxml(t, c);
+      },
+      [kw.TYPEDEF]: (t, c) => {
+        this.typedef_parser.parse_typedef(t, c);
+      },
+      [kw.GROUPING]: (t, c) => {
+        this.grouping_parser.parse_grouping(t, c);
+      },
+      [kw.IMPORT]: (t, c) => {
+        mod.parse_import_stmt(t, c);
+      },
+      [kw.INCLUDE]: (t, c) => {
+        mod.parse_include_stmt(t, c);
+      },
+      [kw.REVISION]: (t, c) => {
+        this.revision_parser.parse_revision(t, c);
+      },
+      [kw.DESCRIPTION]: (t, c) => {
+        this.parse_description(t, c);
+      },
+      [kw.REFERENCE]: (t, c) => {
+        this.parse_reference(t, c);
+      },
+      [kw.FEATURE]: (t, c) => {
+        this.feature_parser.parse_feature_stmt(t, c);
+      },
+      [kw.IDENTITY]: (t, c) => {
+        this.identity_parser.parse_identity(t, c);
+      },
+      [kw.EXTENSION]: (t, c) => {
+        this.extension_parser.parse_extension_stmt(t, c);
+      },
+      [kw.AUGMENT]: (t, c) => {
+        this.augment_parser.parse_augment(t, c);
+      },
+      [kw.DEVIATION]: (t, c) => {
+        this.deviation_parser.parse_deviation(t, c);
+      },
+      [kw.YANG_VERSION]: (t, c) => {
+        mod.parse_yang_version(t, c);
+      },
+      [kw.NAMESPACE]: (t, c) => {
+        mod.parse_namespace(t, c);
+      },
+      [kw.PREFIX]: (t, c) => {
+        mod.parse_prefix(t, c);
+      },
+      [kw.ORGANIZATION]: (t, c) => {
+        mod.parse_organization(t, c);
+      },
+      [kw.CONTACT]: (t, c) => {
+        mod.parse_contact(t, c);
+      },
+      [kw.TYPE]: (t, c) => {
+        this.type_parser.parse_type(t, c);
+      },
+      [kw.UNITS]: (t, c) => {
+        this.parse_units(t, c);
+      },
+      [kw.DEFAULT]: (t, c) => {
+        this.parse_leaf_default(t, c);
+      },
+      [kw.STATUS]: (t, c) => {
+        this.parse_status_ignored(t, c);
+      },
+      [kw.CONFIG]: (t, c) => {
+        this.parse_config(t, c);
+      },
+      [kw.WHEN]: (t, c) => {
+        this.when_parser.parse_when(t, c);
+      },
+      [kw.MUST]: (t, c) => {
+        this.must_parser.parse_must(t, c);
+      },
+      [kw.IF_FEATURE]: (t, c) => {
+        this.feature_parser.parse_if_feature_stmt(t, c);
+      },
+      [kw.PRESENCE]: (t, c) => {
+        this.parse_presence(t, c);
+      },
+      [kw.USES]: (t, c) => {
+        this.uses_parser.parse_uses(t, c);
+      },
+      [kw.REFINE]: (t, c) => {
+        this.refine_parser.parse_refine(t, c);
+      },
+      [kw.CHOICE]: (t, c) => {
+        this.choice_parser.parse_choice(t, c);
+      },
+      [kw.CASE]: (t, c) => {
+        this.choice_parser.parse_case(t, c);
+      },
+      [kw.KEY]: (t, c) => {
+        this.parse_list_key(t, c);
+      },
+      [kw.UNIQUE]: (t, c) => {
+        this.parse_list_unique(t, c);
+      },
+      [kw.MIN_ELEMENTS]: (t, c) => {
+        this.parse_min_elements(t, c);
+      },
+      [kw.MAX_ELEMENTS]: (t, c) => {
+        this.parse_max_elements(t, c);
+      },
+      [kw.ORDERED_BY]: (t) => {
+        this.parse_ordered_by(t);
+      },
+      [kw.MANDATORY]: (t, c) => {
+        this.parse_leaf_mandatory(t, c);
+      },
+      [kw.INPUT]: (t, c) => {
+        this.rpc_parser.parse_input(t, c);
+      },
+      [kw.OUTPUT]: (t, c) => {
+        this.rpc_parser.parse_output(t, c);
+      }
+    };
+    const importPrefix: DispatchFn = (tokens) => {
+      tokens.consume(kw.PREFIX);
+      const acc = this.importAcc;
+      if (!acc) {
+        tokens.syntaxError("internal: import prefix outside import block");
+        return;
+      }
+      acc.localPrefix =
+        tokens.peek_type() === YangTokenType.STRING
+          ? tokens.consume_type(YangTokenType.STRING)
+          : tokens.consume_type(YangTokenType.IDENTIFIER);
+      tokens.consume_if_type(YangTokenType.SEMICOLON);
+    };
+    const importRevision: DispatchFn = (tokens) => {
+      const acc = this.importAcc;
+      if (!acc) {
+        tokens.syntaxError("internal: revision-date outside import block");
+        return;
+      }
+      acc.revisionDate = this.revision_parser.parse_revision_date_statement(tokens);
+    };
+    const overrides: Record<string, Record<string, DispatchFn>> = {
+      import: {
+        [kw.PREFIX]: importPrefix,
+        [kw.DESCRIPTION]: (t, c) => {
+          this.parseDiscardedDescription(t, c);
+        },
+        [kw.REVISION_DATE]: importRevision
+      },
+      include: {
+        [kw.PREFIX]: (t) => {
+          mod.parse_prefix_value_stmt(t);
+        },
+        [kw.DESCRIPTION]: (t, c) => {
+          this.parseDiscardedDescription(t, c);
+        },
+        [kw.REVISION_DATE]: (t) => {
+          this.includeRevisionDate = this.revision_parser.parse_revision_date_statement(t);
+        }
+      },
+      "belongs-to": {
+        [kw.PREFIX]: (t) => {
+          mod.parse_prefix_value_stmt(t);
+        }
+      },
+      typedef: {
+        [kw.DEFAULT]: (t, c) => {
+          this.parse_typedef_default(t, c);
+        }
+      },
+      choice: {
+        [kw.MANDATORY]: (t, c) => {
+          choice.parse_choice_mandatory(t, c);
+        },
+        [kw.DEFAULT]: (t, c) => {
+          choice.parse_choice_default(t, c);
+        }
+      },
+      refine: {
+        [kw.MANDATORY]: (t, c) => {
+          this.parse_leaf_mandatory(t, c);
+        },
+        [kw.DEFAULT]: (t, c) => {
+          this.parse_leaf_default(t, c);
+        }
+      },
+      identity: {
+        [kw.BASE]: (t, c) => {
+          this.identity_parser.parse_identity_base(t, c);
+        }
+      },
+      "if-feature": {
+        [kw.DESCRIPTION]: (t, c) => {
+          this.parseDiscardedDescription(t, c);
+        }
+      },
+      must: {
+        [kw.ERROR_MESSAGE]: (t, c) => {
+          this.must_parser.parse_must_error_message(t, c);
+        }
+      },
+      extension: {
+        [kw.ARGUMENT]: (t, c) => {
+          this.extension_parser.parse_extension_argument_stmt(t, c);
+        }
+      },
+      argument: {
+        [kw.YIN_ELEMENT]: (t, c) => {
+          this.extension_parser.parse_yin_element(t, c);
+        }
+      },
+      deviation: {
+        [kw.DEVIATE]: (t, c) => {
+          this.deviation_parser.parse_deviate_substatement(t, c);
+        }
+      },
+      pattern: {
+        [kw.ERROR_MESSAGE]: (t, c) => {
+          typ.parse_pattern_error_message(t, c);
+        },
+        [kw.ERROR_APP_TAG]: (t, c) => {
+          typ.parse_pattern_error_app_tag(t, c);
+        },
+        [kw.MODIFIER]: (t, c) => {
+          typ.parse_pattern_modifier(t, c);
+        }
+      },
+      enum: {
+        [kw.VALUE]: (t, c) => {
+          typ.parse_enum_value(t, c);
+        },
+        [kw.STATUS]: (t, c) => {
+          typ.parse_enum_status(t, c);
+        }
+      },
+      bit: {
+        [kw.POSITION]: (t, c) => {
+          bits.parse_bit_position(t, c);
+        }
+      },
+      type: {
+        [kw.TYPE]: (t, c, typeStmt: YangTypeStmt) => {
+          const nested = typ.parse_type(t, c);
+          typeStmt.types.push(nested);
+        },
+        [kw.PATTERN]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_pattern(t, c, typeStmt);
+        },
+        [kw.LENGTH]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_length(t, c, typeStmt);
+        },
+        [kw.RANGE]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_range(t, c, typeStmt);
+        },
+        [kw.FRACTION_DIGITS]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_fraction_digits(t, c, typeStmt);
+        },
+        [kw.ENUM]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_enum(t, c, typeStmt);
+        },
+        [kw.BIT]: (t, c, typeStmt: YangTypeStmt) => {
+          bits.parse_type_bit(t, c, typeStmt);
+        },
+        [kw.PATH]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_path(t, c, typeStmt);
+        },
+        [kw.REQUIRE_INSTANCE]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_require_instance(t, c, typeStmt);
+        },
+        [kw.BASE]: (t, c, typeStmt: YangTypeStmt) => {
+          typ.parse_type_base(t, c, typeStmt);
+        },
+        [kw.UNITS]: drop((t, c) => {
+          this.parse_units(t, c);
+        }),
+        [kw.DESCRIPTION]: drop((t, c) => {
+          this.parse_description(t, c);
+        }),
+        [kw.REFERENCE]: drop((t, c) => {
+          this.parse_reference(t, c);
+        })
+      }
+    };
+    const runtime: Record<string, Record<string, DispatchFn>> = {};
+    for (const [parent, spec] of Object.entries(DISPATCH_REGISTRY)) {
+      const over = overrides[parent] ?? {};
+      const table: Record<string, DispatchFn> = {};
+      const missing: string[] = [];
+      for (const keyword of spec.keywords) {
+        const handler = over[keyword] ?? defaults[keyword];
+        if (!handler) {
+          missing.push(keyword);
+        } else {
+          table[keyword] = handler;
+        }
+      }
+      const extra = Object.keys(over).filter((keyword) => !spec.keywords.has(keyword));
+      if (extra.length > 0) {
+        throw new Error(`handler override for keywords not allowed under ${parent}: ${extra.sort().join(", ")}`);
+      }
+      if (missing.length > 0) {
+        throw new Error(`no handler for ${parent}: ${missing.sort().join(", ")}`);
+      }
+      runtime[parent] = table;
+    }
+    return runtime;
+  }
+
   skip_unsupported_or_raise_unknown(tokens: TokenStream, context: string): boolean {
     const peek = tokens.peek();
     if (peek === kw.INPUT || peek === kw.OUTPUT) {
@@ -534,8 +949,8 @@ export class StatementParsers {
     if (this.skip_unsupported_if_present(tokens, context)) {
       return true;
     }
-    const bad = tokens.peek() ?? "<eof>";
-    tokens.syntaxError(`Invalid or unknown statement '${bad}' in ${context}`);
+    const bad = tokens.peek() ?? "";
+    tokens.syntaxError(`Invalid or unknown statement in ${context}: '${bad}'`);
   }
 
   parse_prefixed_extension_statement_public(tokens: TokenStream, context: ParserContext): void {
@@ -587,8 +1002,9 @@ export class StatementParsers {
     tokens.consume_type(YangTokenType.LBRACE);
 
     const moduleStatements: YangStatement[] = [];
+    const scoped = context.with_dispatch("module", "module body");
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-      const stmt = this.parseStatement(tokens, context);
+      const stmt = this.parseStatement(tokens, scoped);
       if (stmt.keyword !== "include") {
         moduleStatements.push(stmt);
       }
@@ -1133,9 +1549,12 @@ export class StatementParsers {
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const childContext = context.push_parent(invocation);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parseStatement(tokens, childContext);
-      }
+      this.parseBody(
+        tokens,
+        childContext,
+        "extension-invocation",
+        `extension invocation '${invocation.name}'`
+      );
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);

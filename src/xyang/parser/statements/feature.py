@@ -28,21 +28,9 @@ class FeatureStatementParser:
         if tokens.consume_if_type(YangTokenType.LBRACE):
             holder = SimpleNamespace(if_features=[], description="", reference="")
             feat_ctx = context.push_parent(holder)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers.dispatch_key(tokens)
-                if tt == kw.DESCRIPTION:
-                    self._parsers.parse_optional_description(tokens, feat_ctx)
-                    continue
-                if tt == kw.IF_FEATURE:
-                    self._parsers.parse_if_feature_stmt(tokens, feat_ctx)
-                    continue
-                if tt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, feat_ctx)
-                    continue
-                if self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, f"feature '{name}'"
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, feat_ctx, "feature", error_context=f"feature '{name}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
             if holder.if_features:
                 if name in context.module.feature_if_features:
@@ -66,19 +54,8 @@ class FeatureStatementParser:
             if isinstance(feats, list):
                 feats.append(expression)
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                tt = self._parsers.dispatch_key(tokens)
-                if tt == kw.DESCRIPTION:
-                    self._parsers.parse_optional_description(
-                        tokens, context.push_parent(SimpleNamespace())
-                    )
-                    continue
-                if tt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, context)
-                    continue
-                if self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "if-feature substatement"
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, context, "if-feature", error_context="if-feature substatement"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

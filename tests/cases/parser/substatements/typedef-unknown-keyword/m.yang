@@ -1,0 +1,14 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef t {
+    type string;
+    not-a-keyword "x";
+  }
+
+  leaf top {
+    type t;
+  }
+}

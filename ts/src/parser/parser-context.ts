@@ -386,6 +386,10 @@ export class ParserContext {
   module: unknown;
   current_parent: ParserContextParent;
   source_dir?: string;
+  /** Parent name from the keyword dispatch registry, when this context is a statement body. */
+  dispatch_parent?: string;
+  /** Text used in ``Invalid or unknown statement in …``. */
+  dispatch_error?: string;
 
   constructor(init: { module: unknown; current_parent: ParserContextParent; source_dir?: string }) {
     this.module = init.module;
@@ -399,5 +403,13 @@ export class ParserContext {
       current_parent: parent,
       source_dir: this.source_dir
     });
+  }
+
+  /** Copy of this context whose ``parseStatement`` calls use *parent*'s allow-list. */
+  with_dispatch(parent: string, errorContext: string): ParserContext {
+    const next = this.push_parent(this.current_parent);
+    next.dispatch_parent = parent;
+    next.dispatch_error = errorContext;
+    return next;
   }
 }

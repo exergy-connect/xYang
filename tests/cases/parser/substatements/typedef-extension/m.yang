@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  extension ext {
+    argument arg;
+  }
+
+  typedef t {
+    type string;
+    m:ext "note";
+  }
+
+  leaf top {
+    type t;
+  }
+}

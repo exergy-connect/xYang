@@ -28,11 +28,12 @@ export class SubmoduleStatementParser {
     tokens.consume(kw.SUBMODULE);
     (context.module as any).name = tokens.consume_type(YangTokenType.IDENTIFIER);
     tokens.consume_type(YangTokenType.LBRACE);
+    const scoped = context.with_dispatch("submodule", "submodule body");
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
       if (tokens.peek() === kw.BELONGS_TO) {
         this.parse_belongs_to(tokens, context);
       } else {
-        const stmt = this.parsers.parseStatement(tokens, context);
+        const stmt = this.parsers.parseStatement(tokens, scoped);
         if (!INCLUDED_STATEMENT_SKIP.has(stmt.keyword ?? "")) {
           this.parsers.pushIncludedStatement(context, stmt);
         }
@@ -45,13 +46,7 @@ export class SubmoduleStatementParser {
     tokens.consume(kw.BELONGS_TO);
     (context.module as any).belongs_to_module = tokens.consume_type(YangTokenType.IDENTIFIER);
     tokens.consume_type(YangTokenType.LBRACE);
-    while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-      if (tokens.peek() === kw.PREFIX) {
-        this.module_parser.parse_prefix_value_stmt(tokens);
-      } else {
-        this.parsers.parseStatement(tokens, context);
-      }
-    }
+    this.parsers.parseBody(tokens, context, "belongs-to", "belongs-to");
     tokens.consume_type(YangTokenType.RBRACE);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

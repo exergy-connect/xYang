@@ -1,7 +1,6 @@
 import * as kw from "../keywords";
 import { YangCaseStmt, YangChoiceStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
-import { withDataNodeSubstatements } from "../metadata-substatements";
 import type { StatementParsers } from "../statement-parsers";
 
 const INLINE_CHOICE_SCHEMA_KEYS = new Set([
@@ -15,60 +14,7 @@ const INLINE_CHOICE_SCHEMA_KEYS = new Set([
 ]);
 
 export class ChoiceStatementParser {
-  private readonly choiceSubstatementDispatch: Record<string, (tokens: TokenStream, context: ParserContext) => void>;
-  private readonly caseSubstatementDispatch: Record<string, (tokens: TokenStream, context: ParserContext) => void>;
-
-  constructor(private readonly parsers: StatementParsers) {
-    this.choiceSubstatementDispatch = withDataNodeSubstatements(this.parsers, {
-      [kw.WHEN]: (tokens, context) => {
-        this.parsers.when_parser.parse_when(tokens, context);
-      },
-      [kw.IF_FEATURE]: (tokens, context) => {
-        this.parsers.feature_parser.parse_if_feature_stmt(tokens, context);
-      },
-      [kw.CASE]: (tokens, context) => {
-        this.parse_case(tokens, context);
-      },
-      [kw.MANDATORY]: (tokens, context) => {
-        this.parse_choice_mandatory(tokens, context);
-      },
-      [kw.DEFAULT]: (tokens, context) => {
-        this.parse_choice_default(tokens, context);
-      }
-    });
-    this.caseSubstatementDispatch = withDataNodeSubstatements(this.parsers, {
-      [kw.WHEN]: (tokens, context) => {
-        this.parsers.when_parser.parse_when(tokens, context);
-      },
-      [kw.IF_FEATURE]: (tokens, context) => {
-        this.parsers.feature_parser.parse_if_feature_stmt(tokens, context);
-      },
-      [kw.USES]: (tokens, context) => {
-        this.parsers.uses_parser.parse_uses(tokens, context);
-      },
-      [kw.LEAF]: (tokens, context) => {
-        this.parsers.leaf_parser.parse_leaf(tokens, context);
-      },
-      [kw.CONTAINER]: (tokens, context) => {
-        this.parsers.container_parser.parse_container(tokens, context);
-      },
-      [kw.LIST]: (tokens, context) => {
-        this.parsers.list_parser.parse_list(tokens, context);
-      },
-      [kw.LEAF_LIST]: (tokens, context) => {
-        this.parsers.leaf_list_parser.parse_leaf_list(tokens, context);
-      },
-      [kw.ANYDATA]: (tokens, context) => {
-        this.parsers.anydata_parser.parse_anydata(tokens, context);
-      },
-      [kw.ANYXML]: (tokens, context) => {
-        this.parsers.anyxml_parser.parse_anyxml(tokens, context);
-      },
-      [kw.CHOICE]: (tokens, context) => {
-        this.parse_choice(tokens, context);
-      }
-    });
-  }
+  constructor(private readonly parsers: StatementParsers) {}
 
   parse_choice(tokens: TokenStream, context: ParserContext): YangChoiceStmt {
     tokens.consume(kw.CHOICE);
@@ -88,22 +34,12 @@ export class ChoiceStatementParser {
   }
 
   private parse_choice_substatement(tokens: TokenStream, context: ParserContext, choiceName: string): void {
-    const unsupported = `choice '${choiceName}'`;
-    const handler = this.parsers.substatement_handler(tokens, this.choiceSubstatementDispatch);
-    if (handler) {
-      handler(tokens, context);
-      return;
-    }
     const key = this.parsers.dispatch_key(tokens);
     if (typeof key === "string" && INLINE_CHOICE_SCHEMA_KEYS.has(key)) {
       this.parse_choice_implicit_case(tokens, context);
       return;
     }
-    if (tokens.peek_type() === YangTokenType.IDENTIFIER && tokens.peek_type_at(1) === YangTokenType.COLON) {
-      this.parsers.parse_prefixed_extension_statement_public(tokens, context);
-      return;
-    }
-    this.parsers.skip_unsupported_or_raise_unknown(tokens, unsupported);
+    this.parsers.dispatchSubstatement(tokens, context, "choice", `choice '${choiceName}'`);
   }
 
   private parse_choice_implicit_case(tokens: TokenStream, context: ParserContext): void {
@@ -113,7 +49,8 @@ export class ChoiceStatementParser {
     }
     const caseStmt = new YangCaseStmt({ name: "" });
     const caseCtx = context.push_parent(caseStmt);
-    const handler = this.parsers.substatement_handler(tokens, this.caseSubstatementDispatch);
+    const key = this.parsers.dispatch_key(tokens);
+    const handler = typeof key === "string" ? this.parsers.handlerFor("case", key) : undefined;
     if (!handler) {
       tokens.syntaxError(`internal: unsupported implicit choice schema '${String(tokens.peek())}'`);
     }
@@ -136,9 +73,7 @@ export class ChoiceStatementParser {
     const stmt = new YangCaseStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parse_case_substatement(tokens, child, name);
-      }
+      this.parsers.parseBody(tokens, child, "case", `case '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     const parent = context.current_parent as YangChoiceStmt;
@@ -149,23 +84,6 @@ export class ChoiceStatementParser {
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     return stmt;
-  }
-
-  private parse_case_substatement(tokens: TokenStream, context: ParserContext, caseName: string): void {
-    const unsupported = `case '${caseName}'`;
-    const handler = this.parsers.substatement_handler(tokens, this.caseSubstatementDispatch);
-    if (handler) {
-      handler(tokens, context);
-      return;
-    }
-    if (tokens.peek_type() === YangTokenType.IDENTIFIER && tokens.peek_type_at(1) === YangTokenType.COLON) {
-      this.parsers.parse_prefixed_extension_statement_public(tokens, context);
-      return;
-    }
-    if (this.parsers.skip_unsupported_if_present(tokens, unsupported)) {
-      return;
-    }
-    this.parsers.skip_unsupported_or_raise_unknown(tokens, unsupported);
   }
 
   parse_choice_mandatory(tokens: TokenStream, context: ParserContext): void {

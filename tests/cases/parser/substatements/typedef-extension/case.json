@@ -1,0 +1,7 @@
+{
+  "description": "A prefixed extension is legal inside a typedef body (#121).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "leaf still validates", "data": { "top": "x" }, "valid": true }
+  ]
+}

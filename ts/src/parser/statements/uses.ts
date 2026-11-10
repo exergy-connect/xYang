@@ -24,9 +24,7 @@ export class UsesStatementParser {
     });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "uses", `uses '${grouping_name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     this.parsers.add_to_parent_or_module(context, stmt);

@@ -1,3 +1,4 @@
+import { DISPATCH_REGISTRY } from "../dispatch-registry";
 import * as kw from "../keywords";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { YangSemanticError } from "../../core/errors";
@@ -10,8 +11,9 @@ export class ModuleStatementParser {
     tokens.consume(kw.MODULE);
     (context.module as any).name = tokens.consume_type(YangTokenType.IDENTIFIER);
     tokens.consume_type(YangTokenType.LBRACE);
+    const scoped = context.with_dispatch("module", "module body");
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-      this.parsers.parseStatement(tokens, context);
+      this.parsers.parseStatement(tokens, scoped);
     }
     tokens.consume_type(YangTokenType.RBRACE);
   }
@@ -59,22 +61,23 @@ export class ModuleStatementParser {
     let localPrefix: string | undefined;
     let revisionDate: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = this.parsers.dispatch_key(tokens);
-        if (tt === kw.PREFIX) {
-          tokens.consume(kw.PREFIX);
-          localPrefix = tokens.peek_type() === YangTokenType.STRING
-            ? tokens.consume_type(YangTokenType.STRING)
-            : tokens.consume_type(YangTokenType.IDENTIFIER);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-          continue;
+      const acc: { localPrefix?: string; revisionDate?: string } = {};
+      this.parsers.importAcc = acc;
+      try {
+        while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
+          const tt = this.parsers.dispatch_key(tokens);
+          if (typeof tt === "string" && DISPATCH_REGISTRY.import!.keywords.has(tt)) {
+            this.parsers.dispatchSubstatement(tokens, context, "import", "import");
+          } else {
+            // Known drift: unknown import body statements are skipped, not raised.
+            this.skip_nested_statement(tokens);
+          }
         }
-        if (tt === kw.REVISION_DATE) {
-          revisionDate = this.parsers.revision_parser.parse_revision_date_statement(tokens);
-          continue;
-        }
-        this.skip_nested_statement(tokens);
+      } finally {
+        this.parsers.importAcc = undefined;
       }
+      localPrefix = acc.localPrefix;
+      revisionDate = acc.revisionDate;
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -92,13 +95,18 @@ export class ModuleStatementParser {
         : tokens.consume_type(YangTokenType.IDENTIFIER);
     let revisionDate: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
+      this.parsers.includeRevisionDate = undefined;
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (this.parsers.dispatch_key(tokens) === kw.REVISION_DATE) {
-          revisionDate = this.parsers.revision_parser.parse_revision_date_statement(tokens);
-          continue;
+        const tt = this.parsers.dispatch_key(tokens);
+        if (typeof tt === "string" && DISPATCH_REGISTRY.include!.keywords.has(tt)) {
+          this.parsers.dispatchSubstatement(tokens, context, "include", "include");
+        } else {
+          // Known drift: unknown include body statements are skipped, not raised.
+          this.skip_nested_statement(tokens);
         }
-        this.skip_nested_statement(tokens);
       }
+      revisionDate = this.parsers.includeRevisionDate;
+      this.parsers.includeRevisionDate = undefined;
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);

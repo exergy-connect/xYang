@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
-from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import YangAnyxmlStmt
 
@@ -21,15 +20,6 @@ class AnyxmlStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._anyxml_body_dispatch = with_data_node_substatements(
-            self._parsers,
-            {
-                kw.WHEN: self._parsers.parse_when,
-                kw.MUST: self._parsers.parse_must,
-                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-                kw.MANDATORY: self._parsers.parse_leaf_mandatory,
-            },
-        )
 
     def parse_anyxml(
         self, tokens: TokenStream, context: ParserContext
@@ -40,14 +30,9 @@ class AnyxmlStatementParser:
         anyxml_stmt = YangAnyxmlStmt(name=anyxml_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(anyxml_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self._parsers.substatement_handler(tokens, self._anyxml_body_dispatch)
-                if handler:
-                    handler(tokens, new_context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, f"anyxml '{anyxml_name}'"
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, new_context, "anyxml", error_context=f"anyxml '{anyxml_name}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         self._parsers.add_to_parent_or_module(context, anyxml_stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

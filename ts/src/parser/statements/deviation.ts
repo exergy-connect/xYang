@@ -21,26 +21,18 @@ export class DeviationStatementParser {
     } catch (err) {
       throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
     }
-    const holder: { description: string; reference: string } = { description: "", reference: "" };
-    let notSupported = false;
+    const holder: { description: string; reference: string; not_supported: boolean; target_path: string } = {
+      description: "",
+      reference: "",
+      not_supported: false,
+      target_path: path
+    };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const body = context.push_parent(holder);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const peek = tokens.peek();
-        if (peek === kw.DESCRIPTION) {
-          this.parsers.parse_description(tokens, body);
-        } else if (peek === kw.REFERENCE) {
-          this.parsers.parse_reference(tokens, body);
-        } else if (peek === kw.DEVIATE) {
-          if (this.parseDeviate(tokens, path)) {
-            notSupported = true;
-          }
-        } else if (!this.parsers.skip_unsupported_or_raise_unknown(tokens, "deviation")) {
-          /* unreachable */
-        }
-      }
+      this.parsers.parseBody(tokens, body, "deviation", "deviation");
       tokens.consume_type(YangTokenType.RBRACE);
     }
+    const notSupported = holder.not_supported;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     const stmt: YangStatement = new YangStatement({
       keyword: "deviation",
@@ -58,6 +50,13 @@ export class DeviationStatementParser {
       stmt.reference = holder.reference;
     }
     return stmt;
+  }
+
+  parse_deviate_substatement(tokens: TokenStream, context: ParserContext): void {
+    const holder = context.current_parent as { not_supported: boolean; target_path: string };
+    if (this.parseDeviate(tokens, holder.target_path)) {
+      holder.not_supported = true;
+    }
   }
 
   /** Returns true when the substatement is ``deviate not-supported``. */

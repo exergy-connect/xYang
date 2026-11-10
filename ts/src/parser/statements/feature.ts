@@ -12,9 +12,7 @@ export class FeatureStatementParser {
     const featParent = { if_features: [] as string[] };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(featParent);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "feature", `feature '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     if (featParent.if_features.length > 0) {
@@ -38,9 +36,7 @@ export class FeatureStatementParser {
       parent.if_features.push(expression);
     }
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, context);
-      }
+      this.parsers.parseBody(tokens, context, "if-feature", "if-feature substatement");
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
