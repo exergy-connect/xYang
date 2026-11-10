@@ -11,6 +11,19 @@ export type TypeCheckerOptions = {
 
 type TypedefShape = { type?: Record<string, unknown> };
 
+function hasTypeRestrictions(constraint?: Record<string, unknown>): boolean {
+  if (!constraint) {
+    return false;
+  }
+  if (typeof constraint.range === "string" && constraint.range.trim() !== "") {
+    return true;
+  }
+  if (typeof constraint.length === "string" && constraint.length.trim() !== "") {
+    return true;
+  }
+  return Array.isArray(constraint.patterns) && constraint.patterns.length > 0;
+}
+
 function asTypeRef(name: string, constraint?: Record<string, unknown>): YangIdentifierRef {
   const prefix =
     constraint && typeof constraint.prefix === "string" && constraint.prefix
@@ -104,6 +117,16 @@ export class TypeChecker {
         via = "direct";
         result = this.system.validate(value, typeName, merged);
       }
+    }
+
+    // A type that names a typedef may narrow it with its own range, length, or patterns.
+    // Each level of the chain checks its own restrictions after the base accepts the value.
+    if (result[0] && via === "typedef" && hasTypeRestrictions(constraint)) {
+      result = this.system.validate(
+        value,
+        this.resolveUnderlyingBuiltinName(typeName, constraint),
+        new TypeConstraint(constraint)
+      );
     }
 
     traceTypeValidation(this.typeValidationDebug, "TypeChecker.validate", {
