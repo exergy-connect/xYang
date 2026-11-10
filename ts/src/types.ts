@@ -97,6 +97,15 @@ export function integerLike(value: unknown): number | null {
   return null;
 }
 
+/** Exact decimal64 text. Distinct from a plain string so unions can tell them apart. */
+export class ExactDecimal {
+  constructor(readonly text: string) {}
+}
+
+const INT64_MIN = BigInt("-9223372036854775808");
+const INT64_MAX = BigInt("9223372036854775807");
+const UINT64_MAX = BigInt("18446744073709551615");
+
 function decimalLike(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value)) {
     return value;
@@ -115,6 +124,26 @@ function validateIntegerBuiltin(
   const bounds = YANG_INTEGER_BOUNDS[typeName];
   if (!bounds) {
     return [false, `Unsupported integer type '${typeName}'`];
+  }
+  if ((typeName === "int64" || typeName === "uint64") && typeof value === "string") {
+    return [false, `Expected ${typeName}`];
+  }
+  if (typeof value === "bigint" && (typeName === "int64" || typeName === "uint64")) {
+    const lo = typeName === "uint64" ? BigInt(0) : INT64_MIN;
+    const hi = typeName === "uint64" ? UINT64_MAX : INT64_MAX;
+    if (value < lo || value > hi) {
+      return [false, `Value ${value} is outside ${typeName}`];
+    }
+    if (range) {
+      const asNumber = Number(value);
+      if (!Number.isSafeInteger(asNumber) || !matchesRange(asNumber, range)) {
+        if (!Number.isSafeInteger(asNumber)) {
+          return [true, null];
+        }
+        return [false, `Integer ${value} does not match ${range}`];
+      }
+    }
+    return [true, null];
   }
   const n = integerLike(value);
   if (n === null) {
@@ -263,6 +292,26 @@ export class TypeSystem {
     }
 
     if (normalizedType === YangTokenType.DECIMAL64 || normalizedType === "number") {
+      if (typeof value === "string") {
+        return [false, "Expected number"];
+      }
+      if (value instanceof ExactDecimal) {
+        const text = value.text.trim();
+        const n = Number(text);
+        if (!Number.isFinite(n)) {
+          return [false, "Expected number"];
+        }
+        if (c.range && !matchesRange(n, c.range)) {
+          return [false, `Number ${n} does not match ${c.range}`];
+        }
+        if (typeof c.fraction_digits === "number" && text.includes(".")) {
+          const decimals = text.split(".")[1]?.length ?? 0;
+          if (decimals > c.fraction_digits) {
+            return [false, `Too many fraction digits (${decimals} > ${c.fraction_digits})`];
+          }
+        }
+        return [true, null];
+      }
       const n = decimalLike(value);
       if (n === null) {
         return [false, "Expected number"]; 

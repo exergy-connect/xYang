@@ -129,24 +129,28 @@ export class TypeChecker {
       );
     }
 
-    traceTypeValidation(this.typeValidationDebug, "TypeChecker.validate", {
-      module: this.module.name ?? "(anonymous)",
-      typeName,
-      via,
-      ok: result[0],
-      reason: result[1],
-      value: summarizeValue(value)
-    });
+    if (this.typeValidationDebug) {
+      traceTypeValidation(true, "TypeChecker.validate", {
+        module: this.module.name ?? "(anonymous)",
+        typeName,
+        via,
+        ok: result[0],
+        reason: result[1],
+        value: summarizeValue(value)
+      });
+    }
     return result;
   }
 
   /** Union members may name typedefs; validate through this checker so typedefs resolve. */
   private validateUnion(value: unknown, constraint: TypeConstraint): [boolean, string | null] {
-    traceTypeValidation(this.typeValidationDebug, "TypeChecker.validateUnion", {
-      module: this.module.name ?? "(anonymous)",
-      memberCount: constraint.types?.length ?? 0,
-      value: summarizeValue(value)
-    });
+    if (this.typeValidationDebug) {
+      traceTypeValidation(true, "TypeChecker.validateUnion", {
+        module: this.module.name ?? "(anonymous)",
+        memberCount: constraint.types?.length ?? 0,
+        value: summarizeValue(value)
+      });
+    }
     for (const member of constraint.types ?? []) {
       const memberObj = member as Record<string, unknown>;
       const memberName =

@@ -42,6 +42,8 @@ export type ValidateOptions = {
   features?: Record<string, readonly string[]> | null;
   /** Extra directories for ``import`` / ``include``. Used only when ``schema`` is a path. */
   includePath?: readonly string[];
+  /** Opt in to native dict-style JSON. Default is strict RFC 7951. */
+  nativeJson?: boolean;
 };
 
 function featureMap(
@@ -82,5 +84,5 @@ export function validate(schema: string | YangModule, data: unknown, options: Va
     throw new TypeError("schema must be a path or YangModule");
   }
   const validator = new YangValidator(module, enabled ? { enabledFeaturesByModule: enabled } : {});
-  return validator.validateDetailed(data);
+  return validator.validateDetailed(data, { nativeJson: options.nativeJson === true });
 }

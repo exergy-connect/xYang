@@ -51,7 +51,7 @@ when they share the schema.
 | `features` | Optional. Module name -> enabled feature names. Omitted: every declared feature is enabled. A module missing from the map keeps all its features. |
 | `schema_error` | Optional. `true` means loading the module must fail; the case then has no `instances`. Optional `code` is a substring the load error must contain, the same in every implementation. |
 | `xfail` | Optional, on the case or on an instance (instance entries override case entries). Implementation id (`python`, `ts`, `cli`) -> reason. |
-| `instances[].data` | The JSON instance document (RFC 7951). |
+| `instances[].data` | The JSON instance document. |
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
 
@@ -59,15 +59,17 @@ when they share the schema.
 
 An error is `{ "path", "code", "message"? }`:
 
-- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into `data`: list entries
-  and leaf-list items by position (`/top/items/1/v`, `/top/tags/0`), member names exactly as they
-  appear in the JSON (`/m:top/a`). The document root is `""`. Errors about a missing node point at
-  where it would be (`/top/name`). `choice` and `case` are not data nodes, so their errors point
-  at the parent data node (`/top`).
+- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the input as written.
+  RFC 7951 lists use array indexes (`/m:top/interface/0/mtu`). A native keyed list uses the dict
+  key (`/top/interface/eth0/mtu`). Member names are the ones in the JSON (`/m:top/a`, not a
+  rewritten `/top/a`). The document root is `""`. Errors about a missing node point at where it
+  would be (`/top/name`). `choice` and `case` are not data nodes, so their errors point at the
+  parent data node (`/top`).
 - **`code`** is one of `range`, `length`, `pattern`, `enum`, `union`, `type`, `must`, `when`,
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
-  `max-elements`, `duplicate-key`, `unknown-field`, `leafref`, `identityref`,
-  `instance-identifier`, `fraction-digits`, `bits`, `xpath-error`, `xpath-unknown-function`.
+  `max-elements`, `duplicate-key`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
+  `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
+  `xpath-error`, `xpath-unknown-function`.
   Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
@@ -92,8 +94,14 @@ not what one implementation happens to do.
    an `xfail` reason for the wrong one.
 4. When a shared case fully covers a per-language test, delete that test in both languages.
 
-Instance data uses xYang's simple (unqualified) top-level member names, which both libraries
-accept today. The RFC 7951 qualified form is covered in `encoding/qualified-names`.
+Instance data defaults to strict RFC 7951. Set `"encoding": "native"` on an instance for native
+JSON (`encoding/dict-style`). The two modes do not fall back to each other. Paths point into the
+input as written. Other `module` files in the case directory (not `submodule` files) are parsed
+after the primary module so their `augment` statements merge into it.
+
+`ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a native
+list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
+than one key was given as an object; multi-key lists are arrays only.
 
 ## CLI protocol
 

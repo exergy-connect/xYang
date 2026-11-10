@@ -156,7 +156,7 @@ module test {
     # Empty type in data: key present with value None; when "../enabled" must evaluate true
     data_enabled = {
         "data": {
-            "enabled": None,
+            "enabled": [None],
             "optional_section": {
                 "note": "enabled is set"
             }

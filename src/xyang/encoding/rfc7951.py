@@ -63,8 +63,27 @@ def instance_member_keys(stmt: YangStatement, parent_module_name: str) -> set[st
     return {f"{def_mod}:{local}"}
 
 
+def member_keys_cached(stmt: YangStatement, parent_module_name: str) -> frozenset[str]:
+    """Read-only ``instance_member_keys`` memoized on *stmt* for the hot validation paths.
+
+    The memo is keyed on everything the result depends on (parent module, name,
+    ``defining_module``), so a statement copied or restamped later recomputes it.
+    """
+    signature = (parent_module_name, stmt.name, getattr(stmt, "defining_module", None))
+    memo = getattr(stmt, "_xyang_member_keys", None)
+    if memo is not None and memo[0] == signature:
+        return memo[1]
+    keys = frozenset(instance_member_keys(stmt, parent_module_name))
+    try:
+        stmt._xyang_member_keys = (signature, keys)  # type: ignore[attr-defined]
+    except AttributeError:
+        pass
+    return keys
+
+
 def instance_member_present(data: Mapping[str, Any], stmt: YangStatement, parent_module_name: str) -> bool:
-    return bool(instance_member_keys(stmt, parent_module_name) & data.keys())
+    keys = member_keys_cached(stmt, parent_module_name)
+    return any(key in data for key in keys)
 
 
 def instance_member_lookup(
@@ -76,7 +95,7 @@ def instance_member_lookup(
   ``json_key`` is the key found in *data*, or ``None`` when the value comes from a
     schema default and is not present in *data*.
     """
-    for key in instance_member_keys(stmt, parent_module_name):
+    for key in member_keys_cached(stmt, parent_module_name):
         if key in data:
             return data[key], key
     return None, None

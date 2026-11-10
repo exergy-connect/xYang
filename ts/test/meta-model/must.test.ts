@@ -24,7 +24,7 @@ describe("python parity: meta-model/test_must", () => {
 
   it("allow_unlimited_fields_valid", () => {
     const data = dm({
-      allow_unlimited_fields: null,
+      allow_unlimited_fields: [null],
       entities: [
         ent(
           "big",
@@ -39,7 +39,7 @@ describe("python parity: meta-model/test_must", () => {
 
   it("allow_unlimited_fields_invalid", () => {
     const data = dm({
-      allow_unlimited_fields: null,
+      allow_unlimited_fields: [null],
       entities: [
         ent("small", "id", [fp("id", "integer", { description: "PK." }), fp("a", "string", { description: "A." })])
       ]

@@ -65,6 +65,7 @@ def validate(
     *,
     features: Mapping[str, Iterable[str]] | None = None,
     include_path: Iterable[str | Path] = (),
+    native_json: bool = False,
 ) -> dict[str, Any]:
     """Validate ``data`` against ``schema`` and return ``validate_detailed``'s dict.
 
@@ -83,4 +84,4 @@ def validate(
         module = parse_yang_file(schema, include_path=tuple(str(path) for path in includes))
     else:
         raise TypeError(f"schema must be a path or YangModule, got {type(schema).__name__}")
-    return YangValidator(module, enabled_features_by_module=enabled).validate_detailed(data)
+    return YangValidator(module, enabled_features_by_module=enabled).validate_detailed(data, native_json=native_json)

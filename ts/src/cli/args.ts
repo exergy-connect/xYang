@@ -13,6 +13,7 @@ export type ValidateCliArgs = CommonCliArgs & {
   format: "text" | "json";
   /** ``null`` enables every declared feature. */
   features: Record<string, string[]> | null;
+  nativeJson: boolean;
 };
 
 export function parseCommonArgs(rest: string[]): CommonCliArgs {
@@ -66,6 +67,7 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
   let anydataValidation: AnydataValidationCli = "off";
   let format: "text" | "json" = "text";
   let features: Record<string, string[]> | null = null;
+  let nativeJson = false;
 
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
@@ -75,6 +77,10 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
         throw new Error("Missing directory after --include-path");
       }
       includePaths.push(resolve(dir));
+      continue;
+    }
+    if (arg === "--native-json") {
+      nativeJson = true;
       continue;
     }
     if (arg === "--format") {
@@ -111,5 +117,5 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     positional.push(arg!);
   }
 
-  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features };
+  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson };
 }

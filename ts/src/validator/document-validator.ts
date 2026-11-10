@@ -3,7 +3,7 @@ import { YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
-import { resolveQualifiedTopLevel } from "../encoding";
+import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
 import {
   AnydataValidationConfig,
   AnydataValidationConfigInput,
@@ -208,6 +208,13 @@ export class DocumentValidator {
     return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
+  private pointerMap: Map<string, string> | null = null;
+
+  /** Map canonical walker pointers back to the input JSON as written. */
+  setPointerMap(pointerMap: Map<string, string> | null): void {
+    this.pointerMap = pointerMap;
+  }
+
   private collect(
     ctx: ValidationContext,
     data: unknown
@@ -247,6 +254,11 @@ export class DocumentValidator {
 
       if (ctx.constraintChecks) {
         this.rejectUnknownListItemKeys(ctx.module, root, "", errors);
+      }
+      if (this.pointerMap) {
+        for (const item of [...errors, ...warnings]) {
+          item.path = remapPointer(item.path, this.pointerMap);
+        }
       }
       return { errors, warnings };
     } finally {
@@ -396,15 +408,17 @@ export class DocumentValidator {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
           const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
-          traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf:full", {
-            path,
-            typeName,
-            leafTypeMode: this.ctx.leafTypeMode,
-            constraintChecks: this.ctx.constraintChecks,
-            ok,
-            reason,
-            value: summarizeValue(value)
-          });
+          if (this.ctx.typeValidationDebug) {
+            traceTypeValidation(true, "DocumentValidator.leaf:full", {
+              path,
+              typeName,
+              leafTypeMode: this.ctx.leafTypeMode,
+              constraintChecks: this.ctx.constraintChecks,
+              ok,
+              reason,
+              value: summarizeValue(value)
+            });
+          }
           if (!ok) {
             const message = reason ?? `invalid value for type ${typeName}`;
             errors.push(issue(path, codeForMessage(message) ?? "type", message));
@@ -437,15 +451,17 @@ export class DocumentValidator {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
             const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
-            traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf-list:full", {
-              path: `${path}[${i}]`,
-              typeName,
-              leafTypeMode: this.ctx.leafTypeMode,
-              constraintChecks: this.ctx.constraintChecks,
-              ok,
-              reason,
-              value: summarizeValue(value[i])
-            });
+            if (this.ctx.typeValidationDebug) {
+              traceTypeValidation(true, "DocumentValidator.leaf-list:full", {
+                path: `${path}[${i}]`,
+                typeName,
+                leafTypeMode: this.ctx.leafTypeMode,
+                constraintChecks: this.ctx.constraintChecks,
+                ok,
+                reason,
+                value: summarizeValue(value[i])
+              });
+            }
             if (!ok) {
               const message = reason ?? `invalid value for type ${typeName}`;
               errors.push(issue(`${path}[${i}]`, codeForMessage(message) ?? "type", message));

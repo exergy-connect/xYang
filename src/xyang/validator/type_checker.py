@@ -479,6 +479,11 @@ class TypeChecker:
         # Numeric strings stay accepted here (see #63); this check does not add a lenient mode.
         if isinstance(value, bool):
             return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+        # int64/uint64 JSON strings are decoded by the instance iterator in RFC mode.
+        # A leftover string is a native-mode string, not an integer (#63 still allows
+        # numeric strings for the smaller integer types).
+        if type_stmt.name in ("int64", "uint64") and isinstance(value, str):
+            return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
         if isinstance(value, int):
             n = value
         elif isinstance(value, float):
@@ -509,6 +514,9 @@ class TypeChecker:
     def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         # bool is a subclass of int; float(True) is 1.0 and must not pass as a number.
         if isinstance(value, bool):
+            return [_issue("type", f"Expected number, got {_json_type_name(value)}")]
+        # RFC decimal64 strings are decoded to Decimal before this check.
+        if isinstance(value, str):
             return [_issue("type", f"Expected number, got {_json_type_name(value)}")]
         try:
             n = float(value)
@@ -579,7 +587,8 @@ class TypeChecker:
         return []
 
     def _check_empty(self, value: Any) -> List[TypeIssue]:
-        if value not in (None, True, "", {}):
+        # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
+        if value is not None:
             return [_issue("type", f"Empty type leaf should have no value, got {value!r}")]
         return []
 

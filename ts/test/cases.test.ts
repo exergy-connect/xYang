@@ -1,12 +1,19 @@
 // Shared conformance cases (tests/cases, see README there) run against the TypeScript implementation.
 import { readdirSync, readFileSync } from "node:fs";
-import { dirname, join } from "node:path";
+import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { parseYangFile, YangValidator } from "../src";
+import { YangParser, YangValidator } from "../src";
 
 type Expected = { path: string; code: string; message?: string };
-type Instance = { name: string; data: unknown; valid: boolean; errors?: Expected[]; xfail?: Record<string, string> };
+type Instance = {
+  name: string;
+  data: unknown;
+  valid: boolean;
+  errors?: Expected[];
+  xfail?: Record<string, string>;
+  encoding?: string;
+};
 type Case = {
   module: string;
   features?: Record<string, string[]>;
@@ -19,11 +26,29 @@ type Case = {
 const CASES = join(dirname(fileURLToPath(import.meta.url)), "../../tests/cases");
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
 
+function loadCaseModule(dir: string, moduleFile: string) {
+  const parser = new YangParser({ include_path: [dir], expand_uses: true });
+  const primary = resolve(dir, moduleFile);
+  const module = parser.parseFile(primary);
+  for (const file of readdirSync(dir)) {
+    if (!file.endsWith(".yang") || resolve(dir, file) === primary) {
+      continue;
+    }
+    if (readFileSync(join(dir, file), "utf8").trimStart().startsWith("submodule")) {
+      continue;
+    }
+    parser.parseFile(join(dir, file));
+  }
+  return module;
+}
+
 function run(dir: string, c: Case, inst: Instance | undefined): void {
-  const module = parseYangFile(join(dir, c.module), { includePath: [dir] });
+  const module = loadCaseModule(dir, c.module);
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
-  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data);
+  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data, {
+    nativeJson: inst.encoding === "native"
+  });
   const expected = inst.errors ?? [];
   const got = new Set(errors.map((e) => `${e.path} ${e.code}`));
   expect([...got].sort(), `raw errors: ${JSON.stringify(errors)}`).toEqual(

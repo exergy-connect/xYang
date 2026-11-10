@@ -131,6 +131,8 @@ const validator = new YangValidator(module);
 const result = validator.validate({ "data-model": { name: "example", entities: [] } });
 ```
 
+Instance input (the JSON document, not the schema `.yang.json` file) is strict RFC 7951 unless you opt into native JSON. There is no fallback between the two. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. Native JSON (`--native-json`, Python `native_json=True`, TypeScript `{ nativeJson: true }`) allows a single-key list as an object keyed by the key value, JSON numbers for those 64-bit and decimal types, and `empty` as `null`. An iterator walks the input as written and yields one tree; error paths are JSON Pointers into that input (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
+
 ---
 
 ## Example: IETF YANG Push notification

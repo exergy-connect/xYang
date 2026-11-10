@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from xyang import YangValidator, parse_yang_file
+from xyang import YangValidator
+from xyang.parser.yang_parser import YangParser
 
 CASES = Path(__file__).parent / "cases"
 IMPLS = ["python"] + (["cli"] if os.environ.get("XYANG_CLI") else [])
@@ -38,7 +39,24 @@ def _params():
                 yield pytest.param(f.parent, case, inst, impl, id=f"{impl}:{cid}:{inst['name']}", marks=marks)
 
 
-def _validate(impl, case_dir, case, data):
+def _load_case_module(case_dir: Path, module: Path):
+    """Parse the case module. Other ``module`` files in the directory are loaded
+    afterwards so their ``augment`` statements merge into the cached primary module.
+    """
+    parser = YangParser(include_path=(case_dir,))
+    primary = module.resolve()
+    parsed = parser.parse_file(primary)
+    parser._module_cache[primary] = parsed
+    for sibling in sorted(case_dir.glob("*.yang")):
+        if sibling.resolve() == primary:
+            continue
+        if sibling.read_text(encoding="utf-8").lstrip().startswith("submodule"):
+            continue
+        parser.parse_file(sibling)
+    return parsed
+
+
+def _validate(impl, case_dir, case, data, *, native_json=False):
     """Returns [(json_pointer, code, message)]; raises if the schema is rejected."""
     module = case_dir / case["module"]
     if impl == "cli":
@@ -46,6 +64,8 @@ def _validate(impl, case_dir, case, data):
             json.dump(data, fh)
             data_path = fh.name
         cmd = [os.environ["XYANG_CLI"], "validate", "--format", "json", str(module), data_path]
+        if native_json:
+            cmd.insert(2, "--native-json")
         cmd += ["--include-path", str(case_dir), "--features", json.dumps(case.get("features"))]
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -59,10 +79,12 @@ def _validate(impl, case_dir, case, data):
             detail = (proc.stderr or proc.stdout).strip() or f"CLI exited {proc.returncode} without a validation result"
             raise RuntimeError(detail)
         return [(e["path"], e["code"], e.get("message", "")) for e in out["errors"]]
-    parsed = parse_yang_file(module, include_path=(str(case_dir),))
+    parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
-    result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(data)
+    result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
+        data, native_json=native_json
+    )
     return [(e["path"], e["code"], e.get("message", "")) for e in result["errors"]]
 
 
@@ -75,7 +97,7 @@ def test_case(case_dir, case, inst, impl):
             assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
-    raw = _validate(impl, case_dir, case, inst["data"])
+    raw = _validate(impl, case_dir, case, inst["data"], native_json=inst.get("encoding") == "native")
     got = sorted({(p, c) for p, c, _m in raw})
     assert got == sorted({(e["path"], e["code"]) for e in expected}), f"raw errors: {raw}"
     for exp in expected:

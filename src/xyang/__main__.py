@@ -37,10 +37,7 @@ def _add_include_path_argument(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=[],
         metavar="DIR",
-        help=(
-            "Directory to search for imported modules "
-            "(repeatable; after the main file's directory)"
-        ),
+        help=("Directory to search for imported modules " "(repeatable; after the main file's directory)"),
     )
 
 
@@ -184,6 +181,11 @@ def main() -> int:
         help="Output format: text (default) or json ({valid, errors} on stdout)",
     )
     validate_parser.add_argument(
+        "--native-json",
+        action="store_true",
+        help="Accept native dict-style JSON instead of strict RFC 7951 (default)",
+    )
+    validate_parser.add_argument(
         "--features",
         default=None,
         metavar="JSON",
@@ -310,12 +312,12 @@ def main() -> int:
             else:
                 data = json.load(sys.stdin)
             if args.format == "json":
-                result = validator.validate_detailed(data)
+                result = validator.validate_detailed(data, native_json=args.native_json)
                 for warning in result["warnings"]:
                     print(f"Warning: {warning['path']}: {warning['message']}", file=sys.stderr)
                 print(_json_validation_report(result))
                 return 0 if result["valid"] else 1
-            is_valid, errors, warnings = validator.validate(data)
+            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json)
             if is_valid:
                 print("Valid.")
                 for w in warnings:
