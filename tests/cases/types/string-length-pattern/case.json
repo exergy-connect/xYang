@@ -5,6 +5,8 @@
     { "name": "valid", "data": { "top": { "code": "abc", "no-digits": "x1", "two-patterns": "abc" } }, "valid": true },
     { "name": "too short", "data": { "top": { "code": "a" } }, "valid": false,
       "errors": [{ "path": "/top/code", "code": "length" }] },
+    { "name": "between length parts", "data": { "top": { "parts": "abc" } }, "valid": false,
+      "errors": [{ "path": "/top/parts", "code": "length" }] },
     { "name": "pattern is anchored", "data": { "top": { "code": "aB" } }, "valid": false,
       "errors": [{ "path": "/top/code", "code": "pattern" }] },
     { "name": "length and pattern both violated", "data": { "top": { "code": "ABCDEFG" } }, "valid": false,
