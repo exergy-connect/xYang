@@ -184,9 +184,9 @@ export class YangTokenizer {
         continue;
       }
 
-      const tok_type = PUNCTUATION.get(ch);
-      if (tok_type !== undefined) {
-        add_token(tok_type, ch, i, current_line, line_start);
+      // Python's str.isspace() skips other Unicode whitespace; match it.
+      if (!/\s/u.test(ch)) {
+        add_token(PUNCTUATION.get(ch) ?? YangTokenType.OTHER, ch, i, current_line, line_start);
       }
       advance();
     }

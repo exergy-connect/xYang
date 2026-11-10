@@ -53,6 +53,9 @@ class YangTokenType(Enum):
     INTEGER = "INTEGER"
     # Unquoted \d+(\.\d+)+ — e.g. yang-version 1.1; not an identifier per RFC 7950.
     DOTTED_NUMBER = "DOTTED_NUMBER"
+    # Any other non-whitespace character (``|``, ``@``, ``*``, …). Part of an
+    # unquoted argument (RFC 7950 §6.1.3); a parse error anywhere else.
+    OTHER = "OTHER"
 
 def diagnostic_source_lines(content: str) -> List[str]:
     """Split source on newlines for error snippets (verbatim text, comments included)."""

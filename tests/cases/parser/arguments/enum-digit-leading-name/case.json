@@ -1,0 +1,13 @@
+{
+  "description": "Unquoted enum names from huawei-ifm.yang (`enum 100GE`, `enum 50|100GE`) are one argument each (RFC 7950 §6.1.3, §9.6.4).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "100GE", "data": { "top": "100GE" }, "valid": true },
+    { "name": "50|100GE", "data": { "top": "50|100GE" }, "valid": true },
+    { "name": "Vlanif", "data": { "top": "Vlanif" }, "valid": true },
+    { "name": "split token GE is not an enum", "data": { "top": "GE" }, "valid": false,
+      "errors": [{ "path": "/top", "code": "enum" }] },
+    { "name": "split token 50 is not an enum", "data": { "top": "50" }, "valid": false,
+      "errors": [{ "path": "/top", "code": "enum" }] }
+  ]
+}
