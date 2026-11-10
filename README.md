@@ -46,7 +46,7 @@ The TypeScript CLI is also built as a single executable with [QuickJS-ng](https:
 
 This does not replace the Python package or the npm package. Those stay the supported library APIs.
 
-GitHub Release assets, and the **QuickJS binary** workflow artifacts, publish:
+A published GitHub Release attaches:
 
 | File | Platform |
 | --- | --- |
@@ -226,10 +226,9 @@ cd ts && npm install && npm test
 |----------|------|---------|
 | **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS |
 | **Build TypeScript CI artifacts** | [`.github/workflows/build-ts-dist.yml`](.github/workflows/build-ts-dist.yml) | Runs `npm run build:ci` and keeps committed build artifacts in sync |
-| **QuickJS binary** | [`.github/workflows/qjs-binary.yml`](.github/workflows/qjs-binary.yml) | Builds the QuickJS-ng `xyang-ts` executable (linux-x64, linux-arm64, macOS, Windows), smoke-tests it against the Node CLI, and uploads the binaries |
-| **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | Attaches those binaries to a published GitHub Release |
+| **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | On a published release, builds all five `xyang-ts` executables, smoke-tests the Linux binaries against the Node CLI, and attaches the files. Also runnable by hand (`workflow_dispatch`) without attaching anything |
 
-The TypeScript test and CI-artifact workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths). The QuickJS workflow also runs when `qjs/**` or `examples/**` change.
+The TypeScript test and CI-artifact workflows run on pushes to `main` and on pull requests that touch `ts/**` (and related paths). The QuickJS binaries are not built on those runs. The stdout flush is covered by the TypeScript test suite.
 
 ### Committed CI artifacts
 

@@ -60,11 +60,9 @@ cd ../qjs && ./smoke.sh dist/xyang-ts-linux-x64
 
 On a non-arm64 host, `./smoke.sh dist/xyang-ts-linux-arm64` runs the binary with `qemu-aarch64-static` when that interpreter is installed.
 
-## CI
+## Release
 
-[`.github/workflows/qjs-binary.yml`](../.github/workflows/qjs-binary.yml) builds every target on pull requests and on pushes to `main` that touch `qjs/`, `ts/`, or `examples/`. It smoke-tests the linux-x64 binary natively and the linux-arm64 binary under QEMU, then uploads `qjs/dist/` as the `xyang-ts-binaries` artifact.
-
-[`.github/workflows/qjs-release.yml`](../.github/workflows/qjs-release.yml) runs the same build when a GitHub Release is published and attaches the binaries to that release.
+Pull requests do not build these binaries. [`.github/workflows/qjs-release.yml`](../.github/workflows/qjs-release.yml) runs when a GitHub Release is published, and when someone starts it by hand. It builds all five targets, smoke-tests linux-x64 natively and linux-arm64 under QEMU against the Node CLI, and attaches the five files to that release. A manual run uploads the binaries as a workflow artifact and does not attach them to a release. macOS and Windows binaries are cross-compiled on the Linux runner and are not executed there.
 
 ## Usage
 
