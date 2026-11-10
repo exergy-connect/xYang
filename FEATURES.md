@@ -1,5 +1,17 @@
 # xYang Feature Set
 
+## Deviations from RFC 7950 / RFC 7951
+
+| Behavior | RFC says | xYang does | Code |
+| --- | --- | --- | --- |
+| XPath value lists `('a','b')` | YANG XPath is XPath 1.0, which has no literal sequences (an XPath 2.0 form) | A parenthesized list of string or number literals is one value. `=` is true when the left side equals any item. Only literals are allowed inside | `src/xyang/xpath/parser.py`, `ts/src/xpath/parser.ts` |
+| Case-insensitive function names | XPath 1.0 function names are case-sensitive | Names are folded with `lower()` / `toLowerCase()` before lookup | `src/xyang/xpath/evaluator.py`, `ts/src/xpath/evaluator.ts` |
+| Flat typedef scope | A typedef nested in a statement is visible only in that statement and its descendants | Every typedef is stored on the module map, so a typedef nested in a container is visible module-wide. Duplicate names are rejected; scoped shadowing is not modeled | `src/xyang/parser/statements/typedef.py`, `ts/src/parser/statements/typedef.ts` |
+| `action` and `deviate` | RFC 7950 includes `action` and `deviate` `not-supported`, `add`, `replace`, and `delete` | `action` is skipped with a warning and is not in the AST. `deviation` is parsed. `deviate not-supported` removes the target node, including across an `import`. `deviate add`, `replace`, and `delete` are skipped with a warning | `src/xyang/parser/unsupported_skip.py`, `src/xyang/parser/statements/deviation.py`, `ts/src/parser/unsupported-skip.ts`, `ts/src/parser/statements/deviation.ts` |
+| Unqualified top-level members | RFC 7951 requires a namespace-qualified name on each member of a top-level JSON object (`m:top`) | A top-level member may be unqualified (`top`) or qualified (`m:top`) | `src/xyang/encoding/instance.py`, `ts/src/encoding/instance.ts` |
+
+Other gaps are tracked as `xfail` entries in `tests/cases/`, listed with `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
+
 This document lists the YANG features implemented in xYang. Primary usage is reflected in `examples/meta-model.yang`; multi-module parsing and `if-feature` are also covered by dedicated tests (e.g. `tests/test_yangson_ex3_import.py`, `tests/test_if_feature.py`).
 
 ## Features Implemented
@@ -54,7 +66,8 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `refine` - Refine statements (modifies nodes from groupings)
 
 ### Instance data encodings
-- ✅ **JSON ([RFC 7951](https://www.rfc-editor.org/rfc/rfc7951))** — Validators consume dict/list instance trees in this shape. Core helper ``xyang.encoding.resolve_qualified_top_level`` (``encoding/rfc7951.py``) maps a namespace-qualified object member ``module-name:node`` to a top-level schema node in that module (used for optional anydata subtree validation and reusable elsewhere).
+- ✅ **JSON ([RFC 7951](https://www.rfc-editor.org/rfc/rfc7951))** — Validators consume dict/list instance trees in this shape. Core helper ``xyang.encoding.resolve_qualified_top_level`` (``encoding/rfc7951.py``) maps a namespace-qualified object member ``module-name:node`` to a top-level schema node in that module (used for optional anydata subtree validation and reusable elsewhere). RFC 7951 is the default.
+- ✅ **Native JSON** — Opt-in with `--native-json`, Python `native_json=True`, TypeScript `{ nativeJson: true }`, or case.json `"encoding": "native"`. Dict-style input: keyed objects for single-key lists, bare names, JSON numbers, and `null` for empty. Error paths point at the input as written. There is no fallback between the two encodings (`src/xyang/encoding/instance.py`, `ts/src/encoding/instance.ts`).
 - ⚠️ **XML** ([RFC 7950](https://www.rfc-editor.org/rfc/rfc7950) XML encoding) — Not supported yet for instance validation or qualified-name resolution.
 - ⚠️ **Binary encodings** (e.g. [RFC 9254](https://www.rfc-editor.org/rfc/rfc9254) CBOR) — Not supported yet.
 

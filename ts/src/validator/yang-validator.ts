@@ -1,3 +1,4 @@
+import { warnDeprecatedOnce } from "../core/deprecation";
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
 import { encodingErrors, iterInstance, projectInstance, remapPointer } from "../encoding";
@@ -47,7 +48,9 @@ export class YangValidator {
     this.documentValidator.enableExtension(extension, config);
   }
 
+  /** @deprecated use enableExtension */
   enable_extension(extension: ValidatorExtension, config: AnydataValidationConfigInput): void {
+    warnDeprecatedOnce("enable_extension", "enableExtension");
     this.enableExtension(extension, config);
   }
 

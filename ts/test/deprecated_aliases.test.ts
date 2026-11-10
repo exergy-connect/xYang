@@ -2,7 +2,7 @@ import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join, resolve } from "node:path";
 import { afterEach, describe, expect, it, vi } from "vitest";
-import { YangParser } from "../src";
+import { parseYangString, ValidatorExtension, YangParser, YangValidator } from "../src";
 import { YangLeafStmt, YangStatementList } from "../src/core/ast";
 
 describe("deprecated snake_case aliases (#72)", () => {
@@ -54,6 +54,28 @@ describe("deprecated snake_case aliases (#72)", () => {
     warn.mockClear();
     expect(list.find_statement("name")).toBe(leaf);
     expect(list.get_all_leaves()).toEqual([leaf]);
+    expect(warn).not.toHaveBeenCalled();
+  });
+
+  it("keeps enable_extension working as a one-time deprecated alias", () => {
+    const warn = vi.spyOn(console, "warn").mockImplementation(() => {});
+    const module = parseYangString(
+      'module m {\n  yang-version 1.1;\n  namespace "urn:m";\n  prefix m;\n}\n'
+    );
+    const validator = new YangValidator(module);
+    const enable = vi.spyOn(validator, "enableExtension");
+
+    validator.enable_extension(ValidatorExtension.ANYDATA_VALIDATION, { modules: [] });
+    expect(enable).toHaveBeenCalledWith(ValidatorExtension.ANYDATA_VALIDATION, { modules: [] });
+    const messages = warn.mock.calls.map((call) => String(call[0]));
+    expect(messages.some((message) => message.includes("enable_extension") && message.includes("enableExtension"))).toBe(
+      true
+    );
+
+    warn.mockClear();
+    enable.mockClear();
+    validator.enable_extension(ValidatorExtension.ANYDATA_VALIDATION, { modules: [] });
+    expect(enable).toHaveBeenCalledOnce();
     expect(warn).not.toHaveBeenCalled();
   });
 });
