@@ -128,6 +128,20 @@ export const YangTokenType = {
 
 export type YangTokenType = (typeof YangTokenType)[keyof typeof YangTokenType];
 
+/**
+ * True when `value` is one of `allowed`. `Array.includes` is typed to the
+ * array's element union, so it rejects a wider `YangTokenType` (which also
+ * includes punctuation such as "+"). Equality keeps the same check and narrows.
+ */
+export function hasTokenType<T extends YangTokenType>(value: string, allowed: readonly T[]): value is T {
+  for (const item of allowed) {
+    if (item === value) {
+      return true;
+    }
+  }
+  return false;
+}
+
 const PUNCTUATION = new Set<YangTokenType>([
   YangTokenType.LBRACE,
   YangTokenType.RBRACE,

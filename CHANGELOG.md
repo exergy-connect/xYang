@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **TypeScript:** `tsc --noEmit` passes again. `YangTokenType` is a const object whose type includes punctuation, so `Array.includes` and `YangTokenType.INPUT` in a type position failed. `hasTokenType` does the same membership check, and input/output parameters use `typeof YangTokenType.INPUT`. Validation and schema behavior are unchanged.
+
 ### Added
 
 - **Parser keyword dispatch:** one table per language maps each parent statement to the substatements it accepts (`parser/dispatch_registry` in Python, `parser/dispatch-registry` in TypeScript). Every statement body uses that table and one miss path: the parent's handler, a prefixed extension, or `YangSyntaxError` naming the parent and the keyword. TypeScript bodies that used to accept any keyword now reject the ones Python already rejected. A prefixed extension is accepted under parents that previously skipped that check, including `typedef` ([#121](https://github.com/exergy-connect/xYang/issues/121)).

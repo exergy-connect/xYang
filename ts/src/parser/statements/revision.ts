@@ -1,5 +1,5 @@
 import * as kw from "../keywords";
-import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
+import { hasTokenType, ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
 export class RevisionStatementParser {
@@ -11,7 +11,7 @@ export class RevisionStatementParser {
     if (tokens.peek_type() === YangTokenType.STRING) {
       date = tokens.consume_type(YangTokenType.STRING);
     } else {
-      while (tokens.has_more() && ![YangTokenType.LBRACE, YangTokenType.SEMICOLON].includes(tokens.peek_type())) {
+      while (tokens.has_more() && !hasTokenType(tokens.peek_type(), [YangTokenType.LBRACE, YangTokenType.SEMICOLON])) {
         date += tokens.consume();
       }
     }

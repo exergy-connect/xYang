@@ -1,5 +1,5 @@
 import { YangModule, YangStatement } from "../core/model";
-import { YangTokenType } from "../parser/parser-context";
+import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
@@ -238,7 +238,7 @@ export class DocumentValidator {
         }
         const keyword = this.effectiveKeyword(stmt);
         if (
-          ![
+          !hasTokenType(keyword, [
             YangTokenType.CONTAINER,
             YangTokenType.LIST,
             YangTokenType.LEAF,
@@ -246,7 +246,7 @@ export class DocumentValidator {
             YangTokenType.ANYDATA,
             YangTokenType.ANYXML,
             YangTokenType.CHOICE
-          ].includes(keyword as YangTokenType)
+          ])
         ) {
           continue;
         }
@@ -531,10 +531,10 @@ export class DocumentValidator {
         }
         return;
       }
-      if (stmt.name && [
+      if (stmt.name && hasTokenType(kw, [
         YangTokenType.CONTAINER, YangTokenType.LIST, YangTokenType.LEAF,
         YangTokenType.LEAF_LIST, YangTokenType.ANYDATA, YangTokenType.ANYXML
-      ].includes(kw as YangTokenType)) {
+      ])) {
         for (const key of this.instanceKeys(stmt)) {
           keys.add(key);
         }
@@ -656,14 +656,14 @@ export class DocumentValidator {
   private statementHasMatchingData(stmt: YangStatement, obj: Record<string, unknown>): boolean {
     const keyword = this.effectiveKeyword(stmt);
     if (
-      [
+      hasTokenType(keyword, [
         YangTokenType.LEAF,
         YangTokenType.LEAF_LIST,
         YangTokenType.CONTAINER,
         YangTokenType.LIST,
         YangTokenType.ANYDATA,
         YangTokenType.ANYXML
-      ].includes(keyword as YangTokenType)
+      ])
     ) {
       return this.instanceKeys(stmt).some((key) => obj[key] !== undefined);
     }
