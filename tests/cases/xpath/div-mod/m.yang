@@ -6,5 +6,6 @@ module m {
   container top {
     leaf divide { type int32; must ". div 2 = 1"; }
     leaf modulo { type int32; must ". mod 2 = 0"; }
+    leaf negmod { type int32; must ". mod 2 = -1"; }
   }
 }

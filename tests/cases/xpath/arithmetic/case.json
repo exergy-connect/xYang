@@ -1,11 +1,12 @@
 {
-  "description": "XPath 1.0 arithmetic operators + - *.",
+  "description": "XPath 1.0 arithmetic operators + - * are numeric (#48).",
   "module": "m.yang",
   "instances": [
     { "name": "+ and -", "data": { "top": { "plus": 2, "minus": 2 } }, "valid": true },
     { "name": "+ false", "data": { "top": { "plus": 5 } }, "valid": false,
       "errors": [{ "path": "/top/plus", "code": "must" }] },
-    { "name": "*", "data": { "top": { "times": 2 } }, "valid": true,
-      "xfail": { "python": "'*' is not a multiplication operator in the Python XPath evaluator (TS supports it)", "cli": "'*' is not a multiplication operator in the Python XPath evaluator (TS supports it)" } }
+    { "name": "*", "data": { "top": { "times": 2 } }, "valid": true },
+    { "name": "+ is numeric", "data": { "top": { "text": "a" } }, "valid": false,
+      "errors": [{ "path": "/top/text", "code": "must" }] }
   ]
 }
