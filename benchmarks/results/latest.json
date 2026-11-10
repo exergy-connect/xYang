@@ -1,11 +1,11 @@
 {
-  "schema_version": 1,
-  "generated_at": "2026-11-10T22:59:56+00:00",
+  "schema_version": 2,
+  "generated_at": "2026-11-10T23:51:44+00:00",
   "smoke": false,
   "environment": {
     "git": {
-      "commit": "9c923c03e5bd97b52402a161a357fdb936031577",
-      "describe": "v0.1.11-34-g9c923c0",
+      "commit": "7cf6c9e3934905ed913a432e795d72cbebe03a3e",
+      "describe": "v0.1.11-41-g7cf6c9e",
       "dirty": false,
       "release_tag": null
     },
@@ -72,55 +72,69 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 101.93835749998925,
-          "min": 99.47318299998642,
-          "max": 104.70757799998864
+          "median": 107.03914550003901,
+          "min": 105.73280000016894,
+          "max": 109.34570900008111
         },
         "peak_rss_mib": {
-          "median": 17.171875,
-          "min": 17.15234375,
-          "max": 17.1953125
+          "median": 17.1953125,
+          "min": 17.1484375,
+          "max": 17.25
         },
         "rss_source": "VmHWM"
       },
       "workloads": {
         "small": {
           "parse": {
-            "processes": 3,
-            "warmup_per_process": 5,
-            "iterations_per_process": 30,
-            "iterations": 90,
-            "time_ms": {
-              "median": 7.831113,
-              "min": 7.631539,
-              "max": 10.541647
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 5,
+              "iterations_per_process": 30,
+              "iterations": 90,
+              "time_ms": {
+                "median": 8.1582485,
+                "min": 7.886511,
+                "max": 12.716759
+              }
             },
-            "peak_rss_mib": {
-              "median": 19.2734375,
-              "min": 19.2421875,
-              "max": 19.28515625
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 18.94921875,
+                "min": 18.921875,
+                "max": 18.95703125
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "modules": 1
             }
           },
           "validate": {
-            "processes": 3,
-            "warmup_per_process": 10,
-            "iterations_per_process": 50,
-            "iterations": 150,
-            "time_ms": {
-              "median": 4.1547515,
-              "min": 4.043588,
-              "max": 4.808923
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 10,
+              "iterations_per_process": 50,
+              "iterations": 150,
+              "time_ms": {
+                "median": 4.1787925,
+                "min": 4.06767,
+                "max": 4.430344
+              }
             },
-            "peak_rss_mib": {
-              "median": 19.0078125,
-              "min": 18.9765625,
-              "max": 19.01953125
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 19.0234375,
+                "min": 19.0,
+                "max": 19.078125
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "valid": true
             }
@@ -128,41 +142,55 @@
         },
         "large": {
           "parse": {
-            "processes": 3,
-            "warmup_per_process": 2,
-            "iterations_per_process": 10,
-            "iterations": 30,
-            "time_ms": {
-              "median": 41.772473500000004,
-              "min": 40.89191,
-              "max": 48.716982
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 2,
+              "iterations_per_process": 10,
+              "iterations": 30,
+              "time_ms": {
+                "median": 43.446092500000006,
+                "min": 42.914245,
+                "max": 49.227883
+              }
             },
-            "peak_rss_mib": {
-              "median": 22.73828125,
-              "min": 22.6875,
-              "max": 22.75
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 20.05859375,
+                "min": 20.02734375,
+                "max": 20.0625
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "modules": 4
             }
           },
           "validate": {
-            "processes": 3,
-            "warmup_per_process": 1,
-            "iterations_per_process": 5,
-            "iterations": 15,
-            "time_ms": {
-              "median": 1174.356982,
-              "min": 1127.951577,
-              "max": 1415.296073
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 1,
+              "iterations_per_process": 5,
+              "iterations": 15,
+              "time_ms": {
+                "median": 1207.012705,
+                "min": 1174.860995,
+                "max": 1293.661622
+              }
             },
-            "peak_rss_mib": {
-              "median": 100.875,
-              "min": 100.83984375,
-              "max": 100.87890625
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 100.7421875,
+                "min": 100.73828125,
+                "max": 100.7890625
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "valid": true
             }
@@ -174,55 +202,69 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 27.396996999982548,
-          "min": 24.50412900009269,
-          "max": 29.952626999943277
+          "median": 27.126791000000594,
+          "min": 25.161902000036207,
+          "max": 30.812886000148865
         },
         "peak_rss_mib": {
-          "median": 49.716796875,
-          "min": 49.6953125,
-          "max": 49.734375
+          "median": 49.92578125,
+          "min": 49.91015625,
+          "max": 49.9375
         },
         "rss_source": "VmHWM"
       },
       "workloads": {
         "small": {
           "parse": {
-            "processes": 3,
-            "warmup_per_process": 5,
-            "iterations_per_process": 30,
-            "iterations": 90,
-            "time_ms": {
-              "median": 8.344273999999999,
-              "min": 6.565233,
-              "max": 11.51459
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 5,
+              "iterations_per_process": 30,
+              "iterations": 90,
+              "time_ms": {
+                "median": 7.5145025,
+                "min": 6.525513,
+                "max": 9.472779
+              }
             },
-            "peak_rss_mib": {
-              "median": 138.00390625,
-              "min": 127.9453125,
-              "max": 138.46484375
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 66.8984375,
+                "min": 66.41796875,
+                "max": 67.70703125
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "modules": 1
             }
           },
           "validate": {
-            "processes": 3,
-            "warmup_per_process": 10,
-            "iterations_per_process": 50,
-            "iterations": 150,
-            "time_ms": {
-              "median": 0.5159015,
-              "min": 0.323707,
-              "max": 1.09486
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 10,
+              "iterations_per_process": 50,
+              "iterations": 150,
+              "time_ms": {
+                "median": 0.453685,
+                "min": 0.3425,
+                "max": 1.938602
+              }
             },
-            "peak_rss_mib": {
-              "median": 74.70703125,
-              "min": 73.9765625,
-              "max": 76.87109375
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 67.703125,
+                "min": 67.62109375,
+                "max": 68.140625
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "valid": true
             }
@@ -230,41 +272,55 @@
         },
         "large": {
           "parse": {
-            "processes": 3,
-            "warmup_per_process": 2,
-            "iterations_per_process": 10,
-            "iterations": 30,
-            "time_ms": {
-              "median": 27.955987,
-              "min": 26.240529,
-              "max": 36.286147
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 2,
+              "iterations_per_process": 10,
+              "iterations": 30,
+              "time_ms": {
+                "median": 26.454624,
+                "min": 25.100893,
+                "max": 51.71084
+              }
             },
-            "peak_rss_mib": {
-              "median": 145.58984375,
-              "min": 143.375,
-              "max": 147.04296875
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 79.98046875,
+                "min": 79.85546875,
+                "max": 81.87890625
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "modules": 4
             }
           },
           "validate": {
-            "processes": 3,
-            "warmup_per_process": 1,
-            "iterations_per_process": 5,
-            "iterations": 15,
-            "time_ms": {
-              "median": 176.290859,
-              "min": 140.506704,
-              "max": 216.084389
+            "timing": {
+              "processes": 3,
+              "warmup_per_process": 1,
+              "iterations_per_process": 5,
+              "iterations": 15,
+              "time_ms": {
+                "median": 174.494749,
+                "min": 154.345434,
+                "max": 197.069035
+              }
             },
-            "peak_rss_mib": {
-              "median": 444.72265625,
-              "min": 425.03125,
-              "max": 457.85546875
+            "memory": {
+              "processes": 5,
+              "operations_per_process": 1,
+              "warmup_per_process": 0,
+              "peak_rss_mib": {
+                "median": 252.25390625,
+                "min": 250.99609375,
+                "max": 252.3359375
+              },
+              "rss_source": "VmHWM"
             },
-            "rss_source": "VmHWM",
             "check": {
               "valid": true
             }
@@ -289,9 +345,9 @@
         "excludes": [
           "src/xyang.egg-info/ (generated packaging metadata, outside the counted root)"
         ],
-        "files": 81,
-        "physical_lines": 15773,
-        "code_lines": 12264
+        "files": 82,
+        "physical_lines": 15917,
+        "code_lines": 12345
       },
       "typescript": {
         "root": "ts/src",
@@ -299,9 +355,9 @@
         "excludes": [
           "*.d.ts"
         ],
-        "files": 82,
-        "physical_lines": 14070,
-        "code_lines": 12612
+        "files": 83,
+        "physical_lines": 14611,
+        "code_lines": 13098
       }
     }
   },
