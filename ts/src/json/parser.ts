@@ -1,5 +1,5 @@
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
-import { YangModule, type ModuleSource, type SerializedStatement } from "../core/model";
+import { YangModule, YangStatement, type ModuleInit, type ModuleSource } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPathPath } from "../xpath/parser";
 import { yangDefaultFromJsonSchema } from "./default-values";
@@ -31,7 +31,7 @@ function basesFromJson(raw: unknown): YangIdentifierRef[] {
     .filter((b): b is YangIdentifierRef => Boolean(b));
 }
 
-function setConfigFromXyang(stmt: SerializedStatement, xyang: Record<string, unknown>): void {
+function setConfigFromXyang(stmt: YangStatement, xyang: Record<string, unknown>): void {
   if (XYANG_KEYS.config in xyang && typeof xyang[XYANG_KEYS.config] === "boolean") {
     stmt.config = xyang[XYANG_KEYS.config] as boolean;
   }
@@ -82,7 +82,7 @@ function firstNonEmptyDescription(...values: unknown[]): string {
   return "";
 }
 
-function whenFromXyang(xy: Record<string, unknown>): SerializedStatement["when"] | undefined {
+function whenFromXyang(xy: Record<string, unknown>): YangStatement["when"] | undefined {
   const w = xy.when;
   if (!w || typeof w !== "object") {
     return undefined;
@@ -99,32 +99,31 @@ function whenFromXyang(xy: Record<string, unknown>): SerializedStatement["when"]
   };
 }
 
-function mustStatementsFromXyang(xy: Record<string, unknown>): SerializedStatement[] {
+function mustStatementsFromXyang(xy: Record<string, unknown>): YangStatement[] {
   const raw = xy.must;
   if (!Array.isArray(raw)) {
     return [];
   }
-  const out: SerializedStatement[] = [];
+  const out: YangStatement[] = [];
   for (const item of raw) {
     const e = asRecord(item);
     const expr = typeof e.must === "string" ? e.must : "";
     if (!expr.trim()) {
       continue;
     }
-    out.push({
-      __class__: "YangStatement",
+    out.push(new YangStatement({
       keyword: "must",
       name: expr,
       argument: expr,
       error_message: typeof e["error-message"] === "string" ? e["error-message"] : "",
       description: typeof e.description === "string" ? e.description : "",
       statements: []
-    });
+    }));
   }
   return out;
 }
 
-function applyStatementMetaFromXyang(stmt: SerializedStatement, xy: Record<string, unknown>): void {
+function applyStatementMetaFromXyang(stmt: YangStatement, xy: Record<string, unknown>): void {
   const when = whenFromXyang(xy);
   if (when) {
     stmt.when = when;
@@ -297,20 +296,19 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
   return shape;
 }
 
-function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
+function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const resolved = resolveSchemaWithOverlay(schema, defs);
   const xy = asRecord(resolved[YANG_SCHEMA_KEYS.xYang]);
   const typeShape = typeShapeFromJsonLeaf(resolved, xy);
   const musts = mustStatementsFromXyang(xy);
   const when = whenFromXyang(xy);
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword: YangTokenType.LEAF,
     name,
     argument: name,
     type: typeShape,
     statements: musts
-  };
+  });
   if (xy.mandatory === true) {
     out.mandatory = true;
   }
@@ -423,17 +421,16 @@ function splitChoiceCommonProperties(branches: Record<string, unknown>[]): {
   return { commonProps, strippedBranches };
 }
 
-function parseChoice(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
+function parseChoice(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const choiceName = typeof xy.name === "string" && xy.name.length > 0 ? xy.name : name;
-  const choiceStmt: SerializedStatement = {
-    __class__: "YangStatement",
+  const choiceStmt: YangStatement = new YangStatement({
     keyword: YangTokenType.CHOICE,
     name: choiceName,
     argument: choiceName,
     mandatory: xy.mandatory === true,
     statements: []
-  };
+  });
   if (Array.isArray(xy["if-features"])) {
     const feats = (xy["if-features"] as unknown[]).filter((x): x is string => typeof x === "string" && x.trim().length > 0);
     if (feats.length > 0) {
@@ -452,13 +449,12 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
     caseIndex += 1;
     const branchXy = asRecord(branch[YANG_SCHEMA_KEYS.xYang]);
     const caseName = typeof branchXy.name === "string" && branchXy.name.length > 0 ? branchXy.name : `case-${caseIndex}`;
-    const caseStmt: SerializedStatement = {
-      __class__: "YangStatement",
+    const caseStmt: YangStatement = new YangStatement({
       keyword: YangTokenType.CASE,
       name: caseName,
       argument: caseName,
       statements: []
-    };
+    });
     if (Array.isArray(branchXy["if-features"])) {
       const feats = (branchXy["if-features"] as unknown[]).filter(
         (x): x is string => typeof x === "string" && x.trim().length > 0
@@ -478,26 +474,25 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
       if (!childStmt) {
         continue;
       }
-      (caseStmt.statements as SerializedStatement[]).push(childStmt);
+      (caseStmt.statements as YangStatement[]).push(childStmt);
     }
-    if ((caseStmt.statements as SerializedStatement[]).length > 0) {
-      (choiceStmt.statements as SerializedStatement[]).push(caseStmt);
+    if ((caseStmt.statements as YangStatement[]).length > 0) {
+      (choiceStmt.statements as YangStatement[]).push(caseStmt);
     }
   }
   return choiceStmt;
 }
 
-function parseAnydataOrAnyxml(name: string, schema: Record<string, unknown>, keyword: string): SerializedStatement {
+function parseAnydataOrAnyxml(name: string, schema: Record<string, unknown>, keyword: string): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const musts = mustStatementsFromXyang(xy);
   const when = whenFromXyang(xy);
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword,
     name,
     argument: name,
     statements: musts
-  };
+  });
   if (xy.mandatory === true) {
     out.mandatory = true;
   }
@@ -508,12 +503,12 @@ function parseAnydataOrAnyxml(name: string, schema: Record<string, unknown>, key
   return out;
 }
 
-function parseContainer(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
+function parseContainer(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const props = asRecord(schema.properties);
   const musts = mustStatementsFromXyang(xy);
   const when = whenFromXyang(xy);
-  const children: SerializedStatement[] = [...musts];
+  const children: YangStatement[] = [...musts];
   for (const [childName, childSchema] of Object.entries(props)) {
     if (!childSchema || typeof childSchema !== "object") {
       continue;
@@ -524,13 +519,12 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
     }
   }
   const hasExplicitChoiceChildren = children.some((s) => s.keyword === YangTokenType.CHOICE);
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword: YangTokenType.CONTAINER,
     name,
     argument: name,
     statements: children
-  };
+  });
   const reqList = Array.isArray(schema.required)
     ? schema.required.filter((x): x is string => typeof x === "string")
     : [];
@@ -573,12 +567,12 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
       choiceSchema,
       defs
     );
-    if ((choiceStmt.statements as SerializedStatement[]).length > 0) {
+    if ((choiceStmt.statements as YangStatement[]).length > 0) {
       children.push(choiceStmt);
     }
   }
   if (Array.isArray(schema.allOf)) {
-    (out as Record<string, unknown>).allOf = schema.allOf;
+    out.allOf = schema.allOf;
   }
   return out;
 }
@@ -597,14 +591,14 @@ function uniqueFromXyang(xy: Record<string, unknown>, where: string): string[][]
   return (raw as string[][]).map((paths) => [...paths]);
 }
 
-function parseList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
+function parseList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const items = asRecord(schema.items as Record<string, unknown>);
   const resolvedItems = resolveSchema(items, defs);
   const itemProps = asRecord(resolvedItems.properties);
   const musts = mustStatementsFromXyang(xy);
   const when = whenFromXyang(xy);
-  const children: SerializedStatement[] = [...musts];
+  const children: YangStatement[] = [...musts];
   for (const [childName, childSchema] of Object.entries(itemProps)) {
     if (!childSchema || typeof childSchema !== "object") {
       continue;
@@ -614,8 +608,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       children.push(stmt);
     }
   }
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword: YangTokenType.LIST,
     name,
     argument: name,
@@ -630,7 +623,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       typeof schema.maxItems === "number"
         ? (schema.maxItems as number)
         : (typeof xy["max-elements"] === "number" ? (xy["max-elements"] as number) : undefined)
-  };
+  });
   const itemReq = Array.isArray(resolvedItems.required)
     ? resolvedItems.required.filter((x): x is string => typeof x === "string")
     : [];
@@ -666,7 +659,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       choiceSchema,
       defs
     );
-    if ((choiceStmt.statements as SerializedStatement[]).length > 0) {
+    if ((choiceStmt.statements as YangStatement[]).length > 0) {
       children.push(choiceStmt);
     }
   }
@@ -678,20 +671,19 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
   return out;
 }
 
-function parseLeafList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
+function parseLeafList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const items = resolveSchema(asRecord(schema.items), defs);
   const itemXy = asRecord(items[YANG_SCHEMA_KEYS.xYang]);
   const mergedXy = { ...xy, ...itemXy };
   const typeShape = typeShapeFromJsonLeaf(items, mergedXy);
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword: YangTokenType.LEAF_LIST,
     name,
     argument: name,
     type: typeShape,
     statements: mustStatementsFromXyang(xy)
-  };
+  });
   if (typeof schema.minItems === "number") {
     out.min_elements = schema.minItems as number;
   } else if (typeof xy["min-elements"] === "number") {
@@ -718,7 +710,7 @@ function parseIoBlock(
   schema: Record<string, unknown>,
   defs: Record<string, unknown>,
   ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
-): SerializedStatement {
+): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const parsed = parseContainer(ioType, schema, defs);
   parsed.keyword = ioType;
@@ -729,25 +721,24 @@ function parseIoBlock(
   return parsed;
 }
 
-function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement | null {
+function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<string, unknown>): YangStatement | null {
   const xy = asRecord(rpcValue[YANG_SCHEMA_KEYS.xYang]);
   if (xy.type !== YangTokenType.RPC) {
     return null;
   }
-  const statements: SerializedStatement[] = [...mustStatementsFromXyang(xy)];
+  const statements: YangStatement[] = [...mustStatementsFromXyang(xy)];
   for (const ioKey of [YangTokenType.INPUT, YangTokenType.OUTPUT] as const) {
     const block = rpcValue[ioKey];
     if (block && typeof block === "object") {
       statements.push(parseIoBlock(block as Record<string, unknown>, defs, ioKey));
     }
   }
-  const out: SerializedStatement = {
-    __class__: "YangStatement",
+  const out: YangStatement = new YangStatement({
     keyword: YangTokenType.RPC,
     name,
     argument: name,
     statements
-  };
+  });
   applyStatementMetaFromXyang(out, xy);
   return out;
 }
@@ -756,7 +747,7 @@ function jsonSchemaPropertyToStatement(
   name: string,
   schema: Record<string, unknown>,
   defs: Record<string, unknown>
-): SerializedStatement | null {
+): YangStatement | null {
   const resolved = resolveSchemaWithOverlay(schema, defs);
   const xy = asRecord(resolved[YANG_SCHEMA_KEYS.xYang]);
   const xyType = typeof xy.type === "string" ? xy.type : "";
@@ -811,7 +802,7 @@ function requireXYangObject(value: unknown, message: string): Record<string, unk
 }
 
 /**
- * Build a {@link YangModule} (serialized AST in `module.data`) from JSON Schema with `x-yang` annotations,
+ * Build a {@link YangModule} from JSON Schema with `x-yang` annotations,
  * as produced by {@link generateJsonSchema}. Covers common data nodes used in tests; extend as needed for parity.
  *
  * Throws `Error` when the root schema, or a root `properties` member, has no `x-yang` object.
@@ -830,7 +821,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   const defs = defsRaw && typeof defsRaw === "object" && !Array.isArray(defsRaw) ? (defsRaw as Record<string, unknown>) : {};
 
   const properties = asRecord(root.properties);
-  const statements: SerializedStatement[] = [];
+  const statements: YangStatement[] = [];
   for (const [propName, propSchema] of Object.entries(properties)) {
     if (!propSchema || typeof propSchema !== "object" || Array.isArray(propSchema)) {
       continue;
@@ -886,9 +877,8 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     };
   }
 
-  const data: Record<string, unknown> = {
-    __class__: "YangModule",
-    name: moduleName,
+  const data: ModuleInit = {
+        name: moduleName,
     yang_version: "1.1",
     namespace,
     prefix,

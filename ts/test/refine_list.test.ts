@@ -187,16 +187,16 @@ describe("python parity: test_refine_list", () => {
     expect(module.name).toBe("refine_list_cardinality");
     const lst = findListNamed(module, "items");
     expect(lst).toBeDefined();
-    expect(lst?.data.max_elements).toBe(3);
-    expect(lst?.data.min_elements).toBe(1);
+    expect(lst?.max_elements).toBe(3);
+    expect(lst?.min_elements).toBe(1);
   });
 
   it("refine path through choice/case reaches the list", () => {
     const module = parseYangString(YANG_REFINE_LIST_UNDER_CHOICE_CASE);
     const lst = findListNamed(module, "rows");
     expect(lst).toBeDefined();
-    expect(lst?.data.max_elements).toBe(0);
-    expect(lst?.data.min_elements).toBe(0);
+    expect(lst?.max_elements).toBe(0);
+    expect(lst?.min_elements).toBe(0);
   });
 
   it("uses inside list with refine applies must to grouping leaf", () => {

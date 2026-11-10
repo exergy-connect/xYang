@@ -35,7 +35,7 @@ describe("python parity: json/test_identity_json", () => {
 
     const data = round.findStatement("data");
     const kind = data?.findStatement("kind");
-    const type = (kind?.data.type as Record<string, unknown> | undefined) ?? {};
+    const type = (kind?.type as Record<string, unknown> | undefined) ?? {};
     expect(type.name).toBe("identityref");
     expect(type.identityref_bases).toEqual([{ name: "animal" }]);
   });

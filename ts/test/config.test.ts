@@ -16,7 +16,7 @@ module m {
 }
 `);
     const c = mod.findStatement("state-tree");
-    expect((c?.data as { config?: boolean }).config).toBe(false);
+    expect(c?.config).toBe(false);
   });
 
   it("emits config in JSON Schema x-yang", () => {

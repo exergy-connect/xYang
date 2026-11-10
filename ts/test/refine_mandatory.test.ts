@@ -30,6 +30,6 @@ describe("python parity: test_refine_mandatory", () => {
     const leaf = container?.statements[0];
     expect(leaf?.keyword).toBe("leaf");
     expect(leaf?.name).toBe("entity");
-    expect(leaf?.data.mandatory).toBe(false);
+    expect(leaf?.mandatory).toBe(false);
   });
 });

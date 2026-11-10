@@ -34,7 +34,7 @@ module adax {
 
     expect(byName.get("payload")?.keyword).toBe(YangTokenType.ANYDATA);
     expect(byName.get("legacy")?.keyword).toBe(YangTokenType.ANYXML);
-    expect(byName.get("legacy")?.data.mandatory).toBe(true);
+    expect(byName.get("legacy")?.mandatory).toBe(true);
   });
 
   it("accepts arbitrary JSON payload under anydata and anyxml", () => {
@@ -91,6 +91,6 @@ module adax {
 
     expect(byName.get("payload")?.keyword).toBe(YangTokenType.ANYDATA);
     expect(byName.get("legacy")?.keyword).toBe(YangTokenType.ANYXML);
-    expect(byName.get("legacy")?.data.mandatory).toBe(true);
+    expect(byName.get("legacy")?.mandatory).toBe(true);
   });
 });

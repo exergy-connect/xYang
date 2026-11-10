@@ -4,7 +4,7 @@ import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { YangParser } from "../src";
-import type { SerializedStatement } from "../src/core/model";
+import type { YangStatement } from "../src/core/model";
 
 const repoRoot = resolve(dirname(fileURLToPath(import.meta.url)), "../..");
 const EXT = resolve(repoRoot, "examples/ietf-yang-push/modules/ietf-yang-structure-ext@2020-06-17.yang");
@@ -33,10 +33,10 @@ function parse(expandUses: boolean) {
   }
 }
 
-function structureIndex(mod: ReturnType<typeof parse>): Record<string, SerializedStatement> | undefined {
-  const runtime = mod.data.extension_runtime as Record<string, unknown> | undefined;
+function structureIndex(mod: ReturnType<typeof parse>): Record<string, YangStatement> | undefined {
+  const runtime = mod.extension_runtime as Record<string, unknown> | undefined;
   const idx = runtime?.[INDEX];
-  return idx && typeof idx === "object" ? (idx as Record<string, SerializedStatement>) : undefined;
+  return idx && typeof idx === "object" ? (idx as Record<string, YangStatement>) : undefined;
 }
 
 describe("post-parse pass order", () => {

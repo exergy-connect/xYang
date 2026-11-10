@@ -51,7 +51,7 @@ module test {
     expect(data).toBeDefined();
     const nameLeaf = data?.findStatement("name");
     expect(nameLeaf).toBeDefined();
-    expect(String(nameLeaf?.data.description ?? "")).toContain("/* not a comment */");
+    expect(String(nameLeaf?.description ?? "")).toContain("/* not a comment */");
   });
 
   it("parses typedef declarations", () => {

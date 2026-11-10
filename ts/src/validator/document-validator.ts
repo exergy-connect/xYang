@@ -149,7 +149,7 @@ export class DocumentValidator {
     this.typeValidationDebug = options.typeValidationDebug === true;
     const constraintChecks = options.constraintChecks ?? true;
     const leafTypeMode = options.leafTypeMode ?? (constraintChecks ? "full" : "none");
-    const ifFeatureCtx = module.data as ModuleData;
+    const ifFeatureCtx = module;
     this.rootCtx = {
       module,
       typeChecker: new TypeChecker(module, { typeValidationDebug: this.typeValidationDebug }),
@@ -297,7 +297,7 @@ export class DocumentValidator {
       return;
     }
 
-    const ifFeatures = stmt.data.if_features;
+    const ifFeatures = stmt.if_features;
     const ifFeatureList = Array.isArray(ifFeatures) ? (ifFeatures as string[]) : [];
     if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
       if (value !== undefined) {
@@ -317,7 +317,7 @@ export class DocumentValidator {
     }
 
     if (keyword === YangTokenType.CONTAINER) {
-      if (value === undefined && stmt.data.presence) {
+      if (value === undefined && stmt.presence) {
         return;
       }
       if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) {
@@ -360,7 +360,7 @@ export class DocumentValidator {
         return;
       }
       this.checkElementCount(stmt, value.length, path, errors);
-      const keyRaw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
+      const keyRaw = typeof stmt.key === "string" ? stmt.key.trim() : "";
       const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).map((k) => k.trim()).filter(Boolean) : [];
       if (this.ctx.constraintChecks && keyNames.length > 0) {
         this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors);
@@ -398,7 +398,7 @@ export class DocumentValidator {
     }
 
     if (keyword === YangTokenType.LEAF) {
-      const mandatory = Boolean(stmt.data.mandatory);
+      const mandatory = Boolean(stmt.mandatory);
       if (value === undefined) {
         if (mandatory) {
           errors.push(issue(path, "mandatory", "mandatory leaf is missing"));
@@ -406,7 +406,7 @@ export class DocumentValidator {
         return;
       }
       if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
-        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
+        const typeShape = (stmt.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
         if (typeName === YangTokenType.LEAFREF) {
           this.checkLeafref(value, typeShape, path, errors, currentNode, rootNode);
@@ -448,7 +448,7 @@ export class DocumentValidator {
       }
       this.checkElementCount(stmt, value.length, path, errors);
       if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
-        const typeShape = (stmt.data.type as Record<string, unknown> | undefined) ?? {};
+        const typeShape = (stmt.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
         for (let i = 0; i < value.length; i += 1) {
           const itemNode: XPathNode = { data: value[i], schema: stmt as unknown as XPathSchema, parent: parentNode };
@@ -481,7 +481,7 @@ export class DocumentValidator {
     }
 
     if (keyword === YangTokenType.ANYDATA || keyword === YangTokenType.ANYXML) {
-      const mandatory = Boolean(stmt.data.mandatory);
+      const mandatory = Boolean(stmt.mandatory);
       if (value === undefined) {
         if (mandatory) {
           errors.push(issue(path, "mandatory", `mandatory ${keyword} is missing`));
@@ -500,8 +500,8 @@ export class DocumentValidator {
   /** min-elements / max-elements for a list or leaf-list. An absent one has count 0 (RFC 7950 §7.7.5). */
   private checkElementCount(stmt: YangStatement, count: number, path: string, errors: InternalIssue[]): void {
     const name = stmt.name ?? "node";
-    const min = stmt.data.min_elements;
-    const max = stmt.data.max_elements;
+    const min = stmt.min_elements;
+    const max = stmt.max_elements;
     if (typeof min === "number" && count < min) {
       errors.push(issue(path, "min-elements", `'${name}' has ${count} element(s) but requires at least ${min}`));
     }
@@ -557,14 +557,14 @@ export class DocumentValidator {
     rootNode: XPathNode
   ): void {
     if (!parentValue || typeof parentValue !== "object" || Array.isArray(parentValue)) {
-      if (choice.data.mandatory === true) {
+      if (choice.mandatory === true) {
         errors.push(issue(path, "mandatory-choice", "mandatory choice has no active case"));
       }
       return;
     }
     const obj = parentValue as Record<string, unknown>;
 
-    const choiceIfs = Array.isArray(choice.data.if_features) ? (choice.data.if_features as string[]) : [];
+    const choiceIfs = Array.isArray(choice.if_features) ? (choice.if_features as string[]) : [];
     const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule);
     if (!choiceActive && this.choiceHasBranchData(choice, obj)) {
       errors.push(
@@ -596,7 +596,7 @@ export class DocumentValidator {
       if (!this.caseHasAnyData(c, obj)) {
         continue;
       }
-      const caseIfs = Array.isArray(c.data.if_features) ? (c.data.if_features as string[]) : [];
+      const caseIfs = Array.isArray(c.if_features) ? (c.if_features as string[]) : [];
       if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
         errors.push(
           issue(
@@ -632,7 +632,7 @@ export class DocumentValidator {
       if (hadBlockedCaseWithData) {
         return;
       }
-      if (choice.data.mandatory === true) {
+      if (choice.mandatory === true) {
         errors.push(issue(path, "mandatory-choice", "mandatory choice has no active case"));
       }
       return;
@@ -686,8 +686,8 @@ export class DocumentValidator {
     }
     const parent = this.ctx.module.name ?? "";
     const defined =
-      typeof stmt.data.defining_module === "string" && stmt.data.defining_module
-        ? stmt.data.defining_module
+      typeof stmt.defining_module === "string" && stmt.defining_module
+        ? stmt.defining_module
         : parent;
     if (!parent || defined === parent) {
       return [local];
@@ -720,7 +720,7 @@ export class DocumentValidator {
       return YangTokenType.CONTAINER;
     }
     if (raw.includes(":")) {
-      const kind = stmt.data.data_node_kind;
+      const kind = stmt.data_node_kind;
       if (kind === YangTokenType.CONTAINER || kind === YangTokenType.LIST) {
         return kind;
       }
@@ -773,7 +773,7 @@ export class DocumentValidator {
    * Entries missing any leaf of the set are ignored.
    */
   private checkListUnique(stmt: YangStatement, val: unknown[], pathStr: string, errors: InternalIssue[]): void {
-    const sets = Array.isArray(stmt.data.unique) ? (stmt.data.unique as string[][]) : [];
+    const sets = Array.isArray(stmt.unique) ? (stmt.unique as string[][]) : [];
     const missing = Symbol("missing");
     const lookup = (entry: unknown, descPath: string): unknown => {
       let cur: unknown = entry;
@@ -954,8 +954,8 @@ export class DocumentValidator {
         const result = this.xpath.eval(ast, context, currentNode);
         const ok = this.xpathBoolean(result);
         if (!ok) {
-          const errorMessage = typeof mustStmt.data.error_message === "string" && mustStmt.data.error_message.trim().length > 0
-            ? mustStmt.data.error_message
+          const errorMessage = typeof mustStmt.error_message === "string" && mustStmt.error_message.trim().length > 0
+            ? mustStmt.error_message
             : `must constraint not satisfied on '${stmt.name ?? "node"}'`;
           errors.push(issue(path, "must", errorMessage, expression));
         }
@@ -974,7 +974,7 @@ export class DocumentValidator {
     rootNode: XPathNode,
     parentNode: XPathNode
   ): boolean {
-    const whenShape = stmt.data.when as Record<string, unknown> | undefined;
+    const whenShape = stmt.when as Record<string, unknown> | undefined;
     const expression = typeof whenShape?.expression === "string" ? whenShape.expression : undefined;
     if (!expression || expression.trim().length === 0) {
       return true;
@@ -1087,7 +1087,7 @@ export class DocumentValidator {
       }
 
       const fragment = { [statementName]: childVal };
-      const payloadIfCtx = mod.data as ModuleData;
+      const payloadIfCtx = mod;
       const payloadCtx: ValidationContext = {
         module: mod,
         typeChecker: new TypeChecker(mod, { typeValidationDebug: this.rootCtx.typeValidationDebug }),

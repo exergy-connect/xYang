@@ -14,7 +14,7 @@ import {
 } from "../core/ast";
 import { formatIdentifierRef } from "../core/identifier-ref";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
-import { SerializedStatement } from "../core/model";
+import { YangModule, YangStatement } from "../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
 import {
   AnydataStatementParser,
@@ -97,7 +97,7 @@ export class StatementParsers {
     revisionDate: string | undefined,
     context: ParserContext,
     tokens: TokenStream
-  ) => Record<string, unknown>;
+  ) => YangModule;
 
   private readonly includeResolver?: (
     submoduleName: string,
@@ -133,7 +133,7 @@ export class StatementParsers {
   readonly when_parser = new WhenStatementParser(this);
 
   private readonly statementKeywordHandlers: Partial<
-    Record<string | YangTokenType, (tokens: TokenStream, context: ParserContext) => SerializedStatement>
+    Record<string | YangTokenType, (tokens: TokenStream, context: ParserContext) => YangStatement>
   > = {
     [kw.LEAF]: (tokens, context) => this.fromAst(this.leaf_parser.parse_leaf(tokens, context)),
     [kw.LEAF_LIST]: (tokens, context) => this.fromAst(this.leaf_list_parser.parse_leaf_list(tokens, context)),
@@ -159,85 +159,83 @@ export class StatementParsers {
     [kw.USES]: (tokens, context) => this.fromAst(this.uses_parser.parse_uses(tokens, context)),
     [kw.REFINE]: (tokens, context) => {
       this.refine_parser.parse_refine(tokens, context);
-      return { __class__: "YangStatement", keyword: "refine", statements: [] };
+      return new YangStatement({ keyword: "refine", statements: [] });
     },
     [kw.MUST]: (tokens, context) => this.fromMust(this.must_parser.parse_must(tokens, context)),
     [kw.WHEN]: (tokens, context) => {
       this.when_parser.parse_when(tokens, context);
-      return { __class__: "YangStatement", keyword: "when", statements: [] };
+      return new YangStatement({ keyword: "when", statements: [] });
     },
     [kw.EXTENSION]: (tokens, context) => this.fromAst(this.extension_parser.parse_extension_stmt(tokens, context)),
     [kw.FEATURE]: (tokens, context) => {
       this.feature_parser.parse_feature_stmt(tokens, context);
-      return { __class__: "YangStatement", keyword: "feature", statements: [] };
+      return new YangStatement({ keyword: "feature", statements: [] });
     },
     [kw.IF_FEATURE]: (tokens, context) => {
       this.feature_parser.parse_if_feature_stmt(tokens, context);
-      return { __class__: "YangStatement", keyword: "if-feature", statements: [] };
+      return new YangStatement({ keyword: "if-feature", statements: [] });
     },
     [kw.IDENTITY]: (tokens, context) => {
       this.identity_parser.parse_identity(tokens, context);
-      return { __class__: "YangStatement", keyword: "identity", statements: [] };
+      return new YangStatement({ keyword: "identity", statements: [] });
     },
     [kw.GROUPING]: (tokens, context) => {
       this.grouping_parser.parse_grouping(tokens, context);
-      return { __class__: "YangStatement", keyword: "grouping", statements: [] };
+      return new YangStatement({ keyword: "grouping", statements: [] });
     },
     [kw.AUGMENT]: (tokens, context) => this.fromAst(this.augment_parser.parse_augment(tokens, context)),
     [kw.DEVIATION]: (tokens, context) => this.deviation_parser.parse_deviation(tokens, context),
     [kw.REVISION]: (tokens, context) => {
       this.revision_parser.parse_revision(tokens, context);
-      return { __class__: "YangStatement", keyword: "revision", statements: [] };
+      return new YangStatement({ keyword: "revision", statements: [] });
     },
     [kw.DESCRIPTION]: (tokens, context) => {
       const desc = this.parse_description(tokens, context);
-      return {
-        __class__: "YangStatement",
-        keyword: "description",
+      return new YangStatement({        keyword: "description",
         argument: desc,
         name: "description",
         statements: []
-      };
+});
     },
     [kw.MANDATORY]: (tokens, context) => {
       this.parse_leaf_mandatory(tokens, context);
-      return { __class__: "YangStatement", keyword: "mandatory", statements: [] };
+      return new YangStatement({ keyword: "mandatory", statements: [] });
     },
     [kw.DEFAULT]: (tokens, context) => {
       this.parse_leaf_default(tokens, context);
-      return { __class__: "YangStatement", keyword: "default", statements: [] };
+      return new YangStatement({ keyword: "default", statements: [] });
     },
     [kw.KEY]: (tokens, context) => {
       this.parse_list_key(tokens, context);
-      return { __class__: "YangStatement", keyword: "key", statements: [] };
+      return new YangStatement({ keyword: "key", statements: [] });
     },
     [kw.UNIQUE]: (tokens, context) => {
       this.parse_list_unique(tokens, context);
-      return { __class__: "YangStatement", keyword: "unique", statements: [] };
+      return new YangStatement({ keyword: "unique", statements: [] });
     },
     [kw.MIN_ELEMENTS]: (tokens, context) => {
       this.parse_min_elements(tokens, context);
-      return { __class__: "YangStatement", keyword: "min-elements", statements: [] };
+      return new YangStatement({ keyword: "min-elements", statements: [] });
     },
     [kw.MAX_ELEMENTS]: (tokens, context) => {
       this.parse_max_elements(tokens, context);
-      return { __class__: "YangStatement", keyword: "max-elements", statements: [] };
+      return new YangStatement({ keyword: "max-elements", statements: [] });
     },
     [kw.ORDERED_BY]: (tokens, context) => {
       this.parse_ordered_by(tokens);
-      return { __class__: "YangStatement", keyword: "ordered-by", statements: [] };
+      return new YangStatement({ keyword: "ordered-by", statements: [] });
     },
     [kw.PRESENCE]: (tokens, context) => {
       this.parse_presence(tokens, context);
-      return { __class__: "YangStatement", keyword: "presence", statements: [] };
+      return new YangStatement({ keyword: "presence", statements: [] });
     },
     [kw.REFERENCE]: (tokens, context) => {
       this.parse_reference(tokens, context);
-      return { __class__: "YangStatement", keyword: "reference", statements: [] };
+      return new YangStatement({ keyword: "reference", statements: [] });
     },
     [kw.CONFIG]: (tokens, context) => {
       this.parse_config(tokens, context);
-      return { __class__: "YangStatement", keyword: "config", statements: [] };
+      return new YangStatement({ keyword: "config", statements: [] });
     }
   };
 
@@ -248,7 +246,7 @@ export class StatementParsers {
       revisionDate: string | undefined,
       context: ParserContext,
       tokens: TokenStream
-    ) => Record<string, unknown>;
+    ) => YangModule;
     includeResolver?: (
       submoduleName: string,
       revisionDate: string | undefined,
@@ -265,13 +263,13 @@ export class StatementParsers {
     this.submodule_parser.parse_submodule(tokens, context);
   }
 
-  pushIncludedStatement(context: ParserContext, stmt: SerializedStatement): void {
-    const mod = context.module as { __included_statements?: SerializedStatement[] };
+  pushIncludedStatement(context: ParserContext, stmt: YangStatement): void {
+    const mod = context.module as { __included_statements?: YangStatement[] };
     (mod.__included_statements ??= []).push(stmt);
   }
 
-  drainIncludedStatements(context: ParserContext): SerializedStatement[] {
-    const mod = context.module as { __included_statements?: SerializedStatement[] };
+  drainIncludedStatements(context: ParserContext): YangStatement[] {
+    const mod = context.module as { __included_statements?: YangStatement[] };
     const pending = mod.__included_statements ?? [];
     mod.__included_statements = [];
     return pending;
@@ -317,7 +315,7 @@ export class StatementParsers {
     );
   }
 
-  parseModule(tokens: TokenStream, context: ParserContext): SerializedStatement {
+  parseModule(tokens: TokenStream, context: ParserContext): YangStatement {
     const root = this.parseStatement(tokens, context);
     if (root.keyword !== "module") {
       throw new YangSemanticError("Expected top-level 'module' statement");
@@ -326,11 +324,11 @@ export class StatementParsers {
   }
 
   /** Serialize an in-memory AST statement (e.g. under `grouping`) for module data / uses expansion. */
-  serializeAstStatement(stmt: unknown): SerializedStatement {
+  serializeAstStatement(stmt: unknown): YangStatement {
     return this.fromAst(stmt as any);
   }
 
-  parseStatement(tokens: TokenStream, context: ParserContext, options?: ParseStatementOptions): SerializedStatement {
+  parseStatement(tokens: TokenStream, context: ParserContext, options?: ParseStatementOptions): YangStatement {
     if (options?.allowedStatementStarts) {
       this.assertStatementStartAllowed(tokens, options.allowedStatementStarts, options.restrictionContext);
     }
@@ -348,7 +346,7 @@ export class StatementParsers {
     return this.parse_statement_generic(tokens, context);
   }
 
-  private parse_statement_generic(tokens: TokenStream, context: ParserContext): SerializedStatement {
+  private parse_statement_generic(tokens: TokenStream, context: ParserContext): YangStatement {
     const tokenType = this.dispatch_key(tokens);
 
     if (tokenType === kw.MODULE) {
@@ -356,57 +354,51 @@ export class StatementParsers {
     }
     if (tokenType === kw.SUBMODULE) {
       this.submodule_parser.parse_submodule(tokens, context);
-      return { __class__: "YangStatement", keyword: "submodule", statements: [] };
+      return new YangStatement({ keyword: "submodule", statements: [] });
     }
     if (tokenType === kw.YANG_VERSION) {
       this.module_parser.parse_yang_version(tokens, context);
-      return {
-        __class__: "YangStatement",
-        keyword: "yang-version",
+      return new YangStatement({        keyword: "yang-version",
         argument: (context.module as any).yang_version,
         name: "yang-version",
         statements: []
-      };
+});
     }
     if (tokenType === kw.NAMESPACE) {
       this.module_parser.parse_namespace(tokens, context);
-      return {
-        __class__: "YangStatement",
-        keyword: "namespace",
+      return new YangStatement({        keyword: "namespace",
         argument: (context.module as any).namespace,
         name: "namespace",
         statements: []
-      };
+});
     }
     if (tokenType === kw.PREFIX) {
       this.module_parser.parse_prefix(tokens, context);
-      return {
-        __class__: "YangStatement",
-        keyword: "prefix",
+      return new YangStatement({        keyword: "prefix",
         argument: (context.module as any).prefix,
         name: "prefix",
         statements: []
-      };
+});
     }
     if (tokenType === kw.ORGANIZATION) {
       this.module_parser.parse_organization(tokens, context);
-      return { __class__: "YangStatement", keyword: "organization", statements: [] };
+      return new YangStatement({ keyword: "organization", statements: [] });
     }
     if (tokenType === kw.CONTACT) {
       this.module_parser.parse_contact(tokens, context);
-      return { __class__: "YangStatement", keyword: "contact", statements: [] };
+      return new YangStatement({ keyword: "contact", statements: [] });
     }
     if (tokenType === kw.IMPORT) {
       this.module_parser.parse_import_stmt(tokens, context);
-      return { __class__: "YangStatement", keyword: "import", statements: [] };
+      return new YangStatement({ keyword: "import", statements: [] });
     }
     if (tokenType === kw.INCLUDE) {
       this.module_parser.parse_include_stmt(tokens, context);
-      return { __class__: "YangStatement", keyword: "include", statements: [] };
+      return new YangStatement({ keyword: "include", statements: [] });
     }
 
     if (this.skip_unsupported_if_present(tokens, "generic")) {
-      return { __class__: "YangStatement", keyword: "unsupported", statements: [] };
+      return new YangStatement({ keyword: "unsupported", statements: [] });
     }
 
     const peek = tokens.peek();
@@ -424,7 +416,7 @@ export class StatementParsers {
     }
 
     const argument = this.parse_argument(tokens);
-    const statements: SerializedStatement[] = [];
+    const statements: YangStatement[] = [];
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
         statements.push(this.parseStatement(tokens, context));
@@ -435,7 +427,7 @@ export class StatementParsers {
       tokens.consume_if_type(YangTokenType.SEMICOLON);
     }
 
-    const out: SerializedStatement = { __class__: "YangStatement", keyword, name: argument, argument, statements };
+    const out: YangStatement = new YangStatement({ keyword, name: argument, argument, statements });
     if (keyword === "type") {
       out.type = this.extract_type_shape(out);
     }
@@ -588,13 +580,13 @@ export class StatementParsers {
     return true;
   }
 
-  private parse_top_level_module(tokens: TokenStream, context: ParserContext): SerializedStatement {
+  private parse_top_level_module(tokens: TokenStream, context: ParserContext): YangStatement {
     tokens.consume(kw.MODULE);
     const moduleName = tokens.consume_type(YangTokenType.IDENTIFIER);
     (context.module as Record<string, unknown>).name = moduleName;
     tokens.consume_type(YangTokenType.LBRACE);
 
-    const moduleStatements: SerializedStatement[] = [];
+    const moduleStatements: YangStatement[] = [];
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
       const stmt = this.parseStatement(tokens, context);
       if (stmt.keyword !== "include") {
@@ -607,13 +599,11 @@ export class StatementParsers {
     }
     tokens.consume_type(YangTokenType.RBRACE);
 
-    return {
-      __class__: "YangStatement",
-      keyword: "module",
+    return new YangStatement({      keyword: "module",
       name: moduleName,
       argument: moduleName,
       statements: moduleStatements
-    };
+});
   }
 
   private fromAst(stmt: {
@@ -641,7 +631,7 @@ export class StatementParsers {
     resolved_module?: { name?: string };
     resolved_extension?: { name?: string };
     cases?: unknown[];
-  }): SerializedStatement {
+  }): YangStatement {
     const keyword = serializedKeywordFromAstStatement(stmt as object);
 
     const children = [
@@ -649,13 +639,11 @@ export class StatementParsers {
       ...this.serializeAstChildren(stmt.cases ?? [])
     ];
 
-    const out: SerializedStatement = {
-      __class__: "YangStatement",
-      keyword,
+    const out: YangStatement = new YangStatement({      keyword,
       name: stmt.name,
       argument: stmt.name,
       statements: children
-    };
+});
 
     if (stmt.type) {
       out.type = this.fromTypeShape(stmt.type);
@@ -701,7 +689,7 @@ export class StatementParsers {
     if (keyword === "container") {
       const groupings = (stmt as { groupings?: Record<string, { name?: string }> }).groupings;
       if (groupings && Object.keys(groupings).length > 0) {
-        const local: Record<string, SerializedStatement> = {};
+        const local: Record<string, YangStatement> = {};
         for (const [gname, grouping] of Object.entries(groupings)) {
           local[gname] = this.fromAst(grouping as never);
         }
@@ -781,15 +769,13 @@ export class StatementParsers {
     return out;
   }
 
-  private serializeRefineStmt(r: YangRefineStmt): SerializedStatement {
-    const out: SerializedStatement = {
-      __class__: "YangStatement",
-      keyword: "refine",
+  private serializeRefineStmt(r: YangRefineStmt): YangStatement {
+    const out: YangStatement = new YangStatement({      keyword: "refine",
       name: "refine",
       argument: r.target_path,
       refine_target_path: r.target_path,
       statements: []
-    };
+});
     if (typeof r.min_elements === "number") {
       out.min_elements = r.min_elements;
     }
@@ -817,8 +803,8 @@ export class StatementParsers {
     return out;
   }
 
-  private serializeAstChildren(children: unknown[]): SerializedStatement[] {
-    const out: SerializedStatement[] = [];
+  private serializeAstChildren(children: unknown[]): YangStatement[] {
+    const out: YangStatement[] = [];
     for (const child of children) {
       if (!child || typeof child !== "object") {
         continue;
@@ -828,28 +814,24 @@ export class StatementParsers {
     return out;
   }
 
-  private fromType(type_stmt: YangTypeStmt): SerializedStatement {
+  private fromType(type_stmt: YangTypeStmt): YangStatement {
     const qname = formatIdentifierRef({ name: type_stmt.name, prefix: type_stmt.prefix });
-    return {
-      __class__: "YangStatement",
-      keyword: "type",
+    return new YangStatement({      keyword: "type",
       name: type_stmt.name,
       argument: qname,
       type: this.fromTypeShape(type_stmt),
       statements: []
-    };
+});
   }
 
-  private fromMust(must_stmt: YangMustStmt): SerializedStatement {
-    return {
-      __class__: "YangStatement",
-      keyword: "must",
+  private fromMust(must_stmt: YangMustStmt): YangStatement {
+    return new YangStatement({      keyword: "must",
       name: must_stmt.expression,
       argument: must_stmt.expression,
       error_message: must_stmt.error_message,
       description: must_stmt.description,
       statements: []
-    };
+});
   }
 
   private fromTypeShape(type_stmt: YangTypeStmt): TypeShape {
@@ -879,7 +861,7 @@ export class StatementParsers {
     return shape;
   }
 
-  private extract_type_shape(typeStmt: SerializedStatement): TypeShape {
+  private extract_type_shape(typeStmt: YangStatement): TypeShape {
     const name = typeStmt.argument ?? "string";
     const shape: TypeShape = { name };
     for (const child of typeStmt.statements ?? []) {
@@ -993,7 +975,7 @@ export class StatementParsers {
       throw new YangSemanticError(`Import prefix '${localPrefix}' must differ from this module's prefix`);
     }
 
-    const imports = (module.import_prefixes as Record<string, Record<string, unknown>> | undefined) ?? {};
+    const imports = (module.import_prefixes as Record<string, YangModule> | undefined) ?? {};
     module.import_prefixes = imports;
 
     if (imports[localPrefix]) {
@@ -1123,7 +1105,7 @@ export class StatementParsers {
     throw new YangSemanticError(`Expected default value, got ${tt}`);
   }
 
-  private parse_prefixed_extension_statement(tokens: TokenStream, context: ParserContext): SerializedStatement {
+  private parse_prefixed_extension_statement(tokens: TokenStream, context: ParserContext): YangStatement {
     const prefix = tokens.consume_type(YangTokenType.IDENTIFIER);
     tokens.consume_type(YangTokenType.COLON);
     const extensionName = tokens.consume_type(YangTokenType.IDENTIFIER);
@@ -1173,18 +1155,21 @@ export class StatementParsers {
     return this.parse_string_argument(tokens);
   }
 
-  private resolve_prefixed_module(context: ParserContext, prefix: string): Record<string, unknown> | undefined {
+  private resolve_prefixed_module(
+    context: ParserContext,
+    prefix: string
+  ): YangModule | Record<string, unknown> | undefined {
     const module = context.module as Record<string, unknown>;
     const ownPrefix = String(module.prefix ?? "").replace(/^['"]|['"]$/g, "");
     if (prefix === ownPrefix) {
       return module;
     }
-    const imports = module.import_prefixes as Record<string, Record<string, unknown>> | undefined;
+    const imports = module.import_prefixes as Record<string, YangModule> | undefined;
     return imports?.[prefix];
   }
 
   private resolve_extension_definition(
-    resolvedModule: Record<string, unknown>,
+    resolvedModule: YangModule | Record<string, unknown>,
     extensionName: string
   ): YangExtensionStmt | undefined {
     const direct = (resolvedModule.extensions as Record<string, YangExtensionStmt> | undefined)?.[extensionName];
@@ -1193,7 +1178,7 @@ export class StatementParsers {
     }
 
     const statements = Array.isArray(resolvedModule.statements)
-      ? (resolvedModule.statements as SerializedStatement[])
+      ? (resolvedModule.statements as YangStatement[])
       : [];
     const extStmt = statements.find((stmt) => stmt.keyword === "extension" && stmt.name === extensionName);
     if (!extStmt) {

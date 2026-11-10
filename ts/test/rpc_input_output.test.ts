@@ -32,12 +32,12 @@ module example-rpc {
     expect(inp?.keyword).toBe("input");
     const delay = inp?.findStatement("delay-seconds");
     expect(delay?.keyword).toBe("leaf");
-    expect((delay?.data.type as { name?: string } | undefined)?.name).toBe("uint16");
+    expect((delay?.type as { name?: string } | undefined)?.name).toBe("uint16");
 
     const out = reboot?.findStatement("output");
     expect(out?.keyword).toBe("output");
     const msg = out?.findStatement("status-message");
     expect(msg?.keyword).toBe("leaf");
-    expect((msg?.data.type as { name?: string } | undefined)?.name).toBe("string");
+    expect((msg?.type as { name?: string } | undefined)?.name).toBe("string");
   });
 });

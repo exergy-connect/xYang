@@ -39,8 +39,8 @@ module m {
 }
 `);
 
-    expect(module.findStatement("a")?.data.if_features).toEqual(["f"]);
-    expect(module.findStatement("b")?.data.if_features).toEqual(["baz"]);
+    expect(module.findStatement("a")?.if_features).toEqual(["f"]);
+    expect(module.findStatement("b")?.if_features).toEqual(["baz"]);
   });
 
   it("stores multiple if-feature substatements in order", () => {
@@ -61,7 +61,7 @@ module m {
 }
 `);
 
-    expect(module.findStatement("z")?.data.if_features).toEqual(["p", "q"]);
+    expect(module.findStatement("z")?.if_features).toEqual(["p", "q"]);
   });
 
   it("stores if-feature on container, leaf-list, and list", () => {
@@ -93,9 +93,9 @@ module m {
     const root = module.findStatement("root");
     const tags = root?.findStatement("tags");
     const items = root?.findStatement("items");
-    expect(root?.data.if_features).toEqual(["c"]);
-    expect(tags?.data.if_features).toEqual(["fl"]);
-    expect(items?.data.if_features).toEqual(["lst"]);
+    expect(root?.if_features).toEqual(["c"]);
+    expect(tags?.if_features).toEqual(["fl"]);
+    expect(items?.if_features).toEqual(["lst"]);
   });
 
   it("stores if-feature on choice and case", () => {
@@ -122,8 +122,8 @@ module m {
     const root = module.findStatement("root");
     const choice = root?.findStatement("ch");
     const caseStmt = choice?.findStatement("ca");
-    expect(choice?.data.if_features).toEqual(["cf"]);
-    expect(caseStmt?.data.if_features).toEqual(["bf"]);
+    expect(choice?.if_features).toEqual(["cf"]);
+    expect(caseStmt?.if_features).toEqual(["bf"]);
   });
 
   it("parses prefixed feature reference from imported module", () => {
@@ -161,8 +161,8 @@ module main {
       const module = parseYangFile(join(dir, "main.yang"));
       const leaf = module.findStatement("x");
 
-      expect((module.data.import_prefixes as Record<string, { name?: string }>).imp?.name).toBe("lib");
-      expect(leaf?.data.if_features).toEqual(["imp:remote"]);
+      expect((module.import_prefixes as Record<string, { name?: string }>).imp?.name).toBe("lib");
+      expect(leaf?.if_features).toEqual(["imp:remote"]);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }
@@ -191,7 +191,7 @@ module m {
 
     const root = module.findStatement("root");
     const uses = root?.statements.find((stmt) => stmt.keyword === "uses");
-    expect(uses?.data.if_features).toEqual(["u"]);
+    expect(uses?.if_features).toEqual(["u"]);
   });
 
   it("evaluates if-feature boolean expressions and enabled-feature maps", () => {
@@ -205,7 +205,7 @@ module m {
   feature c;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const enAll = buildEnabledFeaturesMap(data, null);
     const enNone = buildEnabledFeaturesMap(data, { m: new Set<string>() });
     const enA = buildEnabledFeaturesMap(data, { m: new Set(["a"]) });
@@ -232,7 +232,7 @@ module m {
   feature q;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const enP = buildEnabledFeaturesMap(data, { m: new Set(["p"]) });
     expect(evaluateIfFeatureExpression("  ( p or q ) ", data, enP)).toBe(true);
   });
@@ -246,7 +246,7 @@ module m {
   feature f;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const en = buildEnabledFeaturesMap(data, null);
     expect(evaluateIfFeatureExpression("f", data, en)).toBe(true);
     expect(evaluateIfFeatureExpression("mx:f", data, en)).toBe(true);
@@ -261,7 +261,7 @@ module m {
   feature f;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const en = buildEnabledFeaturesMap(data, null);
     expect(evaluateIfFeatureExpression("nope:f", data, en)).toBe(false);
     expect(evaluateIfFeatureExpression("x:missing", data, en)).toBe(false);
@@ -276,7 +276,7 @@ module m {
   feature f;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const en = buildEnabledFeaturesMap(data, null);
     expect(evaluateIfFeatureExpression("", data, en)).toBe(false);
     expect(evaluateIfFeatureExpression("f f", data, en)).toBe(false);
@@ -293,7 +293,7 @@ module m {
   feature q;
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const enBoth = buildEnabledFeaturesMap(data, { m: new Set(["p", "q"]) });
     const enP = buildEnabledFeaturesMap(data, { m: new Set(["p"]) });
     expect(stmtIfFeaturesSatisfied([], data, enBoth)).toBe(true);
@@ -336,9 +336,9 @@ module main {
       const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "main.yang"));
       const leaf = mod.findStatement("x");
-      expect(leaf?.data.if_features).toEqual(["ex:fea1 or ex:fea2"]);
-      const data = mod.data as Record<string, unknown>;
-      const ifs = leaf?.data.if_features as string[] | undefined;
+      expect(leaf?.if_features).toEqual(["ex:fea1 or ex:fea2"]);
+      const data = mod;
+      const ifs = leaf?.if_features as string[] | undefined;
       const expr = ifs?.[0] ?? "";
       const en1 = buildEnabledFeaturesMap(data, { lib: new Set(["fea1"]), main: new Set() });
       expect(evaluateIfFeatureExpression(expr, data, en1)).toBe(true);
@@ -391,7 +391,7 @@ module c {
       );
       const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "c.yang"));
-      const names = new Set(reachableModuleData(mod.data as Record<string, unknown>).map((m) => String(m.name)));
+      const names = new Set(reachableModuleData(mod).map((m) => String(m.name)));
       expect(names).toEqual(new Set(["c", "b", "a"]));
     } finally {
       rmSync(dir, { recursive: true, force: true });
@@ -427,7 +427,7 @@ module main {
       );
       const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "main.yang"));
-      const data = mod.data as Record<string, unknown>;
+      const data = mod;
       const m = buildEnabledFeaturesMap(data, { main: new Set() });
       expect(m.lib?.has("x")).toBe(true);
       expect(m.main?.size).toBe(0);
@@ -446,7 +446,7 @@ module m {
   feature b { if-feature "not a"; }
 }
 `);
-    const data = module.data as Record<string, unknown>;
+    const data = module;
     const m = buildEnabledFeaturesMap(data, null);
     expect(m.m?.has("a")).toBe(true);
     expect(m.m?.has("b")).toBe(false);
@@ -472,7 +472,7 @@ module m {
 `);
     const root = module.findStatement("root");
     const leafL = root?.findStatement("L");
-    expect(leafL?.data.if_features).toEqual(["u"]);
+    expect(leafL?.if_features).toEqual(["u"]);
   });
 
   it("merges if-feature from refine into expanded target leaf", () => {
@@ -496,7 +496,7 @@ module m {
 `);
     const c = module.findStatement("c");
     const leafX = c?.findStatement("x");
-    expect(leafX?.data.if_features).toEqual(["rf"]);
+    expect(leafX?.if_features).toEqual(["rf"]);
   });
 
   it("records if-feature substatements on feature definitions in module data", () => {
@@ -512,7 +512,7 @@ module m {
   }
 }
 `);
-    const fif = module.data.feature_if_features as Record<string, string[]> | undefined;
+    const fif = module.feature_if_features as Record<string, string[]> | undefined;
     expect(fif).toEqual({ layered: ["core"] });
   });
 });

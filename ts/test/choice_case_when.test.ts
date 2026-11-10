@@ -30,7 +30,7 @@ module test-choice-when {
     const module = parseYangString(MODULE);
     const root = module.findStatement("root");
     const choice = root?.findStatement("c");
-    const whenShape = choice?.data.when as Record<string, unknown> | undefined;
+    const whenShape = choice?.when as Record<string, unknown> | undefined;
 
     expect(root).toBeDefined();
     expect(choice).toBeDefined();

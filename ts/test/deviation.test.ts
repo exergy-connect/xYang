@@ -2,7 +2,6 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { YangModule } from "../src/core/model";
 import { YangSemanticError } from "../src/core/errors";
 import { YangParser } from "../src/parser/yang-parser";
 import { YangValidator } from "../src/validator/yang-validator";
@@ -50,8 +49,7 @@ module dev {
     );
     const parser = new YangParser();
     const dev = parser.parseFile(devPath);
-    const imported = (dev.data.import_prefixes as Record<string, Record<string, unknown>>).b;
-    const base = new YangModule(imported!, { kind: "file", value: basePath, name: basePath });
+    const base = dev.import_prefixes.b!;
     const invalid = new YangValidator(base).validate({ top: { a: "x" } });
     expect(invalid.isValid).toBe(false);
     expect(invalid.errors.some((err) => err.includes("Unknown field 'a'"))).toBe(true);
@@ -91,15 +89,14 @@ module dev {
     );
     const parser = new YangParser();
     const dev = parser.parseFile(devPath);
-    const deviatedData = (dev.data.import_prefixes as Record<string, Record<string, unknown>>).b;
-    const deviated = new YangModule(deviatedData!, { kind: "file", value: basePath, name: basePath });
+    const deviated = dev.import_prefixes.b!;
     const removed = new YangValidator(deviated).validate({ top: { a: "x" } });
     expect(removed.isValid).toBe(false);
     expect(removed.errors.some((err) => err.includes("Unknown field 'a'"))).toBe(true);
     const alone = parser.parseFile(basePath);
     const kept = new YangValidator(alone).validate({ top: { a: "x" } });
     expect(kept.isValid).toBe(true);
-    expect(alone.data).not.toBe(deviatedData);
+    expect(alone).not.toBe(deviated);
   });
 
   it("reports a missing not-supported target as a schema error", () => {

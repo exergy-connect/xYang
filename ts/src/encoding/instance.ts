@@ -51,9 +51,9 @@ function join(prefix: string, token: string): string {
   return `${prefix}/${escapeToken(token)}`;
 }
 
-type SchemaLike = { statements?: YangStatement[]; data?: unknown };
+type SchemaLike = { statements?: YangStatement[] };
 
-/** Per-walk caches. Statement wrappers are rebuilt by every `.statements` read, so key on `.data`. */
+/** Per-walk caches. Statements are stable objects, so the schema node itself is the key. */
 type WalkCache = {
   nodes: WeakMap<object, YangStatement[]>;
   resolved: WeakMap<object, Map<string, YangStatement[]>>;
@@ -63,22 +63,21 @@ type WalkCache = {
 let walkCache: WalkCache | null = null;
 
 function schemaKey(schema: SchemaLike): object {
-  const data = schema.data;
-  return data && typeof data === "object" ? (data as object) : schema;
+  return schema;
 }
 
 function keywordOf(stmt: YangStatement): string {
   const raw = stmt.keyword ?? "";
   if (raw === "notification") return "container";
   if (raw.includes(":")) {
-    const kind = stmt.data.data_node_kind;
+    const kind = stmt.data_node_kind;
     if (kind === "container" || kind === "list") return kind;
   }
   return raw;
 }
 
 function definingModule(stmt: YangStatement, parent: string): string {
-  const explicit = stmt.data.defining_module;
+  const explicit = stmt.defining_module;
   if (typeof explicit === "string" && explicit.length > 0) return explicit;
   return parent;
 }
@@ -117,7 +116,7 @@ function collectDataNodes(schema: SchemaLike): YangStatement[] {
 }
 
 function leafType(stmt: YangStatement): TypeShape | undefined {
-  const type = stmt.data.type;
+  const type = stmt.type;
   return type && typeof type === "object" ? (type as TypeShape) : undefined;
 }
 
@@ -380,7 +379,7 @@ function walkNode(
 }
 
 function keyNames(stmt: YangStatement): string[] {
-  const raw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
+  const raw = typeof stmt.key === "string" ? stmt.key.trim() : "";
   return raw ? raw.split(/\s+/).filter(Boolean) : [];
 }
 

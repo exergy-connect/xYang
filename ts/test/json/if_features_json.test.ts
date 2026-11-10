@@ -28,7 +28,7 @@ module m {
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");
     const leaf = dm?.findStatement("x");
-    expect(leaf?.data.if_features).toEqual(["f"]);
+    expect(leaf?.if_features).toEqual(["f"]);
   });
 
   it("round-trips choice and case if-features with hoisted oneOf schema", () => {
@@ -68,9 +68,9 @@ module m {
     const dm = round.findStatement("data-model");
     const ch = dm?.statements.find((s) => s.keyword === "choice");
     expect(ch).toBeDefined();
-    expect(ch?.data.if_features).toEqual(["cf"]);
+    expect(ch?.if_features).toEqual(["cf"]);
     const caseA = ch?.findStatement("a");
-    expect(caseA?.data.if_features).toEqual(["bf"]);
+    expect(caseA?.if_features).toEqual(["bf"]);
   });
 
   it("round-trips multiple if-feature lines on one leaf (AND semantics storage)", () => {
@@ -98,6 +98,6 @@ module m {
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");
     const leaf = dm?.findStatement("z");
-    expect(leaf?.data.if_features).toEqual(["p", "q"]);
+    expect(leaf?.if_features).toEqual(["p", "q"]);
   });
 });

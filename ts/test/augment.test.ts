@@ -2,7 +2,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { afterEach, describe, expect, it } from "vitest";
-import { parseYangString, YangModule, YangParser, YangSyntaxError, YangValidator } from "../src";
+import { parseYangString, YangParser, YangSyntaxError, YangValidator } from "../src";
 
 const tempDirs: string[] = [];
 
@@ -45,7 +45,7 @@ module m {
 
     const y = augment?.findStatement("y");
     expect(y?.keyword).toBe("leaf");
-    expect((y?.data.type as Record<string, unknown> | undefined)?.name).toBe("int32");
+    expect((y?.type as Record<string, unknown> | undefined)?.name).toBe("int32");
     expect(module.findStatement("a")?.findStatement("y")).toBeUndefined();
   });
 
@@ -83,7 +83,7 @@ module m {
 `);
 
     const augment = module.statements.find((stmt) => stmt.keyword === "augment");
-    expect(augment?.data.if_features).toEqual(["f"]);
+    expect(augment?.if_features).toEqual(["f"]);
   });
 });
 
@@ -147,9 +147,8 @@ module main {
     const mod = parser.parseFile(join(dir, "main.yang"));
     expect(mod.statements.some((s) => s.keyword === "augment")).toBe(false);
 
-    const libData = (mod.data.import_prefixes as Record<string, Record<string, unknown>>).imp;
-    expect(libData).toBeDefined();
-    const libMod = new YangModule(libData, { kind: "file", value: join(dir, "lib.yang") });
+    const libMod = mod.import_prefixes.imp!;
+    expect(libMod).toBeDefined();
 
     const root = libMod.findStatement("root");
     expect(root?.findStatement("existing")?.keyword).toBe("leaf");
@@ -177,7 +176,7 @@ module m {
 `);
 
     const z = module.findStatement("a")?.findStatement("z");
-    expect(z?.data.if_features).toEqual(["f"]);
+    expect(z?.if_features).toEqual(["f"]);
     const { isValid, errors } = new YangValidator(module, {
       enabledFeaturesByModule: { m: new Set() }
     }).validate({ a: { x: "ok", z: "bad" } });

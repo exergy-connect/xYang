@@ -49,7 +49,7 @@ export class TypeChecker {
    */
   private lookupTypedef(ref: YangIdentifierRef): TypedefShape | undefined {
     if (ref.prefix) {
-      const target = resolvePrefixedModule(this.module.data as ModuleData, ref.prefix);
+      const target = resolvePrefixedModule(this.module, ref.prefix);
       if (!target) {
         return undefined;
       }
@@ -164,7 +164,7 @@ export class TypeChecker {
     if (bases.length === 0) {
       return [false, "identityref type has no base identities"];
     }
-    const moduleData = this.module.data as Record<string, unknown>;
+    const moduleData = this.module;
     if (!resolveIdentityValue(moduleData, value)) {
       return [false, `identityref value '${value}' does not resolve to a known identity`];
     }
