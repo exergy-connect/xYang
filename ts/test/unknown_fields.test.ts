@@ -22,7 +22,7 @@ const validator = new YangValidator(model);
 
 describe("unknown fields", () => {
   it.each([
-    [{ topology: { routing: { enable: true } } }, "topology.mode.routing: Unknown field 'enable'"]
+    [{ topology: { routing: { enable: true } } }, "topology.routing.enable: Unknown field 'enable'"]
   ])("rejects unknown members inside a choice case in %j", (data, error) => {
     const result = validator.validate(data);
     expect(result.isValid).toBe(false);
@@ -39,6 +39,6 @@ describe("unknown fields", () => {
 
   it("does not treat a choice or case name as an instance member", () => {
     expect(validator.validate({ topology: { mode: {}, routed: {} } }).errors)
-      .toEqual(["topology: Unknown field 'mode'", "topology: Unknown field 'routed'"]);
+      .toEqual(["topology.mode: Unknown field 'mode'", "topology.routed: Unknown field 'routed'"]);
   });
 });

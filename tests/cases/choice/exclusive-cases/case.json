@@ -6,10 +6,8 @@
     { "name": "implicit case", "data": { "top": { "unix-path": "/tmp/s" } }, "valid": true },
     { "name": "no case", "data": { "top": {} }, "valid": true },
     { "name": "two cases", "data": { "top": { "port": 80, "dgram-port": 53 } }, "valid": false,
-      "errors": [{ "path": "/top", "code": "choice-multiple-cases" }],
-      "xfail": { "ts": "TS reports choice errors at a path that includes the choice name (top.transport)" } },
+      "errors": [{ "path": "/top", "code": "choice-multiple-cases" }] },
     { "name": "type error inside active case", "data": { "top": { "port": 70000 } }, "valid": false,
-      "errors": [{ "path": "/top/port", "code": "range" }],
-      "xfail": { "ts": "TS includes the choice name in data paths inside a choice (top.transport.port)" } }
+      "errors": [{ "path": "/top/port", "code": "range" }] }
   ]
 }

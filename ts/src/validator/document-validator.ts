@@ -249,7 +249,7 @@ export class DocumentValidator {
         ) {
           continue;
         }
-        this.validateStatement(stmt, this.instanceValue(root, stmt), stmt.name, errors, rootNode, rootNode);
+        this.validateStatement(stmt, this.instanceValue(root, stmt), this.childPath("", stmt), errors, rootNode, rootNode);
       }
 
       if (ctx.constraintChecks) {
@@ -291,7 +291,7 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), this.childPath(path, child), errors, parentNode, rootNode);
       }
       return;
     }
@@ -334,13 +334,13 @@ export class DocumentValidator {
       for (const child of stmt.statements) {
         const childKw = this.effectiveKeyword(child);
         if (childKw === YangTokenType.CHOICE) {
-          this.validateChoice(child, obj, `${path}.${child.name ?? "choice"}`, errors, currentNode, rootNode);
+          this.validateChoice(child, obj, path, errors, currentNode, rootNode);
           continue;
         }
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, currentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), this.childPath(path, child), errors, currentNode, rootNode);
       }
       if (this.ctx.constraintChecks) {
         this.rejectUnknownContainerKeys(stmt, obj, path, errors);
@@ -376,13 +376,13 @@ export class DocumentValidator {
         for (const child of stmt.statements) {
           const childKw = this.effectiveKeyword(child);
           if (childKw === YangTokenType.CHOICE) {
-            this.validateChoice(child, row, `${path}[${i}].${child.name ?? "choice"}`, errors, itemNode, rootNode);
+            this.validateChoice(child, row, `${path}[${i}]`, errors, itemNode, rootNode);
             continue;
           }
           if (!child.name) {
             continue;
           }
-          this.validateStatement(child, this.instanceValue(row, child), `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
+          this.validateStatement(child, this.instanceValue(row, child), this.childPath(`${path}[${i}]`, child), errors, itemNode, rootNode);
         }
         if (this.ctx.constraintChecks) {
           this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
@@ -511,8 +511,7 @@ export class DocumentValidator {
     const allowed = this.collectDirectChildKeys(stmt);
     for (const key of Object.keys(row)) {
       if (!allowed.has(key)) {
-        // Display path stays on the parent (existing validate() text). The JSON Pointer names the member.
-        errors.push(issue(path, "unknown-field", `Unknown field '${key}'`, undefined, joinPointer(pointerFromLabel(path), key)));
+        errors.push(issue(path ? `${path}.${key}` : key, "unknown-field", `Unknown field '${key}'`, undefined, joinPointer(pointerFromLabel(path), key)));
       }
     }
   }
@@ -601,7 +600,7 @@ export class DocumentValidator {
         );
         return;
       }
-      if (this.ctx.constraintChecks && !this.checkWhen(c, true, `${path}.${c.name ?? "case"}`, errors, parentNode, rootNode, parentNode)) {
+      if (this.ctx.constraintChecks && !this.checkWhen(c, true, path, errors, parentNode, rootNode, parentNode)) {
         // case has data but when is false: checkWhen already produced an error
         hadBlockedCaseWithData = true;
         continue;
@@ -636,7 +635,7 @@ export class DocumentValidator {
       if (!child.name) {
         continue;
       }
-      this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
+      this.validateStatement(child, this.instanceValue(obj, child), this.childPath(path, child), errors, parentNode, rootNode);
     }
   }
 
@@ -696,6 +695,15 @@ export class DocumentValidator {
       }
     }
     return undefined;
+  }
+
+  /** Display path of a child. `choice` and `case` are not data nodes, so they keep the parent path. */
+  private childPath(path: string, child: YangStatement): string {
+    const kw = this.effectiveKeyword(child);
+    if (kw === YangTokenType.CHOICE || kw === YangTokenType.CASE) {
+      return path;
+    }
+    return path ? `${path}.${child.name}` : (child.name ?? "");
   }
 
   private effectiveKeyword(stmt: YangStatement): string {
@@ -998,11 +1006,11 @@ export class DocumentValidator {
       }
       const childValue = obj ? this.instanceValue(obj, child) : undefined;
       const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
-      if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
+      if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, this.childPath(path, child), errors, childNode, rootNode, parentNode)) {
         continue;
       }
       if (!obj || childValue === undefined) {
-        errors.push(issue(`${path}.${child.name}`, "mandatory", `mandatory ${childKeyword} is missing`));
+        errors.push(issue(this.childPath(path, child), "mandatory", `mandatory ${childKeyword} is missing`));
       }
     }
   }
