@@ -1,0 +1,12 @@
+# xYang
+
+> Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema.
+
+## Docs
+
+- [README](README.md): install, CLI (`parse`, `validate`, `convert`), and library usage
+- [FEATURES](FEATURES.md): YANG features implemented in xYang
+- [Conformance cases](tests/cases/README.md): language-neutral cases and the Python and TypeScript runners
+- [JSON Schema profile](design/json-schema-xyang-profile.md): JSON Schema (2020-12) with `x-yang`
+- [xyang-model skill](skills/xyang-model/SKILL.md): author YANG modules and `.yang.json` models
+- [AGENTS](AGENTS.md): install, CLI, validate examples, and how to run the tests
