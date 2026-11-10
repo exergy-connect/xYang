@@ -18,34 +18,22 @@ type Case = {
 
 const CASES = join(dirname(fileURLToPath(import.meta.url)), "../../tests/cases");
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
-const CODES: [string, RegExp][] = readJson(join(CASES, "error-codes.json")).codes.map(
-  ([code, rx]: [string, string]) => [code, new RegExp(rx)]
-);
-
-/** '<path>: <message>' -> [path, message]; TS paths look like top.items[0].v and never contain spaces. */
-function split(err: string): [string, string] {
-  const m = /^([^\s:]+): (.*)$/s.exec(err);
-  return m ? [m[1], m[2]] : ["", err];
-}
-
-/** TS path (top.items[0].tags[1]) -> JSON Pointer (/top/items/0/tags/1). */
-const pointer = (path: string) => path.split(".").filter(Boolean).map((s) => "/" + s.replace(/\[(\d+)\]/g, "/$1")).join("");
-
-function code(message: string, expected: Expected[]): string {
-  const hint = expected.find((e) => e.message && message.includes(e.message));
-  return hint?.code ?? CODES.find(([, rx]) => rx.test(message))?.[0] ?? "unclassified";
-}
 
 function run(dir: string, c: Case, inst: Instance | undefined): void {
   const module = parseYangFile(join(dir, c.module), { includePath: [dir] });
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
-  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validate(inst.data);
+  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data);
   const expected = inst.errors ?? [];
-  const got = new Set(errors.map(split).map(([p, m]) => `${pointer(p)} ${code(m, expected)}`));
+  const got = new Set(errors.map((e) => `${e.path} ${e.code}`));
   expect([...got].sort(), `raw errors: ${JSON.stringify(errors)}`).toEqual(
     [...new Set(expected.map((e) => `${e.path} ${e.code}`))].sort()
   );
+  for (const exp of expected) {
+    if (exp.message) {
+      expect(errors.some((e) => e.code === exp.code && e.message.includes(exp.message!))).toBe(true);
+    }
+  }
   expect(errors.length === 0).toBe(inst.valid);
 }
 

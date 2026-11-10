@@ -25,13 +25,20 @@ from ..xpath.node import Context, Node
 
 logger = logging.getLogger("xyang.validator")
 
+# (code, message). Codes are the ones previously inferred from message text.
+TypeIssue = tuple[str, str]
+
+
+def _issue(code: str, message: str) -> TypeIssue:
+    return (code, message)
+
 
 def _instance_identifier_path_errors(
     expr: ASTNode,
     value_repr: str,
     ctx: Context,
     evaluator: Any,
-) -> List[str]:
+) -> List[TypeIssue]:
     """Path shape and require-instance target check for a parsed instance-identifier.
 
     Kept as a module function so ``isinstance(expr, PathNode)`` and uses of
@@ -40,18 +47,25 @@ def _instance_identifier_path_errors(
     """
     if not isinstance(expr, PathNode):
         return [
-            "instance-identifier: value must be a path expression (e.g. /top/leaf)"
+            _issue(
+                "instance-identifier",
+                "instance-identifier: value must be a path expression (e.g. /top/leaf)",
+            )
         ]
     if not expr.is_absolute:
         return [
-            "instance-identifier: only absolute paths are supported "
-            "(path must start with '/')"
+            _issue(
+                "instance-identifier",
+                "instance-identifier: only absolute paths are supported " "(path must start with '/')",
+            )
         ]
     nodes = evaluator.eval(expr, ctx, ctx.root)
     if not nodes:
         return [
-            f"instance-identifier: no instance at path {value_repr!r} "
-            "(require-instance is true)"
+            _issue(
+                "instance-identifier",
+                f"instance-identifier: no instance at path {value_repr!r} " "(require-instance is true)",
+            )
         ]
     return []
 
@@ -70,7 +84,7 @@ def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
 class TypeChecker:
     """
     Checks a data value against a YangTypeStmt.
-    Returns a list of error message strings (empty = valid).
+    Returns ``(code, message)`` pairs (empty = valid).
     """
 
     def check(
@@ -83,7 +97,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[str]:
+    ) -> List[TypeIssue]:
         """
         leafref_current: node to use as current() for leafref path resolution (typically
         the parent of the leaf). If None, ctx.current is used.
@@ -95,7 +109,7 @@ class TypeChecker:
                 return []
             ext = root_schema.resolve_prefixed_module(type_stmt.prefix)
             if ext is None:
-                return [f"unknown type prefix {type_stmt.prefix!r} in type {name!r}"]
+                return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
             typedef = ext.get_typedef(name)
             if typedef is not None and typedef.type is not None:
                 return self.check(
@@ -108,7 +122,7 @@ class TypeChecker:
                     evaluator,
                     leafref_current,
                 )
-            return [f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}"]
+            return [_issue("type", f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}")]
 
         if name == "union":
             return self._check_union(
@@ -124,9 +138,7 @@ class TypeChecker:
         if name == "identityref":
             return self._check_identityref(value, type_stmt, root_schema)
         if name == "instance-identifier":
-            return self._check_instance_identifier(
-                value, type_stmt, ctx, evaluator
-            )
+            return self._check_instance_identifier(value, type_stmt, ctx, evaluator)
         if name == "leafref":
             return self._check_leafref(
                 value,
@@ -187,24 +199,23 @@ class TypeChecker:
                 )
         return []
 
-    def _check_identityref(
-        self, value: Any, type_stmt: YangTypeStmt, root_schema: Any
-    ) -> List[str]:
+    def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> List[TypeIssue]:
         if not isinstance(value, str):
-            return [f"identityref value must be a string, got {type(value).__name__}"]
+            return [_issue("identityref", f"identityref value must be a string, got {type(value).__name__}")]
         if not isinstance(root_schema, YangModule):
-            return ["identityref validation requires module schema"]
+            return [_issue("identityref", "identityref validation requires module schema")]
         bases = getattr(type_stmt, "identityref_bases", None) or []
         if not bases:
-            return ["identityref type has no base identities"]
+            return [_issue("identityref", "identityref type has no base identities")]
         if resolve_identity_qname_pair(root_schema, value) is None:
-            return [
-                f"identityref value {value!r} does not resolve to a known identity"
-            ]
+            return [_issue("identityref", f"identityref value {value!r} does not resolve to a known identity")]
         if not identityref_value_valid(root_schema, value, bases):
             bases_fmt = [format_identifier_ref(b) for b in bases]
             return [
-                f"identityref value {value!r} is not derived from all bases {bases_fmt!r}"
+                _issue(
+                    "identityref",
+                    f"identityref value {value!r} is not derived from all bases {bases_fmt!r}",
+                )
             ]
         return []
 
@@ -214,21 +225,29 @@ class TypeChecker:
         type_stmt: YangTypeStmt,
         ctx: Context,
         evaluator: Any,
-    ) -> List[str]:
+    ) -> List[TypeIssue]:
         """RFC 7950 instance-identifier: string path; optional require-instance existence check."""
         if not isinstance(value, str):
             return [
-                f"instance-identifier value must be a string, got {type(value).__name__}"
+                _issue(
+                    "instance-identifier",
+                    f"instance-identifier value must be a string, got {type(value).__name__}",
+                )
             ]
         if not getattr(type_stmt, "require_instance", True):
             return []
         s = value.strip()
         if not s:
-            return ["instance-identifier path must not be empty when require-instance is true"]
+            return [
+                _issue(
+                    "instance-identifier",
+                    "instance-identifier path must not be empty when require-instance is true",
+                )
+            ]
         try:
             parsed = XPathParser(s).parse()
         except XPathSyntaxError as e:
-            return [f"instance-identifier: invalid path expression ({e})"]
+            return [_issue("instance-identifier", f"instance-identifier: invalid path expression ({e})")]
         return _instance_identifier_path_errors(parsed, value, ctx, evaluator)
 
     def _check_union(
@@ -242,7 +261,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[str]:
+    ) -> List[TypeIssue]:
         for member in type_stmt.types:
             if not self.check(
                 value,
@@ -256,7 +275,7 @@ class TypeChecker:
             ):
                 return []
         names = ", ".join(t.name for t in type_stmt.types)
-        return [f"Value {value!r} does not match any union member type ({names})"]
+        return [_issue("union", f"Value {value!r} does not match any union member type ({names})")]
 
     def _check_leafref(
         self,
@@ -266,7 +285,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[str]:
+    ) -> List[TypeIssue]:
         if not type_stmt.require_instance or not type_stmt.path:
             return []
         path_ast = type_stmt.path
@@ -288,9 +307,7 @@ class TypeChecker:
         else:
             if current_node is None:
                 logger.debug("_check_leafref FAIL node_path=%s (no ctxt for rel path)", node_path)
-                return [
-                    f"Leafref relative path {path_str!r} requires context node"
-                ]
+                return [_issue("leafref", f"Leafref relative path {path_str!r} requires context node")]
             start_node = current_node
         target_nodes = evaluator.eval_path(path_ast, leafref_ctx, start_node)
         targets = [n.data for n in target_nodes]
@@ -302,23 +319,23 @@ class TypeChecker:
                 value,
             )
             return [
-                f"Leafref value {value!r} not found via path {path_str!r} "
-                "(require-instance is true)"
+                _issue(
+                    "leafref",
+                    f"Leafref value {value!r} not found via path {path_str!r} " "(require-instance is true)",
+                )
             ]
         return []
 
-    def _check_string(
-        self, value: Any, type_stmt: YangTypeStmt
-    ) -> List[str]:
-        errors: List[str] = []
+    def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+        errors: List[TypeIssue] = []
         s = str(value) if not isinstance(value, str) else value
         if type_stmt.length:
             lo, hi = self._parse_range(type_stmt.length)
             n = len(s)
             if lo is not None and n < lo:
-                errors.append(f"String length {n} is less than minimum {lo}")
+                errors.append(_issue("length", f"String length {n} is less than minimum {lo}"))
             if hi is not None and n > hi:
-                errors.append(f"String length {n} exceeds maximum {hi}")
+                errors.append(_issue("length", f"String length {n} exceeds maximum {hi}"))
         patterns = list(getattr(type_stmt, "patterns", None) or [])
         if patterns:
             for p in patterns:
@@ -333,48 +350,44 @@ class TypeChecker:
                         if not invert
                         else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                     )
-                    errors.append(
-                        _pattern_entry_violation_message(p, default=default_msg)
-                    )
+                    errors.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
         if type_stmt.enums:
             if s not in [str(e) for e in type_stmt.enums]:
                 errors.append(
-                    f"Value {s!r} is not one of: "
-                    f"{', '.join(str(e) for e in type_stmt.enums)}"
+                    _issue(
+                        "enum",
+                        f"Value {s!r} is not one of: " f"{', '.join(str(e) for e in type_stmt.enums)}",
+                    )
                 )
         return errors
 
-    def _check_integer(
-        self, value: Any, type_stmt: YangTypeStmt
-    ) -> List[str]:
+    def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         try:
             n = int(value)
         except (TypeError, ValueError):
-            return [f"Value {value!r} is not a valid integer"]
+            return [_issue("type", f"Value {value!r} is not a valid integer")]
         if type_stmt.range:
             lo, hi = self._parse_range(type_stmt.range)
         else:
             bounds = YANG_INTEGER_BOUNDS.get(type_stmt.name or "")
             lo, hi = (bounds[0], bounds[1]) if bounds else (None, None)
         if lo is not None and n < lo:
-            return [f"Value {n} is less than minimum {lo}"]
+            return [_issue("range", f"Value {n} is less than minimum {lo}")]
         if hi is not None and n > hi:
-            return [f"Value {n} exceeds maximum {hi}"]
+            return [_issue("range", f"Value {n} exceeds maximum {hi}")]
         return []
 
-    def _check_decimal(
-        self, value: Any, type_stmt: YangTypeStmt
-    ) -> List[str]:
+    def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         try:
             n = float(value)
         except (TypeError, ValueError):
-            return [f"Value {value!r} is not a valid number"]
+            return [_issue("type", f"Value {value!r} is not a valid number")]
         if type_stmt.range:
             lo, hi = self._parse_range(type_stmt.range)
             if lo is not None and n < lo:
-                return [f"Value {n} is less than minimum {lo}"]
+                return [_issue("range", f"Value {n} is less than minimum {lo}")]
             if hi is not None and n > hi:
-                return [f"Value {n} exceeds maximum {hi}"]
+                return [_issue("range", f"Value {n} exceeds maximum {hi}")]
         fd = getattr(type_stmt, "fraction_digits", None)
         if fd is not None and fd >= 0:
             s = str(value).strip()
@@ -382,64 +395,72 @@ class TypeChecker:
                 frac = s.split(".", 1)[1]
                 if len(frac) > int(fd):
                     return [
-                        f"Value has more than {fd} fraction digits (decimal64 fraction-digits)"
+                        _issue(
+                            "fraction-digits",
+                            f"Value has more than {fd} fraction digits (decimal64 fraction-digits)",
+                        )
                     ]
         return []
 
-    def _check_boolean(self, value: Any) -> List[str]:
+    def _check_boolean(self, value: Any) -> List[TypeIssue]:
         if value not in (True, False, "true", "false"):
-            return [
-                f"Value {value!r} is not a valid boolean (expected true or false)"
-            ]
+            return [_issue("type", f"Value {value!r} is not a valid boolean (expected true or false)")]
         return []
 
-    def _check_enum(
-        self, value: Any, type_stmt: YangTypeStmt
-    ) -> List[str]:
+    def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         if not type_stmt.enums:
             return [
-                "enumeration type has no enum definitions in schema; cannot validate instance data"
+                _issue(
+                    "enum",
+                    "enumeration type has no enum definitions in schema; cannot validate instance data",
+                )
             ]
         allowed = [str(e) for e in type_stmt.enums]
         if str(value) not in allowed:
             return [
-                f"Value {value!r} is not one of the allowed enum values: "
-                f"{', '.join(allowed)}"
+                _issue(
+                    "enum",
+                    f"Value {value!r} is not one of the allowed enum values: " f"{', '.join(allowed)}",
+                )
             ]
         return []
 
-    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[str]:
+    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
         if not isinstance(value, str):
             return [
-                f"bits value must be a string (space-sep bit names), got {type(value).__name__}"
+                _issue(
+                    "bits",
+                    f"bits value must be a string (space-sep bit names), got {type(value).__name__}",
+                )
             ]
         bits = type_stmt.bits or []
         allowed = {b.name for b in bits}
         if not allowed:
-            return ["bits type has no bit definitions"]
+            return [_issue("bits", "bits type has no bit definitions")]
         parts = [p for p in (s.strip() for s in value.split()) if p]
         seen: set[str] = set()
         for token in parts:
             if token in seen:
-                return [f"Duplicate bit {token!r} in bits value"]
+                return [_issue("bits", f"Duplicate bit {token!r} in bits value")]
             seen.add(token)
             if token not in allowed:
-                return [
-                    f"Unknown bit {token!r}; allowed: {', '.join(sorted(allowed))}"
-                ]
+                return [_issue("bits", f"Unknown bit {token!r}; allowed: {', '.join(sorted(allowed))}")]
         return []
 
-    def _check_empty(self, value: Any) -> List[str]:
+    def _check_empty(self, value: Any) -> List[TypeIssue]:
         if value not in (None, True, "", {}):
-            return [f"Empty type leaf should have no value, got {value!r}"]
+            return [_issue("type", f"Empty type leaf should have no value, got {value!r}")]
         return []
 
-    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[str]:
+    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
         if not isinstance(value, str):
             return [
-                f"binary value must be a base64-encoded string, got {type(value).__name__}"
+                _issue(
+                    "type",
+                    f"binary value must be a base64-encoded string, got {type(value).__name__}",
+                )
             ]
         s = value.strip()
         try:
@@ -448,18 +469,14 @@ class TypeChecker:
             else:
                 decoded = base64.b64decode(s, validate=True)
         except binascii.Error:
-            return ["binary value is not valid base64"]
+            return [_issue("type", "binary value is not valid base64")]
         if type_stmt.length:
             lo, hi = self._parse_range(type_stmt.length)
             n = len(decoded)
             if lo is not None and n < lo:
-                return [
-                    f"binary decoded length {n} octets is less than minimum {int(lo)}"
-                ]
+                return [_issue("length", f"binary decoded length {n} octets is less than minimum {int(lo)}")]
             if hi is not None and n > hi:
-                return [
-                    f"binary decoded length {n} octets exceeds maximum {int(hi)}"
-                ]
+                return [_issue("length", f"binary decoded length {n} octets exceeds maximum {int(hi)}")]
         patterns = list(getattr(type_stmt, "patterns", None) or [])
         for p in patterns:
             patt = getattr(p, "pattern", None)
@@ -473,12 +490,10 @@ class TypeChecker:
                     if not invert
                     else f"binary value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                 )
-                return [_pattern_entry_violation_message(p, default=default_msg)]
+                return [_issue("pattern", _pattern_entry_violation_message(p, default=default_msg))]
         return []
 
-    def _parse_range(
-        self, range_str: str
-    ) -> tuple[Optional[float], Optional[float]]:
+    def _parse_range(self, range_str: str) -> tuple[Optional[float], Optional[float]]:
         range_str = range_str.strip()
         if ".." in range_str:
             lo_s, hi_s = range_str.split("..", 1)
