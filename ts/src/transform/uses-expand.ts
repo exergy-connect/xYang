@@ -10,6 +10,27 @@ function deepClone<T>(value: T): T {
   return JSON.parse(JSON.stringify(value)) as T;
 }
 
+/**
+ * Same result as `deepClone(stmt)` for a statement whose `statements` list the caller replaces
+ * right away. Copies every other field through JSON in key order and leaves the children for the
+ * caller, so a subtree is not cloned again at each level of `expandStatementList`.
+ */
+function cloneStatementShell(stmt: SerializedStatement): SerializedStatement {
+  const copy: Record<string, unknown> = {};
+  for (const key of Object.keys(stmt)) {
+    const value = (stmt as Record<string, unknown>)[key];
+    if (key === "statements" && Array.isArray(value) && value.length > 0) {
+      copy[key] = value;
+      continue;
+    }
+    const text = JSON.stringify(value);
+    if (text !== undefined) {
+      copy[key] = JSON.parse(text);
+    }
+  }
+  return copy as SerializedStatement;
+}
+
 /** Scope for resolving `uses` names (local module or defining module of an imported grouping). */
 type GroupingScope = {
   groupings: Record<string, SerializedStatement>;
@@ -502,7 +523,7 @@ function expandStatementList(
         out.push(expandUsesUnderStatement(e, scope, stack, hostTypedefs));
       }
     } else {
-      out.push(expandUsesUnderStatement(deepClone(stmt), scope, stack, hostTypedefs));
+      out.push(expandUsesUnderStatement(cloneStatementShell(stmt), scope, stack, hostTypedefs));
     }
   }
   return out;
@@ -521,7 +542,10 @@ export function expandUses(module: YangModule): YangModule {
   // Preserve shared import module data references so cross-module ``augment``
   // can mutate the same objects held in the parser cache.
   const sharedImports = data.import_prefixes;
-  const cloned = deepClone(data) as Record<string, unknown>;
+  // Imported modules are restored by reference below, so do not clone them first.
+  const cloned = (
+    sharedImports && typeof sharedImports === "object" ? deepClone({ ...data, import_prefixes: {} }) : deepClone(data)
+  ) as Record<string, unknown>;
   if (sharedImports && typeof sharedImports === "object") {
     cloned.import_prefixes = sharedImports;
   }

@@ -408,15 +408,17 @@ export class DocumentValidator {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
           const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
-          traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf:full", {
-            path,
-            typeName,
-            leafTypeMode: this.ctx.leafTypeMode,
-            constraintChecks: this.ctx.constraintChecks,
-            ok,
-            reason,
-            value: summarizeValue(value)
-          });
+          if (this.ctx.typeValidationDebug) {
+            traceTypeValidation(true, "DocumentValidator.leaf:full", {
+              path,
+              typeName,
+              leafTypeMode: this.ctx.leafTypeMode,
+              constraintChecks: this.ctx.constraintChecks,
+              ok,
+              reason,
+              value: summarizeValue(value)
+            });
+          }
           if (!ok) {
             const message = reason ?? `invalid value for type ${typeName}`;
             errors.push(issue(path, codeForMessage(message) ?? "type", message));
@@ -449,15 +451,17 @@ export class DocumentValidator {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
             const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
-            traceTypeValidation(this.ctx.typeValidationDebug, "DocumentValidator.leaf-list:full", {
-              path: `${path}[${i}]`,
-              typeName,
-              leafTypeMode: this.ctx.leafTypeMode,
-              constraintChecks: this.ctx.constraintChecks,
-              ok,
-              reason,
-              value: summarizeValue(value[i])
-            });
+            if (this.ctx.typeValidationDebug) {
+              traceTypeValidation(true, "DocumentValidator.leaf-list:full", {
+                path: `${path}[${i}]`,
+                typeName,
+                leafTypeMode: this.ctx.leafTypeMode,
+                constraintChecks: this.ctx.constraintChecks,
+                ok,
+                reason,
+                value: summarizeValue(value[i])
+              });
+            }
             if (!ok) {
               const message = reason ?? `invalid value for type ${typeName}`;
               errors.push(issue(`${path}[${i}]`, codeForMessage(message) ?? "type", message));

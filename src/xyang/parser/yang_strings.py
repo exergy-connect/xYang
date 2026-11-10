@@ -16,13 +16,22 @@ def unescape_yang_quoted_string(content: str, quote: str) -> str:
     if quote not in ("'", '"'):
         raise ValueError(f"quote must be \"'\" or '\"', got {quote!r}")
 
+    if "\\" not in content:
+        return content
+
     out: list[str] = []
     i = 0
     n = len(content)
     while i < n:
-        ch = content[i]
-        if ch != "\\" or i + 1 >= n:
-            out.append(ch)
+        backslash = content.find("\\", i)
+        if backslash < 0:
+            out.append(content[i:])
+            break
+        if backslash > i:
+            out.append(content[i:backslash])
+            i = backslash
+        if i + 1 >= n:
+            out.append("\\")
             i += 1
             continue
         nxt = content[i + 1]

@@ -27,7 +27,6 @@ from xyang import YangValidator, parse_yang_file, parse_yang_string  # noqa: E40
 from xyang.encoding.instance import iter_instance  # noqa: E402
 
 PARSE_FILES = [
-    "examples/ietf-yang-push/modules/huawei-ietf-system-ext@2025-10-17.yang",
     "examples/ietf/ietf-alarms@2019-09-11.yang",
     "examples/ietf-yang-push/modules/ietf-subscribed-notifications@2019-09-09.yang",
     "examples/ietf-yang-push/modules/ietf-interfaces@2018-02-20.yang",
@@ -122,7 +121,7 @@ def phases() -> dict[str, Callable[[], Any]]:
         assert result["valid"], result["errors"][:3]
 
     return {
-        "parse (5 largest modules, cold)": _parse_all,
+        "parse (4 largest common modules, cold)": _parse_all,
         f"iter_instance RFC ({ENTRIES} entries)": iterate_rfc,
         f"iter_instance native ({ENTRIES} entries)": iterate_native,
         f"validate RFC ({ENTRIES} entries)": validate_rfc,

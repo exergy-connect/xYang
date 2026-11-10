@@ -65,3 +65,6 @@ artifacts/xyang-ts.mjs
 # QuickJS-ng CLI build (qjs/build.sh)
 qjs/.cache/
 qjs/dist/
+
+# Benchmark CPU profiles (ts/scripts/run-bench.mjs --cpu-prof)
+ts/bench/profiles/

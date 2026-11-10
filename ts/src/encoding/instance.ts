@@ -42,9 +42,30 @@ export type InstanceNode = {
 
 type TypeShape = Record<string, unknown>;
 
-function pointer(tokens: string[]): string {
-  if (tokens.length === 0) return "";
-  return "/" + tokens.map((token) => token.replace(/~/g, "~0").replace(/\//g, "~1")).join("/");
+function escapeToken(token: string): string {
+  if (token.indexOf("~") < 0 && token.indexOf("/") < 0) return token;
+  return token.replace(/~/g, "~0").replace(/\//g, "~1");
+}
+
+/** JSON Pointer for `token` under `prefix` (an already-escaped pointer, "" for the root). */
+function join(prefix: string, token: string): string {
+  return `${prefix}/${escapeToken(token)}`;
+}
+
+type SchemaLike = { statements?: YangStatement[]; data?: unknown };
+
+/** Per-walk caches. Statement wrappers are rebuilt by every `.statements` read, so key on `.data`. */
+type WalkCache = {
+  nodes: WeakMap<object, YangStatement[]>;
+  resolved: WeakMap<object, Map<string, YangStatement[]>>;
+  unwrapped: WeakMap<object, TypeShape | undefined>;
+};
+
+let walkCache: WalkCache | null = null;
+
+function schemaKey(schema: SchemaLike): object {
+  const data = schema.data;
+  return data && typeof data === "object" ? (data as object) : schema;
 }
 
 function keywordOf(stmt: YangStatement): string {
@@ -70,13 +91,25 @@ function memberKey(stmt: YangStatement, parent: string): string {
   return !parent || owner === parent ? name : `${owner}:${name}`;
 }
 
-function dataNodes(schema: { statements?: YangStatement[] }): YangStatement[] {
+function dataNodes(schema: SchemaLike): YangStatement[] {
+  const cache = walkCache;
+  if (!cache) return collectDataNodes(schema);
+  const key = schemaKey(schema);
+  let found = cache.nodes.get(key);
+  if (!found) {
+    found = collectDataNodes(schema);
+    cache.nodes.set(key, found);
+  }
+  return found;
+}
+
+function collectDataNodes(schema: SchemaLike): YangStatement[] {
   const out: YangStatement[] = [];
   for (const stmt of schema.statements ?? []) {
     const keyword = keywordOf(stmt);
     if (SKIP.has(stmt.keyword ?? "")) continue;
     if (keyword === "choice" || keyword === "case") {
-      out.push(...dataNodes(stmt));
+      out.push(...collectDataNodes(stmt));
       continue;
     }
     if (DATA.has(keyword)) out.push(stmt);
@@ -89,7 +122,17 @@ function leafType(stmt: YangStatement): TypeShape | undefined {
   return type && typeof type === "object" ? (type as TypeShape) : undefined;
 }
 
-function unwrap(module: YangModule, type: TypeShape | undefined, seen = new Set<string>()): TypeShape | undefined {
+function unwrap(module: YangModule, type: TypeShape | undefined): TypeShape | undefined {
+  if (!type) return type;
+  const cache = walkCache;
+  if (!cache) return unwrapType(module, type, new Set<string>());
+  if (cache.unwrapped.has(type)) return cache.unwrapped.get(type);
+  const eff = unwrapType(module, type, new Set<string>());
+  cache.unwrapped.set(type, eff);
+  return eff;
+}
+
+function unwrapType(module: YangModule, type: TypeShape | undefined, seen: Set<string>): TypeShape | undefined {
   if (!type || typeof type.name !== "string") return type;
   if (typeof type.prefix === "string" && type.prefix) return type;
   const name = type.name;
@@ -98,7 +141,7 @@ function unwrap(module: YangModule, type: TypeShape | undefined, seen = new Set<
   const typedef = typedefs[name];
   if (typedef?.type && typeof typedef.type.name === "string") {
     seen.add(name);
-    return unwrap(module, typedef.type, seen);
+    return unwrapType(module, typedef.type, seen);
   }
   return type;
 }
@@ -173,6 +216,31 @@ function decodeScalar(
   return value;
 }
 
+function resolveCached(
+  key: string,
+  schema: SchemaLike,
+  children: YangStatement[],
+  parent: string,
+  native: boolean,
+  atRoot: boolean
+): YangStatement[] {
+  const cache = walkCache;
+  if (!cache) return resolveName(key, children, parent, native, atRoot);
+  const owner = schemaKey(schema);
+  let byKey = cache.resolved.get(owner);
+  if (!byKey) {
+    byKey = new Map();
+    cache.resolved.set(owner, byKey);
+  }
+  const memo = atRoot ? `\u0000${key}` : key;
+  let hits = byKey.get(memo);
+  if (!hits) {
+    hits = resolveName(key, children, parent, native, atRoot);
+    byKey.set(memo, hits);
+  }
+  return hits;
+}
+
 function resolveName(
   key: string,
   children: YangStatement[],
@@ -211,11 +279,11 @@ function node(
 
 function walkObject(
   data: Record<string, unknown>,
-  schema: { statements?: YangStatement[] },
+  schema: SchemaLike,
   module: YangModule,
   checker: TypeChecker,
   parent: string,
-  tokens: string[],
+  prefix: string,
   native: boolean,
   atRoot: boolean
 ): InstanceNode[] {
@@ -223,15 +291,15 @@ function walkObject(
   const nodes: InstanceNode[] = [];
   const claimed = new Set<YangStatement>();
   for (const [key, raw] of Object.entries(data)) {
-    const here = [...tokens, key];
-    const hits = resolveName(key, children, parent, native, atRoot);
+    const here = join(prefix, key);
+    const hits = resolveCached(key, schema, children, parent, native, atRoot);
     if (hits.length === 0) {
-      nodes.push(node(null, raw, pointer(here), "unknown", { inputKey: key }));
+      nodes.push(node(null, raw, here, "unknown", { inputKey: key }));
       continue;
     }
     if (hits.length > 1) {
       nodes.push(
-        node(null, null, pointer(here), "ambiguous", {
+        node(null, null, here, "ambiguous", {
           errors: [["ambiguous-name", `member name '${key}' matches more than one node`]],
           include: false
         })
@@ -283,10 +351,9 @@ function walkNode(
   module: YangModule,
   checker: TypeChecker,
   parent: string,
-  tokens: string[],
+  ptr: string,
   native: boolean
 ): InstanceNode {
-  const ptr = pointer(tokens);
   const keyword = keywordOf(stmt);
   if (keyword === "anydata" || keyword === "anyxml") return node(stmt, raw, ptr, "anydata");
   if (keyword === "container") {
@@ -294,16 +361,16 @@ function walkNode(
       return node(stmt, null, ptr, "container", { errors: [["type", "container must be an object"]], include: false });
     }
     return node(stmt, null, ptr, "container", {
-      children: walkObject(raw as Record<string, unknown>, stmt, module, checker, parent, tokens, native, false)
+      children: walkObject(raw as Record<string, unknown>, stmt, module, checker, parent, ptr, native, false)
     });
   }
-  if (keyword === "list") return walkList(raw, stmt, module, checker, parent, tokens, native);
+  if (keyword === "list") return walkList(raw, stmt, module, checker, parent, ptr, native);
   if (keyword === "leaf-list") {
     if (!Array.isArray(raw)) {
       return node(stmt, null, ptr, "leaf-list", { errors: [["type", "leaf-list must be an array"]], include: false });
     }
     const children = raw.map((item, index) => {
-      const child = walkLeaf(item, stmt, module, checker, pointer([...tokens, String(index)]), native);
+      const child = walkLeaf(item, stmt, module, checker, `${ptr}/${index}`, native);
       child.kind = "leaf-list-item";
       return child;
     });
@@ -345,10 +412,9 @@ function walkList(
   module: YangModule,
   checker: TypeChecker,
   parent: string,
-  tokens: string[],
+  ptr: string,
   native: boolean
 ): InstanceNode {
-  const ptr = pointer(tokens);
   const keys = keyNames(stmt);
   let entries: Array<[string, unknown]> = [];
   let keyed = false;
@@ -376,28 +442,27 @@ function walkList(
     });
   }
   const keyLeaf = keys.length === 1 ? dataNodes(stmt).find((child) => child.name === keys[0]) : undefined;
-  const children = entries.map(([token, item], index) => {
-    const entryTokens = [...tokens, token];
-    const entryPointer = pointer(entryTokens);
+  const children = entries.map(([token, item]) => {
+    const entryPointer = join(ptr, token);
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       return node(stmt, null, entryPointer, "entry", {
         errors: [["type", "list item must be an object"]],
         include: false
       });
     }
-    const body = walkObject(item as Record<string, unknown>, stmt, module, checker, parent, entryTokens, native, false);
+    const body = walkObject(item as Record<string, unknown>, stmt, module, checker, parent, entryPointer, native, false);
     if (keyed && keyLeaf?.keyword === "leaf") {
       const converted = convertKey(token, keyLeaf, module, checker, native);
       const present = body.find((child) => child.kind === "leaf" && child.stmt?.name === keyLeaf.name && child.include);
       if (converted === NO) {
         body.push(
-          node(keyLeaf, null, pointer([...entryTokens, keyLeaf.name ?? keys[0]]), "leaf", {
+          node(keyLeaf, null, join(entryPointer, keyLeaf.name ?? keys[0]), "leaf", {
             errors: [["type", `dict key '${token}' cannot be converted to the key type`]],
             include: false
           })
         );
       } else if (!present) {
-        body.unshift(node(keyLeaf, converted, pointer([...entryTokens, keyLeaf.name ?? keys[0]]), "leaf"));
+        body.unshift(node(keyLeaf, converted, join(entryPointer, keyLeaf.name ?? keys[0]), "leaf"));
       } else if (present.value !== converted && String(present.value) !== String(converted)) {
         present.errors.push(["key-mismatch", `key leaf does not match dict key '${token}'`]);
       }
@@ -416,7 +481,15 @@ export function* iterInstance(data: unknown, module: YangModule, options: IterIn
   const schema = options.schema ?? module;
   const parent = schema === module ? (module.name ?? "") : "";
   const checker = new TypeChecker(module);
-  yield* walkObject(data as Record<string, unknown>, schema, module, checker, parent, [], native, true);
+  const outer = walkCache;
+  walkCache = { nodes: new WeakMap(), resolved: new WeakMap(), unwrapped: new WeakMap() };
+  let nodes: InstanceNode[];
+  try {
+    nodes = walkObject(data as Record<string, unknown>, schema, module, checker, parent, "", native, true);
+  } finally {
+    walkCache = outer;
+  }
+  yield* nodes;
 }
 
 export function encodingErrors(nodes: InstanceNode[]): Array<{ path: string; code: string; message: string }> {
@@ -434,13 +507,13 @@ export function projectInstance(
   parent = ""
 ): { data: Record<string, unknown>; pointerMap: Map<string, string> } {
   const pointerMap = new Map<string, string>();
-  return { data: projectLevel(nodes, parent, [], pointerMap), pointerMap };
+  return { data: projectLevel(nodes, parent, "", pointerMap), pointerMap };
 }
 
 function projectLevel(
   nodes: InstanceNode[],
   parent: string,
-  tokens: string[],
+  prefix: string,
   pointerMap: Map<string, string>
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {};
@@ -451,21 +524,21 @@ function projectLevel(
     }
     if (!item.include || !item.stmt) continue;
     const key = memberKey(item.stmt, parent);
-    const canon = [...tokens, key];
-    pointerMap.set(pointer(canon), item.pointer);
+    const canon = join(prefix, key);
+    pointerMap.set(canon, item.pointer);
     if (item.kind === "container") {
       out[key] = projectLevel(item.children, parent, canon, pointerMap);
     } else if (item.kind === "list") {
       const rows = item.children.filter((child) => child.include);
       out[key] = rows.map((entry, index) => {
-        const entryCanon = [...canon, String(index)];
-        pointerMap.set(pointer(entryCanon), entry.pointer);
+        const entryCanon = `${canon}/${index}`;
+        pointerMap.set(entryCanon, entry.pointer);
         return projectLevel(entry.children, parent, entryCanon, pointerMap);
       });
     } else if (item.kind === "leaf-list") {
       const items = item.children.filter((child) => child.include);
       out[key] = items.map((child, index) => {
-        pointerMap.set(pointer([...canon, String(index)]), child.pointer);
+        pointerMap.set(`${canon}/${index}`, child.pointer);
         return child.projected !== undefined ? child.projected : child.value;
       });
     } else if (item.kind === "leaf" || item.kind === "anydata") {
