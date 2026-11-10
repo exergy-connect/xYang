@@ -1,5 +1,6 @@
 import { YANG_INTEGER_BOUNDS } from "./json/integer-bounds";
 import { YangTokenType } from "./parser/parser-context";
+import { translateXsdRegex } from "./xsd-regex";
 
 export type TypeConstraintInput = {
   patterns?: Array<{
@@ -246,7 +247,7 @@ export class TypeSystem {
           if (typeof p?.pattern !== "string" || p.pattern.length === 0) {
             continue;
           }
-          const matched = new RegExp(`^(?:${p.pattern})$`).test(value);
+          const matched = translateXsdRegex(p.pattern).test(value);
           const invert = p.invert_match === true;
           if ((!invert && !matched) || (invert && matched)) {
             const defaultMsg = invert

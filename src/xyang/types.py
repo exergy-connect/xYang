@@ -5,7 +5,6 @@ YANG type system implementation.
 import re
 from typing import Any, Optional, Dict, List, Callable
 from dataclasses import dataclass
-from functools import lru_cache
 
 
 @dataclass
@@ -61,13 +60,11 @@ class TypeSystem:
         """
         self._validators[name] = validator
 
-    @lru_cache(maxsize=128)
-    def _get_compiled_pattern(self, pattern: str) -> Optional[re.Pattern]:
-        """Get or compile a regex pattern with caching."""
-        try:
-            return re.compile(pattern)
-        except re.error:
-            return None
+    def _get_compiled_pattern(self, pattern: str) -> re.Pattern:
+        """Translated XSD regex (cached); raises ``YangSemanticError`` for an unsupported pattern."""
+        from .xsd_regex import translate
+
+        return translate(pattern)
 
     def register_typedef(self, name: str, base_type: str, constraints: Optional[TypeConstraint] = None):
         """Register a typedef."""
@@ -127,7 +124,7 @@ class TypeSystem:
             if constraints.pattern:
                 pattern = constraints.pattern.strip("'\"")
                 compiled = self._get_compiled_pattern(pattern)
-                if compiled and not compiled.match(value):
+                if not compiled.match(value):
                     return False, f"String does not match pattern: {pattern}"
 
             # Check length

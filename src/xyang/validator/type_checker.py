@@ -7,7 +7,6 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
-import re
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
@@ -18,6 +17,7 @@ from ..identity_graph import (
     resolve_identity_value,
 )
 from ..identifier_ref import format_identifier_ref
+from ..xsd_regex import translate
 from ..module import YangModule
 from ..xpath import XPathParser
 from ..xpath.ast import ASTNode, PathNode
@@ -85,6 +85,12 @@ def _instance_identifier_path_errors(
             )
         ]
     return []
+
+
+def _compiled_pattern(entry: Any) -> Any:
+    """Translated XSD regex for a pattern entry (compiled at parse time when it is a ``YangPatternSpec``)."""
+    compiled = getattr(entry, "compiled", None)
+    return compiled if compiled is not None else translate(entry.pattern)
 
 
 def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
@@ -454,7 +460,7 @@ class TypeChecker:
                 patt = getattr(p, "pattern", None)
                 if not isinstance(patt, str) or not patt:
                     continue
-                matched = re.fullmatch(patt, s) is not None
+                matched = _compiled_pattern(p).match(s) is not None
                 invert = bool(getattr(p, "invert_match", False))
                 if (not invert and not matched) or (invert and matched):
                     default_msg = (
@@ -618,7 +624,7 @@ class TypeChecker:
             patt = getattr(p, "pattern", None)
             if not isinstance(patt, str) or not patt:
                 continue
-            matched = re.fullmatch(patt, s) is not None
+            matched = _compiled_pattern(p).match(s) is not None
             invert = bool(getattr(p, "invert_match", False))
             if (not invert and not matched) or (invert and matched):
                 default_msg = (

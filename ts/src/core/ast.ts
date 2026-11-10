@@ -3,6 +3,7 @@ import type { YangIdentifierRef } from "./identifier-ref";
 import { parseXPath } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
 import { warnDeprecatedOnce } from "./deprecation";
+import { translateXsdRegex } from "../xsd-regex";
 
 /**
  * Module object an extension invocation resolves against.
@@ -167,8 +168,12 @@ export class YangPatternSpec {
   error_message?: string;
   error_app_tag?: string;
 
+  /** Compiles the XSD regex, so an unsupported pattern fails when the module loads. */
   constructor(init: Partial<YangPatternSpec> = {}) {
     this.pattern = init.pattern ?? "";
+    if (this.pattern) {
+      translateXsdRegex(this.pattern);
+    }
     this.invert_match = init.invert_match ?? false;
     this.error_message = init.error_message;
     this.error_app_tag = init.error_app_tag;

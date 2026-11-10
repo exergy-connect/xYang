@@ -1,0 +1,6 @@
+{
+  "description": "XSD character class subtraction is not supported; the module fails to load instead of the pattern going to the host regex engine.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "unsupported XSD regex construct"
+}
