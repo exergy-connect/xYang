@@ -60,6 +60,48 @@ module dev {
     assert ok_sibling, sibling_errors
 
 
+def test_target_parsed_alone_keeps_deviated_node(tmp_path: Path) -> None:
+    """A deviation must not edit the shared parser cache. B alone still has the node."""
+    _write(
+        tmp_path,
+        "base.yang",
+        """
+module base {
+  yang-version 1.1;
+  namespace "urn:b";
+  prefix b;
+  container top {
+    leaf a { type string; }
+    leaf b { type uint8; }
+  }
+}
+""",
+    )
+    _write(
+        tmp_path,
+        "dev.yang",
+        """
+module dev {
+  yang-version 1.1;
+  namespace "urn:dev";
+  prefix d;
+  import base { prefix b; }
+  deviation "/b:top/b:a" { deviate not-supported; }
+}
+""",
+    )
+    parser = YangParser()
+    dev = parser.parse_file(tmp_path / "dev.yang")
+    deviated = dev.import_prefixes["b"]
+    removed, removed_errors, _warnings = YangValidator(deviated).validate({"top": {"a": "x"}})
+    assert not removed
+    assert any("Unknown field 'a'" in err for err in removed_errors)
+    alone = parser.parse_file(tmp_path / "base.yang")
+    ok, errors, _warnings = YangValidator(alone).validate({"top": {"a": "x"}})
+    assert ok, errors
+    assert alone is not deviated
+
+
 def test_missing_not_supported_target_is_schema_error(tmp_path: Path) -> None:
     _write(
         tmp_path,

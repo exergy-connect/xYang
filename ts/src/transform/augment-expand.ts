@@ -186,10 +186,102 @@ function removeSchemaChild(parent: ModuleData | SerializedStatement, node: Seria
   (parent as { statements: SerializedStatement[] }).statements = stmts;
 }
 
-function applyNotSupported(ctxModule: ModuleData, dev: SerializedStatement): void {
+function cowStatement(stmt: SerializedStatement): SerializedStatement {
+  return {
+    ...stmt,
+    statements: asStatements(stmt.statements).slice()
+  };
+}
+
+function cowModuleData(data: ModuleData): ModuleData {
+  const imports = (data.import_prefixes as Record<string, ModuleData> | undefined) ?? {};
+  return {
+    ...data,
+    statements: asStatements(data.statements).slice(),
+    import_prefixes: { ...imports }
+  };
+}
+
+function schemaChildIndex(parent: ModuleData | SerializedStatement, name: string): number {
+  return asStatements((parent as { statements?: unknown }).statements).findIndex(
+    (stmt) => stmt.name === name && isSchemaNode(stmt)
+  );
+}
+
+function detachCopiedPath(moduleData: ModuleData, segments: YangIdentifierRef[]): void {
+  const pathText = `/${segments.map((seg) => `${seg.prefix}:${seg.name}`).join("/")}`;
+  const top = asStatements(moduleData.statements);
+  const topIdx = schemaChildIndex(moduleData, segments[0]!.name);
+  if (topIdx < 0) {
+    throw new YangSemanticError(`deviation: no schema node for path '${pathText}'`);
+  }
+  if (segments.length === 1) {
+    top.splice(topIdx, 1);
+    moduleData.statements = top;
+    return;
+  }
+  let current = cowStatement(top[topIdx]!);
+  top[topIdx] = current;
+  moduleData.statements = top;
+  for (const seg of segments.slice(1, -1)) {
+    const children = asStatements(current.statements);
+    const idx = schemaChildIndex(current, seg.name);
+    if (idx < 0) {
+      throw new YangSemanticError(`deviation: no child '${seg.name}' under '${String(current.name ?? "?")}'`);
+    }
+    const next = cowStatement(children[idx]!);
+    children[idx] = next;
+    current.statements = children;
+    current = next;
+  }
+  const last = segments[segments.length - 1]!.name;
+  const children = asStatements(current.statements);
+  const idx = schemaChildIndex(current, last);
+  if (idx < 0) {
+    throw new YangSemanticError(`deviation: no child '${last}' under '${String(current.name ?? "?")}'`);
+  }
+  children.splice(idx, 1);
+  current.statements = children;
+}
+
+function privateTargetModule(
+  root: ModuleData,
+  owner: ModuleData,
+  copies: Map<ModuleData, ModuleData>
+): ModuleData {
+  if (owner === root) {
+    return root;
+  }
+  for (const cloned of copies.values()) {
+    if (cloned === owner) {
+      return owner;
+    }
+  }
+  const existing = copies.get(owner);
+  if (existing) {
+    return existing;
+  }
+  const cloned = cowModuleData(owner);
+  copies.set(owner, cloned);
+  const imports = (root.import_prefixes as Record<string, ModuleData> | undefined) ?? {};
+  root.import_prefixes = imports;
+  for (const [prefix, mod] of Object.entries(imports)) {
+    if (mod === owner) {
+      imports[prefix] = cloned;
+    }
+  }
+  return cloned;
+}
+
+function applyNotSupported(
+  ctxModule: ModuleData,
+  dev: SerializedStatement,
+  copies: Map<ModuleData, ModuleData>
+): void {
   const path = String(dev.deviation_path ?? dev.argument ?? "");
   const stored = dev.deviation_path_segments;
-  const segments = Array.isArray(stored) && stored.length > 0 ? (stored as YangIdentifierRef[]) : undefined;
+  const segments =
+    Array.isArray(stored) && stored.length > 0 ? (stored as YangIdentifierRef[]) : parseAbsoluteSchemaPath(path);
   let located: { parent: ModuleData | SerializedStatement; node: SerializedStatement };
   try {
     located = walkAbsoluteSchemaPath({
@@ -205,20 +297,31 @@ function applyNotSupported(ctxModule: ModuleData, dev: SerializedStatement): voi
     }
     throw err;
   }
-  removeSchemaChild(located.parent, located.node);
+  const owner = resolvePrefixedModule(ctxModule, segments[0]!.prefix!);
+  if (!owner) {
+    throw new YangSemanticError(`deviation: unknown prefix '${segments[0]!.prefix}' in path '${path}'`);
+  }
+  if (owner === ctxModule) {
+    removeSchemaChild(located.parent, located.node);
+    return;
+  }
+  const privateModule = privateTargetModule(ctxModule, owner, copies);
+  detachCopiedPath(privateModule, segments);
 }
 
 /**
  * Remove each ``deviate not-supported`` target, then drop ``deviation`` statements.
  * Same absolute-path resolution as ``augment``. A missing target is a {@link YangSemanticError}.
+ * A target in another module is removed on a copy owned by this build; the cached module is unchanged.
  */
 export function applyDeviations(module: YangModule): YangModule {
   const data = module.data;
   const statements = asStatements(data.statements);
   const deviations = statements.filter((s) => s.keyword === "deviation");
+  const copies = new Map<ModuleData, ModuleData>();
   for (const dev of deviations) {
     if (dev.not_supported === true) {
-      applyNotSupported(data, dev);
+      applyNotSupported(data, dev, copies);
     }
   }
   if (deviations.length > 0) {

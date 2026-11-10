@@ -280,8 +280,15 @@ class YangParser:
         sub.import_prefixes.clear()
 
     def parse_file(self, file_path: Path) -> YangModule:
-        """Parse a YANG file (resolves ``include`` relative to this file's directory)."""
+        """Parse a YANG file (resolves ``include`` relative to this file's directory).
+
+        A file already loaded into this parser's import cache is returned as that
+        object. Deviations applied for another module must not have changed it.
+        """
         path = file_path.resolve()
+        cached = self._module_cache.get(path)
+        if cached is not None:
+            return cached
         self._import_pending.clear()
         self._include_stack = [path]
         try:

@@ -59,6 +59,49 @@ module dev {
     expect(sibling.isValid).toBe(true);
   });
 
+  it("keeps the node when the target module is parsed alone after the deviation", () => {
+    const dir = mkdtempSync(join(tmpdir(), "xyang-deviation-cache-"));
+    const basePath = writeModule(
+      dir,
+      "base.yang",
+      `
+module base {
+  yang-version 1.1;
+  namespace "urn:b";
+  prefix b;
+  container top {
+    leaf a { type string; }
+    leaf b { type uint8; }
+  }
+}
+`
+    );
+    const devPath = writeModule(
+      dir,
+      "dev.yang",
+      `
+module dev {
+  yang-version 1.1;
+  namespace "urn:dev";
+  prefix d;
+  import base { prefix b; }
+  deviation "/b:top/b:a" { deviate not-supported; }
+}
+`
+    );
+    const parser = new YangParser();
+    const dev = parser.parseFile(devPath);
+    const deviatedData = (dev.data.import_prefixes as Record<string, Record<string, unknown>>).b;
+    const deviated = new YangModule(deviatedData!, { kind: "file", value: basePath, name: basePath });
+    const removed = new YangValidator(deviated).validate({ top: { a: "x" } });
+    expect(removed.isValid).toBe(false);
+    expect(removed.errors.some((err) => err.includes("Unknown field 'a'"))).toBe(true);
+    const alone = parser.parseFile(basePath);
+    const kept = new YangValidator(alone).validate({ top: { a: "x" } });
+    expect(kept.isValid).toBe(true);
+    expect(alone.data).not.toBe(deviatedData);
+  });
+
   it("reports a missing not-supported target as a schema error", () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-deviation-missing-"));
     const path = writeModule(

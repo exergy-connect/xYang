@@ -7,6 +7,7 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 
 from __future__ import annotations
 
+import copy
 from typing import Callable, Dict, List, Optional
 
 from .ast import (
@@ -184,19 +185,129 @@ def _remove_schema_child(parent: YangStatementList, child: YangStatement) -> Non
     )
 
 
-def _apply_not_supported(ctx_module: YangModule, dev: YangDeviationStmt) -> None:
+def _cow_statement(stmt: YangStatement) -> YangStatement:
+    """Shallow copy whose child lists are new. Descendants stay shared until copied."""
+    cloned = copy.copy(stmt)
+    cloned.statements = list(stmt.statements)
+    if isinstance(stmt, YangChoiceStmt):
+        cloned.cases = list(stmt.cases)
+    return cloned
+
+
+def _cow_module(mod: YangModule) -> YangModule:
+    """Module copy for one deviating build. The parser cache keeps *mod*."""
+    cloned = copy.copy(mod)
+    cloned.statements = list(mod.statements)
+    cloned.import_prefixes = dict(mod.import_prefixes)
+    return cloned
+
+
+def _schema_child_slot(parent: YangStatementList, name: str) -> tuple[str, int] | None:
+    if isinstance(parent, YangChoiceStmt):
+        for index, case in enumerate(parent.cases):
+            if case.name == name and case.get_schema_node() is not None:
+                return ("cases", index)
+    for index, stmt in enumerate(parent.statements):
+        if getattr(stmt, "name", None) == name and stmt.get_schema_node() is not None:
+            return ("statements", index)
+    return None
+
+
+def _child_at(parent: YangStatementList, slot: tuple[str, int]) -> YangStatement:
+    attr, index = slot
+    return getattr(parent, attr)[index]
+
+
+def _put_child(parent: YangStatementList, slot: tuple[str, int], stmt: YangStatement) -> None:
+    attr, index = slot
+    getattr(parent, attr)[index] = stmt
+
+
+def _drop_child_at(parent: YangStatementList, slot: tuple[str, int]) -> None:
+    attr, index = slot
+    del getattr(parent, attr)[index]
+
+
+def _detach_copied_path(module: YangModule, segments: List[YangIdentifierRef]) -> None:
+    """Remove the node named by *segments* from a module copy, copying ancestors only."""
+    slot = _schema_child_slot(module, segments[0].name)
+    if slot is None:
+        raise YangSemanticError(
+            f"deviation: no schema node for path "
+            f"'/{'/'.join(f'{s.prefix}:{s.name}' for s in segments)}'"
+        )
+    if len(segments) == 1:
+        _drop_child_at(module, slot)
+        return
+    current = _cow_statement(_child_at(module, slot))
+    _put_child(module, slot, current)
+    for seg in segments[1:-1]:
+        slot = _schema_child_slot(current, seg.name)
+        if slot is None:
+            raise YangSemanticError(
+                f"deviation: no child {seg.name!r} under {getattr(current, 'name', '?')!r}"
+            )
+        nxt = _cow_statement(_child_at(current, slot))
+        _put_child(current, slot, nxt)
+        current = nxt
+    slot = _schema_child_slot(current, segments[-1].name)
+    if slot is None:
+        raise YangSemanticError(
+            f"deviation: no child {segments[-1].name!r} under {getattr(current, 'name', '?')!r}"
+        )
+    _drop_child_at(current, slot)
+
+
+def _private_target_module(
+    root: YangModule,
+    owner: YangModule,
+    copies: Dict[int, YangModule],
+) -> YangModule:
+    """Return a module this build may edit. Cached imports are copied once."""
+    if owner is root:
+        return root
+    for cloned in copies.values():
+        if cloned is owner:
+            return owner
+    existing = copies.get(id(owner))
+    if existing is not None:
+        return existing
+    cloned = _cow_module(owner)
+    copies[id(owner)] = cloned
+    for prefix, mod in list(root.import_prefixes.items()):
+        if mod is owner:
+            root.import_prefixes[prefix] = cloned
+    return cloned
+
+
+def _apply_not_supported(
+    root: YangModule,
+    dev: YangDeviationStmt,
+    copies: Dict[int, YangModule],
+) -> None:
     path = dev.target_path
+    segments = dev.target_path_segments or None
     try:
         parent, node = _walk_absolute_schema_path(
-            ctx_module=ctx_module,
+            ctx_module=root,
             path=path,
             kind="deviation",
             find_toplevel=_find_toplevel_schema_child,
-            segments=dev.target_path_segments or None,
+            segments=segments,
         )
     except YangSyntaxError as exc:
         raise YangSemanticError(str(exc)) from exc
-    _remove_schema_child(parent, node)
+    resolved = list(segments) if segments else parse_absolute_schema_path(path)
+    owner = root.resolve_prefixed_module(resolved[0].prefix or "")
+    if owner is None:
+        raise YangSemanticError(
+            f"deviation: unknown prefix {resolved[0].prefix!r} in path {path!r}"
+        )
+    if owner is root:
+        _remove_schema_child(parent, node)
+        return
+    private = _private_target_module(root, owner, copies)
+    _detach_copied_path(private, resolved)
 
 
 def apply_deviations(root: YangModule) -> None:
@@ -204,12 +315,15 @@ def apply_deviations(root: YangModule) -> None:
 
     Uses the same absolute-path resolution as ``augment`` (import prefixes included).
     A path that does not name a schema node is a :class:`YangSemanticError`.
+    A target in another module is removed on a copy owned by *root*; the module
+    object in the parser cache is left unchanged.
     ``deviate add|replace|delete`` are not applied; the parser already warned.
     """
     pending = [s for s in root.statements if isinstance(s, YangDeviationStmt)]
+    copies: Dict[int, YangModule] = {}
     for dev in pending:
         if dev.not_supported:
-            _apply_not_supported(root, dev)
+            _apply_not_supported(root, dev, copies)
     if pending:
         root.statements = [
             s for s in root.statements if not isinstance(s, YangDeviationStmt)
