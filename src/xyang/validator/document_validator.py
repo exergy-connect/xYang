@@ -563,8 +563,7 @@ class DocumentValidator:
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
-            if self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer):
-                return  # duplicate key; skip per-entry validation
+            self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer)
             for i, entry in enumerate(val):
                 if not isinstance(entry, dict):
                     continue

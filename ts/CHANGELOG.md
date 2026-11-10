@@ -12,6 +12,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 ### Fixed
 
 - **`empty` encoding:** shared cases confirm that `[null]` is the only valid RFC 7951 value, and `null`, `true`, and `""` are `type` errors ([#59](https://github.com/exergy-connect/xYang/issues/59)).
+- **Duplicate list keys:** a duplicate key is still reported once at the list, and the entries are validated anyway, so errors inside an entry are no longer hidden ([#67](https://github.com/exergy-connect/xYang/issues/67)).
 - **`deviate not-supported`:** the target node is removed when the module is built, including a node in an imported module. The removal is applied to a copy owned by the deviating module, so loading the target module again from the same parser cache still has that node. Data for the removed node is an unknown field on the copy. `deviate add`, `replace`, and `delete` are still skipped, with a warning that names the kind and the path ([#64](https://github.com/exergy-connect/xYang/issues/64)).
 - **JSON Schema `convert`:** `description` is omitted when the YANG node has none, instead of `"description": ""`. A missing `description` is still read back as an empty string ([#83](https://github.com/exergy-connect/xYang/issues/83)).
 - **`if-feature`:** an unquoted argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).

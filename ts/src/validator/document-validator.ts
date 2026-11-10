@@ -359,8 +359,8 @@ export class DocumentValidator {
       this.checkElementCount(stmt, value.length, path, errors);
       const keyRaw = typeof stmt.data.key === "string" ? stmt.data.key.trim() : "";
       const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).map((k) => k.trim()).filter(Boolean) : [];
-      if (this.ctx.constraintChecks && keyNames.length > 0 && this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors)) {
-        return;
+      if (this.ctx.constraintChecks && keyNames.length > 0) {
+        this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors);
       }
       for (let i = 0; i < value.length; i += 1) {
         const item = value[i];
@@ -715,7 +715,7 @@ export class DocumentValidator {
 
   /**
    * RFC 7950: list instance keys must be unique within the list.
-   * @returns true if a duplicate was found (caller should skip per-entry validation).
+   * Reports the first duplicate only. @returns true if a duplicate was found.
    */
   private checkListKeyUniqueness(
     val: unknown[],
