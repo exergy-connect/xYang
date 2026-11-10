@@ -4,9 +4,10 @@ Tests for XPath parser covering expression cases and error paths.
 
 import pytest
 
-from xyang.errors import XPathSyntaxError
+from xyang.errors import UnsupportedXPathError, XPathSyntaxError
 from xyang.xpath import Context, Node, XPathEvaluator, XPathParser
-from xyang.xpath.ast import BinaryOpNode, LiteralNode, PathNode
+from xyang.xpath.ast import BinaryOpNode, FunctionCallNode, LiteralNode, PathNode
+from xyang.xpath.functions import FUNCTIONS, UNKNOWN_FUNCTION_CODE
 
 
 # --- parse() error paths ---
@@ -204,3 +205,21 @@ def test_invalid_number_raises():
     # Tokenizer may still hand us something that parses as NUMBER but fails int/float
     with pytest.raises((XPathSyntaxError, ValueError)):
         XPathParser("1e2e3").parse()
+
+
+@pytest.mark.parametrize("name", sorted(FUNCTIONS))
+def test_supported_function_parses(name):
+    """Every function in the shared table compiles."""
+    expr = "not(.)" if name == "not" else f"{name}()"
+    ast = XPathParser(expr).parse()
+    assert isinstance(ast, (FunctionCallNode, LiteralNode))
+
+
+def test_unknown_function_is_compile_error():
+    """An unknown function name fails at parse time with the shared code."""
+    with pytest.raises(UnsupportedXPathError) as exc:
+        XPathParser("no-such(.)").parse()
+    assert exc.value.code == UNKNOWN_FUNCTION_CODE
+    assert UNKNOWN_FUNCTION_CODE in str(exc.value)
+    with pytest.raises(UnsupportedXPathError):
+        XPathParser("NO-SUCH()").parse()

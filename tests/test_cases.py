@@ -83,8 +83,10 @@ def _validate(impl, case_dir, case, data):
 @pytest.mark.parametrize("case_dir,case,inst,impl", list(_params()))
 def test_case(case_dir, case, inst, impl):
     if case.get("schema_error"):
-        with pytest.raises(Exception):
+        with pytest.raises(Exception) as excinfo:
             _validate(impl, case_dir, case, None)
+        if case.get("code"):
+            assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
     raw = _validate(impl, case_dir, case, inst["data"])

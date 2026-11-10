@@ -3,6 +3,9 @@ module m {
   namespace "urn:m";
   prefix m;
 
+  identity base;
+  identity child { base base; }
+
   container top {
     must "count(items) <= 2";
     leaf name {
@@ -20,6 +23,50 @@ module m {
     list items {
       key id;
       leaf id { type string; }
+    }
+    leaf flag {
+      type string;
+      must "boolean('x')";
+    }
+    leaf empty-flag {
+      type string;
+      must "boolean('')";
+    }
+    leaf yes {
+      type boolean;
+      must ". = true()";
+    }
+    leaf no {
+      type boolean;
+      must ". = false()";
+    }
+    leaf anchor {
+      type string;
+      must "current() = 'here'";
+    }
+    leaf text {
+      type string;
+      must "string(.) = 'ab'";
+    }
+    leaf qty {
+      type string;
+      must "number(.) = 3";
+    }
+    leaf slug {
+      type string;
+      must "translate(., '_', '') = 'ab'";
+    }
+    leaf ref {
+      type leafref { path "../items/id"; }
+      must "deref(.) = 'k'";
+    }
+    leaf kind {
+      type identityref { base base; }
+      must "derived-from(., 'm:base')";
+    }
+    leaf kind-self {
+      type identityref { base base; }
+      must "derived-from-or-self(., 'm:child')";
     }
   }
 }

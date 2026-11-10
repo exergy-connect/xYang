@@ -165,8 +165,9 @@ export class UnsupportedXPathError extends Error {
   readonly messageText: string;
   readonly expression?: string;
   readonly construct?: string;
+  readonly code?: string;
 
-  constructor(message: string, options: { expression?: string; construct?: string } = {}) {
+  constructor(message: string, options: { expression?: string; construct?: string; code?: string } = {}) {
     const parts = [message];
     if (options.construct) {
       parts.push(`Unsupported construct: ${options.construct}`);
@@ -180,6 +181,7 @@ export class UnsupportedXPathError extends Error {
     this.messageText = message;
     this.expression = options.expression;
     this.construct = options.construct;
+    this.code = options.code;
   }
 
   override toString(): string {

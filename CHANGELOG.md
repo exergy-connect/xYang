@@ -15,6 +15,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **XPath:** an unknown function name is a compile error (`xpath-unknown-function`) in Python and TypeScript. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).
 - **TypeScript validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python. Data that violates these bounds now fails validation.
 - **TypeScript tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first. Node.js 24 is pinned in `.nvmrc` and `.node-version`; CI reads `.nvmrc` and also tests the latest LTS.
 - **TypeScript CLI:** piped stdout is no longer truncated at Node's 64 KiB pipe buffer. `xyang-ts` flushes stdout and stderr before exiting, including large `convert` JSON Schemas.

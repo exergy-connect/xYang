@@ -50,7 +50,7 @@ when they share the schema.
 | `description` | What the case checks; cite the RFC section when behavior is subtle. |
 | `module` | Primary module file in the case directory. |
 | `features` | Optional. Module name -> enabled feature names. Omitted: every declared feature is enabled. A module missing from the map keeps all its features. |
-| `schema_error` | Optional. `true` means loading the module must fail; the case then has no `instances`. |
+| `schema_error` | Optional. `true` means loading the module must fail; the case then has no `instances`. Optional `code` is a substring the load error must contain, the same in every implementation. |
 | `xfail` | Optional, on the case or on an instance (instance entries override case entries). Implementation id (`python`, `ts`, `cli`) -> reason. |
 | `instances[].data` | The JSON instance document (RFC 7951). |
 | `instances[].valid` | Whether the implementation must report no errors. |

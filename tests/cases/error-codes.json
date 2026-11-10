@@ -10,6 +10,7 @@
     ["max-elements", "allows at most \\d+$"],
     ["duplicate-key", "^Duplicate key in list '"],
     ["choice-multiple-cases", "allows only one case"],
+    ["xpath-unknown-function", "xpath-unknown-function: unknown XPath function"],
     ["xpath-error", "^Error evaluating (must|when) expression"],
     ["must", "^must constraint not satisfied on '"],
     ["leafref", "^[Ll]eafref"],

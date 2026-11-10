@@ -1,0 +1,6 @@
+{
+  "description": "An unknown XPath function name is rejected when the must expression is compiled, with code xpath-unknown-function. contains(), substring-before(), substring-after(), and starts-with() are in this set until #85.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "xpath-unknown-function"
+}

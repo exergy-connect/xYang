@@ -18,7 +18,7 @@ from .ast import (
     LiteralNode,
     PathNode,
 )
-from .functions import FUNCTIONS
+from .functions import FUNCTIONS, unknown_function_error
 from .node import Context, Node
 from .schema_nav import SchemaNav
 from .utils import (
@@ -321,4 +321,6 @@ class XPathEvaluator:
         self, ast: FunctionCallNode, ctx: Context, node: Node
     ) -> Any:
         fn = FUNCTIONS.get(ast.name.lower())
-        return fn(self, ast, ctx, node) if fn is not None else None
+        if fn is None:
+            raise unknown_function_error(ast.name)
+        return fn(self, ast, ctx, node)

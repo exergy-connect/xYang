@@ -147,7 +147,13 @@ class XPathEvaluationError(ValueError):
 class UnsupportedXPathError(ValueError):
     """XPath expression contains unsupported constructs."""
     
-    def __init__(self, message: str, expression: str = None, construct: str = None):
+    def __init__(
+        self,
+        message: str,
+        expression: str = None,
+        construct: str = None,
+        code: str | None = None,
+    ):
         """
         Initialize unsupported XPath error.
         
@@ -155,10 +161,12 @@ class UnsupportedXPathError(ValueError):
             message: Error message
             expression: The XPath expression that contains unsupported constructs
             construct: The specific unsupported construct (optional)
+            code: Stable error code shared with the TypeScript implementation
         """
         self.message = message
         self.expression = expression
         self.construct = construct
+        self.code = code
         
         # Build detailed error message
         parts = [message]
