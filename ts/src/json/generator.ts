@@ -13,8 +13,8 @@ import {
   JSON_TYPE_ARRAY,
   JSON_TYPE_FREE_FORM,
   JSON_TYPE_OBJECT,
-  leafTypeToSchema
 } from "./type-constants";
+import { leafTypeToSchema } from "../types/registry";
 
 /** Emit ``description`` only when *text* is a non-empty string. */
 function withDescription(out: Record<string, unknown>, text: unknown): void {

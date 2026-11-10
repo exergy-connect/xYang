@@ -4,21 +4,20 @@
  */
 import { YangModule, YangStatement } from "../core/model";
 import { ExactDecimal } from "../types";
+import {
+  DECIMAL_TYPE_NAMES,
+  NUMBER_INTEGER_NAMES,
+  QUOTED_INTEGER_NAMES,
+  REGISTRY,
+  STRINGISH_NAMES
+} from "../types/registry";
 import { TypeChecker } from "../validator/type-checker";
 
-const INT64 = new Set(["int64", "uint64"]);
-const DECIMAL = new Set(["decimal64", "number"]);
-const STRINGISH = new Set([
-  "string",
-  "enumeration",
-  "bits",
-  "binary",
-  "identityref",
-  "instance-identifier",
-  "leafref"
-]);
-const SMALL_INT = new Set(["int8", "int16", "int32", "uint8", "uint16", "uint32", "integer"]);
-const BUILTINS = new Set([...INT64, ...DECIMAL, ...STRINGISH, ...SMALL_INT, "boolean", "empty", "union"]);
+const INT64 = QUOTED_INTEGER_NAMES;
+const DECIMAL = DECIMAL_TYPE_NAMES;
+const STRINGISH = STRINGISH_NAMES;
+const SMALL_INT = new Set([...NUMBER_INTEGER_NAMES, "integer"]);
+const BUILTINS = new Set([...Object.keys(REGISTRY), ...DECIMAL, "integer"]);
 const INTEGER_KEY = new Set([...INT64, ...SMALL_INT]);
 const ENCODED = new Set([...INT64, ...DECIMAL, "empty"]);
 const INT_TEXT = /^-?\d+$/;

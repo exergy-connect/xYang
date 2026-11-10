@@ -10,8 +10,23 @@ import logging
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
-from ..json.integer_bounds import YANG_INTEGER_BOUNDS
 from ..errors import XPathSyntaxError
+from ..types.registry import (
+    BINARY,
+    BITS,
+    BOOLEAN,
+    DECIMAL_TYPE_NAMES,
+    EMPTY,
+    ENUMERATION,
+    IDENTITYREF,
+    INSTANCE_IDENTIFIER,
+    INTEGER_TYPE_NAMES,
+    REGISTRY,
+    STRING,
+    UNION,
+    Builtin,
+    integer_json_error,
+)
 from ..identity_graph import (
     identityref_value_valid,
     resolve_identity_value,
@@ -111,20 +126,8 @@ def _type_has_restrictions(type_stmt: YangTypeStmt) -> bool:
     return bool(type_stmt.patterns)
 
 
-_INTEGER_TYPE_NAMES = frozenset(
-    {
-        "int8",
-        "int16",
-        "int32",
-        "int64",
-        "uint8",
-        "uint16",
-        "uint32",
-        "uint64",
-        "integer",
-    }
-)
-_DECIMAL_TYPE_NAMES = frozenset({"decimal64", "number"})
+_INTEGER_TYPE_NAMES = INTEGER_TYPE_NAMES
+_DECIMAL_TYPE_NAMES = DECIMAL_TYPE_NAMES
 _STRING_TYPE_NAMES = frozenset(
     {
         "string",
@@ -182,29 +185,18 @@ class TypeChecker:
                 )
             return [_issue("type", f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}")]
 
-        if name == "union":
-            return self._check_union(
+        spec = REGISTRY.get(name)
+        if spec is not None:
+            return self._check_builtin(
+                spec,
                 value,
                 type_stmt,
                 path,
                 root_data,
                 root_schema,
-                ctx=ctx,
-                evaluator=evaluator,
-                leafref_current=leafref_current,
-            )
-        if name == "identityref":
-            return self._check_identityref(value, type_stmt, root_schema)
-        if name == "instance-identifier":
-            return self._check_instance_identifier(value, type_stmt, ctx, evaluator)
-        if name == "leafref":
-            return self._check_leafref(
-                value,
-                type_stmt,
-                path,
-                ctx=ctx,
-                evaluator=evaluator,
-                leafref_current=leafref_current,
+                ctx,
+                evaluator,
+                leafref_current,
             )
         if name in _STRING_TYPE_NAMES:
             return self._check_string(value, type_stmt)
@@ -213,16 +205,6 @@ class TypeChecker:
             return self._check_integer(value, type_stmt)
         if name in _DECIMAL_TYPE_NAMES:
             return self._check_decimal(value, type_stmt)
-        if name == "boolean":
-            return self._check_boolean(value)
-        if name == "enumeration":
-            return self._check_enum(value, type_stmt)
-        if name == "bits":
-            return self._check_bits(value, type_stmt)
-        if name == "empty":
-            return self._check_empty(value)
-        if name == "binary":
-            return self._check_binary(value, type_stmt)
         # Resolve typedef and check against the underlying type
         if getattr(root_schema, "get_typedef", None) is not None:
             typedef = root_schema.get_typedef(name)
@@ -239,6 +221,63 @@ class TypeChecker:
                     leafref_current,
                 )
         return []
+
+    def _check_builtin(
+        self,
+        spec: Builtin,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        path: str,
+        root_data: Any,
+        root_schema: Any,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node],
+    ) -> List[TypeIssue]:
+        """Dispatch a built-in through the type registry."""
+        family = spec.family
+        if family == UNION:
+            return self._check_union(
+                value,
+                type_stmt,
+                path,
+                root_data,
+                root_schema,
+                ctx=ctx,
+                evaluator=evaluator,
+                leafref_current=leafref_current,
+            )
+        if family == "leafref":
+            return self._check_leafref(
+                value,
+                type_stmt,
+                path,
+                ctx=ctx,
+                evaluator=evaluator,
+                leafref_current=leafref_current,
+            )
+        if family == IDENTITYREF:
+            return self._check_identityref(value, type_stmt, root_schema)
+        if family == INSTANCE_IDENTIFIER:
+            return self._check_instance_identifier(value, type_stmt, ctx, evaluator)
+        if family == STRING:
+            return self._check_string(value, type_stmt)
+        if family == "integer":
+            return self._check_integer(value, type_stmt)
+        if family == "decimal":
+            return self._check_decimal(value, type_stmt)
+        if family == BOOLEAN:
+            return self._check_boolean(value)
+        if family == ENUMERATION:
+            return self._check_enum(value, type_stmt)
+        if family == BITS:
+            return self._check_bits(value, type_stmt)
+        if family == EMPTY:
+            return self._check_empty(value)
+        if family == BINARY:
+            return self._check_binary(value, type_stmt)
+        issue = spec.check_value(value, type_stmt)
+        return [] if issue is None else [issue]
 
     def _check_typedef_reference(
         self,
@@ -319,8 +358,9 @@ class TypeChecker:
         return []
 
     def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> List[TypeIssue]:
-        if not isinstance(value, str):
-            return [_issue("identityref", f"identityref value must be a string, got {type(value).__name__}")]
+        gate = REGISTRY[IDENTITYREF].check_value(value, type_stmt)
+        if gate is not None:
+            return [gate]
         if not isinstance(root_schema, YangModule):
             return [_issue("identityref", "identityref validation requires module schema")]
         bases = getattr(type_stmt, "identityref_bases", None) or []
@@ -346,13 +386,9 @@ class TypeChecker:
         evaluator: Any,
     ) -> List[TypeIssue]:
         """RFC 7950 instance-identifier: string path; optional require-instance existence check."""
-        if not isinstance(value, str):
-            return [
-                _issue(
-                    "instance-identifier",
-                    f"instance-identifier value must be a string, got {type(value).__name__}",
-                )
-            ]
+        gate = REGISTRY[INSTANCE_IDENTIFIER].check_value(value, type_stmt)
+        if gate is not None:
+            return [gate]
         if not getattr(type_stmt, "require_instance", True):
             return []
         s = value.strip()
@@ -446,8 +482,9 @@ class TypeChecker:
         return []
 
     def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
-        if not isinstance(value, str):
-            return [_issue("type", f"Expected string, got {_json_type_name(value)}")]
+        gate = REGISTRY[STRING].check_value(value, type_stmt)
+        if gate is not None:
+            return [gate]
         errors: List[TypeIssue] = []
         s = value
         if type_stmt.length:
@@ -485,27 +522,22 @@ class TypeChecker:
         # RFC 7951 encodes int8..int32 and uint8..uint32 as JSON numbers (#63).
         # int64/uint64 strings are decoded by the instance iterator before this check;
         # a leftover string is the wrong JSON type in either mode.
-        if isinstance(value, bool) or isinstance(value, str):
-            return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
-        if isinstance(value, int):
-            n = value
-        elif isinstance(value, float):
-            if not value.is_integer():
-                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
-            try:
-                n = int(value)
-            except (OverflowError, ValueError):
-                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+        spec = REGISTRY.get(type_stmt.name or "")
+        if spec is not None and spec.family == "integer":
+            gate = spec.check_value(value, type_stmt)
         else:
-            try:
-                n = int(value)
-            except (TypeError, ValueError):
-                return [_issue("type", f"Expected integer, got {_json_type_name(value)}")]
+            gate = integer_json_error(value)
+        if gate is not None:
+            return [gate]
+        if isinstance(value, int) and not isinstance(value, bool):
+            n = value
+        else:
+            n = int(value)
         if type_stmt.range:
             issue = self._numeric_range_issue(n, type_stmt.range)
             if issue is not None:
                 return [issue]
-        bounds = YANG_INTEGER_BOUNDS.get(type_stmt.name or "")
+        bounds = spec.bounds if spec is not None and spec.bounds is not None else None
         if bounds:
             lo, hi = bounds
             if n < lo:
@@ -516,15 +548,13 @@ class TypeChecker:
 
     def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         # bool is a subclass of int; float(True) is 1.0 and must not pass as a number.
-        if isinstance(value, bool):
-            return [_issue("type", f"Expected number, got {_json_type_name(value)}")]
         # RFC decimal64 strings are decoded to Decimal before this check.
-        if isinstance(value, str):
-            return [_issue("type", f"Expected number, got {_json_type_name(value)}")]
-        try:
-            n = float(value)
-        except (TypeError, ValueError):
-            return [_issue("type", f"Value {value!r} is not a valid number")]
+        from ..types.registry import DECIMAL64 as _DECIMAL64
+
+        gate = REGISTRY[_DECIMAL64].check_value(value, type_stmt)
+        if gate is not None:
+            return [gate]
+        n = float(value)
         if type_stmt.range:
             issue = self._numeric_range_issue(n, type_stmt.range)
             if issue is not None:
@@ -543,67 +573,28 @@ class TypeChecker:
                     ]
         return []
 
+    def _one(self, issue: Optional[TypeIssue]) -> List[TypeIssue]:
+        return [] if issue is None else [issue]
+
     def _check_boolean(self, value: Any) -> List[TypeIssue]:
-        if value not in (True, False, "true", "false"):
-            return [_issue("type", f"Value {value!r} is not a valid boolean (expected true or false)")]
-        return []
+        return self._one(REGISTRY[BOOLEAN].check_value(value, YangTypeStmt(name=BOOLEAN)))
 
     def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
-        if not type_stmt.enums:
-            return [
-                _issue(
-                    "enum",
-                    "enumeration type has no enum definitions in schema; cannot validate instance data",
-                )
-            ]
-        allowed = [str(e) for e in type_stmt.enums]
-        if str(value) not in allowed:
-            return [
-                _issue(
-                    "enum",
-                    f"Value {value!r} is not one of the allowed enum values: " f"{', '.join(allowed)}",
-                )
-            ]
-        return []
+        return self._one(REGISTRY[ENUMERATION].check_value(value, type_stmt))
 
     def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
-        if not isinstance(value, str):
-            return [
-                _issue(
-                    "bits",
-                    f"bits value must be a string (space-sep bit names), got {type(value).__name__}",
-                )
-            ]
-        bits = type_stmt.bits or []
-        allowed = {b.name for b in bits}
-        if not allowed:
-            return [_issue("bits", "bits type has no bit definitions")]
-        parts = [p for p in (s.strip() for s in value.split()) if p]
-        seen: set[str] = set()
-        for token in parts:
-            if token in seen:
-                return [_issue("bits", f"Duplicate bit {token!r} in bits value")]
-            seen.add(token)
-            if token not in allowed:
-                return [_issue("bits", f"Unknown bit {token!r}; allowed: {', '.join(sorted(allowed))}")]
-        return []
+        return self._one(REGISTRY[BITS].check_value(value, type_stmt))
 
     def _check_empty(self, value: Any) -> List[TypeIssue]:
         # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
-        if value is not None:
-            return [_issue("type", f"Empty type leaf should have no value, got {value!r}")]
-        return []
+        return self._one(REGISTRY[EMPTY].check_value(value, YangTypeStmt(name=EMPTY)))
 
     def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
-        if not isinstance(value, str):
-            return [
-                _issue(
-                    "type",
-                    f"binary value must be a base64-encoded string, got {type(value).__name__}",
-                )
-            ]
+        gate = REGISTRY[BINARY].check_value(value, type_stmt)
+        if gate is not None:
+            return [gate]
         s = value.strip()
         try:
             if not s:

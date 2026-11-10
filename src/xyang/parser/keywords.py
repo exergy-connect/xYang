@@ -52,6 +52,8 @@ DEFAULT = "default"
 ERROR_MESSAGE = "error-message"
 ERROR_APP_TAG = "error-app-tag"
 
+from ..types.registry import INT64
+
 # Type substatements and builtins
 BINARY = "binary"
 BITS = "bits"
@@ -64,7 +66,6 @@ INSTANCE_IDENTIFIER = "instance-identifier"
 INT8 = "int8"
 INT16 = "int16"
 INT32 = "int32"
-INT64 = "int64"
 LEAFREF = "leafref"
 STRING_KW = "string"
 UINT8 = "uint8"

@@ -27,28 +27,27 @@ from ..ast import (
     YangTypeStmt,
 )
 from ..module import YangModule
-from ..validator.type_checker import _DECIMAL_TYPE_NAMES, _INTEGER_TYPE_NAMES, TypeChecker
+from ..types.registry import (
+    DECIMAL_TYPE_NAMES,
+    EMPTY,
+    INTEGER_TYPE_NAMES,
+    NUMBER_INTEGER_NAMES,
+    QUOTED_INTEGER_NAMES,
+    REGISTRY,
+    STRINGISH_NAMES,
+)
+from ..validator.type_checker import TypeChecker
 from ..xpath.evaluator import XPathEvaluator
 from ..xpath.node import Context, Node
 from .rfc7951 import defining_module_name, member_keys_cached
 
-_INT64 = frozenset({"int64", "uint64"})
-_DECIMAL = _DECIMAL_TYPE_NAMES
-_STRINGISH = frozenset(
-    {
-        "string",
-        "enumeration",
-        "bits",
-        "binary",
-        "identityref",
-        "instance-identifier",
-        "leafref",
-    }
-)
-_SMALL_INT = frozenset({"int8", "int16", "int32", "uint8", "uint16", "uint32", "integer"})
-_INTEGER_KEY = _INTEGER_TYPE_NAMES
-_ENCODED = _INT64 | _DECIMAL | frozenset({"empty"})
-_BUILTINS = _INT64 | _DECIMAL | _STRINGISH | _SMALL_INT | frozenset({"boolean", "empty", "union"})
+_INT64 = QUOTED_INTEGER_NAMES
+_DECIMAL = DECIMAL_TYPE_NAMES
+_STRINGISH = STRINGISH_NAMES
+_SMALL_INT = NUMBER_INTEGER_NAMES | {"integer"}
+_INTEGER_KEY = INTEGER_TYPE_NAMES
+_ENCODED = _INT64 | _DECIMAL | frozenset({EMPTY})
+_BUILTINS = frozenset(REGISTRY) | {"number", "integer"}
 _INT_TEXT = re.compile(r"-?\d+")
 _DEC_TEXT = re.compile(r"-?\d+(\.\d+)?")
 _NO = object()
