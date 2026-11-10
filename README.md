@@ -106,6 +106,8 @@ xyang-ts validate examples/meta-model.yang data.json
 xyang-ts convert examples/meta-model.yang
 ```
 
+Python `convert` writes `<file>.yang.json` (or `-o PATH`); `xyang-ts convert` prints to stdout.
+
 Shared flags: `--include-path DIR` (repeatable) for imports; on **validate**, `--anydata-validation off|complete|candidate` and `--anydata-module PATH` for validating RFC 7951 qualified JSON under `anydata` (see below).
 
 ### Python API
@@ -120,6 +122,8 @@ data = {"data-model": {"name": "example", "entities": []}}
 is_valid, errors, warnings = validator.validate(data)
 ```
 
+`validate()` returns a tuple `(is_valid, errors, warnings)`; each error is a string `"<path>: <message>"` with paths like `/top/items[id='a']/v`.
+
 ### TypeScript API
 
 ```typescript
@@ -131,7 +135,9 @@ const validator = new YangValidator(module);
 const result = validator.validate({ "data-model": { name: "example", entities: [] } });
 ```
 
-Instance input (the JSON document, not the schema `.yang.json` file) is strict RFC 7951 unless you opt into native JSON. There is no fallback between the two. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. Native JSON (`--native-json`, Python `native_json=True`, TypeScript `{ nativeJson: true }`) allows a single-key list as an object keyed by the key value, JSON numbers for those 64-bit and decimal types, and `empty` as `null`. An iterator walks the input as written and yields one tree; error paths are JSON Pointers into that input (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
+`validate()` returns `{ isValid, errors, warnings }`; paths look like `top.items[0].v`.
+
+RFC 7951 JSON is the default for instance input (the JSON document, not the schema `.yang.json` file). There is no fallback between encodings. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. `--native-json` (Python `native_json=True`, TypeScript `{ nativeJson: true }`, case.json `"encoding": "native"`) enables native dict-style input: keyed objects for single-key lists, bare names, JSON numbers, and `null` for empty. Error paths point at the input as written (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
 
 ---
 
@@ -193,6 +199,81 @@ Use `candidate` instead of `complete` for structural checks only (no `must` / `w
 - NETCONF/RESTCONF servers, XML instance encoding, or incremental edit validation.
 - Full RFC 7950 surface (`rpc` / `notification` / `deviation` instance validation is limited or skipped—see **FEATURES.md**).
 - A generic XPath 1.0 engine; expressions are evaluated in **schema context** for `must` / `when` (subset documented in **FEATURES.md**).
+
+Supported subset and RFC deviations: [FEATURES.md](FEATURES.md#deviations-from-rfc-7950--rfc-7951).
+
+Grammar: [design/yang-ebnf-supported-constructs.md](design/yang-ebnf-supported-constructs.md).
+
+---
+
+## Browser ES modules
+
+The npm package includes a self-contained browser ESM bundle at
+`@exergy-connect/xyang/browser`. Resolve that export in your build tool or copy
+the resolved file and its adjacent source map to your static assets:
+
+```js
+import { parseYangString, YangValidator } from "@exergy-connect/xyang/browser";
+
+const validator = new YangValidator(parseYangString(source));
+const result = validator.validate(data);
+```
+
+Validation rejects unknown fields at the document root, in containers, and in
+list entries. Arbitrary payloads belong in modeled `anydata` or `anyxml` nodes.
+The browser bundle supports string parsing; filesystem parsing requires Node.js.
+
+## Infer required YANG features (API)
+
+For models gated by feature names or positive `and` conjunctions, infer the
+minimum feature requirements from the elements present in an instance:
+
+```typescript
+import { parseYangString, inferRequiredFeatures } from "@exergy-connect/xyang";
+
+const module = parseYangString(`module example {
+  namespace "urn:example"; prefix ex;
+  feature statistics;
+  leaf count { if-feature "statistics"; type uint32; }
+}`);
+const features = inferRequiredFeatures(module, { "example:count": 3 });
+// ["example:statistics"]
+```
+
+The result is a sorted, deduplicated list of `module-name:feature` strings (not
+import prefixes). It includes gates on enclosing containers, lists, choices and
+cases, gates carried by expanded uses/augments, and transitive feature
+prerequisites. Absent nodes contribute nothing; an empty document returns `[]`.
+Parse with uses expansion enabled (the default). Both unqualified members in the
+current module and module-qualified members are accepted.
+
+This API infers requirements from member presence; it does not validate values,
+mandatory nodes, or other constraints. `anydata` and `anyxml` contents are opaque.
+It throws for unknown or ambiguous instance members, unknown features, cyclic
+prerequisites, malformed container/list structure, and encountered expressions
+outside simple feature atoms or `and` conjunctions (`or`, `not`, and parentheses
+are unsupported). Unsupported conditions on absent branches are not evaluated.
+
+Python exposes the same workflow:
+
+```python
+from xyang import parse_yang_string, infer_required_features
+
+module = parse_yang_string('''module example {
+  namespace "urn:example"; prefix ex;
+  feature statistics;
+  leaf count { if-feature "statistics"; type uint32; }
+}''')
+features = infer_required_features(module, {"example:count": 3})
+# ["example:statistics"]
+```
+
+Python raises `ValueError` for the inference errors described above. TypeScript
+throws `Error`. The returned list contains requirements only; when configuring a
+validator (Python `YangValidator(module, enabled_features_by_module=...)`,
+TypeScript `new YangValidator(module, { enabledFeaturesByModule })`), group these
+names by module and explicitly supply empty sets for modules with no required
+features, since omitted modules otherwise default to all features enabled.
 
 ---
 
@@ -328,73 +409,3 @@ Pin `version` to a release tag that published the `xyang-ts.mjs` asset.
 ## License
 
 MIT License
-
-
-### Browser ES modules
-
-The npm package includes a self-contained browser ESM bundle at
-`@exergy-connect/xyang/browser`. Resolve that export in your build tool or copy
-the resolved file and its adjacent source map to your static assets:
-
-```js
-import { parseYangString, YangValidator } from "@exergy-connect/xyang/browser";
-
-const validator = new YangValidator(parseYangString(source));
-const result = validator.validate(data);
-```
-
-Validation rejects unknown fields at the document root, in containers, and in
-list entries. Arbitrary payloads belong in modeled `anydata` or `anyxml` nodes.
-The browser bundle supports string parsing; filesystem parsing requires Node.js.
-
-## Infer required YANG features (API)
-
-For models gated by feature names or positive `and` conjunctions, infer the
-minimum feature requirements from the elements present in an instance:
-
-```typescript
-import { parseYangString, inferRequiredFeatures } from "@exergy-connect/xyang";
-
-const module = parseYangString(`module example {
-  namespace "urn:example"; prefix ex;
-  feature statistics;
-  leaf count { if-feature "statistics"; type uint32; }
-}`);
-const features = inferRequiredFeatures(module, { "example:count": 3 });
-// ["example:statistics"]
-```
-
-The result is a sorted, deduplicated list of `module-name:feature` strings (not
-import prefixes). It includes gates on enclosing containers, lists, choices and
-cases, gates carried by expanded uses/augments, and transitive feature
-prerequisites. Absent nodes contribute nothing; an empty document returns `[]`.
-Parse with uses expansion enabled (the default). Both unqualified members in the
-current module and module-qualified members are accepted.
-
-This API infers requirements from member presence; it does not validate values,
-mandatory nodes, or other constraints. `anydata` and `anyxml` contents are opaque.
-It throws for unknown or ambiguous instance members, unknown features, cyclic
-prerequisites, malformed container/list structure, and encountered expressions
-outside simple feature atoms or `and` conjunctions (`or`, `not`, and parentheses
-are unsupported). Unsupported conditions on absent branches are not evaluated.
-
-Python exposes the same workflow:
-
-```python
-from xyang import parse_yang_string, infer_required_features
-
-module = parse_yang_string('''module example {
-  namespace "urn:example"; prefix ex;
-  feature statistics;
-  leaf count { if-feature "statistics"; type uint32; }
-}''')
-features = infer_required_features(module, {"example:count": 3})
-# ["example:statistics"]
-```
-
-Python raises `ValueError` for the inference errors described above. TypeScript
-throws `Error`. The returned list contains requirements only; when configuring a
-validator (Python `YangValidator(module, enabled_features_by_module=...)`,
-TypeScript `new YangValidator(module, { enabledFeaturesByModule })`), group these
-names by module and explicitly supply empty sets for modules with no required
-features, since omitted modules otherwise default to all features enabled.
