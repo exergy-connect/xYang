@@ -35,6 +35,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`empty` encoding (Python + TypeScript):** shared cases confirm the strict RFC 7951 form: `[null]` is the only valid value, and `null`, `true`, and `""` are `type` errors (`tests/cases/types/boolean-empty`) ([#59](https://github.com/exergy-connect/xYang/issues/59)).
 - **`deviate not-supported` (Python + TypeScript):** the target node is removed when the module is built, including a node in an imported module. The removal is applied to a copy owned by the deviating module, so loading the target module again from the same parser cache still has that node. Data for the removed node is an unknown field on the copy. `deviate add`, `replace`, and `delete` are still skipped, with a warning that names the kind and the path ([#64](https://github.com/exergy-connect/xYang/issues/64)).
 - **JSON Schema `convert` (Python + TypeScript):** `description` is omitted when the YANG node has none, instead of `"description": ""`. A missing `description` is still read back as an empty string ([#83](https://github.com/exergy-connect/xYang/issues/83)).
 - **Parser (Python + TypeScript):** an unquoted `if-feature` argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).

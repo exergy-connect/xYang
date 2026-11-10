@@ -7,6 +7,12 @@
     { "name": "boolean as word", "data": { "top": { "flag": "yes" } }, "valid": false,
       "errors": [{ "path": "/top/flag", "code": "type" }] },
     { "name": "empty with a value", "data": { "top": { "marker": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/marker", "code": "type" }] },
+    { "name": "empty as bare null (#59)", "data": { "top": { "marker": null } }, "valid": false,
+      "errors": [{ "path": "/top/marker", "code": "type" }] },
+    { "name": "empty as true (#59)", "data": { "top": { "marker": true } }, "valid": false,
+      "errors": [{ "path": "/top/marker", "code": "type" }] },
+    { "name": "empty as empty string (#59)", "data": { "top": { "marker": "" } }, "valid": false,
       "errors": [{ "path": "/top/marker", "code": "type" }] }
   ]
 }
