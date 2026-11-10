@@ -13,11 +13,12 @@ from .ast import (
     YangAugmentStmt,
     YangCaseStmt,
     YangChoiceStmt,
+    YangDeviationStmt,
     YangStatement,
     YangStatementList,
 )
 from .module import YangModule
-from .errors import YangSyntaxError
+from .errors import YangSemanticError, YangSyntaxError
 from .identifier_ref import YangIdentifierRef, parse_absolute_schema_path
 from .refine_expand import copy_yang_statement
 from .uses_expand import (
@@ -75,19 +76,19 @@ def resolve_augment_target(
     )
 
 
-def resolve_absolute_schema_path(
+def _walk_absolute_schema_path(
     *,
     ctx_module: YangModule,
     path: str,
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
     segments: List[YangIdentifierRef] | None = None,
-) -> YangStatement:
-    """Resolve absolute ``/prefix:name/...`` path into a target schema node.
+) -> tuple[YangStatementList, YangStatement]:
+    """Resolve ``/prefix:name/...`` to ``(parent, target)``.
 
     ``find_toplevel`` provides the root-node lookup strategy for segment 0.
     Child traversal semantics are shared (choice/case aware) via
-    ``_find_named_schema_child``.
+    ``_find_named_schema_child``. The parent of a top-level node is its module.
     """
     if not segments:
         try:
@@ -114,6 +115,7 @@ def resolve_absolute_schema_path(
             f"{kind}: no top-level schema node {name0!r} in module {mod0.name!r} "
             f"(path {path!r})"
         )
+    parent: YangStatementList = mod0
     for seg in segments[1:]:
         pref = seg.prefix
         nm = seg.name
@@ -132,13 +134,86 @@ def resolve_absolute_schema_path(
                 f"{kind}: no child {nm!r} under node in path {path!r} "
                 f"(after {cur.name!r})"
             )
+        parent = cur
         cur = nxt
+    return parent, cur
+
+
+def resolve_absolute_schema_path(
+    *,
+    ctx_module: YangModule,
+    path: str,
+    kind: str,
+    find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
+    segments: List[YangIdentifierRef] | None = None,
+) -> YangStatement:
+    """Resolve absolute ``/prefix:name/...`` path into a target schema node.
+
+    ``find_toplevel`` provides the root-node lookup strategy for segment 0.
+    Child traversal semantics are shared (choice/case aware) via
+    ``_find_named_schema_child``.
+    """
+    _parent, cur = _walk_absolute_schema_path(
+        ctx_module=ctx_module,
+        path=path,
+        kind=kind,
+        find_toplevel=find_toplevel,
+        segments=segments,
+    )
     if not hasattr(cur, "statements"):
         raise YangSyntaxError(
             f"{kind}: target node {getattr(cur, 'name', '?')!r} cannot contain "
             f"schema substatements (path {path!r})"
         )
     return cur
+
+
+def _remove_schema_child(parent: YangStatementList, child: YangStatement) -> None:
+    """Drop *child* from *parent* (choice cases live on ``cases``, not ``statements``)."""
+    if isinstance(parent, YangChoiceStmt) and child in parent.cases:
+        parent.cases.remove(child)
+        if child in parent.statements:
+            parent.statements.remove(child)
+        return
+    if child in parent.statements:
+        parent.statements.remove(child)
+        return
+    name = getattr(child, "name", "?")
+    raise YangSemanticError(
+        f"deviation: target node {name!r} is not a child of its parent"
+    )
+
+
+def _apply_not_supported(ctx_module: YangModule, dev: YangDeviationStmt) -> None:
+    path = dev.target_path
+    try:
+        parent, node = _walk_absolute_schema_path(
+            ctx_module=ctx_module,
+            path=path,
+            kind="deviation",
+            find_toplevel=_find_toplevel_schema_child,
+            segments=dev.target_path_segments or None,
+        )
+    except YangSyntaxError as exc:
+        raise YangSemanticError(str(exc)) from exc
+    _remove_schema_child(parent, node)
+
+
+def apply_deviations(root: YangModule) -> None:
+    """Remove each ``deviate not-supported`` target, then drop the ``deviation`` statements.
+
+    Uses the same absolute-path resolution as ``augment`` (import prefixes included).
+    A path that does not name a schema node is a :class:`YangSemanticError`.
+    ``deviate add|replace|delete`` are not applied; the parser already warned.
+    """
+    pending = [s for s in root.statements if isinstance(s, YangDeviationStmt)]
+    for dev in pending:
+        if dev.not_supported:
+            _apply_not_supported(root, dev)
+    if pending:
+        root.statements = [
+            s for s in root.statements if not isinstance(s, YangDeviationStmt)
+        ]
 
 
 def _stamp_defining_module(stmt: YangStatement, module_name: str) -> None:
@@ -202,6 +277,13 @@ def apply_augmentations_across_module_map(modules: Dict[str, YangModule]) -> Non
     for aug_module, aug in pending:
         target = resolve_augment_target(aug_module, aug.augment_path, aug)
         _merge_augment_into_target(aug, target, source_module=aug_module)
+    seen_dev: set[int] = set()
+    for mod in modules.values():
+        oid = id(mod)
+        if oid in seen_dev:
+            continue
+        seen_dev.add(oid)
+        apply_deviations(mod)
     for mod in modules.values():
         mod.statements = [
             s for s in mod.statements if not isinstance(s, YangAugmentStmt)

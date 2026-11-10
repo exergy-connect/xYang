@@ -6,7 +6,7 @@
  * preserving ``uses``/grouping structure for round-trip convert paths.
  */
 
-import { YangSyntaxError } from "../core/errors";
+import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import { SerializedStatement, YangModule } from "../core/model";
 
@@ -102,13 +102,13 @@ export function resolveAugmentTarget(
   });
 }
 
-export function resolveAbsoluteSchemaPath(options: {
+function walkAbsoluteSchemaPath(options: {
   ctxModule: ModuleData;
   path: string;
   segments?: YangIdentifierRef[];
   kind: string;
   findToplevel: (module: ModuleData, name: string) => SerializedStatement | undefined;
-}): SerializedStatement {
+}): { parent: ModuleData | SerializedStatement; node: SerializedStatement } {
   const { ctxModule, path, kind, findToplevel } = options;
   let segments = options.segments;
   if (!segments || segments.length === 0) {
@@ -135,6 +135,7 @@ export function resolveAbsoluteSchemaPath(options: {
         `(path '${path}')`
     );
   }
+  let parent: ModuleData | SerializedStatement = mod0;
   for (const seg of segments.slice(1)) {
     const pref = seg.prefix!;
     const nm = seg.name;
@@ -147,18 +148,83 @@ export function resolveAbsoluteSchemaPath(options: {
         `${kind}: no child '${nm}' under node in path '${path}' ` + `(after '${String(cur.name ?? "")}')`
       );
     }
+    parent = cur;
     cur = nxt;
   }
+  return { parent, node: cur };
+}
+
+export function resolveAbsoluteSchemaPath(options: {
+  ctxModule: ModuleData;
+  path: string;
+  segments?: YangIdentifierRef[];
+  kind: string;
+  findToplevel: (module: ModuleData, name: string) => SerializedStatement | undefined;
+}): SerializedStatement {
+  const cur = walkAbsoluteSchemaPath(options).node;
   if (!Array.isArray(cur.statements) && cur.statements !== undefined) {
     throw new YangSyntaxError(
-      `${kind}: target node '${String(cur.name ?? "?")}' cannot contain ` +
-        `schema substatements (path '${path}')`
+      `${options.kind}: target node '${String(cur.name ?? "?")}' cannot contain ` +
+        `schema substatements (path '${options.path}')`
     );
   }
   if (cur.statements === undefined) {
     cur.statements = [];
   }
   return cur;
+}
+
+function removeSchemaChild(parent: ModuleData | SerializedStatement, node: SerializedStatement): void {
+  const stmts = asStatements((parent as { statements?: unknown }).statements);
+  const idx = stmts.indexOf(node);
+  if (idx < 0) {
+    throw new YangSemanticError(
+      `deviation: target node '${String(node.name ?? "?")}' is not a child of its parent`
+    );
+  }
+  stmts.splice(idx, 1);
+  (parent as { statements: SerializedStatement[] }).statements = stmts;
+}
+
+function applyNotSupported(ctxModule: ModuleData, dev: SerializedStatement): void {
+  const path = String(dev.deviation_path ?? dev.argument ?? "");
+  const stored = dev.deviation_path_segments;
+  const segments = Array.isArray(stored) && stored.length > 0 ? (stored as YangIdentifierRef[]) : undefined;
+  let located: { parent: ModuleData | SerializedStatement; node: SerializedStatement };
+  try {
+    located = walkAbsoluteSchemaPath({
+      ctxModule,
+      path,
+      segments,
+      kind: "deviation",
+      findToplevel: findToplevelSchemaChild
+    });
+  } catch (err) {
+    if (err instanceof YangSyntaxError) {
+      throw new YangSemanticError(err.message);
+    }
+    throw err;
+  }
+  removeSchemaChild(located.parent, located.node);
+}
+
+/**
+ * Remove each ``deviate not-supported`` target, then drop ``deviation`` statements.
+ * Same absolute-path resolution as ``augment``. A missing target is a {@link YangSemanticError}.
+ */
+export function applyDeviations(module: YangModule): YangModule {
+  const data = module.data;
+  const statements = asStatements(data.statements);
+  const deviations = statements.filter((s) => s.keyword === "deviation");
+  for (const dev of deviations) {
+    if (dev.not_supported === true) {
+      applyNotSupported(data, dev);
+    }
+  }
+  if (deviations.length > 0) {
+    data.statements = statements.filter((s) => s.keyword !== "deviation");
+  }
+  return module;
 }
 
 function stampDefiningModule(stmt: SerializedStatement, moduleName: string): void {
@@ -267,6 +333,14 @@ export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModul
     const path = String(aug.augment_path ?? aug.argument ?? "");
     const target = resolveAugmentTarget(mod.data, path, aug);
     mergeAugmentIntoTarget(aug, target, String(mod.name ?? ""));
+  }
+  const seenDev = new Set<ModuleData>();
+  for (const mod of list) {
+    if (seenDev.has(mod.data)) {
+      continue;
+    }
+    seenDev.add(mod.data);
+    applyDeviations(mod);
   }
   for (const mod of list) {
     const stmts = asStatements(mod.data.statements);

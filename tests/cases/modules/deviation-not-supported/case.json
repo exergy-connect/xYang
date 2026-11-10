@@ -1,0 +1,9 @@
+{
+  "description": "deviate not-supported removes the target node. Instance data for that node is an unknown field.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "sibling remains", "data": { "top": { "b": 1 } }, "valid": true },
+    { "name": "removed leaf", "data": { "top": { "a": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/a", "code": "unknown-field" }] }
+  ]
+}

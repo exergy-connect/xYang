@@ -38,6 +38,7 @@ class ModuleStatementParser:
             kw.IDENTITY: self._parsers.parse_identity,
             kw.EXTENSION: self._parsers.parse_extension_stmt,
             kw.AUGMENT: self._parsers.parse_augment,
+            kw.DEVIATION: self._parsers.parse_deviation,
             kw.YANG_VERSION: self.parse_yang_version,
             kw.NAMESPACE: self.parse_namespace,
             kw.PREFIX: self.parse_prefix,

@@ -444,7 +444,6 @@
                               "oneOf": [
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "primitive": {
                                       "$ref": "#/$defs/primitive-type-name",
@@ -539,7 +538,6 @@
                                 },
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "enum": {
                                       "type": "array",
@@ -777,7 +775,6 @@
                                       "oneOf": [
                                         {
                                           "type": "object",
-                                          "description": "",
                                           "properties": {
                                             "primitive": {
                                               "$ref": "#/$defs/primitive-type-name",
@@ -872,7 +869,6 @@
                                         },
                                         {
                                           "type": "object",
-                                          "description": "",
                                           "properties": {
                                             "enum": {
                                               "type": "array",
@@ -920,7 +916,6 @@
                                 },
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "entity": {
                                       "$ref": "#/$defs/entity-name",
@@ -984,7 +979,6 @@
                                           },
                                           "type": {
                                             "type": "object",
-                                            "description": "",
                                             "x-yang": {
                                               "type": "container",
                                               "choice": {
@@ -1077,7 +1071,6 @@
                                                     "oneOf": [
                                                       {
                                                         "type": "object",
-                                                        "description": "",
                                                         "properties": {
                                                           "primitive": {
                                                             "$ref": "#/$defs/primitive-type-name",
@@ -1172,7 +1165,6 @@
                                                       },
                                                       {
                                                         "type": "object",
-                                                        "description": "",
                                                         "properties": {
                                                           "enum": {
                                                             "type": "array",
@@ -1492,7 +1484,6 @@
                                   },
                                   "type": {
                                     "type": "object",
-                                    "description": "",
                                     "x-yang": {
                                       "type": "container",
                                       "choice": {
@@ -1585,7 +1576,6 @@
                                             "oneOf": [
                                               {
                                                 "type": "object",
-                                                "description": "",
                                                 "properties": {
                                                   "primitive": {
                                                     "$ref": "#/$defs/primitive-type-name",
@@ -1680,7 +1670,6 @@
                                               },
                                               {
                                                 "type": "object",
-                                                "description": "",
                                                 "properties": {
                                                   "enum": {
                                                     "type": "array",
@@ -2286,7 +2275,6 @@
                               "oneOf": [
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "primitive": {
                                       "$ref": "#/$defs/primitive-type-name",
@@ -2381,7 +2369,6 @@
                                 },
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "enum": {
                                       "type": "array",
@@ -2619,7 +2606,6 @@
                                       "oneOf": [
                                         {
                                           "type": "object",
-                                          "description": "",
                                           "properties": {
                                             "primitive": {
                                               "$ref": "#/$defs/primitive-type-name",
@@ -2714,7 +2700,6 @@
                                         },
                                         {
                                           "type": "object",
-                                          "description": "",
                                           "properties": {
                                             "enum": {
                                               "type": "array",
@@ -2762,7 +2747,6 @@
                                 },
                                 {
                                   "type": "object",
-                                  "description": "",
                                   "properties": {
                                     "entity": {
                                       "$ref": "#/$defs/entity-name",
@@ -2826,7 +2810,6 @@
                                           },
                                           "type": {
                                             "type": "object",
-                                            "description": "",
                                             "x-yang": {
                                               "type": "container",
                                               "choice": {
@@ -2919,7 +2902,6 @@
                                                     "oneOf": [
                                                       {
                                                         "type": "object",
-                                                        "description": "",
                                                         "properties": {
                                                           "primitive": {
                                                             "$ref": "#/$defs/primitive-type-name",
@@ -3014,7 +2996,6 @@
                                                       },
                                                       {
                                                         "type": "object",
-                                                        "description": "",
                                                         "properties": {
                                                           "enum": {
                                                             "type": "array",
@@ -3334,7 +3315,6 @@
                                   },
                                   "type": {
                                     "type": "object",
-                                    "description": "",
                                     "x-yang": {
                                       "type": "container",
                                       "choice": {
@@ -3427,7 +3407,6 @@
                                             "oneOf": [
                                               {
                                                 "type": "object",
-                                                "description": "",
                                                 "properties": {
                                                   "primitive": {
                                                     "$ref": "#/$defs/primitive-type-name",
@@ -3522,7 +3501,6 @@
                                               },
                                               {
                                                 "type": "object",
-                                                "description": "",
                                                 "properties": {
                                                   "enum": {
                                                     "type": "array",

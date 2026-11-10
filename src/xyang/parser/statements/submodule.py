@@ -34,6 +34,7 @@ class SubmoduleStatementParser:
             kw.IDENTITY: self._parsers.parse_identity,
             kw.GROUPING: self._parsers.parse_grouping,
             kw.AUGMENT: self._parsers.parse_augment,
+            kw.DEVIATION: self._parsers.parse_deviation,
             kw.CONTAINER: self._parsers.parse_container,
             kw.LIST: self._parsers.parse_list,
             kw.LEAF: self._parsers.parse_leaf,

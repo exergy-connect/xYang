@@ -19,6 +19,7 @@ import {
   AnydataStatementParser,
   AnyxmlStatementParser,
   AugmentStatementParser,
+  DeviationStatementParser,
   BitsStatementParser,
   ChoiceStatementParser,
   ContainerStatementParser,
@@ -107,6 +108,7 @@ export class StatementParsers {
   readonly anydata_parser = new AnydataStatementParser(this);
   readonly anyxml_parser = new AnyxmlStatementParser(this);
   private readonly augment_parser = new AugmentStatementParser(this);
+  private readonly deviation_parser = new DeviationStatementParser(this);
   readonly bits_parser = new BitsStatementParser(this);
   readonly choice_parser = new ChoiceStatementParser(this);
   readonly container_parser = new ContainerStatementParser(this);
@@ -181,6 +183,7 @@ export class StatementParsers {
       return { __class__: "YangStatement", keyword: "grouping", statements: [] };
     },
     [kw.AUGMENT]: (tokens, context) => this.fromAst(this.augment_parser.parse_augment(tokens, context)),
+    [kw.DEVIATION]: (tokens, context) => this.deviation_parser.parse_deviation(tokens, context),
     [kw.REVISION]: (tokens, context) => {
       this.revision_parser.parse_revision(tokens, context);
       return { __class__: "YangStatement", keyword: "revision", statements: [] };

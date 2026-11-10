@@ -52,6 +52,12 @@ from .schema_keys import (
     json_schema_defs_uri,
 )
 
+def _with_description(out: dict[str, Any], text: Any) -> None:
+    """Emit ``description`` only when *text* is a non-empty string."""
+    if isinstance(text, str) and text != "":
+        out[JsonSchemaKey.DESCRIPTION] = text
+
+
 _ANY_JSON_INSTANCE_SCHEMA: dict[str, Any] = {
     JsonSchemaKey.TYPE: [
         "array",
@@ -453,16 +459,15 @@ def _type_to_schema_impl(
         examples: list[str] = ["", bit_names[0]]
         if len(bit_names) > 1:
             examples.append(" ".join(bit_names))
-        return {
-            JsonSchemaKey.TYPE: "string",
-            JsonSchemaKey.DESCRIPTION: desc,
-            JsonSchemaKey.PATTERN: _bits_space_separated_pattern(bit_names),
-            JsonSchemaKey.EXAMPLES: examples,
-            JsonSchemaKey.X_YANG: {
-                XYangKey.TYPE: XYangTypeValue.BITS,
-                XYangKey.BITS: bits_obj,
-            },
+        out = {JsonSchemaKey.TYPE: "string"}
+        _with_description(out, desc)
+        out[JsonSchemaKey.PATTERN] = _bits_space_separated_pattern(bit_names)
+        out[JsonSchemaKey.EXAMPLES] = examples
+        out[JsonSchemaKey.X_YANG] = {
+            XYangKey.TYPE: XYangTypeValue.BITS,
+            XYangKey.BITS: bits_obj,
         }
+        return out
     if name == "boolean":
         return {JsonSchemaKey.TYPE: "boolean"}
     if name in YANG_INTEGER_BOUNDS:
@@ -514,11 +519,12 @@ def _type_to_schema_impl(
 
 def _must_to_json(must: YangMustStmt) -> dict[str, Any]:
     """Convert YangMustStmt to x-yang must entry."""
-    return {
+    out = {
         XYangMustEntryKey.MUST: must.expression,
         XYangMustEntryKey.ERROR_MESSAGE: must.error_message or "",
-        JsonSchemaKey.DESCRIPTION: must.description or "",
     }
+    _with_description(out, must.description)
+    return out
 
 
 def _when_to_xyang_json(when: YangWhenStmt) -> dict[str, Any]:
@@ -638,11 +644,9 @@ def _merge_oneof_branches_with_base(
 
 def _choice_meta_xyang(choice_stmt: YangChoiceStmt) -> dict[str, Any]:
     """x-yang.choice metadata for hoisted (sibling-less or merged) choices."""
-    meta: dict[str, Any] = {
-        JsonSchemaKey.NAME: choice_stmt.name,
-        JsonSchemaKey.DESCRIPTION: choice_stmt.description or "",
-        XYangKey.MANDATORY: bool(getattr(choice_stmt, "mandatory", False)),
-    }
+    meta: dict[str, Any] = {JsonSchemaKey.NAME: choice_stmt.name}
+    _with_description(meta, choice_stmt.description)
+    meta[XYangKey.MANDATORY] = bool(getattr(choice_stmt, "mandatory", False))
     ff = _if_features_for_xyang(choice_stmt)
     if ff:
         meta[XYangKey.IF_FEATURES] = ff
@@ -679,7 +683,8 @@ def _choice_to_object_body(
                 case_keys.append(s.name)
         if case_keys:
             case_entries.append((case, case_props, case_keys))
-    out: dict[str, Any] = {JsonSchemaKey.DESCRIPTION: choice_stmt.description or ""}
+    out: dict[str, Any] = {}
+    _with_description(out, choice_stmt.description)
     mandatory = getattr(choice_stmt, "mandatory", False)
     case_branch = []
     for case_st, cp, keys in case_entries:
@@ -687,16 +692,13 @@ def _choice_to_object_body(
         ff = _if_features_for_xyang(case_st)
         if ff:
             case_xy[XYangKey.IF_FEATURES] = ff
-        case_branch.append(
-            {
-                JsonSchemaKey.TYPE: "object",
-                JsonSchemaKey.DESCRIPTION: (case_st.description or ""),
-                JsonSchemaKey.PROPERTIES: cp,
-                JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
-                JsonSchemaKey.REQUIRED: list(keys),
-                JsonSchemaKey.X_YANG: case_xy,
-            }
-        )
+        case_obj: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
+        _with_description(case_obj, case_st.description)
+        case_obj[JsonSchemaKey.PROPERTIES] = cp
+        case_obj[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
+        case_obj[JsonSchemaKey.REQUIRED] = list(keys)
+        case_obj[JsonSchemaKey.X_YANG] = case_xy
+        case_branch.append(case_obj)
     if mandatory and case_entries:
         out[JsonSchemaKey.ONE_OF] = case_branch
     elif not mandatory and len(case_entries) > 1:
@@ -750,11 +752,9 @@ def _container_stmt_to_property(
             ),
             XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
         }
-        out: dict[str, Any] = {
-            JsonSchemaKey.TYPE: "object",
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: xy_container,
-        }
+        out: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
+        _with_description(out, stmt.description)
+        out[JsonSchemaKey.X_YANG] = xy_container
         if JsonSchemaKey.ONE_OF in ch_body:
             out[JsonSchemaKey.ONE_OF] = _merge_oneof_branches_with_base(
                 ch_body[JsonSchemaKey.ONE_OF], base_props, base_required
@@ -789,12 +789,10 @@ def _container_stmt_to_property(
             ),
             XYangKey.CHOICE: _choice_meta_xyang(ch0),
         }
-        out = {
-            JsonSchemaKey.TYPE: "object",
-            # Choice text lives in x-yang.choice.description; do not merge onto the container.
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: xy_container,
-        }
+        out = {JsonSchemaKey.TYPE: "object"}
+        # Choice text lives in x-yang.choice.description; do not merge onto the container.
+        _with_description(out, stmt.description)
+        out[JsonSchemaKey.X_YANG] = xy_container
         if JsonSchemaKey.ONE_OF in ch_body:
             out[JsonSchemaKey.ONE_OF] = ch_body[JsonSchemaKey.ONE_OF]
         elif ch_body.get(JsonSchemaKey.PROPERTIES):
@@ -803,18 +801,16 @@ def _container_stmt_to_property(
         return out
 
     props, required = _child_property_map(children, typedef_names, module, stmt)
-    out = {
-        JsonSchemaKey.TYPE: "object",
-        JsonSchemaKey.DESCRIPTION: stmt.description or "",
-        JsonSchemaKey.X_YANG: _build_xyang(
-            "container",
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=when_stmt,
-            presence=getattr(stmt, "presence", None),
-            if_features=_if_features_for_xyang(stmt),
-            config=_explicit_config(stmt),
-        ),
-    }
+    out = {JsonSchemaKey.TYPE: "object"}
+    _with_description(out, stmt.description)
+    out[JsonSchemaKey.X_YANG] = _build_xyang(
+        "container",
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=when_stmt,
+        presence=getattr(stmt, "presence", None),
+        if_features=_if_features_for_xyang(stmt),
+        config=_explicit_config(stmt),
+    )
     if props:
         out[JsonSchemaKey.PROPERTIES] = props
     out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
@@ -910,9 +906,9 @@ def _list_stmt_to_property(
     out = {
         JsonSchemaKey.TYPE: "array",
         JsonSchemaKey.ITEMS: items,
-        JsonSchemaKey.DESCRIPTION: stmt.description or "",
-        JsonSchemaKey.X_YANG: list_xy,
     }
+    _with_description(out, stmt.description)
+    out[JsonSchemaKey.X_YANG] = list_xy
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
         out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
     if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
@@ -931,17 +927,17 @@ def _leaf_stmt_to_property(
     if type_stmt and type_stmt.name in typedef_names:
         out: dict[str, Any] = {
             JsonSchemaKey.REF: json_schema_defs_uri(type_stmt.name),
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: _build_xyang(
-                "leaf",
-                must_list=getattr(stmt, "must_statements", None) or [],
-                when_stmt=when_stmt,
-                mandatory=stmt.mandatory or None,
-                if_features=_if_features_for_xyang(stmt),
-                units=stmt.units or None,
-                config=_explicit_config(stmt),
-            ),
         }
+        _with_description(out, stmt.description)
+        out[JsonSchemaKey.X_YANG] = _build_xyang(
+            "leaf",
+            must_list=getattr(stmt, "must_statements", None) or [],
+            when_stmt=when_stmt,
+            mandatory=stmt.mandatory or None,
+            if_features=_if_features_for_xyang(stmt),
+            units=stmt.units or None,
+            config=_explicit_config(stmt),
+        )
     else:
         lr_anchor = _leafref_context_parent(module, parent)
         type_schema = _type_to_schema(
@@ -963,10 +959,12 @@ def _leaf_stmt_to_property(
         if type_schema.get(JsonSchemaKey.X_YANG):
             leaf_xyang = {**leaf_xyang, **type_schema.get(JsonSchemaKey.X_YANG, {})}
         out = {
-            **{k: v for k, v in type_schema.items() if k != JsonSchemaKey.X_YANG},
-            JsonSchemaKey.DESCRIPTION: stmt.description or "",
-            JsonSchemaKey.X_YANG: leaf_xyang,
+            k: v
+            for k, v in type_schema.items()
+            if k not in (JsonSchemaKey.X_YANG, JsonSchemaKey.DESCRIPTION)
         }
+        _with_description(out, stmt.description)
+        out[JsonSchemaKey.X_YANG] = leaf_xyang
     if stmt.default is not None:
         yang_type = _leaf_yang_type_name(type_stmt, typedef_names, module)
         schema_type = out.get(JsonSchemaKey.TYPE)
@@ -987,17 +985,16 @@ def _anydata_anyxml_stmt_to_property(
         if isinstance(stmt, YangAnydataStmt)
         else XYangTypeValue.ANYXML
     )
-    return {
-        **_ANY_JSON_INSTANCE_SCHEMA,
-        JsonSchemaKey.DESCRIPTION: stmt.description or "",
-        JsonSchemaKey.X_YANG: _build_xyang(
-            xy_type,
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=when_stmt,
-            mandatory=stmt.mandatory or None,
-            if_features=_if_features_for_xyang(stmt),
-        ),
-    }
+    out = {**_ANY_JSON_INSTANCE_SCHEMA}
+    _with_description(out, stmt.description)
+    out[JsonSchemaKey.X_YANG] = _build_xyang(
+        xy_type,
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=when_stmt,
+        mandatory=stmt.mandatory or None,
+        if_features=_if_features_for_xyang(stmt),
+    )
+    return out
 
 
 def _leaf_list_stmt_to_property(
@@ -1018,16 +1015,16 @@ def _leaf_list_stmt_to_property(
     out = {
         JsonSchemaKey.TYPE: "array",
         JsonSchemaKey.ITEMS: items_schema,
-        JsonSchemaKey.DESCRIPTION: stmt.description or "",
-        JsonSchemaKey.X_YANG: _build_xyang(
-            "leaf-list",
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=when_stmt,
-            if_features=_if_features_for_xyang(stmt),
-            units=stmt.units or None,
-            config=_explicit_config(stmt),
-        ),
     }
+    _with_description(out, stmt.description)
+    out[JsonSchemaKey.X_YANG] = _build_xyang(
+        "leaf-list",
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=when_stmt,
+        if_features=_if_features_for_xyang(stmt),
+        units=stmt.units or None,
+        config=_explicit_config(stmt),
+    )
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
         out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
     if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
@@ -1056,11 +1053,9 @@ def _choice_stmt_to_property(
     ff = _if_features_for_xyang(stmt)
     if ff:
         xy_choice[XYangKey.IF_FEATURES] = ff
-    out = {
-        JsonSchemaKey.TYPE: "object",
-        JsonSchemaKey.DESCRIPTION: body.get(JsonSchemaKey.DESCRIPTION, ""),
-        JsonSchemaKey.X_YANG: xy_choice,
-    }
+    out = {JsonSchemaKey.TYPE: "object"}
+    _with_description(out, body.get(JsonSchemaKey.DESCRIPTION, ""))
+    out[JsonSchemaKey.X_YANG] = xy_choice
     if body.get(JsonSchemaKey.PROPERTIES):
         out[JsonSchemaKey.PROPERTIES] = body[JsonSchemaKey.PROPERTIES]
     if JsonSchemaKey.ONE_OF in body:
@@ -1079,17 +1074,15 @@ def _io_block_to_property(
     )
     children = _expand_uses_for_json(stmt.statements, module)
     props, required = _child_property_map(children, typedef_names, module, stmt)
-    out: dict[str, Any] = {
-        JsonSchemaKey.TYPE: "object",
-        JsonSchemaKey.DESCRIPTION: stmt.description or "",
-        JsonSchemaKey.X_YANG: _build_xyang(
-            io_type,
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=getattr(stmt, "when", None),
-            if_features=_if_features_for_xyang(stmt),
-        ),
-        JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
-    }
+    out: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
+    _with_description(out, stmt.description)
+    out[JsonSchemaKey.X_YANG] = _build_xyang(
+        io_type,
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=getattr(stmt, "when", None),
+        if_features=_if_features_for_xyang(stmt),
+    )
+    out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     if props:
         out[JsonSchemaKey.PROPERTIES] = props
     if required:
@@ -1146,20 +1139,21 @@ def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) 
     """Convert YangIdentityStmt to a $defs entry (enum of qualified names + x-yang)."""
     closure = sorted(descendant_closure(module, name))
     enum_vals = [qualified_identity_name(module, n) for n in closure]
-    return {
+    out = {
         JsonSchemaKey.TYPE: "string",
         JsonSchemaKey.ENUM: enum_vals,
-        JsonSchemaKey.DESCRIPTION: identity.description or "",
-        JsonSchemaKey.X_YANG: {
-            XYangKey.TYPE: XYangTypeValue.IDENTITY,
-            XYangKey.BASES: _format_bases_for_json(list(identity.bases)),
-            **(
-                {XYangKey.IF_FEATURES: list(identity.if_features)}
-                if identity.if_features
-                else {}
-            ),
-        },
     }
+    _with_description(out, identity.description)
+    out[JsonSchemaKey.X_YANG] = {
+        XYangKey.TYPE: XYangTypeValue.IDENTITY,
+        XYangKey.BASES: _format_bases_for_json(list(identity.bases)),
+        **(
+            {XYangKey.IF_FEATURES: list(identity.if_features)}
+            if identity.if_features
+            else {}
+        ),
+    }
+    return out
 
 
 def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, Any]:
@@ -1171,7 +1165,8 @@ def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, A
         module=module,
         leafref_anchor=None,
     )  # no $ref inside typedef def
-    schema[JsonSchemaKey.DESCRIPTION] = typedef.description or ""
+    schema.pop(JsonSchemaKey.DESCRIPTION, None)
+    _with_description(schema, typedef.description)
     if typedef.units:
         _merge_units_into_schema(schema, typedef.units)
     if typedef.default is not None:
@@ -1234,12 +1229,12 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",
         JsonSchemaKey.ID: module.namespace or f"urn:{module.name or 'unknown'}",
-        JsonSchemaKey.DESCRIPTION: module.description or "",
-        JsonSchemaKey.X_YANG: root_xyang,
-        JsonSchemaKey.TYPE: "object",
-        JsonSchemaKey.PROPERTIES: properties,
-        JsonSchemaKey.ADDITIONAL_PROPERTIES: False,
     }
+    _with_description(root, module.description)
+    root[JsonSchemaKey.X_YANG] = root_xyang
+    root[JsonSchemaKey.TYPE] = "object"
+    root[JsonSchemaKey.PROPERTIES] = properties
+    root[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     if defs:
         root[JsonSchemaKey.DEFS] = defs
     return root

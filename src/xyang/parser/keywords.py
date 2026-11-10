@@ -95,12 +95,21 @@ AUGMENT = "augment"
 SUBMODULE = "submodule"
 BELONGS_TO = "belongs-to"
 
-# Unsupported statements
+# Deviation (``not-supported`` is applied; other deviate arguments are skipped)
 DEVIATION = "deviation"
+DEVIATE = "deviate"
+NOT_SUPPORTED = "not-supported"
+ADD = "add"
+DELETE = "delete"
+REPLACE = "replace"
+# ``deviate`` arguments that stay unsupported. ``not-supported`` is applied.
+UNSUPPORTED_DEVIATE_KINDS = frozenset({ADD, DELETE, REPLACE})
+
+# Unsupported statements
 RPC = "rpc"
 ACTION = "action"
 NOTIFICATION = "notification"
 INPUT = "input"
 OUTPUT = "output"
 
-UNSUPPORTED_CONSTRUCT_KEYWORDS = frozenset({DEVIATION, ACTION})
+UNSUPPORTED_CONSTRUCT_KEYWORDS = frozenset({ACTION})

@@ -15,7 +15,11 @@ module ex {
   yang-version 1.1;
   namespace "urn:ex";
   prefix ex;
-  deviation /ex:foo { deviate not-supported; }
+  deviation "/ex:foo" {
+    deviate add {
+      leaf extra { type string; }
+    }
+  }
   extension ext { argument name; }
   rpc reset {
     input { leaf in-arg { type string; } }
@@ -31,9 +35,10 @@ module ex {
     with caplog.at_level(logging.WARNING, logger="xyang.parser.unsupported_skip"):
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
-    # ``rpc`` and nested ``input``/``output`` are parsed; ``action`` and ``deviation`` warn.
-    for kw in ("deviation", "action"):
-        assert kw in warn_msgs.lower()
+    # ``rpc`` and nested ``input``/``output`` are parsed. ``action`` is skipped.
+    # ``deviate add`` is skipped with a warning that names the kind and path.
+    assert "ignoring unsupported 'deviate add' for /ex:foo" in warn_msgs.lower()
+    assert "action" in warn_msgs.lower()
     assert "rpc" not in warn_msgs.lower()
     assert "input" not in warn_msgs.lower()
     assert "output" not in warn_msgs.lower()

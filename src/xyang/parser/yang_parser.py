@@ -10,7 +10,7 @@ import logging
 from pathlib import Path
 from typing import Optional, Tuple
 
-from ..augment_expand import apply_augmentations
+from ..augment_expand import apply_augmentations, apply_deviations
 from ..errors import YangSyntaxError
 from ..ext import apply_extension_invocations
 from ..module import YangModule
@@ -57,6 +57,7 @@ class YangParser:
         if self.expand_uses:
             expand_all_uses_in_module(module)
             apply_augmentations(module)
+            apply_deviations(module)
             apply_extension_invocations(module)
             validate_semantics(module)
 

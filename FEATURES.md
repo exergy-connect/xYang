@@ -117,9 +117,10 @@ All RFC 7950 built-in type **names** are reserved as lexer keywords (see **Built
 
 ### Partial / syntax only
 - ✅ **`augment`** — Parsed into `YangAugmentStmt` and, with `YangParser(expand_uses=True)`, merged into the target schema (including cross-file targets via `import`). Augmented nodes record `defining_module` for RFC 7951 JSON (`module:identifier` when the defining module differs from the parent). CLI `--anydata-validation` loads extra modules through one parser cache and registers the import closure so augments apply to the same `YangModule` instances used for validation. With `expand_uses=False`, augments stay as explicit statements for reversible convert.
+- ✅ `deviate not-supported` is applied (the target node is removed, including across an `import`). `deviate add`, `replace`, and `delete` are skipped with a warning (`Ignoring unsupported 'deviate <kind>' for <path>`).
 
 ### Not implemented (skipped when parsing)
-- ⚠️ `deviation`, `action` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; they are **not** represented in the AST, validation, or JSON Schema. Lets mixed modules parse past these constructs.
+- ⚠️ `action` — **Lexically recognized** and **skipped** (full statement including braced body) after a **`logging` warning**; it is **not** represented in the AST, validation, or JSON Schema.
 
 ### Dynamic extension framework
 - ✅ `extension` definitions are parsed into the AST and tracked on `YangModule.extensions`.

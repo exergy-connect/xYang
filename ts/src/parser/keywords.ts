@@ -78,6 +78,13 @@ export const REFERENCE = "reference";
 export const ARGUMENT = "argument";
 export const YIN_ELEMENT = "yin-element";
 export const DEVIATION = "deviation";
+export const DEVIATE = "deviate";
+export const NOT_SUPPORTED = "not-supported";
+export const ADD = "add";
+export const DELETE = "delete";
+export const REPLACE = "replace";
+/** ``deviate`` arguments that stay unsupported. ``not-supported`` is applied. */
+export const UNSUPPORTED_DEVIATE_KINDS = new Set<string>([ADD, DELETE, REPLACE]);
 export const EXTENSION = "extension";
 export const RPC = "rpc";
 export const ACTION = "action";
@@ -85,4 +92,4 @@ export const NOTIFICATION = "notification";
 export const INPUT = "input";
 export const OUTPUT = "output";
 
-export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>([DEVIATION, ACTION]);
+export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>([ACTION]);
