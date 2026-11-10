@@ -1,7 +1,7 @@
 import { formatIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
-import { TypeConstraint, TypeSystem } from "../types";
+import { TypeConstraint, TypeSystem, type TypeIssue } from "../types";
 import { resolvePrefixedModule, type ModuleData } from "./if-feature-eval";
 import { identityrefValueValid, resolveIdentityValue } from "../identity-graph";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
@@ -91,9 +91,10 @@ export class TypeChecker {
     return ref.name;
   }
 
-  validate(value: unknown, typeName: string, constraint?: Record<string, unknown>): [boolean, string | null] {
+  /** Every `(code, message)` issue. Empty means the value is valid. */
+  validate(value: unknown, typeName: string, constraint?: Record<string, unknown>): TypeIssue[] {
     let via: "typedef" | "typedef-union" | "inline-union" | "direct";
-    let result: [boolean, string | null];
+    let result: TypeIssue[];
 
     const ref = asTypeRef(typeName, constraint);
     const typedef = this.lookupTypedef(ref);
@@ -122,8 +123,8 @@ export class TypeChecker {
 
     // A type that names a typedef may narrow it with its own range, length, or patterns.
     // Each level of the chain checks its own restrictions after the base accepts the value.
-    if (result[0] && via === "typedef" && hasTypeRestrictions(constraint)) {
-      result = this.system.validate(
+    if (result.length === 0 && via === "typedef" && hasTypeRestrictions(constraint)) {
+      result = this.system.issues(
         value,
         this.resolveUnderlyingBuiltinName(typeName, constraint),
         new TypeConstraint(constraint)
@@ -135,8 +136,8 @@ export class TypeChecker {
         module: this.module.name ?? "(anonymous)",
         typeName,
         via,
-        ok: result[0],
-        reason: result[1],
+        ok: result.length === 0,
+        reason: result.length === 0 ? null : result.map(([, message]) => message).join("; "),
         value: summarizeValue(value)
       });
     }
@@ -148,35 +149,38 @@ export class TypeChecker {
     typeName: string,
     shape: Record<string, unknown> | undefined,
     constraint: TypeConstraint
-  ): [boolean, string | null] {
+  ): TypeIssue[] {
     if (typeName === YangTokenType.IDENTITYREF) {
       return this.checkIdentityref(value, shape ?? {});
     }
-    return this.system.validate(value, typeName, constraint);
+    return this.system.issues(value, typeName, constraint);
   }
 
   /** RFC 7951 §6.8 value, derived from every base (bases resolve in the host module, as in Python). */
-  private checkIdentityref(value: unknown, shape: Record<string, unknown>): [boolean, string | null] {
+  private checkIdentityref(value: unknown, shape: Record<string, unknown>): TypeIssue[] {
     if (typeof value !== "string") {
-      return [false, `identityref value must be a string, got ${value === null ? "null" : typeof value}`];
+      return [[
+        "identityref",
+        `identityref value must be a string, got ${value === null ? "null" : typeof value}`
+      ]];
     }
     const bases = Array.isArray(shape.identityref_bases) ? (shape.identityref_bases as YangIdentifierRef[]) : [];
     if (bases.length === 0) {
-      return [false, "identityref type has no base identities"];
+      return [["identityref", "identityref type has no base identities"]];
     }
     const moduleData = this.module;
     if (!resolveIdentityValue(moduleData, value)) {
-      return [false, `identityref value '${value}' does not resolve to a known identity`];
+      return [["identityref", `identityref value '${value}' does not resolve to a known identity`]];
     }
     if (!identityrefValueValid(moduleData, value, bases)) {
       const shown = bases.map((b) => `'${formatIdentifierRef(b)}'`).join(", ");
-      return [false, `identityref value '${value}' is not derived from all bases [${shown}]`];
+      return [["identityref", `identityref value '${value}' is not derived from all bases [${shown}]`]];
     }
-    return [true, null];
+    return [];
   }
 
   /** Union members may name typedefs; validate through this checker so typedefs resolve. */
-  private validateUnion(value: unknown, constraint: TypeConstraint): [boolean, string | null] {
+  private validateUnion(value: unknown, constraint: TypeConstraint): TypeIssue[] {
     if (this.typeValidationDebug) {
       traceTypeValidation(true, "TypeChecker.validateUnion", {
         module: this.module.name ?? "(anonymous)",
@@ -188,11 +192,10 @@ export class TypeChecker {
       const memberObj = member as Record<string, unknown>;
       const memberName =
         typeof memberObj.name === "string" ? memberObj.name : YangTokenType.STRING_KW;
-      const [ok] = this.validate(value, memberName, memberObj);
-      if (ok) {
-        return [true, null];
+      if (this.validate(value, memberName, memberObj).length === 0) {
+        return [];
       }
     }
-    return [false, "Value does not match any union member type"];
+    return [["union", "Value does not match any union member type"]];
   }
 }

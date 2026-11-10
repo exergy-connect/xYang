@@ -2,6 +2,9 @@ import { isQuotedInteger, REGISTRY, YANG_INTEGER_BOUNDS } from "./types/registry
 import { YangTokenType } from "./parser/parser-context";
 import { translateXsdRegex } from "./xsd-regex";
 
+/** `(code, message)`. The same pair Python's type checker returns. */
+export type TypeIssue = [code: string, message: string];
+
 export type TypeConstraintInput = {
   patterns?: Array<{
     pattern: string;
@@ -114,170 +117,175 @@ function decimalLike(value: unknown): number | null {
   return null;
 }
 
-function validateIntegerBuiltin(
-  typeName: string,
-  value: unknown,
-  range?: string
-): [boolean, string | null] {
+function validateIntegerBuiltin(typeName: string, value: unknown, range?: string): TypeIssue[] {
   const bounds = YANG_INTEGER_BOUNDS[typeName];
   if (!bounds) {
-    return [false, `Unsupported integer type '${typeName}'`];
+    return [["type", `Unsupported integer type '${typeName}'`]];
   }
   if (typeof value === "string") {
     // Quoted 64-bit integers are decoded to bigint by the instance iterator.
     // A string that reaches this check is not a JSON integer.
-    return [false, REGISTRY[typeName].checkValue(value, null) ?? "Expected integer, got string"];
+    return [["type", REGISTRY[typeName].checkValue(value, null) ?? "Expected integer, got string"]];
   }
   if (typeof value === "bigint" && isQuotedInteger(typeName)) {
     const unsigned = YANG_INTEGER_BOUNDS[typeName]?.[0] === 0;
     const lo = unsigned ? BigInt(0) : INT64_MIN;
     const hi = unsigned ? UINT64_MAX : INT64_MAX;
     if (value < lo || value > hi) {
-      return [false, `Value ${value} is outside ${typeName}`];
+      return [["type", `Value ${value} is outside ${typeName}`]];
     }
     if (range) {
       const asNumber = Number(value);
       if (!Number.isSafeInteger(asNumber) || !matchesRange(asNumber, range)) {
         if (!Number.isSafeInteger(asNumber)) {
-          return [true, null];
+          return [];
         }
-        return [false, `Integer ${value} does not match ${range}`];
+        return [["range", `Integer ${value} does not match ${range}`]];
       }
     }
-    return [true, null];
+    return [];
   }
   const n = integerLike(value);
   if (n === null) {
-    return [false, `Expected ${typeName}`];
+    return [["type", `Expected ${typeName}`]];
   }
   if (range) {
     if (!matchesRange(n, range)) {
-      return [false, `Integer ${n} does not match ${range}`];
+      return [["range", `Integer ${n} does not match ${range}`]];
     }
-    return [true, null];
+    return [];
   }
   const [lo, hi] = bounds;
   if (n < lo) {
-    return [false, `Value ${n} is less than minimum ${lo}`];
+    return [["range", `Value ${n} is less than minimum ${lo}`]];
   }
   if (n > hi) {
-    return [false, `Value ${n} exceeds maximum ${hi}`];
+    return [["range", `Value ${n} exceeds maximum ${hi}`]];
   }
-  return [true, null];
+  return [];
 }
 
-function validateBinary(value: unknown, length?: string): [boolean, string | null] {
+function validateBinary(value: unknown, length?: string): TypeIssue[] {
   if (typeof value !== "string") {
-    return [false, "Expected base64 string"]; 
+    return [["type", "Expected base64 string"]];
   }
 
   if (!/^[A-Za-z0-9+/]*={0,2}$/.test(value) || value.length % 4 !== 0) {
-    return [false, "Expected valid base64 string"]; 
+    return [["type", "Expected valid base64 string"]];
   }
 
   try {
     const bytes = Buffer.from(value, "base64");
     if (length && !matchesRange(bytes.length, length)) {
-      return [false, `Binary length ${bytes.length} does not match ${length}`];
+      // A length miss stops here. Pattern is not also reported (same as Python).
+      return [["length", `Binary length ${bytes.length} does not match ${length}`]];
     }
   } catch {
-    return [false, "Expected valid base64 string"];
+    return [["type", "Expected valid base64 string"]];
   }
 
-  return [true, null];
+  return [];
 }
 
-function validateBits(value: unknown, bits: Array<{ name: string; position: number }>): [boolean, string | null] {
+function validateBits(value: unknown, bits: Array<{ name: string; position: number }>): TypeIssue[] {
   if (typeof value !== "string") {
-    return [false, "Bits values must be string tokens"]; 
+    return [["bits", "Bits values must be string tokens"]];
   }
   const allowed = new Set(bits.map((bit) => bit.name));
   if (value.trim() === "") {
-    return [true, null];
+    return [];
   }
   const seen = new Set<string>();
   for (const token of value.trim().split(/\s+/)) {
     if (!allowed.has(token)) {
-      return [false, `Unknown bit token '${token}'`];
+      return [["bits", `Unknown bit token '${token}'`]];
     }
     if (seen.has(token)) {
-      return [false, `Duplicate bit token '${token}'`];
+      return [["bits", `Duplicate bit token '${token}'`]];
     }
     seen.add(token);
   }
-  return [true, null];
+  return [];
+}
+
+function stringIssues(value: unknown, c: TypeConstraint): TypeIssue[] {
+  if (typeof value !== "string") {
+    return [["type", "Expected string"]];
+  }
+  const errors: TypeIssue[] = [];
+  if (c.length && !matchesRange(value.length, c.length)) {
+    errors.push(["length", `String length ${value.length} does not match ${c.length}`]);
+  }
+  const patterns = Array.isArray(c.patterns) ? c.patterns : [];
+  for (const p of patterns) {
+    if (typeof p?.pattern !== "string" || p.pattern.length === 0) {
+      continue;
+    }
+    const matched = translateXsdRegex(p.pattern).test(value);
+    const invert = p.invert_match === true;
+    if ((!invert && !matched) || (invert && matched)) {
+      const defaultMsg = invert
+        ? `String matches forbidden pattern ${p.pattern} (invert-match)`
+        : `String does not match pattern ${p.pattern}`;
+      errors.push(["pattern", patternEntryViolationMessage(p, defaultMsg)]);
+    }
+  }
+  if (c.enums && c.enums.length > 0 && !c.enums.includes(value)) {
+    errors.push(["enum", `Value '${value}' is not in enum`]);
+  }
+  return errors;
 }
 
 export class TypeSystem {
-  validate(value: unknown, typeName: string, constraint?: TypeConstraint): [boolean, string | null] {
+  /**
+   * Every restriction violation for this value.
+   * Strings report length, then each failing pattern, then enum.
+   * Other types still return at most one issue (a range miss does not also
+   * report fraction-digits; a binary length miss does not also report pattern).
+   */
+  issues(value: unknown, typeName: string, constraint?: TypeConstraint): TypeIssue[] {
     const c = constraint ?? new TypeConstraint();
     const normalizedType = typeName.trim();
 
     if (normalizedType === YangTokenType.UNION) {
       for (const member of c.types ?? []) {
         const memberName = typeof member.name === "string" ? member.name : YangTokenType.STRING_KW;
-        const [ok] = this.validate(value, memberName, new TypeConstraint(member as TypeConstraintInput));
-        if (ok) {
-          return [true, null];
+        if (this.issues(value, memberName, new TypeConstraint(member as TypeConstraintInput)).length === 0) {
+          return [];
         }
       }
-      return [false, "Value does not match any union member type"];
+      return [["union", "Value does not match any union member type"]];
     }
 
     if (normalizedType === YangTokenType.ENUMERATION) {
       if (typeof value !== "string") {
-        return [false, "Expected enumeration value (string)"];
+        return [["enum", "Expected enumeration value (string)"]];
       }
       if (c.enums && c.enums.length > 0 && !c.enums.includes(value)) {
-        return [false, `Value '${value}' is not in enum`];
+        return [["enum", `Value '${value}' is not in enum`]];
       }
-      return [true, null];
+      return [];
     }
 
     if (normalizedType === YangTokenType.STRING_KW) {
-      if (typeof value !== "string") {
-        return [false, "Expected string"]; 
-      }
-      if (c.length && !matchesRange(value.length, c.length)) {
-        return [false, `String length ${value.length} does not match ${c.length}`];
-      }
-      const patterns = Array.isArray(c.patterns) ? c.patterns : [];
-      if (patterns.length > 0) {
-        for (const p of patterns) {
-          if (typeof p?.pattern !== "string" || p.pattern.length === 0) {
-            continue;
-          }
-          const matched = translateXsdRegex(p.pattern).test(value);
-          const invert = p.invert_match === true;
-          if ((!invert && !matched) || (invert && matched)) {
-            const defaultMsg = invert
-              ? `String matches forbidden pattern ${p.pattern} (invert-match)`
-              : `String does not match pattern ${p.pattern}`;
-            return [false, patternEntryViolationMessage(p, defaultMsg)];
-          }
-        }
-      }
-      if (c.enums && c.enums.length > 0 && !c.enums.includes(value)) {
-        return [false, `Value '${value}' is not in enum`];
-      }
-      return [true, null];
+      return stringIssues(value, c);
     }
 
     if (normalizedType === YangTokenType.BOOLEAN) {
       if (typeof value === "boolean") {
-        return [true, null];
+        return [];
       }
       if (value === YangTokenType.TRUE || value === YangTokenType.FALSE) {
-        return [true, null];
+        return [];
       }
-      return [false, "Expected boolean"]; 
+      return [["type", "Expected boolean"]];
     }
 
     if (normalizedType === YangTokenType.EMPTY) {
       if (value === null) {
-        return [true, null];
+        return [];
       }
-      return [false, "Expected empty (null)"];
+      return [["type", "Expected empty (null)"]];
     }
 
     if (normalizedType in YANG_INTEGER_BOUNDS) {
@@ -294,59 +302,72 @@ export class TypeSystem {
 
     if (normalizedType === YangTokenType.DECIMAL64 || normalizedType === "number") {
       if (typeof value === "string") {
-        return [false, "Expected number"];
+        return [["type", "Expected number"]];
       }
       if (value instanceof ExactDecimal) {
         const text = value.text.trim();
         const n = Number(text);
         if (!Number.isFinite(n)) {
-          return [false, "Expected number"];
+          return [["type", "Expected number"]];
         }
         if (c.range && !matchesRange(n, c.range)) {
-          return [false, `Number ${n} does not match ${c.range}`];
+          return [["range", `Number ${n} does not match ${c.range}`]];
         }
         if (typeof c.fraction_digits === "number" && text.includes(".")) {
           const decimals = text.split(".")[1]?.length ?? 0;
           if (decimals > c.fraction_digits) {
-            return [false, `Too many fraction digits (${decimals} > ${c.fraction_digits})`];
+            return [["fraction-digits", `Too many fraction digits (${decimals} > ${c.fraction_digits})`]];
           }
         }
-        return [true, null];
+        return [];
       }
       const n = decimalLike(value);
       if (n === null) {
-        return [false, "Expected number"]; 
+        return [["type", "Expected number"]];
       }
       if (c.range && !matchesRange(n, c.range)) {
-        return [false, `Number ${n} does not match ${c.range}`];
+        return [["range", `Number ${n} does not match ${c.range}`]];
       }
       if (typeof c.fraction_digits === "number") {
         const decimals = `${n}`.split(".")[1]?.length ?? 0;
         if (decimals > c.fraction_digits) {
-          return [false, `Too many fraction digits (${decimals} > ${c.fraction_digits})`];
+          return [["fraction-digits", `Too many fraction digits (${decimals} > ${c.fraction_digits})`]];
         }
       }
-      return [true, null];
+      return [];
     }
 
     if (normalizedType === YangTokenType.INT64 || normalizedType === "integer") {
       if (typeof value === "string") {
-        return [false, "Expected integer, got string"];
+        return [["type", "Expected integer, got string"]];
       }
       const n = integerLike(value);
       if (n === null) {
-        return [false, "Expected integer"]; 
+        return [["type", "Expected integer"]];
       }
       if (c.range && !matchesRange(n, c.range)) {
-        return [false, `Integer ${n} does not match ${c.range}`];
+        return [["range", `Integer ${n} does not match ${c.range}`]];
       }
-      return [true, null];
+      return [];
     }
 
     // Unknown typedef names without a resolver: accept strings only (baseline).
     if (typeof value === "string") {
+      return [];
+    }
+    return [["type", `Unsupported type '${normalizedType}'`]];
+  }
+
+  /**
+   * Public tuple kept for `@exergy-connect/xyang/types`.
+   * Thin wrapper over {@link issues}: valid, or invalid with the first message.
+   * Validation that must report every issue calls {@link issues}.
+   */
+  validate(value: unknown, typeName: string, constraint?: TypeConstraint): [boolean, string | null] {
+    const found = this.issues(value, typeName, constraint);
+    if (found.length === 0) {
       return [true, null];
     }
-    return [false, `Unsupported type '${normalizedType}'`];
+    return [false, found[0][1]];
   }
 }
