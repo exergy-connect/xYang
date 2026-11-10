@@ -310,9 +310,6 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 ### Functions
 - ✅ `string-length(.)` - Get length of current node value
 - ✅ `translate(., '_', '')` - Translate/remove characters
-- ✅ `contains(string1, string2)` - Check if string1 contains string2
-- ✅ `substring-before(string1, string2)` - Get substring before first occurrence of string2
-- ✅ `substring-after(string1, string2)` - Get substring after first occurrence of string2
 - ✅ `count(...)` - Count elements in a list
 - ✅ `deref(...)` - **Resolve leafref with full support for nested paths**
   - Supports: `deref(../entity)`, `deref(current())`, `deref(deref(...)/../foreignKey/entity)`
@@ -323,6 +320,8 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 - ✅ `true()`, `false()` - Boolean literals
 - ✅ `boolean(...)` - Convert value to boolean following YANG / XPath 1.0 rules
 - ✅ `number(...)` - Convert value to number following XPath rules
+
+`contains()`, `substring-before()`, and `substring-after()` are not implemented. See https://github.com/exergy-connect/xYang/issues/85.
 
 ### Comparisons
 - ✅ `=`, `!=`, `<=`, `>=`, `<`, `>` - All comparison operators with proper type coercion
@@ -353,7 +352,7 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 
 ### String Operations
 - ✅ **String concatenation**: `+` operator for string concatenation
-- ✅ **String functions**: `contains()`, `substring-before()`, `substring-after()` for string manipulation and pattern matching
+- `contains()`, `substring-before()`, and `substring-after()` are not implemented (https://github.com/exergy-connect/xYang/issues/85)
 
 ### Arithmetic Operations
 - ✅ `+`, `-`, `*`, `/` - Arithmetic operators (with `/` treated as path navigation when appropriate)
@@ -554,11 +553,7 @@ The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), inc
   - Union validation now handles leafref members correctly
   - Leafref validation is deferred to LeafrefResolver for proper context resolution
   - Enables typedefs with union of multiple leafref paths (e.g., top-level fields and composite subcomponents)
-- ✅ **XPath string functions**: Added support for additional XPath 1.0 string functions
-  - `contains(string1, string2)` - Check if string1 contains string2
-  - `substring-before(string1, string2)` - Get substring before first occurrence of string2
-  - `substring-after(string1, string2)` - Get substring after first occurrence of string2
-  - All functions follow XPath 1.0 semantics with proper string conversion
+- **XPath string functions**: `contains()`, `substring-before()`, and `substring-after()` are not implemented. See https://github.com/exergy-connect/xYang/issues/85.
 
 ### Choice/Case and Stricter Validation (2026-02-24)
 - ✅ **Choice/case statements**: Full implementation of YANG choice and case statements

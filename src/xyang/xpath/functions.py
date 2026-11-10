@@ -9,6 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, List, Optional
 
+from ..errors import UnsupportedXPathError
 from .ast import FunctionCallNode
 from .node import Context, Node
 
@@ -211,3 +212,17 @@ FUNCTIONS = {
     "derived-from": f_derived_from,
     "derived-from-or-self": f_derived_from_or_self,
 }
+
+# Same code string in the TypeScript dispatcher (ts/src/xpath/functions.ts).
+UNKNOWN_FUNCTION_CODE = "xpath-unknown-function"
+
+
+def unknown_function_error(name: str, expression: str | None = None) -> UnsupportedXPathError:
+    """Compile/eval error for a function name that is not in ``FUNCTIONS``."""
+    key = name.lower()
+    return UnsupportedXPathError(
+        f"{UNKNOWN_FUNCTION_CODE}: unknown XPath function '{key}'",
+        expression=expression,
+        construct=key,
+        code=UNKNOWN_FUNCTION_CODE,
+    )

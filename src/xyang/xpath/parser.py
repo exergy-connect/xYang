@@ -9,6 +9,8 @@ from typing import Any, List, Optional, Tuple
 
 from ..errors import XPathSyntaxError
 
+from .functions import FUNCTIONS, unknown_function_error
+
 from .tokenizer import XPathTokenizer
 from .tokens import Token, TokenType
 
@@ -281,6 +283,8 @@ class XPathParser:
                 node, _ = self._parse_expression()
                 args.append(node)
         self._consume(TokenType.PAREN_CLOSE)
+        if name.lower() not in FUNCTIONS:
+            raise unknown_function_error(name, self.expression)
         return FunctionCallNode(name, args), False
 
     def _parse_path(

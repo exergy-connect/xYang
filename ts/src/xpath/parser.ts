@@ -1,5 +1,6 @@
 import { XPathSyntaxError } from "../core/errors";
 import { XPathAstNode, XPathBinaryNode, XPathFunctionNode, XPathLiteralNode, XPathPathNode } from "./ast";
+import { unknownFunctionError, XPATH_FUNCTION_NAMES } from "./functions";
 import { XPathToken, tokenizeXPath } from "./tokenizer";
 
 const COMPARISON_OPS = new Set(["=", "!=", "<", ">", "<=", ">="]);
@@ -248,6 +249,9 @@ class XPathParser {
       }
     }
     this.consume("paren_close");
+    if (!XPATH_FUNCTION_NAMES.has(name.toLowerCase())) {
+      throw unknownFunctionError(name, this.expression);
+    }
     const node: XPathFunctionNode = { kind: "function", name, args };
     return node;
   }

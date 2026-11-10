@@ -1,6 +1,7 @@
 import { describe, expect, it } from "vitest";
-import { XPathSyntaxError } from "../src/core/errors";
+import { UnsupportedXPathError, XPathSyntaxError } from "../src/core/errors";
 import type { XPathBinaryNode, XPathLiteralNode, XPathPathNode } from "../src/xpath/ast";
+import { UNKNOWN_FUNCTION_CODE, XPATH_FUNCTION_NAMES } from "../src/xpath/functions";
 import { parseXPath } from "../src/xpath/parser";
 import { XPathEvaluator, type XPathContext, type XPathNode } from "../src/xpath/evaluator";
 
@@ -145,5 +146,26 @@ describe("python parity: test_xpath_parser", () => {
 
   it("invalid number literal raises XPathSyntaxError", () => {
     expect(() => parseXPath("1e2e3")).toThrow(XPathSyntaxError);
+  });
+
+  it("every supported function compiles", () => {
+    for (const name of XPATH_FUNCTION_NAMES) {
+      const expr = name === "not" ? "not(.)" : `${name}()`;
+      expect(() => parseXPath(expr)).not.toThrow();
+    }
+  });
+
+  it("unknown function is a compile error with the shared code", () => {
+    expect(() => parseXPath("no-such(.)")).toThrow(UnsupportedXPathError);
+    try {
+      parseXPath("NO-SUCH()");
+      expect.fail("expected throw");
+    } catch (e) {
+      expect(e).toBeInstanceOf(UnsupportedXPathError);
+      const err = e as UnsupportedXPathError;
+      expect(err.code).toBe(UNKNOWN_FUNCTION_CODE);
+      expect(err.message).toContain(UNKNOWN_FUNCTION_CODE);
+      expect(err.message).toContain("no-such");
+    }
   });
 });

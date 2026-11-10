@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **XPath:** an unknown function name is a compile error (`xpath-unknown-function`), matching Python. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).
 - **Validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python (same error wording). Data that violates these bounds now fails validation.
 - **Tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first.
 - **CLI:** piped stdout and stderr are flushed before exit. `process.exit()` immediately after a large `write` was dropping everything past Node's 64 KiB pipe buffer, so `convert` of a realistic module was truncated when stdout was a pipe.

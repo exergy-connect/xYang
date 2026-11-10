@@ -11,6 +11,7 @@ type Case = {
   module: string;
   features?: Record<string, string[]>;
   schema_error?: boolean;
+  code?: string;
   xfail?: Record<string, string>;
   instances?: Instance[];
 };
@@ -56,9 +57,17 @@ for (const file of caseFiles) {
     for (const inst of c.instances ?? [undefined]) {
       const reason = { ...c.xfail, ...inst?.xfail }.ts;
       const test = reason ? it.fails : it;
-      test(`${inst?.name ?? "schema error"}${reason ? ` (xfail: ${reason})` : ""}`, () =>
-        c.schema_error ? expect(() => run(dir, c, inst)).toThrow() : run(dir, c, inst)
-      );
+      test(`${inst?.name ?? "schema error"}${reason ? ` (xfail: ${reason})` : ""}`, () => {
+        if (c.schema_error) {
+          if (c.code) {
+            expect(() => run(dir, c, inst)).toThrow(c.code);
+          } else {
+            expect(() => run(dir, c, inst)).toThrow();
+          }
+          return;
+        }
+        run(dir, c, inst);
+      });
     }
   });
 }

@@ -1,6 +1,7 @@
 import { YangModule } from "../core/model";
 import { isDerivedFromOrSelfQNames, isDerivedFromStrictQNames } from "../identity-graph";
 import { XPathAstNode, XPathBinaryNode, XPathPathNode } from "./ast";
+import { unknownFunctionError } from "./functions";
 
 export type XPathSchema = {
   keyword?: string;
@@ -478,7 +479,7 @@ export class XPathEvaluator {
       return isDerivedFromOrSelfQNames(importer, v1, v2);
     }
 
-    return null;
+    throw unknownFunctionError(name);
   }
 }
 
