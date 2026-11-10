@@ -1,8 +1,12 @@
 import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
-import { join } from "node:path";
+import { dirname, join, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
+import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
+
+const tsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
 const HOST_YANG = `
 module example-push-host {
@@ -31,7 +35,7 @@ module example-rfc8343-shape {
 `;
 
 describe("xyang-ts validate --anydata-*", () => {
-  it("validates anydata subtree via CLI flags", () => {
+  it("validates anydata subtree via CLI flags", async () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-cli-"));
     const hostPath = join(dir, "host.yang");
     const payloadPath = join(dir, "payload.yang");
@@ -51,7 +55,18 @@ describe("xyang-ts validate --anydata-*", () => {
       })
     );
 
-    const cli = join(process.cwd(), "dist", "cli.js");
+    const cli = join(dir, "cli.mjs");
+    await build({
+      absWorkingDir: tsRoot,
+      entryPoints: [resolve(tsRoot, "src/cli.ts")],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node24",
+      outfile: cli,
+      logLevel: "silent"
+    });
+
     const result = spawnSync(
       process.execPath,
       [

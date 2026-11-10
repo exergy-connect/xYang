@@ -12,6 +12,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 ### Fixed
 
 - **Validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python (same error wording). Data that violates these bounds now fails validation.
+- **Tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first.
 
 ### Added
 
