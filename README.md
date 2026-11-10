@@ -277,6 +277,17 @@ features, since omitted modules otherwise default to all features enabled.
 
 ---
 
+## Benchmarks
+
+Time, peak memory, and source lines for both implementations, refreshed by the
+[Benchmark workflow](.github/workflows/benchmark.yml) when a release is
+published. Methodology and limitations: [benchmarks/README.md](benchmarks/README.md).
+
+<!-- xyang-benchmark:start -->
+<!-- xyang-benchmark:end -->
+
+---
+
 ## Repository layout
 
 ```
@@ -286,6 +297,7 @@ xYang/
 ├── qjs/                # QuickJS-ng static executable of the TypeScript CLI
 ├── examples/           # meta-model.yang, ietf-yang-push/, samples
 ├── tests/              # Python tests
+├── benchmarks/         # Release benchmark harness and workloads
 ├── FEATURES.md         # Authoritative feature list
 └── pyproject.toml      # PEP 517/621 project metadata and tooling config
 ```
@@ -320,6 +332,7 @@ cd ts && npm install && npm test
 | **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, `npm run build:ci`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS. The `build:ci` step is a check only: it does not commit or upload |
 | **Release TypeScript artifacts** | [`.github/workflows/release-artifacts.yml`](.github/workflows/release-artifacts.yml) | On a published release, runs `npm run build:ci` and attaches `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js`. On `workflow_dispatch`, uploads those files as workflow artifacts only |
 | **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | On a published release, builds all five `xyang-ts` executables, smoke-tests the Linux binaries against the Node CLI, and attaches the files. Also runnable by hand (`workflow_dispatch`) without attaching anything |
+| **Benchmark** | [`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) | On a published release, measures time, peak memory, and source lines, attaches `benchmark-<tag>.json` to the release, and opens a pull request that refreshes the README benchmark section. On `workflow_dispatch`, measures and uploads a workflow artifact (`open_pr` also proposes the README update). On pull requests touching benchmark files, a smoke run only |
 
 The TypeScript test workflow runs on pushes to `main` and on pull requests that touch `ts/**` (and related paths). It builds the release bundles and does not commit or upload them. The QuickJS binaries and the TypeScript bundles are attached only when a release is published. The stdout flush is covered by the TypeScript test suite.
 

@@ -1,0 +1,196 @@
+# Release benchmark: time, peak memory, and source lines for Python and TypeScript.
+#
+# - pull_request (benchmark files only): smoke run (1 iteration) plus a check that
+#   the README section matches benchmarks/results/latest.json. No timing thresholds.
+# - release published: full run on the release tag. Results are uploaded as a
+#   workflow artifact and attached to the release, and a pull request against main
+#   refreshes README.md and benchmarks/results/latest.json.
+# - workflow_dispatch: full run on the selected ref; artifact only, unless
+#   open_pr is true.
+#
+# Only the workflow GITHUB_TOKEN is used. Opening the pull request needs the
+# repository setting "Allow GitHub Actions to create and approve pull requests";
+# without it the branch is still pushed and the job prints a compare link to
+# open the pull request by hand. A failed measurement fails the job before
+# anything is attached, pushed, or proposed.
+
+name: Benchmark
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+    inputs:
+      open_pr:
+        description: Push a branch and open a pull request that refreshes the README benchmark section
+        type: boolean
+        default: false
+  pull_request:
+    paths:
+      - "benchmarks/**"
+      - "ts/bench/**"
+      - "ts/scripts/build-bench-worker.mjs"
+      - ".github/workflows/benchmark.yml"
+
+permissions:
+  contents: read
+
+concurrency:
+  group: benchmark-${{ github.event.release.tag_name || github.event.pull_request.number || github.ref }}
+  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+jobs:
+  smoke:
+    name: Benchmark smoke
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          cd ts && npm ci
+
+      - name: Smoke run (not a measurement)
+        run: |
+          python benchmarks/release_bench.py run --smoke --out smoke.json
+          python benchmarks/release_bench.py validate smoke.json
+
+      - name: README section matches checked-in results
+        run: python benchmarks/release_bench.py update-readme benchmarks/results/latest.json --check
+
+  measure:
+    name: Measure
+    if: github.event_name != 'pull_request'
+    runs-on: ubuntu-24.04
+    outputs:
+      tag: ${{ steps.meta.outputs.tag }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - id: meta
+        name: Release tag
+        env:
+          TAG: ${{ github.event.release.tag_name }}
+        run: echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          cd ts && npm ci
+
+      - name: Run benchmark
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          args=(run --out bench-out/results.json)
+          if [ -n "${TAG}" ]; then args+=(--release-tag "${TAG}"); fi
+          python benchmarks/release_bench.py "${args[@]}"
+          python benchmarks/release_bench.py render bench-out/results.json > bench-out/README-section.md
+          cat bench-out/README-section.md >> "$GITHUB_STEP_SUMMARY"
+
+      - uses: actions/upload-artifact@v7
+        with:
+          name: benchmark-results
+          path: bench-out/
+          if-no-files-found: error
+
+  attach:
+    name: Attach to release
+    needs: measure
+    if: github.event_name == 'release'
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/download-artifact@v8
+        with:
+          name: benchmark-results
+          path: bench-out
+
+      - name: Upload results to the release
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.measure.outputs.tag }}
+        run: |
+          cp bench-out/results.json "benchmark-${TAG}.json"
+          gh release upload "$TAG" "benchmark-${TAG}.json" --clobber --repo "$GITHUB_REPOSITORY"
+
+  readme-pr:
+    name: README pull request
+    needs: measure
+    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.open_pr)
+    runs-on: ubuntu-24.04
+    permissions:
+      contents: write
+      pull-requests: write
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          ref: main
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - uses: actions/download-artifact@v8
+        with:
+          name: benchmark-results
+          path: bench-out
+
+      - name: Update README benchmark section
+        run: |
+          cp bench-out/results.json benchmarks/results/latest.json
+          python benchmarks/release_bench.py update-readme benchmarks/results/latest.json
+
+      - name: Push branch and open pull request
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ needs.measure.outputs.tag }}
+        run: |
+          set -euo pipefail
+          label="${TAG:-${GITHUB_SHA::12}}"
+          branch="benchmark/${label}-${GITHUB_RUN_ID}"
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git checkout -b "$branch"
+          git add README.md benchmarks/results/latest.json
+          if git diff --cached --quiet; then
+            echo "README benchmark section already up to date."
+            exit 0
+          fi
+          git commit -m "Refresh README benchmark results for ${label}."
+          git push origin "$branch"
+          title="Refresh README benchmark results for ${label}"
+          body="Measured by the Benchmark workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} (commit ${GITHUB_SHA}). Pushes made with GITHUB_TOKEN do not start other workflows; close and reopen this pull request to run CI."
+          if ! gh pr create --base main --head "$branch" --title "$title" --body "$body"; then
+            url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
+            echo "::warning::Could not open the pull request (Actions may not be allowed to create pull requests). Open it by hand: ${url}"
+            echo "Open the README benchmark pull request by hand: ${url}" >> "$GITHUB_STEP_SUMMARY"
+          fi

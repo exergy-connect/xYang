@@ -1,0 +1,52 @@
+module interface-inventory {
+  yang-version 1.1;
+  namespace "urn:xyang:bench:interface-inventory";
+  prefix inv;
+
+  description
+    "Benchmark workload: a device interface inventory. The instance is
+     generated deterministically by benchmarks/workloads.py.";
+
+  revision 2026-11-10;
+
+  typedef port-name {
+    type string {
+      length "1..32";
+      pattern '[a-z]+[0-9]+(\.[0-9]+)?';
+    }
+  }
+
+  container inventory {
+    list interface {
+      key "name";
+      leaf name { type port-name; }
+      leaf description { type string { length "0..64"; } }
+      leaf enabled { type boolean; default "true"; }
+      leaf mtu { type uint16 { range "68..9216"; } }
+      leaf speed { type uint64; units "kbit/s"; }
+      leaf duplex {
+        type enumeration {
+          enum full;
+          enum half;
+          enum auto;
+        }
+      }
+      leaf lag {
+        type leafref { path "../../lag/name"; }
+      }
+      leaf-list tags { type string; }
+      container counters {
+        leaf in-octets { type uint64; }
+        leaf out-octets { type uint64; }
+      }
+    }
+    list lag {
+      key "name";
+      leaf name { type port-name; }
+      leaf min-links {
+        type uint8 { range "1..8"; }
+        must ". <= 8";
+      }
+    }
+  }
+}

@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- **Release benchmark:** `bench/worker.ts` (bundled by `scripts/build-bench-worker.mjs`) is the TypeScript side of the repository benchmark `benchmarks/release_bench.py`, which measures parse and validation time, peak RSS, and source lines for both implementations on the same inputs and refreshes the README benchmark section on release. See [`benchmarks/README.md`](../benchmarks/README.md).
+
 ### Changed
 
 - **Parser keyword dispatch:** `parser/dispatch-registry` is the same parent → substatement table as Python. Statement bodies use it, so an unknown keyword under `typedef`, `leaf`, and the other parents raises `YangSyntaxError` naming the parent and the keyword. A prefixed extension under `typedef` parses. Import and include still skip an unknown body statement instead of raising ([#121](https://github.com/exergy-connect/xYang/issues/121)).
