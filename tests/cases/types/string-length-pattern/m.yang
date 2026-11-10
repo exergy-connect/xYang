@@ -1,0 +1,25 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf code {
+      type string {
+        length "2..4";
+        pattern "[a-z]+";
+      }
+    }
+    leaf no-digits {
+      type string {
+        pattern "[0-9]+" { modifier invert-match; }
+      }
+    }
+    leaf two-patterns {
+      type string {
+        pattern "[a-z]+";
+        pattern "a.*";
+      }
+    }
+  }
+}

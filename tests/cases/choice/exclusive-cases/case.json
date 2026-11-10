@@ -1,0 +1,15 @@
+{
+  "description": "Only one case of a choice may have data; a bare leaf is an implicit case. Choice/case are not data nodes, so errors point at the parent data node.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "one explicit case", "data": { "top": { "port": 80, "keepalive": true } }, "valid": true },
+    { "name": "implicit case", "data": { "top": { "unix-path": "/tmp/s" } }, "valid": true },
+    { "name": "no case", "data": { "top": {} }, "valid": true },
+    { "name": "two cases", "data": { "top": { "port": 80, "dgram-port": 53 } }, "valid": false,
+      "errors": [{ "path": "/top", "code": "choice-multiple-cases" }],
+      "xfail": { "ts": "TS reports choice errors at a path that includes the choice name (top.transport)" } },
+    { "name": "type error inside active case", "data": { "top": { "port": 70000 } }, "valid": false,
+      "errors": [{ "path": "/top/port", "code": "range" }],
+      "xfail": { "ts": "TS includes the choice name in data paths inside a choice (top.transport.port)" } }
+  ]
+}

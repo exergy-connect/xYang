@@ -1,0 +1,9 @@
+{
+  "description": "In YANG XPath a boolean leaf's string value is 'true' or 'false' (RFC 7950 6.4.1), so ../enabled = 'true' compares strings.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "enabled true", "data": { "top": { "enabled": true, "port": 1 } }, "valid": true },
+    { "name": "enabled false", "data": { "top": { "enabled": false, "port": 1 } }, "valid": false,
+      "errors": [{ "path": "/top/port", "code": "must" }] }
+  ]
+}

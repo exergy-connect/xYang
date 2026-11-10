@@ -1,0 +1,12 @@
+{
+  "description": "A node whose when is false must not exist; when it is false its mandatory descendants are not required.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "when true", "data": { "top": { "kind": "advanced", "extra": "x", "tuning": { "level": 1 } } }, "valid": true },
+    { "name": "when false and absent", "data": { "top": { "kind": "basic" } }, "valid": true },
+    { "name": "leaf present while when is false", "data": { "top": { "kind": "basic", "extra": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/extra", "code": "when" }] },
+    { "name": "container present while when is false", "data": { "top": { "kind": "basic", "tuning": { "level": 1 } } },
+      "valid": false, "errors": [{ "path": "/top/tuning", "code": "when" }] }
+  ]
+}

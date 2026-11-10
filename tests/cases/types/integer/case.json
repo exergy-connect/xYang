@@ -1,0 +1,23 @@
+{
+  "description": "Built-in integer bounds, range restriction, multi-part range.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "in range", "data": { "top": { "u8": 255, "small": -10, "multi": 10 } }, "valid": true },
+    { "name": "uint8 overflow", "data": { "top": { "u8": 256 } }, "valid": false,
+      "errors": [{ "path": "/top/u8", "code": "range" }] },
+    { "name": "below range", "data": { "top": { "small": -11 } }, "valid": false,
+      "errors": [{ "path": "/top/small", "code": "range" }] },
+    { "name": "between range parts", "data": { "top": { "multi": 5 } }, "valid": false,
+      "errors": [{ "path": "/top/multi", "code": "range" }],
+      "xfail": { "python": "_parse_range splits on the first '..' only, so multi-part ranges lose their upper bound" } },
+    { "name": "fraction is not an integer", "data": { "top": { "u8": 1.5 } }, "valid": false,
+      "errors": [{ "path": "/top/u8", "code": "type" }],
+      "xfail": { "python": "int(1.5) truncates instead of rejecting a non-integer number" } },
+    { "name": "numeric string for uint8", "data": { "top": { "u8": "5" } }, "valid": false,
+      "errors": [{ "path": "/top/u8", "code": "type" }],
+      "xfail": {
+        "python": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8",
+        "ts": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8"
+      } }
+  ]
+}

@@ -1,0 +1,12 @@
+{
+  "description": "leafref require-instance with absolute and relative paths; require-instance false skips the check.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "existing targets", "data": { "top": { "items": [{ "id": "a" }, { "id": "b" }], "ref": "b", "rel": "a", "loose": "zz" } },
+      "valid": true },
+    { "name": "dangling absolute", "data": { "top": { "items": [{ "id": "a" }], "ref": "z" } }, "valid": false,
+      "errors": [{ "path": "/top/ref", "code": "leafref" }] },
+    { "name": "dangling relative", "data": { "top": { "items": [{ "id": "a" }], "rel": "z" } }, "valid": false,
+      "errors": [{ "path": "/top/rel", "code": "leafref" }] }
+  ]
+}

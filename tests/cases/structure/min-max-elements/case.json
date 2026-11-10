@@ -1,0 +1,21 @@
+{
+  "description": "min-elements / max-elements on list and leaf-list; leaf-list item errors point at the item.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "within bounds", "data": { "top": { "items": [{ "id": "a" }], "tags": ["x", "y"] } }, "valid": true },
+    { "name": "too many entries", "data": { "top": { "items": [{ "id": "a" }, { "id": "b" }, { "id": "c" }] } },
+      "valid": false, "errors": [{ "path": "/top/items", "code": "max-elements" }] },
+    { "name": "empty list below min-elements", "data": { "top": { "items": [] } }, "valid": false,
+      "errors": [{ "path": "/top/items", "code": "min-elements" }] },
+    { "name": "absent list below min-elements", "data": { "top": {} }, "valid": false,
+      "errors": [{ "path": "/top/items", "code": "min-elements" }],
+      "xfail": {
+        "python": "min-elements is only checked when the list is present (RFC 7950 7.7.5 applies it to absent lists too)",
+        "ts": "min-elements is not checked when the list is absent"
+      } },
+    { "name": "too many leaf-list items", "data": { "top": { "items": [{ "id": "a" }], "tags": ["a", "b", "c"] } },
+      "valid": false, "errors": [{ "path": "/top/tags", "code": "max-elements" }] },
+    { "name": "leaf-list item type error", "data": { "top": { "items": [{ "id": "a" }], "tags": ["a", "long"] } },
+      "valid": false, "errors": [{ "path": "/top/tags/1", "code": "length" }] }
+  ]
+}

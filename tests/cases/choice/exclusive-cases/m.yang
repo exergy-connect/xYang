@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    choice transport {
+      case tcp {
+        leaf port { type uint16; }
+        leaf keepalive { type boolean; }
+      }
+      case udp {
+        leaf dgram-port { type uint16; }
+      }
+      leaf unix-path { type string; }
+    }
+  }
+}

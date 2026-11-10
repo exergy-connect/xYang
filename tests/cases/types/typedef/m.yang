@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef percent {
+    type uint8 { range "0..100"; }
+  }
+
+  typedef small-percent {
+    type percent { range "0..50"; }
+  }
+
+  container top {
+    leaf p { type percent; }
+    leaf sp { type small-percent; }
+    leaf inline { type percent { range "10..20"; } }
+  }
+}

@@ -1,0 +1,25 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    must "count(items) <= 2";
+    leaf name {
+      type string;
+      must "string-length(.) <= 5";
+    }
+    leaf mode {
+      type string;
+      must "not(. = 'bad') or ../name = 'ok'";
+    }
+    leaf label {
+      type string;
+      must "concat(../name, '-x') = .";
+    }
+    list items {
+      key id;
+      leaf id { type string; }
+    }
+  }
+}

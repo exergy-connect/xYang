@@ -1,0 +1,21 @@
+{
+  "description": "String length, pattern (anchored), invert-match, and several patterns that must all match.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid", "data": { "top": { "code": "abc", "no-digits": "x1", "two-patterns": "abc" } }, "valid": true },
+    { "name": "too short", "data": { "top": { "code": "a" } }, "valid": false,
+      "errors": [{ "path": "/top/code", "code": "length" }] },
+    { "name": "pattern is anchored", "data": { "top": { "code": "aB" } }, "valid": false,
+      "errors": [{ "path": "/top/code", "code": "pattern" }] },
+    { "name": "length and pattern both violated", "data": { "top": { "code": "ABCDEFG" } }, "valid": false,
+      "errors": [{ "path": "/top/code", "code": "length" }, { "path": "/top/code", "code": "pattern" }],
+      "xfail": { "ts": "TS stops at the first type error on a leaf (reports length only)" } },
+    { "name": "invert-match", "data": { "top": { "no-digits": "123" } }, "valid": false,
+      "errors": [{ "path": "/top/no-digits", "code": "pattern" }] },
+    { "name": "second pattern fails", "data": { "top": { "two-patterns": "bc" } }, "valid": false,
+      "errors": [{ "path": "/top/two-patterns", "code": "pattern" }] },
+    { "name": "not a string", "data": { "top": { "code": 12 } }, "valid": false,
+      "errors": [{ "path": "/top/code", "code": "type" }],
+      "xfail": { "python": "non-string values are coerced with str() and then checked as strings" } }
+  ]
+}

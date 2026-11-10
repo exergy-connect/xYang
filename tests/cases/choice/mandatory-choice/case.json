@@ -1,0 +1,13 @@
+{
+  "description": "Mandatory choice needs one active case; a mandatory leaf in a case applies only when that case is active (RFC 7950 7.9.4, 7.6.5).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "choice satisfied, other case inactive", "data": { "top": { "ipv4": "10.0.0.1" } }, "valid": true },
+    { "name": "mandatory choice missing", "data": { "top": {} }, "valid": false,
+      "errors": [{ "path": "/top", "code": "mandatory-choice" }],
+      "xfail": { "ts": "TS reports choice errors at a path that includes the choice name (top.addr)" } },
+    { "name": "active case missing its mandatory leaf", "data": { "top": { "ipv6": "::1", "user": "bob" } }, "valid": false,
+      "errors": [{ "path": "/top/secret", "code": "mandatory" }],
+      "xfail": { "ts": "TS includes the choice name in data paths inside a choice (top.auth.secret)" } }
+  ]
+}

@@ -1,0 +1,11 @@
+{
+  "description": "decimal64 fraction-digits and range.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid", "data": { "top": { "price": 99.95 } }, "valid": true },
+    { "name": "too many fraction digits", "data": { "top": { "price": 1.234 } }, "valid": false,
+      "errors": [{ "path": "/top/price", "code": "fraction-digits" }] },
+    { "name": "out of range", "data": { "top": { "price": 100.5 } }, "valid": false,
+      "errors": [{ "path": "/top/price", "code": "range" }] }
+  ]
+}

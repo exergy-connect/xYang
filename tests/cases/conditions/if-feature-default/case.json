@@ -1,0 +1,9 @@
+{
+  "description": "Without a features option every declared feature is enabled.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "feature node allowed", "data": { "top": { "a": "x" } }, "valid": true },
+    { "name": "not-feature node rejected", "data": { "top": { "c": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/c", "code": "if-feature" }] }
+  ]
+}

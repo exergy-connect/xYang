@@ -1,0 +1,5 @@
+{
+  "description": "Groupings that use each other are a schema error.",
+  "module": "m.yang",
+  "schema_error": true
+}

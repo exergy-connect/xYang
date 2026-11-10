@@ -1,0 +1,11 @@
+{
+  "description": "Typedef and grouping from an imported module, referenced through a local prefix that differs from the module's own.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid", "data": { "top": { "host": "h", "p": 80 } }, "valid": true },
+    { "name": "imported typedef range", "data": { "top": { "p": 2000 } }, "valid": false,
+      "errors": [{ "path": "/top/p", "code": "range" }] },
+    { "name": "imported grouping leaf", "data": { "top": { "host": "far-too-long" } }, "valid": false,
+      "errors": [{ "path": "/top/host", "code": "length" }] }
+  ]
+}

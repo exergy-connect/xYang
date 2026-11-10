@@ -1,0 +1,8 @@
+submodule m-sub {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  container settings {
+    leaf level { type uint8 { range "1..3"; } }
+  }
+}

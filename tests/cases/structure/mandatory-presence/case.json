@@ -1,0 +1,15 @@
+{
+  "description": "Mandatory leaves; a non-presence container exists implicitly, a presence container does not (RFC 7950 7.5.1, 7.6.5).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "all present", "data": { "top": { "name": "x" }, "opt": { "level": 1 } }, "valid": true },
+    { "name": "mandatory missing", "data": { "top": { "note": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/name", "code": "mandatory" }] },
+    { "name": "absent presence container needs nothing", "data": { "top": { "name": "x" } }, "valid": true },
+    { "name": "present presence container enforces mandatory", "data": { "top": { "name": "x" }, "opt": {} }, "valid": false,
+      "errors": [{ "path": "/opt/level", "code": "mandatory" }] },
+    { "name": "absent non-presence container still enforces mandatory", "data": {}, "valid": false,
+      "errors": [{ "path": "/top/name", "code": "mandatory" }],
+      "xfail": { "python": "Python skips absent containers, so mandatory leaves under an absent non-presence container are not reported" } }
+  ]
+}

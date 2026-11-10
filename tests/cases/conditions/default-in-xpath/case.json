@@ -1,0 +1,9 @@
+{
+  "description": "XPath sees a leaf's default value when the leaf is absent (RFC 7950 7.6.1).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "explicit value satisfies must", "data": { "top": { "mode": "manual", "manual-value": 1 } }, "valid": true },
+    { "name": "default value fails must", "data": { "top": { "manual-value": 1 } }, "valid": false,
+      "errors": [{ "path": "/top/manual-value", "code": "must" }] }
+  ]
+}

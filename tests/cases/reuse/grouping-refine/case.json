@@ -1,0 +1,12 @@
+{
+  "description": "Nested grouping/uses expands in place; refine applies only to that use.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "expanded nodes", "data": { "top": { "host": "a", "port": 1, "name": "n", "backup": { "host": "b" } } },
+      "valid": true },
+    { "name": "refined mandatory", "data": { "top": { "host": "a" } }, "valid": false,
+      "errors": [{ "path": "/top/port", "code": "mandatory" }] },
+    { "name": "type from grouping", "data": { "top": { "port": 1, "backup": { "port": 70000 } } }, "valid": false,
+      "errors": [{ "path": "/top/backup/port", "code": "range" }] }
+  ]
+}

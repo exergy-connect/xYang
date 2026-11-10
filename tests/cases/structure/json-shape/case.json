@@ -1,0 +1,16 @@
+{
+  "description": "A container is a JSON object; list and leaf-list are JSON arrays (RFC 7951 5).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "right shapes", "data": { "top": { "inner": { "a": "x" }, "items": [{ "id": "1" }], "tags": ["t"] } }, "valid": true },
+    { "name": "container as scalar", "data": { "top": { "inner": 5 } }, "valid": false,
+      "errors": [{ "path": "/top/inner", "code": "type" }],
+      "xfail": { "python": "a non-object container value is skipped without an error" } },
+    { "name": "list as object", "data": { "top": { "items": { "id": "1" } } }, "valid": false,
+      "errors": [{ "path": "/top/items", "code": "type" }],
+      "xfail": { "python": "a non-array list value is skipped without an error" } },
+    { "name": "leaf-list as scalar", "data": { "top": { "tags": "t" } }, "valid": false,
+      "errors": [{ "path": "/top/tags", "code": "type" }],
+      "xfail": { "python": "a scalar leaf-list value is treated as a one-element list" } }
+  ]
+}

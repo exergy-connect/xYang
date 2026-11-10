@@ -7,6 +7,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **Shared conformance cases:** language-neutral cases in `tests/cases/` (YANG modules, JSON instances, expected `(JSON Pointer, code)` errors) run by both `tests/test_cases.py` and `ts/test/cases.test.ts`; known Python/TypeScript divergences are recorded as per-implementation expected failures. A new CI workflow runs both runners on every change.
+- **Python `YangValidator(module, enabled_features_by_module=...)`:** configure enabled features without dropping to `DocumentValidator`, matching TypeScript `enabledFeaturesByModule`.
+
+### Fixed
+
+- **TypeScript validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python. Data that violates these bounds now fails validation.
+
 ## [0.1.11] — 2026-11-06
 
 ### Added
