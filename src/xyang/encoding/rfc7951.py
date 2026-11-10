@@ -17,26 +17,30 @@ _STRUCTURE_INDEX_KEY = "ietf-yang-structure-ext:structure-index"
 
 def resolve_structure_instance(
     data: Dict[str, Any], module: YangModule
-) -> Optional[Tuple[YangStatement, Dict[str, Any]]]:
+) -> Optional[Tuple[YangStatement, Dict[str, Any], str]]:
     """
-    If *data* is a single RFC 7951 ``module-name:structure`` object for a registered
-    RFC 8791 structure in *module*, return ``(structure_schema, inner_object)``.
+    If *data* is a single object for a registered RFC 8791 structure in *module*,
+    return ``(structure_schema, inner_object, json_key)``.
+
+    The member is a top-level data node: ``msg`` or ``module-name:msg`` (RFC 7951).
+    ``json_key`` is the key as written in *data*.
     """
     if not isinstance(data, dict) or len(data) != 1:
         return None
     json_key, inner = next(iter(data.items()))
-    if not isinstance(json_key, str) or ":" not in json_key:
+    if not isinstance(json_key, str) or not isinstance(inner, dict):
         return None
-    mod_name, _, struct_name = json_key.partition(":")
-    if mod_name != module.name or not struct_name:
-        return None
+    if ":" in json_key:
+        mod_name, _, struct_name = json_key.partition(":")
+        if mod_name != module.name or not struct_name:
+            return None
+    else:
+        struct_name = json_key
     idx = module.extension_runtime.get(_STRUCTURE_INDEX_KEY) or {}
     schema = idx.get(struct_name)
     if schema is None:
         return None
-    if not isinstance(inner, dict):
-        return None
-    return schema, inner
+    return schema, inner, json_key
 
 
 def defining_module_name(stmt: YangStatement, parent_module_name: str) -> str:

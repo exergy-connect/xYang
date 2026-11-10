@@ -109,16 +109,22 @@ class YangValidator:
     ) -> List[ValidationError]:
         root_schema: YangStatementList = self.module
         instance: Dict[str, Any] = data
+        structure_key: Optional[str] = None
         structure = resolve_structure_instance(data, self.module)
         if structure is not None:
-            root_schema, instance = structure
-        return self._document_validator(root_schema).validate(
+            root_schema, instance, structure_key = structure
+        errors = self._document_validator(root_schema).validate(
             instance,
             leafref_severity=leafref_severity,
             native_json=native_json,
             module=self.module,
             from_iterator=True,
         )
+        if structure_key is not None:
+            for err in errors:
+                err.pointer = _prefix_member(structure_key, err.pointer)
+                err.path = _prefix_member(structure_key, err.path)
+        return errors
 
     @staticmethod
     def _issue(e: ValidationError) -> Dict[str, Any]:
@@ -137,3 +143,13 @@ class YangValidator:
         if e.expression:
             return f"{e.path}: {e.message} (expression: {e.expression})"
         return f"{e.path}: {e.message}"
+
+
+def _prefix_member(json_key: str, location: str) -> str:
+    """Prefix a path or JSON Pointer with the structure member as written."""
+    token = json_key.replace("~", "~0").replace("/", "~1")
+    if location in ("", "/"):
+        return f"/{token}"
+    if location.startswith("/"):
+        return f"/{token}{location}"
+    return f"/{token}/{location}"

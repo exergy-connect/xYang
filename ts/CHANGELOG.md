@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **RFC 8791 structure instances:** a structure is a top-level data node, written `msg` or `m:msg`. Error paths are JSON Pointers into that member (`/m:msg/n`, `/msg/n`), matching Python ([#78](https://github.com/exergy-connect/xYang/issues/78)).
 - **`empty` encoding:** shared cases confirm that `[null]` is the only valid RFC 7951 value, and `null`, `true`, and `""` are `type` errors ([#59](https://github.com/exergy-connect/xYang/issues/59)).
 - **Duplicate list keys:** a duplicate key is still reported once at the list, and the entries are validated anyway, so errors inside an entry are no longer hidden ([#67](https://github.com/exergy-connect/xYang/issues/67)).
 - **Error paths:** errors point at the right node, matching Python. An unknown field is reported at the member (`top.b: Unknown field 'b'`, and `zzz: ...` at the root), and `choice` / `case` names no longer appear in paths, so a leaf inside a case is `top.port` and choice errors are at the parent data node `top`. JSON Pointers in `validateDetailed` follow the same rule ([#60](https://github.com/exergy-connect/xYang/issues/60)).

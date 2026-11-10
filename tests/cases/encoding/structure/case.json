@@ -1,0 +1,11 @@
+{
+  "description": "RFC 8791 sx:structure is a top-level data node in simple or module-qualified form. Paths are JSON Pointers into the input as written.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "qualified out of range", "data": { "m:msg": { "n": 300 } }, "valid": false,
+      "errors": [{ "path": "/m:msg/n", "code": "range", "message": "exceeds maximum" }] },
+    { "name": "simple out of range", "data": { "msg": { "n": 300 } }, "valid": false,
+      "errors": [{ "path": "/msg/n", "code": "range", "message": "exceeds maximum" }] },
+    { "name": "qualified in range", "data": { "m:msg": { "n": 3 } }, "valid": true }
+  ]
+}
