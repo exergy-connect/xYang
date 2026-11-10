@@ -170,6 +170,12 @@ class XPathParser:
                 right, rc = self._parse_unary()
                 left = BinaryOpNode(left, "*", right)
                 cacheable = cacheable and rc
+            elif self._is_keyword("div") or self._is_keyword("mod"):
+                # XPath 1.0 §3.7: div/mod after an operand are multiplicative operators.
+                op = self._consume().value.lower()
+                right, rc = self._parse_unary()
+                left = BinaryOpNode(left, op, right)
+                cacheable = cacheable and rc
             else:
                 break
         return left, cacheable
@@ -326,8 +332,12 @@ class XPathParser:
                 self._consume()
                 return True
             return False
+
         if first_step is not None:
-            _add_step_and_optional_predicate(first_step)
+            # Stop when '.' is not followed by '/', so `. div 2` leaves div for
+            # the multiplicative operator instead of treating it as a step name.
+            if not _add_step_and_optional_predicate(first_step):
+                return PathNode(segments, is_absolute, is_cacheable=cacheable), cacheable
         while self._current().type in (TokenType.DOT, TokenType.DOTDOT, TokenType.IDENTIFIER):
             step = self._consume().value
             if not _add_step_and_optional_predicate(step):

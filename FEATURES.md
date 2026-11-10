@@ -351,11 +351,10 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 - ✅ **Navigation from predicates**: `fields[name = "x"]/type` - Navigate from filtered results
 
 ### String Operations
-- ✅ **String concatenation**: `+` operator for string concatenation
 - `contains()`, `substring-before()`, and `substring-after()` are not implemented (https://github.com/exergy-connect/xYang/issues/85)
 
 ### Arithmetic Operations
-- ✅ `+`, `-`, `*`, `/` - Arithmetic operators (with `/` treated as path navigation when appropriate)
+- ✅ `+`, `-`, `*`, `div`, `mod` (numeric)
 
 ### Advanced Features
 - ✅ **Nested deref()**: `deref(deref(current())/../foreignKey/entity)` - Multiple levels of dereferencing
