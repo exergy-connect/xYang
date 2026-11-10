@@ -83,14 +83,23 @@ export class ModuleStatementParser {
 
   parse_include_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.INCLUDE);
-    tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name =
+      tokens.peek_type() === YangTokenType.STRING
+        ? tokens.consume_type(YangTokenType.STRING)
+        : tokens.consume_type(YangTokenType.IDENTIFIER);
+    let revisionDate: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, context);
+        if (this.parsers.dispatch_key(tokens) === kw.REVISION_DATE) {
+          revisionDate = this.parsers.revision_parser.parse_revision_date_statement(tokens);
+          continue;
+        }
+        this.skip_nested_statement(tokens);
       }
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
+    this.parsers.resolveInclude(context, name, revisionDate, tokens);
   }
 
   parse_prefix_value_stmt(tokens: TokenStream): void {

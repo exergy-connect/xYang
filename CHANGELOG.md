@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **Shared cases:** included submodule data nodes and typedefs (`tests/cases/modules/include`, `include-typedef`), and `augment` inside `uses` (`tests/cases/reuse/uses-augment`, `uses-augment-bad-target`). TypeScript now matches Python on these cases ([#55](https://github.com/exergy-connect/xYang/issues/55), [#62](https://github.com/exergy-connect/xYang/issues/62)).
 - **One-call validate and machine-readable CLI:** `xyang.validate(schema, data, *, features=None, include_path=())` returns the `validate_detailed` dict (`schema` is a path or a parsed module). `xyang validate` accepts `--format text|json`, `--features` (`{"module": ["feature"]}` or `null`), and `-` for stdin. `--format json` prints `{"valid", "errors": [{path, code, message}]}` on stdout and warnings on stderr. Exit codes are 0 valid, 1 invalid, and 2 for usage or schema/parse errors ([#82](https://github.com/exergy-connect/xYang/issues/82)).
 - **Discoverability:** `keywords` on the Python and TypeScript packages, agent notes in `AGENTS.md` (install, `parse` / `validate` / `convert`, validate examples, tests), and [`llms.txt`](llms.txt) ([#81](https://github.com/exergy-connect/xYang/issues/81)).
 - **Native JSON format:** documented the intent of the native JSON form of YANG: reversible, unambiguous, and fast to load (`README.md`, `AGENTS.md`).
@@ -25,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **TypeScript parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set — the same gate and order as Python ([#75](https://github.com/exergy-connect/xYang/issues/75)).
 - **Python validation:** a present container must be a JSON object, a list or leaf-list must be a JSON array, and each list entry must be an object. Wrong shapes report `type` (`container must be an object`, `list must be an array`, `list item must be an object`, `leaf-list must be an array`) instead of being skipped or accepted as a one-element leaf-list ([#52](https://github.com/exergy-connect/xYang/issues/52)).
 - **Python validation:** leaf type checks reject a JSON value of the wrong type instead of coercing it. A non-integral number or a boolean is not an integer (`Expected integer, got <json type>`), a boolean is not a decimal64, and a non-string is not a string (`Expected string, got <json type>`). Length and pattern are not applied to a non-string. Numeric strings for integer types are unchanged ([#51](https://github.com/exergy-connect/xYang/issues/51)).
 - **XPath:** an unknown function name is a compile error (`xpath-unknown-function`) in Python and TypeScript. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).

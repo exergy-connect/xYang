@@ -34,8 +34,10 @@ describe("python parity: test_yangson_ex3_import", () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-ex3-import-"));
     try {
       copyFileSync(resolve(ex3Dir, "example-3-a@2017-08-01.yang"), join(dir, "example-3-a.yang"));
+      copyFileSync(resolve(ex3Dir, "example-3-suba@2017-08-01.yang"), join(dir, "example-3-suba@2017-08-01.yang"));
       copyFileSync(resolve(ex3Dir, "example-3-b@2016-08-22.yang"), join(dir, "example-3-b.yang"));
       copyFileSync(resolve(ex3Dir, "ietf-inet-types@2010-09-24.yang"), join(dir, "ietf-inet-types.yang"));
+      copyFileSync(resolve(ex3Dir, "ietf-inet-types@2013-07-15.yang"), join(dir, "ietf-inet-types@2013-07-15.yang"));
 
       const mod = new YangParser({ expand_uses: false }).parseFile(join(dir, "example-3-b.yang"));
       const imports = mod.data.import_prefixes as Record<string, { name?: string }> | undefined;

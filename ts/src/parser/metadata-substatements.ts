@@ -32,5 +32,9 @@ export function withDataNodeSubstatements(
   out[kw.STATUS] ??= (tokens, context) => {
     parsers.parse_status_ignored(tokens, context);
   };
+  // RFC 7950 §7.13 — typedef is legal in container, list, choice, case, augment, …
+  out[kw.TYPEDEF] ??= (tokens, context) => {
+    parsers.typedef_parser.parse_typedef(tokens, context);
+  };
   return out;
 }

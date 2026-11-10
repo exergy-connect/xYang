@@ -242,7 +242,7 @@ export class DocumentValidator {
         ) {
           continue;
         }
-        this.validateStatement(stmt, root[stmt.name], stmt.name, errors, rootNode, rootNode);
+        this.validateStatement(stmt, this.instanceValue(root, stmt), stmt.name, errors, rootNode, rootNode);
       }
 
       if (ctx.constraintChecks) {
@@ -279,7 +279,7 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, parentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
       }
       return;
     }
@@ -328,7 +328,7 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, currentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, currentNode, rootNode);
       }
       if (this.ctx.constraintChecks) {
         this.rejectUnknownContainerKeys(stmt, obj, path, errors);
@@ -370,7 +370,7 @@ export class DocumentValidator {
           if (!child.name) {
             continue;
           }
-          this.validateStatement(child, row[child.name], `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
+          this.validateStatement(child, this.instanceValue(row, child), `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
         }
         if (this.ctx.constraintChecks) {
           this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
@@ -515,7 +515,9 @@ export class DocumentValidator {
         YangTokenType.CONTAINER, YangTokenType.LIST, YangTokenType.LEAF,
         YangTokenType.LEAF_LIST, YangTokenType.ANYDATA, YangTokenType.ANYXML
       ].includes(kw as YangTokenType)) {
-        keys.add(stmt.name);
+        for (const key of this.instanceKeys(stmt)) {
+          keys.add(key);
+        }
       }
     };
     for (const child of parent.statements ?? []) {
@@ -618,7 +620,7 @@ export class DocumentValidator {
       if (!child.name) {
         continue;
       }
-      this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, parentNode, rootNode);
+      this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
     }
   }
 
@@ -643,7 +645,7 @@ export class DocumentValidator {
         YangTokenType.ANYXML
       ].includes(keyword as YangTokenType)
     ) {
-      return Boolean(stmt.name && obj[stmt.name] !== undefined);
+      return this.instanceKeys(stmt).some((key) => obj[key] !== undefined);
     }
     if (keyword === YangTokenType.CHOICE) {
       return this.choiceHasBranchData(stmt, obj);
@@ -654,8 +656,38 @@ export class DocumentValidator {
     return false;
   }
 
+  /** RFC 7951 member name: local, or ``module:local`` when the node is defined in another module. */
+  private instanceKeys(stmt: YangStatement): string[] {
+    const local = stmt.name;
+    if (!local) {
+      return [];
+    }
+    const parent = this.ctx.module.name ?? "";
+    const defined =
+      typeof stmt.data.defining_module === "string" && stmt.data.defining_module
+        ? stmt.data.defining_module
+        : parent;
+    if (!parent || defined === parent) {
+      return [local];
+    }
+    return [`${defined}:${local}`];
+  }
+
+  private instanceValue(obj: Record<string, unknown>, stmt: YangStatement): unknown {
+    for (const key of this.instanceKeys(stmt)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        return obj[key];
+      }
+    }
+    return undefined;
+  }
+
   private effectiveKeyword(stmt: YangStatement): string {
     const raw = stmt.keyword ?? "";
+    // Python models notification as a container for instance data (RFC 7951 anydata payloads).
+    if (raw === YangTokenType.NOTIFICATION) {
+      return YangTokenType.CONTAINER;
+    }
     if (raw.includes(":")) {
       const kind = stmt.data.data_node_kind;
       if (kind === YangTokenType.CONTAINER || kind === YangTokenType.LIST) {
@@ -948,12 +980,12 @@ export class DocumentValidator {
       if (!child.data.mandatory) {
         continue;
       }
-      const childValue = obj?.[child.name];
+      const childValue = obj ? this.instanceValue(obj, child) : undefined;
       const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
       if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
         continue;
       }
-      if (!obj || obj[child.name] === undefined) {
+      if (!obj || childValue === undefined) {
         errors.push(issue(`${path}.${child.name}`, "mandatory", `mandatory ${childKeyword} is missing`));
       }
     }

@@ -11,6 +11,9 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **Include:** `include` loads the submodule and merges its data nodes, typedefs, identities, groupings, and features into the parent module. `belongs-to`, duplicate names, and circular includes are rejected ([#55](https://github.com/exergy-connect/xYang/issues/55)).
+- **`augment` inside `uses`:** augment substatements are kept on the `uses` node and applied to the expanded grouping before `refine`, so a refine can target a node the augment added. `uses` of the module's own prefix resolves locally. Notification bodies validate like containers, and augmented nodes accept their RFC 7951 `module:name` member ([#62](https://github.com/exergy-connect/xYang/issues/62)).
+- **Post-parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set. `sx:structure` indexing sees the expanded tree; with `expand_uses: false` the structure index is absent ([#75](https://github.com/exergy-connect/xYang/issues/75)).
 - **XPath:** an unknown function name is a compile error (`xpath-unknown-function`), matching Python. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).
 - **Validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python (same error wording). Data that violates these bounds now fails validation.
 - **Tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first.

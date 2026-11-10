@@ -1,0 +1,9 @@
+{
+  "description": "augment inside uses adds nodes to the expanded grouping (RFC 7950 §7.13).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "augmented leaf", "data": { "top": { "c": { "a": "x", "b": 3 } } }, "valid": true },
+    { "name": "augmented leaf type", "data": { "top": { "c": { "a": "x", "b": 300 } } }, "valid": false,
+      "errors": [{ "path": "/top/c/b", "code": "range" }] }
+  ]
+}
