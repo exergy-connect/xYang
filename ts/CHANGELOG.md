@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- **Types:** `YangTokenType` is a const object, so its type includes punctuation such as `"+"`. `Array.includes` rejected that wider type, and `YangTokenType.INPUT` is not a type. `hasTokenType` does the same membership check and narrows, and input/output parameters use `typeof YangTokenType.INPUT`. `tsc --noEmit` passes. The checks are unchanged.
+
 ### Changed
 
 - **Parser keyword dispatch:** `parser/dispatch-registry` is the same parent → substatement table as Python. Statement bodies use it, so an unknown keyword under `typedef`, `leaf`, and the other parents raises `YangSyntaxError` naming the parent and the keyword. A prefixed extension under `typedef` parses. Import and include still skip an unknown body statement instead of raising ([#121](https://github.com/exergy-connect/xYang/issues/121)).

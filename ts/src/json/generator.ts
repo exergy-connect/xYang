@@ -4,7 +4,7 @@ import {
   parseIdentifierRefAtom
 } from "../core/identifier-ref";
 import { YangModule, YangStatement } from "../core/model";
-import { YangTokenType } from "../parser/parser-context";
+import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { expandUses } from "../transform/uses-expand";
 import { jsonSchemaDefaultValue } from "./default-values";
 import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
@@ -30,7 +30,7 @@ function asRecord(value: unknown): Record<string, unknown> {
 }
 
 function isSchemaDataNode(stmt: YangStatement): boolean {
-  return [
+  return hasTokenType(stmt.keyword ?? "", [
     YangTokenType.CONTAINER,
     YangTokenType.LIST,
     YangTokenType.LEAF,
@@ -39,7 +39,7 @@ function isSchemaDataNode(stmt: YangStatement): boolean {
     YangTokenType.CASE,
     YangTokenType.ANYDATA,
     YangTokenType.ANYXML
-  ].includes((stmt.keyword ?? "") as YangTokenType);
+  ]);
 }
 
 /** Paths with predicates cannot be cache-resolved (matches Python JSON generator). */
@@ -274,7 +274,7 @@ function buildSoleChoiceObjectSchema(
     }
     properties[child.name] = statementToSchema(child, module, typedefNames);
     if (
-      [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((child.keyword ?? "") as YangTokenType) &&
+      hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       child.mandatory === true
     ) {
       required.push(child.name);
@@ -295,7 +295,7 @@ function ioBlockToSchema(
   stmt: YangStatement,
   module: YangModule,
   typedefNames: Set<string>,
-  ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
+  ioType: typeof YangTokenType.INPUT | typeof YangTokenType.OUTPUT
 ): Record<string, unknown> {
   const body = buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
   const out: Record<string, unknown> = {
@@ -345,7 +345,7 @@ function buildMultiChildObjectSchema(
     }
     properties[child.name] = statementToSchema(child, module, typedefNames);
     if (
-      [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((child.keyword ?? "") as YangTokenType) &&
+      hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       child.mandatory === true
     ) {
       required.push(child.name);
@@ -702,20 +702,20 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
       continue;
     }
     if (
-      ![
+      !hasTokenType(stmt.keyword ?? "", [
         YangTokenType.CONTAINER,
         YangTokenType.LIST,
         YangTokenType.LEAF,
         YangTokenType.LEAF_LIST,
         YangTokenType.ANYDATA,
         YangTokenType.ANYXML
-      ].includes((stmt.keyword ?? "") as YangTokenType)
+      ])
     ) {
       continue;
     }
     properties[stmt.name] = statementToSchema(stmt, effectiveModule, typedefNames);
     if (
-      [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((stmt.keyword ?? "") as YangTokenType) &&
+      hasTokenType(stmt.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       stmt.mandatory === true
     ) {
       required.push(stmt.name);

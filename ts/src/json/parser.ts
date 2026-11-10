@@ -709,7 +709,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
 function parseIoBlock(
   schema: Record<string, unknown>,
   defs: Record<string, unknown>,
-  ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
+  ioType: typeof YangTokenType.INPUT | typeof YangTokenType.OUTPUT
 ): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const parsed = parseContainer(ioType, schema, defs);
