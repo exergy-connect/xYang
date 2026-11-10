@@ -146,6 +146,13 @@ class YangPatternSpec:
     invert_match: bool = False
     error_message: Optional[str] = None
     error_app_tag: Optional[str] = None
+    #: Translated XSD regex (``xsd_regex.translate``); an unsupported pattern fails here.
+    compiled: Any = field(default=None, init=False, repr=False, compare=False)
+
+    def __post_init__(self) -> None:
+        from .xsd_regex import translate
+
+        self.compiled = translate(self.pattern) if self.pattern else None
 
 
 @dataclass
@@ -209,6 +216,8 @@ class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+    #: One entry per ``unique`` statement: descendant paths with prefixes stripped (``a/b``).
+    unique: List[List[str]] = field(default_factory=list)
 
 
 @dataclass

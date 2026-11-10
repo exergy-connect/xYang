@@ -435,6 +435,20 @@ class StatementParsers:
             context.current_parent.key = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
+    def parse_list_unique(self, tokens: TokenStream, context: ParserContext) -> None:
+        """Parse ``unique "<descendant-path> ..."`` (RFC 7950 §7.8.3)."""
+        tokens.consume(kw.UNIQUE)
+        arg = self.parse_string_argument(tokens)
+        paths = [
+            "/".join(seg.split(":", 1)[-1] for seg in path.split("/") if seg)
+            for path in arg.split()
+        ]
+        if not paths:
+            raise tokens.make_error("unique requires at least one descendant path")
+        if isinstance(context.current_parent, YangListStmt):
+            context.current_parent.unique.append(paths)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
     def parse_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse min-elements (list, leaf-list, or refine)."""
         tokens.consume(kw.MIN_ELEMENTS)

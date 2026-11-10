@@ -91,7 +91,7 @@ def test_typedef_union_string_and_enum():
 
       typedef string-pattern {
         type string {
-          pattern '^[A-Z][a-z]+$';
+          pattern '[A-Z][a-z]+';
         }
       }
 

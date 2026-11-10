@@ -358,7 +358,6 @@ module meta-model {
        Call sites use ``uses foreign-keys { when ... }``: omit when ``type`` uses scalar ``entity`` (target is already named there).";
     list foreignKeys {
       key entity;
-      min-elements 1;
       description "Each entry points at an entity; values align with primary key unless ``field`` specifies another target field (which must be marked ``unique`` on the referenced entity).";
       uses entity-reference;
       leaf field {

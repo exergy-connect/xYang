@@ -337,8 +337,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "definition": {
                               "type": "string",
@@ -431,8 +430,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "primitive-or-enum": {
                               "type": "object",
@@ -654,8 +652,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "entity": {
                               "$ref": "#/$defs/entity-name",
@@ -746,8 +743,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "array": {
                               "type": "object",
@@ -1058,8 +1054,7 @@
                                                       "when": {
                                                         "condition": "not(boolean(./entity))"
                                                       }
-                                                    },
-                                                    "minItems": 1
+                                                    }
                                                   },
                                                   "primitive-or-enum": {
                                                     "type": "object",
@@ -1281,8 +1276,7 @@
                                                       "when": {
                                                         "condition": "not(boolean(./entity))"
                                                       }
-                                                    },
-                                                    "minItems": 1
+                                                    }
                                                   },
                                                   "entity": {
                                                     "$ref": "#/$defs/entity-name",
@@ -1442,8 +1436,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "composite": {
                               "type": "array",
@@ -1563,8 +1556,7 @@
                                               "when": {
                                                 "condition": "not(boolean(./entity))"
                                               }
-                                            },
-                                            "minItems": 1
+                                            }
                                           },
                                           "primitive-or-enum": {
                                             "type": "object",
@@ -1786,8 +1778,7 @@
                                               "when": {
                                                 "condition": "not(boolean(./entity))"
                                               }
-                                            },
-                                            "minItems": 1
+                                            }
                                           },
                                           "entity": {
                                             "$ref": "#/$defs/entity-name",
@@ -2168,8 +2159,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "definition": {
                               "type": "string",
@@ -2262,8 +2252,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "primitive-or-enum": {
                               "type": "object",
@@ -2485,8 +2474,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "entity": {
                               "$ref": "#/$defs/entity-name",
@@ -2577,8 +2565,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "array": {
                               "type": "object",
@@ -2889,8 +2876,7 @@
                                                       "when": {
                                                         "condition": "not(boolean(./entity))"
                                                       }
-                                                    },
-                                                    "minItems": 1
+                                                    }
                                                   },
                                                   "primitive-or-enum": {
                                                     "type": "object",
@@ -3112,8 +3098,7 @@
                                                       "when": {
                                                         "condition": "not(boolean(./entity))"
                                                       }
-                                                    },
-                                                    "minItems": 1
+                                                    }
                                                   },
                                                   "entity": {
                                                     "$ref": "#/$defs/entity-name",
@@ -3273,8 +3258,7 @@
                                 "when": {
                                   "condition": "not(boolean(./entity))"
                                 }
-                              },
-                              "minItems": 1
+                              }
                             },
                             "composite": {
                               "type": "array",
@@ -3394,8 +3378,7 @@
                                               "when": {
                                                 "condition": "not(boolean(./entity))"
                                               }
-                                            },
-                                            "minItems": 1
+                                            }
                                           },
                                           "primitive-or-enum": {
                                             "type": "object",
@@ -3617,8 +3600,7 @@
                                               "when": {
                                                 "condition": "not(boolean(./entity))"
                                               }
-                                            },
-                                            "minItems": 1
+                                            }
                                           },
                                           "entity": {
                                             "$ref": "#/$defs/entity-name",

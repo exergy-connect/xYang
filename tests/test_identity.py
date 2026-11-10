@@ -190,7 +190,7 @@ def test_validate_must_on_sibling_when_identityref_satisfies_derived_from():
 
     module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING)
     validator = YangValidator(module)
-    data = {"data": {"kind": "is:dog", "label": "x"}}
+    data = {"data": {"kind": "identity-must-sibling:dog", "label": "x"}}
     is_valid, errors, _warnings = validator.validate(data)
     assert is_valid, errors
 
@@ -200,7 +200,7 @@ def test_validate_must_on_sibling_fails_when_identityref_not_mammal_lineage():
 
     module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING)
     validator = YangValidator(module)
-    data = {"data": {"kind": "is:animal", "label": "x"}}
+    data = {"data": {"kind": "identity-must-sibling:animal", "label": "x"}}
     is_valid, errors, _warnings = validator.validate(data)
     assert not is_valid
     assert errors

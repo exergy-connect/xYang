@@ -48,6 +48,52 @@ export function resolveIdentityQnamePair(importer: YangModule, qname: string): I
   return resolveIdentityBaseRef(importer.data, ref);
 }
 
+/**
+ * Resolve an RFC 7951 identityref instance value (§6.8). `name` resolves in the module.
+ * `modname:name` resolves where `modname` is the *module name* (not the prefix) of the
+ * module itself or of a module it imports.
+ */
+export function resolveIdentityValue(moduleData: Record<string, unknown>, value: unknown): IdentityPair | null {
+  if (typeof value !== "string" || value.length === 0) {
+    return null;
+  }
+  const colon = value.indexOf(":");
+  let target: Record<string, unknown> | undefined = moduleData;
+  let local = value;
+  if (colon >= 0) {
+    const modName = value.slice(0, colon);
+    local = value.slice(colon + 1);
+    if (modName !== moduleData.name) {
+      const imports = (moduleData.import_prefixes as Record<string, Record<string, unknown>> | undefined) ?? {};
+      target = Object.values(imports).find((m) => m && typeof m === "object" && m.name === modName);
+    }
+  }
+  if (!target || !(local in getIdentities(target))) {
+    return null;
+  }
+  return { mod: target, local };
+}
+
+/** RFC 7950: the value must be derived from (or equal to) **every** identityref base. */
+export function identityrefValueValid(
+  moduleData: Record<string, unknown>,
+  value: unknown,
+  bases: Array<string | YangIdentifierRef>
+): boolean {
+  if (bases.length === 0) {
+    return false;
+  }
+  const v = resolveIdentityValue(moduleData, value);
+  if (!v) {
+    return false;
+  }
+  const closure = identityAncestorClosure(v.mod, v.local);
+  return bases.every((b) => {
+    const br = resolveIdentityBaseRef(moduleData, b);
+    return br !== null && pairInPairs(br, closure);
+  });
+}
+
 export function resolveIdentityBaseRef(
   fromMod: Record<string, unknown>,
   base: string | YangIdentifierRef
@@ -122,8 +168,9 @@ export function identityAncestorClosure(
   return out;
 }
 
+/** `vQ` is an instance value (RFC 7951 module name); `tQ` is a schema literal (prefix). */
 export function isDerivedFromStrictQNames(importer: YangModule, vQ: string, tQ: string): boolean {
-  const v = resolveIdentityQnamePair(importer, vQ);
+  const v = resolveIdentityValue(importer.data, vQ);
   const t = resolveIdentityQnamePair(importer, tQ);
   if (!v || !t) {
     return false;
@@ -133,7 +180,7 @@ export function isDerivedFromStrictQNames(importer: YangModule, vQ: string, tQ: 
 }
 
 export function isDerivedFromOrSelfQNames(importer: YangModule, vQ: string, tQ: string): boolean {
-  const v = resolveIdentityQnamePair(importer, vQ);
+  const v = resolveIdentityValue(importer.data, vQ);
   const t = resolveIdentityQnamePair(importer, tQ);
   if (!v || !t) {
     return false;

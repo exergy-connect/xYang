@@ -67,7 +67,7 @@ An error is `{ "path", "code", "message"? }`:
   parent data node (`/top`).
 - **`code`** is one of `range`, `length`, `pattern`, `enum`, `union`, `type`, `must`, `when`,
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
-  `max-elements`, `duplicate-key`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
+  `max-elements`, `duplicate-key`, `unique`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
   `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
   `xpath-error`, `xpath-unknown-function`.
   Both validators emit the code; add it in both places when you need a new one.

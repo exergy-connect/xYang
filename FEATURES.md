@@ -84,9 +84,10 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
 - ✅ `min-elements` - Minimum elements (5 occurrences)
 - ✅ `max-elements` - Maximum elements (1 occurrence)
 - ✅ `key` - List keys (heavily used)
+- ✅ `unique` - Unique leaf combinations across list entries (RFC 7950 §7.8.3); entries missing a leaf of the set are ignored. Round-trips as `x-yang.unique`
 
 ### Type Constraints
-- ✅ `pattern` - Pattern matching (6 occurrences); **multiple** patterns and **`modifier invert-match`** per RFC 7950, with per-pattern error metadata. JSON Schema: top-level `pattern` when a single non-inverted regex suffices; otherwise `allOf` / `not` plus **`x-yang.string-patterns`** for round-trip (Python and `ts/`).
+- ✅ `pattern` - Pattern matching (6 occurrences); XSD regex syntax (RFC 7950 §9.4.5) translated at load time, including `\p{X}` categories and `\i` / `\c`; unsupported XSD constructs fail the module load; **multiple** patterns and **`modifier invert-match`** per RFC 7950, with per-pattern error metadata. JSON Schema: top-level `pattern` when a single non-inverted regex suffices; otherwise `allOf` / `not` plus **`x-yang.string-patterns`** for round-trip (Python and `ts/`).
 - ✅ `length` - Length constraints (3 occurrences)
 - ✅ `range` - Range constraints (2 occurrences)
 - ✅ `fraction-digits` - Decimal fraction digits (3 occurrences)

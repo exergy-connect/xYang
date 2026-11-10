@@ -67,7 +67,7 @@ module test {
 
   typedef string-pattern {
     type string {
-      pattern '^[A-Z][a-z]+$';
+      pattern '[A-Z][a-z]+';
     }
   }
 

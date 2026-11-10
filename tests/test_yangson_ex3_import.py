@@ -103,19 +103,17 @@ def test_example_3_suba_parses_submodule(parse_ex3: YangParser) -> None:
 
 
 def test_yang_library_ex3_json_validates(ietf_yang_library_module) -> None:
-    """Legacy modules-state JSON (ex3) validates against yang-library-ex3.yang."""
-    raw = json.loads((EX3_DIR / "yang-library-ex3.json").read_text(encoding="utf-8"))
-    assert "ietf-yang-library:modules-state" in raw
-    data = {"modules-state": raw["ietf-yang-library:modules-state"]}
-    valid, errors, warnings = YangValidator(ietf_yang_library_module).validate(data)
-    assert valid, f"expected valid instance, got errors={errors!r} warnings={warnings!r}"
+    """Legacy modules-state (ex3) and RFC 8525 yang-library JSON validate together.
 
-
-def test_rfc8525_ex3_json_validates(ietf_yang_library_module) -> None:
-    """RFC 8525 yang-library JSON validates against yang-library-ex3.yang."""
-    raw = json.loads((EX3_DIR / "rfc8525-ex3.json").read_text(encoding="utf-8"))
-    assert "ietf-yang-library:yang-library" in raw
-    data = {"yang-library": raw["ietf-yang-library:yang-library"]}
+    Both containers are non-presence, so each exists implicitly and its mandatory
+    leaves apply (RFC 7950 7.5.1); the document needs both.
+    """
+    legacy = json.loads((EX3_DIR / "yang-library-ex3.json").read_text(encoding="utf-8"))
+    rfc8525 = json.loads((EX3_DIR / "rfc8525-ex3.json").read_text(encoding="utf-8"))
+    data = {
+        "modules-state": legacy["ietf-yang-library:modules-state"],
+        "yang-library": rfc8525["ietf-yang-library:yang-library"],
+    }
     valid, errors, warnings = YangValidator(ietf_yang_library_module).validate(data)
     assert valid, f"expected valid instance, got errors={errors!r} warnings={warnings!r}"
 

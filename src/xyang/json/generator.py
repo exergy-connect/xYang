@@ -903,6 +903,8 @@ def _list_stmt_to_property(
     )
     if choice_overlay:
         list_xy = {**list_xy, **choice_overlay}
+    if stmt.unique:
+        list_xy[XYangKey.UNIQUE] = [list(paths) for paths in stmt.unique]
     out = {
         JsonSchemaKey.TYPE: "array",
         JsonSchemaKey.ITEMS: items,

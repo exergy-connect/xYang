@@ -1,0 +1,14 @@
+{
+  "description": "identityref values are qualified by the module name, not the prefix (RFC 7951 6.8). The module is m with prefix p.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "module-name qualified", "data": { "top": { "proto": "m:tcp" } }, "valid": true },
+    { "name": "bare name from the same module", "data": { "top": { "proto": "tcp" } }, "valid": true },
+    { "name": "prefix qualified", "data": { "top": { "proto": "p:tcp" } }, "valid": false,
+      "errors": [{ "path": "/top/proto", "code": "identityref" }] },
+    { "name": "identity with another base", "data": { "top": { "proto": "m:color" } }, "valid": false,
+      "errors": [{ "path": "/top/proto", "code": "identityref", "message": "is not derived from all bases" }] },
+    { "name": "unknown identity", "data": { "top": { "proto": "m:udp" } }, "valid": false,
+      "errors": [{ "path": "/top/proto", "code": "identityref", "message": "does not resolve" }] }
+  ]
+}

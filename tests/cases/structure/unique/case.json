@@ -1,12 +1,16 @@
 {
-  "description": "unique: no two list entries may share the same values for the unique leaves (RFC 7950 7.8.3).",
+  "description": "unique: no two list entries may share the same values for the unique leaves; entries missing any of them are ignored (RFC 7950 7.8.3).",
   "module": "m.yang",
-  "xfail": { "python": "the 'unique' statement is a parse error", "cli": "the 'unique' statement is a parse error" },
   "instances": [
     { "name": "distinct values", "data": { "top": { "servers": [{ "name": "a", "ip": "1" }, { "name": "b", "ip": "2" }] } },
       "valid": true },
     { "name": "duplicate unique value", "data": { "top": { "servers": [{ "name": "a", "ip": "1" }, { "name": "b", "ip": "1" }] } },
-      "valid": false, "errors": [{ "path": "/top/servers", "code": "unique" }],
-      "xfail": { "ts": "unique is parsed but not enforced" } }
+      "valid": false, "errors": [{ "path": "/top/servers", "code": "unique", "message": "Unique constraint violated in list 'servers': ip='1' (entries at index 0 and 1)" }] },
+    { "name": "entry without the unique leaf is ignored", "data": { "top": { "servers": [{ "name": "a", "ip": "1" }, { "name": "b" }, { "name": "c" }] } },
+      "valid": true },
+    { "name": "two-leaf set with one value shared", "data": { "top": { "endpoints": [{ "name": "a", "ip": "1", "port": 80 }, { "name": "b", "ip": "1", "port": 81 }] } },
+      "valid": true },
+    { "name": "two-leaf set with both values shared", "data": { "top": { "endpoints": [{ "name": "a", "ip": "1", "port": 80 }, { "name": "b", "ip": "1", "port": 80 }] } },
+      "valid": false, "errors": [{ "path": "/top/endpoints", "code": "unique" }] }
   ]
 }

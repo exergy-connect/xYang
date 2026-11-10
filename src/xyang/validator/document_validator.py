@@ -23,6 +23,7 @@ RFC 7950 §7.9.4 mandatory ``choice`` / §7.6.5 mandatory ``leaf`` under a ``cas
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
@@ -61,6 +62,24 @@ from .validation_error import ValidationError, Severity
 ParentCtx = Tuple[Context, Node]
 
 logger = logging.getLogger("xyang.validator")
+
+_MISSING = object()
+
+
+def _descendant_value(entry: Any, path: str) -> Any:
+    """Value at a ``unique`` descendant path (``a/b``) in a list entry, or ``_MISSING``."""
+    cur = entry
+    for seg in path.split("/"):
+        if not isinstance(cur, dict) or seg not in cur:
+            return _MISSING
+        cur = cur[seg]
+    return cur
+
+
+def _unique_display(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 class DocumentValidator:
@@ -474,6 +493,14 @@ class DocumentValidator:
         if debug:
             logger.debug("phase 2 structural path=%s", child_path)
         if not self._check_structural(stmt, name, data, child_path, child_pointer, enforce_mandatory_choice):
+            if isinstance(stmt, YangContainerStmt) and stmt.presence is None and not present:
+                # RFC 7950 §7.5.1: a non-presence container exists implicitly, so
+                # mandatory and min-elements below it still apply.
+                empty_node = parent_node.step({}, stmt)
+                path.push(name, pointer_name=json_name)
+                child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
+                self._visit_children({}, stmt, (parent_ctx_obj.child(empty_node), empty_node), path, child_enforce)
+                path.pop()
             return
 
         # -- 3. must (evaluated in current node context) --
@@ -563,8 +590,9 @@ class DocumentValidator:
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
-            if self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer):
-                return  # duplicate key; skip per-entry validation
+            self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer)
+            if self._constraint_checks:
+                self._check_list_unique(stmt, val, child_path, child_pointer)
             for i, entry in enumerate(val):
                 if not isinstance(entry, dict):
                     continue
@@ -781,8 +809,8 @@ class DocumentValidator:
             count = len(effective) if isinstance(effective, list) else (1 if effective is not None else 0)
             min_e = getattr(stmt, "min_elements", None)
             max_e = getattr(stmt, "max_elements", None)
-            # Only enforce min/max when list is present (YANG: optional list may be omitted)
-            if min_e is not None and present and count < min_e:
+            # RFC 7950 §7.7.5: min-elements also applies to an absent list (count 0).
+            if min_e is not None and count < min_e:
                 self._add(
                     path=path,
                     pointer=pointer,
@@ -881,6 +909,32 @@ class DocumentValidator:
                 return True
             seen_keys[key_tuple] = i
         return False
+
+    def _check_list_unique(self, stmt: YangListStmt, val: list, path_str: str, pointer: str) -> None:
+        """RFC 7950 §7.8.3: one error per ``unique`` set whose values repeat across entries.
+
+        Entries missing any leaf of the set are ignored.
+        """
+        for paths in stmt.unique:
+            seen: Dict[str, int] = {}
+            for i, entry in enumerate(val):
+                values = [_descendant_value(entry, p) for p in paths]
+                if any(v is _MISSING for v in values):
+                    continue
+                token = json.dumps(values, sort_keys=True, default=str)
+                if token in seen:
+                    shown = ", ".join(f"{p}='{_unique_display(v)}'" for p, v in zip(paths, values))
+                    self._add(
+                        path=path_str,
+                        pointer=pointer,
+                        code="unique",
+                        message=(
+                            f"Unique constraint violated in list '{stmt.name}': {shown} "
+                            f"(entries at index {seen[token]} and {i})"
+                        ),
+                    )
+                    break
+                seen[token] = i
 
     def _entry_key_from_names(self, entry: Any, key_names: List[str]) -> Optional[str]:
         """Path key string for a list entry from key leaf names."""

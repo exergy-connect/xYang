@@ -10,5 +10,12 @@ module m {
       leaf name { type string; }
       leaf ip { type string; }
     }
+    list endpoints {
+      key name;
+      unique "m:ip port";
+      leaf name { type string; }
+      leaf ip { type string; }
+      leaf port { type uint16; }
+    }
   }
 }
