@@ -27,7 +27,12 @@ export class FeatureStatementParser {
 
   parse_if_feature_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.IF_FEATURE);
-    const expression = this.parsers.parse_string_concatenation(tokens);
+    let expression = this.parsers.parse_string_argument(tokens);
+    // ``prefix:name`` is one unquoted argument; the lexer splits on ':'.
+    if (tokens.has_more() && tokens.peek_type() === YangTokenType.COLON) {
+      tokens.consume_type(YangTokenType.COLON);
+      expression = `${expression}:${tokens.consume()}`;
+    }
     const parent: any = context.current_parent;
     if (parent && Array.isArray(parent.if_features)) {
       parent.if_features.push(expression);

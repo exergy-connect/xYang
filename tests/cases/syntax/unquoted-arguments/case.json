@@ -1,12 +1,8 @@
 {
-  "description": "RFC 7950 6.1.3 allows unquoted string arguments, e.g. 'if-feature f;'.",
+  "description": "RFC 7950 6.1.3 allows unquoted string arguments, e.g. 'if-feature f;' (#65).",
   "module": "m.yang",
-  "xfail": {
-    "python": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'",
-    "cli": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'",
-    "ts": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'"
-  },
   "instances": [
-    { "name": "parses and validates", "data": { "top": { "a": "x" } }, "valid": true }
+    { "name": "parses and validates", "data": { "top": { "a": "x" } }, "valid": true },
+    { "name": "prefixed if-feature", "data": { "top": { "b": "y" } }, "valid": true }
   ]
 }

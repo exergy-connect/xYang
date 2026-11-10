@@ -107,12 +107,12 @@ export class YangParser {
     this.includePath = (options.include_path ?? []).map((p) => resolve(p));
   }
 
-  /** Resolve `import` / `include` like Python `YangParser._resolve_submodule_path` (revision file, then basename, then last `name@*.yang`). */
+  /** Resolve `import` / `include` like Python `YangParser._resolve_module_file`. */
   private resolveImportedModulePath(
     moduleBasename: string,
     revisionDate: string | undefined,
     sourceDir: string,
-    kind: "imported module" | "submodule" = "imported module"
+    kind: "module" | "submodule" = "module"
   ): string {
     const trimmedRev = revisionDate?.trim();
     const candidates: string[] = [];
@@ -121,27 +121,49 @@ export class YangParser {
     }
     candidates.push(`${moduleBasename}.yang`);
     const dirs = [sourceDir, ...this.includePath];
+    let found: string | undefined;
     for (const dir of dirs) {
       for (const c of candidates) {
         const p = resolve(dir, c);
         if (existsSync(p)) {
-          return p;
+          found = p;
+          break;
         }
       }
-      let matches: string[] = [];
-      try {
-        matches = readdirSync(dir).filter((f) => f.startsWith(`${moduleBasename}@`) && f.endsWith(".yang"));
-      } catch {
-        matches = [];
-      }
-      if (matches.length > 0) {
-        matches.sort();
-        return resolve(dir, matches[matches.length - 1]!);
+      if (found) {
+        break;
       }
     }
-    throw new YangSemanticError(
-      `Could not find ${kind} '${moduleBasename}' (tried ${candidates.join(", ")}) under ${dirs.join(", ")}`
-    );
+    if (!found) {
+      for (const dir of dirs) {
+        let matches: string[] = [];
+        try {
+          matches = readdirSync(dir).filter((f) => f.startsWith(`${moduleBasename}@`) && f.endsWith(".yang"));
+        } catch {
+          matches = [];
+        }
+        if (matches.length > 0) {
+          matches.sort();
+          found = resolve(dir, matches[matches.length - 1]!);
+          break;
+        }
+      }
+    }
+    if (!found) {
+      const tried = `[${candidates.map((c) => `'${c}'`).join(", ")}]`;
+      throw new YangSemanticError(
+        `Could not find ${kind} '${moduleBasename}' (tried filenames ${tried}) under [${dirs.join(", ")}]`
+      );
+    }
+    const expected = trimmedRev ? `${moduleBasename}@${trimmedRev}.yang` : undefined;
+    const foundName = found.slice(Math.max(found.lastIndexOf("/"), found.lastIndexOf("\\")) + 1);
+    if (expected && foundName !== expected) {
+      const statement = kind === "module" ? "import" : "include";
+      console.warn(
+        `${statement} '${moduleBasename}' revision-date ${trimmedRev} not found; using ${foundName}`
+      );
+    }
+    return found;
   }
 
   private resolveImport(
@@ -156,7 +178,7 @@ export class YangParser {
         "import requires a filesystem location: use parseYangFile(), or parseYangString(... from a file-backed source)"
       );
     }
-    const filePath = this.resolveImportedModulePath(moduleName, revisionDate, dirname(sourcePath));
+    const filePath = this.resolveImportedModulePath(moduleName, revisionDate, dirname(sourcePath), "module");
     const imported = this.parseFile(filePath);
     return imported.data;
   }

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import importlib.metadata
 import json
 import sys
 from pathlib import Path
@@ -137,15 +138,19 @@ def _load_instance_data(data_path: Path) -> Any:
 
 
 def main() -> int:
+    try:
+        cli_version = importlib.metadata.version("xyang")
+    except importlib.metadata.PackageNotFoundError:
+        cli_version = "unknown"
     parser = argparse.ArgumentParser(
         prog="xyang",
-        description="xYang: YANG parsing and validation (subset for meta-model.yang)",
+        description="xYang: Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema",
     )
     parser.add_argument(
         "-V",
         "--version",
         action="version",
-        version="%(prog)s 0.1.4",
+        version=f"%(prog)s {cli_version}",
     )
     subparsers = parser.add_subparsers(dest="cmd", help="Commands")
     path_parent = argparse.ArgumentParser(add_help=False)

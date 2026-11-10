@@ -1,8 +1,5 @@
 """
-xYang - YANG parsing and validation using xpath.
-
-Based on xYang; uses xpath for parsing must/when expressions and for
-document validation (when, structure, must, type checks).
+xYang: Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema.
 """
 
 from __future__ import annotations

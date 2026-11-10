@@ -30,6 +30,8 @@ xyang convert path/to/module.yang -o path/to/module.yang.json
 xyang validate path/to/module.yang path/to/data.json
 ```
 
+TypeScript CLI: `npx xyang-ts parse|validate|convert <file.yang> [data.json]`. TypeScript `convert` writes to stdout. Python `convert` writes `<file>.yang.json`, or the path given with `-o`.
+
 Without installing: `PYTHONPATH=src python3 -m xyang …` from the xYang repo root.
 
 Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json.generate_json_schema`, `xyang.json.parse_json_schema` (see repo `README.md`).
@@ -39,14 +41,15 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 | Topic | Location |
 |--------|-----------|
 | Supported YANG / CLI / feature checklist | `FEATURES.md` |
-| JSON Schema + `x-yang` shape (emit & parse) | `docs/json-schema-xyang-profile.md` |
-| Supported textual grammar (EBNF-style) | `docs/yang-ebnf-supported-constructs.md` |
+| JSON Schema + `x-yang` shape (emit & parse) | `design/json-schema-xyang-profile.md` |
+| Supported textual grammar (EBNF-style) | `design/yang-ebnf-supported-constructs.md` |
 | Large real YANG example | `examples/meta-model.yang` |
 | Generated JSON Schema example | `examples/meta-model.yang.json` |
+| Executable behavior spec | `tests/cases/` (`tests/cases/README.md`) |
 
 ## Design rules for **valid xYang models**
 
-1. **Self-contained modules** — `import` / `include` / `augment` are **not** implemented; keep one module per file for tooling.
+1. `import` (with `--include-path`), `include`/`submodule` and `augment` are supported. Keep imported modules next to the main file or pass `--include-path`.
 2. **Instance data keys** match **leaf**, **container**, **list**, and **choice case** names under the schema tree (no `choice` / `case` keys in JSON).
 3. **Leafref** — `type leafref { path "…"; }` with absolute or relative paths as supported; instance validation resolves targets. JSON: `x-yang.type: "leafref"`, `path`, `require-instance` on the leaf (see profile doc).
 4. **Identity / identityref** — identities and `identityref` with `base` are supported; JSON uses `$defs` and `x-yang` for bases (see profile doc).
@@ -64,7 +67,7 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 
 ## Workflow B: JSON Schema + `x-yang` (advanced)
 
-1. Read **`docs/json-schema-xyang-profile.md`** end-to-end.
+1. Read **`design/json-schema-xyang-profile.md`** end-to-end.
 2. Root object: `$schema`, `$id`, `type: object`, `properties` for each **top-level** data node; each property that is part of the module needs a recognizable **`x-yang`** (`container`, `list`, `leaf`, `leaf-list`, `choice`).
 3. Module metadata lives in **root `x-yang`**: `module`, `yang-version`, `namespace`, `prefix`, etc.
 4. Use **`$defs`** for typedefs and identities as described in the profile doc.
@@ -72,7 +75,7 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 
 ## Unsupported (do not use in models meant for xYang)
 
-See **`FEATURES.md` § “Features NOT Implemented”** (e.g. `import`, `augment`, `binary`, …). Built-in type **names** may lex as keywords even when validation is incomplete—stick to documented combinations.
+Unsupported: `deviation`, `action` (skipped with a warning). Known gaps per implementation: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
 
 ## After authoring
 

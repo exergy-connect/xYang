@@ -22,6 +22,9 @@ export class BitsStatementParser {
       }
       tokens.consume_type(YangTokenType.RBRACE);
     }
+    if (type_stmt.bits.some((bit) => bit.name === name)) {
+      tokens.syntaxError(`Duplicate bit name '${name}' in bits type`);
+    }
     type_stmt.bits.push(new YangBitStmt({ name, position }));
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

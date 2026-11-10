@@ -33,12 +33,12 @@ XPath evaluation is fast and consistent.
 ## Optimizations Applied
 
 ### 1. Regex Pattern Caching
-- **Location**: `xYang/types.py`
+- **Location**: `src/xyang/types.py`
 - **Change**: Cache compiled regex patterns in `TypeSystem`
 - **Impact**: Reduces regex compilation overhead for repeated validations
 
 ### 2. Improved Tokenizer
-- **Location**: `xYang/parser.py`
+- **Location**: `src/xyang/parser/tokenizer.py`
 - **Changes**:
   - Pre-compute content length
   - Use set lookup for special characters
@@ -46,12 +46,12 @@ XPath evaluation is fast and consistent.
 - **Impact**: ~27% faster string parsing
 
 ### 3. Optimized translate() Function
-- **Location**: `xYang/xpath/evaluator.py`
+- **Location**: `src/xyang/xpath/functions.py` (`f_translate`)
 - **Change**: Use `str.translate()` with `str.maketrans()` instead of multiple `replace()` calls
 - **Impact**: Faster XPath translate() operations
 
 ### 4. String Operation Improvements
-- **Location**: `xYang/parser.py`
+- **Location**: `src/xyang/parser/tokenizer.py`
 - **Change**: Use `find()` instead of `index()` for comment removal
 - **Impact**: Slightly faster comment processing
 

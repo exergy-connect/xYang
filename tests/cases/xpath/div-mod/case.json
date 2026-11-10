@@ -1,14 +1,10 @@
 {
-  "description": "XPath 1.0 div and mod operators.",
+  "description": "XPath 1.0 div and mod operators are numeric (#48).",
   "module": "m.yang",
-  "xfail": {
-    "python": "div and mod are XPath syntax errors, so the module does not load",
-    "cli": "div and mod are XPath syntax errors, so the module does not load",
-    "ts": "div and mod are XPath syntax errors, so the module does not load"
-  },
   "instances": [
     { "name": "div and mod", "data": { "top": { "divide": 2, "modulo": 4 } }, "valid": true },
     { "name": "mod false", "data": { "top": { "modulo": 3 } }, "valid": false,
-      "errors": [{ "path": "/top/modulo", "code": "must" }] }
+      "errors": [{ "path": "/top/modulo", "code": "must" }] },
+    { "name": "truncating mod", "data": { "top": { "negmod": -5 } }, "valid": true }
   ]
 }

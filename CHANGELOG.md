@@ -21,12 +21,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Tests:** removed per-language tests whose valid/invalid outcome is already covered by a shared case in `tests/cases/`. Bits (empty, duplicate token, non-string), bits-in-union, duplicate bit names, empty enumerations, and `if-feature` on a list moved into shared cases. TypeScript still accepts duplicate bit names; that case is an expected failure.
+- **Tests:** removed per-language tests whose valid/invalid outcome is already covered by a shared case in `tests/cases/`. Bits (empty, duplicate token, non-string), bits-in-union, duplicate bit names, empty enumerations, and `if-feature` on a list moved into shared cases.
 - **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads `xyang-ts.mjs` from GitHub Release assets instead of checking out a committed bundle. The `path` input and `xyang-root` output are removed (#89).
 - CI no longer commits `artifacts/xyang-ts.mjs` or `docs/xyang.umd.min.js`. A published release builds them with `npm run build:ci` and attaches them; pull-request CI only runs that build as a check and does not push commits (#89).
 
 ### Fixed
 
+- **Parser (Python + TypeScript):** an unquoted `if-feature` argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).
+- **Import revision-date (Python + TypeScript):** when `import x { revision-date R; }` does not find `x@R.yang`, the parser warns with the file it opened (`import 'x' revision-date R not found; using ...`) instead of falling back silently. An exact revision file is chosen ahead of a newer `x@*.yang`. A missing import reports `Could not find module`, not `submodule` ([#66](https://github.com/exergy-connect/xYang/issues/66)).
+- **TypeScript:** a `bits` type that declares the same bit name twice is a parse error (`Duplicate bit name`), matching Python ([#93](https://github.com/exergy-connect/xYang/issues/93)).
+- **XPath:** `+`, `-`, `*`, `div`, and `mod` are numeric operators (XPath 1.0). Python evaluates `*`, and both languages parse and evaluate `div` and `mod` (`mod` is a truncating remainder, the same as JavaScript `%`). `+` does not concatenate strings ([#48](https://github.com/exergy-connect/xYang/issues/48)).
+- **FEATURES.md:** dropped the contradictory lines on augment merging, `if-feature` in JSON Schema, and path caching, removed the usage-statistics section and the stale test-count list, and moved "Recent Improvements" to [History (moved from FEATURES.md)](#history-moved-from-featuresmd) ([#68](https://github.com/exergy-connect/xYang/issues/68)).
+- **Agent skill:** `skills/xyang-model/SKILL.md` documents `import`, `include`/`submodule`, and `augment`, points at `design/` for the JSON Schema profile and grammar, and includes the TypeScript CLI ([#69](https://github.com/exergy-connect/xYang/issues/69)).
+- **Version and descriptions:** `xyang --version` reads the installed package version (or `unknown` when that metadata is missing). The CLI, `pyproject.toml` description, and package docstring share one description. `PERFORMANCE.md` cites the current source paths ([#70](https://github.com/exergy-connect/xYang/issues/70)).
 - **TypeScript parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set — the same gate and order as Python ([#75](https://github.com/exergy-connect/xYang/issues/75)).
 - **Python validation:** multi-part `range` and `length` restrictions keep every part. A value is accepted when it falls in at least one part, and an integer is still checked against its built-in minimum and maximum when a `range` is present (`range "1..3 | 10..max"` rejects `4` and `5`, and values above the type's maximum) ([#54](https://github.com/exergy-connect/xYang/issues/54)).
 - **Validation (Python + TypeScript):** a `range`, `length`, or `pattern` on a `type` that names a typedef is applied after that typedef's own restrictions, so a derived typedef or a leaf can narrow a range ([#56](https://github.com/exergy-connect/xYang/issues/56)).
@@ -207,6 +214,120 @@ First published release (`xyang` **0.1.0** on PyPI).
 - **`xyang`** CLI: `parse`, `validate`, `convert` (YANG → **YANG.json** hybrid).
 - JSON Schema **2020-12** export with **`x-yang`** metadata where supported.
 - **Zero** required runtime dependencies; optional **PyYAML** for `.yaml` / `.yml` instance validation.
+
+## History (moved from FEATURES.md)
+
+## Recent Improvements
+
+### RPC and notification parsing (2026-05)
+- ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
+- ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes (`tests/test_rpc_input_output.py`).
+- ✅ **RPC in yang.json**: `generate_json_schema` / `parse_json_schema` round-trip via `x-yang.rpcs` (`tests/json/test_rpc_json.py`); integer built-ins round-trip via JSON Schema `minimum` / `maximum`.
+
+### TypeScript CLI and parser (2026-05)
+- ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).
+- ✅ **`augment` body**: `case`, `notification`, and other data-node substatements under `augment` (and `augment` under `uses` via `YangUsesStmt.augmentations`).
+- ✅ **`status` on typedefs**: Ignored at parse time (RFC 7950 §7.21.2) so standard modules with `status deprecated` parse cleanly.
+- ✅ **`rpc` / `input` / `output`**: Parser and yang.json parity with Python (`ts/test/rpc_input_output.test.ts`, `ts/test/json/rpc_json.test.ts`); `rpc` not in unsupported-skip; `rpc` inside `container` rejected (syntax error).
+
+
+### String patterns: modifiers and multiple substatements (2026-04)
+- ✅ **YANG:** Parse several `pattern` lines, optional `modifier invert-match` blocks, and per-pattern `error-message` / `error-app-tag`.
+- ✅ **Validation:** `DocumentValidator` / TS type checker apply every pattern in order, including invert semantics and pattern-specific errors.
+- ✅ **JSON Schema:** Emit `x-yang.string-patterns` and reconstruct the list when parsing `.yang.json` back into an AST.
+
+### Import, submodule, if-feature, and docs (2026-04)
+- ✅ **`import` / `include` / `submodule`**: Resolve and parse dependent `.yang` files; merge included submodules; `import` prefix map for prefixed types and `if-feature` expressions.
+- ✅ **`if-feature`**: Parsing on data-definition parents supported by the grammar; boolean evaluation; `DocumentValidator` integration; `uses` / `refine` propagation; per-feature conditions on `feature` statements; `copy_yang_statement` refactored with `dataclasses.replace`.
+- ✅ **`FEATURES.md`**: Brought in line with the codebase (this update).
+
+### Meta-model example and documentation (2026-04)
+- ✅ **`examples/meta-model.yang`** stays aligned with the xFrame canonical module (including `year` in `primitive-type-name`, multiple `revision` statements, and current `when` / `must` paths under the `type` container).
+- ✅ **`FEATURES.md` usage statistics** were recomputed with stricter patterns (e.g. `must "` only) so counts are not inflated by the word “must” inside description text.
+
+### CLI, Convert, and JSON Schema (2026-03)
+- ✅ **CLI**: `xyang` (or `python -m xyang`) with subcommands
+  - `parse <file.yang>` — print module name, namespace, prefix, typedef count, etc.
+  - `validate <file.yang> [data.json]` — validate JSON against the YANG module (stdin if no file)
+  - `convert <file.yang> [-o path]` — convert .yang to JSON Schema; output path always ends with `.yang.json` (default: `<stem>.yang.json` alongside input)
+- ✅ **Convert**: Uses `YangParser(expand_uses=False)` for a reversible AST (`uses`/`augment` not flattened at parse); the JSON generator expands `uses` when emitting; produces draft 2020-12 JSON Schema with `x-yang` annotations.
+- ✅ **JSON Schema pattern fix**: Pattern strings are written as-is; `json.dumps()` performs the single escape needed for JSON. Previously patterns were double-escaped, producing invalid regex in the output (e.g. `\\\\d` instead of `\\d`).
+
+### Union Types with Leafref and XPath String Functions (2026-02-26)
+- ✅ **Union types with leafref**: Added support for union types containing leafref members
+  - Union validation now handles leafref members correctly
+  - Leafref validation is deferred to LeafrefResolver for proper context resolution
+  - Enables typedefs with union of multiple leafref paths (e.g., top-level fields and composite subcomponents)
+- **XPath string functions**: `contains()`, `substring-before()`, and `substring-after()` are not implemented. See https://github.com/exergy-connect/xYang/issues/85.
+
+### Choice/Case and Stricter Validation (2026-02-24)
+- ✅ **Choice/case statements**: Full implementation of YANG choice and case statements
+  - Supports mandatory choices (exactly one case must be present)
+  - Validates that only one case is present per choice
+  - Properly handles choice cases in uses expansion
+  - Comprehensive test suite in `tests/test_choice_case.py` (8 tests)
+- ✅ **Union types in typedefs**: Full support for union types in typedef definitions
+  - Validates values against all union member types
+  - Properly resolves typedefs with union base types
+  - Comprehensive test suite in `tests/test_typedef_union.py` (6 tests)
+- ✅ **Nested typedefs (YANG 1.1)**: `typedef` inside `container`, `list`, `grouping`, etc. (e.g. IETF `ietf-notification-capabilities`); `tests/test_typedef_in_container.py`
+- ✅ **Stricter structure validation**: Validator now rejects unknown fields not defined in schema
+  - Field checking is scoped locally to each validation context
+  - Properly handles choice/case when collecting valid field names
+  - Clear error messages with path information
+
+### Foreign Key Validation and Must Constraints (2026-02-23)
+- ✅ **Foreign key primary key validation**: Added must constraints to enforce that foreign keys reference primary keys
+  - Constraint on `foreignKeys` list: if `field` is specified, it must equal the referenced entity's primary key
+  - Constraint on `field` leaf: validates that field references the primary key when specified
+- ✅ **Parents list validation**: Added comprehensive must constraints for parent-child relationships
+  - Validates that child foreign key references parent's primary key
+  - Validates that child foreign key field type matches parent primary key type
+- ✅ **Must constraints on leafref lists**: Full support for must constraints on list statements containing leafref types
+  - `current()` correctly refers to the list item context
+  - Constraints can access sibling leafref values within the same list item
+  - Comprehensive test suite in `tests/test_must_on_leafref_list.py` (5 tests)
+- ✅ **Leafref error messages**: Enhanced error messages to include field names for better debugging
+- ✅ **Deref() improvements**: Enhanced `deref()` function to handle:
+  - Entity name resolution with fallback mechanisms
+  - Complex paths with predicates (e.g., `foreignKeys[0]/entity`)
+  - Path stripping for predicate handling
+  - Nested deref() calls with proper context preservation
+- ✅ **Grouping expansion refactoring**: Moved grouping expansion to parsing phase
+  - Groupings are now expanded once during parsing, not in each validator
+  - Eliminates redundancy and ensures consistency across validators
+  - Removed unused grouping expansion code from validators
+- ✅ **Test coverage**: The suite has since grown (see **Test Coverage**); historical note: 178 tests at the time of this entry, including fixes for:
+  - Foreign key validation tests
+  - Parents validation tests
+  - Deref() function tests
+  - Current context in predicate tests
+  - Leafref relative path tests
+
+### Composite Fields and Grouping Support (2026-01-16)
+- ✅ **Composite field type**: Added `composite` to primitive-type enumeration
+- ✅ **Composite field structure**: Implemented composite fields with subcomponents using grouping architecture
+- ✅ **Field definition refactoring**: Refactored field definitions to use grouping-based architecture
+  - Created `composite-field` grouping for subcomponent definitions
+  - Created `field-definition` grouping that extends `composite-field`
+  - Created `foreign-key-definition` grouping for reuse
+- ✅ **Primary key changes**: Changed `primary_key` from leaf-list to single leaf supporting composite fields
+- ✅ **Foreign key refactoring**: Changed `foreignKey` to use `references` list for multiple entity/field combinations
+- ✅ **Grouping/uses parser support**: Full parser implementation completed
+  - Supports grouping definitions and uses statements
+  - Supports refine statements to modify nodes from groupings
+  - Supports nested groupings (grouping that uses another grouping)
+  - Properly expands uses statements by copying statements from groupings
+  - Must constraints from groupings are evaluated in the correct context
+  - Comprehensive test suite in `tests/test_grouping_uses.py` (8 tests, all passing)
+
+### XPath Evaluator Enhancements (2026)
+- ✅ **Nested deref() support**: Full implementation of nested `deref()` calls for complex cross-entity validation
+- ✅ **Path navigation fixes**: Proper handling of `../../name` and other multi-level relative paths
+- ✅ **Predicate navigation**: Support for navigating from predicate results (e.g., `fields[...]/type`)
+- ✅ **Leaf-list indexing**: Correct handling of `primary_key[1]` and other numeric indices
+- ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
+- ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
 [Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.9...HEAD
 [0.1.9]: https://github.com/exergy-connect/xYang/compare/v0.1.8...v0.1.9
