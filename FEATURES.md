@@ -63,7 +63,7 @@ The lexer treats **all** RFC 7950 built-in type names (Section 4.2.4) as reserve
   - Supports must constraints on containers, lists, leaves, leaf-lists, `anydata`, and `anyxml`
   - Supports must constraints on lists containing leafref types
   - `current()` correctly refers to list item context in list must constraints
-- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports for **data nodes**: `container`, `leaf`, `leaf-list`, `list`, `anydata`, `anyxml`, `choice`, `case`, and `uses` (not on `refine`). `augment` accepts `when` in the parse tree, but augment targets are **not** merged into the instance-validation schema (see **Features NOT Implemented**).
+- ✅ `when` - When conditions — **Parsed and evaluated** on every RFC 7950 parent the parser supports for **data nodes**: `container`, `leaf`, `leaf-list`, `list`, `anydata`, `anyxml`, `choice`, `case`, and `uses` (not on `refine`).
 - ✅ `if-feature` - **Parsed** on `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses`, `refine`, `augment`, `identity`, and braced `feature`; **boolean expressions** (`and` / `or` / `not`, parentheses, `prefix:feature`) evaluated for **document validation** via `DocumentValidator(..., enabled_features_by_module=...)`. `uses` / `refine` `if-feature` values are ANDed onto expanded grouping nodes; `copy_yang_statement` preserves `if_features` through `uses` expansion. Feature-level `if-feature` substatements prune `build_enabled_features_map()` (RFC 7950 §7.20.1). **Not** emitted in JSON Schema `x-yang` yet.
 - ✅ `mandatory` - Mandatory fields (16 occurrences)
   - Supports mandatory on choice statements (exactly one case must be present)
@@ -155,7 +155,7 @@ The validator evaluates `if-feature` **before** `when` and structural rules (RFC
 
 - **Expressions**: `and`, `or`, `not`, parentheses; feature names or `prefix:feature` (imports and own module prefix).
 - **API**: `DocumentValidator(module, enabled_features_by_module={ "module-name": frozenset({"feat", ...}), ... })`. Modules omitted from the map use all **pruned** declared features (after applying each feature’s own `if-feature` substatements).
-- **Parents** (parsed, with validation where the node participates in the data tree): `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses` (merged into expanded nodes), `refine` (merged into refine targets). `augment` and `identity` store expressions in the AST for tooling; instance validation does not yet walk augment-applied schema.
+- **Parents** (parsed, with validation where the node participates in the data tree): `container`, `leaf`, `leaf-list`, `list`, `choice`, `case`, `uses` (merged into expanded nodes), `refine` (merged into refine targets).
 
 See `src/xyang/validator/if_feature_eval.py` and `tests/test_if_feature.py`.
 
@@ -370,7 +370,7 @@ The XPath evaluator uses proper tokenization and AST-based parsing (not string-b
 
 During document validation, path expression results are cached to avoid recomputing the same path. Only **absolute, cacheable** paths use the cache; relative and context-dependent paths are never cached.
 
-- **Global cache**: If `Context.path_cache` is set (e.g. by the document validator), it is used as a single global cache for the run. There is no per-expression local cache; each `eval(ast, ctx, node)` reads and writes directly to this cache when the path is cacheable.
+- **Global cache**: If `Context.path_cache` is set (e.g. by the document validator), it is used as a single global cache for the run. There is no local cache per expression; each `eval(ast, ctx, node)` reads and writes directly to this cache when the path is cacheable.
 - **Keys**: Path results are keyed by the path string from `path.to_string()` (e.g. `/top/flag`, `/top/items`). Stored value is the **node list** only.
 - **Cacheability (static)**: Whether a path is cacheable is determined **during parsing**, not at evaluation time. The parser sets `PathNode.is_cacheable` to `False` when the path is relative or when any predicate uses context-sensitive constructs (e.g. `current()`, relative steps like `../flag`). Only when `path.is_absolute` and `path.is_cacheable` are both true does the evaluator look up or store in the cache. Relative paths are never cached because their result depends on the starting node.
 - **Observability**: `XPathEvaluator.get_cache_stats()` returns `lookups`, `hits`, and `hit_ratio` for the current run. Call `clear_cache_stats()` at the start of each validation run so stats reflect that run only. Enable debug logging on `xyang.xpath.evaluator` to trace which path keys trigger each lookup, hit, and store.
@@ -455,11 +455,8 @@ The modular architecture separates concerns:
 
 ## Limitations
 
-- **Augment**: Augment statements are parsed but **not** merged into the schema used for instance validation or JSON Schema generation for remote targets.
-- **If-feature in JSON Schema**: Hybrid `.yang.json` does not yet carry `if-feature` under `x-yang`; use `DocumentValidator` with `enabled_features_by_module` for conditional validation.
-- **XPath scope**: Only the XPath features used in `meta-model.yang` are implemented. Unsupported: axes (e.g. `child::`, `following-sibling::`), namespaces, and more complex location paths.
+- **XPath scope**: XPath 1.0 subset listed under *XPath Implementation*; no axes (`child::`, `following-sibling::`) or namespace nodes.
 - **Error reporting**: In constraint validation the evaluator catches exceptions and returns `False` or `None`, so detailed error information is not surfaced to the caller.
-- **Expression caching**: Caching is per-expression (local cache per `eval()`); path results that depend on `current()` or similar in predicates are not retained (purged after the expression).
 - **Schema/document model**: The implementation is tied to the meta-model and document structure (e.g. schema-aware `Node`); it is not a general-purpose XPath 1.0 engine.
 
 ## Implementation notes
@@ -467,159 +464,7 @@ The modular architecture separates concerns:
 - **Leafref / deref**: `deref()` supports nested paths and cross-entity references: simple leafrefs (`deref(../entity)`), nested (`deref(deref(current())/../foreignKey/entity)`), relative paths, and entity/field lookups in the schema.
 - **Performance**: The evaluator uses expression caching (short expressions), efficient context path handling, set-based operator lookups, and early returns where applicable.
 
-## Usage Statistics from meta-model.yang
-
-Counts below are from `examples/meta-model.yang`, using **line-initial** YANG keywords (or `type <keyword>`) so prose inside multi-line `description` strings is excluded. **`must`** is counted as lines matching `must "` (opening quoted expression).
-
-- `must`: 19
-- `default`: 7
-- `mandatory`: 16
-- `pattern`: 6
-- `length`: 3
-- `type enumeration` (typedef bodies): 6
-- `type leafref`: 7
-- `type union`: 3 (fully supported in typedefs)
-- `min-elements`: 5
-- `case`: 7
-- `choice`: 2
-- `type decimal64`: 3
-- `fraction-digits`: 3
-- `when`: 3
-- `presence`: 1
-- `max-elements`: 1
-- `range`: 2
-
 ## Test Coverage
 
-The suite currently has **416+ passing tests** (`python3 -m pytest tests/`), including:
-- Basic YANG parsing and validation
-- Type validation (including enumeration)
-- Constraint validation (must, when, if-feature, mandatory, default)
-- Leafref resolution and validation
-- Deref() function with nested calls
-- Grouping and uses statements (including nested groupings, refine, `when` / `if-feature` on `uses` and `refine`)
-- Choice/case statements (including `if-feature` on choice/case)
-- Union types in typedefs
-- Unknown field detection
-- XPath expression evaluation
-- Foreign key validation
-- Parent-child relationship validation
-- Must constraints on leafref lists
-- Current context preservation in predicates
-- Relative and absolute path resolution
-- **Import / include / submodule** patterns (`tests/test_yangson_ex3_import.py` and related fixtures under `tests/data/yangson-ex3/`)
-- **If-feature** parsing, evaluation, and validation (`tests/test_if_feature.py`)
-- JSON schema generator (YANG → JSON Schema, round-trip; `tests/json/test_generator.py`)
-- **RPC `input` / `output`** parse and yang.json round-trip (`tests/test_rpc_input_output.py`, `tests/json/test_rpc_json.py`)
-
-## Recent Improvements
-
-### RPC and notification parsing (2026-05)
-- ✅ **`notification`**: Parsed into `YangNotificationStmt` (module/submodule and under `container`, `list`, `grouping`, `augment`).
-- ✅ **`rpc` / `input` / `output`**: Module-level RPC with I/O blocks parsed into dedicated AST nodes (`tests/test_rpc_input_output.py`).
-- ✅ **RPC in yang.json**: `generate_json_schema` / `parse_json_schema` round-trip via `x-yang.rpcs` (`tests/json/test_rpc_json.py`); integer built-ins round-trip via JSON Schema `minimum` / `maximum`.
-
-### TypeScript CLI and parser (2026-05)
-- ✅ **`xyang-ts validate --anydata-validation` / `--anydata-module`**: Parity with Python CLI for optional anydata subtree validation; see [`ts/CHANGELOG.md`](ts/CHANGELOG.md).
-- ✅ **`augment` body**: `case`, `notification`, and other data-node substatements under `augment` (and `augment` under `uses` via `YangUsesStmt.augmentations`).
-- ✅ **`status` on typedefs**: Ignored at parse time (RFC 7950 §7.21.2) so standard modules with `status deprecated` parse cleanly.
-- ✅ **`rpc` / `input` / `output`**: Parser and yang.json parity with Python (`ts/test/rpc_input_output.test.ts`, `ts/test/json/rpc_json.test.ts`); `rpc` not in unsupported-skip; `rpc` inside `container` rejected (syntax error).
-
-
-### String patterns: modifiers and multiple substatements (2026-04)
-- ✅ **YANG:** Parse several `pattern` lines, optional `modifier invert-match` blocks, and per-pattern `error-message` / `error-app-tag`.
-- ✅ **Validation:** `DocumentValidator` / TS type checker apply every pattern in order, including invert semantics and pattern-specific errors.
-- ✅ **JSON Schema:** Emit `x-yang.string-patterns` and reconstruct the list when parsing `.yang.json` back into an AST.
-
-### Import, submodule, if-feature, and docs (2026-04)
-- ✅ **`import` / `include` / `submodule`**: Resolve and parse dependent `.yang` files; merge included submodules; `import` prefix map for prefixed types and `if-feature` expressions.
-- ✅ **`if-feature`**: Parsing on data-definition parents supported by the grammar; boolean evaluation; `DocumentValidator` integration; `uses` / `refine` propagation; per-feature conditions on `feature` statements; `copy_yang_statement` refactored with `dataclasses.replace`.
-- ✅ **`FEATURES.md`**: Brought in line with the codebase (this update).
-
-### Meta-model example and documentation (2026-04)
-- ✅ **`examples/meta-model.yang`** stays aligned with the xFrame canonical module (including `year` in `primitive-type-name`, multiple `revision` statements, and current `when` / `must` paths under the `type` container).
-- ✅ **`FEATURES.md` usage statistics** were recomputed with stricter patterns (e.g. `must "` only) so counts are not inflated by the word “must” inside description text.
-
-### CLI, Convert, and JSON Schema (2026-03)
-- ✅ **CLI**: `xyang` (or `python -m xyang`) with subcommands
-  - `parse <file.yang>` — print module name, namespace, prefix, typedef count, etc.
-  - `validate <file.yang> [data.json]` — validate JSON against the YANG module (stdin if no file)
-  - `convert <file.yang> [-o path]` — convert .yang to JSON Schema; output path always ends with `.yang.json` (default: `<stem>.yang.json` alongside input)
-- ✅ **Convert**: Uses `YangParser(expand_uses=False)` for a reversible AST (`uses`/`augment` not flattened at parse); the JSON generator expands `uses` when emitting; produces draft 2020-12 JSON Schema with `x-yang` annotations.
-- ✅ **JSON Schema pattern fix**: Pattern strings are written as-is; `json.dumps()` performs the single escape needed for JSON. Previously patterns were double-escaped, producing invalid regex in the output (e.g. `\\\\d` instead of `\\d`).
-
-### Union Types with Leafref and XPath String Functions (2026-02-26)
-- ✅ **Union types with leafref**: Added support for union types containing leafref members
-  - Union validation now handles leafref members correctly
-  - Leafref validation is deferred to LeafrefResolver for proper context resolution
-  - Enables typedefs with union of multiple leafref paths (e.g., top-level fields and composite subcomponents)
-- **XPath string functions**: `contains()`, `substring-before()`, and `substring-after()` are not implemented. See https://github.com/exergy-connect/xYang/issues/85.
-
-### Choice/Case and Stricter Validation (2026-02-24)
-- ✅ **Choice/case statements**: Full implementation of YANG choice and case statements
-  - Supports mandatory choices (exactly one case must be present)
-  - Validates that only one case is present per choice
-  - Properly handles choice cases in uses expansion
-  - Comprehensive test suite in `tests/test_choice_case.py` (8 tests)
-- ✅ **Union types in typedefs**: Full support for union types in typedef definitions
-  - Validates values against all union member types
-  - Properly resolves typedefs with union base types
-  - Comprehensive test suite in `tests/test_typedef_union.py` (6 tests)
-- ✅ **Nested typedefs (YANG 1.1)**: `typedef` inside `container`, `list`, `grouping`, etc. (e.g. IETF `ietf-notification-capabilities`); `tests/test_typedef_in_container.py`
-- ✅ **Stricter structure validation**: Validator now rejects unknown fields not defined in schema
-  - Field checking is scoped locally to each validation context
-  - Properly handles choice/case when collecting valid field names
-  - Clear error messages with path information
-
-### Foreign Key Validation and Must Constraints (2026-02-23)
-- ✅ **Foreign key primary key validation**: Added must constraints to enforce that foreign keys reference primary keys
-  - Constraint on `foreignKeys` list: if `field` is specified, it must equal the referenced entity's primary key
-  - Constraint on `field` leaf: validates that field references the primary key when specified
-- ✅ **Parents list validation**: Added comprehensive must constraints for parent-child relationships
-  - Validates that child foreign key references parent's primary key
-  - Validates that child foreign key field type matches parent primary key type
-- ✅ **Must constraints on leafref lists**: Full support for must constraints on list statements containing leafref types
-  - `current()` correctly refers to the list item context
-  - Constraints can access sibling leafref values within the same list item
-  - Comprehensive test suite in `tests/test_must_on_leafref_list.py` (5 tests)
-- ✅ **Leafref error messages**: Enhanced error messages to include field names for better debugging
-- ✅ **Deref() improvements**: Enhanced `deref()` function to handle:
-  - Entity name resolution with fallback mechanisms
-  - Complex paths with predicates (e.g., `foreignKeys[0]/entity`)
-  - Path stripping for predicate handling
-  - Nested deref() calls with proper context preservation
-- ✅ **Grouping expansion refactoring**: Moved grouping expansion to parsing phase
-  - Groupings are now expanded once during parsing, not in each validator
-  - Eliminates redundancy and ensures consistency across validators
-  - Removed unused grouping expansion code from validators
-- ✅ **Test coverage**: The suite has since grown (see **Test Coverage**); historical note: 178 tests at the time of this entry, including fixes for:
-  - Foreign key validation tests
-  - Parents validation tests
-  - Deref() function tests
-  - Current context in predicate tests
-  - Leafref relative path tests
-
-### Composite Fields and Grouping Support (2026-01-16)
-- ✅ **Composite field type**: Added `composite` to primitive-type enumeration
-- ✅ **Composite field structure**: Implemented composite fields with subcomponents using grouping architecture
-- ✅ **Field definition refactoring**: Refactored field definitions to use grouping-based architecture
-  - Created `composite-field` grouping for subcomponent definitions
-  - Created `field-definition` grouping that extends `composite-field`
-  - Created `foreign-key-definition` grouping for reuse
-- ✅ **Primary key changes**: Changed `primary_key` from leaf-list to single leaf supporting composite fields
-- ✅ **Foreign key refactoring**: Changed `foreignKey` to use `references` list for multiple entity/field combinations
-- ✅ **Grouping/uses parser support**: Full parser implementation completed
-  - Supports grouping definitions and uses statements
-  - Supports refine statements to modify nodes from groupings
-  - Supports nested groupings (grouping that uses another grouping)
-  - Properly expands uses statements by copying statements from groupings
-  - Must constraints from groupings are evaluated in the correct context
-  - Comprehensive test suite in `tests/test_grouping_uses.py` (8 tests, all passing)
-
-### XPath Evaluator Enhancements (2026)
-- ✅ **Nested deref() support**: Full implementation of nested `deref()` calls for complex cross-entity validation
-- ✅ **Path navigation fixes**: Proper handling of `../../name` and other multi-level relative paths
-- ✅ **Predicate navigation**: Support for navigating from predicate results (e.g., `fields[...]/type`)
-- ✅ **Leaf-list indexing**: Correct handling of `primary_key[1]` and other numeric indices
-- ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
-- ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
+Behavior is specified by the shared cases in `tests/cases/` (see `tests/cases/README.md`).
+Known gaps are listed with `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
