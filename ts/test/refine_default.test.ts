@@ -113,8 +113,8 @@ describe("python parity: test_refine_default", () => {
     expect(leaf.data.default).toBe("false");
   });
 
-  it("with expand_uses false, refined_defaults stay on the refine AST under uses", () => {
-    const mod = new YangParser({ expand_uses: false }).parseString(REFINE_DEFAULT_FALSE);
+  it("with expandUses false, refined_defaults stay on the refine AST under uses", () => {
+    const mod = new YangParser({ expandUses: false }).parseString(REFINE_DEFAULT_FALSE);
     const c = mod.findStatement("c");
     const uses = c?.statements[0];
     expect(uses?.keyword).toBe("uses");

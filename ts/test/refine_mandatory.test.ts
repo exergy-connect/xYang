@@ -24,7 +24,7 @@ module t {
 
 describe("python parity: test_refine_mandatory", () => {
   it("refine mandatory false overrides grouping leaf mandatory true after uses expand", () => {
-    const mod = new YangParser({ expand_uses: true }).parseString(YANG);
+    const mod = new YangParser({ expandUses: true }).parseString(YANG);
     const container = mod.findStatement("c");
     expect(container?.name).toBe("c");
     const leaf = container?.statements[0];

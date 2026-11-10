@@ -309,6 +309,10 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 
 ### Functions
 - ✅ `string-length(.)` - Get length of current node value
+- ✅ `contains(., 'ab')` - True when the first string contains the second (XPath 1.0). An empty second argument is true
+- ✅ `starts-with(., 'z')` - True when the first string starts with the second. An empty second argument is true
+- ✅ `substring-before(., '-')` - Substring preceding the first occurrence of the second argument; empty when that argument is empty or does not occur
+- ✅ `substring-after(., '-')` - Substring following the first occurrence of the second argument; the whole source when that argument is empty; empty when it does not occur
 - ✅ `translate(., '_', '')` - Translate/remove characters
 - ✅ `count(...)` - Count elements in a list
 - ✅ `deref(...)` - **Resolve leafref with full support for nested paths**
@@ -320,8 +324,6 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 - ✅ `true()`, `false()` - Boolean literals
 - ✅ `boolean(...)` - Convert value to boolean following YANG / XPath 1.0 rules
 - ✅ `number(...)` - Convert value to number following XPath rules
-
-`contains()`, `substring-before()`, and `substring-after()` are not implemented. See https://github.com/exergy-connect/xYang/issues/85.
 
 ### Comparisons
 - ✅ `=`, `!=`, `<=`, `>=`, `<`, `>` - All comparison operators with proper type coercion
@@ -349,9 +351,6 @@ Parsing rule: after `(`, if the next token is a string or number literal, the pa
 - ✅ **Comparison predicates**: `[name = current()]`, `[type != 'array']` - Filter lists by field values
 - ✅ **Complex predicates**: `[name = deref(current())/../foreignKey/field]` - Predicates with function calls
 - ✅ **Navigation from predicates**: `fields[name = "x"]/type` - Navigate from filtered results
-
-### String Operations
-- `contains()`, `substring-before()`, and `substring-after()` are not implemented (https://github.com/exergy-connect/xYang/issues/85)
 
 ### Arithmetic Operations
 - ✅ `+`, `-`, `*`, `div`, `mod` (numeric)

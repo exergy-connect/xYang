@@ -1,0 +1,36 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf name {
+      type string;
+      must "starts-with(., 'z')";
+    }
+    leaf empty-needle {
+      type string;
+      must "starts-with(., '')";
+    }
+    leaf missing {
+      type string;
+      must "starts-with()";
+    }
+    leaf one-arg {
+      type string;
+      must "starts-with(.)";
+    }
+    leaf extra {
+      type string;
+      must "starts-with(., 'z', 'z')";
+    }
+    leaf qty {
+      type int32;
+      must "starts-with(., '1')";
+    }
+    leaf literal {
+      type string;
+      must "starts-with(12, 1)";
+    }
+  }
+}

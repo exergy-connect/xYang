@@ -33,6 +33,17 @@ console.log(result);
 
 Use `parseYangFile("path/to/module.yang")` to load a module from disk.
 
+## Python ↔ TypeScript names
+
+| Python | TypeScript |
+| --- | --- |
+| `parse_yang_file(path, include_path=...)` | `parseYangFile(path, { includePath })` |
+| `YangParser(expand_uses=, include_path=)` | `new YangParser({ expandUses, includePath })` |
+| `enable_extension` | `enableExtension` |
+| `validate() -> (ok, errors, warnings)` | `validate() -> { isValid, errors, warnings }` |
+
+`expand_uses`, `include_path`, `find_statement`, and `get_all_leaves` still work and warn once. Use the camelCase names.
+
 ## CLI
 
 ```bash

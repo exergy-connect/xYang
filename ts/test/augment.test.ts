@@ -23,7 +23,7 @@ function tempYangDir(): string {
 
 describe("python parity: test_augment (parse shape, expandUses=false)", () => {
   it("parses augment path and body statements without merging", () => {
-    const module = new YangParser({ expand_uses: false }).parseString(`
+    const module = new YangParser({ expandUses: false }).parseString(`
 module m {
   yang-version 1.1;
   namespace "urn:m";
@@ -50,7 +50,7 @@ module m {
   });
 
   it("parses concatenated string form for augment path", () => {
-    const module = new YangParser({ expand_uses: false }).parseString(`
+    const module = new YangParser({ expandUses: false }).parseString(`
 module m {
   yang-version 1.1;
   namespace "urn:m";
@@ -68,7 +68,7 @@ module m {
   });
 
   it("captures augment-level if-feature metadata", () => {
-    const module = new YangParser({ expand_uses: false }).parseString(`
+    const module = new YangParser({ expandUses: false }).parseString(`
 module m {
   yang-version 1.1;
   namespace "urn:m";
@@ -143,7 +143,7 @@ module main {
       "utf-8"
     );
 
-    const parser = new YangParser({ expand_uses: true, include_path: [dir] });
+    const parser = new YangParser({ expandUses: true, includePath: [dir] });
     const mod = parser.parseFile(join(dir, "main.yang"));
     expect(mod.statements.some((s) => s.keyword === "augment")).toBe(false);
 

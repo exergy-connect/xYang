@@ -1,5 +1,5 @@
 {
-  "description": "Every XPath function both implementations support: boolean, concat, count, current, deref, derived-from, derived-from-or-self, false, not, number, string, string-length, translate, true.",
+  "description": "XPath functions covered here: boolean, concat, count, current, deref, derived-from, derived-from-or-self, false, not, number, string, string-length, translate, true. contains, starts-with, substring-before, and substring-after are #85.",
   "module": "m.yang",
   "instances": [
     { "name": "all satisfied", "data": { "top": { "name": "ab", "mode": "good", "label": "ab-x", "items": [{ "id": "1" }] } },

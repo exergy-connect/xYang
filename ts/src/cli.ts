@@ -156,7 +156,7 @@ function main(argv: string[]): number {
     if (!file) {
       throw new Error("Missing <file.yang>");
     }
-    const module = new YangParser({ expand_uses: false, include_path: includePaths }).parseFile(file);
+    const module = new YangParser({ expandUses: false, includePath: includePaths }).parseFile(file);
     const schema = generateJsonSchema(module);
     process.stdout.write(`${JSON.stringify(schema, null, 2)}\n`);
     return 0;

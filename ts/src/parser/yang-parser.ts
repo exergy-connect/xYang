@@ -6,13 +6,18 @@ import { ModuleSource, SerializedStatement, YangModule } from "../core/model";
 import { ParserContext, TokenStream } from "./parser-context";
 import { StatementParsers } from "./statement-parsers";
 import { YangTokenizer } from "./tokenizer";
+import { warnDeprecatedOnce } from "../core/deprecation";
 import { applyBuiltinExtensionInvocations } from "../ext";
 import { applyAugments } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
 import { validateSemantics } from "../validator/semantic-validation";
 
 type ParserOptions = {
+  expandUses?: boolean;
+  includePath?: string[];
+  /** @deprecated use expandUses */
   expand_uses?: boolean;
+  /** @deprecated use includePath */
   include_path?: string[];
 };
 
@@ -103,15 +108,21 @@ export class YangParser {
   });
 
   constructor(options: ParserOptions = {}) {
-    this.expandUses = options.expand_uses ?? true;
-    this.includePath = (options.include_path ?? []).map((p) => resolve(p));
+    if ("expand_uses" in options) {
+      warnDeprecatedOnce("expand_uses", "expandUses");
+    }
+    if ("include_path" in options) {
+      warnDeprecatedOnce("include_path", "includePath");
+    }
+    this.expandUses = options.expandUses ?? options.expand_uses ?? true;
+    this.includePath = (options.includePath ?? options.include_path ?? []).map((p) => resolve(p));
   }
 
   /** Resolve `import` / `include` like Python `YangParser._resolve_module_file`. */
   private resolveImportedModulePath(
     moduleBasename: string,
     revisionDate: string | undefined,
-    sourceDir: string,
+    sourceDir: string | undefined,
     kind: "module" | "submodule" = "module"
   ): string {
     const trimmedRev = revisionDate?.trim();
@@ -120,7 +131,7 @@ export class YangParser {
       candidates.push(`${moduleBasename}@${trimmedRev}.yang`);
     }
     candidates.push(`${moduleBasename}.yang`);
-    const dirs = [sourceDir, ...this.includePath];
+    const dirs = sourceDir ? [sourceDir, ...this.includePath] : [...this.includePath];
     let found: string | undefined;
     for (const dir of dirs) {
       for (const c of candidates) {
@@ -166,19 +177,24 @@ export class YangParser {
     return found;
   }
 
+  private sourceDirFromContext(context: ParserContext): string | undefined {
+    const sourcePath = (context.module as Record<string, unknown>).__source_path as string | undefined;
+    return sourcePath ? dirname(sourcePath) : undefined;
+  }
+
   private resolveImport(
     moduleName: string,
     revisionDate: string | undefined,
     context: ParserContext,
     _tokens: TokenStream
   ): Record<string, unknown> {
-    const sourcePath = (context.module as Record<string, unknown>).__source_path as string | undefined;
-    if (!sourcePath) {
+    const sourceDir = this.sourceDirFromContext(context);
+    if (!sourceDir && this.includePath.length === 0) {
       throw new YangSemanticError(
         "import requires a filesystem location: use parseYangFile(), or parseYangString(... from a file-backed source)"
       );
     }
-    const filePath = this.resolveImportedModulePath(moduleName, revisionDate, dirname(sourcePath), "module");
+    const filePath = this.resolveImportedModulePath(moduleName, revisionDate, sourceDir, "module");
     const imported = this.parseFile(filePath);
     return imported.data;
   }
@@ -195,14 +211,14 @@ export class YangParser {
     _tokens: TokenStream
   ): void {
     const module = context.module as Record<string, unknown>;
-    const sourcePath = module.__source_path as string | undefined;
-    if (!sourcePath) {
+    const sourceDir = this.sourceDirFromContext(context);
+    if (!sourceDir && this.includePath.length === 0) {
       throw new YangSemanticError(
         "include requires a filesystem location for the submodule: " +
           "use parseYangFile(), or parseYangString(... from a file-backed source)"
       );
     }
-    const path = this.resolveImportedModulePath(submoduleName, revisionDate, dirname(sourcePath), "submodule");
+    const path = this.resolveImportedModulePath(submoduleName, revisionDate, sourceDir, "submodule");
     if (this.includeStack.includes(path)) {
       throw new YangSyntaxError(`Circular submodule include: ${path}`, { filename: path });
     }
@@ -247,7 +263,7 @@ export class YangParser {
     }
   }
 
-  private parseTokenStream(stream: TokenStream, source: ModuleSource): YangModule {
+  private parseTokenStream(stream: TokenStream, source: ModuleSource, sourceDir?: string): YangModule {
     const moduleState: Record<string, unknown> = {
       name: "",
       yang_version: "1.1",
@@ -265,7 +281,12 @@ export class YangParser {
       import_prefixes: {},
       extensions: {},
       extension_runtime: {},
-      __source_path: source.kind === "file" ? source.value : undefined,
+      __source_path:
+        source.kind === "file"
+          ? source.value
+          : sourceDir
+            ? resolve(sourceDir, "memory.yang")
+            : undefined,
       statements: []
     };
     const context = new ParserContext({ module: moduleState, current_parent: {} });
@@ -291,7 +312,7 @@ export class YangParser {
     if (Object.keys(serializedGroupings).length > 0) {
       data.groupings = serializedGroupings;
     }
-    // Python order, gated on expand_uses: uses, then augment, then extensions.
+    // Python order, gated on expandUses: uses, then augment, then extensions.
     let mod = new YangModule(data, source);
     if (this.expandUses) {
       mod = expandUses(mod);
@@ -302,10 +323,14 @@ export class YangParser {
     return mod;
   }
 
-  parseString(content: string, sourceName = "<memory>"): YangModule {
+  /**
+   * @param sourceDir Directory searched before `includePath` for `import` / `include`.
+   *   `parseYangString` passes `dirname(sourcePath)`.
+   */
+  parseString(content: string, sourceName = "<memory>", sourceDir?: string): YangModule {
     const stream = this.tokenizer.tokenize(content, sourceName);
     const source: ModuleSource = { kind: "string", value: content, name: sourceName };
-    return this.parseTokenStream(stream, source);
+    return this.parseTokenStream(stream, source, sourceDir);
   }
 
   parseFile(path: string): YangModule {

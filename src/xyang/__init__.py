@@ -12,7 +12,9 @@ from .errors import (
     YangCircularUsesError,
     YangRefineTargetNotFoundError,
     YangSemanticError,
+    YangSyntaxError,
 )
+from .json import generate_json_schema, parse_json_schema
 from .parser import parse_yang_file, parse_yang_string
 from .validator.yang_validator import YangValidator
 from .module import YangModule
@@ -28,6 +30,9 @@ __all__ = [
     "YangSemanticError",
     "YangCircularUsesError",
     "YangRefineTargetNotFoundError",
+    "YangSyntaxError",
+    "generate_json_schema",
+    "parse_json_schema",
 ]
 
 

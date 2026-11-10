@@ -55,8 +55,8 @@ export function loadAnydataModules(options: LoadAnydataModulesOptions): YangModu
       : yangFilesInDirs([dirname(hostResolved), ...includePaths]);
 
   const parser = new YangParser({
-    include_path: includePaths,
-    expand_uses: parseOpts.expandUses ?? true
+    includePath: includePaths,
+    expandUses: parseOpts.expandUses ?? true
   });
 
   for (const yangPath of paths) {

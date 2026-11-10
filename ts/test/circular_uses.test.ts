@@ -29,7 +29,7 @@ describe("python parity: test_circular_uses", () => {
 
 
   it("parses cyclic text without error when uses expansion is disabled", () => {
-    const mod = new YangParser({ expand_uses: false }).parseString(SELF_REFERENTIAL_YANG);
+    const mod = new YangParser({ expandUses: false }).parseString(SELF_REFERENTIAL_YANG);
     expect(mod.name).toBe("c");
   });
 });

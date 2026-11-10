@@ -8,7 +8,7 @@ const GENERIC_FIELD_YANG = join(__dirname, "../../examples/generic-field.yang");
 
 describe("python parity: test_generic_field_example", () => {
   it("parses generic-field.yang with uses expansion disabled", () => {
-    const parser = new YangParser({ expand_uses: false });
+    const parser = new YangParser({ expandUses: false });
     const module = parser.parseFile(GENERIC_FIELD_YANG);
     expect(module.name).toBe("generic-field");
     expect(module.namespace).toBe("urn:xyang:example:generic-field");

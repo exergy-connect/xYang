@@ -35,7 +35,7 @@ describe("imported grouping uses expansion", () => {
 `
     );
 
-    const mod = new YangParser({ include_path: [dir], expand_uses: false }).parseFile(
+    const mod = new YangParser({ includePath: [dir], expandUses: false }).parseFile(
       join(dir, "topo.yang")
     );
     const topology = (mod.data.statements as { name?: string; statements?: unknown[] }[]).find(
@@ -81,7 +81,7 @@ describe("imported grouping uses expansion", () => {
 `
     );
 
-    const parser = new YangParser({ include_path: [dir], expand_uses: true });
+    const parser = new YangParser({ includePath: [dir], expandUses: true });
     const mod = parser.parseFile(join(dir, "topo.yang"));
     const topology = (mod.data.statements as { name?: string; statements?: unknown[] }[]).find(
       (s) => s.name === "topology"
@@ -119,7 +119,7 @@ describe("imported grouping uses expansion", () => {
 `
     );
 
-    const mod = new YangParser({ include_path: [dir], expand_uses: true }).parseFile(join(dir, "app.yang"));
+    const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(join(dir, "app.yang"));
     // Imported module must retain groupings for cross-module uses.
     const lib = (mod.data.import_prefixes as Record<string, { groupings?: Record<string, unknown> }>).l;
     expect(lib?.groupings?.g).toBeDefined();
@@ -159,7 +159,7 @@ describe("imported grouping uses expansion", () => {
 `
     );
 
-    const mod = new YangParser({ include_path: [dir], expand_uses: true }).parseFile(join(dir, "app.yang"));
+    const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(join(dir, "app.yang"));
     const v = new YangValidator(mod);
     expect(v.validate({ root: { x: "a", y: 1 } }).isValid).toBe(true);
   });
@@ -196,7 +196,7 @@ describe("imported grouping uses expansion", () => {
 `
     );
 
-    const mod = new YangParser({ include_path: [dir], expand_uses: true }).parseFile(
+    const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(
       join(dir, "consumer.yang")
     );
     expect((mod.data.typedefs as Record<string, unknown>).code).toBeDefined();

@@ -17,8 +17,6 @@ _CLI_ERRORS: tuple[type[BaseException], ...] = (
     OSError,
     ValueError,
     json.JSONDecodeError,
-    ImportError,
-    TypeError,
 )
 try:
     import yaml as _yaml
@@ -132,7 +130,7 @@ def _load_instance_data(data_path: Path) -> Any:
         try:
             import yaml  # type: ignore[import-not-found]
         except ImportError as exc:
-            raise ImportError("Reading .yaml or .yml requires PyYAML. " "Install it with: pip install PyYAML") from exc
+            raise ValueError("Reading .yaml or .yml requires PyYAML. Install it with: pip install PyYAML") from exc
         return yaml.safe_load(text)
     return json.loads(text)
 
