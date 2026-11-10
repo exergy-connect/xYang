@@ -1,0 +1,14 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf price {
+      type decimal64 {
+        fraction-digits 2;
+        range "0..100";
+      }
+    }
+  }
+}

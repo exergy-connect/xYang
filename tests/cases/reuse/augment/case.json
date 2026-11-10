@@ -1,0 +1,9 @@
+{
+  "description": "augment in the same module adds nodes to the target.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "augmented leaf", "data": { "top": { "a": "x", "extra": 3 } }, "valid": true },
+    { "name": "augmented leaf type", "data": { "top": { "extra": 9 } }, "valid": false,
+      "errors": [{ "path": "/top/extra", "code": "range" }] }
+  ]
+}

@@ -1,0 +1,21 @@
+{
+  "description": "Typedef restrictions apply, and derived typedefs / leaf types can narrow them further.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid", "data": { "top": { "p": 100, "sp": 50, "inline": 15 } }, "valid": true },
+    { "name": "typedef range", "data": { "top": { "p": 101 } }, "valid": false,
+      "errors": [{ "path": "/top/p", "code": "range" }] },
+    { "name": "derived typedef narrows range", "data": { "top": { "sp": 60 } }, "valid": false,
+      "errors": [{ "path": "/top/sp", "code": "range" }],
+      "xfail": {
+        "python": "restrictions on a type that names a typedef are dropped; only the innermost typedef's range is checked",
+        "ts": "restrictions on a type that names a typedef are dropped; only the innermost typedef's range is checked"
+      } },
+    { "name": "leaf narrows typedef range", "data": { "top": { "inline": 30 } }, "valid": false,
+      "errors": [{ "path": "/top/inline", "code": "range" }],
+      "xfail": {
+        "python": "restrictions on a type that names a typedef are dropped; only the typedef's range is checked",
+        "ts": "restrictions on a type that names a typedef are dropped; only the typedef's range is checked"
+      } }
+  ]
+}

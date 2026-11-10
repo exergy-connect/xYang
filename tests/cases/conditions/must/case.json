@@ -1,0 +1,17 @@
+{
+  "description": "must on a leaf, on a container (cross-field), inside list entries with error-message, and with current() in a predicate.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "all satisfied",
+      "data": { "top": { "v": 1, "window": { "start": 1, "end": 2 }, "items": [{ "id": "a", "w": 1 }, { "id": "b", "parent": "a" }] } },
+      "valid": true },
+    { "name": "leaf must", "data": { "top": { "v": 0 } }, "valid": false,
+      "errors": [{ "path": "/top/v", "code": "must" }] },
+    { "name": "container cross-field must", "data": { "top": { "window": { "start": 5, "end": 2 } } }, "valid": false,
+      "errors": [{ "path": "/top/window", "code": "must" }] },
+    { "name": "error-message in list entry", "data": { "top": { "items": [{ "id": "a", "w": 1 }, { "id": "b", "w": -1 }] } },
+      "valid": false, "errors": [{ "path": "/top/items/1/w", "code": "must", "message": "w must be positive" }] },
+    { "name": "current() in predicate", "data": { "top": { "items": [{ "id": "a", "parent": "zz" }] } }, "valid": false,
+      "errors": [{ "path": "/top/items/0/parent", "code": "must" }] }
+  ]
+}

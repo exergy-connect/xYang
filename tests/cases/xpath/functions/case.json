@@ -1,0 +1,17 @@
+{
+  "description": "Supported XPath core functions in must: count(), string-length(), not(), concat().",
+  "module": "m.yang",
+  "instances": [
+    { "name": "all satisfied", "data": { "top": { "name": "ab", "mode": "good", "label": "ab-x", "items": [{ "id": "1" }] } },
+      "valid": true },
+    { "name": "or rescues not()", "data": { "top": { "name": "ok", "mode": "bad" } }, "valid": true },
+    { "name": "count()", "data": { "top": { "items": [{ "id": "1" }, { "id": "2" }, { "id": "3" }] } }, "valid": false,
+      "errors": [{ "path": "/top", "code": "must" }] },
+    { "name": "string-length()", "data": { "top": { "name": "abcdef" } }, "valid": false,
+      "errors": [{ "path": "/top/name", "code": "must" }] },
+    { "name": "not() and or", "data": { "top": { "name": "no", "mode": "bad" } }, "valid": false,
+      "errors": [{ "path": "/top/mode", "code": "must" }] },
+    { "name": "concat()", "data": { "top": { "name": "ab", "label": "ab-y" } }, "valid": false,
+      "errors": [{ "path": "/top/label", "code": "must" }] }
+  ]
+}

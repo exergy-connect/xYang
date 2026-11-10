@@ -9,6 +9,14 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- **Validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python (same error wording). Data that violates these bounds now fails validation.
+
+### Added
+
+- **Shared conformance cases:** `test/cases.test.ts` runs the language-neutral cases in [`tests/cases/`](../tests/cases/README.md).
+
 ## [0.1.11] — 2026-11-06
 
 ### Added

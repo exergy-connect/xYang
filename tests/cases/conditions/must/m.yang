@@ -1,0 +1,29 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf v {
+      type int32;
+      must ". > 0";
+    }
+    container window {
+      must "end >= start";
+      leaf start { type uint32; }
+      leaf end { type uint32; }
+    }
+    list items {
+      key id;
+      leaf id { type string; }
+      leaf w {
+        type int32;
+        must ". > 0" { error-message "w must be positive"; }
+      }
+      leaf parent {
+        type string;
+        must "../../items[id = current()]";
+      }
+    }
+  }
+}

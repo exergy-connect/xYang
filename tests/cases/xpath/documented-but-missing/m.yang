@@ -1,0 +1,20 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf has-ab {
+      type string;
+      must "contains(., 'ab')";
+    }
+    leaf starts-z {
+      type string;
+      must "starts-with(., 'z')";
+    }
+    leaf before {
+      type string;
+      must "substring-before(., '-') = 'a'";
+    }
+  }
+}

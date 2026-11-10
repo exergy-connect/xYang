@@ -1,0 +1,14 @@
+{
+  "description": "List keys must be unique (single and composite keys); errors inside entries point at the entry by position.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "unique keys", "data": { "top": { "items": [{ "id": "a", "v": 1 }, { "id": "b", "v": 2 }],
+      "pairs": [{ "a": "x", "b": 1 }, { "a": "x", "b": 2 }] } }, "valid": true },
+    { "name": "duplicate key", "data": { "top": { "items": [{ "id": "a" }, { "id": "a" }] } }, "valid": false,
+      "errors": [{ "path": "/top/items", "code": "duplicate-key" }] },
+    { "name": "duplicate composite key", "data": { "top": { "pairs": [{ "a": "x", "b": 1 }, { "a": "x", "b": 1 }] } },
+      "valid": false, "errors": [{ "path": "/top/pairs", "code": "duplicate-key" }] },
+    { "name": "error in second entry", "data": { "top": { "items": [{ "id": "a", "v": 1 }, { "id": "b", "v": 20 }] } },
+      "valid": false, "errors": [{ "path": "/top/items/1/v", "code": "range" }] }
+  ]
+}

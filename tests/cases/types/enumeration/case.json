@@ -1,0 +1,11 @@
+{
+  "description": "Enumeration values are names (RFC 7951 6.4), not their integer values.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "known name", "data": { "top": { "color": "green" } }, "valid": true },
+    { "name": "unknown name", "data": { "top": { "color": "blue" } }, "valid": false,
+      "errors": [{ "path": "/top/color", "code": "enum" }] },
+    { "name": "enum value instead of name", "data": { "top": { "color": 5 } }, "valid": false,
+      "errors": [{ "path": "/top/color", "code": "enum" }] }
+  ]
+}

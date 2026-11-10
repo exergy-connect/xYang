@@ -1,0 +1,12 @@
+{
+  "description": "A union value is valid if any member type accepts it.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "integer member", "data": { "top": { "limit": 5 } }, "valid": true },
+    { "name": "enumeration member", "data": { "top": { "limit": "unlimited" } }, "valid": true },
+    { "name": "no member matches", "data": { "top": { "limit": "lots" } }, "valid": false,
+      "errors": [{ "path": "/top/limit", "code": "union" }] },
+    { "name": "integer out of member range", "data": { "top": { "limit": 200 } }, "valid": false,
+      "errors": [{ "path": "/top/limit", "code": "union" }] }
+  ]
+}

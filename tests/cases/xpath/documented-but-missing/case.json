@@ -1,0 +1,23 @@
+{
+  "description": "XPath string functions listed in FEATURES.md (contains, substring-before) and starts-with.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "contains() true", "data": { "top": { "has-ab": "xaby" } }, "valid": true,
+      "xfail": {
+        "python": "contains() is not implemented; unknown functions evaluate to null so the must fails",
+        "ts": "contains() is not implemented; unknown functions evaluate to null so the must fails"
+      } },
+    { "name": "starts-with() true", "data": { "top": { "starts-z": "zz" } }, "valid": true,
+      "xfail": {
+        "python": "starts-with() is not implemented; unknown functions evaluate to null so the must fails",
+        "ts": "starts-with() is not implemented; unknown functions evaluate to null so the must fails"
+      } },
+    { "name": "substring-before() true", "data": { "top": { "before": "a-b" } }, "valid": true,
+      "xfail": {
+        "python": "substring-before() is not implemented; unknown functions evaluate to null so the must fails",
+        "ts": "substring-before() is not implemented; unknown functions evaluate to null so the must fails"
+      } },
+    { "name": "contains() false", "data": { "top": { "has-ab": "xy" } }, "valid": false,
+      "errors": [{ "path": "/top/has-ab", "code": "must" }] }
+  ]
+}

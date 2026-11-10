@@ -1,0 +1,12 @@
+{
+  "description": "if-feature expressions with feature f disabled and g enabled; nodes whose if-feature is false must not exist.",
+  "module": "m.yang",
+  "features": { "m": ["g"] },
+  "instances": [
+    { "name": "active nodes", "data": { "top": { "b": "x", "c": "y" } }, "valid": true },
+    { "name": "disabled feature", "data": { "top": { "a": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/a", "code": "if-feature" }] },
+    { "name": "and expression false", "data": { "top": { "d": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/d", "code": "if-feature" }] }
+  ]
+}

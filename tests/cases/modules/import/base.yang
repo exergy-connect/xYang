@@ -1,0 +1,15 @@
+module base {
+  yang-version 1.1;
+  namespace "urn:base";
+  prefix b;
+
+  typedef port {
+    type uint16 { range "1..1024"; }
+  }
+
+  grouping addr {
+    leaf host {
+      type string { length "1..10"; }
+    }
+  }
+}

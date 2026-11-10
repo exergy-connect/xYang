@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf kind {
+      type enumeration { enum basic; enum advanced; }
+    }
+    leaf extra {
+      when "../kind = 'advanced'";
+      type string;
+    }
+    container tuning {
+      when "../kind = 'advanced'";
+      leaf level { type uint8; mandatory true; }
+    }
+  }
+}
