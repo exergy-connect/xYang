@@ -346,6 +346,7 @@ features = infer_required_features(module, {"example:count": 3})
 
 Python raises `ValueError` for the inference errors described above. TypeScript
 throws `Error`. The returned list contains requirements only; when configuring a
-validator, group these names by module and explicitly supply empty sets for
-modules with no required features, since omitted modules otherwise default to
-all features enabled.
+validator (Python `YangValidator(module, enabled_features_by_module=...)`,
+TypeScript `new YangValidator(module, { enabledFeaturesByModule })`), group these
+names by module and explicitly supply empty sets for modules with no required
+features, since omitted modules otherwise default to all features enabled.

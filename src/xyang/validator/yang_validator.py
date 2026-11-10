@@ -2,7 +2,7 @@
 xYang validator: uses xpath DocumentValidator for validation.
 """
 
-from typing import Any, Dict, List, Optional, Tuple
+from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
 from ..ast import YangStatementList
 from ..encoding import resolve_structure_instance
@@ -20,9 +20,25 @@ class YangValidator:
     (e.g. from xyang.parser.parse_yang_string / parse_yang_file).
     """
 
-    def __init__(self, module: YangModule) -> None:
+    def __init__(
+        self,
+        module: YangModule,
+        *,
+        enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = None,
+    ) -> None:
+        """
+        Args:
+            module: Parsed host module.
+            enabled_features_by_module: Module name -> enabled feature names. ``None`` enables every
+                declared feature; a module missing from the mapping keeps all its features enabled.
+                Same semantics as TypeScript ``YangValidator(module, { enabledFeaturesByModule })``.
+        """
         self.module = module
-        self._enabled_features_by_module: Optional[Dict[str, Any]] = None
+        self._enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = (
+            {name: frozenset(feats) for name, feats in enabled_features_by_module.items()}
+            if enabled_features_by_module is not None
+            else None
+        )
         self._extensions: List[Tuple[ValidatorExtension, Dict[str, Any]]] = []
 
     def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
