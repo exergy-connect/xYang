@@ -242,8 +242,7 @@ export class DocumentValidator {
         ) {
           continue;
         }
-        const member = this.canonicalMemberName(stmt) ?? stmt.name;
-        this.validateStatement(stmt, root[member], member, errors, rootNode, rootNode);
+        this.validateStatement(stmt, this.instanceValue(root, stmt), stmt.name, errors, rootNode, rootNode);
       }
 
       if (ctx.constraintChecks) {
@@ -280,8 +279,7 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        const member = this.canonicalMemberName(child) ?? child.name;
-        this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, parentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
       }
       return;
     }
@@ -330,8 +328,7 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        const member = this.canonicalMemberName(child) ?? child.name;
-        this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, currentNode, rootNode);
+        this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, currentNode, rootNode);
       }
       if (this.ctx.constraintChecks) {
         this.rejectUnknownContainerKeys(stmt, obj, path, errors);
@@ -373,8 +370,7 @@ export class DocumentValidator {
           if (!child.name) {
             continue;
           }
-          const member = this.canonicalMemberName(child) ?? child.name;
-          this.validateStatement(child, this.readChild(row, child), `${path}[${i}].${member}`, errors, itemNode, rootNode);
+          this.validateStatement(child, this.instanceValue(row, child), `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
         }
         if (this.ctx.constraintChecks) {
           this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
@@ -505,29 +501,6 @@ export class DocumentValidator {
     }
   }
 
-  /** RFC 7951 member name: local when defined in the host module, ``module:name`` otherwise. */
-  private canonicalMemberName(stmt: YangStatement): string | undefined {
-    const name = stmt.name;
-    if (!name) {
-      return undefined;
-    }
-    const explicit = stmt.data.defining_module;
-    const owner = typeof explicit === "string" && explicit.length > 0 ? explicit : "";
-    const parent = this.ctx.module.name ?? "";
-    if (owner && owner !== parent) {
-      return `${owner}:${name}`;
-    }
-    return name;
-  }
-
-  private readChild(obj: Record<string, unknown> | undefined, stmt: YangStatement): unknown {
-    const key = this.canonicalMemberName(stmt);
-    if (!obj || !key || !Object.prototype.hasOwnProperty.call(obj, key)) {
-      return undefined;
-    }
-    return obj[key];
-  }
-
   private collectDirectChildKeys(parent: YangStatement | YangModule): Set<string> {
     const keys = new Set<string>();
     const walk = (stmt: YangStatement): void => {
@@ -542,9 +515,8 @@ export class DocumentValidator {
         YangTokenType.CONTAINER, YangTokenType.LIST, YangTokenType.LEAF,
         YangTokenType.LEAF_LIST, YangTokenType.ANYDATA, YangTokenType.ANYXML
       ].includes(kw as YangTokenType)) {
-        const canonical = this.canonicalMemberName(stmt);
-        if (canonical) {
-          keys.add(canonical);
+        for (const key of this.instanceKeys(stmt)) {
+          keys.add(key);
         }
       }
     };
@@ -648,8 +620,7 @@ export class DocumentValidator {
       if (!child.name) {
         continue;
       }
-      const member = this.canonicalMemberName(child) ?? child.name;
-      this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, parentNode, rootNode);
+      this.validateStatement(child, this.instanceValue(obj, child), `${path}.${child.name}`, errors, parentNode, rootNode);
     }
   }
 
@@ -674,8 +645,7 @@ export class DocumentValidator {
         YangTokenType.ANYXML
       ].includes(keyword as YangTokenType)
     ) {
-      const key = this.canonicalMemberName(stmt);
-      return Boolean(key && Object.prototype.hasOwnProperty.call(obj, key));
+      return this.instanceKeys(stmt).some((key) => obj[key] !== undefined);
     }
     if (keyword === YangTokenType.CHOICE) {
       return this.choiceHasBranchData(stmt, obj);
@@ -686,8 +656,38 @@ export class DocumentValidator {
     return false;
   }
 
+  /** RFC 7951 member name: local, or ``module:local`` when the node is defined in another module. */
+  private instanceKeys(stmt: YangStatement): string[] {
+    const local = stmt.name;
+    if (!local) {
+      return [];
+    }
+    const parent = this.ctx.module.name ?? "";
+    const defined =
+      typeof stmt.data.defining_module === "string" && stmt.data.defining_module
+        ? stmt.data.defining_module
+        : parent;
+    if (!parent || defined === parent) {
+      return [local];
+    }
+    return [`${defined}:${local}`];
+  }
+
+  private instanceValue(obj: Record<string, unknown>, stmt: YangStatement): unknown {
+    for (const key of this.instanceKeys(stmt)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
+        return obj[key];
+      }
+    }
+    return undefined;
+  }
+
   private effectiveKeyword(stmt: YangStatement): string {
     const raw = stmt.keyword ?? "";
+    // Python models notification as a container for instance data (RFC 7951 anydata payloads).
+    if (raw === YangTokenType.NOTIFICATION) {
+      return YangTokenType.CONTAINER;
+    }
     if (raw.includes(":")) {
       const kind = stmt.data.data_node_kind;
       if (kind === YangTokenType.CONTAINER || kind === YangTokenType.LIST) {
@@ -980,14 +980,13 @@ export class DocumentValidator {
       if (!child.data.mandatory) {
         continue;
       }
-      const childValue = this.readChild(obj, child);
+      const childValue = obj ? this.instanceValue(obj, child) : undefined;
       const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
       if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
         continue;
       }
-      const member = this.canonicalMemberName(child) ?? child.name;
-      if (!obj || !Object.prototype.hasOwnProperty.call(obj, member)) {
-        errors.push(issue(`${path}.${member}`, "mandatory", `mandatory ${childKeyword} is missing`));
+      if (!obj || childValue === undefined) {
+        errors.push(issue(`${path}.${child.name}`, "mandatory", `mandatory ${childKeyword} is missing`));
       }
     }
   }

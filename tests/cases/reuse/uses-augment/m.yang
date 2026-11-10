@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping g {
+    container c {
+      leaf a { type string; }
+    }
+  }
+
+  container top {
+    uses g {
+      augment "c" {
+        leaf b { type uint8; }
+      }
+    }
+  }
+}
