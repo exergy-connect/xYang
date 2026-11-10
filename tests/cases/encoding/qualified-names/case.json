@@ -14,7 +14,6 @@
         "ts": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)"
       } },
     { "name": "unknown module prefix", "data": { "x:top": { "a": 1 } }, "valid": false,
-      "errors": [{ "path": "/x:top", "code": "unknown-field" }],
-      "xfail": { "ts": "TS reports root unknown fields with no path at all" } }
+      "errors": [{ "path": "/x:top", "code": "unknown-field" }] }
   ]
 }

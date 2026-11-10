@@ -1,7 +1,7 @@
 export { parseYangFile, parseYangString } from "./parser";
 export { YangParser } from "./parser/yang-parser";
 export { YangValidator } from "./validator/yang-validator";
-export type { YangValidatorOptions } from "./validator/yang-validator";
+export type { DetailedValidationResult, ValidationIssue, YangValidatorOptions } from "./validator/yang-validator";
 export {
   buildEnabledFeaturesMap,
   evaluateIfFeatureExpression,

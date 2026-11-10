@@ -52,6 +52,17 @@ def parse_anydata_extension_kwargs(
     return modules, mode
 
 
+def _rewrite_located(value: str, anydata_path: str, json_key: str, schema_local_name: str) -> str:
+    """Use RFC 7951 ``json_key`` in a display path or JSON Pointer."""
+    inner_prefix = anydata_path.rstrip("/") + "/" + schema_local_name
+    public_prefix = anydata_path.rstrip("/") + "/" + json_key
+    if value == inner_prefix:
+        return public_prefix
+    if value.startswith(inner_prefix + "/"):
+        return public_prefix + value[len(inner_prefix) :]
+    return value
+
+
 def _rewrite_error_path(
     err: ValidationError,
     anydata_path: str,
@@ -59,20 +70,13 @@ def _rewrite_error_path(
     schema_local_name: str,
 ) -> ValidationError:
     """Use RFC 7951 ``json_key`` in paths; inner :class:`DocumentValidator` uses schema names."""
-    p = err.path
-    inner_prefix = anydata_path.rstrip("/") + "/" + schema_local_name
-    public_prefix = anydata_path.rstrip("/") + "/" + json_key
-    if p == inner_prefix:
-        new_path = public_prefix
-    elif p.startswith(inner_prefix + "/"):
-        new_path = public_prefix + p[len(inner_prefix) :]
-    else:
-        new_path = p
     return ValidationError(
-        path=new_path,
+        path=_rewrite_located(err.path, anydata_path, json_key, schema_local_name),
         message=err.message,
         expression=err.expression,
         severity=err.severity,
+        code=err.code,
+        pointer=_rewrite_located(err.pointer, anydata_path, json_key, schema_local_name),
     )
 
 
@@ -93,25 +97,31 @@ def run_anydata_subtree_validation(
     for json_key, child_val in value.items():
         stmt, mod = resolve_qualified_top_level(json_key, modules)
         if stmt is None or mod is None:
+            member_path = f"{anydata_path.rstrip('/')}/{json_key}"
             outer._errors.append(
                 ValidationError(
-                    path=f"{anydata_path.rstrip('/')}/{json_key}",
+                    path=member_path,
                     message=(
                         f"Unknown anydata member {json_key!r}: "
                         "no matching module:identifier in the provided module map"
                     ),
+                    code="unknown-field",
+                    pointer=member_path,
                 )
             )
             continue
 
         if isinstance(stmt, YangLeafStmt):
+            member_path = f"{anydata_path.rstrip('/')}/{json_key}"
             outer._errors.append(
                 ValidationError(
-                    path=f"{anydata_path.rstrip('/')}/{json_key}",
+                    path=member_path,
                     message=(
                         f"anydata member {json_key!r} maps to a leaf; "
                         "nested subtree validation expects a container or list"
                     ),
+                    code="type",
+                    pointer=member_path,
                 )
             )
             continue
@@ -130,9 +140,7 @@ def run_anydata_subtree_validation(
             path=inner_pb,
         )
         for err in sub_errors:
-            outer._errors.append(
-                _rewrite_error_path(err, anydata_path, json_key, stmt.name)
-            )
+            outer._errors.append(_rewrite_error_path(err, anydata_path, json_key, stmt.name))
 
 
 __all__ = [

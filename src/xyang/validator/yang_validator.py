@@ -73,19 +73,55 @@ class YangValidator:
         Validate data against the YANG module.
 
         Returns:
-            (is_valid, errors, warnings)
+            (is_valid, errors, warnings) as display strings ``"<path>: <message>"``.
         """
+        doc_errors = self._collect(data, leafref_severity=leafref_severity)
+        errors = [self._format_error(e) for e in doc_errors if e.severity == Severity.ERROR]
+        warnings = [self._format_error(e) for e in doc_errors if e.severity == Severity.WARNING]
+        return len(errors) == 0, errors, warnings
+
+    def validate_detailed(
+        self,
+        data: Dict[str, Any],
+        *,
+        leafref_severity: Severity = Severity.ERROR,
+    ) -> Dict[str, Any]:
+        """
+        Validate data and return structured issues.
+
+        Each issue is ``{code, path, message, expression?, severity}``. ``path`` is a
+        JSON Pointer into ``data`` (list and leaf-list entries by position). ``validate``
+        string output is unchanged.
+        """
+        doc_errors = self._collect(data, leafref_severity=leafref_severity)
+        errors = [self._issue(e) for e in doc_errors if e.severity == Severity.ERROR]
+        warnings = [self._issue(e) for e in doc_errors if e.severity == Severity.WARNING]
+        return {"valid": len(errors) == 0, "errors": errors, "warnings": warnings}
+
+    def _collect(
+        self,
+        data: Dict[str, Any],
+        *,
+        leafref_severity: Severity,
+    ) -> List[ValidationError]:
         root_schema: YangStatementList = self.module
         instance: Dict[str, Any] = data
         structure = resolve_structure_instance(data, self.module)
         if structure is not None:
             root_schema, instance = structure
-        doc_errors: List[ValidationError] = self._document_validator(root_schema).validate(
-            instance, leafref_severity=leafref_severity
-        )
-        errors = [self._format_error(e) for e in doc_errors if e.severity == Severity.ERROR]
-        warnings = [self._format_error(e) for e in doc_errors if e.severity == Severity.WARNING]
-        return len(errors) == 0, errors, warnings
+        return self._document_validator(root_schema).validate(instance, leafref_severity=leafref_severity)
+
+    @staticmethod
+    def _issue(e: ValidationError) -> Dict[str, Any]:
+        issue: Dict[str, Any] = {
+            "code": e.code,
+            "path": e.pointer,
+            "message": e.message,
+        }
+        if e.expression:
+            issue["expression"] = e.expression
+        issue["severity"] = e.severity.value
+        return issue
 
     @staticmethod
     def _format_error(e: ValidationError) -> str:

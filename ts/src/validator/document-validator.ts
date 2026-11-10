@@ -15,6 +15,102 @@ import { TypeChecker } from "./type-checker";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
+export type ValidationSeverity = "error" | "warning";
+
+/** Structured validation issue. `path` is a JSON Pointer into the instance. */
+export type ValidationIssue = {
+  code: string;
+  path: string;
+  message: string;
+  expression?: string;
+  severity: ValidationSeverity;
+};
+
+export type DetailedValidationResult = {
+  valid: boolean;
+  errors: ValidationIssue[];
+  warnings: ValidationIssue[];
+};
+
+type InternalIssue = ValidationIssue & { pathLabel: string };
+
+/**
+ * Message-to-code table previously stored in tests/cases/error-codes.json.
+ * Used for type-checker text, which is still produced as a message. Order matters.
+ */
+const MESSAGE_CODES: Array<[string, RegExp]> = [
+  ["unknown-field", /Unknown field '/],
+  ["if-feature", /'if-feature' condition is false/],
+  ["when", /'when' (condition )?evaluates to false|not allowed by when condition/],
+  ["mandatory-choice", /[Mm]andatory choice .*has no active case/],
+  ["mandatory", /^Mandatory (leaf|anydata|anyxml) '|^mandatory (leaf|anydata|anyxml) is missing/],
+  ["min-elements", /requires at least \d+$/],
+  ["max-elements", /allows at most \d+$/],
+  ["duplicate-key", /^Duplicate key in list '/],
+  ["xpath-unknown-function", /xpath-unknown-function: unknown XPath function/],
+  ["xpath-error", /^Error evaluating (must|when) expression/],
+  ["must", /^must constraint not satisfied on '/],
+  ["leafref", /^[Ll]eafref/],
+  ["instance-identifier", /^instance-identifier/],
+  ["identityref", /^identityref value/],
+  ["union", /does not match any union member type/],
+  ["length", /^String length \d+|^binary decoded length|^Binary length/],
+  ["pattern", /does not match pattern|matches forbidden pattern/],
+  ["fraction-digits", /fraction digits/],
+  ["range", /is less than minimum|exceeds maximum|^(Integer|Number) \S+ does not match /],
+  ["enum", /is not in enum|is not one of|^Expected enumeration value/],
+  ["bits", /[Bb]it token|bit '|[Bb]its value/],
+  ["type", /^Expected |is not a valid |should have no value|must be an? (object|array|string)|base64/]
+];
+
+function codeForMessage(message: string): string | undefined {
+  return MESSAGE_CODES.find(([, rx]) => rx.test(message))?.[0];
+}
+
+/** TS display path (`top.items[0].v`) -> JSON Pointer (`/top/items/0/v`). Root is `""`. */
+function pointerFromLabel(path: string): string {
+  return path
+    .split(".")
+    .filter(Boolean)
+    .map((segment) => "/" + segment.replace(/\[(\d+)\]/g, "/$1"))
+    .join("");
+}
+
+function joinPointer(base: string, token: string): string {
+  return `${base}/${token.replace(/~/g, "~0").replace(/\//g, "~1")}`;
+}
+
+function issue(pathLabel: string, code: string, message: string, expression?: string, path?: string): InternalIssue {
+  const item: InternalIssue = {
+    code,
+    path: path ?? pointerFromLabel(pathLabel),
+    message,
+    severity: "error",
+    pathLabel
+  };
+  if (expression) {
+    item.expression = expression;
+  }
+  return item;
+}
+
+function formatIssue(item: InternalIssue): string {
+  return item.pathLabel ? `${item.pathLabel}: ${item.message}` : item.message;
+}
+
+function toPublicIssue(item: InternalIssue): ValidationIssue {
+  const pub: ValidationIssue = {
+    code: item.code,
+    path: item.path,
+    message: item.message,
+    severity: item.severity
+  };
+  if (item.expression) {
+    pub.expression = item.expression;
+  }
+  return pub;
+}
+
 export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
 
 export type LeafTypeMode = "full" | "none";
@@ -90,7 +186,17 @@ export class DocumentValidator {
   }
 
   validate(data: unknown): [boolean, string[], string[]] {
-    return this.validateWithContext(this.rootCtx, data);
+    const collected = this.collect(this.rootCtx, data);
+    return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
+  }
+
+  validateDetailed(data: unknown): DetailedValidationResult {
+    const collected = this.collect(this.rootCtx, data);
+    return {
+      valid: collected.errors.length === 0,
+      errors: collected.errors.map(toPublicIssue),
+      warnings: collected.warnings.map(toPublicIssue)
+    };
   }
 
   /**
@@ -98,13 +204,22 @@ export class DocumentValidator {
    * and, recursively, for each anydata payload shape without constructing a second DocumentValidator.
    */
   private validateWithContext(ctx: ValidationContext, data: unknown): [boolean, string[], string[]] {
+    const collected = this.collect(ctx, data);
+    return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
+  }
+
+  private collect(
+    ctx: ValidationContext,
+    data: unknown
+  ): { errors: InternalIssue[]; warnings: InternalIssue[] } {
     this.contextStack.push(ctx);
     try {
-      const errors: string[] = [];
-      const warnings: string[] = [];
+      const errors: InternalIssue[] = [];
+      const warnings: InternalIssue[] = [];
 
       if (!data || typeof data !== "object" || Array.isArray(data)) {
-        return [false, ["Document must be an object"], warnings];
+        errors.push(issue("", "type", "Document must be an object"));
+        return { errors, warnings };
       }
 
       const root = data as Record<string, unknown>;
@@ -133,7 +248,7 @@ export class DocumentValidator {
       if (ctx.constraintChecks) {
         this.rejectUnknownListItemKeys(ctx.module, root, "", errors);
       }
-      return [errors.length === 0, errors, warnings];
+      return { errors, warnings };
     } finally {
       this.contextStack.pop();
     }
@@ -143,7 +258,7 @@ export class DocumentValidator {
     stmt: YangStatement,
     value: unknown,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     parentNode: XPathNode,
     rootNode: XPathNode
   ): void {
@@ -174,7 +289,11 @@ export class DocumentValidator {
     if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
       if (value !== undefined) {
         errors.push(
-          `${path}: Node '${stmt.name ?? "node"}' is present but its 'if-feature' condition is false — this node must not exist`
+          issue(
+            path,
+            "if-feature",
+            `Node '${stmt.name ?? "node"}' is present but its 'if-feature' condition is false — this node must not exist`
+          )
         );
       }
       return;
@@ -193,7 +312,7 @@ export class DocumentValidator {
         return;
       }
       if (!value || typeof value !== "object" || Array.isArray(value)) {
-        errors.push(`${path}: container must be an object`);
+        errors.push(issue(path, "type", "container must be an object"));
         return;
       }
       const obj = value as Record<string, unknown>;
@@ -222,7 +341,7 @@ export class DocumentValidator {
         return;
       }
       if (!Array.isArray(value)) {
-        errors.push(`${path}: list must be an array`);
+        errors.push(issue(path, "type", "list must be an array"));
         return;
       }
       this.checkElementCount(stmt, value.length, path, errors);
@@ -234,7 +353,7 @@ export class DocumentValidator {
       for (let i = 0; i < value.length; i += 1) {
         const item = value[i];
         if (!item || typeof item !== "object" || Array.isArray(item)) {
-          errors.push(`${path}[${i}]: list item must be an object`);
+          errors.push(issue(`${path}[${i}]`, "type", "list item must be an object"));
           continue;
         }
         const itemNode: XPathNode = { data: item, schema: stmt as unknown as XPathSchema, parent: parentNode };
@@ -264,7 +383,7 @@ export class DocumentValidator {
       const mandatory = Boolean(stmt.data.mandatory);
       if (value === undefined) {
         if (mandatory) {
-          errors.push(`${path}: mandatory leaf is missing`);
+          errors.push(issue(path, "mandatory", "mandatory leaf is missing"));
         }
         return;
       }
@@ -287,7 +406,8 @@ export class DocumentValidator {
             value: summarizeValue(value)
           });
           if (!ok) {
-            errors.push(`${path}: ${reason ?? `invalid value for type ${typeName}`}`);
+            const message = reason ?? `invalid value for type ${typeName}`;
+            errors.push(issue(path, codeForMessage(message) ?? "type", message));
           }
         }
       }
@@ -302,7 +422,7 @@ export class DocumentValidator {
         return;
       }
       if (!Array.isArray(value)) {
-        errors.push(`${path}: leaf-list must be an array`);
+        errors.push(issue(path, "type", "leaf-list must be an array"));
         return;
       }
       this.checkElementCount(stmt, value.length, path, errors);
@@ -327,7 +447,8 @@ export class DocumentValidator {
               value: summarizeValue(value[i])
             });
             if (!ok) {
-              errors.push(`${path}[${i}]: ${reason ?? `invalid value for type ${typeName}`}`);
+              const message = reason ?? `invalid value for type ${typeName}`;
+              errors.push(issue(`${path}[${i}]`, codeForMessage(message) ?? "type", message));
             }
           }
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
@@ -340,7 +461,7 @@ export class DocumentValidator {
       const mandatory = Boolean(stmt.data.mandatory);
       if (value === undefined) {
         if (mandatory) {
-          errors.push(`${path}: mandatory ${keyword} is missing`);
+          errors.push(issue(path, "mandatory", `mandatory ${keyword} is missing`));
         }
         return;
       }
@@ -354,27 +475,28 @@ export class DocumentValidator {
   }
 
   /** min-elements / max-elements for a present list or leaf-list (absent ones are not checked, as in Python). */
-  private checkElementCount(stmt: YangStatement, count: number, path: string, errors: string[]): void {
+  private checkElementCount(stmt: YangStatement, count: number, path: string, errors: InternalIssue[]): void {
     const name = stmt.name ?? "node";
     const min = stmt.data.min_elements;
     const max = stmt.data.max_elements;
     if (typeof min === "number" && count < min) {
-      errors.push(`${path}: '${name}' has ${count} element(s) but requires at least ${min}`);
+      errors.push(issue(path, "min-elements", `'${name}' has ${count} element(s) but requires at least ${min}`));
     }
     if (typeof max === "number" && count > max) {
-      errors.push(`${path}: '${name}' has ${count} element(s) but allows at most ${max}`);
+      errors.push(issue(path, "max-elements", `'${name}' has ${count} element(s) but allows at most ${max}`));
     }
   }
 
-  private rejectUnknownContainerKeys(stmt: YangStatement, obj: Record<string, unknown>, path: string, errors: string[]): void {
+  private rejectUnknownContainerKeys(stmt: YangStatement, obj: Record<string, unknown>, path: string, errors: InternalIssue[]): void {
     this.rejectUnknownListItemKeys(stmt, obj, path, errors);
   }
 
-  private rejectUnknownListItemKeys(stmt: YangStatement | YangModule, row: Record<string, unknown>, path: string, errors: string[]): void {
+  private rejectUnknownListItemKeys(stmt: YangStatement | YangModule, row: Record<string, unknown>, path: string, errors: InternalIssue[]): void {
     const allowed = this.collectDirectChildKeys(stmt);
     for (const key of Object.keys(row)) {
       if (!allowed.has(key)) {
-        errors.push(`${path ? path + ": " : ""}Unknown field '${key}'`);
+        // Display path stays on the parent (existing validate() text). The JSON Pointer names the member.
+        errors.push(issue(path, "unknown-field", `Unknown field '${key}'`, undefined, joinPointer(pointerFromLabel(path), key)));
       }
     }
   }
@@ -406,13 +528,13 @@ export class DocumentValidator {
     choice: YangStatement,
     parentValue: unknown,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     parentNode: XPathNode,
     rootNode: XPathNode
   ): void {
     if (!parentValue || typeof parentValue !== "object" || Array.isArray(parentValue)) {
       if (choice.data.mandatory === true) {
-        errors.push(`${path}: mandatory choice has no active case`);
+        errors.push(issue(path, "mandatory-choice", "mandatory choice has no active case"));
       }
       return;
     }
@@ -422,7 +544,11 @@ export class DocumentValidator {
     const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule);
     if (!choiceActive && this.choiceHasBranchData(choice, obj)) {
       errors.push(
-        `${path}: Choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
+        issue(
+          path,
+          "if-feature",
+          `Choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
+        )
       );
       return;
     }
@@ -449,7 +575,11 @@ export class DocumentValidator {
       const caseIfs = Array.isArray(c.data.if_features) ? (c.data.if_features as string[]) : [];
       if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
         errors.push(
-          `${path}: Case '${c.name ?? "case"}' of choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
+          issue(
+            path,
+            "if-feature",
+            `Case '${c.name ?? "case"}' of choice '${choice.name ?? "choice"}' has data but its 'if-feature' condition is false — this branch must not exist`
+          )
         );
         return;
       }
@@ -463,7 +593,13 @@ export class DocumentValidator {
 
     if (activeCases.length > 1) {
       const names = activeCases.map((c) => c.name ?? "<unnamed>").join(", ");
-      errors.push(`${path}: choice '${choice.name ?? "choice"}' allows only one case, but multiple are active: ${names}`);
+      errors.push(
+        issue(
+          path,
+          "choice-multiple-cases",
+          `choice '${choice.name ?? "choice"}' allows only one case, but multiple are active: ${names}`
+        )
+      );
       return;
     }
 
@@ -473,7 +609,7 @@ export class DocumentValidator {
         return;
       }
       if (choice.data.mandatory === true) {
-        errors.push(`${path}: mandatory choice has no active case`);
+        errors.push(issue(path, "mandatory-choice", "mandatory choice has no active case"));
       }
       return;
     }
@@ -538,7 +674,7 @@ export class DocumentValidator {
     keyNames: string[],
     listName: string,
     pathStr: string,
-    errors: string[]
+    errors: InternalIssue[]
   ): boolean {
     if (keyNames.length === 0) {
       return false;
@@ -556,7 +692,11 @@ export class DocumentValidator {
         const firstIdx = seenKeys.get(keyStr)!;
         const keyDisplay = keyNames.map((k) => `${k}='${String(row[k])}'`).join(", ");
         errors.push(
-          `${pathStr}: Duplicate key in list '${listName}': ${keyDisplay} (entries at index ${firstIdx} and ${i})`
+          issue(
+            pathStr,
+            "duplicate-key",
+            `Duplicate key in list '${listName}': ${keyDisplay} (entries at index ${firstIdx} and ${i})`
+          )
         );
         return true;
       }
@@ -588,7 +728,7 @@ export class DocumentValidator {
     value: unknown,
     typeShape: Record<string, unknown>,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     leafContextNode: XPathNode,
     rootNode: XPathNode
   ): void {
@@ -596,7 +736,7 @@ export class DocumentValidator {
     const ast = this.leafrefPathAst(typeShape);
     if (!ast || ast.kind !== "path") {
       if (requireInstance) {
-        errors.push(`${path}: leafref has no path`);
+        errors.push(issue(path, "leafref", "leafref has no path"));
       }
       return;
     }
@@ -615,18 +755,18 @@ export class DocumentValidator {
         }
       }
       if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
-        errors.push(`${path}: leafref value must be a string, number, or boolean`);
+        errors.push(issue(path, "leafref", "leafref value must be a string, number, or boolean"));
         return;
       }
       const s = String(value);
       if (requireInstance && !allowed.has(s)) {
         errors.push(
-          `${path}: leafref: value '${s}' does not reference an existing instance (require-instance is true)`
+          issue(path, "leafref", `leafref: value '${s}' does not reference an existing instance (require-instance is true)`)
         );
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`${path}: leafref: error evaluating path (${msg})`);
+      errors.push(issue(path, "leafref", `leafref: error evaluating path (${msg})`));
     }
   }
 
@@ -634,12 +774,12 @@ export class DocumentValidator {
     value: unknown,
     typeShape: Record<string, unknown>,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     currentNode: XPathNode,
     rootNode: XPathNode
   ): void {
     if (typeof value !== "string") {
-      errors.push(`${path}: instance-identifier value must be a string, got ${typeof value}`);
+      errors.push(issue(path, "instance-identifier", `instance-identifier value must be a string, got ${typeof value}`));
       return;
     }
     const requireInstance = typeShape.require_instance !== false;
@@ -648,7 +788,7 @@ export class DocumentValidator {
     }
     const s = value.trim();
     if (!s) {
-      errors.push(`${path}: instance-identifier path must not be empty when require-instance is true`);
+      errors.push(issue(path, "instance-identifier", "instance-identifier path must not be empty when require-instance is true"));
       return;
     }
     let ast: XPathAstNode;
@@ -656,30 +796,38 @@ export class DocumentValidator {
       ast = parseXPath(s);
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`${path}: instance-identifier: invalid path expression (${msg})`);
+      errors.push(issue(path, "instance-identifier", `instance-identifier: invalid path expression (${msg})`));
       return;
     }
     if (ast.kind !== "path") {
-      errors.push(`${path}: instance-identifier: value must be a path expression (e.g. /top/leaf)`);
+      errors.push(issue(path, "instance-identifier", "instance-identifier: value must be a path expression (e.g. /top/leaf)"));
       return;
     }
     if (!ast.isAbsolute) {
-      errors.push(`${path}: instance-identifier: only absolute paths are supported (path must start with '/')`);
+      errors.push(
+        issue(path, "instance-identifier", "instance-identifier: only absolute paths are supported (path must start with '/')")
+      );
       return;
     }
     const context: XPathContext = { current: currentNode, root: rootNode };
     try {
       const nodes = this.xpath.evalPath(ast, context, rootNode);
       if (nodes.length === 0) {
-        errors.push(`${path}: instance-identifier: no instance at path ${JSON.stringify(value)} (require-instance is true)`);
+        errors.push(
+          issue(
+            path,
+            "instance-identifier",
+            `instance-identifier: no instance at path ${JSON.stringify(value)} (require-instance is true)`
+          )
+        );
       }
     } catch (e) {
       const msg = e instanceof Error ? e.message : String(e);
-      errors.push(`${path}: instance-identifier: invalid path expression (${msg})`);
+      errors.push(issue(path, "instance-identifier", `instance-identifier: invalid path expression (${msg})`));
     }
   }
 
-  private checkMust(stmt: YangStatement, currentNode: XPathNode, rootNode: XPathNode, path: string, errors: string[]): void {
+  private checkMust(stmt: YangStatement, currentNode: XPathNode, rootNode: XPathNode, path: string, errors: InternalIssue[]): void {
     const mustStatements = stmt.statements.filter((child) => child.keyword === "must" && typeof child.argument === "string");
 
     for (const mustStmt of mustStatements) {
@@ -690,7 +838,9 @@ export class DocumentValidator {
           ast = parseXPath(expression);
           this.xpathCache.set(expression, ast);
         } catch {
-          errors.push(`${path}: Error evaluating must expression on '${stmt.name ?? "node"}'`);
+          errors.push(
+            issue(path, "xpath-error", `Error evaluating must expression on '${stmt.name ?? "node"}'`, expression)
+          );
           continue;
         }
       }
@@ -702,10 +852,10 @@ export class DocumentValidator {
           const errorMessage = typeof mustStmt.data.error_message === "string" && mustStmt.data.error_message.trim().length > 0
             ? mustStmt.data.error_message
             : `must constraint not satisfied on '${stmt.name ?? "node"}'`;
-          errors.push(`${path}: ${errorMessage}`);
+          errors.push(issue(path, "must", errorMessage, expression));
         }
       } catch {
-        errors.push(`${path}: Error evaluating must expression on '${stmt.name ?? "node"}'`);
+        errors.push(issue(path, "xpath-error", `Error evaluating must expression on '${stmt.name ?? "node"}'`, expression));
       }
     }
   }
@@ -714,7 +864,7 @@ export class DocumentValidator {
     stmt: YangStatement,
     value: unknown,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     currentNode: XPathNode,
     rootNode: XPathNode,
     parentNode: XPathNode
@@ -731,7 +881,7 @@ export class DocumentValidator {
         ast = parseXPath(expression);
         this.xpathCache.set(expression, ast);
       } catch {
-        errors.push(`${path}: Error evaluating when expression on '${stmt.name ?? "node"}'`);
+        errors.push(issue(path, "xpath-error", `Error evaluating when expression on '${stmt.name ?? "node"}'`, expression));
         return false;
       }
     }
@@ -744,13 +894,13 @@ export class DocumentValidator {
       const active = this.xpathBoolean(result);
       if (!active) {
         if (value !== undefined) {
-          errors.push(`${path}: node is not allowed by when condition`);
+          errors.push(issue(path, "when", "node is not allowed by when condition", expression));
         }
         return false;
       }
       return true;
     } catch {
-      errors.push(`${path}: Error evaluating when expression on '${stmt.name ?? "node"}'`);
+      errors.push(issue(path, "xpath-error", `Error evaluating when expression on '${stmt.name ?? "node"}'`, expression));
       return false;
     }
   }
@@ -775,7 +925,7 @@ export class DocumentValidator {
     stmt: YangStatement,
     parentValue: unknown,
     path: string,
-    errors: string[],
+    errors: InternalIssue[],
     parentNode: XPathNode,
     rootNode: XPathNode
   ): void {
@@ -804,7 +954,7 @@ export class DocumentValidator {
         continue;
       }
       if (!obj || obj[child.name] === undefined) {
-        errors.push(`${path}.${child.name}: mandatory ${childKeyword} is missing`);
+        errors.push(issue(`${path}.${child.name}`, "mandatory", `mandatory ${childKeyword} is missing`));
       }
     }
   }
@@ -828,7 +978,7 @@ export class DocumentValidator {
     stmt: YangStatement,
     value: unknown,
     anydataPath: string,
-    errors: string[]
+    errors: InternalIssue[]
   ): void {
     if (!this.ctx.anydataValidation || !value || typeof value !== "object" || Array.isArray(value)) {
       return;
@@ -842,7 +992,11 @@ export class DocumentValidator {
       const { statementName, moduleName } = resolveQualifiedTopLevel(jsonKey, moduleMap);
       if (!statementName || !moduleName) {
         errors.push(
-          `${anydataPath}.${jsonKey}: Unknown anydata member '${jsonKey}': no matching module:identifier in the provided modules`
+          issue(
+            `${anydataPath}.${jsonKey}`,
+            "unknown-field",
+            `Unknown anydata member '${jsonKey}': no matching module:identifier in the provided modules`
+          )
         );
         continue;
       }
@@ -850,13 +1004,17 @@ export class DocumentValidator {
       const mod = moduleMap[moduleName];
       const top = mod?.findStatement(statementName);
       if (!top) {
-        errors.push(`${anydataPath}.${jsonKey}: Unknown anydata member '${jsonKey}'`);
+        errors.push(issue(`${anydataPath}.${jsonKey}`, "unknown-field", `Unknown anydata member '${jsonKey}'`));
         continue;
       }
 
       if (top.keyword === YangTokenType.LEAF) {
         errors.push(
-          `${anydataPath}.${jsonKey}: anydata member '${jsonKey}' maps to a leaf; nested subtree validation expects a container or list`
+          issue(
+            `${anydataPath}.${jsonKey}`,
+            "type",
+            `anydata member '${jsonKey}' maps to a leaf; nested subtree validation expects a container or list`
+          )
         );
         continue;
       }
@@ -873,11 +1031,10 @@ export class DocumentValidator {
         ifFeatureCtx: payloadIfCtx,
         enabledByModule: buildEnabledFeaturesMap(payloadIfCtx, this.enabledFeaturesOverride)
       };
-      const [ok, innerErrors] = this.validateWithContext(payloadCtx, fragment);
-      if (!ok) {
-        for (const error of innerErrors) {
-          errors.push(`${anydataPath}.${jsonKey}: ${error}`);
-        }
+      const inner = this.collect(payloadCtx, fragment);
+      for (const innerIssue of inner.errors) {
+        // Prefix matches the previous string form: "<anydata>.<key>: <inner formatted error>".
+        errors.push(issue(`${anydataPath}.${jsonKey}`, innerIssue.code, formatIssue(innerIssue)));
       }
     }
   }
