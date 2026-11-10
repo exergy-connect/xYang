@@ -146,7 +146,7 @@ function unwrapType(module: YangModule, type: TypeShape | undefined, seen: Set<s
 
 function accepts(checker: TypeChecker, value: unknown, type: TypeShape): boolean {
   const name = typeof type.name === "string" ? type.name : "string";
-  return checker.validate(value, name, type)[0];
+  return checker.validate(value, name, type).length === 0;
 }
 
 function isIntText(value: unknown): value is string {

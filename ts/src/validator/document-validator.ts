@@ -36,7 +36,7 @@ type InternalIssue = ValidationIssue & { pathLabel: string };
 
 /**
  * Message-to-code table previously stored in tests/cases/error-codes.json.
- * Used for type-checker text, which is still produced as a message. Order matters.
+ * Type-checker issues already carry a code. This table is for other messages. Order matters.
  */
 const MESSAGE_CODES: Array<[string, RegExp]> = [
   ["unknown-field", /Unknown field '/],
@@ -413,21 +413,20 @@ export class DocumentValidator {
         } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
           this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
         } else {
-          const [ok, reason] = this.ctx.typeChecker.validate(value, typeName, typeShape);
+          const typeIssues = this.ctx.typeChecker.validate(value, typeName, typeShape);
           if (this.ctx.typeValidationDebug) {
             traceTypeValidation(true, "DocumentValidator.leaf:full", {
               path,
               typeName,
               leafTypeMode: this.ctx.leafTypeMode,
               constraintChecks: this.ctx.constraintChecks,
-              ok,
-              reason,
+              ok: typeIssues.length === 0,
+              reason: typeIssues.length === 0 ? null : typeIssues.map(([, message]) => message).join("; "),
               value: summarizeValue(value)
             });
           }
-          if (!ok) {
-            const message = reason ?? `invalid value for type ${typeName}`;
-            errors.push(issue(path, codeForMessage(message) ?? "type", message));
+          for (const [code, message] of typeIssues) {
+            errors.push(issue(path, code, message));
           }
         }
       }
@@ -457,21 +456,20 @@ export class DocumentValidator {
           } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
             this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
-            const [ok, reason] = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
+            const typeIssues = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
             if (this.ctx.typeValidationDebug) {
               traceTypeValidation(true, "DocumentValidator.leaf-list:full", {
                 path: `${path}[${i}]`,
                 typeName,
                 leafTypeMode: this.ctx.leafTypeMode,
                 constraintChecks: this.ctx.constraintChecks,
-                ok,
-                reason,
+                ok: typeIssues.length === 0,
+                reason: typeIssues.length === 0 ? null : typeIssues.map(([, message]) => message).join("; "),
                 value: summarizeValue(value[i])
               });
             }
-            if (!ok) {
-              const message = reason ?? `invalid value for type ${typeName}`;
-              errors.push(issue(`${path}[${i}]`, codeForMessage(message) ?? "type", message));
+            for (const [code, message] of typeIssues) {
+              errors.push(issue(`${path}[${i}]`, code, message));
             }
           }
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
