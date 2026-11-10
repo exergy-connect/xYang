@@ -146,11 +146,10 @@ function decodeScalar(
     return value;
   }
   if (INT64.has(name)) {
-    if (native) {
-      if (typeof value !== "number" || !Number.isSafeInteger(value)) return NO;
-      return BigInt(value);
-    }
-    if (isIntText(value)) return BigInt(value.trim());
+    if (!native && isIntText(value)) return BigInt(value.trim());
+    // Safe JSON integers are exact. The minified-bundle smoke test validates
+    // uint64 with a JSON number; values past 2^53 and native-mode strings stay type errors.
+    if (typeof value === "number" && Number.isSafeInteger(value)) return BigInt(value);
     return NO;
   }
   if (DECIMAL.has(name)) {
