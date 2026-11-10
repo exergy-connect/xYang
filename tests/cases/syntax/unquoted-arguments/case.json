@@ -3,6 +3,7 @@
   "module": "m.yang",
   "xfail": {
     "python": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'",
+    "cli": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'",
     "ts": "unquoted if-feature argument fails with 'Expected STRING, got IDENTIFIER'"
   },
   "instances": [

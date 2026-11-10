@@ -1,7 +1,7 @@
 {
   "description": "unique: no two list entries may share the same values for the unique leaves (RFC 7950 7.8.3).",
   "module": "m.yang",
-  "xfail": { "python": "the 'unique' statement is a parse error" },
+  "xfail": { "python": "the 'unique' statement is a parse error", "cli": "the 'unique' statement is a parse error" },
   "instances": [
     { "name": "distinct values", "data": { "top": { "servers": [{ "name": "a", "ip": "1" }, { "name": "b", "ip": "2" }] } },
       "valid": true },

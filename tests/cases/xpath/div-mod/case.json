@@ -3,6 +3,7 @@
   "module": "m.yang",
   "xfail": {
     "python": "div and mod are XPath syntax errors, so the module does not load",
+    "cli": "div and mod are XPath syntax errors, so the module does not load",
     "ts": "div and mod are XPath syntax errors, so the module does not load"
   },
   "instances": [

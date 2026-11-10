@@ -103,6 +103,29 @@ def _load_anydata_module_map(
     return modules
 
 
+def _features_arg(raw: str | None) -> dict[str, frozenset[str]] | None:
+    """Parse ``--features`` JSON. ``None`` and JSON ``null`` enable every feature."""
+    if raw is None:
+        return None
+    from xyang import _feature_map
+
+    try:
+        value = json.loads(raw)
+    except json.JSONDecodeError as exc:
+        raise ValueError(f"--features must be a JSON object or null: {exc}") from exc
+    if value is None:
+        return None
+    try:
+        return _feature_map(value)
+    except TypeError as exc:
+        raise ValueError(str(exc)) from exc
+
+
+def _json_validation_report(result: dict[str, Any]) -> str:
+    errors = [{"path": issue["path"], "code": issue["code"], "message": issue["message"]} for issue in result["errors"]]
+    return json.dumps({"valid": result["valid"], "errors": errors})
+
+
 def _load_instance_data(data_path: Path) -> Any:
     """Load JSON or YAML instance data from a file path."""
     text = data_path.read_text(encoding="utf-8")
@@ -152,7 +175,22 @@ def main() -> int:
         type=Path,
         nargs="?",
         default=None,
-        help="Path to JSON or YAML data file (.yaml/.yml need PyYAML; read from stdin if omitted)",
+        help="Path to JSON or YAML data (.yaml/.yml need PyYAML). '-' or omitted reads JSON from stdin",
+    )
+    validate_parser.add_argument(
+        "--format",
+        choices=("text", "json"),
+        default="text",
+        help="Output format: text (default) or json ({valid, errors} on stdout)",
+    )
+    validate_parser.add_argument(
+        "--features",
+        default=None,
+        metavar="JSON",
+        help=(
+            'Enabled features as a JSON object {"module": ["feature", ...]}, '
+            "or null to enable every declared feature (the default)"
+        ),
     )
     validate_parser.add_argument(
         "--anydata-validation",
@@ -229,17 +267,18 @@ def main() -> int:
         p = Path(args.yang_file)
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
-            return 1
+            return 2
         try:
             include_path = _include_path_from_args(args)
+            features = _features_arg(args.features)
             module = parse_yang_file(str(p), include_path=include_path)
-            validator = YangValidator(module)
+            validator = YangValidator(module, enabled_features_by_module=features)
             if args.anydata_validation != "off":
                 extra_paths: list[Path] = list(args.anydata_module)
                 for ep in extra_paths:
                     if not ep.exists():
                         print(f"Error: file not found: {ep}", file=sys.stderr)
-                        return 1
+                        return 2
                 modules = _load_anydata_module_map(
                     p.resolve(),
                     module,
@@ -262,14 +301,20 @@ def main() -> int:
                     modules=modules,
                     mode=mode,
                 )
-            if args.data_file is not None:
+            if args.data_file is not None and str(args.data_file) != "-":
                 data_path = Path(args.data_file)
                 if not data_path.exists():
                     print(f"Error: file not found: {data_path}", file=sys.stderr)
-                    return 1
+                    return 2
                 data = _load_instance_data(data_path)
             else:
                 data = json.load(sys.stdin)
+            if args.format == "json":
+                result = validator.validate_detailed(data)
+                for warning in result["warnings"]:
+                    print(f"Warning: {warning['path']}: {warning['message']}", file=sys.stderr)
+                print(_json_validation_report(result))
+                return 0 if result["valid"] else 1
             is_valid, errors, warnings = validator.validate(data)
             if is_valid:
                 print("Valid.")
@@ -282,7 +327,7 @@ def main() -> int:
             return 1
         except _CLI_ERRORS as e:
             _print_cli_error(e)
-            return 1
+            return 2
 
     if args.cmd == "convert":
         from xyang.parser import YangParser

@@ -16,6 +16,6 @@
       "errors": [{ "path": "/top/two-patterns", "code": "pattern" }] },
     { "name": "not a string", "data": { "top": { "code": 12 } }, "valid": false,
       "errors": [{ "path": "/top/code", "code": "type" }],
-      "xfail": { "python": "non-string values are coerced with str() and then checked as strings" } }
+      "xfail": { "python": "non-string values are coerced with str() and then checked as strings", "cli": "non-string values are coerced with str() and then checked as strings" } }
   ]
 }

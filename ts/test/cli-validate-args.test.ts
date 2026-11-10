@@ -27,6 +27,28 @@ describe("cli validate args", () => {
     const args = parseValidateArgs(["host.yang"]);
     expect(args.anydataValidation).toBe("off");
     expect(args.anydataModulePaths).toEqual([]);
+    expect(args.format).toBe("text");
+    expect(args.features).toBeNull();
+  });
+
+  it("parses format and features", () => {
+    const args = parseValidateArgs([
+      "--format",
+      "json",
+      "--features",
+      '{"m":["f1"]}',
+      "host.yang",
+      "-"
+    ]);
+    expect(args.format).toBe("json");
+    expect(args.features).toEqual({ m: ["f1"] });
+    expect(args.positional).toEqual(["host.yang", "-"]);
+  });
+
+  it("accepts features null and rejects a non-object", () => {
+    expect(parseValidateArgs(["--features", "null", "host.yang"]).features).toBeNull();
+    expect(() => parseValidateArgs(["--features", "[1]", "host.yang"])).toThrow(/--features/);
+    expect(() => parseValidateArgs(["--format", "yaml", "host.yang"])).toThrow(/--format/);
   });
 
   it("rejects invalid anydata-validation mode", () => {

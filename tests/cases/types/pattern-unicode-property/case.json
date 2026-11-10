@@ -1,7 +1,7 @@
 {
   "description": "XSD regex category escape \\p{L} (common in IETF modules). Patterns are XSD regexes, not host-language regexes.",
   "module": "m.yang",
-  "xfail": { "python": "pattern goes straight to re.fullmatch; '\\p' is a bad escape, so validation raises re.error" },
+  "xfail": { "python": "pattern goes straight to re.fullmatch; '\\p' is a bad escape, so validation raises re.error", "cli": "pattern goes straight to re.fullmatch; '\\p' is a bad escape, so validation raises re.error" },
   "instances": [
     { "name": "letters", "data": { "top": { "word": "h\u00e9llo" } }, "valid": true,
       "xfail": { "ts": "pattern compiled as new RegExp without the u flag, so \\p{L} matches a literal 'p{L}' and valid letters are rejected" } },

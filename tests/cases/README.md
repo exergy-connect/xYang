@@ -8,7 +8,7 @@ and, later, a standalone CLI binary.
 |---|---|
 | Python | `pytest tests/test_cases.py` ([`tests/test_cases.py`](../test_cases.py)) |
 | TypeScript | `cd ts && npx vitest run test/cases.test.ts` ([`ts/test/cases.test.ts`](../../ts/test/cases.test.ts)) |
-| CLI binary | `XYANG_CLI=/path/to/xyang pytest tests/test_cases.py -k cli:` (see [CLI protocol](#cli-protocol); not implemented yet) |
+| CLI binary | `XYANG_CLI=/path/to/xyang pytest tests/test_cases.py -k cli:` (see [CLI protocol](#cli-protocol)) |
 
 CI runs the Python and TypeScript runners on every push and pull request
 ([`.github/workflows/conformance.yml`](../../.github/workflows/conformance.yml)).
@@ -97,7 +97,7 @@ accept today. The RFC 7951 qualified form is covered in `encoding/qualified-name
 
 ## CLI protocol
 
-TODO: neither CLI implements this yet. The Python runner adds a `cli` implementation when
+The Python runner adds a `cli` implementation when
 `XYANG_CLI` is set and calls, per instance:
 
 ```
@@ -106,8 +106,10 @@ $XYANG_CLI validate --format json <case-dir>/<module> <instance.json> \
 ```
 
 and expects stdout to be `{"valid": bool, "errors": [{"path": "<JSON Pointer>", "code": "<code>", "message": "..."}]}`,
-with the error codes listed above. Schema errors should exit non-zero without that JSON.
-`xfail` entries keyed `cli` apply to this runner.
+with the error codes listed above. Schema errors exit non-zero without that JSON.
+`xfail` entries keyed `cli` apply to the Python CLI (they mirror `python`). When
+`XYANG_CLI` is the TypeScript CLI (`*.js` or `xyang-ts`), the `ts` entries apply
+instead, because that binary follows the TypeScript library.
 
 ## Known divergences
 

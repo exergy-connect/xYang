@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- **One-call validate and machine-readable CLI:** `xyang.validate(schema, data, *, features=None, include_path=())` returns the `validate_detailed` dict (`schema` is a path or a parsed module). `xyang validate` accepts `--format text|json`, `--features` (`{"module": ["feature"]}` or `null`), and `-` for stdin. `--format json` prints `{"valid", "errors": [{path, code, message}]}` on stdout and warnings on stderr. Exit codes are 0 valid, 1 invalid, and 2 for usage or schema/parse errors ([#82](https://github.com/exergy-connect/xYang/issues/82)).
 - **Discoverability:** `keywords` on the Python and TypeScript packages, agent notes in `AGENTS.md` (install, `parse` / `validate` / `convert`, validate examples, tests), and [`llms.txt`](llms.txt) ([#81](https://github.com/exergy-connect/xYang/issues/81)).
 - **Native JSON format:** documented the intent of the native JSON form of YANG: reversible, unambiguous, and fast to load (`README.md`, `AGENTS.md`).
 - **Structured validation errors (Python + TypeScript):** `YangValidator.validate_detailed` and `validateDetailed` return `{valid, errors, warnings}`. Each issue is `{code, path, message, expression?, severity}` and `path` is a JSON Pointer (list and leaf-list entries by position). `validate()` string output is unchanged. Shared case runners read codes and pointers from this API ([#79](https://github.com/exergy-connect/xYang/issues/79)).

@@ -11,6 +11,7 @@
       "errors": [{ "path": "/top/items", "code": "min-elements" }],
       "xfail": {
         "python": "min-elements is only checked when the list is present (RFC 7950 7.7.5 applies it to absent lists too)",
+        "cli": "min-elements is only checked when the list is present (RFC 7950 7.7.5 applies it to absent lists too)",
         "ts": "min-elements is not checked when the list is absent"
       } },
     { "name": "too many leaf-list items", "data": { "top": { "items": [{ "id": "a" }], "tags": ["a", "b", "c"] } },

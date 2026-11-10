@@ -18,6 +18,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
+- **One-call validate and machine-readable CLI:** `validate(schema, data, { features, includePath })` returns the `validateDetailed` object (`schema` is a path or a parsed module). `xyang-ts validate` accepts `--format text|json`, `--features` (`{"module": ["feature"]}` or `null`), and `-` for stdin. `--format json` prints `{"valid", "errors": [{path, code, message}]}` on stdout and warnings on stderr. Exit codes are 0 valid, 1 invalid, and 2 for usage or schema/parse errors ([#82](https://github.com/exergy-connect/xYang/issues/82)).
 - **Package metadata:** `keywords` on `@exergy-connect/xyang` ([#81](https://github.com/exergy-connect/xYang/issues/81)).
 - **Structured validation errors:** `YangValidator.validateDetailed` returns `{valid, errors, warnings}`. Each issue is `{code, path, message, expression?, severity}` and `path` is a JSON Pointer. `validate()` string output is unchanged ([#79](https://github.com/exergy-connect/xYang/issues/79)).
 - **Shared conformance cases:** `test/cases.test.ts` runs the language-neutral cases in [`tests/cases/`](../tests/cases/README.md).

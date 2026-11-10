@@ -5,6 +5,7 @@ import { AnydataValidationMode } from "./ext/anydata_validation";
 import { parseYangFile, YangParser } from "./parser";
 import { ValidatorExtension } from "./validator/validator-extension";
 import { YangValidator } from "./validator/yang-validator";
+import type { ValidationIssue } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
 import { parseCommonArgs, parseValidateArgs } from "./cli/args";
 import { loadAnydataModules, normalizeRfc7951InstanceRoot } from "./cli/load-anydata-modules";
@@ -14,13 +15,115 @@ function printUsage(): void {
     [
       "xyang-ts commands:",
       "  parse [--include-path DIR]... <file.yang>",
-      "  validate [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... <file.yang> [data.json]",
+      "  validate [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... <file.yang> [data.json|-]",
       "  convert [--include-path DIR]... <file.yang>",
       "",
+      "  --format              text (default) or json ({valid, errors} on stdout)",
+      "  --features            {\"module\": [\"feature\"]} or null (default: all features)",
       "  --anydata-validation  off | complete | candidate  (default: off)",
       "  --anydata-module      additional .yang for anydata subtree validation (repeatable)"
     ].join("\n") + "\n"
   );
+}
+
+function featureSets(features: Record<string, string[]> | null): Record<string, Set<string>> | undefined {
+  if (features == null) {
+    return undefined;
+  }
+  return Object.fromEntries(Object.entries(features).map(([name, feats]) => [name, new Set(feats)]));
+}
+
+function writeJsonWarnings(warnings: ValidationIssue[]): void {
+  for (const issue of warnings) {
+    process.stderr.write(`Warning: ${issue.path}: ${issue.message}\n`);
+  }
+}
+
+function runValidate(rest: string[]): number {
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features } = parseValidateArgs(rest);
+  const yangFile = positional[0];
+  if (!yangFile) {
+    throw new Error("Missing <file.yang>");
+  }
+  if (!existsSync(yangFile)) {
+    throw new Error(`file not found: ${yangFile}`);
+  }
+
+  const parseOpts = includePaths.length > 0 ? { includePath: includePaths } : {};
+  const module = parseYangFile(yangFile, parseOpts);
+  const enabled = featureSets(features);
+  const validator = new YangValidator(module, enabled ? { enabledFeaturesByModule: enabled } : {});
+
+  if (anydataValidation !== "off") {
+    for (const path of anydataModulePaths) {
+      if (!existsSync(path)) {
+        throw new Error(`file not found: ${path}`);
+      }
+    }
+    const modules = loadAnydataModules({
+      hostPath: resolve(yangFile),
+      hostModule: module,
+      includePaths,
+      extraModulePaths: anydataModulePaths,
+      parseOpts
+    });
+    if (modules.length < 2 && anydataModulePaths.length === 0) {
+      process.stderr.write(
+        "Warning: --anydata-validation enabled but no extra modules were loaded; " +
+          "use --include-path or --anydata-module\n"
+      );
+    }
+    const mode =
+      anydataValidation === "complete" ? AnydataValidationMode.COMPLETE : AnydataValidationMode.CANDIDATE;
+    validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, { modules, mode });
+  }
+
+  let data: unknown;
+  const dataArg = positional[1];
+  if (dataArg && dataArg !== "-") {
+    if (!existsSync(dataArg)) {
+      throw new Error(`file not found: ${dataArg}`);
+    }
+    data = JSON.parse(readFileSync(dataArg, "utf-8"));
+  } else {
+    data = JSON.parse(readFileSync(0, "utf-8"));
+  }
+  // Text output keeps the historical RFC 7951 root unwrap. JSON pointers have to
+  // address the input document, so --format json validates that document as given.
+  if (format === "text" && module.name) {
+    data = normalizeRfc7951InstanceRoot(data, module.name);
+  }
+
+  if (format === "json") {
+    const detailed = validator.validateDetailed(data);
+    writeJsonWarnings(detailed.warnings);
+    const report = {
+      valid: detailed.valid,
+      errors: detailed.errors.map((issue) => ({
+        path: issue.path,
+        code: issue.code,
+        message: issue.message
+      }))
+    };
+    process.stdout.write(`${JSON.stringify(report)}\n`);
+    return detailed.valid ? 0 : 1;
+  }
+
+  const result = validator.validate(data);
+  if (result.warnings?.length) {
+    for (const line of result.warnings) {
+      process.stderr.write(`Warning: ${line}\n`);
+    }
+  }
+  if (!result.isValid) {
+    process.stderr.write("Validation failed:\n");
+    for (const line of result.errors) {
+      process.stderr.write(`  ${line}\n`);
+    }
+    return 1;
+  }
+  process.stdout.write("Valid.\n");
+  return 0;
 }
 
 function main(argv: string[]): number {
@@ -43,74 +146,12 @@ function main(argv: string[]): number {
   }
 
   if (command === "validate") {
-    const { includePaths, positional, anydataValidation, anydataModulePaths } = parseValidateArgs(rest);
-    const yangFile = positional[0];
-    if (!yangFile) {
-      throw new Error("Missing <file.yang>");
+    try {
+      return runValidate(rest);
+    } catch (error) {
+      process.stderr.write(`${(error as Error).message}\n`);
+      return 2;
     }
-    if (!existsSync(yangFile)) {
-      throw new Error(`file not found: ${yangFile}`);
-    }
-
-    const parseOpts = includePaths.length > 0 ? { includePath: includePaths } : {};
-    const module = parseYangFile(yangFile, parseOpts);
-    const validator = new YangValidator(module);
-
-    if (anydataValidation !== "off") {
-      for (const path of anydataModulePaths) {
-        if (!existsSync(path)) {
-          throw new Error(`file not found: ${path}`);
-        }
-      }
-      const modules = loadAnydataModules({
-        hostPath: resolve(yangFile),
-        hostModule: module,
-        includePaths,
-        extraModulePaths: anydataModulePaths,
-        parseOpts
-      });
-      if (modules.length < 2 && anydataModulePaths.length === 0) {
-        process.stderr.write(
-          "Warning: --anydata-validation enabled but no extra modules were loaded; " +
-            "use --include-path or --anydata-module\n"
-        );
-      }
-      const mode =
-        anydataValidation === "complete"
-          ? AnydataValidationMode.COMPLETE
-          : AnydataValidationMode.CANDIDATE;
-      validator.enableExtension(ValidatorExtension.ANYDATA_VALIDATION, { modules, mode });
-    }
-
-    let data: unknown;
-    if (positional[1]) {
-      const dataPath = positional[1];
-      if (!existsSync(dataPath)) {
-        throw new Error(`file not found: ${dataPath}`);
-      }
-      data = JSON.parse(readFileSync(dataPath, "utf-8"));
-    } else {
-      data = JSON.parse(readFileSync(0, "utf-8"));
-    }
-    if (module.name) {
-      data = normalizeRfc7951InstanceRoot(data, module.name);
-    }
-
-    const result = validator.validate(data);
-    if (result.warnings?.length) {
-      for (const line of result.warnings) {
-        process.stderr.write(`Warning: ${line}\n`);
-      }
-    }
-    if (!result.isValid) {
-      process.stderr.write("Validation failed:\n");
-      for (const line of result.errors) {
-        process.stderr.write(`  ${line}\n`);
-      }
-      return 1;
-    }
-    process.stdout.write("Valid.\n");
-    return 0;
   }
 
   if (command === "convert") {

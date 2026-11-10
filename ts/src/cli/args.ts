@@ -10,6 +10,9 @@ export type CommonCliArgs = {
 export type ValidateCliArgs = CommonCliArgs & {
   anydataValidation: AnydataValidationCli;
   anydataModulePaths: string[];
+  format: "text" | "json";
+  /** ``null`` enables every declared feature. */
+  features: Record<string, string[]> | null;
 };
 
 export function parseCommonArgs(rest: string[]): CommonCliArgs {
@@ -30,11 +33,39 @@ export function parseCommonArgs(rest: string[]): CommonCliArgs {
   return { includePaths, positional };
 }
 
+function parseFeaturesArg(raw: string | undefined): Record<string, string[]> | null {
+  if (raw === undefined) {
+    throw new Error("Missing JSON after --features");
+  }
+  let value: unknown;
+  try {
+    value = JSON.parse(raw);
+  } catch (error) {
+    throw new Error(`--features must be a JSON object or null: ${(error as Error).message}`);
+  }
+  if (value === null) {
+    return null;
+  }
+  if (typeof value !== "object" || Array.isArray(value)) {
+    throw new Error("--features must be a JSON object mapping module names to feature names, or null");
+  }
+  const features: Record<string, string[]> = {};
+  for (const [name, feats] of Object.entries(value)) {
+    if (!Array.isArray(feats) || feats.some((feature) => typeof feature !== "string")) {
+      throw new Error(`--features[${name}] must be an array of feature name strings`);
+    }
+    features[name] = feats;
+  }
+  return features;
+}
+
 export function parseValidateArgs(rest: string[]): ValidateCliArgs {
   const includePaths: string[] = [];
   const anydataModulePaths: string[] = [];
   const positional: string[] = [];
   let anydataValidation: AnydataValidationCli = "off";
+  let format: "text" | "json" = "text";
+  let features: Record<string, string[]> | null = null;
 
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
@@ -44,6 +75,18 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
         throw new Error("Missing directory after --include-path");
       }
       includePaths.push(resolve(dir));
+      continue;
+    }
+    if (arg === "--format") {
+      const value = rest[++i];
+      if (value !== "text" && value !== "json") {
+        throw new Error("--format must be text or json");
+      }
+      format = value;
+      continue;
+    }
+    if (arg === "--features") {
+      features = parseFeaturesArg(rest[++i]);
       continue;
     }
     if (arg === "--anydata-validation") {
@@ -62,8 +105,11 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
       anydataModulePaths.push(resolve(path));
       continue;
     }
+    if (arg?.startsWith("-") && arg !== "-") {
+      throw new Error(`unrecognized argument: ${arg}`);
+    }
     positional.push(arg!);
   }
 
-  return { includePaths, positional, anydataValidation, anydataModulePaths };
+  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features };
 }
