@@ -91,6 +91,14 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
   }
 
   if (typeName in YANG_INTEGER_BOUNDS) {
+    if (typeName === YangTokenType.INT64 || typeName === YangTokenType.UINT64) {
+      const pattern = typeName === YangTokenType.INT64 ? "^-?[0-9]+$" : "^[0-9]+$";
+      const xYang: Record<string, unknown> = { type: typeName };
+      if (typeof typeShape.range === "string" && typeShape.range) {
+        xYang.range = typeShape.range;
+      }
+      return { type: JSON_TYPE_STRING, pattern, "x-yang": xYang };
+    }
     const out: Record<string, unknown> = { type: JSON_TYPE_INTEGER };
     const rangeStr = typeof typeShape.range === "string" ? typeShape.range : undefined;
     const { minimum, maximum } = jsonIntegerBoundsForBuiltin(typeName, rangeStr);
@@ -104,24 +112,18 @@ export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<str
   }
 
   if ([YangTokenType.DECIMAL64, JSON_TYPE_NUMBER].includes(typeName)) {
-    const out: Record<string, unknown> = { type: JSON_TYPE_NUMBER };
-    if (typeof typeShape.fraction_digits === "number" && typeShape.fraction_digits > 0) {
-      out.multipleOf = 10 ** -typeShape.fraction_digits;
+    const xYang: Record<string, unknown> = { type: YangTokenType.DECIMAL64 };
+    if (typeof typeShape.fraction_digits === "number") {
+      xYang["fraction-digits"] = typeShape.fraction_digits;
     }
-    if (typeof typeShape.range === "string") {
-      const [rawMin, rawMax] = typeShape.range.split("..");
-      const minRaw = (rawMin ?? "").trim();
-      const maxRaw = (rawMax ?? "").trim();
-      const min = Number.parseFloat(minRaw);
-      const max = Number.parseFloat(maxRaw);
-      if (!Number.isNaN(min) && minRaw.toLowerCase() !== "min") {
-        out.minimum = min;
-      }
-      if (!Number.isNaN(max) && maxRaw.toLowerCase() !== "max") {
-        out.maximum = max;
-      }
+    if (typeof typeShape.range === "string" && typeShape.range) {
+      xYang.range = typeShape.range;
     }
-    return out;
+    return {
+      type: JSON_TYPE_STRING,
+      pattern: "^-?[0-9]+(\\.[0-9]+)?$",
+      "x-yang": xYang
+    };
   }
 
   if (typeName === YangTokenType.BOOLEAN) {

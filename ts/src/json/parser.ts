@@ -132,6 +132,19 @@ function applyStatementMetaFromXyang(stmt: SerializedStatement, xy: Record<strin
 }
 
 function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
+  if (
+    schema.type === JSON_TYPE_STRING &&
+    (xy.type === YangTokenType.INT64 || xy.type === YangTokenType.UINT64 || xy.type === YangTokenType.DECIMAL64)
+  ) {
+    const shape: Record<string, unknown> = { name: xy.type };
+    if (typeof xy.range === "string" && xy.range) {
+      shape.range = xy.range;
+    }
+    if (xy.type === YangTokenType.DECIMAL64 && typeof xy["fraction-digits"] === "number") {
+      shape.fraction_digits = xy["fraction-digits"];
+    }
+    return shape;
+  }
   if (xy.type === YangTokenType.LEAFREF) {
     const path = typeof xy.path === "string" ? xy.path : "";
     if (path) {
@@ -770,6 +783,12 @@ function jsonSchemaPropertyToStatement(
     xyType === YangTokenType.LEAFREF ||
     xyType === YangTokenType.IDENTITYREF ||
     xyType === YangTokenType.INSTANCE_IDENTIFIER
+  ) {
+    return parseLeaf(name, resolved, defs);
+  }
+  if (
+    resolved.type === JSON_TYPE_STRING &&
+    (xyType === YangTokenType.INT64 || xyType === YangTokenType.UINT64 || xyType === YangTokenType.DECIMAL64)
   ) {
     return parseLeaf(name, resolved, defs);
   }

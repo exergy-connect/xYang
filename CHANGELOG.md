@@ -38,6 +38,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- JSON Schema export types int64/uint64/decimal64 as RFC 7951 strings (#63).
 - **Numeric strings for 8/16/32-bit integers (Python + TypeScript):** `int8`, `int16`, `int32`, `uint8`, `uint16`, and `uint32` reject a JSON string with `Expected integer, got string`. RFC 7951 encodes those as JSON numbers, which is what `convert` already emits (`"type": "integer"`). A schema default (`default 3` on an integer typedef or union) is still applied as a number. `int64`, `uint64`, and `decimal64` are unchanged. `tests/cases/types/integer/schema-cross-check.json` requires the generated schema and the validator to agree on that set. Issue #63 left JSON Schema for `int64`, `uint64`, and `decimal64` out of scope, so those types were not changed to a string pattern ([#63](https://github.com/exergy-connect/xYang/issues/63)).
 - **RFC 8791 structure instances (Python + TypeScript):** a structure is a top-level data node, written `msg` or `m:msg`. Error paths are JSON Pointers into that member (`/m:msg/n`, `/msg/n`). Python no longer drops the member, and TypeScript accepts the qualified form ([#78](https://github.com/exergy-connect/xYang/issues/78)).
 - **`empty` encoding (Python + TypeScript):** shared cases confirm the strict RFC 7951 form: `[null]` is the only valid value, and `null`, `true`, and `""` are `type` errors (`tests/cases/types/boolean-empty`) ([#59](https://github.com/exergy-connect/xYang/issues/59)).

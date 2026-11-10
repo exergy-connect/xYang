@@ -138,7 +138,7 @@ module c {
     expect(choice?.statements.length).toBe(2);
   });
 
-  it("decimal64 emits multipleOf and round-trips fraction-digits", () => {
+  it("decimal64 emits an RFC 7951 string and round-trips fraction-digits", () => {
     const module = parseYangString(`
 module t {
   yang-version 1.1;
@@ -152,8 +152,11 @@ module t {
     const schema = generateJsonSchema(module);
     const x = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>)["x"] as Record<string, unknown>;
-    expect(x.type).toBe("number");
-    expect(x.multipleOf).toBe(0.001);
+    expect(x.type).toBe("string");
+    expect(x.pattern).toBe("^-?[0-9]+(\\.[0-9]+)?$");
+    const xYang = x["x-yang"] as Record<string, unknown>;
+    expect(xYang.type).toBe("decimal64");
+    expect(xYang["fraction-digits"]).toBe(3);
 
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");

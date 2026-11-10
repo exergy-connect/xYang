@@ -1,6 +1,6 @@
 /**
  * The generated JSON Schema and YangValidator agree on RFC 7951 integers.
- * Issue #63 left JSON Schema for int64, uint64, and decimal64 out of scope.
+ * 8/16/32-bit integers are JSON numbers. int64 is a decimal string.
  */
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";

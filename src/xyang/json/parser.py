@@ -318,6 +318,17 @@ def _type_from_schema_impl(defs: dict[str, Any], schema: dict[str, Any], xyang: 
                 ]
             return type_stmt
     if t == "string":
+        numeric = xyang.get(XYangKey.TYPE)
+        if numeric in ("int64", "uint64", "decimal64"):
+            type_stmt = YangTypeStmt(name=numeric)
+            rng = xyang.get("range")
+            if isinstance(rng, str) and rng:
+                type_stmt.range = rng
+            if numeric == "decimal64":
+                fd = xyang.get("fraction-digits")
+                if isinstance(fd, int) and not isinstance(fd, bool):
+                    type_stmt.fraction_digits = fd
+            return type_stmt
         type_stmt = YangTypeStmt(name="string")
         raw_pat: str | None = None
         if JsonSchemaKey.PATTERN in schema:
@@ -1039,6 +1050,8 @@ def _convert_property(
     if node_type == XYangTypeValue.IDENTITYREF:
         node_type = "leaf"
     if node_type == XYangTypeValue.INSTANCE_IDENTIFIER:
+        node_type = "leaf"
+    if node_type in ("int64", "uint64", "decimal64") and schema.get(JsonSchemaKey.TYPE) == "string":
         node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in (
         "leaf",
