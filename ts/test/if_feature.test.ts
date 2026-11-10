@@ -169,7 +169,7 @@ module main {
   });
 
   it("keeps uses-level if-feature when uses expansion is disabled", () => {
-    const parser = new YangParser({ expand_uses: false });
+    const parser = new YangParser({ expandUses: false });
     const module = parser.parseString(`
 module m {
   yang-version 1.1;
@@ -333,7 +333,7 @@ module main {
 `,
         "utf-8"
       );
-      const parser = new YangParser({ expand_uses: false });
+      const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "main.yang"));
       const leaf = mod.findStatement("x");
       expect(leaf?.data.if_features).toEqual(["ex:fea1 or ex:fea2"]);
@@ -389,7 +389,7 @@ module c {
 `,
         "utf-8"
       );
-      const parser = new YangParser({ expand_uses: false });
+      const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "c.yang"));
       const names = new Set(reachableModuleData(mod.data as Record<string, unknown>).map((m) => String(m.name)));
       expect(names).toEqual(new Set(["c", "b", "a"]));
@@ -425,7 +425,7 @@ module main {
 `,
         "utf-8"
       );
-      const parser = new YangParser({ expand_uses: false });
+      const parser = new YangParser({ expandUses: false });
       const mod = parser.parseFile(join(dir, "main.yang"));
       const data = mod.data as Record<string, unknown>;
       const m = buildEnabledFeaturesMap(data, { main: new Set() });

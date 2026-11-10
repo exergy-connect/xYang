@@ -220,8 +220,8 @@ describe("python parity: test_refine_list", () => {
     }
   });
 
-  it("same module parses with expand_uses disabled", () => {
-    const parser = new YangParser({ expand_uses: false });
+  it("same module parses with expandUses disabled", () => {
+    const parser = new YangParser({ expandUses: false });
     const module = parser.parseString(YANG_GENERIC_FIELD_NO_ARRAY_CASE);
     expect(module.name).toBe("generic_field_no_array");
   });

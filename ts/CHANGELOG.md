@@ -35,6 +35,9 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Changed
 
+- **Model:** `model.ts` is the runtime model. Repeated `statements` access returns the same `YangStatement` objects while the underlying array is the same object. The unused `core/module.ts` class is removed ([#73](https://github.com/exergy-connect/xYang/issues/73)).
+- **Public names:** `YangParser` options are `expandUses` and `includePath`. `findStatement` and `getAllLeaves` are the real methods. `expand_uses`, `include_path`, `find_statement`, and `get_all_leaves` still work and warn once per process ([#72](https://github.com/exergy-connect/xYang/issues/72)).
+- **Parse entry points:** `parseYangString` takes `{ filename, sourcePath, includePath, expandUses }` and can resolve imports. `parseYangFile` does not keep a process-lifetime module cache ([#77](https://github.com/exergy-connect/xYang/issues/77)).
 - **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads the `xyang-ts.mjs` release asset instead of a committed bundle. The `path` input and `xyang-root` output are removed (#89).
 - `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js` are no longer committed. `npm run build:ci` still writes them locally; a published release attaches them (#89).
 

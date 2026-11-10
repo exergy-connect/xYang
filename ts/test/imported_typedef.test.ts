@@ -40,7 +40,7 @@ describe("imported typedef resolution", () => {
 `
     );
 
-    const parser = new YangParser({ include_path: [dir], expand_uses: true });
+    const parser = new YangParser({ includePath: [dir], expandUses: true });
     const mod = parser.parseFile(join(dir, "host.yang"));
     const v = new YangValidator(mod);
 

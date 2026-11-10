@@ -1,7 +1,6 @@
+import { dirname } from "node:path";
 import { YangModule } from "../core/model";
 import { YangParser } from "./yang-parser";
-
-const defaultParser = new YangParser();
 
 export { YangParser };
 
@@ -10,17 +9,33 @@ export type ParseYangFileOptions = {
   expandUses?: boolean;
 };
 
-export function parseYangString(content: string): YangModule {
-  return defaultParser.parseString(content);
+export type ParseYangStringOptions = {
+  filename?: string;
+  sourcePath?: string;
+  includePath?: string[];
+  expandUses?: boolean;
+};
+
+/**
+ * Parse YANG source text with a fresh parser.
+ *
+ * Imports resolve against `dirname(sourcePath)` when `sourcePath` is set, then
+ * `includePath`.
+ */
+export function parseYangString(content: string, options: ParseYangStringOptions = {}): YangModule {
+  const parser = new YangParser({
+    includePath: options.includePath,
+    expandUses: options.expandUses
+  });
+  const sourceDir = options.sourcePath ? dirname(options.sourcePath) : undefined;
+  return parser.parseString(content, options.filename ?? "<memory>", sourceDir);
 }
 
+/** Parse a YANG file with a fresh parser. Imports inside that parse are still cached. */
 export function parseYangFile(path: string, options: ParseYangFileOptions = {}): YangModule {
-  if (options.includePath?.length || options.expandUses === false) {
-    const parser = new YangParser({
-      include_path: options.includePath,
-      expand_uses: options.expandUses
-    });
-    return parser.parseFile(path);
-  }
-  return defaultParser.parseFile(path);
+  const parser = new YangParser({
+    includePath: options.includePath,
+    expandUses: options.expandUses
+  });
+  return parser.parseFile(path);
 }
