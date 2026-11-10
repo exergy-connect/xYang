@@ -27,7 +27,7 @@ function parse(expandUses: boolean) {
     copyFileSync(EXT, join(dir, "ietf-yang-structure-ext@2020-06-17.yang"));
     const source = join(dir, "m.yang");
     writeFileSync(source, YANG);
-    return new YangParser({ expand_uses: expandUses }).parseFile(source);
+    return new YangParser({ expandUses: expandUses }).parseFile(source);
   } finally {
     rmSync(dir, { recursive: true, force: true });
   }
@@ -47,7 +47,7 @@ describe("post-parse pass order", () => {
     expect(children.some((child) => child.keyword === "uses")).toBe(false);
   });
 
-  it("leaves the structure index empty when expand_uses is false", () => {
+  it("leaves the structure index empty when expandUses is false", () => {
     expect(structureIndex(parse(false))).toBeUndefined();
   });
 });

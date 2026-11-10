@@ -4,6 +4,7 @@ import { YangValidator } from "./validator/yang-validator";
 import type { DetailedValidationResult, ValidationIssue, YangValidatorOptions } from "./validator/yang-validator";
 
 export { parseYangFile, parseYangString };
+export type { ParseYangFileOptions, ParseYangStringOptions } from "./parser";
 export { YangParser } from "./parser/yang-parser";
 export { YangValidator };
 export type { DetailedValidationResult, ValidationIssue, YangValidatorOptions };

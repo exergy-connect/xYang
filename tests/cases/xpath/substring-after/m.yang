@@ -1,0 +1,44 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf name {
+      type string;
+      must "substring-after(., '-') = 'b'";
+    }
+    leaf multi {
+      type string;
+      must "substring-after(., '-') = 'b-c'";
+    }
+    leaf empty-needle {
+      type string;
+      must "substring-after(., '') = .";
+    }
+    leaf no-match {
+      type string;
+      must "substring-after(., 'z') = ''";
+    }
+    leaf missing {
+      type string;
+      must "substring-after() = ''";
+    }
+    leaf one-arg {
+      type string;
+      must "substring-after(.) = ''";
+    }
+    leaf extra {
+      type string;
+      must "substring-after(., '-', 'x') = ''";
+    }
+    leaf qty {
+      type int32;
+      must "substring-after(., 1) = '23'";
+    }
+    leaf literal {
+      type string;
+      must "substring-after(12, 1) = '2'";
+    }
+  }
+}

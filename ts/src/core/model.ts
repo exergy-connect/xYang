@@ -1,3 +1,7 @@
+/**
+ * `model.ts` is the single runtime model. The `__class__` dict layer is transitional.
+ */
+
 export type ModuleSource = {
   kind: "file" | "string";
   value: string;
@@ -24,6 +28,8 @@ function asStatement(data: unknown): YangStatement | undefined {
 
 export class YangStatement {
   readonly data: SerializedStatement;
+  private statementsCache?: YangStatement[];
+  private statementsSource?: unknown;
 
   constructor(data: SerializedStatement) {
     this.data = data;
@@ -42,8 +48,14 @@ export class YangStatement {
   }
 
   get statements(): YangStatement[] {
-    const items = Array.isArray(this.data.statements) ? this.data.statements : [];
-    return items.map((item) => new YangStatement(item));
+    const raw = this.data.statements;
+    if (this.statementsCache && this.statementsSource === raw) {
+      return this.statementsCache;
+    }
+    const items = Array.isArray(raw) ? raw : [];
+    this.statementsSource = raw;
+    this.statementsCache = items.map((item) => new YangStatement(item));
+    return this.statementsCache;
   }
 
   findStatement(name: string): YangStatement | undefined {
@@ -54,6 +66,8 @@ export class YangStatement {
 export class YangModule {
   readonly data: Record<string, unknown>;
   readonly source: ModuleSource;
+  private statementsCache?: YangStatement[];
+  private statementsSource?: unknown;
 
   constructor(data: Record<string, unknown>, source: ModuleSource) {
     this.data = data;
@@ -107,10 +121,13 @@ export class YangModule {
 
   get statements(): YangStatement[] {
     const raw = this.data.statements;
-    if (!Array.isArray(raw)) {
-      return [];
+    if (this.statementsCache && this.statementsSource === raw) {
+      return this.statementsCache;
     }
-    return raw.map(asStatement).filter((stmt): stmt is YangStatement => Boolean(stmt));
+    const items = Array.isArray(raw) ? raw : [];
+    this.statementsSource = raw;
+    this.statementsCache = items.map(asStatement).filter((stmt): stmt is YangStatement => Boolean(stmt));
+    return this.statementsCache;
   }
 
   findStatement(name: string): YangStatement | undefined {

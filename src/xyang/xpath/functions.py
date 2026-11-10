@@ -9,7 +9,7 @@ from __future__ import annotations
 
 from typing import TYPE_CHECKING, Any, List, Optional
 
-from ..errors import UnsupportedXPathError
+from ..errors import UnsupportedXPathError, XPathEvaluationError
 from .ast import FunctionCallNode
 from .node import Context, Node
 
@@ -50,6 +50,56 @@ def f_string(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: No
         return ""
     v = first_value(ev.eval(ast.args[0], ctx, node))
     return "" if v is None else str(v)
+
+
+def _as_xpath_string(ev: "XPathEvaluator", arg: Any, ctx: Context, node: Node) -> str:
+    """XPath 1.0 string conversion, the same as ``string()`` for one argument."""
+    v = first_value(ev.eval(arg, ctx, node))
+    return "" if v is None else str(v)
+
+
+def _require_arity(ast: FunctionCallNode, expected: int) -> None:
+    """Wrong arity raises ``XPathEvaluationError``. Validation reports that as ``xpath-error``."""
+    if len(ast.args) != expected:
+        raise XPathEvaluationError(f"{ast.name.lower()}() expects {expected} arguments, got {len(ast.args)}")
+
+
+def f_contains(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """contains(source, needle): true when needle occurs in source. Empty needle is true."""
+    _require_arity(ast, 2)
+    source = _as_xpath_string(ev, ast.args[0], ctx, node)
+    needle = _as_xpath_string(ev, ast.args[1], ctx, node)
+    return needle in source
+
+
+def f_starts_with(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """starts-with(source, needle): true when source begins with needle. Empty needle is true."""
+    _require_arity(ast, 2)
+    source = _as_xpath_string(ev, ast.args[0], ctx, node)
+    needle = _as_xpath_string(ev, ast.args[1], ctx, node)
+    return source.startswith(needle)
+
+
+def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """Substring preceding the first needle. Empty when needle is empty or absent."""
+    _require_arity(ast, 2)
+    source = _as_xpath_string(ev, ast.args[0], ctx, node)
+    needle = _as_xpath_string(ev, ast.args[1], ctx, node)
+    index = source.find(needle)
+    if index < 0:
+        return ""
+    return source[:index]
+
+
+def f_substring_after(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """Substring following the first needle. Empty needle returns the whole source."""
+    _require_arity(ast, 2)
+    source = _as_xpath_string(ev, ast.args[0], ctx, node)
+    needle = _as_xpath_string(ev, ast.args[1], ctx, node)
+    index = source.find(needle)
+    if index < 0:
+        return ""
+    return source[index + len(needle) :]
 
 
 def f_number(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
@@ -134,9 +184,7 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
     return results
 
 
-def f_derived_from(
-    ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node
-) -> Any:
+def f_derived_from(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """derived-from(identityref, identity) — value is strict descendant of target (RFC 7950)."""
     if len(ast.args) != 2:
         return False
@@ -165,9 +213,7 @@ def f_derived_from(
     return is_derived_from_strict_qnames(mod, v1, v2)
 
 
-def f_derived_from_or_self(
-    ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node
-) -> Any:
+def f_derived_from_or_self(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """derived-from-or-self(identityref, identity) — equal or strict descendant."""
     if len(ast.args) != 2:
         return False
@@ -207,6 +253,10 @@ FUNCTIONS = {
     "boolean": f_bool,  # XPath 1.0 (RFC 7950 when/must)
     "string-length": f_string_length,
     "concat": f_concat,
+    "contains": f_contains,
+    "starts-with": f_starts_with,
+    "substring-before": f_substring_before,
+    "substring-after": f_substring_after,
     "translate": f_translate,
     "deref": f_deref,
     "derived-from": f_derived_from,
