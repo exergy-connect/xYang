@@ -1,5 +1,5 @@
 import { existsSync, readFileSync, readdirSync } from "node:fs";
-import { basename, dirname, resolve } from "node:path";
+import { dirname, resolve } from "node:path";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { ModuleSource, SerializedStatement, YangModule } from "../core/model";
@@ -156,10 +156,11 @@ export class YangParser {
       );
     }
     const expected = trimmedRev ? `${moduleBasename}@${trimmedRev}.yang` : undefined;
-    if (expected && basename(found) !== expected) {
+    const foundName = found.slice(Math.max(found.lastIndexOf("/"), found.lastIndexOf("\\")) + 1);
+    if (expected && foundName !== expected) {
       const statement = kind === "module" ? "import" : "include";
       console.warn(
-        `${statement} '${moduleBasename}' revision-date ${trimmedRev} not found; using ${basename(found)}`
+        `${statement} '${moduleBasename}' revision-date ${trimmedRev} not found; using ${foundName}`
       );
     }
     return found;
