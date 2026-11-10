@@ -471,6 +471,17 @@ def _type_to_schema_impl(
     if name == "boolean":
         return {JsonSchemaKey.TYPE: "boolean"}
     if name in YANG_INTEGER_BOUNDS:
+        if name in ("int64", "uint64"):
+            pattern = "^-?[0-9]+$" if name == "int64" else "^[0-9]+$"
+            out = {
+                JsonSchemaKey.TYPE: "string",
+                JsonSchemaKey.PATTERN: pattern,
+            }
+            xyang: dict[str, Any] = {XYangKey.TYPE: name}
+            if type_stmt.range:
+                xyang["range"] = type_stmt.range
+            out[JsonSchemaKey.X_YANG] = xyang
+            return out
         out = {JsonSchemaKey.TYPE: "integer"}
         min_v, max_v = json_integer_bounds_for_builtin(name, type_stmt.range or None)
         if min_v is not None:
@@ -479,25 +490,16 @@ def _type_to_schema_impl(
             out[JsonSchemaKey.MAXIMUM] = max_v
         return out
     if name == "decimal64":
-        out = {JsonSchemaKey.TYPE: "number"}
+        out = {
+            JsonSchemaKey.TYPE: "string",
+            JsonSchemaKey.PATTERN: "^-?[0-9]+(\\.[0-9]+)?$",
+        }
+        xyang = {XYangKey.TYPE: "decimal64"}
         if type_stmt.fraction_digits is not None:
-            fd = int(type_stmt.fraction_digits)
-            if fd > 0:
-                out[JsonSchemaKey.MULTIPLE_OF] = 10**-fd
+            xyang["fraction-digits"] = int(type_stmt.fraction_digits)
         if type_stmt.range:
-            parts = [p.strip() for p in type_stmt.range.split("..", 1)]
-            if len(parts) == 2:
-                lo, hi = parts[0], parts[1]
-                if lo.lower() != "min":
-                    try:
-                        out[JsonSchemaKey.MINIMUM] = float(lo)
-                    except ValueError:
-                        pass
-                if hi.lower() != "max":
-                    try:
-                        out[JsonSchemaKey.MAXIMUM] = float(hi)
-                    except ValueError:
-                        pass
+            xyang["range"] = type_stmt.range
+        out[JsonSchemaKey.X_YANG] = xyang
         return out
     if name == "empty":
         return {JsonSchemaKey.TYPE: "object", JsonSchemaKey.MAX_PROPERTIES: 0}

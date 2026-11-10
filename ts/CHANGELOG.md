@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- JSON Schema export types int64/uint64/decimal64 as RFC 7951 strings (#63).
 - **Numeric strings for 8/16/32-bit integers:** `int8`, `int16`, `int32`, `uint8`, `uint16`, and `uint32` reject a JSON string with `Expected integer, got string`, matching Python and the exported `"type": "integer"` schema. `int64` and `uint64` lexical strings are unchanged. The shared cross-check requires the generated schema and the validator to agree. JSON Schema for `int64`, `uint64`, and `decimal64` stays as it was: issue #63 left that out of scope ([#63](https://github.com/exergy-connect/xYang/issues/63)).
 - **RFC 8791 structure instances:** a structure is a top-level data node, written `msg` or `m:msg`. Error paths are JSON Pointers into that member (`/m:msg/n`, `/msg/n`), matching Python ([#78](https://github.com/exergy-connect/xYang/issues/78)).
 - **`empty` encoding:** shared cases confirm that `[null]` is the only valid RFC 7951 value, and `null`, `true`, and `""` are `type` errors ([#59](https://github.com/exergy-connect/xYang/issues/59)).

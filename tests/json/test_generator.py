@@ -121,8 +121,8 @@ module t {
     assert leaf.default == "2"
 
 
-def test_decimal64_emits_multiple_of_and_roundtrip_restores_fraction_digits():
-    """decimal64 fraction-digits n maps to multipleOf 10^-n in JSON Schema."""
+def test_decimal64_emits_string_pattern_and_roundtrip_restores_fraction_digits():
+    """decimal64 is an RFC 7951 string; fraction-digits and range stay in x-yang."""
     yang = """
 module t {
   yang-version 1.1;
@@ -136,8 +136,10 @@ module t {
     module = parse_yang_string(yang)
     schema = generate_json_schema(module)
     x = schema["properties"]["data-model"]["properties"]["x"]
-    assert x["type"] == "number"
-    assert x["multipleOf"] == 0.001
+    assert x["type"] == "string"
+    assert x["pattern"] == r"^-?[0-9]+(\.[0-9]+)?$"
+    assert x["x-yang"]["type"] == "decimal64"
+    assert x["x-yang"]["fraction-digits"] == 3
 
     module2 = parse_json_schema(schema)
     dm = module2.statements[0]

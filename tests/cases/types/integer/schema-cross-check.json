@@ -1,5 +1,5 @@
 {
-  "description": "Generated JSON Schema and the validator agree. RFC 7951 encodes 8/16/32-bit integers as JSON numbers. int64 strings are validator-valid and are not listed: issue #63 left JSON Schema for int64, uint64, and decimal64 out of scope.",
+  "description": "Generated JSON Schema and the validator agree. RFC 7951 encodes 8/16/32-bit integers as JSON numbers and int64 as a string.",
   "module": "m.yang",
   "instances": [
     { "name": "uint8 in range", "data": { "top": { "u8": 5 } }, "valid": true },
@@ -17,6 +17,8 @@
     { "name": "int8 below builtin", "data": { "top": { "i8": -129 } }, "valid": false },
     { "name": "restricted in range", "data": { "top": { "small": -10 } }, "valid": true },
     { "name": "restricted below range", "data": { "top": { "small": -11 } }, "valid": false },
-    { "name": "restricted numeric string", "data": { "top": { "small": "0" } }, "valid": false }
+    { "name": "restricted numeric string", "data": { "top": { "small": "0" } }, "valid": false },
+    { "name": "int64 string", "data": { "top": { "big": "9007199254740993" } }, "valid": true },
+    { "name": "int64 json number", "data": { "top": { "big": 5 } }, "valid": false }
   ]
 }
