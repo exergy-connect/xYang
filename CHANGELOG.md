@@ -20,12 +20,15 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
-- **Tests:** removed per-language tests whose valid/invalid outcome is already covered by a shared case in `tests/cases/`. Bits (empty, duplicate token, non-string), bits-in-union, duplicate bit names, empty enumerations, and `if-feature` on a list moved into shared cases. TypeScript still accepts duplicate bit names; that case is an expected failure.
+- **Tests:** removed per-language tests whose valid/invalid outcome is already covered by a shared case in `tests/cases/`. Bits (empty, duplicate token, non-string), bits-in-union, duplicate bit names, empty enumerations, and `if-feature` on a list moved into shared cases.
 - **Breaking:** GitHub Action `xyang-ts` input `ref` is replaced by `version` (a release tag, default `latest`). The action downloads `xyang-ts.mjs` from GitHub Release assets instead of checking out a committed bundle. The `path` input and `xyang-root` output are removed (#89).
 - CI no longer commits `artifacts/xyang-ts.mjs` or `docs/xyang.umd.min.js`. A published release builds them with `npm run build:ci` and attaches them; pull-request CI only runs that build as a check and does not push commits (#89).
 
 ### Fixed
 
+- **Parser (Python + TypeScript):** an unquoted `if-feature` argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).
+- **Import revision-date (Python + TypeScript):** when `import x { revision-date R; }` does not find `x@R.yang`, the parser warns with the file it opened (`import 'x' revision-date R not found; using ...`) instead of falling back silently. An exact revision file is chosen ahead of a newer `x@*.yang`. A missing import reports `Could not find module`, not `submodule` ([#66](https://github.com/exergy-connect/xYang/issues/66)).
+- **TypeScript:** a `bits` type that declares the same bit name twice is a parse error (`Duplicate bit name`), matching Python ([#93](https://github.com/exergy-connect/xYang/issues/93)).
 - **TypeScript parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set — the same gate and order as Python ([#75](https://github.com/exergy-connect/xYang/issues/75)).
 - **Python validation:** multi-part `range` and `length` restrictions keep every part. A value is accepted when it falls in at least one part, and an integer is still checked against its built-in minimum and maximum when a `range` is present (`range "1..3 | 10..max"` rejects `4` and `5`, and values above the type's maximum) ([#54](https://github.com/exergy-connect/xYang/issues/54)).
 - **Validation (Python + TypeScript):** a `range`, `length`, or `pattern` on a `type` that names a typedef is applied after that typedef's own restrictions, so a derived typedef or a leaf can narrow a range ([#56](https://github.com/exergy-connect/xYang/issues/56)).

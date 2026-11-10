@@ -1,7 +1,6 @@
 {
-  "description": "A bits type cannot declare the same bit name twice.",
+  "description": "A bits type cannot declare the same bit name twice (#93).",
   "module": "m.yang",
   "schema_error": true,
-  "code": "Duplicate bit",
-  "xfail": { "ts": "duplicate bit names are accepted when the module is parsed" }
+  "code": "Duplicate bit"
 }

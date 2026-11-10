@@ -11,6 +11,9 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **`if-feature`:** an unquoted argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).
+- **Import revision-date:** when `import x { revision-date R; }` does not find `x@R.yang`, the parser warns with the file it opened (`import 'x' revision-date R not found; using ...`) instead of falling back silently. Search order matches Python: exact names in every directory, then the last sorted `x@*.yang` in the first directory that has one. A missing import reports `Could not find module` ([#66](https://github.com/exergy-connect/xYang/issues/66)).
+- **`bits`:** a type that declares the same bit name twice is a parse error (`Duplicate bit name`), matching Python ([#93](https://github.com/exergy-connect/xYang/issues/93)).
 - **Include:** `include` loads the submodule and merges its data nodes, typedefs, identities, groupings, and features into the parent module. `belongs-to`, duplicate names, and circular includes are rejected ([#55](https://github.com/exergy-connect/xYang/issues/55)).
 - **`augment` inside `uses`:** augment substatements are kept on the `uses` node and applied to the expanded grouping before `refine`, so a refine can target a node the augment added. `uses` of the module's own prefix resolves locally. Notification bodies validate like containers, and augmented nodes accept their RFC 7951 `module:name` member ([#62](https://github.com/exergy-connect/xYang/issues/62)).
 - **Post-parse order:** uses expansion, then `augment`, then RFC 8791 extension indexing, and only when `expand_uses` is set. `sx:structure` indexing sees the expanded tree; with `expand_uses: false` the structure index is absent ([#75](https://github.com/exergy-connect/xYang/issues/75)).
