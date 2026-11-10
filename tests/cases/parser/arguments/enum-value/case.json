@@ -1,0 +1,8 @@
+{
+  "description": "RFC 7950 9.6.4: enum value 0 and value \"1\" are integers (#115).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "unquoted value", "data": { "top": { "a": "zero" } }, "valid": true },
+    { "name": "quoted value", "data": { "top": { "a": "one" } }, "valid": true }
+  ]
+}

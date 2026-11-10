@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 6.1.3: an unquoted namespace URI is one argument, the same as the quoted form (#115).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "unquoted namespace loads", "data": { "top": { "a": "x" } }, "valid": true }
+  ]
+}

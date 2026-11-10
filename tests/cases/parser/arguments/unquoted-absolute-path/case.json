@@ -1,0 +1,7 @@
+{
+  "description": "An unquoted argument may start with / (augment /m:top and augment \"/m:top\") (#115).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "both augments apply", "data": { "top": { "a": "x", "u": "u", "q": "q" } }, "valid": true }
+  ]
+}

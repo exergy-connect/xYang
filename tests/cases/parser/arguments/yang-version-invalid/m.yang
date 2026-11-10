@@ -1,0 +1,5 @@
+module m {
+  yang-version 2;
+  namespace "urn:m";
+  prefix m;
+}

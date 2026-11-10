@@ -109,6 +109,7 @@ export class TypeStatementParser {
   }
 
   parse_type_length(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+    // One string: ``1..127`` or ``"1..127"``.
     tokens.consume(kw.LENGTH);
     type_stmt.length = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -126,12 +127,38 @@ export class TypeStatementParser {
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
-  parse_type_enum(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+  parse_type_enum(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.ENUM);
-    type_stmt.enums.push(tokens.consume());
+    const enumName = tokens.consume();
+    type_stmt.enums.push(enumName);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        tokens.consume();
+        const pt = this.parsers.dispatch_key(tokens);
+        if (pt === kw.DESCRIPTION) {
+          this.parsers.parse_description(tokens, context);
+        } else if (pt === kw.REFERENCE) {
+          this.parsers.parse_reference(tokens, context);
+        } else if (pt === kw.IF_FEATURE) {
+          this.parsers.feature_parser.parse_if_feature_stmt(tokens, context);
+        } else if (pt === kw.VALUE) {
+          tokens.consume(kw.VALUE);
+          const raw = this.parsers.parse_string_argument(tokens);
+          if (!/^[+-]?\d+$/.test(raw)) {
+            tokens.syntaxError(`value argument must be an integer, got '${raw}'`);
+          }
+          tokens.consume_if_type(YangTokenType.SEMICOLON);
+        } else if (pt === kw.STATUS) {
+          tokens.consume(kw.STATUS);
+          tokens.consume_type(YangTokenType.IDENTIFIER);
+          tokens.consume_if_type(YangTokenType.SEMICOLON);
+        } else if (
+          tokens.peek_type() === YangTokenType.IDENTIFIER &&
+          tokens.peek_type_at(1) === YangTokenType.COLON
+        ) {
+          this.parsers.parse_prefixed_extension_statement_public(tokens, context);
+        } else {
+          this.parsers.skip_unsupported_or_raise_unknown(tokens, `enum '${enumName}'`);
+        }
       }
       tokens.consume_type(YangTokenType.RBRACE);
     }

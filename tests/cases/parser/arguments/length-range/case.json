@@ -1,0 +1,11 @@
+{
+  "description": "RFC 7950 9.4.4: length 1..127 and length \"1..127\" are the same argument (#115).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "both in range", "data": { "top": { "plain": "a", "quoted": "a" } }, "valid": true },
+    { "name": "unquoted length", "data": { "top": { "plain": "", "quoted": "a" } }, "valid": false,
+      "errors": [{ "path": "/top/plain", "code": "length" }] },
+    { "name": "quoted length", "data": { "top": { "plain": "a", "quoted": "" } }, "valid": false,
+      "errors": [{ "path": "/top/quoted", "code": "length" }] }
+  ]
+}

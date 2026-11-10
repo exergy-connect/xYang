@@ -4,6 +4,8 @@ Statement parsers for YANG statements.
 
 from __future__ import annotations
 
+import re
+
 from . import keywords as kw
 
 from types import SimpleNamespace
@@ -203,19 +205,9 @@ class StatementParsers:
         if not tokens.has_more():
             return None
         tt = tokens.peek_type()
-        if tt in (YangTokenType.LBRACE, YangTokenType.SEMICOLON):
+        if tt in (YangTokenType.LBRACE, YangTokenType.SEMICOLON, YangTokenType.RBRACE):
             return None
-        if tt == YangTokenType.STRING:
-            return self.parse_string_concatenation(tokens)
-        if tt in (
-            YangTokenType.IDENTIFIER,
-            YangTokenType.INTEGER,
-            YangTokenType.DOTTED_NUMBER,
-        ):
-            return tokens.consume()
-        if tokens.peek() in (kw.TRUE, kw.FALSE):
-            return tokens.consume()
-        return None
+        return self.parse_string_argument(tokens)
 
     def _parse_extension_invocation_substatement(
         self,
@@ -452,7 +444,7 @@ class StatementParsers:
     def parse_min_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse min-elements (list, leaf-list, or refine)."""
         tokens.consume(kw.MIN_ELEMENTS)
-        value = int(tokens.consume_type(YangTokenType.INTEGER))
+        value = self.parse_integer_or_unbounded(tokens, "min-elements")
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
             parent.min_elements = value
@@ -463,7 +455,7 @@ class StatementParsers:
     def parse_max_elements(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse max-elements (list, leaf-list, or refine)."""
         tokens.consume(kw.MAX_ELEMENTS)
-        value = int(tokens.consume_type(YangTokenType.INTEGER))
+        value = self.parse_integer_or_unbounded(tokens, "max-elements")
         parent = context.current_parent
         if isinstance(parent, YangRefineStmt):
             parent.max_elements = value
@@ -560,18 +552,68 @@ class StatementParsers:
             setattr(parent, "units", units)
 
     def parse_string_concatenation(self, tokens: TokenStream) -> str:
-        """Consume one or more STRING tokens with optional PLUS between; return concatenated string."""
+        """Quoted string with ``+`` concatenation, or one unquoted argument."""
+        if not tokens.has_more() or tokens.peek_type() != YangTokenType.STRING:
+            return self.parse_string_argument(tokens)
         parts = [tokens.consume_type(YangTokenType.STRING)]
         while tokens.has_more() and tokens.peek_type() == YangTokenType.PLUS:
             tokens.consume_type(YangTokenType.PLUS)
+            if not tokens.has_more() or tokens.peek_type() != YangTokenType.STRING:
+                raise tokens.make_error("Expected quoted string after '+'")
             parts.append(tokens.consume_type(YangTokenType.STRING))
         return "".join(parts)
 
     def parse_string_argument(self, tokens: TokenStream) -> str:
-        """Parse a YANG string argument (quoted concat or a single lexical token)."""
+        """One statement argument: quoted string (``+`` concatenation) or an unquoted run.
+
+        The unquoted form runs up to whitespace, ``;``, or ``{`` and may contain
+        ``:``, ``/``, ``.``, and digits (RFC 7950 §6.1.3).
+        """
+        if not tokens.has_more():
+            raise tokens.make_error("Expected statement argument, got 'end'")
         if tokens.peek_type() == YangTokenType.STRING:
             return self.parse_string_concatenation(tokens)
-        return tokens.consume().strip("\"'")
+        return self._read_unquoted_argument(tokens)
+
+    def _read_unquoted_argument(self, tokens: TokenStream) -> str:
+        """Concatenate lexemes that are adjacent in the source."""
+        stop = (
+            YangTokenType.SEMICOLON,
+            YangTokenType.LBRACE,
+            YangTokenType.RBRACE,
+            YangTokenType.STRING,
+        )
+        parts: list[str] = []
+        prev_line: int | None = None
+        prev_end: int | None = None
+        while tokens.has_more():
+            tok = tokens.peek_token()
+            if tok is None or tok.type in stop:
+                break
+            if prev_end is not None and (tok.line_num != prev_line or tok.char_pos != prev_end):
+                break
+            parts.append(tok.value)
+            prev_line = tok.line_num
+            prev_end = tok.char_pos + len(tok.value)
+            tokens.consume()
+        if not parts:
+            got = tokens.peek() if tokens.has_more() else "end"
+            raise tokens.make_error(f"Expected statement argument, got {got!r}")
+        return "".join(parts)
+
+    def parse_integer_or_unbounded(self, tokens: TokenStream, statement: str) -> int | None:
+        """``min-elements`` / ``max-elements``: an integer or ``unbounded``.
+
+        ``unbounded`` is stored as ``None`` (no bound). Invalid text is a syntax error.
+        """
+        raw = self.parse_string_argument(tokens)
+        if raw == "unbounded":
+            return None
+        if re.fullmatch(r"[+-]?\d+", raw) is None:
+            raise tokens.make_error(
+                f"{statement} argument must be an integer or 'unbounded', got {raw!r}"
+            )
+        return int(raw)
 
     def parse_must(self, tokens: TokenStream, context: ParserContext) -> YangMustStmt:
         return self._must_parser.parse_must(tokens, context)

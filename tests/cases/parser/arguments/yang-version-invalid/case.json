@@ -1,0 +1,6 @@
+{
+  "description": "yang-version 2 is a syntax error naming the statement and the value (#115).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "yang-version argument must be '1' or '1.1'"
+}

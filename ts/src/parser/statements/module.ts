@@ -18,14 +18,17 @@ export class ModuleStatementParser {
 
   parse_yang_version(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.YANG_VERSION);
-    const [version] = tokens.consume_oneof([YangTokenType.IDENTIFIER, YangTokenType.DOTTED_NUMBER]);
+    const version = this.parsers.parse_string_argument(tokens);
+    if (version !== "1" && version !== "1.1") {
+      tokens.syntaxError(`yang-version argument must be '1' or '1.1', got '${version}'`);
+    }
     (context.module as any).yang_version = version;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_namespace(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.NAMESPACE);
-    (context.module as any).namespace = tokens.consume_type(YangTokenType.STRING);
+    (context.module as any).namespace = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
