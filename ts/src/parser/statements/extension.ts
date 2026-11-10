@@ -12,14 +12,7 @@ export class ExtensionStatementParser {
     const ext = new YangExtensionStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(ext);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = this.parsers.dispatch_key(tokens);
-        if (tt === kw.ARGUMENT) {
-          this.parse_extension_argument_stmt(tokens, child);
-        } else {
-          this.parsers.parseStatement(tokens, child);
-        }
-      }
+      this.parsers.parseBody(tokens, child, "extension", `extension '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     (context.module as any).extensions[name] = ext;
@@ -38,17 +31,18 @@ export class ExtensionStatementParser {
       parent.argument_name = arg;
     }
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek() === kw.YIN_ELEMENT) {
-          tokens.consume(kw.YIN_ELEMENT);
-          const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
-          parent.argument_yin_element = tt === kw.TRUE;
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else {
-          this.parsers.parseStatement(tokens, context);
-        }
-      }
+      this.parsers.parseBody(tokens, context, "argument", "extension argument");
       tokens.consume_type(YangTokenType.RBRACE);
+    }
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_yin_element(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.YIN_ELEMENT);
+    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
+    const parent = context.current_parent;
+    if (parent instanceof YangExtensionStmt) {
+      parent.argument_yin_element = tt === kw.TRUE;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

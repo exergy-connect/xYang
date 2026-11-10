@@ -12,9 +12,7 @@ export class AnydataStatementParser {
     const stmt = new YangAnydataStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "anydata", `anydata '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     this.parsers.add_to_parent_or_module(context, stmt);

@@ -13,9 +13,7 @@ export class WhenStatementParser {
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(whenStmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "when", "when");
       tokens.consume_type(YangTokenType.RBRACE);
     }
 

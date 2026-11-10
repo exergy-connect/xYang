@@ -8,6 +8,7 @@ import re
 
 from .. import keywords as kw
 
+from types import SimpleNamespace
 from typing import TYPE_CHECKING, cast
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
@@ -24,21 +25,7 @@ class TypeStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._type_substatement_dispatch = {
-            kw.TYPE: lambda t, c, _s: self.parse_type(t, c),
-            kw.PATTERN: self.parse_type_pattern,
-            kw.LENGTH: self.parse_type_length,
-            kw.RANGE: self.parse_type_range,
-            kw.FRACTION_DIGITS: self.parse_type_fraction_digits,
-            kw.ENUM: self.parse_type_enum,
-            kw.BIT: self._parsers._bits_parser.parse_type_bit,
-            kw.PATH: self.parse_type_path,
-            kw.REQUIRE_INSTANCE: self.parse_type_require_instance,
-            kw.BASE: self.parse_type_base,
-            kw.UNITS: lambda t, c, _s: self._parsers.parse_units(t, c),
-            kw.DESCRIPTION: lambda t, c, _s: self._parsers.parse_description(t, c),
-            kw.REFERENCE: lambda t, c, _s: self._parsers.parse_reference(t, c),
-        }
+        self._pattern_stack: list[SimpleNamespace] = []
 
     def _parse_type_substatement(
         self,
@@ -47,18 +34,14 @@ class TypeStatementParser:
         type_stmt: YangTypeStmt,
         type_name: str,
     ) -> None:
-        """Parse one substatement inside ``type { ... }`` without registry indirection."""
-        handler = self._parsers.substatement_handler(tokens, self._type_substatement_dispatch)
-        if handler:
-            handler(tokens, context, type_stmt)
-            return
-        if self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-            return
-        if self._parsers.skip_unsupported_or_raise_unknown_stmt(
-            tokens, f"type '{type_name}'"
-        ):
-            return
+        """Parse one substatement inside ``type { ... }``."""
+        self._parsers.dispatch_substatement(
+            tokens,
+            context,
+            "type",
+            type_stmt,
+            error_context=f"type '{type_name}'",
+        )
 
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
@@ -117,36 +100,17 @@ class TypeStatementParser:
         """Parse ``pattern`` (RFC 7950 §9.4.6): string argument, then ``;`` or substatement block."""
         tokens.consume(kw.PATTERN)
         pattern = self._parsers.parse_string_concatenation(tokens)
-        invert_match = False
-        pattern_error_message = None
-        pattern_error_app_tag = None
-        if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                pt = self._parsers.dispatch_key(tokens)
-                if pt == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, context)
-                elif pt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, context)
-                elif pt == kw.ERROR_MESSAGE:
-                    tokens.consume(kw.ERROR_MESSAGE)
-                    pattern_error_message = self._parsers.parse_string_concatenation(tokens)
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif pt == kw.ERROR_APP_TAG:
-                    tokens.consume(kw.ERROR_APP_TAG)
-                    pattern_error_app_tag = self._parsers.parse_string_concatenation(tokens)
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif pt == kw.MODIFIER:
-                    tokens.consume(kw.MODIFIER)
-                    modifier = tokens.consume()
-                    invert_match = modifier == "invert-match"
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif self._parsers.is_prefixed_extension_start(tokens):
-                    self._parsers.parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "pattern"
-                ):
-                    pass
-            tokens.consume_type(YangTokenType.RBRACE)
+        acc = SimpleNamespace(error_message=None, error_app_tag=None, invert_match=False)
+        self._pattern_stack.append(acc)
+        try:
+            if tokens.consume_if_type(YangTokenType.LBRACE):
+                self._parsers.parse_body(tokens, context, "pattern", error_context="pattern")
+                tokens.consume_type(YangTokenType.RBRACE)
+        finally:
+            self._pattern_stack.pop()
+        pattern_error_message = acc.error_message
+        pattern_error_app_tag = acc.error_app_tag
+        invert_match = acc.invert_match
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         spec = YangPatternSpec(
             pattern=pattern,
@@ -180,32 +144,9 @@ class TypeStatementParser:
         enum_name = tokens.consume()  # identifier or keyword (e.g. string, boolean)
         type_stmt.enums.append(enum_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                pt = self._parsers.dispatch_key(tokens)
-                if pt == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, context)
-                elif pt == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, context)
-                elif pt == kw.IF_FEATURE:
-                    self._parsers.parse_if_feature_stmt(tokens, context)
-                elif pt == kw.VALUE:
-                    tokens.consume(kw.VALUE)
-                    raw = self._parsers.parse_string_argument(tokens)
-                    if re.fullmatch(r"[+-]?\d+", raw) is None:
-                        raise tokens.make_error(
-                            f"value argument must be an integer, got {raw!r}"
-                        )
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif pt == kw.STATUS:
-                    tokens.consume(kw.STATUS)
-                    tokens.consume_type(YangTokenType.IDENTIFIER)
-                    tokens.consume_if_type(YangTokenType.SEMICOLON)
-                elif self._parsers.is_prefixed_extension_start(tokens):
-                    self._parsers.parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, f"enum '{enum_name}'"
-                ):
-                    pass
+            self._parsers.parse_body(
+                tokens, context, "enum", error_context=f"enum '{enum_name}'"
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -221,4 +162,32 @@ class TypeStatementParser:
         tokens.consume(kw.REQUIRE_INSTANCE)
         _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
         type_stmt.require_instance = tt == kw.TRUE
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_pattern_error_message(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.ERROR_MESSAGE)
+        self._pattern_stack[-1].error_message = self._parsers.parse_string_concatenation(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_pattern_error_app_tag(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.ERROR_APP_TAG)
+        self._pattern_stack[-1].error_app_tag = self._parsers.parse_string_concatenation(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_pattern_modifier(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.MODIFIER)
+        modifier = tokens.consume()
+        self._pattern_stack[-1].invert_match = modifier == "invert-match"
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_enum_value(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.VALUE)
+        raw = self._parsers.parse_string_argument(tokens)
+        if re.fullmatch(r"[+-]?\d+", raw) is None:
+            raise tokens.make_error(f"value argument must be an integer, got {raw!r}")
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_enum_status(self, tokens: TokenStream, _context: ParserContext) -> None:
+        tokens.consume(kw.STATUS)
+        tokens.consume_type(YangTokenType.IDENTIFIER)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

@@ -1,0 +1,6 @@
+{
+  "description": "An unknown keyword under leaf is a syntax error naming the parent and the keyword (#121).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Invalid or unknown statement in leaf 'top': 'not-a-keyword'"
+}

@@ -9,23 +9,29 @@ export class BitsStatementParser {
   parse_type_bit(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.BIT);
     const name = tokens.consume();
-    let position: number | undefined;
+    const bit = new YangBitStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek() === kw.POSITION) {
-          tokens.consume(kw.POSITION);
-          position = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else {
-          this.parsers.parseStatement(tokens, context);
-        }
-      }
+      const child = context.push_parent(bit);
+      this.parsers.parseBody(tokens, child, "bit", "bit");
       tokens.consume_type(YangTokenType.RBRACE);
     }
-    if (type_stmt.bits.some((bit) => bit.name === name)) {
+    if (type_stmt.bits.some((existing) => existing.name === name)) {
       tokens.syntaxError(`Duplicate bit name '${name}' in bits type`);
     }
-    type_stmt.bits.push(new YangBitStmt({ name, position }));
+    type_stmt.bits.push(bit);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_bit_position(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.POSITION);
+    const parent = context.current_parent;
+    if (parent instanceof YangBitStmt && parent.position !== undefined) {
+      tokens.syntaxError("Duplicate position in bit statement");
+    }
+    const position = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
+    if (parent instanceof YangBitStmt) {
+      parent.position = position;
+    }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

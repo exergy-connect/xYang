@@ -23,30 +23,6 @@ class SubmoduleStatementParser:
     ) -> None:
         self._parsers = parsers
         self._module_parser = module_parser
-        self._submodule_dispatch = {
-            kw.YANG_VERSION: self._module_parser.parse_yang_version,
-            kw.ORGANIZATION: self._module_parser.parse_organization,
-            kw.CONTACT: self._module_parser.parse_contact,
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.REFERENCE: self._parsers.parse_reference,
-            kw.IMPORT: self._module_parser.parse_import_stmt,
-            kw.INCLUDE: self._module_parser.parse_include_stmt,
-            kw.REVISION: self._parsers.parse_revision,
-            kw.FEATURE: self._parsers.parse_feature_stmt,
-            kw.EXTENSION: self._parsers.parse_extension_stmt,
-            kw.TYPEDEF: self._parsers.parse_typedef,
-            kw.IDENTITY: self._parsers.parse_identity,
-            kw.GROUPING: self._parsers.parse_grouping,
-            kw.AUGMENT: self._parsers.parse_augment,
-            kw.DEVIATION: self._parsers.parse_deviation,
-            kw.CONTAINER: self._parsers.parse_container,
-            kw.LIST: self._parsers.parse_list,
-            kw.LEAF: self._parsers.parse_leaf,
-            kw.LEAF_LIST: self._parsers.parse_leaf_list,
-            kw.ANYDATA: self._parsers.parse_anydata,
-            kw.ANYXML: self._parsers.parse_anyxml,
-            kw.NOTIFICATION: self._parsers.parse_notification,
-        }
 
     def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse submodule statement (YANG 1.1)."""
@@ -64,27 +40,15 @@ class SubmoduleStatementParser:
     def _parse_submodule_statement(
         self, tokens: TokenStream, context: ParserContext
     ) -> None:
-        handler = self._parsers.substatement_handler(tokens, self._submodule_dispatch)
-        if handler:
-            handler(tokens, context)
-            return
-        if self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-            return
-        if self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, "submodule body"):
-            return
+        self._parsers.dispatch_substatement(
+            tokens, context, "submodule", error_context="submodule body"
+        )
 
     def _parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume(kw.BELONGS_TO)
         parent_module = tokens.consume_type(YangTokenType.IDENTIFIER)
         context.module.belongs_to_module = parent_module
         tokens.consume_type(YangTokenType.LBRACE)
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-            if tokens.peek() == kw.PREFIX:
-                self._module_parser.parse_prefix_value_stmt(tokens, context)
-            elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                tokens, "belongs-to"
-            ):
-                continue
+        self._parsers.parse_body(tokens, context, "belongs-to", error_context="belongs-to")
         tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

@@ -5,6 +5,8 @@ import { parseXPathPath } from "../../xpath/parser";
 import type { StatementParsers } from "../statement-parsers";
 
 export class TypeStatementParser {
+  private patternBody: { errorMessage?: string; errorAppTag?: string; invert: boolean } | undefined;
+
   constructor(private readonly parsers: StatementParsers) {}
 
   parse_type(tokens: TokenStream, context: ParserContext): YangTypeStmt {
@@ -22,33 +24,7 @@ export class TypeStatementParser {
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(type_stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = this.parsers.dispatch_key(tokens);
-        if (tt === kw.PATTERN) {
-          this.parse_type_pattern(tokens, child, type_stmt);
-        } else if (tt === kw.LENGTH) {
-          this.parse_type_length(tokens, child, type_stmt);
-        } else if (tt === kw.RANGE) {
-          this.parse_type_range(tokens, child, type_stmt);
-        } else if (tt === kw.FRACTION_DIGITS) {
-          this.parse_type_fraction_digits(tokens, child, type_stmt);
-        } else if (tt === kw.ENUM) {
-          this.parse_type_enum(tokens, child, type_stmt);
-        } else if (tt === kw.BIT) {
-          this.parsers.bits_parser.parse_type_bit(tokens, child, type_stmt);
-        } else if (tt === kw.PATH) {
-          this.parse_type_path(tokens, child, type_stmt);
-        } else if (tt === kw.REQUIRE_INSTANCE) {
-          this.parse_type_require_instance(tokens, child, type_stmt);
-        } else if (tt === kw.BASE) {
-          this.parse_type_base(tokens, child, type_stmt);
-        } else if (tt === kw.TYPE) {
-          const nested = this.parse_type(tokens, child);
-          type_stmt.types.push(nested);
-        } else {
-          this.parsers.parseStatement(tokens, child);
-        }
-      }
+      this.parsers.parseBody(tokens, child, "type", `type '${name}'`, type_stmt);
       tokens.consume_type(YangTokenType.RBRACE);
       if (type_stmt.name === kw.ENUMERATION && type_stmt.enums.length === 0) {
         tokens.syntaxError("enumeration type must contain at least one enum statement");
@@ -76,26 +52,17 @@ export class TypeStatementParser {
     let invertMatch = false;
     let patternErrorMessage: string | undefined;
     let patternErrorAppTag: string | undefined;
-    if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const tt = this.parsers.dispatch_key(tokens);
-        if (tt === kw.ERROR_MESSAGE) {
-          tokens.consume(kw.ERROR_MESSAGE);
-          patternErrorMessage = this.parsers.parse_string_concatenation(tokens);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (tt === kw.ERROR_APP_TAG) {
-          tokens.consume(kw.ERROR_APP_TAG);
-          patternErrorAppTag = this.parsers.parse_string_concatenation(tokens);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (tt === kw.MODIFIER) {
-          tokens.consume(kw.MODIFIER);
-          invertMatch = tokens.consume() === "invert-match";
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else {
-          this.parsers.parseStatement(tokens, _context);
-        }
+    this.patternBody = { invert: false };
+    try {
+      if (tokens.consume_if_type(YangTokenType.LBRACE)) {
+        this.parsers.parseBody(tokens, _context, "pattern", "pattern");
+        tokens.consume_type(YangTokenType.RBRACE);
       }
-      tokens.consume_type(YangTokenType.RBRACE);
+      invertMatch = this.patternBody.invert;
+      patternErrorMessage = this.patternBody.errorMessage;
+      patternErrorAppTag = this.patternBody.errorAppTag;
+    } finally {
+      this.patternBody = undefined;
     }
     type_stmt.patterns.push(
       new YangPatternSpec({
@@ -132,34 +99,7 @@ export class TypeStatementParser {
     const enumName = tokens.consume();
     type_stmt.enums.push(enumName);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const pt = this.parsers.dispatch_key(tokens);
-        if (pt === kw.DESCRIPTION) {
-          this.parsers.parse_description(tokens, context);
-        } else if (pt === kw.REFERENCE) {
-          this.parsers.parse_reference(tokens, context);
-        } else if (pt === kw.IF_FEATURE) {
-          this.parsers.feature_parser.parse_if_feature_stmt(tokens, context);
-        } else if (pt === kw.VALUE) {
-          tokens.consume(kw.VALUE);
-          const raw = this.parsers.parse_string_argument(tokens);
-          if (!/^[+-]?\d+$/.test(raw)) {
-            tokens.syntaxError(`value argument must be an integer, got '${raw}'`);
-          }
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (pt === kw.STATUS) {
-          tokens.consume(kw.STATUS);
-          tokens.consume_type(YangTokenType.IDENTIFIER);
-          tokens.consume_if_type(YangTokenType.SEMICOLON);
-        } else if (
-          tokens.peek_type() === YangTokenType.IDENTIFIER &&
-          tokens.peek_type_at(1) === YangTokenType.COLON
-        ) {
-          this.parsers.parse_prefixed_extension_statement_public(tokens, context);
-        } else {
-          this.parsers.skip_unsupported_or_raise_unknown(tokens, `enum '${enumName}'`);
-        }
-      }
+      this.parsers.parseBody(tokens, context, "enum", `enum '${enumName}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -176,6 +116,39 @@ export class TypeStatementParser {
     tokens.consume(kw.REQUIRE_INSTANCE);
     const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
     type_stmt.require_instance = tt === kw.TRUE;
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_pattern_error_message(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.ERROR_MESSAGE);
+    this.patternBody!.errorMessage = this.parsers.parse_string_concatenation(tokens);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_pattern_error_app_tag(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.ERROR_APP_TAG);
+    this.patternBody!.errorAppTag = this.parsers.parse_string_concatenation(tokens);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_pattern_modifier(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.MODIFIER);
+    this.patternBody!.invert = tokens.consume() === "invert-match";
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_enum_value(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.VALUE);
+    const raw = this.parsers.parse_string_argument(tokens);
+    if (!/^[+-]?\d+$/.test(raw)) {
+      tokens.syntaxError(`value argument must be an integer, got '${raw}'`);
+    }
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_enum_status(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.STATUS);
+    tokens.consume_type(YangTokenType.IDENTIFIER);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 }

@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
-from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangCaseStmt, YangChoiceStmt
 
@@ -32,48 +31,17 @@ class ChoiceStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._choice_substatement_dispatch = with_data_node_substatements(
-            self._parsers,
-            {
-                kw.WHEN: self._parsers.parse_when,
-                kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-                kw.CASE: self.parse_case,
-                kw.MANDATORY: self.parse_choice_mandatory,
-                kw.DEFAULT: self.parse_choice_default,
-            },
-        )
-        self._case_substatement_dispatch = with_data_node_substatements(
-            self._parsers,
-            {
-            kw.WHEN: self._parsers.parse_when,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.USES: self._parsers.parse_uses,
-            kw.LEAF: self._parsers.parse_leaf,
-            kw.CONTAINER: self._parsers.parse_container,
-            kw.LIST: self._parsers.parse_list,
-            kw.LEAF_LIST: self._parsers.parse_leaf_list,
-            kw.ANYDATA: self._parsers.parse_anydata,
-            kw.ANYXML: self._parsers.parse_anyxml,
-            kw.CHOICE: self.parse_choice,
-            },
-        )
 
     def _parse_choice_substatement(
         self, tokens: TokenStream, context: ParserContext, choice_name: str
     ) -> None:
-        unsupported = f"choice '{choice_name}'"
-        handler = self._parsers.substatement_handler(tokens, self._choice_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-            return
         key = self._parsers.dispatch_key(tokens)
         if isinstance(key, str) and key in _INLINE_CHOICE_SCHEMA_KEYS:
             self._parse_choice_implicit_case(tokens, context)
             return
-        if self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-            return
-        self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported)
+        self._parsers.dispatch_substatement(
+            tokens, context, "choice", error_context=f"choice '{choice_name}'"
+        )
 
     def _parse_choice_implicit_case(
         self, tokens: TokenStream, context: ParserContext
@@ -84,8 +52,9 @@ class ChoiceStatementParser:
             raise tokens.make_error("internal: implicit choice case outside choice body")
         case_stmt = YangCaseStmt(name="")
         case_ctx = context.push_parent(case_stmt)
-        handler = self._parsers.substatement_handler(
-            tokens, self._case_substatement_dispatch
+        key = self._parsers.dispatch_key(tokens)
+        handler = (
+            self._parsers.handler_for("case", key) if isinstance(key, str) else None
         )
         if handler is None:
             raise tokens.make_error(
@@ -108,14 +77,9 @@ class ChoiceStatementParser:
     def _parse_case_substatement(
         self, tokens: TokenStream, context: ParserContext, case_name: str
     ) -> None:
-        unsupported = f"case '{case_name}'"
-        handler = self._parsers.substatement_handler(tokens, self._case_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-        elif self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, unsupported):
-            return
+        self._parsers.dispatch_substatement(
+            tokens, context, "case", error_context=f"case '{case_name}'"
+        )
 
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
         """Parse choice statement."""

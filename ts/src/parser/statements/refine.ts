@@ -18,9 +18,7 @@ export class RefineStatementParser {
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "refine", `refine '${target_path}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
 

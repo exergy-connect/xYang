@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Optional
 
 from .. import keywords as kw
 
-from ..metadata_substatements import with_metadata_substatements
 from ..parser_context import TokenStream, ParserContext, YangTokenType
 from ...ast import (
     YangChoiceStmt,
@@ -31,14 +30,6 @@ class TypedefStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._typedef_body_dispatch = with_metadata_substatements(
-            self._parsers,
-            {
-                kw.TYPE: self._parsers.parse_type,
-                kw.UNITS: self._parsers.parse_units,
-                kw.DEFAULT: self._parsers.parse_typedef_default,
-            },
-        )
 
     def parse_typedef(
         self, tokens: TokenStream, context: ParserContext
@@ -51,14 +42,9 @@ class TypedefStatementParser:
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(typedef_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                handler = self._parsers.substatement_handler(tokens, self._typedef_body_dispatch)
-                if handler:
-                    handler(tokens, new_context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, unsupported_ctx
-                ):
-                    continue
+            self._parsers.parse_body(
+                tokens, new_context, "typedef", error_context=unsupported_ctx
+            )
             tokens.consume_type(YangTokenType.RBRACE)
 
         if typedef_name in context.module.typedefs:

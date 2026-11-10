@@ -197,6 +197,8 @@ export class YangTypeStmt {
   path?: PathNode;
   require_instance: boolean;
   identityref_bases: YangIdentifierRef[];
+  /** ``units`` under ``type`` (accepted; not an RFC 7950 type substatement). */
+  units: string;
 
   constructor(init: Partial<YangTypeStmt> = {}) {
     this.name = init.name ?? "";
@@ -211,6 +213,7 @@ export class YangTypeStmt {
     this.path = init.path;
     this.require_instance = init.require_instance ?? true;
     this.identityref_bases = init.identityref_bases ?? [];
+    this.units = init.units ?? "";
   }
 }
 

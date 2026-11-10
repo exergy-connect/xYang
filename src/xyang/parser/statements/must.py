@@ -29,18 +29,7 @@ class MustStatementParser:
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(must_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                token_type = self._parsers.dispatch_key(tokens)
-                if token_type == kw.ERROR_MESSAGE:
-                    self.parse_must_error_message(tokens, new_context)
-                elif token_type == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, new_context)
-                elif token_type == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, new_context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "must"
-                ):
-                    continue
+            self._parsers.parse_body(tokens, new_context, "must", error_context="must")
             tokens.consume_type(YangTokenType.RBRACE)
 
         if isinstance(context.current_parent, YangStatementWithMust):

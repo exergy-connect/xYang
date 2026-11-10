@@ -19,41 +19,6 @@ class ModuleStatementParser:
 
     def __init__(self, parsers: "StatementParsers") -> None:
         self._parsers = parsers
-        self._module_dispatch = {
-            kw.LEAF: self._parsers.parse_leaf,
-            kw.LIST: self._parsers.parse_list,
-            kw.LEAF_LIST: self._parsers.parse_leaf_list,
-            kw.CONTAINER: self._parsers.parse_container,
-            kw.NOTIFICATION: self._parsers.parse_notification,
-            kw.RPC: self._parsers.parse_rpc,
-            kw.ANYDATA: self._parsers.parse_anydata,
-            kw.ANYXML: self._parsers.parse_anyxml,
-            kw.TYPEDEF: self._parsers.parse_typedef,
-            kw.GROUPING: self._parsers.parse_grouping,
-            kw.IMPORT: self.parse_import_stmt,
-            kw.INCLUDE: self.parse_include_stmt,
-            kw.REVISION: self._parsers.parse_revision,
-            kw.DESCRIPTION: self._parsers.parse_description,
-            kw.REFERENCE: self._parsers.parse_reference,
-            kw.FEATURE: self._parsers.parse_feature_stmt,
-            kw.IDENTITY: self._parsers.parse_identity,
-            kw.EXTENSION: self._parsers.parse_extension_stmt,
-            kw.AUGMENT: self._parsers.parse_augment,
-            kw.DEVIATION: self._parsers.parse_deviation,
-            kw.YANG_VERSION: self.parse_yang_version,
-            kw.NAMESPACE: self.parse_namespace,
-            kw.PREFIX: self.parse_prefix,
-            kw.ORGANIZATION: self.parse_organization,
-            kw.CONTACT: self.parse_contact,
-        }
-        self._import_body_dispatch = {
-            kw.PREFIX: self.parse_import_prefix_binding,
-            kw.REFERENCE: self._parsers.parse_reference_string_only,
-        }
-        self._include_body_dispatch = {
-            kw.PREFIX: self.parse_prefix_value_stmt,
-            kw.REFERENCE: self._parsers.parse_reference_string_only,
-        }
 
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
@@ -70,15 +35,9 @@ class ModuleStatementParser:
 
     def _parse_module_statement(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse one statement in module body."""
-        handler = self._parsers.substatement_handler(tokens, self._module_dispatch)
-        if handler:
-            handler(tokens, context)
-            return
-        if self._parsers.is_prefixed_extension_start(tokens):
-            self._parsers.parse_prefixed_extension_statement(tokens, context)
-            return
-        if self._parsers.skip_unsupported_or_raise_unknown_stmt(tokens, "module body"):
-            return
+        self._parsers.dispatch_substatement(
+            tokens, context, "module", error_context="module body"
+        )
 
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse import and load the referenced module (RFC 7950)."""
@@ -91,24 +50,7 @@ class ModuleStatementParser:
         acc = SimpleNamespace(local_prefix=None, revision_date=None)
         self._parsers._import_parse_state = acc
         try:
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek() == kw.REVISION_DATE:
-                    self._parse_import_revision_date_binding(tokens, context)
-                    continue
-                if tokens.peek() == kw.DESCRIPTION:
-                    self._parsers.parse_optional_description(
-                        tokens, context.push_parent(SimpleNamespace())
-                    )
-                    continue
-                handler = self._parsers.substatement_handler(tokens, self._import_body_dispatch)
-                if handler:
-                    handler(tokens, context)
-                elif self._parsers.is_prefixed_extension_start(tokens):
-                    self._parsers.parse_prefixed_extension_statement(tokens, context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "import"
-                ):
-                    continue
+            self._parsers.parse_body(tokens, context, "import", error_context="import")
         finally:
             self._parsers._import_parse_state = None
         tokens.consume_type(YangTokenType.RBRACE)
@@ -129,25 +71,9 @@ class ModuleStatementParser:
         sub_name = tokens.consume_type(YangTokenType.IDENTIFIER)
         revision_date = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                if tokens.peek() == kw.REVISION_DATE:
-                    revision_date = self._parsers._revision_parser.parse_revision_date_statement(
-                        tokens
-                    )
-                elif tokens.peek() == kw.DESCRIPTION:
-                    self._parsers.parse_optional_description(
-                        tokens, context.push_parent(SimpleNamespace())
-                    )
-                else:
-                    handler = self._parsers.substatement_handler(tokens, self._include_body_dispatch)
-                    if handler:
-                        handler(tokens, context)
-                    elif self._parsers.is_prefixed_extension_start(tokens):
-                        self._parsers.parse_prefixed_extension_statement(tokens, context)
-                    elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                        tokens, "include"
-                    ):
-                        continue
+            self._parsers._include_revision_date = None
+            self._parsers.parse_body(tokens, context, "include", error_context="include")
+            revision_date = self._parsers._include_revision_date
             tokens.consume_type(YangTokenType.RBRACE)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         if self._parsers._yang_parser is not None:

@@ -12,13 +12,7 @@ export class IdentityStatementParser {
     const stmt = new YangIdentityStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        if (tokens.peek() === kw.BASE) {
-          this.parse_identity_base(tokens, child);
-        } else {
-          this.parsers.parseStatement(tokens, child);
-        }
-      }
+      this.parsers.parseBody(tokens, child, "identity", `identity '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     (context.module as any).identities[name] = stmt;

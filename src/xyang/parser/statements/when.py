@@ -30,16 +30,7 @@ class WhenStatementParser:
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(when_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                token_type = self._parsers.dispatch_key(tokens)
-                if token_type == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, new_context)
-                elif token_type == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, new_context)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "when"
-                ):
-                    continue
+            self._parsers.parse_body(tokens, new_context, "when", error_context="when")
             tokens.consume_type(YangTokenType.RBRACE)
 
         if parent_for_when and isinstance(parent_for_when, YangStatementWithWhen):

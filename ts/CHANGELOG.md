@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- **Parser keyword dispatch:** `parser/dispatch-registry` is the same parent → substatement table as Python. Statement bodies use it, so an unknown keyword under `typedef`, `leaf`, and the other parents raises `YangSyntaxError` naming the parent and the keyword. A prefixed extension under `typedef` parses. Import and include still skip an unknown body statement instead of raising ([#121](https://github.com/exergy-connect/xYang/issues/121)).
+
 ### Fixed
 
 - **Substatements:** a prefixed extension in a `type` body, `units` on a `typedef` (copied onto leafs that do not set their own), module `reference`, submodule `organization` / `contact` / `description` / `reference`, `type` in an extension invocation, `default` in a `choice`, and `grouping` in a `container` (lexical scope) match Python. The same typedef reached again through an include is one definition, not a duplicate. ([#116](https://github.com/exergy-connect/xYang/issues/116))

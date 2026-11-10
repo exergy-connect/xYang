@@ -1,25 +1,10 @@
 import * as kw from "../keywords";
 import { YangTypedefStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
-import { withMetadataSubstatements } from "../metadata-substatements";
 import type { StatementParsers } from "../statement-parsers";
 
 export class TypedefStatementParser {
-  private readonly typedefBodyDispatch: Record<string, (tokens: TokenStream, context: ParserContext) => void>;
-
-  constructor(private readonly parsers: StatementParsers) {
-    this.typedefBodyDispatch = withMetadataSubstatements(this.parsers, {
-      [kw.TYPE]: (tokens, context) => {
-        this.parsers.type_parser.parse_type(tokens, context);
-      },
-      [kw.UNITS]: (tokens, context) => {
-        this.parsers.parse_units(tokens, context);
-      },
-      [kw.DEFAULT]: (tokens, context) => {
-        this.parsers.parse_typedef_default(tokens, context);
-      }
-    });
-  }
+  constructor(private readonly parsers: StatementParsers) {}
 
   parse_typedef(tokens: TokenStream, context: ParserContext): YangTypedefStmt {
     tokens.consume(kw.TYPEDEF);
@@ -28,14 +13,7 @@ export class TypedefStatementParser {
     const unsupportedCtx = `typedef '${name}'`;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        const handler = this.parsers.substatement_handler(tokens, this.typedefBodyDispatch);
-        if (handler) {
-          handler(tokens, child);
-        } else if (!this.parsers.skip_unsupported_or_raise_unknown(tokens, unsupportedCtx)) {
-          /* unreachable */
-        }
-      }
+      this.parsers.parseBody(tokens, child, "typedef", unsupportedCtx);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     (context.module as any).typedefs[name] = stmt;

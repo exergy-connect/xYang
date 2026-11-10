@@ -40,21 +40,16 @@ class DeviationStatementParser:
         )
         if tokens.consume_if_type(YangTokenType.LBRACE):
             body = context.push_parent(dev)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                peek = tokens.peek()
-                if peek == kw.DESCRIPTION:
-                    self._parsers.parse_description(tokens, body)
-                elif peek == kw.REFERENCE:
-                    self._parsers.parse_reference(tokens, body)
-                elif peek == kw.DEVIATE:
-                    self._parse_deviate(tokens, dev)
-                elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-                    tokens, "deviation"
-                ):
-                    continue
+            self._parsers.parse_body(tokens, body, "deviation", error_context="deviation")
             tokens.consume_type(YangTokenType.RBRACE)
         self._parsers.add_to_parent_or_module(context, dev)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_deviate_substatement(self, tokens: TokenStream, context: ParserContext) -> None:
+        dev = context.current_parent
+        if not isinstance(dev, YangDeviationStmt):
+            raise tokens.make_error("internal: deviate outside deviation")
+        self._parse_deviate(tokens, dev)
 
     def _parse_deviate(self, tokens: TokenStream, dev: YangDeviationStmt) -> None:
         tokens.consume(kw.DEVIATE)

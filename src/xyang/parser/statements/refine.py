@@ -8,7 +8,6 @@ from .. import keywords as kw
 
 from typing import TYPE_CHECKING
 
-from ..metadata_substatements import with_data_node_substatements
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangRefineStmt, YangUsesStmt
 from ...errors import XPathSyntaxError
@@ -24,31 +23,6 @@ class RefineStatementParser:
 
     def __init__(self, parsers: StatementParsers) -> None:
         self._parsers = parsers
-        self._refine_substatement_dispatch = with_data_node_substatements(
-            self._parsers,
-            {
-            kw.MUST: self._parsers.parse_must,
-            kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
-            kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
-            kw.ORDERED_BY: self._parsers.parse_ordered_by,
-            kw.MANDATORY: self._parse_refine_mandatory,
-            kw.DEFAULT: self._parse_refine_default,
-            kw.IF_FEATURE: self._parsers.parse_if_feature_stmt,
-            kw.TYPE: self._parsers.parse_type,
-            },
-        )
-
-    def _parse_refine_substatement(
-        self, tokens: TokenStream, context: ParserContext, target_path: PathNode
-    ) -> None:
-        """One substatement inside ``refine { ... }`` (no ``refine:*`` registry keys)."""
-        handler = self._parsers.substatement_handler(tokens, self._refine_substatement_dispatch)
-        if handler:
-            handler(tokens, context)
-        elif self._parsers.skip_unsupported_or_raise_unknown_stmt(
-            tokens, f"refine '{target_path.to_string()}'"
-        ):
-            return
 
     def _parse_refine_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory in refine (RFC 7950 section 7.13.2: leaf / choice target)."""
@@ -88,8 +62,12 @@ class RefineStatementParser:
         refine_stmt = YangRefineStmt(name="refine", target_path=path_node)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(refine_stmt)
-            while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
-                self._parse_refine_substatement(tokens, new_context, path_node)
+            self._parsers.parse_body(
+                tokens,
+                new_context,
+                "refine",
+                error_context=f"refine '{path_node.to_string()}'",
+            )
             tokens.consume_type(YangTokenType.RBRACE)
         if context.current_parent and isinstance(context.current_parent, YangUsesStmt):
             context.current_parent.refines.append(refine_stmt)

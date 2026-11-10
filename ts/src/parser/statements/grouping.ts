@@ -12,9 +12,7 @@ export class GroupingStatementParser {
     const stmt = new YangGroupingStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-        this.parsers.parseStatement(tokens, child);
-      }
+      this.parsers.parseBody(tokens, child, "grouping", `grouping '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
     const parent = context.current_parent as { keyword?: string; groupings?: Record<string, YangGroupingStmt> };
