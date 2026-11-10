@@ -2,6 +2,8 @@
 
 xYang parses YANG, checks RFC 7951 JSON, and exports JSON Schema. Python lives in `src/xyang`. TypeScript lives in `ts/src` and mirrors it: `src/xyang/x/y.py` corresponds to `ts/src/x/y.ts`.
 
+Key learnings for agents: [`docs/KEY-LEARNINGS.md`](docs/KEY-LEARNINGS.md).
+
 | To change | Look in |
 |---|---|
 | Built-in type JSON encoding | `types/registry` |
