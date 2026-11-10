@@ -25,6 +25,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **JSON Schema import:** `parse_json_schema` rejects a schema that has no root `x-yang` object, and a root property that has no `x-yang`, instead of returning an empty module named `unknown` ([#80](https://github.com/exergy-connect/xYang/issues/80)).
 - **Python validation:** a present container must be a JSON object, a list or leaf-list must be a JSON array, and each list entry must be an object. Wrong shapes report `type` (`container must be an object`, `list must be an array`, `list item must be an object`, `leaf-list must be an array`) instead of being skipped or accepted as a one-element leaf-list ([#52](https://github.com/exergy-connect/xYang/issues/52)).
 - **Python validation:** leaf type checks reject a JSON value of the wrong type instead of coercing it. A non-integral number or a boolean is not an integer (`Expected integer, got <json type>`), a boolean is not a decimal64, and a non-string is not a string (`Expected string, got <json type>`). Length and pattern are not applied to a non-string. Numeric strings for integer types are unchanged ([#51](https://github.com/exergy-connect/xYang/issues/51)).
 - **XPath:** an unknown function name is a compile error (`xpath-unknown-function`) in Python and TypeScript. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).

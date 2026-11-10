@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **JSON Schema import:** `parseJsonSchema` rejects a schema that has no root `x-yang` object, and a root property that has no `x-yang`, instead of returning a module with an empty name and no statements ([#80](https://github.com/exergy-connect/xYang/issues/80)).
 - **XPath:** an unknown function name is a compile error (`xpath-unknown-function`), matching Python. `contains()`, `substring-before()`, and `substring-after()` stay unimplemented (see #85).
 - **Validation:** enforce `min-elements` / `max-elements` on present lists and leaf-lists, matching Python (same error wording). Data that violates these bounds now fails validation.
 - **Tests:** `npm test` runs the CLI from source, so a clean checkout no longer needs `npm run build` first.

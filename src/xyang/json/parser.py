@@ -1069,6 +1069,10 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     Returns:
         YangModule with .statements (one per root JSON Schema property, e.g.
         ``data-model`` or ``program``), and .typedefs.
+
+    Raises:
+        ValueError: The root schema, or a root ``properties`` member, has no
+        ``x-yang`` object. Plain JSON Schema is not imported.
     """
     if isinstance(source, dict):
         data = source
@@ -1084,7 +1088,13 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     else:
         raise TypeError("source must be path, JSON string, or dict")
 
-    root_xyang = data.get(JsonSchemaKey.X_YANG) or {}
+    root_xyang = data.get(JsonSchemaKey.X_YANG)
+    if not isinstance(root_xyang, dict):
+        raise ValueError(
+            'JSON Schema has no root "x-yang" annotation; '
+            'xYang needs a .yang.json produced by "xyang convert" '
+            "(see design/json-schema-xyang-profile.md)"
+        )
     defs = data.get(JsonSchemaKey.DEFS) or {}
 
     module = YangModule(
@@ -1112,6 +1122,10 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     for root_name, root_val in root_props.items():
         if not isinstance(root_val, dict):
             continue
+        if not isinstance(root_val.get(JsonSchemaKey.X_YANG), dict):
+            raise ValueError(
+                f'JSON Schema property "{root_name}" has no "x-yang" annotation'
+            )
         stmt = _convert_property(root_name, root_val, defs, f"/{root_name}")
         if stmt is not None:
             module.statements.append(stmt)
