@@ -6,6 +6,9 @@ import type { StatementParsers } from "../statement-parsers";
 
 export class TypeStatementParser {
   private patternBody: { errorMessage?: string; errorAppTag?: string; invert: boolean } | undefined;
+  private restrictionBody:
+    | { description: string; reference: string; errorMessage?: string; errorAppTag?: string }
+    | undefined;
 
   constructor(private readonly parsers: StatementParsers) {}
 
@@ -75,16 +78,57 @@ export class TypeStatementParser {
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
-  parse_type_length(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
-    // One string: ``1..127`` or ``"1..127"``.
+  parse_type_length(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.LENGTH);
     type_stmt.length = this.parsers.parse_string_argument(tokens);
+    const meta = this.parseRestrictionBody(tokens, context, "length");
+    type_stmt.length_error_message = meta.errorMessage;
+    type_stmt.length_error_app_tag = meta.errorAppTag;
+    type_stmt.length_description = meta.description;
+    type_stmt.length_reference = meta.reference;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
-  parse_type_range(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+  parse_type_range(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.RANGE);
     type_stmt.range = this.parsers.parse_string_argument(tokens);
+    const meta = this.parseRestrictionBody(tokens, context, "range");
+    type_stmt.range_error_message = meta.errorMessage;
+    type_stmt.range_error_app_tag = meta.errorAppTag;
+    type_stmt.range_description = meta.description;
+    type_stmt.range_reference = meta.reference;
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  private parseRestrictionBody(
+    tokens: TokenStream,
+    context: ParserContext,
+    parent: string
+  ): { description: string; reference: string; errorMessage?: string; errorAppTag?: string } {
+    const holder = { description: "", reference: "", errorMessage: undefined as string | undefined, errorAppTag: undefined as string | undefined };
+    if (!tokens.consume_if_type(YangTokenType.LBRACE)) {
+      return holder;
+    }
+    const body = context.push_parent(holder);
+    this.restrictionBody = holder;
+    try {
+      this.parsers.parseBody(tokens, body, parent, parent);
+    } finally {
+      this.restrictionBody = undefined;
+    }
+    tokens.consume_type(YangTokenType.RBRACE);
+    return holder;
+  }
+
+  parse_restriction_error_message(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.ERROR_MESSAGE);
+    this.restrictionBody!.errorMessage = this.parsers.parse_string_concatenation(tokens);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_restriction_error_app_tag(tokens: TokenStream, _context: ParserContext): void {
+    tokens.consume(kw.ERROR_APP_TAG);
+    this.restrictionBody!.errorAppTag = this.parsers.parse_string_concatenation(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

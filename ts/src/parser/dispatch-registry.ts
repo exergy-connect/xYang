@@ -296,9 +296,17 @@ const PARENTS: Array<[string, DispatchParent]> = [
       ])
     )
   ],
-  // Argument only. A braced body is not dispatched (known drift).
-  ["length", { rfc: "9.4.4", keywords: new Set() }],
-  ["range", { rfc: "9.2.4", keywords: new Set() }]
+  [
+    "length",
+    parent(
+      "9.4.4",
+      new Set([kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE])
+    )
+  ],
+  [
+    "range",
+    parent("9.2.4", new Set([kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE]))
+  ]
 ];
 
 export const DISPATCH_REGISTRY: Record<string, DispatchParent> = Object.fromEntries(PARENTS);

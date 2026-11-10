@@ -7,6 +7,7 @@ from __future__ import annotations
 import base64
 import binascii
 import logging
+from types import SimpleNamespace
 from typing import Any, List, Optional
 
 from ..ast import YangTypeStmt
@@ -488,7 +489,13 @@ class TypeChecker:
         errors: List[TypeIssue] = []
         s = value
         if type_stmt.length:
-            issue = self._length_issue(len(s), type_stmt.length, binary=False)
+            issue = self._length_issue(
+                len(s),
+                type_stmt.length,
+                binary=False,
+                error_message=type_stmt.length_error_message,
+                error_app_tag=type_stmt.length_error_app_tag,
+            )
             if issue is not None:
                 errors.append(issue)
         patterns = list(getattr(type_stmt, "patterns", None) or [])
@@ -534,7 +541,12 @@ class TypeChecker:
         else:
             n = int(value)
         if type_stmt.range:
-            issue = self._numeric_range_issue(n, type_stmt.range)
+            issue = self._numeric_range_issue(
+                n,
+                type_stmt.range,
+                error_message=type_stmt.range_error_message,
+                error_app_tag=type_stmt.range_error_app_tag,
+            )
             if issue is not None:
                 return [issue]
         bounds = spec.bounds if spec is not None and spec.bounds is not None else None
@@ -556,7 +568,12 @@ class TypeChecker:
             return [gate]
         n = float(value)
         if type_stmt.range:
-            issue = self._numeric_range_issue(n, type_stmt.range)
+            issue = self._numeric_range_issue(
+                n,
+                type_stmt.range,
+                error_message=type_stmt.range_error_message,
+                error_app_tag=type_stmt.range_error_app_tag,
+            )
             if issue is not None:
                 return [issue]
         fd = getattr(type_stmt, "fraction_digits", None)
@@ -604,7 +621,13 @@ class TypeChecker:
         except binascii.Error:
             return [_issue("type", "binary value is not valid base64")]
         if type_stmt.length:
-            issue = self._length_issue(len(decoded), type_stmt.length, binary=True)
+            issue = self._length_issue(
+                len(decoded),
+                type_stmt.length,
+                binary=True,
+                error_message=type_stmt.length_error_message,
+                error_app_tag=type_stmt.length_error_app_tag,
+            )
             if issue is not None:
                 return [issue]
         patterns = list(getattr(type_stmt, "patterns", None) or [])
@@ -671,16 +694,36 @@ class TypeChecker:
                 return ("max", hi)
         return ("max", n)
 
-    def _numeric_range_issue(self, n: float, text: str) -> Optional[TypeIssue]:
+    def _numeric_range_issue(
+        self,
+        n: float,
+        text: str,
+        *,
+        error_message: Optional[str] = None,
+        error_app_tag: Optional[str] = None,
+    ) -> Optional[TypeIssue]:
         miss = self._range_miss(n, self._parse_ranges(text))
         if miss is None:
             return None
         kind, bound = miss
         if kind == "min":
-            return _issue("range", f"Value {n} is less than minimum {bound}")
-        return _issue("range", f"Value {n} exceeds maximum {bound}")
+            default = f"Value {n} is less than minimum {bound}"
+        else:
+            default = f"Value {n} exceeds maximum {bound}"
+        return _issue("range", _pattern_entry_violation_message(
+            SimpleNamespace(error_message=error_message, error_app_tag=error_app_tag),
+            default=default,
+        ))
 
-    def _length_issue(self, n: int, text: str, *, binary: bool) -> Optional[TypeIssue]:
+    def _length_issue(
+        self,
+        n: int,
+        text: str,
+        *,
+        binary: bool,
+        error_message: Optional[str] = None,
+        error_app_tag: Optional[str] = None,
+    ) -> Optional[TypeIssue]:
         miss = self._range_miss(n, self._parse_ranges(text))
         if miss is None:
             return None
@@ -688,11 +731,17 @@ class TypeChecker:
         if binary:
             shown = int(bound)
             if kind == "min":
-                return _issue("length", f"binary decoded length {n} octets is less than minimum {shown}")
-            return _issue("length", f"binary decoded length {n} octets exceeds maximum {shown}")
-        if kind == "min":
-            return _issue("length", f"String length {n} is less than minimum {bound}")
-        return _issue("length", f"String length {n} exceeds maximum {bound}")
+                default = f"binary decoded length {n} octets is less than minimum {shown}"
+            else:
+                default = f"binary decoded length {n} octets exceeds maximum {shown}"
+        elif kind == "min":
+            default = f"String length {n} is less than minimum {bound}"
+        else:
+            default = f"String length {n} exceeds maximum {bound}"
+        return _issue("length", _pattern_entry_violation_message(
+            SimpleNamespace(error_message=error_message, error_app_tag=error_app_tag),
+            default=default,
+        ))
 
     def _to_num(self, s: str) -> Optional[float]:
         try:

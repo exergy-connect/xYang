@@ -190,6 +190,15 @@ export class YangTypeStmt {
   patterns: YangPatternSpec[];
   length?: string;
   range?: string;
+  /** RFC 7950 §9.4.4 / §9.2.4 body. ``length`` and ``range`` strings are unchanged. */
+  length_error_message?: string;
+  length_error_app_tag?: string;
+  length_description: string;
+  length_reference: string;
+  range_error_message?: string;
+  range_error_app_tag?: string;
+  range_description: string;
+  range_reference: string;
   fraction_digits?: number;
   enums: string[];
   bits: YangBitStmt[];
@@ -206,6 +215,14 @@ export class YangTypeStmt {
     this.patterns = init.patterns ?? [];
     this.length = init.length;
     this.range = init.range;
+    this.length_error_message = init.length_error_message;
+    this.length_error_app_tag = init.length_error_app_tag;
+    this.length_description = init.length_description ?? "";
+    this.length_reference = init.length_reference ?? "";
+    this.range_error_message = init.range_error_message;
+    this.range_error_app_tag = init.range_error_app_tag;
+    this.range_description = init.range_description ?? "";
+    this.range_reference = init.range_reference ?? "";
     this.fraction_digits = init.fraction_digits;
     this.enums = init.enums ?? [];
     this.bits = init.bits ?? [];

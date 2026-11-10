@@ -171,6 +171,15 @@ class YangTypeStmt:
     patterns: List[YangPatternSpec] = field(default_factory=list)
     length: Optional[str] = None
     range: Optional[str] = None
+    # RFC 7950 §9.4.4 / §9.2.4 body. The constraint strings above are unchanged.
+    length_error_message: Optional[str] = None
+    length_error_app_tag: Optional[str] = None
+    length_description: str = ""
+    length_reference: str = ""
+    range_error_message: Optional[str] = None
+    range_error_app_tag: Optional[str] = None
+    range_description: str = ""
+    range_reference: str = ""
     fraction_digits: Optional[int] = None
     enums: List[str] = field(default_factory=list)
     bits: List[YangBitStmt] = field(default_factory=list)  # For bits type

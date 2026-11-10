@@ -294,6 +294,14 @@ class StatementParsers:
                 kw.STATUS: typ.parse_enum_status,
             },
             "bit": {kw.POSITION: bits.parse_bit_position},
+            "length": {
+                kw.ERROR_MESSAGE: typ.parse_restriction_error_message,
+                kw.ERROR_APP_TAG: typ.parse_restriction_error_app_tag,
+            },
+            "range": {
+                kw.ERROR_MESSAGE: typ.parse_restriction_error_message,
+                kw.ERROR_APP_TAG: typ.parse_restriction_error_app_tag,
+            },
             "type": {
                 kw.TYPE: drop_type_stmt(typ.parse_type),
                 kw.PATTERN: typ.parse_type_pattern,
