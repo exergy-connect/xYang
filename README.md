@@ -21,6 +21,16 @@ MIT licensed.
 
 ---
 
+## Native JSON format: intent
+
+The xYang native JSON format is an optimized, reversible transformation of standard YANG files. Like JSON to YAML, it carries the same information. `xyang convert` and `schema_to_yang_json` write the `.yang.json` file; `parse_json_schema` loads it. TypeScript uses `generateJsonSchema` and `parseJsonSchema`.
+
+- **Reversible.** Converting back must produce equivalent YANG.
+- **Unambiguous.** Each construct has one canonical form.
+- **Fast to load.** Processing uses the JSON and does not parse YANG text at runtime.
+
+---
+
 ## Install
 
 **Python**

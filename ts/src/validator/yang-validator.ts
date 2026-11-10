@@ -1,7 +1,14 @@
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
-import { DocumentValidator, EnabledFeaturesByModule } from "./document-validator";
+import {
+  DetailedValidationResult,
+  DocumentValidator,
+  EnabledFeaturesByModule,
+  ValidationIssue
+} from "./document-validator";
 import { ValidatorExtension } from "./validator-extension";
+
+export type { DetailedValidationResult, ValidationIssue };
 
 export type ValidationResult = {
   isValid: boolean;
@@ -44,5 +51,13 @@ export class YangValidator {
   validate(data: unknown): ValidationResult {
     const [isValid, errors, warnings] = this.documentValidator.validate(data);
     return { isValid, errors, warnings };
+  }
+
+  /**
+   * Structured issues. `validate()` string output is unchanged.
+   * Each issue is `{ code, path, message, expression?, severity }` with `path` a JSON Pointer.
+   */
+  validateDetailed(data: unknown): DetailedValidationResult {
+    return this.documentValidator.validateDetailed(data);
   }
 }

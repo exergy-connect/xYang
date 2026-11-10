@@ -18,6 +18,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
+- **Structured validation errors:** `YangValidator.validateDetailed` returns `{valid, errors, warnings}`. Each issue is `{code, path, message, expression?, severity}` and `path` is a JSON Pointer. `validate()` string output is unchanged ([#79](https://github.com/exergy-connect/xYang/issues/79)).
 - **Shared conformance cases:** `test/cases.test.ts` runs the language-neutral cases in [`tests/cases/`](../tests/cases/README.md).
 
 ### Changed

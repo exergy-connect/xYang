@@ -1,0 +1,24 @@
+{
+  "description": "Structured errors (#79): both validators report code plus a JSON Pointer for a range error, an unknown field inside a list entry, and a must failure.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "uint8 out of range",
+      "data": { "top": { "u8": 300 } },
+      "valid": false,
+      "errors": [{ "path": "/top/u8", "code": "range", "message": "exceeds maximum" }]
+    },
+    {
+      "name": "unknown field in list entry",
+      "data": { "top": { "items": [{ "id": "a", "x": 1 }] } },
+      "valid": false,
+      "errors": [{ "path": "/top/items/0/x", "code": "unknown-field", "message": "Unknown field 'x'" }]
+    },
+    {
+      "name": "must not satisfied",
+      "data": { "top": { "n": -1 } },
+      "valid": false,
+      "errors": [{ "path": "/top/n", "code": "must", "message": "must constraint not satisfied" }]
+    }
+  ]
+}

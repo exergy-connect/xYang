@@ -19,6 +19,9 @@ class ValidationError:
 
     path        -- XPath-like location, e.g.
                    /data-model/entities[name='foo']/fields[name='bar']/minDate
+                   (this is what ``str(error)`` and ``YangValidator.validate`` print)
+    pointer     -- JSON Pointer into the instance (list entries by position)
+    code        -- stable error code (``range``, ``must``, ``unknown-field``, ...)
     message     -- human- and AI-readable description of what failed
     expression  -- the failing XPath expression string, if applicable
     severity    -- error or warning (default ERROR)
@@ -28,6 +31,8 @@ class ValidationError:
     message: str
     expression: Optional[str] = None
     severity: Severity = Severity.ERROR
+    code: str = ""
+    pointer: str = ""
 
     def __str__(self) -> str:
         out = f"{self.path}: {self.message}"

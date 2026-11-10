@@ -17,7 +17,6 @@ CI runs the Python and TypeScript runners on every push and pull request
 
 ```
 tests/cases/
-  error-codes.json            message -> code table (temporary, see below)
   <area>/<case-name>/
     case.json                 the case
     m.yang                    primary module (name given in case.json)
@@ -65,16 +64,17 @@ An error is `{ "path", "code", "message"? }`:
   appear in the JSON (`/m:top/a`). The document root is `""`. Errors about a missing node point at
   where it would be (`/top/name`). `choice` and `case` are not data nodes, so their errors point
   at the parent data node (`/top`).
-- **`code`** is one of the codes in [`error-codes.json`](error-codes.json) (`range`, `length`,
-  `pattern`, `enum`, `union`, `type`, `must`, `when`, `if-feature`, `mandatory`,
-  `mandatory-choice`, `choice-multiple-cases`, `min-elements`, `max-elements`, `duplicate-key`,
-  `unknown-field`, `leafref`, `identityref`, `instance-identifier`, ...). Add a code there when
-  you need a new one.
+- **`code`** is one of `range`, `length`, `pattern`, `enum`, `union`, `type`, `must`, `when`,
+  `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
+  `max-elements`, `duplicate-key`, `unknown-field`, `leafref`, `identityref`,
+  `instance-identifier`, `fraction-digits`, `bits`, `xpath-error`, `xpath-unknown-function`.
+  Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
 
-The runner compares the **set** of `(path, code)` pairs exactly: no missing errors, no extra
-errors. Duplicate pairs count once.
+Runners call `validate_detailed` / `validateDetailed` and compare the **set** of `(path, code)`
+pairs exactly: no missing errors, no extra errors. Duplicate pairs count once. `path` is the
+JSON Pointer on the issue, not the legacy display string from `validate()`.
 
 ### Expected failures
 
@@ -95,23 +95,6 @@ not what one implementation happens to do.
 Instance data uses xYang's simple (unqualified) top-level member names, which both libraries
 accept today. The RFC 7951 qualified form is covered in `encoding/qualified-names`.
 
-## How runners map results
-
-Implementations report free-text errors (`"<path>: <message>"`) today, so each runner has a
-small adapter:
-
-- **Code:** the first regex in `error-codes.json` that matches the message (after the optional
-  `message` hint from the expected error). Both languages read the same table, so wording
-  differences are visible in one place.
-- **Path:** Python reports `/top/items[id='a']/v` (key predicates) and TypeScript reports
-  `top.items[0].v` (positions). Both are converted to the JSON Pointer `/top/items/0/v`. This only
-  rewrites notation; when an implementation reports a different node (for example TypeScript
-  puts unknown-field errors on the parent, and adds the choice name to paths inside a choice),
-  the case fails and carries an `xfail` reason.
-
-Once implementations return structured errors with a code and a pointer, the adapters and
-`error-codes.json` go away.
-
 ## CLI protocol
 
 TODO: neither CLI implements this yet. The Python runner adds a `cli` implementation when
@@ -123,7 +106,7 @@ $XYANG_CLI validate --format json <case-dir>/<module> <instance.json> \
 ```
 
 and expects stdout to be `{"valid": bool, "errors": [{"path": "<JSON Pointer>", "code": "<code>", "message": "..."}]}`,
-with codes from `error-codes.json`. Schema errors should exit non-zero without that JSON.
+with the error codes listed above. Schema errors should exit non-zero without that JSON.
 `xfail` entries keyed `cli` apply to this runner.
 
 ## Known divergences

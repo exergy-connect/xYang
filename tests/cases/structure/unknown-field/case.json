@@ -4,13 +4,10 @@
   "instances": [
     { "name": "known members", "data": { "top": { "a": "x", "items": [{ "id": "1" }] } }, "valid": true },
     { "name": "unknown in container", "data": { "top": { "a": "x", "b": 1 } }, "valid": false,
-      "errors": [{ "path": "/top/b", "code": "unknown-field" }],
-      "xfail": { "ts": "TS reports unknown fields at the parent path (top), not at the member (top.b)" } },
+      "errors": [{ "path": "/top/b", "code": "unknown-field" }] },
     { "name": "unknown at root", "data": { "top": {}, "zzz": 1 }, "valid": false,
-      "errors": [{ "path": "/zzz", "code": "unknown-field" }],
-      "xfail": { "ts": "TS reports root unknown fields with no path at all" } },
+      "errors": [{ "path": "/zzz", "code": "unknown-field" }] },
     { "name": "unknown in list entry", "data": { "top": { "items": [{ "id": "1", "x": 2 }] } }, "valid": false,
-      "errors": [{ "path": "/top/items/0/x", "code": "unknown-field" }],
-      "xfail": { "ts": "TS reports unknown fields at the parent path (top.items[0]), not at the member" } }
+      "errors": [{ "path": "/top/items/0/x", "code": "unknown-field" }] }
   ]
 }
