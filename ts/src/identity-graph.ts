@@ -2,16 +2,16 @@ import type { YangIdentifierRef } from "./core/identifier-ref";
 import { parseIdentifierRefAtom } from "./core/identifier-ref";
 import type { YangModule } from "./core/model";
 
-/** (defining module data, local identity name) */
-export type IdentityPair = { mod: Record<string, unknown>; local: string };
+/** (defining module, local identity name) */
+export type IdentityPair = { mod: YangModule; local: string };
 
-function ownPrefixStripped(mod: Record<string, unknown>): string {
+function ownPrefixStripped(mod: YangModule): string {
   return String(mod.prefix ?? "").replace(/^['"]|['"]$/g, "");
 }
 
 type IdentityInfo = { bases: Array<string | YangIdentifierRef> };
 
-function getIdentities(mod: Record<string, unknown>): Record<string, IdentityInfo> {
+function getIdentities(mod: YangModule): Record<string, IdentityInfo> {
   const raw = mod.identities;
   if (!raw || typeof raw !== "object") {
     return {};
@@ -26,16 +26,12 @@ function asBaseRef(base: string | YangIdentifierRef): YangIdentifierRef {
   return base.prefix ? { prefix: base.prefix, name: base.name } : { name: base.name };
 }
 
-export function resolvePrefixedModuleData(
-  importerData: Record<string, unknown>,
-  prefix: string
-): Record<string, unknown> | undefined {
-  const own = ownPrefixStripped(importerData);
+export function resolvePrefixedModuleData(importer: YangModule, prefix: string): YangModule | undefined {
+  const own = ownPrefixStripped(importer);
   if (prefix === own) {
-    return importerData;
+    return importer;
   }
-  const imports = (importerData.import_prefixes as Record<string, Record<string, unknown>> | undefined) ?? {};
-  const m = imports[prefix];
+  const m = importer.import_prefixes[prefix];
   return m && typeof m === "object" ? m : undefined;
 }
 
@@ -45,7 +41,7 @@ export function resolveIdentityQnamePair(importer: YangModule, qname: string): I
   if (!ref.prefix) {
     return null;
   }
-  return resolveIdentityBaseRef(importer.data, ref);
+  return resolveIdentityBaseRef(importer, ref);
 }
 
 /**
@@ -53,18 +49,18 @@ export function resolveIdentityQnamePair(importer: YangModule, qname: string): I
  * `modname:name` resolves where `modname` is the *module name* (not the prefix) of the
  * module itself or of a module it imports.
  */
-export function resolveIdentityValue(moduleData: Record<string, unknown>, value: unknown): IdentityPair | null {
+export function resolveIdentityValue(moduleData: YangModule, value: unknown): IdentityPair | null {
   if (typeof value !== "string" || value.length === 0) {
     return null;
   }
   const colon = value.indexOf(":");
-  let target: Record<string, unknown> | undefined = moduleData;
+  let target: YangModule | undefined = moduleData;
   let local = value;
   if (colon >= 0) {
     const modName = value.slice(0, colon);
     local = value.slice(colon + 1);
     if (modName !== moduleData.name) {
-      const imports = (moduleData.import_prefixes as Record<string, Record<string, unknown>> | undefined) ?? {};
+      const imports = moduleData.import_prefixes;
       target = Object.values(imports).find((m) => m && typeof m === "object" && m.name === modName);
     }
   }
@@ -76,7 +72,7 @@ export function resolveIdentityValue(moduleData: Record<string, unknown>, value:
 
 /** RFC 7950: the value must be derived from (or equal to) **every** identityref base. */
 export function identityrefValueValid(
-  moduleData: Record<string, unknown>,
+  moduleData: YangModule,
   value: unknown,
   bases: Array<string | YangIdentifierRef>
 ): boolean {
@@ -95,7 +91,7 @@ export function identityrefValueValid(
 }
 
 export function resolveIdentityBaseRef(
-  fromMod: Record<string, unknown>,
+  fromMod: YangModule,
   base: string | YangIdentifierRef
 ): IdentityPair | null {
   const ref = asBaseRef(base);
@@ -139,7 +135,7 @@ function pairKey(p: IdentityPair): string {
 
 /** Reflexive transitive closure of identity bases from (startMod, startName). */
 export function identityAncestorClosure(
-  startMod: Record<string, unknown>,
+  startMod: YangModule,
   startName: string
 ): IdentityPair[] {
   const start: IdentityPair = { mod: startMod, local: startName };
@@ -170,7 +166,7 @@ export function identityAncestorClosure(
 
 /** `vQ` is an instance value (RFC 7951 module name); `tQ` is a schema literal (prefix). */
 export function isDerivedFromStrictQNames(importer: YangModule, vQ: string, tQ: string): boolean {
-  const v = resolveIdentityValue(importer.data, vQ);
+  const v = resolveIdentityValue(importer, vQ);
   const t = resolveIdentityQnamePair(importer, tQ);
   if (!v || !t) {
     return false;
@@ -180,7 +176,7 @@ export function isDerivedFromStrictQNames(importer: YangModule, vQ: string, tQ: 
 }
 
 export function isDerivedFromOrSelfQNames(importer: YangModule, vQ: string, tQ: string): boolean {
-  const v = resolveIdentityValue(importer.data, vQ);
+  const v = resolveIdentityValue(importer, vQ);
   const t = resolveIdentityQnamePair(importer, tQ);
   if (!v || !t) {
     return false;

@@ -33,7 +33,7 @@ describe("import revision-date (#66)", () => {
     const root = writeModule(dir, "m.yang", "m", "m", "  import base { prefix b; revision-date 2020-01-01; }");
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const module = parseYangFile(root);
-    const imported = (module.data as { import_prefixes: Record<string, { description?: string }> }).import_prefixes.b;
+    const imported = module.import_prefixes.b;
     expect(imported?.description).toBe("2019");
     const messages = warnSpy.mock.calls.map((call: unknown[]) => String(call[0]));
     expect(messages).toContain(
@@ -48,7 +48,7 @@ describe("import revision-date (#66)", () => {
     const root = writeModule(dir, "m.yang", "m", "m", "  import base { prefix b; revision-date 2020-01-01; }");
     warnSpy = vi.spyOn(console, "warn").mockImplementation(() => {});
     const module = parseYangFile(root);
-    const imported = (module.data as { import_prefixes: Record<string, { description?: string }> }).import_prefixes.b;
+    const imported = module.import_prefixes.b;
     expect(imported?.description).toBe("2020");
     const messages = warnSpy.mock.calls.map((call: unknown[]) => String(call[0]));
     expect(messages.some((message: string) => message.includes("revision-date"))).toBe(false);

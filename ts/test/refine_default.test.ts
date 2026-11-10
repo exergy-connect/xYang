@@ -92,13 +92,13 @@ describe("python parity: test_refine_default", () => {
   it("refine default false on leaf from grouping applies after uses expand", () => {
     const mod = parseYangString(REFINE_DEFAULT_FALSE);
     const leaf = leafUnderContainerC(mod, "flag");
-    expect(leaf.data.default).toBe("false");
+    expect(leaf.default).toBe("false");
   });
 
   it("refine default false applies through nested groupings (generic_field pattern)", () => {
     const mod = parseYangString(REFINE_REQUIRED_DEFAULT);
     const leaf = leafUnderContainerC(mod, "required");
-    expect(leaf.data.default).toBe("false");
+    expect(leaf.default).toBe("false");
   });
 
   it("JSON Schema carries leaf default and parseJsonSchema round-trips it", () => {
@@ -110,7 +110,7 @@ describe("python parity: test_refine_default", () => {
 
     const mod2 = parseJsonSchema(JSON.stringify(schema));
     const leaf = leafUnderContainerC(mod2, "flag");
-    expect(leaf.data.default).toBe("false");
+    expect(leaf.default).toBe("false");
   });
 
   it("with expandUses false, refined_defaults stay on the refine AST under uses", () => {
@@ -118,7 +118,7 @@ describe("python parity: test_refine_default", () => {
     const c = mod.findStatement("c");
     const uses = c?.statements[0];
     expect(uses?.keyword).toBe("uses");
-    const refines = (uses!.data as { refines?: Array<Record<string, unknown>> }).refines;
+    const refines = uses!.refines;
     expect(refines?.length).toBe(1);
     expect(refines?.[0]?.refine_target_path).toBe("flag");
     expect(refines?.[0]?.refined_defaults).toEqual(["false"]);
@@ -127,7 +127,7 @@ describe("python parity: test_refine_default", () => {
   it("refine applies multiple defaults to leaf-list", () => {
     const mod = parseYangString(REFINE_LEAF_LIST_TWO_DEFAULTS);
     const ll = leafListUnderContainerC(mod, "tags");
-    expect(ll.data.defaults).toEqual(["alpha", "beta"]);
+    expect(ll.defaults).toEqual(["alpha", "beta"]);
   });
 
   it("refine single default on leaf-list (int32)", () => {
@@ -153,7 +153,7 @@ module refine_ll_one {
 `;
     const mod = parseYangString(yang);
     const ll = leafListUnderContainerC(mod, "ids");
-    const defaults = ll.data.defaults as unknown[] | undefined;
+    const defaults = ll.defaults as unknown[] | undefined;
     expect(defaults?.length).toBe(1);
     const v = defaults![0];
     expect(v === 7 || v === "7").toBe(true);
@@ -168,6 +168,6 @@ module refine_ll_one {
 
     const mod2 = parseJsonSchema(JSON.stringify(schema));
     const ll = leafListUnderContainerC(mod2, "tags");
-    expect(ll.data.defaults).toEqual(["alpha", "beta"]);
+    expect(ll.defaults).toEqual(["alpha", "beta"]);
   });
 });

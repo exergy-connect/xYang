@@ -58,11 +58,11 @@ describe("python parity: json/test_rpc_json", () => {
     const inp = reboot2?.findStatement("input");
     expect(inp?.keyword).toBe(YangTokenType.INPUT);
     const delayLeaf = inp?.findStatement("delay-seconds");
-    expect((delayLeaf?.data.type as { name?: string } | undefined)?.name).toBe("uint16");
+    expect((delayLeaf?.type as { name?: string } | undefined)?.name).toBe("uint16");
 
     const out = reboot2?.findStatement("output");
     expect(out?.keyword).toBe(YangTokenType.OUTPUT);
     const msgLeaf = out?.findStatement("status-message");
-    expect((msgLeaf?.data.type as { name?: string } | undefined)?.name).toBe("string");
+    expect((msgLeaf?.type as { name?: string } | undefined)?.name).toBe("string");
   });
 });

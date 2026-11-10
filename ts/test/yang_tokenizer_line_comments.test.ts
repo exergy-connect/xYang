@@ -43,6 +43,6 @@ module t {
     const mod = parseYangString(yang);
     const u = mod.findStatement("u");
     expect(u).toBeDefined();
-    expect(u?.data.default).toBe("https://example.org/a/b");
+    expect(u?.default).toBe("https://example.org/a/b");
   });
 });

@@ -171,7 +171,14 @@ function normalizeStatement(stmtLike: unknown): Record<string, unknown> | null {
   return null;
 }
 
-function normalizeModule(moduleData: Record<string, unknown>): Record<string, unknown> {
+function normalizeModule(moduleData: {
+  name?: string;
+  namespace?: string;
+  prefix?: string;
+  yang_version?: string;
+  typedefs?: Record<string, unknown>;
+  statements?: unknown[];
+}): Record<string, unknown> {
   const typedefs = (moduleData.typedefs as Record<string, unknown>) ?? {};
   const statements = Array.isArray(moduleData.statements) ? moduleData.statements : [];
   const normalizedTypedefs: Record<string, unknown> = {};
@@ -221,8 +228,8 @@ describe("python parity: json/test_meta_model_ast_identical", () => {
     const jsonModule = parseJsonSchema(JSON.parse(readFileSync(META_MODEL_JSON, "utf-8")) as Record<string, unknown>);
     const yangModule = parseYangFile(META_MODEL_YANG);
 
-    const normJson = normalizeModule(jsonModule.data as Record<string, unknown>);
-    const normYang = normalizeModule(yangModule.data as Record<string, unknown>);
+    const normJson = normalizeModule(jsonModule);
+    const normYang = normalizeModule(yangModule);
 
     expect(normJson.name).toBe(normYang.name);
     expect(normJson.namespace).toBe(normYang.namespace);

@@ -85,16 +85,16 @@ function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
     }
     const entry: Record<string, unknown> = {
       must: child.argument,
-      "error-message": typeof child.data.error_message === "string" ? child.data.error_message : ""
+      "error-message": typeof child.error_message === "string" ? child.error_message : ""
     };
-    withDescription(entry, child.data.description);
+    withDescription(entry, child.description);
     out.push(entry);
   }
   return out;
 }
 
 function explicitConfig(stmt: YangStatement): boolean | undefined {
-  const cfg = stmt.data.config;
+  const cfg = stmt.config;
   return typeof cfg === "boolean" ? cfg : undefined;
 }
 
@@ -107,13 +107,13 @@ function withStatementMeta(
   if (config !== undefined) {
     out[XYANG_KEYS.config] = config;
   }
-  const ifFeatures = Array.isArray(stmt.data.if_features)
-    ? stmt.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+  const ifFeatures = Array.isArray(stmt.if_features)
+    ? stmt.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
     : [];
   if (ifFeatures.length > 0) {
     out["if-features"] = ifFeatures;
   }
-  const whenShape = asRecord(stmt.data.when);
+  const whenShape = asRecord(stmt.when);
   const whenExpression = typeof whenShape.expression === "string" ? whenShape.expression : "";
   if (whenExpression.trim().length > 0) {
     const whenOut: Record<string, unknown> = { condition: whenExpression };
@@ -126,7 +126,7 @@ function withStatementMeta(
     }
     out.when = whenOut;
   }
-  const presenceRaw = stmt.data.presence;
+  const presenceRaw = stmt.presence;
   if (typeof presenceRaw === "string" && presenceRaw.trim().length > 0) {
     out.presence = presenceRaw;
   }
@@ -173,7 +173,7 @@ function resolveAbsoluteLeafTypePath(module: YangModule, path: unknown): Record<
   if (current?.keyword !== YangTokenType.LEAF) {
     return undefined;
   }
-  return asRecord(current.data.type);
+  return asRecord(current.type);
 }
 
 function typedefRefOrInline(
@@ -248,11 +248,11 @@ function mergeOneOfBranchesWithBase(
 function choiceMetaForXYang(choice: YangStatement): Record<string, unknown> {
   const meta: Record<string, unknown> = {
     name: choice.name ?? "",
-    mandatory: choice.data.mandatory === true
+    mandatory: choice.mandatory === true
   };
-  withDescription(meta, choice.data.description);
-  const ifFeatures = Array.isArray(choice.data.if_features)
-    ? choice.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+  withDescription(meta, choice.description);
+  const ifFeatures = Array.isArray(choice.if_features)
+    ? choice.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
     : [];
   if (ifFeatures.length > 0) {
     meta["if-features"] = ifFeatures;
@@ -275,7 +275,7 @@ function buildSoleChoiceObjectSchema(
     properties[child.name] = statementToSchema(child, module, typedefNames);
     if (
       [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((child.keyword ?? "") as YangTokenType) &&
-      child.data.mandatory === true
+      child.mandatory === true
     ) {
       required.push(child.name);
     }
@@ -302,7 +302,7 @@ function ioBlockToSchema(
     ...body,
     [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: ioType })
   };
-  withDescription(out, stmt.data.description);
+  withDescription(out, stmt.description);
   return out;
 }
 
@@ -346,7 +346,7 @@ function buildMultiChildObjectSchema(
     properties[child.name] = statementToSchema(child, module, typedefNames);
     if (
       [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((child.keyword ?? "") as YangTokenType) &&
-      child.data.mandatory === true
+      child.mandatory === true
     ) {
       required.push(child.name);
     }
@@ -369,7 +369,7 @@ function buildChoiceOneOf(
 ): Record<string, unknown> | undefined {
   const branches: Array<Record<string, unknown>> = [];
   const cases = choice.statements.filter((stmt) => stmt.keyword === YangTokenType.CASE);
-  const mandatory = choice.data.mandatory === true;
+  const mandatory = choice.mandatory === true;
 
   if (!mandatory) {
     branches.push({ type: JSON_TYPE_OBJECT, maxProperties: 0 });
@@ -395,7 +395,7 @@ function buildChoiceOneOf(
       required,
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(c, { name: c.name ?? "case" })
     };
-    withDescription(branch, c.data.description);
+    withDescription(branch, c.description);
     branches.push(branch);
   }
 
@@ -418,14 +418,14 @@ function statementToSchema(
     const oneOfShape = buildChoiceOneOf(stmt, module, typedefNames);
     const xyChoice: Record<string, unknown> = {
       type: "choice",
-      mandatory: stmt.data.mandatory === true
+      mandatory: stmt.mandatory === true
     };
     const choiceConfig = explicitConfig(stmt);
     if (choiceConfig !== undefined) {
       xyChoice[XYANG_KEYS.config] = choiceConfig;
     }
-    const ifFeatures = Array.isArray(stmt.data.if_features)
-      ? stmt.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
+    const ifFeatures = Array.isArray(stmt.if_features)
+      ? stmt.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
       : [];
     if (ifFeatures.length > 0) {
       xyChoice["if-features"] = ifFeatures;
@@ -434,7 +434,7 @@ function statementToSchema(
       type: JSON_TYPE_OBJECT,
       [YANG_SCHEMA_KEYS.xYang]: xyChoice
     };
-    withDescription(out, stmt.data.description);
+    withDescription(out, stmt.description);
     if (oneOfShape?.oneOf) {
       out.oneOf = oneOfShape.oneOf;
     }
@@ -454,7 +454,7 @@ function statementToSchema(
       ...body,
       [YANG_SCHEMA_KEYS.xYang]: xYang
     };
-    withDescription(out, stmt.data.description);
+    withDescription(out, stmt.description);
     return out;
   }
 
@@ -462,12 +462,12 @@ function statementToSchema(
     const { others, soleChoice } = partitionChoiceSiblings(stmt.statements);
     const listXY = withStatementMeta(stmt, {
       type: keyword,
-      key: typeof stmt.data.key === "string" ? stmt.data.key : undefined
+      key: typeof stmt.key === "string" ? stmt.key : undefined
     }) as Record<string, unknown>;
     if (soleChoice) {
       listXY.choice = choiceMetaForXYang(soleChoice);
     }
-    const unique = stmt.data.unique;
+    const unique = stmt.unique;
     if (Array.isArray(unique) && unique.length > 0) {
       listXY.unique = (unique as string[][]).map((paths) => [...paths]);
     }
@@ -479,18 +479,18 @@ function statementToSchema(
       items: itemSchema,
       [YANG_SCHEMA_KEYS.xYang]: listXY
     };
-    withDescription(out, stmt.data.description);
-    if (typeof stmt.data.min_elements === "number") {
-      out.minItems = stmt.data.min_elements;
+    withDescription(out, stmt.description);
+    if (typeof stmt.min_elements === "number") {
+      out.minItems = stmt.min_elements;
     }
-    if (typeof stmt.data.max_elements === "number") {
-      out.maxItems = stmt.data.max_elements;
+    if (typeof stmt.max_elements === "number") {
+      out.maxItems = stmt.max_elements;
     }
     return out;
   }
 
   if (keyword === YangTokenType.LEAF_LIST) {
-    const typeShape = asRecord(stmt.data.type);
+    const typeShape = asRecord(stmt.type);
     const itemSchema = typedefRefOrInline(typeShape, typedefNames);
     const typeName = (typeShape.name as string | undefined) ?? YangTokenType.STRING_KW;
     const out: Record<string, unknown> = {
@@ -500,7 +500,7 @@ function statementToSchema(
         type: keyword
       })
     };
-    withDescription(out, stmt.data.description);
+    withDescription(out, stmt.description);
     if (typeName === YangTokenType.LEAFREF) {
       const itemsXYang = asRecord(out.items);
       itemsXYang[YANG_SCHEMA_KEYS.xYang] = {
@@ -518,13 +518,13 @@ function statementToSchema(
       };
       out.items = itemsXYang;
     }
-    if (typeof stmt.data.min_elements === "number") {
-      out.minItems = stmt.data.min_elements;
+    if (typeof stmt.min_elements === "number") {
+      out.minItems = stmt.min_elements;
     }
-    if (typeof stmt.data.max_elements === "number") {
-      out.maxItems = stmt.data.max_elements;
+    if (typeof stmt.max_elements === "number") {
+      out.maxItems = stmt.max_elements;
     }
-    const llDefaults = stmt.data.defaults as unknown[] | undefined;
+    const llDefaults = stmt.defaults as unknown[] | undefined;
     if (Array.isArray(llDefaults) && llDefaults.length > 0) {
       out.default = llDefaults;
     }
@@ -532,7 +532,7 @@ function statementToSchema(
   }
 
   if (keyword === YangTokenType.LEAF) {
-    const typeShape = asRecord(stmt.data.type);
+    const typeShape = asRecord(stmt.type);
     const typeName = (typeShape.name as string | undefined) ?? YangTokenType.STRING_KW;
     let leafSchema = typedefRefOrInline(typeShape, typedefNames);
 
@@ -546,7 +546,7 @@ function statementToSchema(
     const xYang = withStatementMeta(stmt, {
       type: keyword
     });
-    if (stmt.data.mandatory === true) {
+    if (stmt.mandatory === true) {
       xYang.mandatory = true;
     }
     if (typeName === YangTokenType.LEAFREF) {
@@ -576,10 +576,10 @@ function statementToSchema(
       ...leafSchemaRest,
       [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy }
     };
-    withDescription(out, stmt.data.description);
-    if (stmt.data.default !== undefined) {
+    withDescription(out, stmt.description);
+    if (stmt.default !== undefined) {
       const schemaType = typeof out.type === "string" ? out.type : null;
-      out.default = jsonSchemaDefaultValue(stmt.data.default, {
+      out.default = jsonSchemaDefaultValue(stmt.default, {
         yangTypeName: typeName,
         jsonSchemaType: schemaType
       });
@@ -594,7 +594,7 @@ function statementToSchema(
         type: keyword
       })
     };
-    withDescription(out, stmt.data.description);
+    withDescription(out, stmt.description);
     return out;
   }
 
@@ -716,7 +716,7 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
     properties[stmt.name] = statementToSchema(stmt, effectiveModule, typedefNames);
     if (
       [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes((stmt.keyword ?? "") as YangTokenType) &&
-      stmt.data.mandatory === true
+      stmt.mandatory === true
     ) {
       required.push(stmt.name);
     }

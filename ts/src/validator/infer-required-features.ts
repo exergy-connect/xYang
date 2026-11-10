@@ -3,7 +3,7 @@ import { declaredFeatures, ModuleData, reachableModuleData, resolvePrefixedModul
 
 /** Infer sorted module:feature requirements for present data; does not validate values. */
 export function inferRequiredFeatures(module: YangModule, instance: unknown): string[] {
-  const modules = reachableModuleData(module.data);
+  const modules = reachableModuleData(module);
   const required = new Set<string>();
   const active = new Set<string>();
   const addConditions = (conditions: unknown, ctx: ModuleData): void => {
@@ -32,7 +32,7 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
   type Entry = { stmt: YangStatement; gates: Gate[]; ctx: ModuleData };
   const entries = (statements: YangStatement[], ctx: ModuleData, gates: Gate[] = []): Entry[] =>
     statements.flatMap(stmt => {
-      const owner = stmt.data.defining_module;
+      const owner = stmt.defining_module;
       const local = owner ? modules.find(m => m.name === owner) : ctx;
       if (!local) throw new Error(`Unknown defining module: ${String(owner)}`);
       if (["choice", "case"].includes(stmt.keyword ?? "")) return entries(stmt.statements, local, [...gates, { stmt, ctx: local }]);
@@ -47,8 +47,8 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
         (key === e.stmt.name && e.ctx === ctx));
       if (matches.length !== 1) throw new Error(`Unknown or ambiguous instance element: ${key}`);
       const { stmt, gates, ctx: local } = matches[0]!;
-      for (const gate of gates) addConditions(gate.stmt.data.if_features, gate.ctx);
-      addConditions(stmt.data.if_features, local);
+      for (const gate of gates) addConditions(gate.stmt.if_features, gate.ctx);
+      addConditions(stmt.if_features, local);
       if (stmt.keyword === "container") walk(stmt.statements, child, local);
       if (stmt.keyword === "list") {
         if (!Array.isArray(child)) throw new Error(`List array expected: ${key}`);
@@ -56,6 +56,6 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
       }
     }
   };
-  walk(module.statements, instance, module.data);
+  walk(module.statements, instance, module);
   return [...required].sort();
 }

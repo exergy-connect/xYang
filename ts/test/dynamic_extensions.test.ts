@@ -25,15 +25,15 @@ module ex {
 
     const ext = mod.statements.find((stmt) => stmt.keyword === "extension" && stmt.name === "custom");
     expect(ext).toBeDefined();
-    expect(ext?.data.argument_name).toBe("name");
+    expect(ext?.argument_name).toBe("name");
 
-    const invocations = mod.statements.filter((stmt) => stmt.data.prefix === "ex");
+    const invocations = mod.statements.filter((stmt) => stmt.prefix === "ex");
     expect(invocations).toHaveLength(1);
     const invocation = invocations[0];
     expect(invocation.keyword).toBe("ex:custom");
     expect(invocation.argument).toBe("payload");
-    expect(invocation.data.resolved_module_name).toBe("ex");
-    expect(invocation.data.resolved_extension_name).toBe("custom");
+    expect(invocation.resolved_module_name).toBe("ex");
+    expect(invocation.resolved_extension_name).toBe("custom");
     expect(invocation.findStatement("foo")?.keyword).toBe("leaf");
   });
 
@@ -209,8 +209,8 @@ module demo-sem {
       const structure = mod.statements.find((stmt) => stmt.keyword === "sx:structure");
       const leafB = structure?.findStatement("b");
       expect(leafB).toBeDefined();
-      expect(leafB?.data.if_features).toEqual(["f"]);
-      const whenShape = leafB?.data.when as Record<string, unknown> | undefined;
+      expect(leafB?.if_features).toEqual(["f"]);
+      const whenShape = leafB?.when as Record<string, unknown> | undefined;
       expect(whenShape?.expression).toBe("(enabled = 'true') and (mode = 'x')");
       expect(whenShape?.evaluate_with_parent_context).toBe(true);
 

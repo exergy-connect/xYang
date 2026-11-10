@@ -1,8 +1,8 @@
 import { YangSemanticError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
-import type { SerializedStatement } from "../core/model";
+import { YangStatement, type YangModule } from "../core/model";
 
-type ModuleShape = Record<string, unknown>;
+type ModuleShape = YangModule;
 
 const STRUCTURE_INDEX_KEY = "ietf-yang-structure-ext:structure-index";
 
@@ -10,15 +10,15 @@ function isObject(value: unknown): value is Record<string, unknown> {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
-function asStatements(value: unknown): SerializedStatement[] {
-  return Array.isArray(value) ? (value as SerializedStatement[]) : [];
+function asStatements(value: unknown): YangStatement[] {
+  return Array.isArray(value) ? (value as YangStatement[]) : [];
 }
 
-function deepCloneStatement(stmt: SerializedStatement): SerializedStatement {
-  return JSON.parse(JSON.stringify(stmt)) as SerializedStatement;
+function deepCloneStatement(stmt: YangStatement): YangStatement {
+  return new YangStatement(JSON.parse(JSON.stringify(stmt)) as YangStatement);
 }
 
-function mergeRootIfFeatures(stmt: SerializedStatement, inherited: string[]): void {
+function mergeRootIfFeatures(stmt: YangStatement, inherited: string[]): void {
   if (inherited.length === 0) {
     return;
   }
@@ -26,7 +26,7 @@ function mergeRootIfFeatures(stmt: SerializedStatement, inherited: string[]): vo
   stmt.if_features = [...inherited, ...current];
 }
 
-function mergeRootWhen(stmt: SerializedStatement, inheritedWhen?: Record<string, unknown>): void {
+function mergeRootWhen(stmt: YangStatement, inheritedWhen?: Record<string, unknown>): void {
   if (!inheritedWhen || typeof inheritedWhen.expression !== "string") {
     return;
   }
@@ -71,17 +71,17 @@ function resolvePrefixedModule(ctxModule: ModuleShape, prefix: string, fullPath:
   return resolved;
 }
 
-function findNamedChild(owner: SerializedStatement, name: string): SerializedStatement | undefined {
+function findNamedChild(owner: YangStatement, name: string): YangStatement | undefined {
   const children = asStatements(owner.statements);
   return children.find((child) => child.name === name);
 }
 
-function findTopLevelStructure(moduleData: ModuleShape, name: string): SerializedStatement | undefined {
+function findTopLevelStructure(moduleData: ModuleShape, name: string): YangStatement | undefined {
   const runtime = isObject(moduleData.extension_runtime) ? moduleData.extension_runtime : undefined;
   const structureIndex = runtime && isObject(runtime[STRUCTURE_INDEX_KEY]) ? (runtime[STRUCTURE_INDEX_KEY] as Record<string, unknown>) : undefined;
   const indexed = structureIndex?.[name];
   if (isObject(indexed)) {
-    return indexed as SerializedStatement;
+    return indexed as unknown as YangStatement;
   }
 
   const statements = asStatements(moduleData.statements);
@@ -91,7 +91,7 @@ function findTopLevelStructure(moduleData: ModuleShape, name: string): Serialize
   });
 }
 
-function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): SerializedStatement {
+function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): YangStatement {
   const segments = parsePrefixedPath(path, "augment-structure");
   const first = segments[0]!;
   const pref0 = first.prefix!;
@@ -111,7 +111,7 @@ function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): Se
   return current;
 }
 
-function applyRFC8791Invocation(stmt: SerializedStatement, contextModule: ModuleShape): SerializedStatement | undefined {
+function applyRFC8791Invocation(stmt: YangStatement, contextModule: ModuleShape): YangStatement | undefined {
   const moduleName = String(stmt.resolved_module_name ?? "");
   const extName = String(stmt.resolved_extension_name ?? "");
   if (moduleName !== "ietf-yang-structure-ext") {
@@ -154,11 +154,11 @@ function applyRFC8791Invocation(stmt: SerializedStatement, contextModule: Module
   return stmt;
 }
 
-function walkAndApply(owner: ModuleShape | SerializedStatement, contextModule: ModuleShape): void {
+function walkAndApply(owner: ModuleShape | YangStatement, contextModule: ModuleShape): void {
   const statements = asStatements(owner.statements);
-  const out: SerializedStatement[] = [];
+  const out: YangStatement[] = [];
   for (const statement of statements) {
-    let current: SerializedStatement | undefined = statement;
+    let current: YangStatement | undefined = statement;
     if (typeof statement.resolved_module_name === "string" && typeof statement.resolved_extension_name === "string") {
       current = applyRFC8791Invocation(statement, contextModule);
     }

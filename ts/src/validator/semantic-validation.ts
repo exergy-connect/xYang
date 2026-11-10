@@ -1,8 +1,8 @@
 import { YangSemanticError } from "../core/errors";
-import { SerializedStatement, YangModule } from "../core/model";
+import { YangStatement, YangModule } from "../core/model";
 
-function iterStatements(statements: SerializedStatement[] | undefined): SerializedStatement[] {
-  const out: SerializedStatement[] = [];
+function iterStatements(statements: YangStatement[] | undefined): YangStatement[] {
+  const out: YangStatement[] = [];
   for (const stmt of statements ?? []) {
     out.push(stmt);
     out.push(...iterStatements(stmt.statements));
@@ -11,7 +11,7 @@ function iterStatements(statements: SerializedStatement[] | undefined): Serializ
 }
 
 function validateListKeyConstraints(module: YangModule): void {
-  for (const stmt of iterStatements(module.data.statements as SerializedStatement[] | undefined)) {
+  for (const stmt of iterStatements(module.statements)) {
     if (stmt.keyword !== "list" || typeof stmt.key !== "string" || stmt.key.trim() === "") {
       continue;
     }

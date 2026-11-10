@@ -38,7 +38,7 @@ it("accepts a concatenated description in an imported module", () => {
 `);
 
   const module = new YangParser({ includePath: [dir] }).parseFile(root);
-  const imports = (module.data as { import_prefixes: Record<string, unknown> }).import_prefixes;
+  const imports = module.import_prefixes;
   const imported = imports.dep as {
     typedefs: Record<string, { description: string }>;
   };

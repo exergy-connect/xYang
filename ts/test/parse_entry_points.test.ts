@@ -28,9 +28,8 @@ function writeBase(dir: string): void {
   );
 }
 
-function importedName(module: { data: Record<string, unknown> }): string | undefined {
-  const imports = module.data.import_prefixes as Record<string, { name?: string }> | undefined;
-  return imports?.b?.name;
+function importedName(module: { import_prefixes: Record<string, { name?: string }> }): string | undefined {
+  return module.import_prefixes.b?.name;
 }
 
 describe("parse entry points (#77)", () => {

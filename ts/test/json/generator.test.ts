@@ -38,7 +38,7 @@ module v {
     expect((round.typedefs["version-string"] as { type?: { name?: string } })?.type?.name).toBe("string");
     const dm = round.findStatement("data-model");
     const version = dm?.findStatement("version");
-    expect((version?.data.type as Record<string, unknown> | undefined)?.name).toBe("version-string");
+    expect((version?.type as Record<string, unknown> | undefined)?.name).toBe("version-string");
   });
 
   it("round-trips if-features metadata on leaf", () => {
@@ -65,7 +65,7 @@ module m {
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");
     const x = dm?.findStatement("x");
-    expect(x?.data.if_features).toEqual(["f"]);
+    expect(x?.if_features).toEqual(["f"]);
   });
 
   it("emits and parses leafref metadata and type shape", () => {
@@ -99,7 +99,7 @@ module lr {
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");
     const peerLeaf = dm?.findStatement("peer");
-    const t = (peerLeaf?.data.type as Record<string, unknown> | undefined) ?? {};
+    const t = (peerLeaf?.type as Record<string, unknown> | undefined) ?? {};
     expect(t.name).toBe("leafref");
     expect(t.path).toBe("/data-model/port");
     expect(t.require_instance).toBe(true);
@@ -161,7 +161,7 @@ module t {
     const round = parseJsonSchema(schema);
     const dm = round.findStatement("data-model");
     const leaf = dm?.findStatement("x");
-    const t = (leaf?.data.type as Record<string, unknown> | undefined) ?? {};
+    const t = (leaf?.type as Record<string, unknown> | undefined) ?? {};
     expect(t.name).toBe("decimal64");
     expect(t.fraction_digits).toBe(3);
   });

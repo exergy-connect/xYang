@@ -38,7 +38,7 @@ describe("imported grouping uses expansion", () => {
     const mod = new YangParser({ includePath: [dir], expandUses: false }).parseFile(
       join(dir, "topo.yang")
     );
-    const topology = (mod.data.statements as { name?: string; statements?: unknown[] }[]).find(
+    const topology = (mod.statements as { name?: string; statements?: unknown[] }[]).find(
       (s) => s.name === "topology"
     );
     const uses = (topology?.statements as { keyword?: string; grouping_name?: string; grouping_prefix?: string; argument?: string }[] | undefined)?.find(
@@ -83,7 +83,7 @@ describe("imported grouping uses expansion", () => {
 
     const parser = new YangParser({ includePath: [dir], expandUses: true });
     const mod = parser.parseFile(join(dir, "topo.yang"));
-    const topology = (mod.data.statements as { name?: string; statements?: unknown[] }[]).find(
+    const topology = (mod.statements as { name?: string; statements?: unknown[] }[]).find(
       (s) => s.name === "topology"
     );
     expect(topology?.statements?.some((s) => (s as { name?: string }).name === "af")).toBe(true);
@@ -121,7 +121,7 @@ describe("imported grouping uses expansion", () => {
 
     const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(join(dir, "app.yang"));
     // Imported module must retain groupings for cross-module uses.
-    const lib = (mod.data.import_prefixes as Record<string, { groupings?: Record<string, unknown> }>).l;
+    const lib = (mod.import_prefixes as Record<string, { groupings?: Record<string, unknown> }>).l;
     expect(lib?.groupings?.g).toBeDefined();
 
     const v = new YangValidator(mod);
@@ -199,7 +199,7 @@ describe("imported grouping uses expansion", () => {
     const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(
       join(dir, "consumer.yang")
     );
-    expect((mod.data.typedefs as Record<string, unknown>).code).toBeDefined();
+    expect((mod.typedefs as Record<string, unknown>).code).toBeDefined();
     const v = new YangValidator(mod);
     expect(v.validate({ data: { value: "a" } }).isValid).toBe(true);
     expect(v.validate({ data: { value: "nope" } }).isValid).toBe(false);

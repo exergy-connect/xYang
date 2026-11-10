@@ -10,8 +10,10 @@ import {
   parseIdentifierRefAtom,
   type YangIdentifierRef
 } from "../core/identifier-ref";
+import type { YangModule } from "../core/model";
 
-export type ModuleData = Record<string, unknown>;
+/** A parsed module. Callers used to pass the `.data` bag; pass the module. */
+export type ModuleData = YangModule;
 
 function stripQuotes(prefix: unknown): string {
   return String(prefix ?? "").replace(/^['"]|['"]$/g, "");

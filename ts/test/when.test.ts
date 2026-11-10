@@ -44,7 +44,7 @@ module test {
 
     const dataModel = module.findStatement("data");
     const itemType = dataModel?.findStatement("item_type");
-    const whenShape = itemType?.data.when as Record<string, unknown> | undefined;
+    const whenShape = itemType?.when as Record<string, unknown> | undefined;
     expect(whenShape?.expression).toBe("../type = 'array'");
   });
 
@@ -71,7 +71,7 @@ module test {
 
     const dataModel = module.findStatement("data");
     const extra = dataModel?.findStatement("extra");
-    const whenShape = extra?.data.when as Record<string, unknown> | undefined;
+    const whenShape = extra?.when as Record<string, unknown> | undefined;
 
     expect(whenShape?.expression).toBe("../mode = 'on'");
     expect(String(whenShape?.description ?? "")).toContain("Only when mode is on.");

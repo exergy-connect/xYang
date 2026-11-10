@@ -82,7 +82,7 @@ module test {
     const choice = module.findStatement("data")?.findStatement("protocol");
     expect(choice).toBeDefined();
     expect(choice?.keyword).toBe("choice");
-    expect(choice?.data.mandatory).toBe(true);
+    expect(choice?.mandatory).toBe(true);
   });
 
   it("stores mandatory false on choice statement", () => {
@@ -106,7 +106,7 @@ module test {
     const choice = module.findStatement("data")?.findStatement("protocol");
     expect(choice).toBeDefined();
     expect(choice?.keyword).toBe("choice");
-    expect(choice?.data.mandatory).toBe(false);
+    expect(choice?.mandatory).toBe(false);
   });
 
   it("defaults choice mandatory to false when omitted", () => {
@@ -128,7 +128,7 @@ module test {
 
     const choice = module.findStatement("data")?.findStatement("protocol");
     expect(choice).toBeDefined();
-    expect(choice?.data.mandatory).toBe(false);
+    expect(choice?.mandatory).toBe(false);
   });
 
   it("rejects duplicate schema node names across cases (RFC 7950 §7.9)", () => {
@@ -214,13 +214,13 @@ module test {
     const choice = module.findStatement("data")?.findStatement("protocol");
     expect(choice).toBeDefined();
     expect(choice?.keyword).toBe("choice");
-    expect(choice?.data.mandatory).toBe(false);
+    expect(choice?.mandatory).toBe(false);
 
     const caseA = choice?.statements.find((s) => s.keyword === "case" && s.name === "a");
     expect(caseA).toBeDefined();
     const leafX = caseA?.findStatement("x");
     expect(leafX?.keyword).toBe("leaf");
-    expect(leafX?.data.mandatory).toBe(true);
+    expect(leafX?.mandatory).toBe(true);
   });
 
 

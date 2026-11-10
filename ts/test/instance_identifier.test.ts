@@ -67,12 +67,12 @@ describe("python parity: test_instance_identifier", () => {
     expect(dm).toBeDefined();
 
     const ptr = dm?.findStatement("ptr");
-    const ptrType = ptr?.data.type as Record<string, unknown> | undefined;
+    const ptrType = ptr?.type as Record<string, unknown> | undefined;
     expect(ptrType?.name).toBe("instance-identifier");
     expect(ptrType?.require_instance).toBe(true);
 
     const loose = dm?.findStatement("ptr_loose");
-    const looseType = loose?.data.type as Record<string, unknown> | undefined;
+    const looseType = loose?.type as Record<string, unknown> | undefined;
     expect(looseType?.name).toBe("instance-identifier");
     expect(looseType?.require_instance).toBe(false);
   });

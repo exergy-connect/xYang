@@ -22,8 +22,8 @@ module m {
 
     const mod2 = parseJsonSchema(schema);
     const leaf = mod2.findStatement("x");
-    expect((leaf?.data.type as { name?: string })?.name).toBe("uint16");
-    expect((leaf?.data.type as { range?: string })?.range).toBeUndefined();
+    expect((leaf?.type as { name?: string })?.name).toBe("uint16");
+    expect((leaf?.type as { range?: string })?.range).toBeUndefined();
   });
 
   it("int32 range 0..max round-trips", () => {

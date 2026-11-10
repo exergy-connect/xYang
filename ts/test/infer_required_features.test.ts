@@ -36,7 +36,7 @@ it("resolves imported prerequisites using module names", () => {
     feature base; feature extra { if-feature "base"; } }`);
   const main = parseYangString(`module main { namespace "urn:main"; prefix m;
     leaf value { if-feature "other:extra"; type string; } }`);
-  main.data.import_prefixes = { other: lib.data };
+  main.import_prefixes = { other: lib };
   expect(inferRequiredFeatures(main, { value: "x" })).toEqual(["lib:base", "lib:extra"]);
 });
 it.each(["missing", "not a", "(a)", "a and", "a a"])("rejects condition %s", condition => {

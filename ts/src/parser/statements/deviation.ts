@@ -1,7 +1,7 @@
 import * as kw from "../keywords";
 import { parseAbsoluteSchemaPath } from "../../core/identifier-ref";
 import { YangSyntaxError } from "../../core/errors";
-import type { SerializedStatement } from "../../core/model";
+import { YangStatement } from "../../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { _consume_balanced_braces, warn_unsupported_deviate } from "../unsupported-skip";
 import type { StatementParsers } from "../statement-parsers";
@@ -9,7 +9,7 @@ import type { StatementParsers } from "../statement-parsers";
 export class DeviationStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
-  parse_deviation(tokens: TokenStream, context: ParserContext): SerializedStatement {
+  parse_deviation(tokens: TokenStream, context: ParserContext): YangStatement {
     tokens.consume(kw.DEVIATION);
     if (tokens.peek_type() !== YangTokenType.STRING) {
       tokens.syntaxError("deviation argument must be a quoted absolute schema path");
@@ -42,8 +42,7 @@ export class DeviationStatementParser {
       tokens.consume_type(YangTokenType.RBRACE);
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
-    const stmt: SerializedStatement = {
-      __class__: "YangStatement",
+    const stmt: YangStatement = new YangStatement({
       keyword: "deviation",
       name: "deviation",
       argument: path,
@@ -51,7 +50,7 @@ export class DeviationStatementParser {
       deviation_path_segments: segments,
       not_supported: notSupported,
       statements: []
-    };
+    });
     if (holder.description) {
       stmt.description = holder.description;
     }

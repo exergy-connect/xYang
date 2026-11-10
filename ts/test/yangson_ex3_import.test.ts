@@ -24,7 +24,7 @@ function buildYangLibraryData(): Record<string, unknown> {
 describe("python parity: test_yangson_ex3_import", () => {
   it("parses example-3-a fixture with uses expansion disabled", () => {
     const mod = new YangParser({ expandUses: false }).parseFile(resolve(ex3Dir, "example-3-a@2017-08-01.yang"));
-    const groupings = mod.data.groupings as Record<string, unknown> | undefined;
+    const groupings = mod.groupings as Record<string, unknown> | undefined;
     expect(mod.name).toBe("example-3-a");
     expect(mod.namespace).toBe("http://example.com/example-3/a");
     expect(groupings?.gbar).toBeDefined();
@@ -40,9 +40,9 @@ describe("python parity: test_yangson_ex3_import", () => {
       copyFileSync(resolve(ex3Dir, "ietf-inet-types@2013-07-15.yang"), join(dir, "ietf-inet-types@2013-07-15.yang"));
 
       const mod = new YangParser({ expandUses: false }).parseFile(join(dir, "example-3-b.yang"));
-      const imports = mod.data.import_prefixes as Record<string, { name?: string }> | undefined;
+      const imports = mod.import_prefixes as Record<string, { name?: string }> | undefined;
       const augment = mod.statements.find((stmt) => stmt.keyword === "augment");
-      const augmentPath = (augment?.data.augment_path as string | undefined) ?? augment?.argument;
+      const augmentPath = (augment?.augment_path as string | undefined) ?? augment?.argument;
 
       expect(mod.name).toBe("example-3-b");
       expect(imports).toBeDefined();

@@ -8,9 +8,9 @@
 
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
-import { SerializedStatement, YangModule } from "../core/model";
+import { YangStatement, YangModule } from "../core/model";
 
-type ModuleData = Record<string, unknown>;
+type ModuleData = YangModule;
 
 const SCHEMA_NODE_KEYWORDS = new Set([
   "container",
@@ -28,12 +28,12 @@ const SCHEMA_NODE_KEYWORDS = new Set([
   "output"
 ]);
 
-function deepCloneStatement(stmt: SerializedStatement): SerializedStatement {
-  return JSON.parse(JSON.stringify(stmt)) as SerializedStatement;
+function deepCloneStatement(stmt: YangStatement): YangStatement {
+  return new YangStatement(JSON.parse(JSON.stringify(stmt)) as YangStatement);
 }
 
-function asStatements(value: unknown): SerializedStatement[] {
-  return Array.isArray(value) ? (value as SerializedStatement[]) : [];
+function asStatements(value: unknown): YangStatement[] {
+  return Array.isArray(value) ? (value as YangStatement[]) : [];
 }
 
 function ownPrefix(module: ModuleData): string {
@@ -49,7 +49,7 @@ function resolvePrefixedModule(ctxModule: ModuleData, prefix: string): ModuleDat
   return resolved && typeof resolved === "object" ? resolved : undefined;
 }
 
-function pathSegmentsFromAugment(aug: SerializedStatement, path: string): YangIdentifierRef[] {
+function pathSegmentsFromAugment(aug: YangStatement, path: string): YangIdentifierRef[] {
   const stored = aug.augment_path_segments;
   if (Array.isArray(stored) && stored.length > 0) {
     return stored as YangIdentifierRef[];
@@ -61,12 +61,12 @@ function pathSegmentsFromAugment(aug: SerializedStatement, path: string): YangId
   }
 }
 
-function isSchemaNode(stmt: SerializedStatement): boolean {
+function isSchemaNode(stmt: YangStatement): boolean {
   const kw = typeof stmt.keyword === "string" ? stmt.keyword : "";
   return Boolean(stmt.name) && SCHEMA_NODE_KEYWORDS.has(kw);
 }
 
-function findNamedSchemaChild(parent: SerializedStatement, name: string): SerializedStatement | undefined {
+function findNamedSchemaChild(parent: YangStatement, name: string): YangStatement | undefined {
   for (const child of asStatements(parent.statements)) {
     if (child.name === name && isSchemaNode(child)) {
       return child;
@@ -75,7 +75,7 @@ function findNamedSchemaChild(parent: SerializedStatement, name: string): Serial
   return undefined;
 }
 
-function findToplevelSchemaChild(module: ModuleData, name: string): SerializedStatement | undefined {
+function findToplevelSchemaChild(module: ModuleData, name: string): YangStatement | undefined {
   for (const child of asStatements(module.statements)) {
     if (child.name === name && isSchemaNode(child)) {
       return child;
@@ -91,8 +91,8 @@ function findToplevelSchemaChild(module: ModuleData, name: string): SerializedSt
 export function resolveAugmentTarget(
   ctxModule: ModuleData,
   path: string,
-  aug?: SerializedStatement
-): SerializedStatement {
+  aug?: YangStatement
+): YangStatement {
   return resolveAbsoluteSchemaPath({
     ctxModule,
     path,
@@ -107,8 +107,8 @@ function walkAbsoluteSchemaPath(options: {
   path: string;
   segments?: YangIdentifierRef[];
   kind: string;
-  findToplevel: (module: ModuleData, name: string) => SerializedStatement | undefined;
-}): { parent: ModuleData | SerializedStatement; node: SerializedStatement } {
+  findToplevel: (module: ModuleData, name: string) => YangStatement | undefined;
+}): { parent: ModuleData | YangStatement; node: YangStatement } {
   const { ctxModule, path, kind, findToplevel } = options;
   let segments = options.segments;
   if (!segments || segments.length === 0) {
@@ -135,7 +135,7 @@ function walkAbsoluteSchemaPath(options: {
         `(path '${path}')`
     );
   }
-  let parent: ModuleData | SerializedStatement = mod0;
+  let parent: ModuleData | YangStatement = mod0;
   for (const seg of segments.slice(1)) {
     const pref = seg.prefix!;
     const nm = seg.name;
@@ -159,8 +159,8 @@ export function resolveAbsoluteSchemaPath(options: {
   path: string;
   segments?: YangIdentifierRef[];
   kind: string;
-  findToplevel: (module: ModuleData, name: string) => SerializedStatement | undefined;
-}): SerializedStatement {
+  findToplevel: (module: ModuleData, name: string) => YangStatement | undefined;
+}): YangStatement {
   const cur = walkAbsoluteSchemaPath(options).node;
   if (!Array.isArray(cur.statements) && cur.statements !== undefined) {
     throw new YangSyntaxError(
@@ -174,7 +174,7 @@ export function resolveAbsoluteSchemaPath(options: {
   return cur;
 }
 
-function removeSchemaChild(parent: ModuleData | SerializedStatement, node: SerializedStatement): void {
+function removeSchemaChild(parent: ModuleData | YangStatement, node: YangStatement): void {
   const stmts = asStatements((parent as { statements?: unknown }).statements);
   const idx = stmts.indexOf(node);
   if (idx < 0) {
@@ -183,26 +183,40 @@ function removeSchemaChild(parent: ModuleData | SerializedStatement, node: Seria
     );
   }
   stmts.splice(idx, 1);
-  (parent as { statements: SerializedStatement[] }).statements = stmts;
+  (parent as { statements: YangStatement[] }).statements = stmts;
 }
 
-function cowStatement(stmt: SerializedStatement): SerializedStatement {
-  return {
-    ...stmt,
-    statements: asStatements(stmt.statements).slice()
-  };
+function cowStatement(stmt: YangStatement): YangStatement {
+  const copy = new YangStatement(stmt);
+  copy.statements = stmt.statements.slice();
+  return copy;
 }
 
 function cowModuleData(data: ModuleData): ModuleData {
-  const imports = (data.import_prefixes as Record<string, ModuleData> | undefined) ?? {};
-  return {
-    ...data,
-    statements: asStatements(data.statements).slice(),
-    import_prefixes: { ...imports }
-  };
+  return new YangModule(
+    {
+      name: data.name,
+      yang_version: data.yang_version,
+      namespace: data.namespace,
+      prefix: data.prefix,
+      organization: data.organization,
+      contact: data.contact,
+      description: data.description,
+      typedefs: data.typedefs,
+      identities: data.identities,
+      import_prefixes: { ...data.import_prefixes },
+      extensions: data.extensions,
+      extension_runtime: data.extension_runtime,
+      features: data.features,
+      feature_if_features: data.feature_if_features,
+      groupings: data.groupings,
+      statements: data.statements.slice()
+    },
+    data.source
+  );
 }
 
-function schemaChildIndex(parent: ModuleData | SerializedStatement, name: string): number {
+function schemaChildIndex(parent: ModuleData | YangStatement, name: string): number {
   return asStatements((parent as { statements?: unknown }).statements).findIndex(
     (stmt) => stmt.name === name && isSchemaNode(stmt)
   );
@@ -275,14 +289,14 @@ function privateTargetModule(
 
 function applyNotSupported(
   ctxModule: ModuleData,
-  dev: SerializedStatement,
+  dev: YangStatement,
   copies: Map<ModuleData, ModuleData>
 ): void {
   const path = String(dev.deviation_path ?? dev.argument ?? "");
   const stored = dev.deviation_path_segments;
   const segments =
     Array.isArray(stored) && stored.length > 0 ? (stored as YangIdentifierRef[]) : parseAbsoluteSchemaPath(path);
-  let located: { parent: ModuleData | SerializedStatement; node: SerializedStatement };
+  let located: { parent: ModuleData | YangStatement; node: YangStatement };
   try {
     located = walkAbsoluteSchemaPath({
       ctxModule,
@@ -315,7 +329,7 @@ function applyNotSupported(
  * A target in another module is removed on a copy owned by this build; the cached module is unchanged.
  */
 export function applyDeviations(module: YangModule): YangModule {
-  const data = module.data;
+  const data = module;
   const statements = asStatements(data.statements);
   const deviations = statements.filter((s) => s.keyword === "deviation");
   const copies = new Map<ModuleData, ModuleData>();
@@ -330,14 +344,14 @@ export function applyDeviations(module: YangModule): YangModule {
   return module;
 }
 
-function stampDefiningModule(stmt: SerializedStatement, moduleName: string): void {
+function stampDefiningModule(stmt: YangStatement, moduleName: string): void {
   stmt.defining_module = moduleName;
   for (const child of asStatements(stmt.statements)) {
     stampDefiningModule(child, moduleName);
   }
 }
 
-function mergeIfFeaturesFromAugment(aug: SerializedStatement, child: SerializedStatement): void {
+function mergeIfFeaturesFromAugment(aug: YangStatement, child: YangStatement): void {
   const ufs = aug.if_features;
   if (!Array.isArray(ufs) || ufs.length === 0) {
     return;
@@ -346,13 +360,13 @@ function mergeIfFeaturesFromAugment(aug: SerializedStatement, child: SerializedS
   child.if_features = [...ufs, ...existing];
 }
 
-function mergeWhenFromAugment(aug: SerializedStatement, child: SerializedStatement): void {
+function mergeWhenFromAugment(aug: YangStatement, child: YangStatement): void {
   const uw = aug.when as Record<string, unknown> | undefined;
   if (!uw || typeof uw.expression !== "string" || uw.expression.trim() === "") {
     return;
   }
   const usesWhen: Record<string, unknown> = {
-    ...deepCloneStatement(uw as SerializedStatement),
+    ...(JSON.parse(JSON.stringify(uw)) as Record<string, unknown>),
     evaluate_with_parent_context: true
   };
   const existing = child.when as Record<string, unknown> | undefined;
@@ -369,8 +383,8 @@ function mergeWhenFromAugment(aug: SerializedStatement, child: SerializedStateme
 }
 
 function mergeAugmentIntoTarget(
-  aug: SerializedStatement,
-  target: SerializedStatement,
+  aug: YangStatement,
+  target: YangStatement,
   sourceModuleName: string
 ): void {
   const copies = asStatements(aug.statements).map((x) => deepCloneStatement(x));
@@ -388,7 +402,7 @@ function mergeAugmentIntoTarget(
 
 /**
  * Register *mod* and every module reachable via ``import`` (RFC 7950 import closure).
- * ``import_prefixes`` values are module *data* records (shared with the parser cache).
+ * ``import_prefixes`` values are the cached {@link YangModule} objects.
  */
 export function registerModuleClosure(modules: Map<string, YangModule>, mod: YangModule): void {
   const name = mod.name;
@@ -396,17 +410,12 @@ export function registerModuleClosure(modules: Map<string, YangModule>, mod: Yan
     return;
   }
   modules.set(name, mod);
-  const imports = (mod.data.import_prefixes as Record<string, ModuleData> | undefined) ?? {};
-  for (const importedData of Object.values(imports)) {
-    if (!importedData || typeof importedData !== "object") {
-      continue;
-    }
-    const importedName = typeof importedData.name === "string" ? importedData.name : "";
+  for (const imported of Object.values(mod.import_prefixes)) {
+    const importedName = imported?.name ?? "";
     if (!importedName || modules.has(importedName)) {
       continue;
     }
-    // Wrap shared data so later merges mutate the same object the parser cached.
-    registerModuleClosure(modules, new YangModule(importedData, { kind: "string", value: importedName }));
+    registerModuleClosure(modules, imported);
   }
 }
 
@@ -419,14 +428,14 @@ export function registerModuleClosure(modules: Map<string, YangModule>, mod: Yan
  */
 export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModule> | Record<string, YangModule>): void {
   const list = modules instanceof Map ? [...modules.values()] : Object.values(modules);
-  const pending: Array<{ mod: YangModule; aug: SerializedStatement }> = [];
+  const pending: Array<{ mod: YangModule; aug: YangStatement }> = [];
   const seen = new Set<ModuleData>();
   for (const mod of list) {
-    if (seen.has(mod.data)) {
+    if (seen.has(mod)) {
       continue;
     }
-    seen.add(mod.data);
-    for (const stmt of asStatements(mod.data.statements)) {
+    seen.add(mod);
+    for (const stmt of asStatements(mod.statements)) {
       if (stmt.keyword === "augment") {
         pending.push({ mod, aug: stmt });
       }
@@ -434,20 +443,20 @@ export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModul
   }
   for (const { mod, aug } of pending) {
     const path = String(aug.augment_path ?? aug.argument ?? "");
-    const target = resolveAugmentTarget(mod.data, path, aug);
+    const target = resolveAugmentTarget(mod, path, aug);
     mergeAugmentIntoTarget(aug, target, String(mod.name ?? ""));
   }
   const seenDev = new Set<ModuleData>();
   for (const mod of list) {
-    if (seenDev.has(mod.data)) {
+    if (seenDev.has(mod)) {
       continue;
     }
-    seenDev.add(mod.data);
+    seenDev.add(mod);
     applyDeviations(mod);
   }
   for (const mod of list) {
-    const stmts = asStatements(mod.data.statements);
-    mod.data.statements = stmts.filter((s) => s.keyword !== "augment");
+    const stmts = asStatements(mod.statements);
+    mod.statements = stmts.filter((s) => s.keyword !== "augment");
   }
 }
 
@@ -457,18 +466,17 @@ export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModul
  * ``augment`` statement from *module*.
  */
 export function applyAugments(module: YangModule): YangModule {
-  const data = module.data;
-  const statements = asStatements(data.statements);
+  const statements = asStatements(module.statements);
   const augments = statements.filter((s) => s.keyword === "augment");
   if (augments.length === 0) {
     return module;
   }
-  const sourceName = String(data.name ?? "");
+  const sourceName = String(module.name ?? "");
   for (const aug of augments) {
     const path = String(aug.augment_path ?? aug.argument ?? "");
-    const target = resolveAugmentTarget(data, path, aug);
+    const target = resolveAugmentTarget(module, path, aug);
     mergeAugmentIntoTarget(aug, target, sourceName);
   }
-  data.statements = statements.filter((s) => s.keyword !== "augment");
+  module.statements = statements.filter((s) => s.keyword !== "augment");
   return module;
 }

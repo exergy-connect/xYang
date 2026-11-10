@@ -7,7 +7,8 @@ import { unknownFunctionError } from "./functions";
 export type XPathSchema = {
   keyword?: string;
   name?: string;
-  data?: Record<string, unknown>;
+  default?: unknown;
+  type?: { name?: string; path?: unknown; [key: string]: unknown };
   statements?: XPathSchema[];
 };
 
@@ -171,8 +172,8 @@ function defaultValue(schema: XPathSchema | null): unknown {
   if (!schema || schema.keyword !== "leaf") {
     return undefined;
   }
-  const raw = schema.data?.default;
-  const typeName = (schema.data?.type as Record<string, unknown> | undefined)?.name;
+  const raw = schema.default;
+  const typeName = (schema.type as Record<string, unknown> | undefined)?.name;
   if (typeName === "boolean" && typeof raw === "string") {
     const lower = raw.toLowerCase();
     if (lower === "true") return true;
@@ -480,7 +481,7 @@ export class XPathEvaluator {
       const sourceNodes = isNodeSet(raw) ? raw : isNode(raw) ? [raw] : [];
       const results: XPathNode[] = [];
       for (const sourceNode of sourceNodes) {
-        const typeShape = sourceNode.schema?.data?.type as Record<string, unknown> | undefined;
+        const typeShape = sourceNode.schema?.type as Record<string, unknown> | undefined;
         if (!typeShape || typeShape.name !== "leafref") {
           continue;
         }

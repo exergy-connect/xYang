@@ -63,7 +63,7 @@ describe("parser parity with Python", () => {
 }`);
     const c = mod.findStatement("state-tree");
     expect(c).toBeDefined();
-    expect(c?.data.config).toBe(false);
+    expect(c?.config).toBe(false);
   });
 
   it("YangSyntaxError toString includes line and message", () => {
@@ -145,6 +145,6 @@ describe("parser parity with Python", () => {
     const root = mod.findStatement("root");
     const leaf = root?.findStatement("x");
     expect(leaf).toBeDefined();
-    expect((leaf?.data as { reference?: string }).reference).toBe("RFC 7950");
+    expect(leaf?.reference).toBe("RFC 7950");
   });
 });
