@@ -75,20 +75,3 @@ export function loadAnydataModules(options: LoadAnydataModulesOptions): YangModu
   applyAugmentationsAcrossModuleMap(modules);
   return [...modules.values()];
 }
-
-/** Unwrap a single RFC 7951 qualified top-level key when it names this module. */
-export function normalizeRfc7951InstanceRoot(data: unknown, moduleName: string): unknown {
-  if (!data || typeof data !== "object" || Array.isArray(data)) {
-    return data;
-  }
-  const root = data as Record<string, unknown>;
-  const keys = Object.keys(root);
-  if (keys.length !== 1 || !keys[0].includes(":")) {
-    return data;
-  }
-  const [mod, local] = keys[0].split(":", 2);
-  if (mod === moduleName && local) {
-    return { [local]: root[keys[0]] };
-  }
-  return data;
-}

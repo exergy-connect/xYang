@@ -1,1 +1,2 @@
-export { resolveQualifiedTopLevel } from "./encoding";
+export { normalizeInstance, normalizationErrors, resolveQualifiedTopLevel } from "./encoding";
+export type { EncodingError } from "./encoding";

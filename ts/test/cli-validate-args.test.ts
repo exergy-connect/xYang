@@ -1,6 +1,5 @@
 import { describe, expect, it } from "vitest";
 import { parseValidateArgs } from "../src/cli/args";
-import { normalizeRfc7951InstanceRoot } from "../src/cli/load-anydata-modules";
 
 describe("cli validate args", () => {
   it("parses anydata flags and positional args", () => {
@@ -55,20 +54,5 @@ describe("cli validate args", () => {
     expect(() =>
       parseValidateArgs(["--anydata-validation", "strict", "host.yang"])
     ).toThrow("--anydata-validation must be off, complete, or candidate");
-  });
-});
-
-describe("normalizeRfc7951InstanceRoot", () => {
-  it("unwraps module-qualified top-level key", () => {
-    const out = normalizeRfc7951InstanceRoot(
-      { "ietf-yp-notification:envelope": { "event-time": "x" } },
-      "ietf-yp-notification"
-    );
-    expect(out).toEqual({ envelope: { "event-time": "x" } });
-  });
-
-  it("leaves unqualified data unchanged", () => {
-    const data = { envelope: { "event-time": "x" } };
-    expect(normalizeRfc7951InstanceRoot(data, "ietf-yp-notification")).toEqual(data);
   });
 });

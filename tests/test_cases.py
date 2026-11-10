@@ -8,7 +8,8 @@ from pathlib import Path
 
 import pytest
 
-from xyang import YangValidator, parse_yang_file
+from xyang import YangValidator
+from xyang.parser.yang_parser import YangParser
 
 CASES = Path(__file__).parent / "cases"
 IMPLS = ["python"] + (["cli"] if os.environ.get("XYANG_CLI") else [])
@@ -38,6 +39,23 @@ def _params():
                 yield pytest.param(f.parent, case, inst, impl, id=f"{impl}:{cid}:{inst['name']}", marks=marks)
 
 
+def _load_case_module(case_dir: Path, module: Path):
+    """Parse the case module. Other ``module`` files in the directory are loaded
+    afterwards so their ``augment`` statements merge into the cached primary module.
+    """
+    parser = YangParser(include_path=(case_dir,))
+    primary = module.resolve()
+    parsed = parser.parse_file(primary)
+    parser._module_cache[primary] = parsed
+    for sibling in sorted(case_dir.glob("*.yang")):
+        if sibling.resolve() == primary:
+            continue
+        if sibling.read_text(encoding="utf-8").lstrip().startswith("submodule"):
+            continue
+        parser.parse_file(sibling)
+    return parsed
+
+
 def _validate(impl, case_dir, case, data):
     """Returns [(json_pointer, code, message)]; raises if the schema is rejected."""
     module = case_dir / case["module"]
@@ -59,7 +77,7 @@ def _validate(impl, case_dir, case, data):
             detail = (proc.stderr or proc.stdout).strip() or f"CLI exited {proc.returncode} without a validation result"
             raise RuntimeError(detail)
         return [(e["path"], e["code"], e.get("message", "")) for e in out["errors"]]
-    parsed = parse_yang_file(module, include_path=(str(case_dir),))
+    parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
     result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(data)

@@ -8,7 +8,7 @@ import { YangValidator } from "./validator/yang-validator";
 import type { ValidationIssue } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
 import { parseCommonArgs, parseValidateArgs } from "./cli/args";
-import { loadAnydataModules, normalizeRfc7951InstanceRoot } from "./cli/load-anydata-modules";
+import { loadAnydataModules } from "./cli/load-anydata-modules";
 
 function printUsage(): void {
   process.stdout.write(
@@ -88,12 +88,6 @@ function runValidate(rest: string[]): number {
   } else {
     data = JSON.parse(readFileSync(0, "utf-8"));
   }
-  // Text output keeps the historical RFC 7951 root unwrap. JSON pointers have to
-  // address the input document, so --format json validates that document as given.
-  if (format === "text" && module.name) {
-    data = normalizeRfc7951InstanceRoot(data, module.name);
-  }
-
   if (format === "json") {
     const detailed = validator.validateDetailed(data);
     writeJsonWarnings(detailed.warnings);

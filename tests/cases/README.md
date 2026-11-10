@@ -59,15 +59,19 @@ when they share the schema.
 
 An error is `{ "path", "code", "message"? }`:
 
-- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into `data`: list entries
-  and leaf-list items by position (`/top/items/1/v`, `/top/tags/0`), member names exactly as they
-  appear in the JSON (`/m:top/a`). The document root is `""`. Errors about a missing node point at
-  where it would be (`/top/name`). `choice` and `case` are not data nodes, so their errors point
-  at the parent data node (`/top`).
+- **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the **normalized**
+  instance, not the spelling in the input. List entries and leaf-list items use array indexes
+  (`/top/items/1/v`, `/top/interface/0/mtu`) even when the input was a dict keyed by the list key.
+  Member names are the canonical ones: a local name when the node is defined in the host module
+  (`/top/a` for both `{"top": ...}` and `{"m:top": ...}`), and `module:name` when it is defined in
+  another module. The document root is `""`. Errors about a missing node point at where it would
+  be (`/top/name`). `choice` and `case` are not data nodes, so their errors point at the parent
+  data node (`/top`).
 - **`code`** is one of `range`, `length`, `pattern`, `enum`, `union`, `type`, `must`, `when`,
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
-  `max-elements`, `duplicate-key`, `unknown-field`, `leafref`, `identityref`,
-  `instance-identifier`, `fraction-digits`, `bits`, `xpath-error`, `xpath-unknown-function`.
+  `max-elements`, `duplicate-key`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
+  `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
+  `xpath-error`, `xpath-unknown-function`.
   Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
@@ -92,8 +96,14 @@ not what one implementation happens to do.
    an `xfail` reason for the wrong one.
 4. When a shared case fully covers a per-language test, delete that test in both languages.
 
-Instance data uses xYang's simple (unqualified) top-level member names, which both libraries
-accept today. The RFC 7951 qualified form is covered in `encoding/qualified-names`.
+Instance data may be RFC 7951 JSON or dict-style JSON (`encoding/dict-style`). Both encodings of
+one instance produce the same normalized tree and the same `(path, code)` set. Paths are always
+the normalized form. Other `module` files in the case directory (not `submodule` files) are
+parsed after the primary module so their `augment` statements merge into it.
+
+`ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a dict-style
+list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
+than one key was given as an object; multi-key lists are arrays only.
 
 ## CLI protocol
 

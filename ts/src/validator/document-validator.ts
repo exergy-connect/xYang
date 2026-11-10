@@ -242,7 +242,8 @@ export class DocumentValidator {
         ) {
           continue;
         }
-        this.validateStatement(stmt, root[stmt.name], stmt.name, errors, rootNode, rootNode);
+        const member = this.canonicalMemberName(stmt) ?? stmt.name;
+        this.validateStatement(stmt, root[member], member, errors, rootNode, rootNode);
       }
 
       if (ctx.constraintChecks) {
@@ -279,7 +280,8 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, parentNode, rootNode);
+        const member = this.canonicalMemberName(child) ?? child.name;
+        this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, parentNode, rootNode);
       }
       return;
     }
@@ -328,7 +330,8 @@ export class DocumentValidator {
         if (!child.name) {
           continue;
         }
-        this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, currentNode, rootNode);
+        const member = this.canonicalMemberName(child) ?? child.name;
+        this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, currentNode, rootNode);
       }
       if (this.ctx.constraintChecks) {
         this.rejectUnknownContainerKeys(stmt, obj, path, errors);
@@ -370,7 +373,8 @@ export class DocumentValidator {
           if (!child.name) {
             continue;
           }
-          this.validateStatement(child, row[child.name], `${path}[${i}].${child.name}`, errors, itemNode, rootNode);
+          const member = this.canonicalMemberName(child) ?? child.name;
+          this.validateStatement(child, this.readChild(row, child), `${path}[${i}].${member}`, errors, itemNode, rootNode);
         }
         if (this.ctx.constraintChecks) {
           this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
@@ -501,6 +505,29 @@ export class DocumentValidator {
     }
   }
 
+  /** RFC 7951 member name: local when defined in the host module, ``module:name`` otherwise. */
+  private canonicalMemberName(stmt: YangStatement): string | undefined {
+    const name = stmt.name;
+    if (!name) {
+      return undefined;
+    }
+    const explicit = stmt.data.defining_module;
+    const owner = typeof explicit === "string" && explicit.length > 0 ? explicit : "";
+    const parent = this.ctx.module.name ?? "";
+    if (owner && owner !== parent) {
+      return `${owner}:${name}`;
+    }
+    return name;
+  }
+
+  private readChild(obj: Record<string, unknown> | undefined, stmt: YangStatement): unknown {
+    const key = this.canonicalMemberName(stmt);
+    if (!obj || !key || !Object.prototype.hasOwnProperty.call(obj, key)) {
+      return undefined;
+    }
+    return obj[key];
+  }
+
   private collectDirectChildKeys(parent: YangStatement | YangModule): Set<string> {
     const keys = new Set<string>();
     const walk = (stmt: YangStatement): void => {
@@ -515,7 +542,10 @@ export class DocumentValidator {
         YangTokenType.CONTAINER, YangTokenType.LIST, YangTokenType.LEAF,
         YangTokenType.LEAF_LIST, YangTokenType.ANYDATA, YangTokenType.ANYXML
       ].includes(kw as YangTokenType)) {
-        keys.add(stmt.name);
+        const canonical = this.canonicalMemberName(stmt);
+        if (canonical) {
+          keys.add(canonical);
+        }
       }
     };
     for (const child of parent.statements ?? []) {
@@ -618,7 +648,8 @@ export class DocumentValidator {
       if (!child.name) {
         continue;
       }
-      this.validateStatement(child, obj[child.name], `${path}.${child.name}`, errors, parentNode, rootNode);
+      const member = this.canonicalMemberName(child) ?? child.name;
+      this.validateStatement(child, this.readChild(obj, child), `${path}.${member}`, errors, parentNode, rootNode);
     }
   }
 
@@ -643,7 +674,8 @@ export class DocumentValidator {
         YangTokenType.ANYXML
       ].includes(keyword as YangTokenType)
     ) {
-      return Boolean(stmt.name && obj[stmt.name] !== undefined);
+      const key = this.canonicalMemberName(stmt);
+      return Boolean(key && Object.prototype.hasOwnProperty.call(obj, key));
     }
     if (keyword === YangTokenType.CHOICE) {
       return this.choiceHasBranchData(stmt, obj);
@@ -948,13 +980,14 @@ export class DocumentValidator {
       if (!child.data.mandatory) {
         continue;
       }
-      const childValue = obj?.[child.name];
+      const childValue = this.readChild(obj, child);
       const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
       if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, `${path}.${child.name}`, errors, childNode, rootNode, parentNode)) {
         continue;
       }
-      if (!obj || obj[child.name] === undefined) {
-        errors.push(issue(`${path}.${child.name}`, "mandatory", `mandatory ${childKeyword} is missing`));
+      const member = this.canonicalMemberName(child) ?? child.name;
+      if (!obj || !Object.prototype.hasOwnProperty.call(obj, member)) {
+        errors.push(issue(`${path}.${member}`, "mandatory", `mandatory ${childKeyword} is missing`));
       }
     }
   }

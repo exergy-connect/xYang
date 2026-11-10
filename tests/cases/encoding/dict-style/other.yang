@@ -1,0 +1,12 @@
+module other {
+  yang-version 1.1;
+  namespace "urn:other";
+  prefix other;
+
+  import m { prefix m; }
+
+  augment "/m:top" {
+    leaf note { type string; }
+    leaf extra { type string; }
+  }
+}

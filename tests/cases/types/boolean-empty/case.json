@@ -1,13 +1,8 @@
 {
-  "description": "boolean is a JSON literal; empty is encoded as [null] (RFC 7951 6.9).",
+  "description": "boolean is a JSON literal; empty is encoded as [null] (RFC 7951 6.9) and normalized to null.",
   "module": "m.yang",
   "instances": [
-    { "name": "valid", "data": { "top": { "flag": false, "marker": [null] } }, "valid": true,
-      "xfail": {
-        "python": "empty accepts None/True/\"\"/{} but not the RFC 7951 encoding [null]",
-        "cli": "empty accepts None/True/\"\"/{} but not the RFC 7951 encoding [null]",
-        "ts": "empty accepts null but not the RFC 7951 encoding [null]"
-      } },
+    { "name": "valid", "data": { "top": { "flag": false, "marker": [null] } }, "valid": true },
     { "name": "boolean literal", "data": { "top": { "flag": true } }, "valid": true },
     { "name": "boolean as word", "data": { "top": { "flag": "yes" } }, "valid": false,
       "errors": [{ "path": "/top/flag", "code": "type" }] },

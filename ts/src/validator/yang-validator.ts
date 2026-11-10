@@ -1,5 +1,6 @@
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
+import { normalizationErrors, normalizeInstance } from "../encoding";
 import {
   DetailedValidationResult,
   DocumentValidator,
@@ -49,8 +50,13 @@ export class YangValidator {
   }
 
   validate(data: unknown): ValidationResult {
-    const [isValid, errors, warnings] = this.documentValidator.validate(data);
-    return { isValid, errors, warnings };
+    const normalized = normalizeInstance(data, this.module);
+    const [isValid, errors, warnings] = this.documentValidator.validate(normalized);
+    const encoding = normalizationErrors(normalized).map((issue) =>
+      issue.path ? `${issue.path}: ${issue.message}` : issue.message
+    );
+    const all = [...encoding, ...errors];
+    return { isValid: isValid && encoding.length === 0, errors: all, warnings };
   }
 
   /**
@@ -58,6 +64,15 @@ export class YangValidator {
    * Each issue is `{ code, path, message, expression?, severity }` with `path` a JSON Pointer.
    */
   validateDetailed(data: unknown): DetailedValidationResult {
-    return this.documentValidator.validateDetailed(data);
+    const normalized = normalizeInstance(data, this.module);
+    const result = this.documentValidator.validateDetailed(normalized);
+    const encoding: ValidationIssue[] = normalizationErrors(normalized).map((issue) => ({
+      code: issue.code,
+      path: issue.path,
+      message: issue.message,
+      severity: "error"
+    }));
+    const errors = [...encoding, ...result.errors];
+    return { valid: errors.length === 0, errors, warnings: result.warnings };
   }
 }

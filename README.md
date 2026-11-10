@@ -131,6 +131,8 @@ const validator = new YangValidator(module);
 const result = validator.validate({ "data-model": { name: "example", entities: [] } });
 ```
 
+Instance input (the JSON document, not the schema `.yang.json` file) may be RFC 7951 or plain dict-style JSON. Both are normalized to one tree before validation: a single-key list may be an object keyed by the key value, member names may omit the module qualifier, `int64` / `uint64` / `decimal64` accept a JSON number or the RFC 7951 string, and `empty` is `null` or `[null]`. Error paths are JSON Pointers into that normalized tree. In a union, a `string` member (or another string-typed member) wins over the RFC 7951 string encoding of `int64`, `uint64`, and `decimal64`, so `"5"` and `5` can select different members. That differs from strict RFC 7951 member-order resolution on purpose.
+
 ---
 
 ## Example: IETF YANG Push notification

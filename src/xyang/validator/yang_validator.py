@@ -5,7 +5,7 @@ xYang validator: uses xpath DocumentValidator for validation.
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
 from ..ast import YangStatementList
-from ..encoding import resolve_structure_instance
+from ..encoding import normalize_instance, resolve_structure_instance
 from ..module import YangModule
 from .document_validator import DocumentValidator
 from .validation_error import Severity, ValidationError
@@ -109,7 +109,13 @@ class YangValidator:
         structure = resolve_structure_instance(data, self.module)
         if structure is not None:
             root_schema, instance = structure
-        return self._document_validator(root_schema).validate(instance, leafref_severity=leafref_severity)
+        normalized = normalize_instance(instance, self.module, schema=root_schema)
+        norm_errors = [
+            ValidationError(path=err.pointer or "/", message=err.message, code=err.code, pointer=err.pointer)
+            for err in getattr(normalized, "normalization_errors", [])
+        ]
+        doc_errors = self._document_validator(root_schema).validate(normalized, leafref_severity=leafref_severity)
+        return norm_errors + doc_errors
 
     @staticmethod
     def _issue(e: ValidationError) -> Dict[str, Any]:

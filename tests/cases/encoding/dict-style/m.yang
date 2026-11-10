@@ -1,0 +1,43 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    list interface {
+      key name;
+      leaf name { type string; }
+      leaf mtu { type int64 { range "0..9000"; } }
+    }
+    list pairs {
+      key "a b";
+      leaf a { type string; }
+      leaf b { type uint8; }
+    }
+    leaf marker { type empty; }
+    leaf wide { type int64; }
+    leaf bigu { type uint64; }
+    leaf price { type decimal64 { fraction-digits 1; } }
+    leaf num-or-str {
+      type union {
+        type int64;
+        type string;
+      }
+      must ". = 5";
+    }
+    leaf str-wins {
+      type union {
+        type int64 { range "10..20"; }
+        type string;
+      }
+    }
+    leaf num-or-bool {
+      type union {
+        type int64;
+        type boolean;
+      }
+    }
+    leaf extra { type string; }
+    anydata blob;
+  }
+}

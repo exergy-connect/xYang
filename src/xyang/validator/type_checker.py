@@ -486,7 +486,8 @@ class TypeChecker:
         return []
 
     def _check_empty(self, value: Any) -> List[TypeIssue]:
-        if value not in (None, True, "", {}):
+        # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
+        if value is not None:
             return [_issue("type", f"Empty type leaf should have no value, got {value!r}")]
         return []
 
