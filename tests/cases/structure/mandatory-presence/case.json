@@ -9,7 +9,6 @@
     { "name": "present presence container enforces mandatory", "data": { "top": { "name": "x" }, "opt": {} }, "valid": false,
       "errors": [{ "path": "/opt/level", "code": "mandatory" }] },
     { "name": "absent non-presence container still enforces mandatory", "data": {}, "valid": false,
-      "errors": [{ "path": "/top/name", "code": "mandatory" }],
-      "xfail": { "python": "Python skips absent containers, so mandatory leaves under an absent non-presence container are not reported", "cli": "Python skips absent containers, so mandatory leaves under an absent non-presence container are not reported" } }
+      "errors": [{ "path": "/top/name", "code": "mandatory" }] }
   ]
 }

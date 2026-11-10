@@ -316,19 +316,20 @@ export class DocumentValidator {
     }
 
     if (keyword === YangTokenType.CONTAINER) {
-      if (value === undefined) {
-        // `presence` containers that are absent have no instance subtree; do not require inner nodes.
-        if (!stmt.data.presence) {
-          this.validateMandatoryChildren(stmt, undefined, path, errors, currentNode, rootNode);
-        }
+      if (value === undefined && stmt.data.presence) {
         return;
       }
-      if (!value || typeof value !== "object" || Array.isArray(value)) {
+      if (value !== undefined && (!value || typeof value !== "object" || Array.isArray(value))) {
         errors.push(issue(path, "type", "container must be an object"));
         return;
       }
-      const obj = value as Record<string, unknown>;
-      if (this.ctx.constraintChecks) {
+      // RFC 7950 §7.5.1: an absent non-presence container exists implicitly, so mandatory
+      // and min-elements below it still apply. Its own `must` is not evaluated.
+      const absent = value === undefined;
+      const obj = (value ?? {}) as Record<string, unknown>;
+      if (absent) {
+        currentNode.data = obj;
+      } else if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
       for (const child of stmt.statements) {
@@ -350,6 +351,7 @@ export class DocumentValidator {
 
     if (keyword === YangTokenType.LIST) {
       if (value === undefined) {
+        this.checkElementCount(stmt, 0, path, errors);
         return;
       }
       if (!Array.isArray(value)) {
@@ -433,6 +435,7 @@ export class DocumentValidator {
 
     if (keyword === YangTokenType.LEAF_LIST) {
       if (value === undefined) {
+        this.checkElementCount(stmt, 0, path, errors);
         return;
       }
       if (!Array.isArray(value)) {
@@ -490,7 +493,7 @@ export class DocumentValidator {
     }
   }
 
-  /** min-elements / max-elements for a present list or leaf-list (absent ones are not checked, as in Python). */
+  /** min-elements / max-elements for a list or leaf-list. An absent one has count 0 (RFC 7950 §7.7.5). */
   private checkElementCount(stmt: YangStatement, count: number, path: string, errors: InternalIssue[]): void {
     const name = stmt.name ?? "node";
     const min = stmt.data.min_elements;
@@ -975,44 +978,6 @@ export class DocumentValidator {
       return value.length > 0;
     }
     return value !== null && value !== undefined;
-  }
-
-  private validateMandatoryChildren(
-    stmt: YangStatement,
-    parentValue: unknown,
-    path: string,
-    errors: InternalIssue[],
-    parentNode: XPathNode,
-    rootNode: XPathNode
-  ): void {
-    const obj = parentValue && typeof parentValue === "object" && !Array.isArray(parentValue)
-      ? (parentValue as Record<string, unknown>)
-      : undefined;
-
-    for (const child of stmt.statements) {
-      const childKeyword = child.keyword ?? "";
-      if (
-        ![YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML].includes(childKeyword as YangTokenType) ||
-        !child.name
-      ) {
-        continue;
-      }
-      const cIf = Array.isArray(child.data.if_features) ? (child.data.if_features as string[]) : [];
-      if (!stmtIfFeaturesSatisfied(cIf, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
-        continue;
-      }
-      if (!child.data.mandatory) {
-        continue;
-      }
-      const childValue = obj ? this.instanceValue(obj, child) : undefined;
-      const childNode: XPathNode = { data: childValue, schema: child as unknown as XPathSchema, parent: parentNode };
-      if (this.ctx.constraintChecks && !this.checkWhen(child, childValue, this.childPath(path, child), errors, childNode, rootNode, parentNode)) {
-        continue;
-      }
-      if (!obj || childValue === undefined) {
-        errors.push(issue(this.childPath(path, child), "mandatory", `mandatory ${childKeyword} is missing`));
-      }
-    }
   }
 
   private anydataModuleMap(modules: YangModule[]): Record<string, YangModule> {

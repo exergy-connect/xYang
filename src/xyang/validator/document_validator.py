@@ -474,6 +474,14 @@ class DocumentValidator:
         if debug:
             logger.debug("phase 2 structural path=%s", child_path)
         if not self._check_structural(stmt, name, data, child_path, child_pointer, enforce_mandatory_choice):
+            if isinstance(stmt, YangContainerStmt) and stmt.presence is None and not present:
+                # RFC 7950 §7.5.1: a non-presence container exists implicitly, so
+                # mandatory and min-elements below it still apply.
+                empty_node = parent_node.step({}, stmt)
+                path.push(name, pointer_name=json_name)
+                child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
+                self._visit_children({}, stmt, (parent_ctx_obj.child(empty_node), empty_node), path, child_enforce)
+                path.pop()
             return
 
         # -- 3. must (evaluated in current node context) --
@@ -780,8 +788,8 @@ class DocumentValidator:
             count = len(effective) if isinstance(effective, list) else (1 if effective is not None else 0)
             min_e = getattr(stmt, "min_elements", None)
             max_e = getattr(stmt, "max_elements", None)
-            # Only enforce min/max when list is present (YANG: optional list may be omitted)
-            if min_e is not None and present and count < min_e:
+            # RFC 7950 §7.7.5: min-elements also applies to an absent list (count 0).
+            if min_e is not None and count < min_e:
                 self._add(
                     path=path,
                     pointer=pointer,
