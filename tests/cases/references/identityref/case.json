@@ -3,7 +3,7 @@
   "module": "m.yang",
   "instances": [
     { "name": "derived identity", "data": { "top": { "proto": "tcp" } }, "valid": true,
-      "xfail": { "python": "unprefixed identity names do not resolve, only module-qualified ones (m:tcp)" } },
+      "xfail": { "python": "unprefixed identity names do not resolve, only module-qualified ones (m:tcp)", "cli": "unprefixed identity names do not resolve, only module-qualified ones (m:tcp)" } },
     { "name": "module-qualified identity", "data": { "top": { "proto": "m:tcp" } }, "valid": true },
     { "name": "identity with another base", "data": { "top": { "proto": "m:color" } }, "valid": false,
       "errors": [{ "path": "/top/proto", "code": "identityref" }],

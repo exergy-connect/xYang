@@ -5,12 +5,14 @@
     { "name": "qualified top-level member", "data": { "m:top": { "a": 1 } }, "valid": true,
       "xfail": {
         "python": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)",
+        "cli": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)",
         "ts": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)"
       } },
     { "name": "qualified top-level member, child error", "data": { "m:top": { "a": 300 } }, "valid": false,
       "errors": [{ "path": "/m:top/a", "code": "range" }],
       "xfail": {
         "python": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)",
+        "cli": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)",
         "ts": "YangValidator rejects 'm:top' as an unknown field (only the TS CLI unwraps it)"
       } },
     { "name": "unknown module prefix", "data": { "x:top": { "a": 1 } }, "valid": false,

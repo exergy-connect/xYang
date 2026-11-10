@@ -6,6 +6,6 @@
     { "name": "+ false", "data": { "top": { "plus": 5 } }, "valid": false,
       "errors": [{ "path": "/top/plus", "code": "must" }] },
     { "name": "*", "data": { "top": { "times": 2 } }, "valid": true,
-      "xfail": { "python": "'*' is not a multiplication operator in the Python XPath evaluator (TS supports it)" } }
+      "xfail": { "python": "'*' is not a multiplication operator in the Python XPath evaluator (TS supports it)", "cli": "'*' is not a multiplication operator in the Python XPath evaluator (TS supports it)" } }
   ]
 }

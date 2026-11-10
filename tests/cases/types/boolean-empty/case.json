@@ -5,6 +5,7 @@
     { "name": "valid", "data": { "top": { "flag": false, "marker": [null] } }, "valid": true,
       "xfail": {
         "python": "empty accepts None/True/\"\"/{} but not the RFC 7951 encoding [null]",
+        "cli": "empty accepts None/True/\"\"/{} but not the RFC 7951 encoding [null]",
         "ts": "empty accepts null but not the RFC 7951 encoding [null]"
       } },
     { "name": "boolean literal", "data": { "top": { "flag": true } }, "valid": true },

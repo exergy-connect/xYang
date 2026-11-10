@@ -9,7 +9,7 @@
       "errors": [{ "path": "/top/small", "code": "range" }] },
     { "name": "between range parts", "data": { "top": { "multi": 5 } }, "valid": false,
       "errors": [{ "path": "/top/multi", "code": "range" }],
-      "xfail": { "python": "_parse_range splits on the first '..' only, so multi-part ranges lose their upper bound" } },
+      "xfail": { "python": "_parse_range splits on the first '..' only, so multi-part ranges lose their upper bound", "cli": "_parse_range splits on the first '..' only, so multi-part ranges lose their upper bound" } },
     { "name": "fraction is not an integer", "data": { "top": { "u8": 1.5 } }, "valid": false,
       "errors": [{ "path": "/top/u8", "code": "type" }] },
     { "name": "boolean is not an integer", "data": { "top": { "u8": true } }, "valid": false,
@@ -18,6 +18,7 @@
       "errors": [{ "path": "/top/u8", "code": "type" }],
       "xfail": {
         "python": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8",
+        "cli": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8",
         "ts": "numeric strings are coerced; RFC 7951 6.1 requires a JSON number for uint8"
       } }
   ]
