@@ -42,7 +42,7 @@ Use `parseYangFile("path/to/module.yang")` to load a module from disk.
 | `enable_extension` | `enableExtension` |
 | `validate() -> (ok, errors, warnings)` | `validate() -> { isValid, errors, warnings }` |
 
-`expand_uses`, `include_path`, `find_statement`, and `get_all_leaves` still work and warn once. Use the camelCase names.
+`expand_uses`, `include_path`, `find_statement`, `get_all_leaves`, and `enable_extension` still work and warn once. Use the camelCase names.
 
 ## CLI
 
