@@ -116,9 +116,9 @@ class ChoiceStatementParser:
     def parse_choice_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse mandatory statement in choice."""
         tokens.consume(kw.MANDATORY)
-        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
+        value = self._parsers.parse_boolean_argument(tokens, "mandatory")
         if context.current_parent and isinstance(context.current_parent, YangChoiceStmt):
-            context.current_parent.mandatory = tt == kw.TRUE
+            context.current_parent.mandatory = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_choice_default(self, tokens: TokenStream, context: ParserContext) -> None:

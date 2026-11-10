@@ -1,0 +1,6 @@
+{
+  "description": "require-instance \"yes\" is a syntax error naming require-instance and the value.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "require-instance argument must be 'true' or 'false', got 'yes'"
+}

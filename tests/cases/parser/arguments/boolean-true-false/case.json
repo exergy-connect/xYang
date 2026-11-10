@@ -1,0 +1,7 @@
+{
+  "description": "Boolean arguments true and false are the same quoted or unquoted on mandatory, config, require-instance, yin-element, choice mandatory, and refine mandatory.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "quoted true and unquoted false", "data": { "top": { "quoted-true": "x", "ref-quoted": "x", "ref-plain": "x", "chosen": "a" } }, "valid": true }
+  ]
+}

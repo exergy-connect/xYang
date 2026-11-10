@@ -1,0 +1,6 @@
+{
+  "description": "mandatory \"1\" is not coerced to true.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "mandatory argument must be 'true' or 'false', got '1'"
+}

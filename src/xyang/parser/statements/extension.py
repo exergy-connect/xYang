@@ -74,8 +74,8 @@ class ExtensionStatementParser:
     ) -> None:
         """Parse ``yin-element`` under ``extension argument``."""
         tokens.consume(kw.YIN_ELEMENT)
-        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
+        value = self._parsers.parse_boolean_argument(tokens, "yin-element")
         parent = context.current_parent
         if isinstance(parent, YangExtensionStmt):
-            parent.argument_yin_element = tt == kw.TRUE
+            parent.argument_yin_element = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)

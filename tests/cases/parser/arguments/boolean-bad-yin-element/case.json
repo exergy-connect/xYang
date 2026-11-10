@@ -1,0 +1,6 @@
+{
+  "description": "yin-element \"yes\" is a syntax error naming yin-element and the value.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "yin-element argument must be 'true' or 'false', got 'yes'"
+}

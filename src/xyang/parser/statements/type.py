@@ -200,8 +200,9 @@ class TypeStatementParser:
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse require-instance constraint (for leafref)."""
         tokens.consume(kw.REQUIRE_INSTANCE)
-        _, tt = tokens.consume_oneof([kw.TRUE, kw.FALSE])
-        type_stmt.require_instance = tt == kw.TRUE
+        type_stmt.require_instance = self._parsers.parse_boolean_argument(
+            tokens, "require-instance"
+        )
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_pattern_error_message(self, tokens: TokenStream, _context: ParserContext) -> None:

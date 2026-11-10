@@ -159,8 +159,7 @@ export class TypeStatementParser {
 
   parse_type_require_instance(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.REQUIRE_INSTANCE);
-    const [, tt] = tokens.consume_oneof([kw.TRUE, kw.FALSE]);
-    type_stmt.require_instance = tt === kw.TRUE;
+    type_stmt.require_instance = this.parsers.parse_boolean_argument(tokens, "require-instance");
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
