@@ -23,6 +23,7 @@ RFC 7950 §7.9.4 mandatory ``choice`` / §7.6.5 mandatory ``leaf`` under a ``cas
 
 from __future__ import annotations
 
+import json
 import logging
 from typing import AbstractSet, Any, Dict, List, Optional, Tuple
 
@@ -61,6 +62,24 @@ from .validation_error import ValidationError, Severity
 ParentCtx = Tuple[Context, Node]
 
 logger = logging.getLogger("xyang.validator")
+
+_MISSING = object()
+
+
+def _descendant_value(entry: Any, path: str) -> Any:
+    """Value at a ``unique`` descendant path (``a/b``) in a list entry, or ``_MISSING``."""
+    cur = entry
+    for seg in path.split("/"):
+        if not isinstance(cur, dict) or seg not in cur:
+            return _MISSING
+        cur = cur[seg]
+    return cur
+
+
+def _unique_display(value: Any) -> str:
+    if isinstance(value, bool):
+        return "true" if value else "false"
+    return str(value)
 
 
 class DocumentValidator:
@@ -572,6 +591,8 @@ class DocumentValidator:
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
             self._check_list_key_uniqueness(val, key_names, name, child_path, child_pointer)
+            if self._constraint_checks:
+                self._check_list_unique(stmt, val, child_path, child_pointer)
             for i, entry in enumerate(val):
                 if not isinstance(entry, dict):
                     continue
@@ -888,6 +909,32 @@ class DocumentValidator:
                 return True
             seen_keys[key_tuple] = i
         return False
+
+    def _check_list_unique(self, stmt: YangListStmt, val: list, path_str: str, pointer: str) -> None:
+        """RFC 7950 §7.8.3: one error per ``unique`` set whose values repeat across entries.
+
+        Entries missing any leaf of the set are ignored.
+        """
+        for paths in stmt.unique:
+            seen: Dict[str, int] = {}
+            for i, entry in enumerate(val):
+                values = [_descendant_value(entry, p) for p in paths]
+                if any(v is _MISSING for v in values):
+                    continue
+                token = json.dumps(values, sort_keys=True, default=str)
+                if token in seen:
+                    shown = ", ".join(f"{p}='{_unique_display(v)}'" for p, v in zip(paths, values))
+                    self._add(
+                        path=path_str,
+                        pointer=pointer,
+                        code="unique",
+                        message=(
+                            f"Unique constraint violated in list '{stmt.name}': {shown} "
+                            f"(entries at index {seen[token]} and {i})"
+                        ),
+                    )
+                    break
+                seen[token] = i
 
     def _entry_key_from_names(self, entry: Any, key_names: List[str]) -> Optional[str]:
         """Path key string for a list entry from key leaf names."""

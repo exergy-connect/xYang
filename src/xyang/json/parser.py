@@ -739,6 +739,7 @@ def _convert_list(
                 child_statements.append(child)
     lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
     lst.must_statements = must_list
+    lst.unique = _unique_from_xyang(xyang, f"{parent_path}/{name}")
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
         lst.when = when_stmt
@@ -749,6 +750,17 @@ def _convert_list(
     _set_if_features_from_xyang(lst, xyang)
     _set_config_from_xyang(lst, xyang)
     return lst
+
+
+def _unique_from_xyang(xyang: dict[str, Any], where: str) -> list[list[str]]:
+    raw = xyang.get(XYangKey.UNIQUE)
+    if raw is None:
+        return []
+    if not isinstance(raw, list) or not all(
+        isinstance(paths, list) and paths and all(isinstance(p, str) and p for p in paths) for paths in raw
+    ):
+        raise ValueError(f"x-yang 'unique' at {where} must be a list of non-empty lists of paths, got {raw!r}")
+    return [list(paths) for paths in raw]
 
 
 def _convert_leaf(

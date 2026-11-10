@@ -573,6 +573,20 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
   return out;
 }
 
+function uniqueFromXyang(xy: Record<string, unknown>, where: string): string[][] | undefined {
+  const raw = xy.unique;
+  if (raw === undefined) {
+    return undefined;
+  }
+  const ok =
+    Array.isArray(raw) &&
+    raw.every((paths) => Array.isArray(paths) && paths.length > 0 && paths.every((p) => typeof p === "string" && p.length > 0));
+  if (!ok) {
+    throw new Error(`x-yang 'unique' at ${where} must be a list of non-empty lists of paths, got ${JSON.stringify(raw)}`);
+  }
+  return (raw as string[][]).map((paths) => [...paths]);
+}
+
 function parseList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): SerializedStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
   const items = asRecord(schema.items as Record<string, unknown>);
@@ -597,6 +611,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
     argument: name,
     statements: children,
     key: typeof xy.key === "string" ? xy.key : undefined,
+    unique: uniqueFromXyang(xy, name),
     min_elements:
       typeof schema.minItems === "number"
         ? (schema.minItems as number)

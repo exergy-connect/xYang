@@ -259,12 +259,15 @@ export class YangListStmt extends YangStatementWithWhen {
   key?: string;
   min_elements?: number;
   max_elements?: number;
+  /** One entry per `unique` statement: descendant paths with prefixes stripped (`a/b`). */
+  unique: string[][];
 
   constructor(init: Partial<YangListStmt> = {}) {
     super(init);
     this.keyword = "list";
     this.must_statements = init.must_statements ?? [];
     this.key = init.key;
+    this.unique = init.unique ?? [];
     this.min_elements = init.min_elements;
     this.max_elements = init.max_elements;
   }

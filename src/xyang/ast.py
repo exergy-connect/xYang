@@ -209,6 +209,8 @@ class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     key: Optional[str] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
+    #: One entry per ``unique`` statement: descendant paths with prefixes stripped (``a/b``).
+    unique: List[List[str]] = field(default_factory=list)
 
 
 @dataclass

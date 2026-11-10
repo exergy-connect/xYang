@@ -4,6 +4,7 @@ import {
   YangExtensionInvocationStmt,
   YangExtensionStmt,
   YangLeafListStmt,
+  YangListStmt,
   YangMustStmt,
   YangNotificationStmt,
   YangRefineStmt,
@@ -209,6 +210,10 @@ export class StatementParsers {
     [kw.KEY]: (tokens, context) => {
       this.parse_list_key(tokens, context);
       return { __class__: "YangStatement", keyword: "key", statements: [] };
+    },
+    [kw.UNIQUE]: (tokens, context) => {
+      this.parse_list_unique(tokens, context);
+      return { __class__: "YangStatement", keyword: "unique", statements: [] };
     },
     [kw.MIN_ELEMENTS]: (tokens, context) => {
       this.parse_min_elements(tokens, context);
@@ -629,6 +634,10 @@ export class StatementParsers {
     if (stmt.key !== undefined) {
       out.key = stmt.key;
     }
+    const unique = (stmt as { unique?: string[][] }).unique;
+    if (Array.isArray(unique) && unique.length > 0) {
+      out.unique = unique.map((paths) => [...paths]);
+    }
     const minElements = (stmt as { min_elements?: number }).min_elements;
     if (typeof minElements === "number") {
       out.min_elements = minElements;
@@ -949,6 +958,30 @@ export class StatementParsers {
     const [value] = tokens.consume_oneof([YangTokenType.STRING, YangTokenType.IDENTIFIER]);
     const parent: any = context.current_parent;
     if (parent && "key" in parent) parent.key = value;
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  /** `unique "<descendant-path> ..."` (RFC 7950 §7.8.3). */
+  parse_list_unique(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.UNIQUE);
+    const arg = this.parse_string_argument(tokens);
+    const paths = arg
+      .split(/\s+/)
+      .filter(Boolean)
+      .map((path) =>
+        path
+          .split("/")
+          .filter(Boolean)
+          .map((seg) => seg.slice(seg.indexOf(":") + 1))
+          .join("/")
+      );
+    if (paths.length === 0) {
+      tokens.syntaxError("unique requires at least one descendant path");
+    }
+    const parent: unknown = context.current_parent;
+    if (parent instanceof YangListStmt) {
+      parent.unique.push(paths);
+    }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

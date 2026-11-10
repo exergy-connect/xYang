@@ -62,6 +62,7 @@ class XYangKey:
     MUST = "must"
     BITS = "bits"
     KEY = "key"
+    UNIQUE = "unique"
     PRESENCE = "presence"
     MANDATORY = "mandatory"
     CONFIG = "config"

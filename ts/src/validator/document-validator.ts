@@ -47,6 +47,7 @@ const MESSAGE_CODES: Array<[string, RegExp]> = [
   ["min-elements", /requires at least \d+$/],
   ["max-elements", /allows at most \d+$/],
   ["duplicate-key", /^Duplicate key in list '/],
+  ["unique", /^Unique constraint violated/],
   ["xpath-unknown-function", /xpath-unknown-function: unknown XPath function/],
   ["xpath-error", /^Error evaluating (must|when) expression/],
   ["must", /^must constraint not satisfied on '/],
@@ -363,6 +364,9 @@ export class DocumentValidator {
       const keyNames = keyRaw.length > 0 ? keyRaw.split(/\s+/).map((k) => k.trim()).filter(Boolean) : [];
       if (this.ctx.constraintChecks && keyNames.length > 0) {
         this.checkListKeyUniqueness(value, keyNames, stmt.name ?? "list", path, errors);
+      }
+      if (this.ctx.constraintChecks) {
+        this.checkListUnique(stmt, value, path, errors);
       }
       for (let i = 0; i < value.length; i += 1) {
         const item = value[i];
@@ -762,6 +766,48 @@ export class DocumentValidator {
       seenKeys.set(keyStr, i);
     }
     return false;
+  }
+
+  /**
+   * RFC 7950 §7.8.3: one error per `unique` set whose values repeat across entries.
+   * Entries missing any leaf of the set are ignored.
+   */
+  private checkListUnique(stmt: YangStatement, val: unknown[], pathStr: string, errors: InternalIssue[]): void {
+    const sets = Array.isArray(stmt.data.unique) ? (stmt.data.unique as string[][]) : [];
+    const missing = Symbol("missing");
+    const lookup = (entry: unknown, descPath: string): unknown => {
+      let cur: unknown = entry;
+      for (const seg of descPath.split("/")) {
+        if (!cur || typeof cur !== "object" || Array.isArray(cur) || !Object.prototype.hasOwnProperty.call(cur, seg)) {
+          return missing;
+        }
+        cur = (cur as Record<string, unknown>)[seg];
+      }
+      return cur;
+    };
+    for (const paths of sets) {
+      const seen = new Map<string, number>();
+      for (let i = 0; i < val.length; i += 1) {
+        const values = paths.map((p) => lookup(val[i], p));
+        if (values.includes(missing)) {
+          continue;
+        }
+        const token = JSON.stringify(values);
+        const first = seen.get(token);
+        if (first !== undefined) {
+          const shown = paths.map((p, j) => `${p}='${String(values[j])}'`).join(", ");
+          errors.push(
+            issue(
+              pathStr,
+              "unique",
+              `Unique constraint violated in list '${stmt.name ?? "list"}': ${shown} (entries at index ${first} and ${i})`
+            )
+          );
+          break;
+        }
+        seen.set(token, i);
+      }
+    }
   }
 
   /**

@@ -467,6 +467,10 @@ function statementToSchema(
     if (soleChoice) {
       listXY.choice = choiceMetaForXYang(soleChoice);
     }
+    const unique = stmt.data.unique;
+    if (Array.isArray(unique) && unique.length > 0) {
+      listXY.unique = (unique as string[][]).map((paths) => [...paths]);
+    }
     const itemSchema = soleChoice
       ? buildSoleChoiceObjectSchema(others, soleChoice, module, typedefNames)
       : buildMultiChildObjectSchema(stmt.statements, module, typedefNames);

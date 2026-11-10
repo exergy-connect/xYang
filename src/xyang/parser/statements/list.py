@@ -25,6 +25,7 @@ class ListStatementParser:
             self._parsers,
             {
             kw.KEY: self._parsers.parse_list_key,
+            kw.UNIQUE: self._parsers.parse_list_unique,
             kw.MIN_ELEMENTS: self._parsers.parse_min_elements,
             kw.MAX_ELEMENTS: self._parsers.parse_max_elements,
             kw.ORDERED_BY: self._parsers.parse_ordered_by,

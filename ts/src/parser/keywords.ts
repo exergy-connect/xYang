@@ -57,6 +57,7 @@ export const WHEN = "when";
 export const PRESENCE = "presence";
 export const KEY = "key";
 export const MIN_ELEMENTS = "min-elements";
+export const UNIQUE = "unique";
 export const MAX_ELEMENTS = "max-elements";
 export const ORDERED_BY = "ordered-by";
 export const MANDATORY = "mandatory";
