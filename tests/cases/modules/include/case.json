@@ -1,7 +1,6 @@
 {
   "description": "Data nodes from an included submodule belong to the including module.",
   "module": "m.yang",
-  "xfail": { "ts": "data nodes from an included submodule are not part of the validated schema ('Unknown field settings')" },
   "instances": [
     { "name": "submodule node", "data": { "top": { "a": "x" }, "settings": { "level": 2 } }, "valid": true },
     { "name": "submodule node type", "data": { "settings": { "level": 7 } }, "valid": false,

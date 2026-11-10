@@ -3,6 +3,21 @@ import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 import { ModuleStatementParser } from "./module";
 
+/** Header and linkage statements are applied for their side effects, not copied as schema nodes. */
+const INCLUDED_STATEMENT_SKIP = new Set([
+  "yang-version",
+  "namespace",
+  "prefix",
+  "organization",
+  "contact",
+  "description",
+  "reference",
+  "revision",
+  "import",
+  "include",
+  "unsupported"
+]);
+
 export class SubmoduleStatementParser {
   constructor(
     private readonly parsers: StatementParsers,
@@ -17,7 +32,10 @@ export class SubmoduleStatementParser {
       if (tokens.peek() === kw.BELONGS_TO) {
         this.parse_belongs_to(tokens, context);
       } else {
-        this.parsers.parseStatement(tokens, context);
+        const stmt = this.parsers.parseStatement(tokens, context);
+        if (!INCLUDED_STATEMENT_SKIP.has(stmt.keyword ?? "")) {
+          this.parsers.pushIncludedStatement(context, stmt);
+        }
       }
     }
     tokens.consume_type(YangTokenType.RBRACE);

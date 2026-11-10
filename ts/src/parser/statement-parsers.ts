@@ -86,6 +86,9 @@ type TypeShape = {
 };
 
 export class StatementParsers {
+  /** Set while an ``include``d submodule is being merged into its parent. */
+  includingSubmoduleName?: string;
+
   private readonly importResolver?: (
     moduleName: string,
     localPrefix: string,
@@ -93,6 +96,13 @@ export class StatementParsers {
     context: ParserContext,
     tokens: TokenStream
   ) => Record<string, unknown>;
+
+  private readonly includeResolver?: (
+    submoduleName: string,
+    revisionDate: string | undefined,
+    context: ParserContext,
+    tokens: TokenStream
+  ) => void;
 
   readonly anydata_parser = new AnydataStatementParser(this);
   readonly anyxml_parser = new AnyxmlStatementParser(this);
@@ -231,8 +241,44 @@ export class StatementParsers {
       context: ParserContext,
       tokens: TokenStream
     ) => Record<string, unknown>;
+    includeResolver?: (
+      submoduleName: string,
+      revisionDate: string | undefined,
+      context: ParserContext,
+      tokens: TokenStream
+    ) => void;
   } = {}) {
     this.importResolver = options.importResolver;
+    this.includeResolver = options.includeResolver;
+  }
+
+  /** Parse a ``submodule`` file into *context* (the including module). */
+  parseSubmodule(tokens: TokenStream, context: ParserContext): void {
+    this.submodule_parser.parse_submodule(tokens, context);
+  }
+
+  pushIncludedStatement(context: ParserContext, stmt: SerializedStatement): void {
+    const mod = context.module as { __included_statements?: SerializedStatement[] };
+    (mod.__included_statements ??= []).push(stmt);
+  }
+
+  drainIncludedStatements(context: ParserContext): SerializedStatement[] {
+    const mod = context.module as { __included_statements?: SerializedStatement[] };
+    const pending = mod.__included_statements ?? [];
+    mod.__included_statements = [];
+    return pending;
+  }
+
+  resolveInclude(
+    context: ParserContext,
+    submoduleName: string,
+    revisionDate: string | undefined,
+    tokens: TokenStream
+  ): void {
+    if (!this.includeResolver) {
+      throw new YangSemanticError("Include resolution is not configured for this parser instance");
+    }
+    this.includeResolver(submoduleName, revisionDate, context, tokens);
   }
 
   dispatch_key(tokens: TokenStream): string | YangTokenType {
@@ -497,7 +543,14 @@ export class StatementParsers {
 
     const moduleStatements: SerializedStatement[] = [];
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
-      moduleStatements.push(this.parseStatement(tokens, context));
+      const stmt = this.parseStatement(tokens, context);
+      if (stmt.keyword !== "include") {
+        moduleStatements.push(stmt);
+      }
+      const included = this.drainIncludedStatements(context);
+      if (included.length > 0) {
+        moduleStatements.push(...included);
+      }
     }
     tokens.consume_type(YangTokenType.RBRACE);
 
@@ -640,6 +693,13 @@ export class StatementParsers {
       }
       if (Array.isArray(u.refines) && u.refines.length > 0) {
         out.refines = u.refines.map((r) => this.serializeRefineStmt(r as YangRefineStmt));
+      }
+      if (Array.isArray(u.augmentations) && u.augmentations.length > 0) {
+        out.augmentations = u.augmentations.map((aug) => {
+          const serialized = this.fromAst(aug);
+          serialized.path = aug.augment_path;
+          return serialized;
+        });
       }
     }
     const presence = (stmt as { presence?: string }).presence;
@@ -856,6 +916,16 @@ export class StatementParsers {
     module.import_prefixes = imports;
 
     if (imports[localPrefix]) {
+      const includedFrom = this.includingSubmoduleName;
+      if (includedFrom) {
+        const existingName = String((imports[localPrefix] as { name?: string }).name ?? "");
+        if (existingName === moduleName) {
+          return;
+        }
+        throw new YangSemanticError(
+          `Import prefix '${localPrefix}' from include of '${includedFrom}' conflicts with existing import of '${existingName}'`
+        );
+      }
       throw new YangSemanticError(`Duplicate import prefix '${localPrefix}'`);
     }
 

@@ -1,0 +1,6 @@
+{
+  "description": "augment inside uses whose target path matches no node is a schema error (RFC 7950).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "no target for path 'missing'"
+}

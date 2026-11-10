@@ -1,0 +1,9 @@
+{
+  "description": "A typedef from an included submodule is in scope for the including module.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "in range", "data": { "v": 2 }, "valid": true },
+    { "name": "out of range", "data": { "v": 7 }, "valid": false,
+      "errors": [{ "path": "/v", "code": "range" }] }
+  ]
+}

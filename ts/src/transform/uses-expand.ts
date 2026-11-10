@@ -1,4 +1,4 @@
-import { YangCircularUsesError, YangRefineTargetNotFoundError, YangSemanticError } from "../core/errors";
+import { YangCircularUsesError, YangRefineTargetNotFoundError, YangSemanticError, YangSyntaxError } from "../core/errors";
 import {
   formatIdentifierRef,
   type YangIdentifierRef
@@ -14,7 +14,17 @@ function deepClone<T>(value: T): T {
 type GroupingScope = {
   groupings: Record<string, SerializedStatement>;
   import_prefixes: Record<string, Record<string, unknown>>;
+  /** This module's own prefix. ``uses own:grouping`` resolves locally (RFC 7950). */
+  prefix?: string;
 };
+
+function modulePrefix(moduleData: Record<string, unknown> | undefined): string | undefined {
+  if (!moduleData) {
+    return undefined;
+  }
+  const prefix = String(moduleData.prefix ?? "").replace(/^['"]|['"]$/g, "");
+  return prefix.length > 0 ? prefix : undefined;
+}
 
 function asGroupingMap(value: unknown): Record<string, SerializedStatement> {
   if (!value || typeof value !== "object") {
@@ -59,6 +69,13 @@ function resolveGrouping(
     throw new YangSemanticError("Empty grouping name in uses");
   }
   if (ref.prefix) {
+    if (scope.prefix && ref.prefix === scope.prefix) {
+      const grouping = scope.groupings[ref.name];
+      if (!grouping) {
+        throw new YangSemanticError(`Unknown grouping '${key}'`);
+      }
+      return { key, grouping, nestedScope: scope };
+    }
     const imp = scope.import_prefixes[ref.prefix];
     if (!imp) {
       throw new YangSemanticError(`Unknown import prefix '${ref.prefix}' in uses '${key}'`);
@@ -73,7 +90,8 @@ function resolveGrouping(
       grouping,
       nestedScope: {
         groupings,
-        import_prefixes: asImportMap(imp.import_prefixes)
+        import_prefixes: asImportMap(imp.import_prefixes),
+        prefix: modulePrefix(imp)
       }
     };
   }
@@ -146,6 +164,183 @@ function findRefineTarget(nodes: SerializedStatement[], segments: string[]): Ser
     return found;
   }
   return findRefineTarget(found.statements ?? [], rest);
+}
+
+const SCHEMA_WALK = new Set([
+  "container",
+  "list",
+  "leaf",
+  "leaf-list",
+  "choice",
+  "case",
+  "anydata",
+  "anyxml",
+  "notification",
+  "rpc",
+  "action",
+  "input",
+  "output"
+]);
+
+function isWalkable(stmt: SerializedStatement): boolean {
+  return typeof stmt.keyword === "string" && SCHEMA_WALK.has(stmt.keyword);
+}
+
+/** Direct schema children. Choice branches flatten to case bodies (Python ``statement_children``). */
+function statementChildren(stmt: SerializedStatement): SerializedStatement[] {
+  const kids = stmt.statements ?? [];
+  if (stmt.keyword === "choice") {
+    const out: SerializedStatement[] = [];
+    for (const caseStmt of kids) {
+      if (caseStmt.keyword !== "case") {
+        continue;
+      }
+      for (const child of caseStmt.statements ?? []) {
+        if (isWalkable(child)) {
+          out.push(child);
+        }
+      }
+    }
+    return out;
+  }
+  return kids.filter(isWalkable);
+}
+
+function casesOf(stmt: SerializedStatement): SerializedStatement[] {
+  if (stmt.keyword !== "choice") {
+    return [];
+  }
+  return (stmt.statements ?? []).filter((child) => child.keyword === "case");
+}
+
+/** Python ``find_nodes_by_refine_path``: choice and case names are path segments. */
+function findFromNode(stmt: SerializedStatement, segments: string[], idx: number): SerializedStatement[] {
+  const want = segments[idx]!;
+  const last = idx === segments.length - 1;
+  if (stmt.name === want && isWalkable(stmt)) {
+    if (last) {
+      return [stmt];
+    }
+    if (stmt.keyword === "choice" && idx + 1 < segments.length) {
+      const caseName = segments[idx + 1]!;
+      const matches: SerializedStatement[] = [];
+      for (const caseStmt of casesOf(stmt)) {
+        if (caseStmt.name !== caseName) {
+          continue;
+        }
+        if (idx + 1 === segments.length - 1) {
+          return [caseStmt];
+        }
+        for (const child of statementChildren(caseStmt)) {
+          matches.push(...findFromNode(child, segments, idx + 2));
+        }
+      }
+      return matches;
+    }
+    const matches: SerializedStatement[] = [];
+    for (const child of statementChildren(stmt)) {
+      matches.push(...findFromNode(child, segments, idx + 1));
+    }
+    return matches;
+  }
+  if (stmt.keyword === "choice") {
+    const matches: SerializedStatement[] = [];
+    let named = false;
+    for (const caseStmt of casesOf(stmt)) {
+      if (caseStmt.name !== want) {
+        continue;
+      }
+      named = true;
+      if (last) {
+        return [caseStmt];
+      }
+      for (const child of statementChildren(caseStmt)) {
+        matches.push(...findFromNode(child, segments, idx + 1));
+      }
+    }
+    if (named) {
+      return matches;
+    }
+  }
+  const matches: SerializedStatement[] = [];
+  for (const child of statementChildren(stmt)) {
+    matches.push(...findFromNode(child, segments, idx));
+  }
+  return matches;
+}
+
+function findNodesByAugmentPath(nodes: SerializedStatement[], segments: string[]): SerializedStatement[] {
+  const out: SerializedStatement[] = [];
+  for (const root of nodes) {
+    if (!isWalkable(root)) {
+      continue;
+    }
+    out.push(...findFromNode(root, segments, 0));
+  }
+  return out;
+}
+
+function augmentPathSegments(path: string): string[] {
+  const raw = path.trim().replace(/^['"]|['"]$/g, "");
+  if (!raw || raw.startsWith("/") || raw.includes("[") || raw.includes(" ")) {
+    throw new YangSyntaxError(`invalid augment path '${raw}'`);
+  }
+  const parts = raw.split("/");
+  if (parts.some((part) => part.trim() === "")) {
+    throw new YangSyntaxError(`invalid augment path '${raw}'`);
+  }
+  return parts.map((part) => {
+    const trimmed = part.trim();
+    const colon = trimmed.indexOf(":");
+    return colon >= 0 ? trimmed.slice(colon + 1) : trimmed;
+  });
+}
+
+/**
+ * RFC 7950 §7.13 / §7.17: merge ``augment`` substatements of ``uses`` into the expanded grouping.
+ * Port of Python ``_apply_uses_augmentations``.
+ */
+function applyAugmentsFromUses(usesStmt: SerializedStatement, body: SerializedStatement[]): void {
+  const augmentations = usesStmt.augmentations as SerializedStatement[] | undefined;
+  if (!Array.isArray(augmentations) || augmentations.length === 0) {
+    return;
+  }
+  const groupingName =
+    (typeof usesStmt.argument === "string" && usesStmt.argument) ||
+    (typeof usesStmt.grouping_name === "string" && usesStmt.grouping_name) ||
+    "uses";
+  for (const aug of augmentations) {
+    const path = String(aug.path ?? aug.augment_path ?? aug.argument ?? "");
+    let segments: string[];
+    try {
+      segments = augmentPathSegments(path);
+    } catch (err) {
+      const detail = err instanceof Error ? err.message : String(err);
+      throw new YangSyntaxError(`uses '${groupingName}' augment: invalid path '${path}': ${detail}`);
+    }
+    const targets = findNodesByAugmentPath(body, segments);
+    if (targets.length === 0) {
+      throw new YangSyntaxError(`uses '${groupingName}' augment: no target for path '${path}'`);
+    }
+    if (targets.length !== 1) {
+      throw new YangSyntaxError(
+        `uses '${groupingName}' augment: path '${path}' matched ${targets.length} nodes, expected one`
+      );
+    }
+    const target = targets[0]!;
+    if (!Array.isArray(target.statements)) {
+      throw new YangSyntaxError(
+        `uses '${groupingName}' augment: target '${target.name ?? "?"}' ` +
+          `cannot contain schema substatements (path '${path}')`
+      );
+    }
+    const copies = (aug.statements ?? []).map((stmt) => deepClone(stmt));
+    for (const copy of copies) {
+      mergeIfFeaturesFromParentUses(aug, copy);
+      mergeWhenFromParentUses(aug, copy);
+    }
+    target.statements = [...target.statements, ...copies];
+  }
 }
 
 function applyRefinesFromUses(usesStmt: SerializedStatement, expanded: SerializedStatement[]): void {
@@ -255,6 +450,7 @@ function expandGroupingBody(
         continue;
       }
       const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack, hostTypedefs);
+      applyAugmentsFromUses(child, body);
       applyRefinesFromUses(child, body);
       for (const stmt of body) {
         mergeIfFeaturesFromParentUses(child, stmt);
@@ -298,6 +494,7 @@ function expandStatementList(
         continue;
       }
       const expanded = expandGroupingBody(ref, scope, stack, hostTypedefs);
+      applyAugmentsFromUses(stmt, expanded);
       applyRefinesFromUses(stmt, expanded);
       for (const e of expanded) {
         mergeIfFeaturesFromParentUses(stmt, e);
@@ -338,7 +535,8 @@ export function expandUses(module: YangModule): YangModule {
   // Keep a live view of imported modules' groupings (shared, not deep-cloned away).
   const expandScope: GroupingScope = {
     groupings: asGroupingMap(cloned.groupings),
-    import_prefixes: asImportMap(cloned.import_prefixes)
+    import_prefixes: asImportMap(cloned.import_prefixes),
+    prefix: modulePrefix(cloned)
   };
 
   const hostTypedefs =

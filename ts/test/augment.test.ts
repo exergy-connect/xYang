@@ -156,7 +156,7 @@ module main {
     expect(root?.findStatement("extra")?.keyword).toBe("leaf");
 
     const { isValid, errors } = new YangValidator(libMod).validate({
-      root: { existing: "a", extra: "b" }
+      root: { existing: "a", "main:extra": "b" }
     });
     expect(isValid, errors.join("; ")).toBe(true);
   });
