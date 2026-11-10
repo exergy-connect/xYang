@@ -1,0 +1,40 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf name {
+      type string;
+      must "substring-before(., '-') = 'a'";
+    }
+    leaf empty-needle {
+      type string;
+      must "substring-before(., '') = ''";
+    }
+    leaf no-match {
+      type string;
+      must "substring-before(., 'z') = ''";
+    }
+    leaf missing {
+      type string;
+      must "substring-before() = ''";
+    }
+    leaf one-arg {
+      type string;
+      must "substring-before(.) = ''";
+    }
+    leaf extra {
+      type string;
+      must "substring-before(., '-', 'x') = ''";
+    }
+    leaf qty {
+      type int32;
+      must "substring-before(., 2) = '1'";
+    }
+    leaf literal {
+      type string;
+      must "substring-before(12, 2) = '1'";
+    }
+  }
+}

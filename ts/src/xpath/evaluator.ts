@@ -1,3 +1,4 @@
+import { XPathEvaluationError } from "../core/errors";
 import { YangModule } from "../core/model";
 import { isDerivedFromOrSelfQNames, isDerivedFromStrictQNames } from "../identity-graph";
 import { XPathAstNode, XPathBinaryNode, XPathPathNode } from "./ast";
@@ -61,6 +62,19 @@ function nodeSetValues(value: unknown): unknown[] {
 function firstValue(value: unknown): unknown {
   const values = nodeSetValues(value);
   return values[0];
+}
+
+/** XPath 1.0 string conversion, the same as `string()` for one argument. */
+function asXPathString(value: unknown): string {
+  const first = firstValue(value);
+  return first == null ? "" : String(first);
+}
+
+/** Wrong arity is an evaluation error. Validators report it as `xpath-error`. */
+function requireArity(name: string, args: XPathAstNode[], expected: number): void {
+  if (args.length !== expected) {
+    throw new XPathEvaluationError(`${name}() expects ${expected} arguments, got ${args.length}`);
+  }
 }
 
 function coercePair(left: unknown, right: unknown): [unknown, unknown] {
@@ -397,6 +411,38 @@ export class XPathEvaluator {
     }
     if (fn === "concat") {
       return args.map((arg) => String(firstValue(this.eval(arg, context, node)) ?? "")).join("");
+    }
+    if (fn === "contains") {
+      requireArity(fn, args, 2);
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      return source.includes(needle);
+    }
+    if (fn === "starts-with") {
+      requireArity(fn, args, 2);
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      return source.startsWith(needle);
+    }
+    if (fn === "substring-before") {
+      requireArity(fn, args, 2);
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      const index = source.indexOf(needle);
+      if (index < 0) {
+        return "";
+      }
+      return source.slice(0, index);
+    }
+    if (fn === "substring-after") {
+      requireArity(fn, args, 2);
+      const source = asXPathString(this.eval(args[0], context, node));
+      const needle = asXPathString(this.eval(args[1], context, node));
+      const index = source.indexOf(needle);
+      if (index < 0) {
+        return "";
+      }
+      return source.slice(index + needle.length);
     }
     if (fn === "translate") {
       if (args.length !== 3) {

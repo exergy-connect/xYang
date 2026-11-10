@@ -4,6 +4,7 @@ import { UnsupportedXPathError } from "../core/errors";
 export const XPATH_FUNCTION_NAMES = new Set([
   "boolean",
   "concat",
+  "contains",
   "count",
   "current",
   "deref",
@@ -12,8 +13,11 @@ export const XPATH_FUNCTION_NAMES = new Set([
   "false",
   "not",
   "number",
+  "starts-with",
   "string",
   "string-length",
+  "substring-after",
+  "substring-before",
   "translate",
   "true"
 ]);

@@ -1,0 +1,40 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf name {
+      type string;
+      must "contains(., 'ab')";
+    }
+    leaf empty-needle {
+      type string;
+      must "contains(., '')";
+    }
+    leaf missing {
+      type string;
+      must "contains()";
+    }
+    leaf one-arg {
+      type string;
+      must "contains(.)";
+    }
+    leaf extra {
+      type string;
+      must "contains(., 'ab', 'x')";
+    }
+    leaf qty {
+      type int32;
+      must "contains(., '12')";
+    }
+    leaf literal {
+      type string;
+      must "contains('x12y', 12)";
+    }
+    leaf absent-path {
+      type string;
+      must "not(contains(../no-such, 'a'))";
+    }
+  }
+}
