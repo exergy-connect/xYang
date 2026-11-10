@@ -20,7 +20,7 @@ describe("python parity: test_when", () => {
     return value !== null && value !== undefined;
   }
 
-  it("when condition true validates", () => {
+  it("stores a when expression on the schema node", () => {
     const module = parseYangString(`
 module test {
   yang-version 1.1;
@@ -46,18 +46,6 @@ module test {
     const itemType = dataModel?.findStatement("item_type");
     const whenShape = itemType?.data.when as Record<string, unknown> | undefined;
     expect(whenShape?.expression).toBe("../type = 'array'");
-
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        type: "array",
-        item_type: {
-          primitive: "string"
-        }
-      }
-    });
-    expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
   });
 
   it("parses braced when form with description", () => {
@@ -89,49 +77,6 @@ module test {
     expect(String(whenShape?.description ?? "")).toContain("Only when mode is on.");
   });
 
-  it("when false: node is optional when missing and invalid when present", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    leaf type {
-      type string;
-    }
-    container item_type {
-      when "../type = 'array'";
-      description "Only present when type is array";
-      leaf primitive {
-        type string;
-        mandatory true;
-      }
-    }
-  }
-}
-`);
-    const validator = new YangValidator(module);
-
-    const missingResult = validator.validate({
-      data: {
-        type: "string"
-      }
-    });
-    expect(missingResult.isValid).toBe(true);
-    expect(missingResult.errors).toEqual([]);
-
-    const presentResult = validator.validate({
-      data: {
-        type: "string",
-        item_type: {
-          primitive: "string"
-        }
-      }
-    });
-    expect(presentResult.isValid).toBe(false);
-    expect(presentResult.errors.some((error) => error.toLowerCase().includes("item_type"))).toBe(true);
-  });
 
   it("when condition with empty leaf presence/absence", () => {
     const module = parseYangString(`

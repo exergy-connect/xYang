@@ -1,0 +1,6 @@
+{
+  "description": "RFC 7950: an enumeration type needs at least one enum.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "enum"
+}

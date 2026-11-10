@@ -138,27 +138,6 @@ describe("python parity: test_identity", () => {
     expect(module.name).toBe("identity-must-sibling");
   });
 
-  it("validate must derived-from accepts mammal descendant", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM);
-    const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "im:dog" } });
-    expect(result.isValid, result.errors.join("\n")).toBe(true);
-  });
-
-  it("validate must derived-from rejects base-only identity", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM);
-    const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "im:animal" } });
-    expect(result.isValid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-  });
-
-  it("validate must derived-from-or-self accepts exact base", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_OR_SELF);
-    const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "io:mammal" } });
-    expect(result.isValid, result.errors.join("\n")).toBe(true);
-  });
 
   it("validate must on sibling when identityref satisfies derived-from", () => {
     const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);

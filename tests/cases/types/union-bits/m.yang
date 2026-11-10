@@ -1,0 +1,17 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf limit {
+      type union {
+        type int32;
+        type bits {
+          bit a;
+          bit b;
+        }
+      }
+    }
+  }
+}

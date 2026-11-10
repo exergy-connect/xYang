@@ -1,19 +1,10 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { generateJsonSchema, parseYangFile, YangModule, YangStatement, YangValidator } from "../../src";
+import { generateJsonSchema, parseYangFile, YangModule, YangStatement } from "../../src";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const YANG_FILE = join(__dirname, "../../../tests/json/data/choice_cases/choice_cases.yang");
-
-function minimalDataModel(reqChoice?: Record<string, unknown>, optChoice?: Record<string, unknown>): Record<string, unknown> {
-  return {
-    "data-model": {
-      ...(reqChoice ? { req_choice_container: reqChoice } : {}),
-      ...(optChoice ? { opt_choice_container: optChoice } : {})
-    }
-  };
-}
 
 function collectXYangChoicePaths(node: unknown, path = "$"): string[] {
   const out: string[] = [];
@@ -137,23 +128,5 @@ describe("python parity: json/test_choice_cases", () => {
     expect(Array.isArray(opt.oneOf)).toBe(true);
     expect((opt.oneOf as unknown[]).length).toBe(3);
     expect((opt.oneOf as Array<Record<string, unknown>>)[0]).toEqual({ type: "object", maxProperties: 0 });
-  });
-
-  it("validates mandatory choice cases", () => {
-    const validator = new YangValidator(parseYangFile(YANG_FILE));
-
-    expect(validator.validate(minimalDataModel({ primitive: "string" })).isValid).toBe(true);
-    expect(validator.validate(minimalDataModel({ entity: "e1" })).isValid).toBe(true);
-    expect(validator.validate(minimalDataModel({})).isValid).toBe(false);
-    expect(validator.validate(minimalDataModel({ primitive: "string", entity: "e1" })).isValid).toBe(false);
-  });
-
-  it("validates optional choice cases", () => {
-    const validator = new YangValidator(parseYangFile(YANG_FILE));
-
-    expect(validator.validate(minimalDataModel(undefined, {})).isValid).toBe(true);
-    expect(validator.validate(minimalDataModel(undefined, { a: "x" })).isValid).toBe(true);
-    expect(validator.validate(minimalDataModel(undefined, { b: "y" })).isValid).toBe(true);
-    expect(validator.validate(minimalDataModel(undefined, { a: "x", b: "y" })).isValid).toBe(false);
   });
 });

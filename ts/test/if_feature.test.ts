@@ -452,54 +452,6 @@ module m {
     expect(m.m?.has("b")).toBe(false);
   });
 
-  it("rejects instance data for nodes whose if-feature is false", () => {
-    const module = parseYangString(`
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature f;
-  container root {
-    leaf a {
-      if-feature "f";
-      type string;
-    }
-  }
-}
-`);
-    const v = new YangValidator(module, { enabledFeaturesByModule: { m: new Set() } });
-    const bad = v.validate({ root: { a: "hi" } });
-    expect(bad.isValid).toBe(false);
-    expect(bad.errors.some((e) => e.toLowerCase().includes("if-feature"))).toBe(true);
-
-    const okAbsent = v.validate({ root: {} });
-    expect(okAbsent.isValid).toBe(true);
-
-    const vOn = new YangValidator(module, { enabledFeaturesByModule: { m: new Set(["f"]) } });
-    expect(vOn.validate({ root: { a: "ok" } }).isValid).toBe(true);
-  });
-
-  it("rejects list data when list if-feature is inactive", () => {
-    const module = parseYangString(`
-module m {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix x;
-  feature lst;
-  container root {
-    list items {
-      if-feature "lst";
-      key "id";
-      leaf id { type string; }
-    }
-  }
-}
-`);
-    const v = new YangValidator(module, { enabledFeaturesByModule: { m: new Set() } });
-    const r = v.validate({ root: { items: [{ id: "1" }] } });
-    expect(r.isValid).toBe(false);
-    expect(r.errors.some((e) => e.toLowerCase().includes("if-feature"))).toBe(true);
-  });
 
   it("merges if-feature from uses into expanded grouping nodes", () => {
     const module = parseYangString(`

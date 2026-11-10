@@ -4,7 +4,7 @@ Basic tests for xYang library (using xyang package).
 
 import pytest
 
-from xyang import parse_yang_string, YangValidator
+from xyang import parse_yang_string
 from xyang.types import TypeSystem, TypeConstraint
 
 
@@ -133,49 +133,6 @@ def test_type_constraints():
 
     is_valid, error = type_system.validate("this is too long", "string", constraint)
     assert not is_valid
-
-
-def test_validate_simple_data():
-    """Test data validation."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    leaf name {
-      type string;
-      mandatory true;
-    }
-    leaf count {
-      type uint8;
-      default 0;
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-
-    # Valid data
-    valid_data = {
-        "data": {
-            "name": "test"
-        }
-    }
-    is_valid, errors, warnings = validator.validate(valid_data)
-    assert is_valid
-
-    # Invalid data (missing mandatory)
-    invalid_data = {
-        "data": {
-            "count": 5
-        }
-    }
-    is_valid, errors, warnings = validator.validate(invalid_data)
-    assert not is_valid
-    assert len(errors) > 0
 
 
 def test_parse_ordered_by_accepted_on_list_and_leaf_list():

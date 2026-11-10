@@ -52,22 +52,6 @@ def test_instance_identifier_yang_valid_when_target_exists():
     assert ok, f"expected valid: {errors}"
 
 
-def test_instance_identifier_yang_invalid_missing_target():
-    """require-instance true: path must resolve to at least one node."""
-    module = parse_yang_string(_minimal_module_yang())
-    v = YangValidator(module)
-    data: dict[str, Any] = {
-        "data-model": {
-            "top": {"x": "hello"},
-            "ptr": "/data-model/top/missing-leaf",
-            "ptr_loose": "/any",
-        }
-    }
-    ok, errors, _ = v.validate(data)
-    assert not ok
-    assert any("instance-identifier" in e.lower() for e in errors)
-
-
 def test_instance_identifier_yang_invalid_not_absolute():
     """Only absolute paths are supported for require-instance checks."""
     module = parse_yang_string(_minimal_module_yang())

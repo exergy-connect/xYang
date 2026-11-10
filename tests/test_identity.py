@@ -185,37 +185,6 @@ def test_parse_identity_module_with_must_on_sibling_leaf():
     assert module.name == "identity-must-sibling"
 
 
-def test_validate_must_derived_from_accepts_mammal_descendant():
-    from xyang import parse_yang_string, YangValidator
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM)
-    validator = YangValidator(module)
-    data = {"data": {"kind": "im:dog"}}
-    is_valid, errors, _warnings = validator.validate(data)
-    assert is_valid, errors
-
-
-def test_validate_must_derived_from_rejects_base_only():
-    from xyang import parse_yang_string, YangValidator
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM)
-    validator = YangValidator(module)
-    data = {"data": {"kind": "im:animal"}}
-    is_valid, errors, _warnings = validator.validate(data)
-    assert not is_valid
-    assert errors
-
-
-def test_validate_must_derived_from_or_self_accepts_exact_base():
-    from xyang import parse_yang_string, YangValidator
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_OR_SELF)
-    validator = YangValidator(module)
-    data = {"data": {"kind": "io:mammal"}}
-    is_valid, errors, _warnings = validator.validate(data)
-    assert is_valid, errors
-
-
 def test_validate_must_on_sibling_when_identityref_satisfies_derived_from():
     from xyang import parse_yang_string, YangValidator
 

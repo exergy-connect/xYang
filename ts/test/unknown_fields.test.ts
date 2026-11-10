@@ -22,12 +22,8 @@ const validator = new YangValidator(model);
 
 describe("unknown fields", () => {
   it.each([
-    [{ typo: true }, "Unknown field 'typo'"],
-    [{ topology: { deviceX: "frr" } }, "topology: Unknown field 'deviceX'"],
-    [{ topology: { empty: { extra: 1 } } }, "topology.empty: Unknown field 'extra'"],
-    [{ topology: { routing: { enable: true } } }, "topology.mode.routing: Unknown field 'enable'"],
-    [{ topology: { nodes: [{ name: "a", extra: 1 }] } }, "topology.nodes[0]: Unknown field 'extra'"]
-  ])("rejects unknown members in %j", (data, error) => {
+    [{ topology: { routing: { enable: true } } }, "topology.mode.routing: Unknown field 'enable'"]
+  ])("rejects unknown members inside a choice case in %j", (data, error) => {
     const result = validator.validate(data);
     expect(result.isValid).toBe(false);
     expect(result.errors).toContain(error);

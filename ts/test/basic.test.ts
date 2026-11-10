@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYangString, YangValidator } from "../src";
+import { parseYangString } from "../src";
 import { TypeConstraint, TypeSystem } from "../src/types";
 
 describe("basic TypeScript parity tests", () => {
@@ -119,44 +119,6 @@ module test {
 
     isValid = typeSystem.validate("this is too long", "string", constraint)[0];
     expect(isValid).toBe(false);
-  });
-
-  it("validates simple module data and mandatory leaves", () => {
-    const yangContent = `
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    leaf name {
-      type string;
-      mandatory true;
-    }
-    leaf count {
-      type uint8;
-      default 0;
-    }
-  }
-}
-`;
-    const module = parseYangString(yangContent);
-    const validator = new YangValidator(module);
-
-    const validResult = validator.validate({
-      data: {
-        name: "test"
-      }
-    });
-    expect(validResult.isValid).toBe(true);
-
-    const invalidResult = validator.validate({
-      data: {
-        count: 5
-      }
-    });
-    expect(invalidResult.isValid).toBe(false);
-    expect(invalidResult.errors.length).toBeGreaterThan(0);
   });
 
   it("accepts ordered-by on list and leaf-list", () => {
