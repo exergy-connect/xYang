@@ -16,6 +16,13 @@ import {
   leafTypeToSchema
 } from "./type-constants";
 
+/** Emit ``description`` only when *text* is a non-empty string. */
+function withDescription(out: Record<string, unknown>, text: unknown): void {
+  if (typeof text === "string" && text.length > 0) {
+    out.description = text;
+  }
+}
+
 function asRecord(value: unknown): Record<string, unknown> {
   return value && typeof value === "object" && !Array.isArray(value)
     ? (value as Record<string, unknown>)
@@ -76,11 +83,12 @@ function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
     if (child.keyword !== YangTokenType.MUST || typeof child.argument !== "string") {
       continue;
     }
-    out.push({
+    const entry: Record<string, unknown> = {
       must: child.argument,
-      "error-message": typeof child.data.error_message === "string" ? child.data.error_message : "",
-      description: typeof child.data.description === "string" ? child.data.description : ""
-    });
+      "error-message": typeof child.data.error_message === "string" ? child.data.error_message : ""
+    };
+    withDescription(entry, child.data.description);
+    out.push(entry);
   }
   return out;
 }
@@ -240,9 +248,9 @@ function mergeOneOfBranchesWithBase(
 function choiceMetaForXYang(choice: YangStatement): Record<string, unknown> {
   const meta: Record<string, unknown> = {
     name: choice.name ?? "",
-    description: typeof choice.data.description === "string" ? choice.data.description : "",
     mandatory: choice.data.mandatory === true
   };
+  withDescription(meta, choice.data.description);
   const ifFeatures = Array.isArray(choice.data.if_features)
     ? choice.data.if_features.filter((x): x is string => typeof x === "string" && x.trim().length > 0)
     : [];
@@ -290,11 +298,12 @@ function ioBlockToSchema(
   ioType: YangTokenType.INPUT | YangTokenType.OUTPUT
 ): Record<string, unknown> {
   const body = buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
-  return {
+  const out: Record<string, unknown> = {
     ...body,
-    description: typeof stmt.data.description === "string" ? stmt.data.description : "",
     [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: ioType })
   };
+  withDescription(out, stmt.data.description);
+  return out;
 }
 
 function rpcToJson(
@@ -381,12 +390,12 @@ function buildChoiceOneOf(
     }
     const branch: Record<string, unknown> = {
       type: JSON_TYPE_OBJECT,
-      description: typeof c.data.description === "string" ? c.data.description : "",
       properties,
       additionalProperties: false,
       required,
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(c, { name: c.name ?? "case" })
     };
+    withDescription(branch, c.data.description);
     branches.push(branch);
   }
 
@@ -423,9 +432,9 @@ function statementToSchema(
     }
     const out: Record<string, unknown> = {
       type: JSON_TYPE_OBJECT,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
       [YANG_SCHEMA_KEYS.xYang]: xyChoice
     };
+    withDescription(out, stmt.data.description);
     if (oneOfShape?.oneOf) {
       out.oneOf = oneOfShape.oneOf;
     }
@@ -443,9 +452,9 @@ function statementToSchema(
       : buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
     const out: Record<string, unknown> = {
       ...body,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
       [YANG_SCHEMA_KEYS.xYang]: xYang
     };
+    withDescription(out, stmt.data.description);
     return out;
   }
 
@@ -464,9 +473,9 @@ function statementToSchema(
     const out: Record<string, unknown> = {
       type: JSON_TYPE_ARRAY,
       items: itemSchema,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
       [YANG_SCHEMA_KEYS.xYang]: listXY
     };
+    withDescription(out, stmt.data.description);
     if (typeof stmt.data.min_elements === "number") {
       out.minItems = stmt.data.min_elements;
     }
@@ -483,11 +492,11 @@ function statementToSchema(
     const out: Record<string, unknown> = {
       type: JSON_TYPE_ARRAY,
       items: itemSchema,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, {
         type: keyword
       })
     };
+    withDescription(out, stmt.data.description);
     if (typeName === YangTokenType.LEAFREF) {
       const itemsXYang = asRecord(out.items);
       itemsXYang[YANG_SCHEMA_KEYS.xYang] = {
@@ -558,11 +567,12 @@ function statementToSchema(
       xYang["require-instance"] = typeShape.require_instance !== false;
     }
     const schemaXy = asRecord(leafSchema[YANG_SCHEMA_KEYS.xYang]);
+    const { description: _leafTypeDescription, ...leafSchemaRest } = leafSchema;
     const out: Record<string, unknown> = {
-      ...leafSchema,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
+      ...leafSchemaRest,
       [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy }
     };
+    withDescription(out, stmt.data.description);
     if (stmt.data.default !== undefined) {
       const schemaType = typeof out.type === "string" ? out.type : null;
       out.default = jsonSchemaDefaultValue(stmt.data.default, {
@@ -576,11 +586,11 @@ function statementToSchema(
   if (keyword === YangTokenType.ANYDATA || keyword === YangTokenType.ANYXML) {
     const out: Record<string, unknown> = {
       type: JSON_TYPE_FREE_FORM,
-      description: typeof stmt.data.description === "string" ? stmt.data.description : "",
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, {
         type: keyword
       })
     };
+    withDescription(out, stmt.data.description);
     return out;
   }
 
@@ -596,10 +606,11 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
   for (const [name, entry] of Object.entries(typedefs)) {
     const typeShape = asRecord(entry.type);
     const schema = typedefRefOrInline(typeShape, names);
+    const { description: _typedefTypeDescription, ...schemaRest } = schema;
     const def: Record<string, unknown> = {
-      ...schema,
-      description: typeof entry.description === "string" ? entry.description : ""
+      ...schemaRest
     };
+    withDescription(def, entry.description);
     const schemaXy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
     const typedefXy: Record<string, unknown> = {};
     const rawPatList = Array.isArray(typeShape.patterns) ? typeShape.patterns : [];
@@ -728,12 +739,12 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
   const schema: Record<string, unknown> = {
     $schema: JSON_SCHEMA_DRAFT_2020_12,
     $id: effectiveModule.namespace ? effectiveModule.namespace : (effectiveModule.name ? `urn:${effectiveModule.name}` : "urn:module"),
-    description: effectiveModule.description ?? "",
     type: JSON_TYPE_OBJECT,
     properties,
     additionalProperties: false,
     [YANG_SCHEMA_KEYS.xYang]: rootXYang
   };
+  withDescription(schema, effectiveModule.description);
 
   if (required.length > 0) {
     schema.required = required;

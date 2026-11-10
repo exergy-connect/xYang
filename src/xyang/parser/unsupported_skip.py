@@ -1,8 +1,9 @@
 """
 Skip unsupported YANG constructs after emitting a warning.
 
-Top-level statements (deviation, rpc, …) that are not modeled in the AST have their
-tokens consumed so the rest of the module can parse.
+Top-level statements (action, …) that are not modeled in the AST have their
+tokens consumed so the rest of the module can parse. ``deviation`` is parsed;
+only ``deviate add|replace|delete`` is skipped here.
 """
 
 from __future__ import annotations
@@ -22,7 +23,6 @@ logger = logging.getLogger(__name__)
 # RFC 7950 / 1.1 statements xYang does not implement — recognize and skip.
 UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
     {
-        kw.DEVIATION,
         kw.ACTION,
     }
 )
@@ -78,6 +78,11 @@ def skip_unsupported_construct(tokens: TokenStream, *, context: str) -> None:
             return
         tokens.consume()
     tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+
+def warn_unsupported_deviate(kind: str, path: str) -> None:
+    """``deviate add|replace|delete`` stays unsupported; say which kind and path."""
+    logger.warning("Ignoring unsupported 'deviate %s' for %s", kind, path)
 
 
 def is_unsupported_construct_start(tokens: TokenStream) -> bool:

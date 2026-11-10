@@ -1,7 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "$id": "urn:test:version",
-  "description": "",
   "x-yang": {
     "module": "version-typedef-test",
     "yang-version": "1.1",
@@ -35,10 +34,15 @@
     "version-string": {
       "type": "string",
       "pattern": "^\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+$",
-      "description": "Version string type",
       "x-yang": {
-        "type": "typedef"
-      }
+        "string-patterns": [
+          {
+            "pattern": "\\d{2}\\.\\d{2}\\.\\d{2}\\.\\d+",
+            "invert-match": false
+          }
+        ]
+      },
+      "description": "Version string type"
     }
   }
 }

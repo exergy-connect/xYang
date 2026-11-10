@@ -22,6 +22,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- **CI:** a head commit whose message contains the trailer line `Local-Tests: passed` skips the Python matrix, the Node minimum and latest LTS jobs, and the conformance cases on pull requests. Add the trailer only after `pytest -q`, `pytest tests/test_cases.py -q -rxX`, and `cd ts && npm test` have passed locally. Pushes to `main`, tags, and releases always run the full suite. Required Checks still succeed when those jobs were skipped for the trailer, and fail when a heavy job failed or was cancelled.
 - **TypeScript model:** `ts/src/core/model.ts` is the runtime model. `statements` returns the same wrapper objects when the underlying statement array is unchanged. The unused `ts/src/core/module.ts` class is removed ([#73](https://github.com/exergy-connect/xYang/issues/73)).
 - **TypeScript API:** public names are camelCase (`expandUses`, `includePath`, `findStatement`, `getAllLeaves`). The snake_case names still work and warn once per process ([#72](https://github.com/exergy-connect/xYang/issues/72)).
 - **TypeScript parsing:** `parseYangString(content, { filename, sourcePath, includePath, expandUses })` resolves imports from `dirname(sourcePath)` and `includePath`. `parseYangFile` builds a new parser on every call, so an edited file is read again ([#77](https://github.com/exergy-connect/xYang/issues/77)).
@@ -33,6 +34,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **`deviate not-supported` (Python + TypeScript):** the target node is removed when the module is built, including a node in an imported module. The removal is applied to a copy owned by the deviating module, so loading the target module again from the same parser cache still has that node. Data for the removed node is an unknown field on the copy. `deviate add`, `replace`, and `delete` are still skipped, with a warning that names the kind and the path ([#64](https://github.com/exergy-connect/xYang/issues/64)).
+- **JSON Schema `convert` (Python + TypeScript):** `description` is omitted when the YANG node has none, instead of `"description": ""`. A missing `description` is still read back as an empty string ([#83](https://github.com/exergy-connect/xYang/issues/83)).
 - **Parser (Python + TypeScript):** an unquoted `if-feature` argument is accepted, including a prefixed name (`if-feature f;` and `if-feature m:f;`). Quoted and concatenated arguments are unchanged ([#65](https://github.com/exergy-connect/xYang/issues/65)).
 - **Import revision-date (Python + TypeScript):** when `import x { revision-date R; }` does not find `x@R.yang`, the parser warns with the file it opened (`import 'x' revision-date R not found; using ...`) instead of falling back silently. An exact revision file is chosen ahead of a newer `x@*.yang`. A missing import reports `Could not find module`, not `submodule` ([#66](https://github.com/exergy-connect/xYang/issues/66)).
 - **TypeScript:** a `bits` type that declares the same bit name twice is a parse error (`Duplicate bit name`), matching Python ([#93](https://github.com/exergy-connect/xYang/issues/93)).

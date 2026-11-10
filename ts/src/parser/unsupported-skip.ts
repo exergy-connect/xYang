@@ -1,7 +1,7 @@
 import * as kw from "./keywords";
 import { TokenStream, YangTokenType } from "./parser-context";
 
-export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([kw.DEVIATION, kw.ACTION]);
+export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([kw.ACTION]);
 
 export function _consume_balanced_braces(tokens: TokenStream): void {
   let depth = 0;
@@ -52,6 +52,12 @@ export function skip_unsupported_construct(tokens: TokenStream, { context }: { c
     tokens.consume();
   }
   tokens.consume_if_type(YangTokenType.SEMICOLON);
+}
+
+/** ``deviate add|replace|delete`` stays unsupported; say which kind and path. */
+export function warn_unsupported_deviate(kind: string, path: string): void {
+  // eslint-disable-next-line no-console
+  console.warn(`Ignoring unsupported 'deviate ${kind}' for ${path}`);
 }
 
 export function is_unsupported_construct_start(tokens: TokenStream): boolean {

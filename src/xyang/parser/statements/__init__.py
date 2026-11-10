@@ -3,6 +3,7 @@
 from .anydata import AnydataStatementParser
 from .anyxml import AnyxmlStatementParser
 from .augment import AugmentStatementParser
+from .deviation import DeviationStatementParser
 from .extension import ExtensionStatementParser
 from .feature import FeatureStatementParser
 from .identity import IdentityStatementParser
@@ -27,6 +28,7 @@ __all__ = [
     "AnydataStatementParser",
     "AnyxmlStatementParser",
     "AugmentStatementParser",
+    "DeviationStatementParser",
     "BitsStatementParser",
     "ExtensionStatementParser",
     "FeatureStatementParser",
