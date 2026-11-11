@@ -1,5 +1,5 @@
-import { XPathSyntaxError } from "../core/errors";
-import { XPathAstNode, XPathBinaryNode, XPathFunctionNode, XPathLiteralNode, XPathPathNode } from "./ast";
+import { XPathSyntaxError, YangSyntaxError } from "../core/errors";
+import { XPathAstNode, XPathBinaryNode, XPathFunctionNode, XPathLiteralNode, XPathPathNode, isWildcardStep } from "./ast";
 import { unknownFunctionError, XPATH_FUNCTION_NAMES } from "./functions";
 import { XPathToken, tokenizeXPath } from "./tokenizer";
 
@@ -331,6 +331,15 @@ class XPathParser {
         position: token.position
       });
     }
+    if (node.kind === "path") {
+      for (const segment of node.segments) {
+        if (isWildcardStep(segment.step)) {
+          throw new XPathSyntaxError(`Wildcard '${segment.step}' is not allowed in a schema path`, {
+            expression: this.expression
+          });
+        }
+      }
+    }
     return node;
   }
 }
@@ -341,4 +350,61 @@ export function parseXPath(expression: string): XPathAstNode {
 
 export function parseXPathPath(expression: string, options: { allowPredicate?: boolean } = {}): XPathAstNode {
   return new XPathParser(expression).parsePathExpression(options);
+}
+
+/**
+ * Bind each `prefix:*` step in `node` to the module `resolve` names for its prefix.
+ * An unbound prefix is a load error, as for `augment` and `deviation` paths.
+ */
+export function bindWildcardPrefixes(
+  node: XPathAstNode | undefined,
+  resolve: (prefix: string) => string | undefined,
+  expression = ""
+): void {
+  if (!node) return;
+  switch (node.kind) {
+    case "path":
+      for (const segment of node.segments) {
+        if (segment.step.endsWith(":*")) {
+          const prefix = segment.step.slice(0, -2);
+          const module = resolve(prefix);
+          if (module === undefined) {
+            throw new YangSyntaxError(`xpath: unknown prefix '${prefix}' in '${segment.step}' of '${expression}'`);
+          }
+          segment.module = module;
+        }
+        bindWildcardPrefixes(segment.predicate, resolve, expression);
+      }
+      return;
+    case "binary":
+      bindWildcardPrefixes(node.left, resolve, expression);
+      bindWildcardPrefixes(node.right, resolve, expression);
+      return;
+    case "function":
+      for (const arg of node.args) bindWildcardPrefixes(arg, resolve, expression);
+      return;
+    default:
+  }
+}
+
+/** Prefixes of the `prefix:*` steps in `node`, without duplicates. */
+export function wildcardPrefixes(node: XPathAstNode | undefined, found: Set<string> = new Set()): Set<string> {
+  if (!node) return found;
+  switch (node.kind) {
+    case "path":
+      for (const segment of node.segments) {
+        if (segment.step.endsWith(":*")) found.add(segment.step.slice(0, -2));
+        wildcardPrefixes(segment.predicate, found);
+      }
+      break;
+    case "binary":
+      wildcardPrefixes(node.left, found);
+      wildcardPrefixes(node.right, found);
+      break;
+    case "function":
+      for (const arg of node.args) wildcardPrefixes(arg, found);
+      break;
+    default:
+  }
+  return found;
 }

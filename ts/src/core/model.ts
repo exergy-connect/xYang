@@ -16,6 +16,8 @@ export type WhenShape = {
   expression?: string;
   description?: string;
   evaluate_with_parent_context?: boolean;
+  /** Module each `prefix:*` step in `expression` is bound to, by prefix. */
+  xpath_prefixes?: Record<string, string>;
 };
 
 /** Type substatement shape carried on data nodes (`type.name`, `type.range`, …). */
@@ -58,6 +60,8 @@ export type YangStatementInit = {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
+  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
   refines?: Array<YangStatement | YangStatementInit>;
@@ -110,6 +114,8 @@ export class YangStatement {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
+  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
   refines?: YangStatement[];

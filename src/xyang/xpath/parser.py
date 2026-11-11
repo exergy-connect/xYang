@@ -5,9 +5,9 @@ XPath parser for xpath. Produces AST nodes with accept(ev, ctx, node).
 from __future__ import annotations
 
 import logging
-from typing import Any, List, Optional, Tuple
+from typing import Any, Callable, List, Optional, Tuple
 
-from ..errors import XPathSyntaxError
+from ..errors import XPathSyntaxError, YangSyntaxError
 
 from .functions import FUNCTIONS, unknown_function_error
 
@@ -27,6 +27,36 @@ logger = logging.getLogger(__name__)
 
 _COMPARISON_OPS = {"=", "!=", "<", ">", "<=", ">="}
 _ADDITIVE_OPS = {"+", "-"}
+
+
+def bind_wildcard_prefixes(
+    node: Optional[ASTNode],
+    resolve: Callable[[str], Optional[str]],
+    expression: str = "",
+) -> None:
+    """Bind each ``prefix:*`` step in *node* to the module *resolve* names for its prefix.
+
+    Raises :class:`YangSyntaxError` for a prefix that is not bound in the module that
+    wrote the expression, as ``augment`` and ``deviation`` paths do.
+    """
+    if isinstance(node, PathNode):
+        for seg in node.segments:
+            if seg.step.endswith(":*"):
+                prefix = seg.step[:-2]
+                module = resolve(prefix)
+                if module is None:
+                    raise YangSyntaxError(
+                        f"xpath: unknown prefix {prefix!r} in {seg.step!r} of {expression!r}"
+                    )
+                seg.module = module
+            if seg.predicate is not None:
+                bind_wildcard_prefixes(seg.predicate, resolve, expression)
+    elif isinstance(node, BinaryOpNode):
+        bind_wildcard_prefixes(node.left, resolve, expression)
+        bind_wildcard_prefixes(node.right, resolve, expression)
+    elif isinstance(node, FunctionCallNode):
+        for arg in node.args:
+            bind_wildcard_prefixes(arg, resolve, expression)
 
 
 class XPathParser:
@@ -88,6 +118,12 @@ class XPathParser:
                 position=t.position,
                 expression=self.expression,
             )
+        for seg in path.segments:
+            if seg.is_wildcard:
+                raise XPathSyntaxError(
+                    f"Wildcard {seg.step!r} is not allowed in a schema path",
+                    expression=self.expression,
+                )
         return path
 
     def _current(self) -> Token:
@@ -312,6 +348,10 @@ class XPathParser:
             """
             nonlocal cacheable
             seg = PathSegment(step, None)
+            if step.endswith(":*"):
+                # The binding depends on the module that wrote the expression, so a
+                # run-wide cache keyed by path text must not share it.
+                cacheable = False
             segments.append(seg)
             while self._current().type == TokenType.BRACKET_OPEN:
                 if not allow_predicate:

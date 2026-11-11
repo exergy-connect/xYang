@@ -10,6 +10,7 @@ export class MustStatementParser {
     tokens.consume(kw.MUST);
     const expression = this.parsers.parse_string_concatenation(tokens);
     const stmt = new YangMustStmt({ expression });
+    stmt.bindPrefixes(context.module);
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

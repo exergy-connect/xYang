@@ -1074,6 +1074,7 @@ export class StatementParsers {
       expression?: string;
       description?: string;
       evaluate_with_parent_context?: boolean;
+      xpath_prefixes?: Record<string, string>;
     };
     mandatory?: boolean;
     default?: unknown;
@@ -1189,7 +1190,8 @@ export class StatementParsers {
       out.when = {
         expression: stmt.when.expression,
         description: stmt.when.description ?? "",
-        evaluate_with_parent_context: stmt.when.evaluate_with_parent_context ?? false
+        evaluate_with_parent_context: stmt.when.evaluate_with_parent_context ?? false,
+        ...(stmt.when.xpath_prefixes ? { xpath_prefixes: stmt.when.xpath_prefixes } : {})
       };
     }
     if (Array.isArray(stmt.must_statements) && stmt.must_statements.length > 0) {
@@ -1287,6 +1289,7 @@ export class StatementParsers {
       argument: must_stmt.expression,
       error_message: must_stmt.error_message,
       description: must_stmt.description,
+      xpath_prefixes: must_stmt.xpath_prefixes,
       statements: []
 });
   }

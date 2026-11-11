@@ -340,6 +340,8 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 - ✅ `boolean(...)` - Convert value to boolean following YANG / XPath 1.0 rules
 - ✅ `number(...)` - Convert value to number following XPath rules
 
+- ✅ **Wildcard node tests** (XPath 1.0 §2.3, §3.7): `*` selects every data-node child of the context node, including children another module augments in, and counts list entries and leaf-list items one by one (`count(*)`, `*[x]`, `a/*/b`). `prefix:*` selects only the children defined by the module that `prefix` is bound to in the module that wrote the expression (its own prefix or an `import`). `*` is the multiply operator after an operand (`2 * 3`, `a * b`, `count(*) * 2`) and a node test otherwise. A `prefix:*` whose prefix the module does not bind is rejected when the module loads. Wildcards are not allowed in schema paths (`leafref`, `augment`, `refine`). Nodes in a choice's cases are included. A `prefix:*` inside a grouping that another module uses resolves against the module that wrote the grouping. A native-JSON `must` / `when` has no recorded imports, so its prefixes resolve against the root module. Tests: `tests/cases/xpath/wildcard*`.
+
 ### Comparisons
 - ✅ `=`, `!=`, `<=`, `>=`, `<`, `>` - All comparison operators with proper type coercion
 

@@ -1,0 +1,16 @@
+module other {
+  yang-version 1.1;
+  namespace "urn:other";
+  prefix o;
+  import m { prefix base; }
+
+  augment "/base:top" {
+    leaf ext {
+      type string;
+      must "count(../o:*) = 1";
+      must "count(../base:*) = 1";
+      must "count(../*) = 2";
+    }
+    leaf extra { type string; }
+  }
+}

@@ -10,7 +10,7 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Callable, List
+from typing import Any, Callable, List, Optional
 
 from .ast import (
     ASTNode,
@@ -19,6 +19,8 @@ from .ast import (
     LiteralNode,
     PathNode,
 )
+from ..errors import XPathSyntaxError
+from ..module import YangModule
 from .functions import FUNCTIONS, unknown_function_error
 from .node import Context, Node
 from .schema_nav import SchemaNav
@@ -198,8 +200,18 @@ class XPathEvaluator:
                 pass
             elif seg.step == "..":
                 nodes = [n.parent for n in nodes if n.parent is not None]
+            elif seg.is_wildcard:
+                if seg.step != "*" and seg.module is None:
+                    raise XPathSyntaxError(
+                        f"Prefix of {seg.step!r} is not bound to a module",
+                        expression=path.to_string(),
+                    )
+                next_nodes = []
+                for n in nodes:
+                    next_nodes.extend(self._step_wildcard(n, ctx, seg.module))
+                nodes = next_nodes
             else:
-                next_nodes: List[Node] = []
+                next_nodes = []
                 for n in nodes:
                     next_nodes.extend(self._step(n, seg.step))
                 nodes = next_nodes
@@ -208,6 +220,48 @@ class XPathEvaluator:
                 nodes = self._apply_predicate(nodes, seg.predicate, ctx)
 
         return nodes
+
+    def _step_wildcard(
+        self, node: Node, ctx: Context, module: Optional[str]
+    ) -> List[Node]:
+        """``*`` / ``prefix:*``: every data-node child present in the instance (or by default).
+
+        With *module* set, only children that module defines (RFC 7951 namespace of the
+        child, so nodes augmented in by another module are included only for that module).
+        """
+        from ..encoding.rfc7951 import defining_module_name, instance_member_lookup
+
+        data = node.data
+        if isinstance(data, list) and (
+            SchemaNav.is_list(node.schema) or SchemaNav.is_leaf_list(node.schema)
+        ):
+            return [
+                n
+                for item in data
+                for n in self._step_wildcard(node.step(item, node.schema), ctx, module)
+            ]
+        if not isinstance(data, dict):
+            return []
+
+        root_schema = ctx.root.schema
+        root_module = root_schema.name if isinstance(root_schema, YangModule) else ""
+        result: List[Node] = []
+        for child in SchemaNav.data_children(node.schema):
+            if module is not None and defining_module_name(child, root_module) != module:
+                continue
+            val, key = instance_member_lookup(data, child, root_module)
+            if key is None:
+                val = SchemaNav.default(child)
+            elif val is None:
+                val = True
+            if val is None:
+                continue
+            if SchemaNav.is_list(child) or SchemaNav.is_leaf_list(child):
+                items = val if isinstance(val, list) else [val]
+                result.extend(node.step(item, child) for item in items)
+            else:
+                result.append(node.step(val, child))
+        return result
 
     def _step(self, node: Node, key: str) -> List[Node]:
         """

@@ -1,0 +1,54 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    container all {
+      must "count(*) = 1";
+      leaf a { type string; }
+      leaf b { type string; }
+    }
+    container filtered {
+      must "count(*[v]) = 1";
+      container p { leaf v { type string; } }
+      container q { leaf v { type string; } }
+    }
+    container deep {
+      must "count(x/*/b) = 1";
+      container x {
+        container y { leaf b { type string; } }
+        container z { leaf b { type string; } }
+      }
+    }
+    container counts {
+      must "count(*) = 3";
+      list items {
+        key id;
+        leaf id { type string; }
+      }
+      leaf-list tags { type string; }
+    }
+    container empty {
+      must "count(*) = 0";
+      leaf a { type string; }
+    }
+    container gate {
+      container src {
+        leaf p { type string; }
+        leaf q { type string; }
+      }
+      leaf guarded {
+        when "count(../src/*) = 2";
+        type string;
+      }
+    }
+    container pick {
+      must "count(*) = 1";
+      choice which {
+        case one { leaf x { type string; } }
+        case two { leaf y { type string; } }
+      }
+    }
+  }
+}

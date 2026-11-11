@@ -1,7 +1,13 @@
 export type XPathPathSegment = {
   step: string;
   predicate?: XPathAstNode;
+  /** Module a `prefix:*` step is bound to; set by `bindWildcardPrefixes`. */
+  module?: string;
 };
+
+export function isWildcardStep(step: string): boolean {
+  return step === "*" || step.endsWith(":*");
+}
 
 export type XPathLiteralNode = {
   kind: "literal";

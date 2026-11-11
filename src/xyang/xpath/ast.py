@@ -40,6 +40,13 @@ class PathSegment:
     def __init__(self, step: str, predicate: Optional[ASTNode] = None):
         self.step = step
         self.predicate = predicate
+        # Module name a ``prefix:*`` step is bound to; set by ``bind_wildcard_prefixes``.
+        self.module: Optional[str] = None
+
+    @property
+    def is_wildcard(self) -> bool:
+        """``*`` or ``prefix:*`` (XPath 1.0 NameTest)."""
+        return self.step == "*" or self.step.endswith(":*")
 
 
 class PathNode(ASTNode):

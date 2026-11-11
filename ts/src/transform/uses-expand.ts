@@ -142,6 +142,21 @@ function mergeIfFeaturesFromParentUses(usesStmt: YangStatement, child: YangState
   child.if_features = [...ufs, ...existing];
 }
 
+function mergeXPathPrefixes(
+  a: Record<string, string> | undefined,
+  b: Record<string, string> | undefined
+): Record<string, string> | undefined {
+  if (!a || !b) return a ?? b;
+  for (const [prefix, module] of Object.entries(b)) {
+    if (a[prefix] !== undefined && a[prefix] !== module) {
+      throw new YangSemanticError(
+        `uses: 'when' joins expressions that bind prefix '${prefix}' to '${a[prefix]}' and '${module}'`
+      );
+    }
+  }
+  return { ...a, ...b };
+}
+
 /** RFC 7950: `when` on `uses` applies to all schema nodes expanded from that `uses`. */
 function mergeWhenFromParentUses(usesStmt: YangStatement, child: YangStatement): void {
   const uw = usesStmt.when as Record<string, unknown> | undefined;
@@ -157,9 +172,14 @@ function mergeWhenFromParentUses(usesStmt: YangStatement, child: YangStatement):
     child.when = usesWhen as YangStatement["when"];
     return;
   }
+  const prefixes = mergeXPathPrefixes(
+    existing.xpath_prefixes as Record<string, string> | undefined,
+    uw.xpath_prefixes as Record<string, string> | undefined
+  );
   child.when = {
     ...existing,
     expression: `(${existing.expression}) and (${uw.expression})`,
+    ...(prefixes ? { xpath_prefixes: prefixes } : {}),
     description: String(existing.description ?? ""),
     evaluate_with_parent_context: true
   };

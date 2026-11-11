@@ -21,7 +21,7 @@ from .errors import YangCircularUsesError, YangRefineTargetNotFoundError, YangSy
 from .module import YangModule
 from .refine_expand import apply_refine_to_node, copy_yang_statement, find_nodes_by_refine_path
 from .xpath import XPathParser
-from .xpath.ast import PathNode
+from .xpath.ast import BinaryOpNode, PathNode
 
 logger = logging.getLogger(__name__)
 
@@ -135,6 +135,9 @@ def _merge_uses_when_into_grouping_roots(
                     description=merged_desc,
                     evaluate_with_parent_context=True,
                 )
+                if uses_when.ast is not None and old.ast is not None:
+                    # Keep each operand's ``prefix:*`` binding; re-parsing the text loses it.
+                    node.when.ast = BinaryOpNode(uses_when.ast, "and", old.ast)
 
 
 def _refine_target_matches_stmt_path(target_path: PathNode, stmt_path: str) -> bool:

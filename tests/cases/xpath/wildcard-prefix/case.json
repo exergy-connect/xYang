@@ -1,0 +1,79 @@
+{
+  "description": "'prefix:*' selects only the children defined by the module its prefix is bound to in the module that wrote the expression. 'other' augments 'm' and binds 'm' as 'base' and itself as 'o'; '*' selects both modules' children.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "own children only",
+      "data": {
+        "m:top": {
+          "a": "1"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "augmented children are not the base module's",
+      "data": {
+        "m:top": {
+          "a": "1",
+          "other:ext": "e"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "two children of the base module",
+      "data": {
+        "m:top": {
+          "a": "1",
+          "b": "2"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:top",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "augment's own prefix and the base module's imported prefix",
+      "data": {
+        "m:top": {
+          "a": "1",
+          "other:ext": "e",
+          "other:extra": "x"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:top/other:ext",
+          "code": "must"
+        }
+      ],
+      "xfail": {
+        "ts": "TypeScript reports the path of a node augmented in by another module without its module prefix (/m:top/ext, not /m:top/other:ext); the must is evaluated correctly"
+      }
+    },
+    {
+      "name": "no children of the base module",
+      "data": {
+        "m:top": {
+          "other:ext": "e"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:top/other:ext",
+          "code": "must"
+        }
+      ],
+      "xfail": {
+        "ts": "TypeScript reports the path of a node augmented in by another module without its module prefix (/m:top/ext, not /m:top/other:ext); the must is evaluated correctly"
+      }
+    }
+  ]
+}
