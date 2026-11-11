@@ -31,7 +31,8 @@ MODULE = MODELS / "example-topology-tools@2026-11-11.yang"
 ROOT = "example-topology-tools:session"
 TOOL_PREFIX = "example-topology-tools:"
 TS_CLI = REPO / "ts" / "dist" / "cli.js"
-TOOL_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,64}$")
+# MCP 2025-11-25: names SHOULD be 1 to 128 characters of A-Z, a-z, 0-9, "_", "-" and ".".
+TOOL_NAME = re.compile(r"^[A-Za-z0-9_.-]{1,128}$")
 
 
 def fixtures() -> list[Path]:
