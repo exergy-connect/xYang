@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **QuickJS release workflow:** `qjs-release.yml` runs on `ubuntu-24.04` instead of `ubuntu-latest`. `ubuntu-latest` became Ubuntu 26.04, where `qemu-user-static` has no installation candidate, so the v1.0.0 release run failed at `apt-get install` before building and attached no binaries. The build and both Linux smoke tests are unchanged. A manual run accepts `source_ref` to build and smoke-test an existing tag, such as `v1.0.0`, with the current workflow; it uploads a workflow artifact and attaches nothing.
+
 ## [1.0.0] — 2026-11-11
 
 Changes since 0.1.11. Breaking changes for upgrading code and data:

@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- **QuickJS binaries:** the release workflow that builds the `xyang-ts` QuickJS executables runs on `ubuntu-24.04`. On `ubuntu-latest` (Ubuntu 26.04) `qemu-user-static` cannot be installed, so the v1.0.0 run built no binaries. The build and smoke tests are unchanged.
+
 ## [1.0.0] — 2026-11-11
 
 Changes since 0.1.11. Breaking changes for upgrading code and data:
