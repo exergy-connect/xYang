@@ -149,8 +149,8 @@ class TypeChecker:
         leafref_current: Optional[Node] = None,
     ) -> List[TypeIssue]:
         """
-        leafref_current: node to use as current() for leafref path resolution (typically
-        the parent of the leaf). If None, ctx.current is used.
+        leafref_current: node to use as current() for leafref path resolution: the leaf
+        or leaf-list item being checked (RFC 7950 9.9.2). If None, ctx.current is used.
         """
         name = type_stmt.name
 
@@ -440,7 +440,7 @@ class TypeChecker:
             value,
             path_str,
         )
-        # For relative paths and current() in predicates, use leafref_current (parent of leaf)
+        # For relative paths and current() in predicates, use leafref_current (the leaf or leaf-list item)
         current_node = leafref_current if leafref_current is not None else ctx.current
         if leafref_current is not None and leafref_current is not ctx.current:
             leafref_ctx = Context(current=leafref_current, root=ctx.root, path_cache=ctx.path_cache)

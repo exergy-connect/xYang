@@ -1,0 +1,31 @@
+{
+  "description": "Relative leafref on a leaf-list item starts at the item (RFC 7950 9.9.2), exactly like a leaf; absolute paths start at the root. Nested and direct leaf-lists, with an ordinary leaf and an absolute leaf-list as controls.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid nested, direct, leaf and absolute references",
+      "data": {
+        "node": [
+          { "id": "a", "one": "b", "c": { "many": ["a", "b"] }, "direct": ["a", "b"] },
+          { "id": "b", "one": "a", "c": { "many": ["a"] }, "direct": ["b"] }
+        ],
+        "top": { "items": [{ "id": "x" }, { "id": "y" }], "abs": ["x", "y"] }
+      },
+      "valid": true },
+    { "name": "dangling nested relative leaf-list item",
+      "data": { "node": [{ "id": "a", "c": { "many": ["a", "missing"] } }] },
+      "valid": false,
+      "errors": [{ "path": "/node/0/c/many/1", "code": "leafref" }] },
+    { "name": "dangling direct relative leaf-list item",
+      "data": { "node": [{ "id": "a", "direct": ["missing"] }] },
+      "valid": false,
+      "errors": [{ "path": "/node/0/direct/0", "code": "leafref" }] },
+    { "name": "dangling ordinary leaf unchanged",
+      "data": { "node": [{ "id": "a", "one": "missing" }] },
+      "valid": false,
+      "errors": [{ "path": "/node/0/one", "code": "leafref" }] },
+    { "name": "dangling absolute leaf-list item unchanged",
+      "data": { "top": { "items": [{ "id": "x" }], "abs": ["x", "missing"] } },
+      "valid": false,
+      "errors": [{ "path": "/top/abs/1", "code": "leafref" }] }
+  ]
+}

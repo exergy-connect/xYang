@@ -660,7 +660,7 @@ class DocumentValidator:
                     self._root_schema,
                     ctx=item_ctx,
                     evaluator=self._evaluator,
-                    leafref_current=parent_node,
+                    leafref_current=item_node,
                 ):
                     severity = self._leafref_severity if leaf_list_leafref else Severity.ERROR
                     self._add(
