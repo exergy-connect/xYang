@@ -44,7 +44,14 @@ module example-topology-tools {
 
   grouping add-link-input {
     leaf source { type node-name; mandatory true; description "One end of the link."; }
-    leaf target { type node-name; mandatory true; description "The other end of the link. Must differ from source."; }
+    leaf target {
+      type node-name;
+      mandatory true;
+      must ". != ../source" {
+        error-message "A link cannot connect a node to itself.";
+      }
+      description "The other end of the link. Must differ from source.";
+    }
     leaf bandwidth-mbps {
       type uint32 { range "1..400000"; }
       default "1000";
@@ -124,9 +131,6 @@ module example-topology-tools {
           }
         }
         refine target {
-          must ". != ../source" {
-            error-message "A link cannot connect a node to itself.";
-          }
           must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
             error-message "target must name a node that an earlier successful add-node call created.";
           }

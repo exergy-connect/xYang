@@ -1,0 +1,147 @@
+{
+  "tools": [
+    {
+      "name": "add-node",
+      "description": "Add a node to the topology.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/node-name",
+            "description": "Name of the new node. Unique in the topology."
+          },
+          "role": {
+            "type": "string",
+            "enum": [
+              "router",
+              "switch",
+              "host"
+            ],
+            "description": "What the node does.",
+            "default": "router"
+          }
+        },
+        "required": [
+          "name"
+        ],
+        "$defs": {
+          "node-name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "Lowercase node name, 1 to 32 characters."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "$ref": "#/$defs/node-name",
+            "description": "Name of the node that was added."
+          }
+        },
+        "$defs": {
+          "node-name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "Lowercase node name, 1 to 32 characters."
+          }
+        }
+      }
+    },
+    {
+      "name": "add-link",
+      "description": "Connect two existing nodes with a link.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "source": {
+            "$ref": "#/$defs/node-name",
+            "description": "One end of the link."
+          },
+          "target": {
+            "$ref": "#/$defs/node-name",
+            "description": "The other end of the link. Must differ from source."
+          },
+          "bandwidth-mbps": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 400000,
+            "description": "Link capacity in megabits per second.",
+            "default": 1000
+          }
+        },
+        "required": [
+          "source",
+          "target"
+        ],
+        "$defs": {
+          "node-name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "Lowercase node name, 1 to 32 characters."
+          }
+        }
+      }
+    },
+    {
+      "name": "find-path",
+      "description": "Find a path between two nodes, as a list of hops.",
+      "inputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "from": {
+            "$ref": "#/$defs/node-name",
+            "description": "Start node."
+          },
+          "to": {
+            "$ref": "#/$defs/node-name",
+            "description": "End node."
+          },
+          "max-hops": {
+            "type": "integer",
+            "minimum": 1,
+            "maximum": 16,
+            "description": "Longest path to consider, in hops.",
+            "default": 8
+          }
+        },
+        "required": [
+          "from",
+          "to"
+        ],
+        "$defs": {
+          "node-name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "Lowercase node name, 1 to 32 characters."
+          }
+        }
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "hop": {
+            "type": "array",
+            "items": {
+              "$ref": "#/$defs/node-name"
+            },
+            "description": "Nodes on the path, from 'from' to 'to'."
+          }
+        },
+        "$defs": {
+          "node-name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,31}$",
+            "description": "Lowercase node name, 1 to 32 characters."
+          }
+        }
+      }
+    }
+  ]
+}

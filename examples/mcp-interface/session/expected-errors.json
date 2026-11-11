@@ -1,0 +1,147 @@
+{
+  "valid": [],
+  "arguments-for-other-tool": [
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/source",
+      "code": "mandatory",
+      "message": "Mandatory leaf 'source' is missing"
+    },
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/target",
+      "code": "mandatory",
+      "message": "Mandatory leaf 'target' is missing"
+    },
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-node",
+      "code": "when",
+      "message": "Node 'add-node' is present but its 'when' condition evaluates to false \u2014 this node must not exist"
+    }
+  ],
+  "bandwidth-out-of-range": [
+    {
+      "path": "/example-topology-tools:session/call/4/arguments/add-link/bandwidth-mbps",
+      "code": "range",
+      "message": "Value 0 is less than minimum 1"
+    }
+  ],
+  "duplicate-node": [
+    {
+      "path": "/example-topology-tools:session/call/0/arguments/add-node/name",
+      "code": "must",
+      "message": "A node name may be added successfully only once in a session."
+    },
+    {
+      "path": "/example-topology-tools:session/call/5/arguments/add-node/name",
+      "code": "must",
+      "message": "A node name may be added successfully only once in a session."
+    }
+  ],
+  "hallucinated-link-target": [
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/target",
+      "code": "must",
+      "message": "target must name a node that an earlier successful add-node call created."
+    }
+  ],
+  "hallucinated-path-hop": [
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path/hop/1",
+      "code": "must",
+      "message": "Every hop must be a node that an earlier successful add-node call created."
+    }
+  ],
+  "link-before-node": [
+    {
+      "path": "/example-topology-tools:session/call/4/arguments/add-link/target",
+      "code": "must",
+      "message": "target must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/6/arguments/find-path/to",
+      "code": "must",
+      "message": "to must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path/hop/2",
+      "code": "must",
+      "message": "Every hop must be a node that an earlier successful add-node call created."
+    }
+  ],
+  "link-to-failed-node": [
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/target",
+      "code": "must",
+      "message": "target must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/4/arguments/add-link/source",
+      "code": "must",
+      "message": "source must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path/hop/1",
+      "code": "must",
+      "message": "Every hop must be a node that an earlier successful add-node call created."
+    }
+  ],
+  "missing-arguments": [
+    {
+      "path": "/example-topology-tools:session/call/0/arguments",
+      "code": "must",
+      "message": "arguments must hold exactly one container: the one for the called tool."
+    },
+    {
+      "path": "/example-topology-tools:session/call/0/arguments/add-node/name",
+      "code": "mandatory",
+      "message": "Mandatory leaf 'name' is missing"
+    },
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/source",
+      "code": "must",
+      "message": "source must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/6/arguments/find-path/from",
+      "code": "must",
+      "message": "from must name a node that an earlier successful add-node call created."
+    },
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path/hop/0",
+      "code": "must",
+      "message": "Every hop must be a node that an earlier successful add-node call created."
+    }
+  ],
+  "path-missing-endpoint": [
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path",
+      "code": "must",
+      "message": "A path must contain its 'from' and 'to' nodes."
+    }
+  ],
+  "path-too-long": [
+    {
+      "path": "/example-topology-tools:session/call/6/result/find-path",
+      "code": "must",
+      "message": "A path may not be longer than max-hops."
+    }
+  ],
+  "self-loop": [
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/target",
+      "code": "must",
+      "message": "A link cannot connect a node to itself."
+    }
+  ],
+  "undeclared-tool": [
+    {
+      "path": "/example-topology-tools:session/call/5/arguments/add-node",
+      "code": "when",
+      "message": "Node 'add-node' is present but its 'when' condition evaluates to false \u2014 this node must not exist"
+    },
+    {
+      "path": "/example-topology-tools:session/call/5/tool",
+      "code": "identityref",
+      "message": "identityref value 'example-topology-tools:delete-node' does not resolve to a known identity"
+    }
+  ]
+}
