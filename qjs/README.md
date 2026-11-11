@@ -73,13 +73,13 @@ Pull requests do not build these binaries. [`.github/workflows/qjs-release.yml`]
 ./dist/xyang-ts-linux-x64 convert examples/meta-model.yang
 ```
 
-Flags match `xyang-ts`: repeatable `--include-path`, and on `validate`, `--anydata-validation` and `--anydata-module`.
+Flags match `xyang-ts`: repeatable `--include-path`, and on `validate`, `--format text|json`, `--native-json`, `--features`, `--anydata-validation`, and `--anydata-module`.
 
 Piped stdout is flushed before the process exits. A schema larger than Node's 64 KiB pipe buffer is not truncated.
 
 ## Not in this binary
 
-A `--format json` mode and an MCP server are follow-ups. This build does not add either.
+An MCP server is a follow-up. This build does not add one.
 
 ## License
 
