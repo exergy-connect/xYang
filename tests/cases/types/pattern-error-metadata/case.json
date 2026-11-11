@@ -1,0 +1,10 @@
+{
+  "description": "pattern error-message and error-app-tag appear in the validation message (RFC 7950 §9.4.6).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "digits", "data": { "data-model": { "x": "12" } }, "valid": true },
+    { "name": "pattern metadata", "data": { "data-model": { "x": "abc" } }, "valid": false,
+      "errors": [{ "path": "/data-model/x", "code": "pattern",
+        "message": "Must be decimal digits. (error-app-tag: m:bad-id)" }] }
+  ]
+}

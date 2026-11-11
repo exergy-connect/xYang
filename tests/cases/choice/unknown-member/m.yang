@@ -1,0 +1,27 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container topology {
+    presence "Configured topology";
+    leaf device { type string; }
+    container empty {}
+    choice mode {
+      case routed {
+        container routing {
+          leaf enabled { type boolean; }
+        }
+      }
+      case bridged {
+        leaf bridge { type string; }
+      }
+    }
+    list nodes {
+      key "name";
+      leaf name { type string; }
+    }
+    anydata metadata;
+    anyxml payload;
+  }
+}

@@ -1,0 +1,13 @@
+{
+  "description": "refine applies max-elements and min-elements to a list from the used grouping.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "within bounds", "data": { "c": { "items": [{ "k": "a" }] } }, "valid": true },
+    { "name": "below min-elements", "data": { "c": { "items": [] } }, "valid": false,
+      "errors": [{ "path": "/c/items", "code": "min-elements" }] },
+    { "name": "above max-elements", "data": { "c": { "items": [
+      { "k": "a" }, { "k": "b" }, { "k": "c" }, { "k": "d" }
+    ] } }, "valid": false,
+      "errors": [{ "path": "/c/items", "code": "max-elements" }] }
+  ]
+}

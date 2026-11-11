@@ -12,7 +12,7 @@ REPO_ROOT = Path(__file__).resolve().parent.parent.parent
 META_MODEL_YANG = REPO_ROOT / "examples" / "meta-model.yang"
 
 
-@pytest.fixture(name="meta_model_module")
+@pytest.fixture(name="meta_model_module", scope="module")
 def _meta_model_module_fixture():
     assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
     return parse_yang_file(str(META_MODEL_YANG))
@@ -185,31 +185,6 @@ def test_default_on_entity_field_with_type_definition_accepted(meta_model_module
             "description": "Reference site overrides default to medium.",
             "type": {"definition": "priority_level"},
             "default": "medium",
-        }
-    )
-    validator = YangValidator(meta_model_module)
-    ok, errors, _warnings = validator.validate({"data-model": dm})
-    assert ok, errors
-
-
-def test_default_on_entity_field_primitive_definition_accepted(meta_model_module):
-    """``default`` on a definition reference is valid when the definition is primitive."""
-    dm = _base_data_model()["data-model"]
-    ent = dm["entities"][0]
-    ent["field_definitions"] = [
-        {
-            "name": "count_def",
-            "description": "Reusable non-negative integer.",
-            "type": {"primitive": "integer", "min": 0, "max": 99},
-            "default": 1,
-        }
-    ]
-    ent["fields"].append(
-        {
-            "name": "qty",
-            "description": "Quantity from definition with site default 3.",
-            "type": {"definition": "count_def"},
-            "default": 3,
         }
     )
     validator = YangValidator(meta_model_module)

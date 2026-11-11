@@ -1,8 +1,8 @@
 import { readFileSync } from "node:fs";
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { parseJsonSchema, parseYangFile, YangValidator } from "../../src";
+import { beforeAll, describe, expect, it } from "vitest";
+import { parseJsonSchema, parseYangFile, YangValidator, type YangModule } from "../../src";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const META_MODEL_YANG = join(__dirname, "../../../examples/meta-model.yang");
@@ -93,21 +93,21 @@ const DATA_ITEM_TYPE_WHEN_FALSE_INVALID = minimalDataModel([
   }
 ]);
 
-function loadModules() {
-  return {
-    fromYang: parseYangFile(META_MODEL_YANG),
-    fromJson: parseJsonSchema(JSON.parse(readFileSync(META_MODEL_YANG_JSON, "utf-8")) as Record<string, unknown>)
-  };
-}
-
-function validate(moduleData: ReturnType<typeof loadModules>["fromYang"], data: Record<string, unknown>) {
+function validate(moduleData: YangModule, data: Record<string, unknown>) {
   const result = new YangValidator(moduleData).validate(data);
   return { isValid: result.isValid, errors: result.errors };
 }
 
 describe("python parity: json/test_item_type", () => {
+  let fromYang: YangModule;
+  let fromJson: YangModule;
+
+  beforeAll(() => {
+    fromYang = parseYangFile(META_MODEL_YANG);
+    fromJson = parseJsonSchema(JSON.parse(readFileSync(META_MODEL_YANG_JSON, "utf-8")) as Record<string, unknown>);
+  });
+
   it("accepts item_type.primitive for array fields in both encodings", () => {
-    const { fromYang, fromJson } = loadModules();
     const y = validate(fromYang, DATA_ITEM_TYPE_PRIMITIVE_VALID);
     const j = validate(fromJson, DATA_ITEM_TYPE_PRIMITIVE_VALID);
 
@@ -116,7 +116,6 @@ describe("python parity: json/test_item_type", () => {
   });
 
   it("accepts item_type.entity for array fields in both encodings", () => {
-    const { fromYang, fromJson } = loadModules();
     const y = validate(fromYang, DATA_ITEM_TYPE_ENTITY_VALID);
     const j = validate(fromJson, DATA_ITEM_TYPE_ENTITY_VALID);
 
@@ -125,7 +124,6 @@ describe("python parity: json/test_item_type", () => {
   });
 
   it("rejects empty item_type under array in both encodings", () => {
-    const { fromYang, fromJson } = loadModules();
     const y = validate(fromYang, DATA_ITEM_TYPE_EMPTY_INVALID);
     const j = validate(fromJson, DATA_ITEM_TYPE_EMPTY_INVALID);
 
@@ -136,7 +134,6 @@ describe("python parity: json/test_item_type", () => {
   });
 
   it("rejects item_type when type is not array in both encodings", () => {
-    const { fromYang, fromJson } = loadModules();
     const y = validate(fromYang, DATA_ITEM_TYPE_WHEN_FALSE_INVALID);
     const j = validate(fromJson, DATA_ITEM_TYPE_WHEN_FALSE_INVALID);
 

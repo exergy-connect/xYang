@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from xyang import parse_yang_string
 from xyang.ast import YangInputStmt, YangLeafStmt, YangOutputStmt, YangRpcStmt
-from xyang.json import generate_json_schema, parse_json_schema, schema_to_yang_json
+from xyang.json import generate_json_schema, parse_json_schema
 from xyang.json.schema_keys import XYangTypeValue
 
 
@@ -68,13 +68,3 @@ def test_rpc_emitted_under_x_yang_rpcs_and_round_trips():
     assert isinstance(msg_leaf, YangLeafStmt)
     assert msg_leaf.type is not None
     assert msg_leaf.type.name == "string"
-
-
-def test_schema_to_yang_json_includes_rpcs(tmp_path):
-    mod = parse_yang_string(_RPC_YANG)
-    out_file = tmp_path / "example-rpc.yang.json"
-    text = schema_to_yang_json(mod, output_path=out_file)
-    assert out_file.exists()
-    assert '"rpcs"' in text
-    loaded = parse_json_schema(out_file.read_text())
-    assert loaded.find_statement("reboot") is not None

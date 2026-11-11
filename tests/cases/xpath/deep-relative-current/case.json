@@ -1,0 +1,13 @@
+{
+  "description": "Deep relative must count(../../../../fields[name = current()]) = 1 resolves from a nested list leaf back to the entity fields list.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "referenced field exists",
+      "data": { "root": { "entities": [{ "name": "e", "fields": [{ "name": "a" }, { "name": "ref", "computed": { "operation": "add", "fields": [{ "field": "a" }] } }] }] } },
+      "valid": true },
+    { "name": "referenced field missing",
+      "data": { "root": { "entities": [{ "name": "e", "fields": [{ "name": "a" }, { "name": "ref", "computed": { "operation": "add", "fields": [{ "field": "missing" }] } }] }] } },
+      "valid": false,
+      "errors": [{ "path": "/root/entities/0/fields/1/computed/fields/0/field", "code": "must", "message": "field must exist in entity" }] }
+  ]
+}

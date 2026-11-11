@@ -1,0 +1,14 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container root {
+    list items {
+      key missing;
+      leaf name {
+        type string;
+      }
+    }
+  }
+}

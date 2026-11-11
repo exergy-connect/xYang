@@ -1,4 +1,4 @@
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { parseYangString, YangValidator } from "../src";
 
 const META_MODEL_SUBSET = `
@@ -83,13 +83,14 @@ module meta-model {
 }
 `;
 
-function validatorForSubset(): YangValidator {
-  return new YangValidator(parseYangString(META_MODEL_SUBSET));
-}
-
 describe("python parity: test_computed_fields", () => {
+  let validator: YangValidator;
+
+  beforeAll(() => {
+    validator = new YangValidator(parseYangString(META_MODEL_SUBSET));
+  });
+
   it("computed field with missing same-entity reference fails", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         consolidated: true,
@@ -119,7 +120,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("valid computed field in same entity passes", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         entities: [
@@ -148,7 +148,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("missing field in cross-entity reference fails", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         consolidated: true,
@@ -185,7 +184,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("cross-entity computed field without foreign key fails", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         consolidated: true,
@@ -221,7 +219,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("cross-entity computed field with foreign key passes", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         entities: [
@@ -257,7 +254,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("computed operation with too few field refs fails", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         entities: [
@@ -286,7 +282,6 @@ describe("python parity: test_computed_fields", () => {
   });
 
   it("aggregation with multiple fields passes", () => {
-    const validator = validatorForSubset();
     const result = validator.validate({
       "data-model": {
         entities: [

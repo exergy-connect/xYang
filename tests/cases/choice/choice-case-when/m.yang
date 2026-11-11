@@ -1,0 +1,21 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container root {
+    leaf mode {
+      type string;
+    }
+    choice c {
+      when "./mode = 'on'";
+      case a {
+        when "./mode = 'off'";
+        leaf a { type string; }
+      }
+      case b {
+        leaf b { type string; }
+      }
+    }
+  }
+}

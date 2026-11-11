@@ -1,0 +1,17 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping g {
+    leaf a { type string; }
+  }
+
+  container c {
+    uses g {
+      refine does_not_exist {
+        description "x";
+      }
+    }
+  }
+}

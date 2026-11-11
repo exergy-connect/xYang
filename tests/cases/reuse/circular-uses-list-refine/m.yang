@@ -1,0 +1,37 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping sink {
+    leaf ok { type string; }
+  }
+
+  grouping core {
+    choice branch {
+      case escape {
+        uses sink;
+      }
+      case recurse {
+        list hold {
+          key id;
+          leaf id { type string; }
+          uses loop_back;
+        }
+      }
+    }
+  }
+
+  grouping loop_back {
+    uses core {
+      refine branch/recurse/hold {
+        max-elements 0;
+        min-elements 0;
+      }
+    }
+  }
+
+  container root {
+    uses loop_back;
+  }
+}

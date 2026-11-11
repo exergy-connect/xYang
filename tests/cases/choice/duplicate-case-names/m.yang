@@ -1,0 +1,20 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container c {
+    choice interface-type {
+      case a {
+        leaf ethernet {
+          type string;
+        }
+      }
+      case b {
+        container ethernet {
+          leaf x { type string; }
+        }
+      }
+    }
+  }
+}

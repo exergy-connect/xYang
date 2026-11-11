@@ -1,0 +1,26 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping field-with-constraint {
+    leaf name {
+      type string;
+      mandatory true;
+    }
+    leaf type {
+      type string;
+      mandatory true;
+    }
+    leaf min {
+      type int32;
+      must "../type = 'integer' or ../type = 'number'" {
+        error-message "min can only be used with integer or number types";
+      }
+    }
+  }
+
+  container data {
+    uses field-with-constraint;
+  }
+}

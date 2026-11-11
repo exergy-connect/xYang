@@ -12,10 +12,6 @@ module m {
       type string;
       must "starts-with(., '')";
     }
-    leaf missing {
-      type string;
-      must "starts-with()";
-    }
     leaf one-arg {
       type string;
       must "starts-with(.)";

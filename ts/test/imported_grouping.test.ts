@@ -50,49 +50,6 @@ describe("imported grouping uses expansion", () => {
     expect(uses?.grouping_name?.includes(":")).toBe(false);
   });
 
-  it("expands uses prefix:grouping from an imported module", () => {
-    const dir = mkdtempSync(join(tmpdir(), "xyang-imported-grouping-"));
-    writeFileSync(
-      join(dir, "types.yang"),
-      `module types {
-  yang-version 1.1;
-  namespace "urn:ex:types";
-  prefix t;
-  grouping af-flags {
-    container af {
-      leaf ipv4 { type boolean; }
-      leaf ipv6 { type boolean; }
-    }
-  }
-}
-`
-    );
-    writeFileSync(
-      join(dir, "topo.yang"),
-      `module topo {
-  yang-version 1.1;
-  namespace "urn:ex:topo";
-  prefix nt;
-  import types { prefix ntype; }
-  container topology {
-    uses ntype:af-flags;
-  }
-}
-`
-    );
-
-    const parser = new YangParser({ includePath: [dir], expandUses: true });
-    const mod = parser.parseFile(join(dir, "topo.yang"));
-    const topology = (mod.statements as { name?: string; statements?: unknown[] }[]).find(
-      (s) => s.name === "topology"
-    );
-    expect(topology?.statements?.some((s) => (s as { name?: string }).name === "af")).toBe(true);
-
-    const v = new YangValidator(mod);
-    expect(v.validate({ topology: { af: { ipv4: true, ipv6: false } } }).isValid).toBe(true);
-    expect(v.validate({ topology: { af: { ipv4: "nope" } } }).isValid).toBe(false);
-  });
-
   it("expands imported grouping when the consumer has no local groupings", () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-imported-grouping-only-"));
     writeFileSync(

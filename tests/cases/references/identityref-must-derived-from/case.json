@@ -1,0 +1,9 @@
+{
+  "description": "must with derived-from on a sibling identityref: derived identities pass, the base identity fails (RFC 7950 §10).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "derived identity satisfies must", "data": { "data": { "kind": "m:dog", "label": "x" } }, "valid": true },
+    { "name": "base identity fails must", "data": { "data": { "kind": "m:animal", "label": "x" } }, "valid": false,
+      "errors": [{ "path": "/data/label", "code": "must" }] }
+  ]
+}

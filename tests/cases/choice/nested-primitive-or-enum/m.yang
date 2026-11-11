@@ -1,0 +1,31 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container root {
+    choice outer {
+      mandatory true;
+      case inner_wrap {
+        choice inner {
+          mandatory true;
+          case open_primitive {
+            leaf primitive {
+              type string;
+            }
+          }
+          case closed_enum {
+            leaf-list enum {
+              type string;
+            }
+          }
+        }
+      }
+      case c_case {
+        leaf alt {
+          type string;
+        }
+      }
+    }
+  }
+}

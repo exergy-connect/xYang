@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { generateJsonSchema, parseYangFile, YangModule, YangStatement } from "../../src";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -89,10 +89,15 @@ function collectChoiceNames(module: YangModule): Set<string> {
 }
 
 describe("python parity: json/test_choice_cases", () => {
-  it("emits hoisted choice schema (no x-yang.type=choice nodes, no choice-name properties)", () => {
-    const module = parseYangFile(YANG_FILE);
-    const schema = generateJsonSchema(module);
+  let module: YangModule;
+  let schema: Record<string, unknown>;
 
+  beforeAll(() => {
+    module = parseYangFile(YANG_FILE);
+    schema = generateJsonSchema(module);
+  });
+
+  it("emits hoisted choice schema (no x-yang.type=choice nodes, no choice-name properties)", () => {
     const choicePaths = collectXYangChoicePaths(schema);
     expect(choicePaths).toEqual([]);
 
@@ -103,7 +108,6 @@ describe("python parity: json/test_choice_cases", () => {
   });
 
   it("emits oneOf for mandatory and optional choices", () => {
-    const schema = generateJsonSchema(parseYangFile(YANG_FILE));
     const dm = ((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>);
     const dmProps = dm.properties as Record<string, unknown>;
 

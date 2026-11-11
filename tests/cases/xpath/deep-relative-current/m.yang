@@ -1,0 +1,27 @@
+module m {
+  namespace "urn:m";
+  prefix m;
+
+  container root {
+    list entities {
+      key name;
+      leaf name { type string; }
+      list fields {
+        key name;
+        leaf name { type string; }
+        container computed {
+          leaf operation { type string; }
+          list fields {
+            key field;
+            leaf field {
+              type string;
+              must "count(../../../../fields[name = current()]) = 1" {
+                error-message "field must exist in entity";
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+}

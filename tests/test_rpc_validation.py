@@ -1,6 +1,7 @@
-"""Validate rpc and action input and output instances (issue #149) with a validated context.
+"""RPC and action validate API contracts and CLI --rpc/--output/--context (issue #149).
 
-Shared cases: tests/cases/operations.
+Validation outcomes live in tests/cases/operations/; this file keeps mutation,
+legacy validate() text paths, and CLI exit/stdout contracts.
 """
 
 import copy
@@ -49,49 +50,6 @@ def module():
     return parse_yang_string(MODULE)
 
 
-def test_old_behavior_without_rpc_is_unknown_field(module):
-    result = validate(module, SELF_LINK)
-    assert [(e["path"], e["code"]) for e in result["errors"]] == [("/example-topology-tools:input", "unknown-field")]
-
-
-def test_self_link_fails_must_with_the_error_message(module):
-    result = validate(module, SELF_LINK, rpc="add-link")
-    assert result["valid"] is False
-    assert [(e["path"], e["code"], e["message"]) for e in result["errors"]] == [
-        ("/example-topology-tools:input/target", "must", "A link cannot connect a node to itself.")
-    ]
-
-
-def test_other_target_passes(module):
-    assert validate(module, OTHER_LINK, rpc="add-link", direction="input")["valid"] is True
-
-
-def test_native_json_takes_bare_parameters(module):
-    result = validate(module, SELF_LINK["example-topology-tools:input"], rpc="add-link", native_json=True)
-    assert [(e["path"], e["code"]) for e in result["errors"]] == [("/target", "must")]
-
-
-def test_output_direction(module):
-    ok = validate(module, {"example-topology-tools:output": {"link-id": "l1"}}, rpc="add-link", direction="output")
-    assert ok["valid"] is True
-    bad = validate(module, {"example-topology-tools:output": {}}, rpc="add-link", direction="output")
-    assert [(e["path"], e["code"]) for e in bad["errors"]] == [("/example-topology-tools:output/link-id", "mandatory")]
-
-
-def test_context_joins_the_operation_node(module):
-    data = {"example-topology-tools:input": {"source": "r1", "target": "r2", "via": "r3"}}
-    context = {"example-topology-tools:topology": {"node": [{"name": "r3"}]}}
-    assert validate(module, data, rpc="add-link", context=context)["valid"] is True
-    without = validate(module, data, rpc="add-link")
-    assert [(e["path"], e["code"]) for e in without["errors"]] == [("/example-topology-tools:input/via", "leafref")]
-
-
-def test_wrapper_is_not_an_xpath_level(module):
-    """``../source`` is resolved from the operation node, so the wrapper adds no level."""
-    result = YangValidator(module).validate_detailed(OTHER_LINK, rpc="add-link")
-    assert result["errors"] == []
-
-
 def test_module_and_data_are_not_mutated(module):
     statements = list(module.statements)
     rpc = next(s for s in statements if type(s).__name__ == "YangRpcStmt")
@@ -114,22 +72,6 @@ def test_validate_text_output_uses_the_wrapper_path(module):
     ok, errors, _warnings = YangValidator(module).validate(SELF_LINK, rpc="add-link")
     assert ok is False
     assert errors[0].startswith("/example-topology-tools:input/target: A link cannot connect a node to itself.")
-
-
-@pytest.mark.parametrize(
-    "kwargs,message",
-    [
-        ({"rpc": "nope"}, "no rpc 'nope'"),
-        ({"direction": "output"}, "direction applies only together with rpc or action"),
-        ({"context": {}}, "context applies only together with rpc or action"),
-        ({"rpc": "add-link", "direction": "sideways"}, "direction must be 'input' or 'output'"),
-        ({"rpc": "add-link", "context": []}, "context must be a JSON object"),
-        ({"rpc": ""}, "rpc must be a non-empty rpc name"),
-    ],
-)
-def test_usage_errors_raise_value_error(module, kwargs, message):
-    with pytest.raises(ValueError, match=message):
-        validate(module, OTHER_LINK, **kwargs)
 
 
 def _cli(*args: str) -> subprocess.CompletedProcess:

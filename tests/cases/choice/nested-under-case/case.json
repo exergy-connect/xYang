@@ -1,0 +1,13 @@
+{
+  "description": "Nested mandatory choice directly under an outer case: leaves appear flat under the parent; at most one case of each choice may have data (RFC 7950 §7.9).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "outer leaf branch", "data": { "root": { "alt": "z" } }, "valid": true },
+    { "name": "flat inner primitive", "data": { "root": { "primitive": "hello" } }, "valid": true },
+    { "name": "flat inner other", "data": { "root": { "other": "y" } }, "valid": true },
+    { "name": "both inner branches", "data": { "root": { "primitive": "a", "other": "b" } }, "valid": false,
+      "errors": [{ "path": "/root", "code": "choice-multiple-cases" }] },
+    { "name": "inner and outer alt", "data": { "root": { "primitive": "a", "alt": "z" } }, "valid": false,
+      "errors": [{ "path": "/root", "code": "choice-multiple-cases" }] }
+  ]
+}

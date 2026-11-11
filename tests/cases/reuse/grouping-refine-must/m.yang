@@ -1,0 +1,26 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping base-field {
+    leaf name {
+      type string;
+      mandatory true;
+    }
+    leaf type {
+      type string;
+      mandatory true;
+    }
+  }
+
+  container data {
+    uses base-field {
+      refine type {
+        must ". != 'invalid'" {
+          error-message "Type cannot be invalid";
+        }
+      }
+    }
+  }
+}

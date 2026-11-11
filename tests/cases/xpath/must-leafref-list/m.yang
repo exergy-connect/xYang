@@ -1,0 +1,31 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    list items {
+      key id;
+      leaf id { type string; }
+      leaf name { type string; }
+    }
+    list references {
+      key ref_id;
+      leaf ref_id {
+        type leafref {
+          path "/data/items/id";
+          require-instance true;
+        }
+      }
+      leaf ref_name {
+        type leafref {
+          path "/data/items/name";
+          require-instance true;
+        }
+      }
+      must "ref_name = /data/items[id = current()/ref_id]/name" {
+        error-message "Referenced name must match the referenced item's name";
+      }
+    }
+  }
+}

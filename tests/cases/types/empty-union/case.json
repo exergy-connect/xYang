@@ -1,0 +1,8 @@
+{
+  "description": "A union with no member types rejects every value.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "any value rejected", "data": { "data": { "value": "anything" } }, "valid": false,
+      "errors": [{ "path": "/data/value", "code": "union" }] }
+  ]
+}

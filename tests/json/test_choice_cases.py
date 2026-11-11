@@ -23,14 +23,14 @@ _DATA_DIR = Path(__file__).resolve().parent / "data" / "choice_cases"
 YANG_FILE = _DATA_DIR / "choice_cases.yang"
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def module_from_yang():
     """Load choice-cases model from .yang."""
     assert YANG_FILE.exists(), f"Missing {YANG_FILE}"
     return parse_yang_file(str(YANG_FILE))
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def generated_schema(module_from_yang):
     """Generate JSON schema from the YANG module."""
     return generate_json_schema(module_from_yang)

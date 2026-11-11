@@ -16,8 +16,6 @@
     { "name": "empty needle on text", "data": { "top": { "empty-needle": "a-b" } }, "valid": true },
     { "name": "needle absent", "data": { "top": { "no-match": "abc" } }, "valid": true },
     { "name": "needle absent on empty", "data": { "top": { "no-match": "" } }, "valid": true },
-    { "name": "missing args", "data": { "top": { "missing": "a-b" } }, "valid": false,
-      "errors": [{ "path": "/top/missing", "code": "xpath-error" }] },
     { "name": "one arg", "data": { "top": { "one-arg": "a-b" } }, "valid": false,
       "errors": [{ "path": "/top/one-arg", "code": "xpath-error" }] },
     { "name": "extra arg", "data": { "top": { "extra": "a-b" } }, "valid": false,

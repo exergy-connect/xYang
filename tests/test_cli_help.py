@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import argparse
+import io
 import os
 import re
 import subprocess
@@ -41,6 +42,21 @@ def _run(*args: str, cwd: Path, stdin: str = "") -> subprocess.CompletedProcess[
     )
 
 
+def _main(capsys, monkeypatch, *args: str) -> subprocess.CompletedProcess[str]:
+    """In-process ``xyang``; the subprocess path is covered by the top-level checks."""
+    from xyang.__main__ import main
+
+    monkeypatch.setattr(sys, "argv", ["xyang", *args])
+    monkeypatch.setattr(sys, "stdin", io.StringIO(""))
+    capsys.readouterr()
+    try:
+        code = main()
+    except SystemExit as exc:
+        code = exc.code if isinstance(exc.code, int) else 1
+    out, err = capsys.readouterr()
+    return subprocess.CompletedProcess(args, code, out, err)
+
+
 def _option_strings(parser: argparse.ArgumentParser) -> set[str]:
     found: set[str] = set()
     for action in parser._actions:
@@ -56,7 +72,9 @@ def _takes_value(action: argparse.Action) -> bool:
     return action.nargs not in (0, "?", "*")
 
 
-def test_help_lists_registered_commands_and_options(tmp_path: Path) -> None:
+def test_help_lists_registered_commands_and_options(tmp_path: Path, capsys, monkeypatch) -> None:
+    monkeypatch.setenv("COLUMNS", "88")
+    monkeypatch.chdir(tmp_path)
     parser = build_parser()
     commands = command_parsers(parser)
     assert commands, "parser registered no commands"
@@ -84,7 +102,7 @@ def test_help_lists_registered_commands_and_options(tmp_path: Path) -> None:
         assert "default" in sub.format_help().lower()
         assert "examples:" in sub.format_help()
         for flag in ("--help", "-h"):
-            result = _run(name, flag, cwd=tmp_path, stdin="")
+            result = _main(capsys, monkeypatch, name, flag)
             assert result.returncode == 0, (name, flag, result.stderr)
             assert result.stderr == ""
             assert result.stdout == sub.format_help()
@@ -95,10 +113,15 @@ def test_help_lists_registered_commands_and_options(tmp_path: Path) -> None:
             assert not extra_long, (name, extra_long)
             assert not extra_short, (name, extra_short)
 
+    first, first_parser = next(iter(commands.items()))
+    real = _run(first, "--help", cwd=tmp_path)
+    assert real.returncode == 0 and real.stderr == "" and real.stdout == first_parser.format_help()
+
     assert list(tmp_path.iterdir()) == []
 
 
-def test_malformed_invocation_exits_2(tmp_path: Path) -> None:
+def test_malformed_invocation_exits_2(tmp_path: Path, capsys, monkeypatch) -> None:
+    monkeypatch.chdir(tmp_path)
     unknown_command = _run("no-such-command", cwd=tmp_path, stdin="")
     assert unknown_command.returncode == 2
     assert unknown_command.stdout == ""
@@ -110,7 +133,7 @@ def test_malformed_invocation_exits_2(tmp_path: Path) -> None:
 
     commands = command_parsers()
     for name, sub in commands.items():
-        unknown = _run(name, "--not-a-registered-flag", "module.yang", cwd=tmp_path, stdin="")
+        unknown = _main(capsys, monkeypatch, name, "--not-a-registered-flag", "module.yang")
         assert unknown.returncode == 2, (name, unknown.stderr)
         assert unknown.stdout == ""
         assert "unrecognized arguments" in unknown.stderr
@@ -118,7 +141,7 @@ def test_malformed_invocation_exits_2(tmp_path: Path) -> None:
         for action in sub._actions:
             if not _takes_value(action):
                 continue
-            missing = _run(name, action.option_strings[-1], cwd=tmp_path, stdin="")
+            missing = _main(capsys, monkeypatch, name, action.option_strings[-1])
             assert missing.returncode == 2, (name, action.option_strings, missing.stderr)
             assert missing.stdout == ""
             assert missing.stderr.strip()

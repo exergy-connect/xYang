@@ -1,0 +1,6 @@
+{
+  "description": "case-stmt does not allow mandatory as a direct substatement (RFC 7950 Appendix A).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Invalid or unknown statement in case 'a': 'mandatory'"
+}

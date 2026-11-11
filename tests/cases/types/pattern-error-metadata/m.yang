@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef id {
+    type string {
+      pattern '[0-9]+' {
+        error-message "Must be decimal digits.";
+        error-app-tag "m:bad-id";
+      }
+    }
+  }
+
+  container data-model {
+    leaf x { type id; }
+  }
+}

@@ -16,9 +16,9 @@ from xyang import YangValidator, parse_yang_file
 from xyang.validator.document_validator import DocumentValidator
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def meta_model():
-    """Load the meta-model YANG module."""
+    """Load the meta-model YANG module once per module."""
     yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model.yang"
     return parse_yang_file(str(yang_path))
 

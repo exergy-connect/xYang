@@ -1,10 +1,11 @@
-"""Tests for ``instance-identifier`` type (YANG parse, validation, JSON round-trip)."""
+"""Tests for ``instance-identifier`` JSON Schema round-trip.
+
+Validation coverage: tests/cases/references/instance-identifier.
+"""
 
 from __future__ import annotations
 
-from typing import Any
-
-from xyang import YangValidator, parse_yang_string
+from xyang import parse_yang_string
 from xyang.ast import YangLeafStmt
 from xyang.json import generate_json_schema, parse_json_schema
 
@@ -37,37 +38,6 @@ module iid-test {
 """
 
 
-def test_instance_identifier_yang_valid_when_target_exists():
-    """Absolute path to an existing leaf passes when require-instance is true."""
-    module = parse_yang_string(_minimal_module_yang())
-    v = YangValidator(module)
-    data: dict[str, Any] = {
-        "data-model": {
-            "top": {"x": "hello"},
-            "ptr": "/data-model/top/x",
-            "ptr_loose": "not-a-valid-path-syntax-(",
-        }
-    }
-    ok, errors, _ = v.validate(data)
-    assert ok, f"expected valid: {errors}"
-
-
-def test_instance_identifier_yang_invalid_not_absolute():
-    """Only absolute paths are supported for require-instance checks."""
-    module = parse_yang_string(_minimal_module_yang())
-    v = YangValidator(module)
-    data: dict[str, Any] = {
-        "data-model": {
-            "top": {"x": "hello"},
-            "ptr": "top/x",
-            "ptr_loose": "x",
-        }
-    }
-    ok, errors, _ = v.validate(data)
-    assert not ok
-    assert any("absolute" in e.lower() for e in errors)
-
-
 def test_instance_identifier_json_schema_round_trip():
     """generate_json_schema → parse_json_schema preserves instance-identifier + require-instance."""
     module = parse_yang_string(_minimal_module_yang())
@@ -87,6 +57,8 @@ def test_instance_identifier_json_schema_round_trip():
 
 def test_instance_identifier_json_schema_validate():
     """JSON schema produced from YANG validates instance data like the YANG module."""
+    from xyang import YangValidator
+
     module = parse_yang_string(_minimal_module_yang())
     schema = generate_json_schema(module)
     m = parse_json_schema(schema)

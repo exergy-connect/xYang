@@ -1,8 +1,11 @@
-"""RFC 7950 ``when`` on ``choice`` and ``case`` (parser + validator)."""
+"""RFC 7950 ``when`` on ``choice`` and ``case`` (parser AST).
+
+Validation coverage: tests/cases/choice/choice-case-when.
+"""
 
 from __future__ import annotations
 
-from xyang import YangValidator, parse_yang_string
+from xyang import parse_yang_string
 
 _MODULE = """
 module test-choice-when {
@@ -39,33 +42,3 @@ def test_parse_choice_and_case_when():
     case_a = next(c for c in ch.cases if c.name == "a")
     assert case_a.when is not None
     assert "off" in case_a.when.condition
-
-
-def test_choice_when_false_skips_branch_data_ok():
-    m = parse_yang_string(_MODULE)
-    v = YangValidator(m)
-    ok, errors, _w = v.validate({"root": {"mode": "off"}})
-    assert ok, errors
-
-
-def test_choice_when_false_with_branch_data_errors():
-    m = parse_yang_string(_MODULE)
-    v = YangValidator(m)
-    ok, errors, _w = v.validate({"root": {"mode": "off", "a": "x"}})
-    assert not ok
-    assert any("when" in e.lower() for e in errors)
-
-
-def test_case_when_false_with_data_errors():
-    m = parse_yang_string(_MODULE)
-    v = YangValidator(m)
-    ok, errors, _w = v.validate({"root": {"mode": "on", "a": "x"}})
-    assert not ok
-    assert any("when" in e.lower() for e in errors)
-
-
-def test_case_b_without_case_when_when_choice_applies():
-    m = parse_yang_string(_MODULE)
-    v = YangValidator(m)
-    ok, errors, _w = v.validate({"root": {"mode": "on", "b": "y"}})
-    assert ok, errors

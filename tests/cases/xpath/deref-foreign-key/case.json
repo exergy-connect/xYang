@@ -1,0 +1,37 @@
+{
+  "description": "deref() in must path expressions, in absolute-path predicates, and as deref(current())/../foreignKeys on a relative leafref child_fk.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "deref path and child_fk ok",
+      "data": { "data-model": { "entities": [
+        { "name": "parent", "primary_key": "id", "fields": [{ "name": "id", "type": "string" }] },
+        { "name": "child", "primary_key": "id", "fields": [
+          { "name": "id", "type": "string" },
+          { "name": "parent_id", "type": "string", "foreignKeys": [{ "entity": "parent" }] }
+        ], "parents": [{ "child_fk": "parent_id" }] }
+      ] } },
+      "valid": true },
+    { "name": "missing entity",
+      "data": { "data-model": { "entities": [
+        { "name": "only", "primary_key": "id", "fields": [
+          { "name": "id", "type": "string" },
+          { "name": "ref", "type": "string", "foreignKeys": [{ "entity": "missing" }] }
+        ] }
+      ] } },
+      "valid": false,
+      "errors": [
+        { "path": "/data-model/entities/0/fields/1/foreignKeys/0", "code": "must", "message": "deref() in path expression must resolve to exactly one node" },
+        { "path": "/data-model/entities/0/fields/1/foreignKeys/0", "code": "must", "message": "deref() in predicate: referenced entity must exist" },
+        { "path": "/data-model/entities/0/fields/1/foreignKeys/0/entity", "code": "leafref" }
+      ] },
+    { "name": "child_fk without foreignKeys",
+      "data": { "data-model": { "entities": [
+        { "name": "one", "primary_key": "id", "fields": [
+          { "name": "id", "type": "string" },
+          { "name": "plain", "type": "string" }
+        ], "parents": [{ "child_fk": "plain" }] }
+      ] } },
+      "valid": false,
+      "errors": [{ "path": "/data-model/entities/0/parents/0/child_fk", "code": "must", "message": "Child foreign key field must have a foreignKeys definition" }] }
+  ]
+}

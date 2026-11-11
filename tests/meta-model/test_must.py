@@ -1,9 +1,9 @@
 """
-Meta-model must expressions: one positive and one negative test per must.
+Meta-model must expressions: focused positive/negative checks.
 
-Each must statement in examples/meta-model.yang is covered by a test_*_valid
-and test_*_invalid test. Tests use minimal data so the targeted must is the
-one that passes or fails.
+Overlapping required/default and minDate coverage lives in
+test_new_meta_model_required_default.py; other files cover samples and
+parent_array. This module keeps the remaining distinct must scenarios.
 """
 from __future__ import annotations
 
@@ -15,9 +15,9 @@ from tests.meta_model_data import dm, ent, f_composite, f_computed, fp, subf
 from xyang import YangValidator, parse_yang_file
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def meta_model():
-    """Load the meta-model YANG module."""
+    """Load the meta-model YANG module once per module."""
     yang_path = Path(__file__).parent.parent.parent / "examples" / "meta-model.yang"
     return parse_yang_file(str(yang_path))
 
@@ -64,17 +64,6 @@ def test_allow_unlimited_fields_invalid(meta_model):
     assert any("allow_unlimited_fields" in str(e) for e in errors)
 
 
-def test_entity_field_limit_valid(meta_model):
-    """Entity with <=7 non-array fields passes (no allow_unlimited_fields)."""
-    data = dm(
-        entities=[
-            ent("e", "id", [fp("id", "integer", description="PK."), fp("x", "string", description="X.")]),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
-
-
 def test_entity_field_limit_invalid(meta_model):
     """Entity with >7 non-array fields fails without allow_unlimited_fields."""
     data = dm(
@@ -90,15 +79,6 @@ def test_entity_field_limit_invalid(meta_model):
     valid, errors = _validate(meta_model, data)
     assert not valid
     assert any("7" in str(e) or "field" in str(e).lower() for e in errors)
-
-
-def test_entity_name_underscore_valid(meta_model):
-    """Entity name within underscore limit passes."""
-    data = dm(
-        entities=[ent("entity_a", "id", [fp("id", "integer", description="PK.")])],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
 
 
 def test_entity_name_underscore_invalid(meta_model):
@@ -126,55 +106,6 @@ def test_primary_key_reference_invalid(meta_model):
     valid, errors = _validate(meta_model, data)
     assert not valid
     assert any("primary_key" in str(e) or "field" in str(e).lower() for e in errors)
-
-
-def test_mindate_type_valid(meta_model):
-    """minDate on date type passes."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [fp("id", "integer", description="PK."), fp("d", "date", minDate="2020-01-01", description="D.")],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
-
-
-def test_mindate_type_invalid(meta_model):
-    """minDate on non-date type fails."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [
-                    fp("id", "integer", description="PK."),
-                    fp("t", "string", minDate="2020-01-01", description="T."),
-                ],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert not valid
-    assert any("minDate" in str(e) or "date" in str(e).lower() for e in errors)
-
-
-def test_maxdate_type_valid(meta_model):
-    """maxDate on date type passes."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [fp("id", "integer", description="PK."), fp("d", "date", maxDate="2020-12-31", description="D.")],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
 
 
 def test_maxdate_ordering_invalid(meta_model):
@@ -243,26 +174,6 @@ def test_foreign_key_unknown_entity_invalid(meta_model):
     valid, errors = _validate(meta_model, data)
     assert not valid
     assert errors
-
-
-def test_computed_binary_two_fields_valid(meta_model):
-    """Binary operation (add/subtraction) with exactly 2 fields passes."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [
-                    fp("id", "integer", description="PK."),
-                    fp("a", "integer", description="A."),
-                    fp("b", "integer", description="B."),
-                    f_computed("sum", "integer", "add", [{"field": "a"}, {"field": "b"}]),
-                ],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
 
 
 def test_computed_binary_two_fields_invalid(meta_model):
@@ -450,55 +361,6 @@ def test_computed_cross_entity_no_fk_invalid(meta_model):
     valid, errors = _validate(meta_model, data)
     assert not valid
     assert any("foreign key" in str(e).lower() or "Cross-entity" in str(e) for e in errors)
-
-
-def test_required_no_default_valid(meta_model):
-    """required=true with no default passes."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [fp("id", "integer", description="PK."), fp("x", "string", required=True, description="X.")],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
-
-
-def test_required_with_default_invalid(meta_model):
-    """required=true with default fails."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "id",
-                [
-                    fp("id", "integer", description="PK."),
-                    fp("x", "string", required=True, default="v", description="X."),
-                ],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert not valid
-    assert any("required" in str(e).lower() or "default" in str(e).lower() for e in errors)
-
-
-def test_composite_subcomponent_type_valid(meta_model):
-    """Composite subcomponent with non-composite type passes."""
-    data = dm(
-        entities=[
-            ent(
-                "e",
-                "pk",
-                [f_composite("pk", [subf("a", "integer"), subf("b", "string")], description="Composite PK.")],
-            ),
-        ],
-    )
-    valid, errors = _validate(meta_model, data)
-    assert valid, errors
 
 
 def test_composite_subcomponent_type_invalid(meta_model):

@@ -1,0 +1,17 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    list items {
+      key id;
+      leaf id { type string; }
+      leaf type { type string; }
+      leaf value { type string; }
+      must "concat(type, '-', value) != 'other-' or type = 'test'" {
+        error-message "When type is 'other', value must not be empty";
+      }
+    }
+  }
+}

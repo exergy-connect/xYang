@@ -1,0 +1,9 @@
+{
+  "description": "refine path through choice/case reaches the list and applies cardinality.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "empty allowed", "data": { "root": {} }, "valid": true },
+    { "name": "max-elements zero", "data": { "root": { "rows": [{ "id": "a" }] } }, "valid": false,
+      "errors": [{ "path": "/root/rows", "code": "max-elements" }] }
+  ]
+}

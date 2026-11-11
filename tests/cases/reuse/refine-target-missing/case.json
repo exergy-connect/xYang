@@ -1,0 +1,6 @@
+{
+  "description": "refine whose target matches no node in the used grouping is a schema error.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "does_not_exist"
+}

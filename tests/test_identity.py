@@ -1,6 +1,8 @@
 """
-Tests for YANG ``identity`` / ``identityref`` and ``must`` with ``derived-from`` /
-``derived-from-or-self`` (RFC 7950, Section 10).
+Tests for YANG ``identity`` / ``identityref`` parsing (RFC 7950).
+
+Validation coverage: tests/cases/references/identityref,
+tests/cases/references/identityref-must-derived-from.
 """
 
 # Minimal YANG 1.1 module: base identity, derived identity, leaf with identityref.
@@ -87,36 +89,6 @@ module identity-must-derived-from-or-self {
 }
 """
 
-IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING = """
-module identity-must-sibling {
-  yang-version 1.1;
-  namespace "urn:identity-must-sibling";
-  prefix "is";
-
-  identity animal;
-
-  identity mammal {
-    base animal;
-  }
-
-  identity dog {
-    base mammal;
-  }
-
-  container data {
-    leaf kind {
-      type identityref {
-        base animal;
-      }
-    }
-    leaf label {
-      type string;
-      must "derived-from(../kind, 'is:mammal')";
-    }
-  }
-}
-"""
-
 
 def test_parse_minimal_identity_module():
     """Parse a module with ``identity`` statements and an ``identityref`` leaf."""
@@ -175,32 +147,3 @@ def test_parse_identity_module_with_must_derived_from_or_self():
 
     module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_OR_SELF)
     assert module.name == "identity-must-derived-from-or-self"
-
-
-def test_parse_identity_module_with_must_on_sibling_leaf():
-    """Parse ``must`` on a leaf that constrains a sibling ``identityref`` via ``derived-from``."""
-    from xyang import parse_yang_string
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING)
-    assert module.name == "identity-must-sibling"
-
-
-def test_validate_must_on_sibling_when_identityref_satisfies_derived_from():
-    from xyang import parse_yang_string, YangValidator
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING)
-    validator = YangValidator(module)
-    data = {"data": {"kind": "identity-must-sibling:dog", "label": "x"}}
-    is_valid, errors, _warnings = validator.validate(data)
-    assert is_valid, errors
-
-
-def test_validate_must_on_sibling_fails_when_identityref_not_mammal_lineage():
-    from xyang import parse_yang_string, YangValidator
-
-    module = parse_yang_string(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING)
-    validator = YangValidator(module)
-    data = {"data": {"kind": "identity-must-sibling:animal", "label": "x"}}
-    is_valid, errors, _warnings = validator.validate(data)
-    assert not is_valid
-    assert errors

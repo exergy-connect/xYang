@@ -1,6 +1,6 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
+import { beforeAll, describe, expect, it } from "vitest";
 import { generateJsonSchema, parseYangFile } from "../../src";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -28,18 +28,19 @@ function collectInvalidPropertyKeys(node: unknown, out: string[]): void {
 }
 
 describe("meta-model target: schema converter", () => {
+  let schema: Record<string, unknown>;
+
+  beforeAll(() => {
+    schema = generateJsonSchema(parseYangFile(META_MODEL_YANG));
+  });
+
   it("does not emit XPath/must expressions as JSON property names", () => {
-    const module = parseYangFile(META_MODEL_YANG);
-    const schema = generateJsonSchema(module);
     const invalid: string[] = [];
     collectInvalidPropertyKeys(schema, invalid);
     expect(invalid).toEqual([]);
   });
 
   it("emits minItems/maxItems for computed.fields list", () => {
-    const module = parseYangFile(META_MODEL_YANG);
-    const schema = generateJsonSchema(module);
-
     const dm = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     const entities = (dm.properties as Record<string, unknown>).entities as Record<string, unknown>;
     const entityItems = entities.items as Record<string, unknown>;
@@ -53,9 +54,6 @@ describe("meta-model target: schema converter", () => {
   });
 
   it("preserves must description text", () => {
-    const module = parseYangFile(META_MODEL_YANG);
-    const schema = generateJsonSchema(module);
-
     const dm = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     const allowUnlimited = (dm.properties as Record<string, unknown>).allow_unlimited_fields as Record<string, unknown>;
     const xYang = allowUnlimited["x-yang"] as Record<string, unknown>;

@@ -1,0 +1,19 @@
+{
+  "description": "must on a list entry containing leafrefs: current() is the list entry so current()/ref_id selects a sibling leafref.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "ref_name matches",
+      "data": { "data": {
+        "items": [{ "id": "item1", "name": "Item One" }, { "id": "item2", "name": "Item Two" }],
+        "references": [{ "ref_id": "item1", "ref_name": "Item One" }, { "ref_id": "item2", "ref_name": "Item Two" }]
+      } },
+      "valid": true },
+    { "name": "ref_name mismatched",
+      "data": { "data": {
+        "items": [{ "id": "item1", "name": "Item One" }, { "id": "item2", "name": "Item Two" }],
+        "references": [{ "ref_id": "item1", "ref_name": "Item Two" }]
+      } },
+      "valid": false,
+      "errors": [{ "path": "/data/references/0", "code": "must", "message": "Referenced name must match the referenced item's name" }] }
+  ]
+}

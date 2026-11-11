@@ -61,6 +61,7 @@ python_classes = ["Test*"]
 python_functions = ["test_*"]
 markers = [
     "slow: opt-in integration tests (XYANG_HUAWEI_DIR)",
+    "ontology: audit-example tests; pull-request pytest deselects them, a published release runs them",
 ]
 
 [tool.black]

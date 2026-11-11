@@ -1,0 +1,17 @@
+{
+  "description": "XPath value-list equality in must: string and numeric literal lists (a = ('x','y') / a = (1,2,3)).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "string and number in lists",
+      "data": { "top": { "type": "integer", "x": 2 } },
+      "valid": true },
+    { "name": "string not in list",
+      "data": { "top": { "type": "boolean", "x": 2 } },
+      "valid": false,
+      "errors": [{ "path": "/top/type", "code": "must" }] },
+    { "name": "number not in list",
+      "data": { "top": { "type": "integer", "x": 9 } },
+      "valid": false,
+      "errors": [{ "path": "/top/x", "code": "must" }] }
+  ]
+}

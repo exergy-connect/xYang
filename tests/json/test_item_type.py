@@ -111,14 +111,14 @@ DATA_ITEM_TYPE_WHEN_FALSE_INVALID = _minimal_data_model([
 ])
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def module_from_yang():
     """Load meta-model from .yang (native parser)."""
     assert META_MODEL_YANG.exists(), f"Missing {META_MODEL_YANG}"
     return parse_yang_file(str(META_MODEL_YANG))
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def module_from_yang_json():
     """Load meta-model from .yang.json (JSON parser)."""
     assert META_MODEL_YANG_JSON.exists(), f"Missing {META_MODEL_YANG_JSON}"

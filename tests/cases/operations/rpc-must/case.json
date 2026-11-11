@@ -29,6 +29,8 @@
     {"name": "native mode rejects the wrapper", "rpc": "add-link", "encoding": "native", "data": {"m:input": {"source": "r1", "target": "r2"}}, "valid": false, "errors": [{"path": "/m:input", "code": "unknown-field"}, {"path": "/source", "code": "mandatory"}, {"path": "/target", "code": "mandatory"}]},
     {"name": "unknown rpc", "rpc": "no-such-rpc", "data": {"m:input": {}}, "usage_error": "no rpc 'no-such-rpc'"},
     {"name": "direction without rpc", "direction": "output", "data": {"m:output": {}}, "usage_error": "direction applies only together with rpc"},
-    {"name": "context without rpc", "context": {}, "data": {}, "usage_error": "context applies only together with rpc"}
+    {"name": "context without rpc", "context": {}, "data": {}, "usage_error": "context applies only together with rpc"},
+    {"name": "invalid direction", "rpc": "add-link", "direction": "sideways", "data": {"m:input": {}}, "usage_error": "direction must be 'input' or 'output'"},
+    {"name": "empty rpc name", "rpc": "", "data": {"m:input": {}}, "usage_error": "rpc must be a non-empty rpc name"}
   ]
 }

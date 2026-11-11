@@ -1,112 +1,21 @@
-"""
-Tests for type-aware coercion in XPath comparisons.
+"""Validate() does not mutate caller data during XPath comparisons.
 
-- Numeric: string digits are coerced in comparisons (e.g. current() > 0).
-- Boolean: current() returns raw data; string 'true'/'false' are not coerced
-  to boolean in must, and boolean(non-empty string) is true. Data is not modified.
+Validity outcomes: tests/cases/xpath/type-coercion.
 """
 
-import pytest
 from xyang import parse_yang_string, YangValidator
 
-
-def test_boolean_coercion_string_true():
-    """Test that string 'true' is coerced during XPath comparison."""
-    yang_content = """
+_BOOL_INT = """
 module test {
   yang-version 1.1;
   namespace "urn:test";
   prefix "t";
-  
+
   container data {
     leaf enabled {
       type boolean;
       must "current() = true()";
     }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"enabled": "true"}}
-    is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as string (coercion happens inline during comparison)
-    assert isinstance(data["data"]["enabled"], str)
-    assert data["data"]["enabled"] == "true"
-    # But validation passes because coercion happens in comparison
-    assert is_valid
-
-
-def test_boolean_coercion_string_false():
-    """Test that string 'false' in must: current() is raw value; != false() holds (string vs bool), so valid."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf enabled {
-      type boolean;
-      must "current() != false()";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"enabled": "false"}}
-    is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as string
-    assert isinstance(data["data"]["enabled"], str)
-    assert data["data"]["enabled"] == "false"
-    # current() returns string "false"; string != false() so must holds, validation passes
-    assert is_valid
-
-
-def test_boolean_coercion_with_boolean_function():
-    """Test boolean(current()) in must: non-empty string is truthy, so both 'true' and 'false' pass."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf enabled {
-      type boolean;
-      must "boolean(current()) = true()";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    # String "true": boolean("true") is truthy, must passes
-    data1 = {"data": {"enabled": "true"}}
-    is_valid1, errors1, warnings1 = validator.validate(data1)
-    assert is_valid1, f"Expected valid, got errors: {errors1}"
-    
-    # String "false": boolean("false") is truthy (non-empty string), must passes
-    data2 = {"data": {"enabled": "false"}}
-    is_valid2, errors2, warnings2 = validator.validate(data2)
-    assert is_valid2, f"Expected valid (non-empty string is truthy), got errors: {errors2}"
-
-
-def test_int32_numeric_string_is_a_type_error():
-    """RFC 7951 encodes int32 as a JSON number. A numeric string is a type error."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
     leaf count {
       type int32;
       must "current() > 0";
@@ -114,226 +23,20 @@ module test {
   }
 }
 """
-    module = parse_yang_string(yang_content)
+
+
+def test_validate_does_not_mutate_boolean_or_int_input():
+    module = parse_yang_string(_BOOL_INT)
     validator = YangValidator(module)
-    
-    data = {"data": {"count": "123"}}
-    is_valid, errors, warnings = validator.validate(data)
 
-    assert isinstance(data["data"]["count"], str)
-    assert data["data"]["count"] == "123"
-    assert not is_valid
-    assert any("Expected integer, got string" in err for err in errors)
+    bool_data = {"data": {"enabled": "true"}}
+    ok, errors, _ = validator.validate(bool_data)
+    assert ok, errors
+    assert bool_data["data"]["enabled"] == "true"
+    assert isinstance(bool_data["data"]["enabled"], str)
 
-
-def test_int32_negative_numeric_string_is_a_type_error():
-    """A negative numeric string is not an int32."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf count {
-      type int32;
-      must "current() > 0";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"count": "-5"}}
-    is_valid, errors, warnings = validator.validate(data)
-
-    assert isinstance(data["data"]["count"], str)
-    assert data["data"]["count"] == "-5"
-    assert not is_valid
-    assert any("Expected integer, got string" in err for err in errors)
-
-
-def test_int32_must_constraint_on_json_numbers():
-    """A JSON number is an int32, so must still sees the number."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf count {
-      type int32;
-      must "current() > 0";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data1 = {"data": {"count": 123}}
-    is_valid1, errors1, warnings1 = validator.validate(data1)
-    assert is_valid1, f"Expected valid, got errors: {errors1}"
-
-    data2 = {"data": {"count": -5}}
-    is_valid2, errors2, warnings2 = validator.validate(data2)
-    assert not is_valid2, "Expected invalid (-5 <= 0)"
-
-
-def test_boolean_already_typed():
-    """Test that already-typed boolean values work correctly."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf enabled {
-      type boolean;
-      must "current() = true()";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"enabled": True}}
-    original_value = data["data"]["enabled"]
-    is_valid, errors, warnings = validator.validate(data)
-    
-    assert is_valid
-    # Value should remain unchanged (same object)
-    assert data["data"]["enabled"] is original_value
-
-
-def test_int32_already_typed():
-    """Test that already-typed integer values work correctly."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf count {
-      type int32;
-      must "current() > 0";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"count": 42}}
-    original_value = data["data"]["count"]
-    is_valid, errors, warnings = validator.validate(data)
-    
-    assert is_valid
-    # Value should remain unchanged
-    assert data["data"]["count"] == original_value
-
-
-def test_leaf_list_boolean_coercion():
-    """Test leaf-list must: current() is the whole list; non-empty list is truthy, so must passes."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf-list flags {
-      type boolean;
-      must "current() = true()";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"flags": ["true", "false", "true"]}}
-    is_valid, errors, warnings = validator.validate(data)
-    
-    # Data remains as strings
-    assert all(isinstance(flag, str) for flag in data["data"]["flags"])
-    assert data["data"]["flags"] == ["true", "false", "true"]
-    # current() is the whole list; comparison with true() yields valid in this implementation
-    assert is_valid
-
-
-def test_leaf_list_int32_numeric_strings_are_type_errors():
-    """Each int32 leaf-list entry must be a JSON number."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    leaf-list counts {
-      type int32;
-      must "current() > 0";
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {"data": {"counts": ["1", "2", "3"]}}
-    is_valid, errors, warnings = validator.validate(data)
-
-    assert data["data"]["counts"] == ["1", "2", "3"]
-    assert not is_valid
-    assert any("Expected integer, got string" in err for err in errors)
-
-
-def test_nested_container_boolean_string_and_int32_number():
-    """A boolean string is still accepted. The int32 leaf is a JSON number."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-  
-  container data {
-    container inner {
-      leaf enabled {
-        type boolean;
-        must "current() = true()";
-      }
-      leaf count {
-        type int32;
-        must "current() > 0";
-      }
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    validator = YangValidator(module)
-    
-    data = {
-        "data": {
-            "inner": {
-                "enabled": "true",
-                "count": 42
-            }
-        }
-    }
-    is_valid, errors, warnings = validator.validate(data)
-    
-    assert isinstance(data["data"]["inner"]["enabled"], str)
-    assert data["data"]["inner"]["enabled"] == "true"
-    assert data["data"]["inner"]["count"] == 42
-    assert is_valid, errors
-
-
-if __name__ == "__main__":
-    pytest.main([__file__, "-v"])
+    int_data = {"data": {"count": "123"}}
+    ok, errors, _ = validator.validate(int_data)
+    assert not ok
+    assert int_data["data"]["count"] == "123"
+    assert isinstance(int_data["data"]["count"], str)

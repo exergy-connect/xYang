@@ -1,0 +1,34 @@
+{
+  "description": "must on foreignKeys list: when consolidated, field type must equal the referenced entity's primary_key field type via deref(current()/entity).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "consolidated false",
+      "data": { "data-model": { "consolidated": false, "entities": [
+        { "name": "parent", "primary_key": ["id"], "fields": [{ "name": "id", "type": "integer" }] },
+        { "name": "child", "primary_key": ["id"], "fields": [
+          { "name": "id", "type": "integer" },
+          { "name": "parent_id", "type": "string", "foreignKeys": [{ "entity": "parent" }] }
+        ] }
+      ] } },
+      "valid": true },
+    { "name": "types match",
+      "data": { "data-model": { "consolidated": true, "entities": [
+        { "name": "parent", "primary_key": ["id"], "fields": [{ "name": "id", "type": "integer" }] },
+        { "name": "child", "primary_key": ["id"], "fields": [
+          { "name": "id", "type": "integer" },
+          { "name": "parent_id", "type": "integer", "foreignKeys": [{ "entity": "parent" }] }
+        ] }
+      ] } },
+      "valid": true },
+    { "name": "type mismatch",
+      "data": { "data-model": { "consolidated": true, "entities": [
+        { "name": "parent", "primary_key": ["id"], "fields": [{ "name": "id", "type": "integer" }] },
+        { "name": "child", "primary_key": ["id"], "fields": [
+          { "name": "id", "type": "integer" },
+          { "name": "parent_id", "type": "string", "foreignKeys": [{ "entity": "parent" }] }
+        ] }
+      ] } },
+      "valid": false,
+      "errors": [{ "path": "/data-model/entities/1/fields/1/foreignKeys/0", "code": "must", "message": "Foreign key field type must match the referenced entity's primary key field type" }] }
+  ]
+}

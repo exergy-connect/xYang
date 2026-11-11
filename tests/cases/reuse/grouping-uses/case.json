@@ -1,0 +1,9 @@
+{
+  "description": "Nested grouping/uses expands; mandatory from the inner grouping applies.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "expanded nodes", "data": { "data": { "id": "123", "name": "n", "value": 1 } }, "valid": true },
+    { "name": "mandatory from nested grouping", "data": { "data": { "name": "n" } }, "valid": false,
+      "errors": [{ "path": "/data/id", "code": "mandatory" }] }
+  ]
+}

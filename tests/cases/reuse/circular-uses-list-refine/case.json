@@ -1,0 +1,6 @@
+{
+  "description": "Recursive uses through a list remains a schema error; list cardinality refine does not cut the cycle.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "loop_back"
+}

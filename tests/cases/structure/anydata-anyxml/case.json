@@ -1,0 +1,9 @@
+{
+  "description": "anydata/anyxml accept arbitrary JSON values; mandatory anyxml is required when present under the parent.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "arbitrary payloads", "data": { "data-model": { "payload": { "nested": [1, 2, null], "ok": true }, "legacy": "plain string is fine", "tag": "x" } }, "valid": true },
+    { "name": "mandatory anyxml missing", "data": { "data-model": { "tag": "x" } }, "valid": false,
+      "errors": [{ "path": "/data-model/legacy", "code": "mandatory" }] }
+  ]
+}

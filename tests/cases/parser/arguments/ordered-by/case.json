@@ -1,0 +1,7 @@
+{
+  "description": "ordered-by user|system is accepted on list and leaf-list (no ordering semantics).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "list and leaf-list", "data": { "data": { "items": [{ "name": "a" }], "tags": ["x"] } }, "valid": true }
+  ]
+}

@@ -12,16 +12,11 @@ from xyang.ast import (
     YangChoiceStmt,
     YangLeafListStmt,
     YangLeafStmt,
-    YangListStmt,
-    YangStatement,
     YangUsesStmt,
 )
-from xyang.errors import YangCircularUsesError
 from xyang.json.generator import generate_json_schema
 from xyang.json.parser import parse_json_schema
-from xyang.module import YangModule
 from xyang.parser.yang_parser import YangParser
-from xyang.xpath.ast import ast_is_const_false
 
 
 def _leaf_under_container_c(module, *, name: str):
@@ -362,198 +357,6 @@ def test_refine_leaf_list_json_schema_default_array_round_trips():
     assert ll.defaults == ["alpha", "beta"]
 
 
-def test_refine_bad_path_raises():
-    yang = """
-module t {
-  yang-version 1.1;
-  namespace "urn:test:t";
-  prefix "t";
-  grouping g {
-    leaf a { type string; }
-  }
-  container c {
-    uses g {
-      refine does_not_exist {
-        description "x";
-      }
-    }
-  }
-}
-"""
-    with pytest.raises(YangRefineTargetNotFoundError) as exc_info:
-        parse_yang_string(yang)
-    assert "does_not_exist" in str(exc_info.value)
-
-
-def test_refine_min_elements_bad_path_raises():
-    yang = """
-module t2 {
-  yang-version 1.1;
-  namespace "urn:test:t2";
-  prefix "t";
-  grouping g {
-    leaf a { type string; }
-  }
-  container c {
-    uses g {
-      refine missing/list {
-        max-elements 0;
-      }
-    }
-  }
-}
-"""
-    with pytest.raises(YangRefineTargetNotFoundError) as exc_info:
-        parse_yang_string(yang)
-    assert "missing/list" in exc_info.value.target_path
-
-
-def _walk(stmt: YangStatement):
-    yield stmt
-    if isinstance(stmt, YangChoiceStmt):
-        for case in stmt.cases:
-            yield from _walk(case)
-    elif isinstance(stmt, YangCaseStmt):
-        for child in stmt.statements:
-            yield from _walk(child)
-    else:
-        for child in getattr(stmt, "statements", []):
-            yield from _walk(child)
-
-
-def _find_list_named(module: YangModule, name: str) -> YangListStmt | None:
-    for stmt in module.statements:
-        for node in _walk(stmt):
-            if isinstance(node, YangListStmt) and node.name == name:
-                return node
-    return None
-
-
-def _find_leaf_named(module: YangModule, name: str) -> YangLeafStmt | None:
-    for stmt in module.statements:
-        for node in _walk(stmt):
-            if isinstance(node, YangLeafStmt) and node.name == name:
-                return node
-    return None
-
-
-YANG_REFINE_LIST_CARDINALITY = """
-module refine_list_cardinality {
-  yang-version 1.1;
-  namespace "urn:test:refine-list-cardinality";
-  prefix "rlc";
-
-  grouping g {
-    list items {
-      key k;
-      leaf k {
-        type string;
-      }
-    }
-  }
-
-  container c {
-    uses g {
-      refine items {
-        max-elements 3;
-        min-elements 1;
-      }
-    }
-  }
-}
-"""
-
-
-def test_refine_applies_max_min_elements_to_list():
-    module = parse_yang_string(YANG_REFINE_LIST_CARDINALITY)
-    assert module.name == "refine_list_cardinality"
-    lst = _find_list_named(module, "items")
-    assert lst is not None
-    assert lst.max_elements == 3
-    assert lst.min_elements == 1
-
-
-YANG_REFINE_LIST_UNDER_CHOICE_CASE = """
-module refine_list_under_choice {
-  yang-version 1.1;
-  namespace "urn:test:refine-list-under-choice";
-  prefix "rluc";
-
-  grouping g {
-    choice ch {
-      case only {
-        list rows {
-          key id;
-          leaf id {
-            type string;
-          }
-        }
-      }
-    }
-  }
-
-  container root {
-    uses g {
-      refine ch/only/rows {
-        max-elements 0;
-        min-elements 0;
-      }
-    }
-  }
-}
-"""
-
-
-def test_refine_applies_to_list_under_choice_case():
-    module = parse_yang_string(YANG_REFINE_LIST_UNDER_CHOICE_CASE)
-    lst = _find_list_named(module, "rows")
-    assert lst is not None
-    assert lst.max_elements == 0
-    assert lst.min_elements == 0
-
-
-YANG_USES_IN_LIST_WITH_REFINE = """
-module uses_in_list_with_refine {
-  yang-version 1.1;
-  namespace "urn:test:uses-in-list-with-refine";
-  prefix "uil";
-
-  grouping payload {
-    leaf payload_leaf {
-      type string;
-    }
-  }
-
-  container c {
-    list L {
-      key k;
-      leaf k {
-        type string;
-      }
-      uses payload {
-        refine payload_leaf {
-          must "false()";
-          description "Refine on a leaf inside grouping used from list body.";
-        }
-      }
-    }
-  }
-}
-"""
-
-
-def test_uses_inside_list_with_refine_applies_to_grouping_leaf():
-    module = parse_yang_string(YANG_USES_IN_LIST_WITH_REFINE)
-    assert module.name == "uses_in_list_with_refine"
-    lst = _find_list_named(module, "L")
-    assert lst is not None
-    leaf = _find_leaf_named(module, "payload_leaf")
-    assert leaf is not None
-    assert leaf.must_statements and any(
-        ast_is_const_false(m.ast) for m in leaf.must_statements
-    )
-
-
 YANG_GENERIC_FIELD_NO_ARRAY_CASE = """
 module generic_field_no_array {
   yang-version 1.1;
@@ -615,12 +418,6 @@ module generic_field_no_array {
 """
 
 
-def test_grouping_generic_field_without_case_array_raises_circular_uses_when_expanding():
-    with pytest.raises(YangCircularUsesError) as exc:
-        parse_yang_string(YANG_GENERIC_FIELD_NO_ARRAY_CASE)
-    assert "generic-field" in str(exc.value)
-
-
 def test_grouping_generic_field_without_case_array_parses_with_expand_disabled():
     parser = YangParser(expand_uses=False)
     module = parser.parse_string(YANG_GENERIC_FIELD_NO_ARRAY_CASE)
@@ -667,30 +464,3 @@ module refine_case_desc {
     case_within = next(c for c in ch_filter.cases if c.name == "within-subscription")
     assert case_within.description == "Refined case description."
 
-
-def test_refine_mandatory_false_on_grouping_leaf():
-    yang = """
-module t {
-  namespace "urn:test:r";
-  prefix "r";
-  grouping g {
-    leaf entity {
-      type string;
-      mandatory true;
-    }
-  }
-  container c {
-    uses g {
-      refine entity {
-        mandatory false;
-      }
-    }
-  }
-}
-"""
-    mod = YangParser(expand_uses=True).parse_string(yang)
-    container = mod.statements[0]
-    leaf = container.statements[0]
-    assert isinstance(leaf, YangLeafStmt)
-    assert leaf.name == "entity"
-    assert leaf.mandatory is False

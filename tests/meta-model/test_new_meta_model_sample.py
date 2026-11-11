@@ -42,7 +42,7 @@ _TYPE_SHAPE_FIELD_NAMES = frozenset(
 )
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def meta_model_module():
     assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
     return parse_yang_file(str(META_MODEL_YANG))
@@ -55,14 +55,6 @@ def _load_sample_data_model() -> dict:
     tree = yaml.safe_load(raw)
     assert isinstance(tree, dict), "Root of sample YAML must be a mapping"
     return {"data-model": tree}
-
-
-def test_new_meta_model_sample_yaml_validates(meta_model_module):
-    """Full sample YAML conforms to examples/meta-model.yang."""
-    data = _load_sample_data_model()
-    validator = YangValidator(meta_model_module)
-    is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"Validation errors: {errors}; warnings: {warnings}"
 
 
 def test_new_meta_model_sample_covers_all_primitive_enums_and_type_shapes(meta_model_module):

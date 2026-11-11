@@ -1,0 +1,16 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf type {
+      type string;
+      must ". = ('string', 'integer', 'number')";
+    }
+    leaf x {
+      type int32;
+      must ". = (1, 2, 3)";
+    }
+  }
+}

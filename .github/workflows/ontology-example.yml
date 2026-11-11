@@ -1,31 +1,72 @@
+# Audit-example tests. Not part of pull-request or main-push CI: the pytest
+# matrix deselects the `ontology` marker, and `npm test` excludes the
+# TypeScript file.
+#
+# Runs when a GitHub Release is published — the same `release: published`
+# event as Publish to PyPI, Publish to npm, Release TypeScript artifacts,
+# QuickJS release, and Benchmark — and on a manual workflow_dispatch, which
+# runs the same checks and publishes nothing.
+#
+# A failure fails this workflow on the release. The other release workflows
+# start in parallel and do not wait on each other; this one does not change
+# that.
+
 name: Ontology example
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - "examples/ontology-hypergraph/**"
-      - "tests/test_ontology_hypergraph.py"
-      - "src/**"
-      - ".github/workflows/ontology-example.yml"
-  pull_request:
-    paths:
-      - "examples/ontology-hypergraph/**"
-      - "tests/test_ontology_hypergraph.py"
-      - "src/**"
-      - ".github/workflows/ontology-example.yml"
+  release:
+    types: [published]
   workflow_dispatch:
 
 permissions:
   contents: read
 
+concurrency:
+  group: ontology-example-${{ github.workflow }}-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
 jobs:
-  independent-validation:
+  python:
+    name: Python ontology
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v7
-      - uses: actions/setup-python@v6
+      - uses: actions/setup-python@v7
         with:
           python-version: "3.11"
-      - run: pip install -e . pytest -r examples/ontology-hypergraph/requirements-tools.txt
-      - run: pytest tests/test_ontology_hypergraph.py -q
+      - name: Install xyang, pytest, and the optional ontology tools
+        run: pip install -e . pytest -r examples/ontology-hypergraph/requirements-tools.txt
+      - name: Run ontology tests
+        run: |
+          set -euo pipefail
+          pytest tests/test_ontology_hypergraph.py -q --tb=short --junitxml=ontology-junit.xml
+          python3 - <<'PY'
+          import xml.etree.ElementTree as ET
+
+          root = ET.parse("ontology-junit.xml").getroot()
+          suites = list(root) if root.tag == "testsuites" else [root]
+          tests = sum(int(s.attrib.get("tests", 0)) for s in suites)
+          skipped = sum(int(s.attrib.get("skipped", 0)) for s in suites)
+          if tests == 0 or skipped:
+              raise SystemExit(
+                  "ontology release run must execute every test with the optional tools "
+                  f"installed: {tests} tests, {skipped} skipped"
+              )
+          PY
+
+  typescript:
+    name: TypeScript ontology
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: Install dependencies
+        working-directory: ts
+        run: npm ci
+      - name: Run ontology tests
+        working-directory: ts
+        run: npm run test:ontology

@@ -1,0 +1,32 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    leaf enabled-eq {
+      type boolean;
+      must "current() = true()";
+    }
+    leaf enabled-ne {
+      type boolean;
+      must "current() != false()";
+    }
+    leaf enabled-fn {
+      type boolean;
+      must "boolean(current()) = true()";
+    }
+    leaf count {
+      type int32;
+      must "current() > 0";
+    }
+    leaf-list flags {
+      type boolean;
+      must "current() = true()";
+    }
+    leaf-list counts {
+      type int32;
+      must "current() > 0";
+    }
+  }
+}

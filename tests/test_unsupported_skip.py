@@ -1,4 +1,8 @@
-"""Unsupported YANG statements (rpc, deviation, …) are skipped with a warning."""
+"""Unsupported YANG statements (rpc, deviation, …) are skipped with a warning.
+
+Top-level input/output and rpc-in-container syntax errors live under
+``tests/cases/parser/``.
+"""
 
 from __future__ import annotations
 
@@ -61,32 +65,3 @@ def test_action_is_parsed_under_a_container_and_rejected_at_module_level() -> No
     with pytest.raises(Exception, match="unknown statement in module body: 'action'"):
         parse_yang_string('module ex { yang-version 1.1; namespace "urn:ex"; prefix ex; action go { } }')
 
-
-@pytest.mark.parametrize("keyword", ["input", "output"])
-def test_module_rejects_top_level_input_output(keyword: str) -> None:
-    yang = f"""
-module ex {{
-  yang-version 1.1;
-  namespace "urn:ex";
-  prefix ex;
-  {keyword} {{ leaf x {{ type empty; }} }}
-}}
-"""
-    with pytest.raises(Exception, match=rf"{keyword}.*rpc.*action"):
-        parse_yang_string(yang)
-
-
-def test_container_rejects_rpc() -> None:
-    yang = """
-module ex {
-  yang-version 1.1;
-  namespace "urn:ex";
-  prefix ex;
-  container c {
-    rpc inner { }
-    leaf x { type int8; }
-  }
-}
-"""
-    with pytest.raises(Exception, match="rpc"):
-        parse_yang_string(yang)

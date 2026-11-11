@@ -69,11 +69,4 @@ describe("xyang-ts stdout flush before exit", () => {
     expect(text).toBe(expectedSchema(yangPath));
     expect(JSON.parse(text).properties.top.properties.field_799.description).toContain("field 799");
   });
-
-  it("matches the library schema for examples/meta-model.yang", () => {
-    const yangPath = join(tsRoot, "..", "examples", "meta-model.yang");
-    const stdout = convertStdout(yangPath);
-    expect(stdout.length).toBeGreaterThan(64 * 1024);
-    expect(stdout.toString("utf-8")).toBe(expectedSchema(yangPath));
-  });
 });

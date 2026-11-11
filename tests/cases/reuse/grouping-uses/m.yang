@@ -1,0 +1,26 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping base-fields {
+    leaf id {
+      type string;
+      mandatory true;
+    }
+  }
+
+  grouping extended-fields {
+    uses base-fields;
+    leaf name {
+      type string;
+    }
+  }
+
+  container data {
+    uses extended-fields;
+    leaf value {
+      type int32;
+    }
+  }
+}

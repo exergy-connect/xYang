@@ -1,0 +1,13 @@
+{
+  "description": "must ../fields[name = current()] on a leaf: current() is the leaf value and the predicate selects a sibling list entry.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "matching field",
+      "data": { "data": { "entities": [{ "name": "e1", "primary_key": "id", "fields": [{ "name": "id" }, { "name": "other" }] }] } },
+      "valid": true },
+    { "name": "missing field",
+      "data": { "data": { "entities": [{ "name": "e1", "primary_key": "missing", "fields": [{ "name": "id" }] }] } },
+      "valid": false,
+      "errors": [{ "path": "/data/entities/0/primary_key", "code": "must", "message": "primary_key must reference existing field" }] }
+  ]
+}

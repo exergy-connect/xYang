@@ -64,7 +64,7 @@ xyang-ts validate --format json --include-path $M $M/example-audit@2026-11-10.ya
   examples/ontology-hypergraph/fixtures/invalid/supported-despite-breach.json
 ```
 
-Tests: `pytest tests/test_ontology_hypergraph.py -q` and `cd ts && npx vitest run test/ontology_audit_example.test.ts`. Both assert the exact errors in [`fixtures/expected-errors.json`](fixtures/expected-errors.json).
+Tests: `pytest -m ontology` and `cd ts && npm run test:ontology`. Both assert the exact errors in [`fixtures/expected-errors.json`](fixtures/expected-errors.json). Pull-request CI does not run them. A published release does, with `requirements-tools.txt` installed so the pyang and OWL RL checks are not skipped (`workflow_dispatch` on Ontology example runs the same jobs).
 
 ## How the model makes this expressible
 

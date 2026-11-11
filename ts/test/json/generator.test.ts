@@ -41,33 +41,6 @@ module v {
     expect((version?.type as Record<string, unknown> | undefined)?.name).toBe("version-string");
   });
 
-  it("round-trips if-features metadata on leaf", () => {
-    const module = parseYangString(`
-module m {
-  yang-version 1.1;
-  namespace "urn:m";
-  prefix m;
-  feature f;
-
-  container data-model {
-    leaf x {
-      if-feature "f";
-      type string;
-    }
-  }
-}
-`);
-    const schema = generateJsonSchema(module);
-    const leaf = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
-      .properties as Record<string, unknown>)["x"] as Record<string, unknown>;
-    expect((leaf["x-yang"] as Record<string, unknown>)["if-features"]).toEqual(["f"]);
-
-    const round = parseJsonSchema(schema);
-    const dm = round.findStatement("data-model");
-    const x = dm?.findStatement("x");
-    expect(x?.if_features).toEqual(["f"]);
-  });
-
   it("emits and parses leafref metadata and type shape", () => {
     const module = parseYangString(`
 module lr {

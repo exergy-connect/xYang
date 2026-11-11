@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data-model {
+    leaf consolidated { type boolean; }
+    list items {
+      key id;
+      leaf id { type string; }
+      leaf type { type string; }
+      leaf value {
+        type string;
+        must "/data-model/consolidated = false() or ../type = 'test' or . != ''";
+      }
+    }
+  }
+}

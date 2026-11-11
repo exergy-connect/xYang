@@ -132,8 +132,15 @@ jobs:
         working-directory: ts
         run: npm ci
 
+      # Ontology example tests are marked `ontology` and run on a published release
+      # (.github/workflows/ontology-example.yml), not in this matrix.
       - name: Run tests
-        run: pytest --tb=short -q
+        run: pytest --tb=short -q -m "not ontology"
+
+      - name: Test inventory
+        if: matrix.python-version == '3.13'
+        run: |
+          { echo '```'; python tests/inventory.py; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
 
   required-check:
     name: Required Checks

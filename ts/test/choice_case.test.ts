@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { YangSemanticError, YangSyntaxError, parseYangFile, parseYangString, YangValidator } from "../src";
+import { parseYangFile, parseYangString, YangValidator } from "../src";
 
 const repoRoot = resolve(__dirname, "..", "..");
 const metaModelPath = resolve(repoRoot, "examples/meta-model.yang");
@@ -58,6 +58,9 @@ function fArrayEntity(
 }
 
 describe("python parity: test_choice_case", () => {
+  // Validation/schema-error coverage: tests/cases/choice/* and
+  // tests/cases/parser/substatements/case-mandatory
+
   it("stores mandatory true on choice statement", () => {
     const module = parseYangString(`
 module test {
@@ -109,85 +112,6 @@ module test {
     expect(choice?.mandatory).toBe(false);
   });
 
-  it("defaults choice mandatory to false when omitted", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    choice protocol {
-      case a {
-        leaf x { type string; }
-      }
-    }
-  }
-}
-`);
-
-    const choice = module.findStatement("data")?.findStatement("protocol");
-    expect(choice).toBeDefined();
-    expect(choice?.mandatory).toBe(false);
-  });
-
-  it("rejects duplicate schema node names across cases (RFC 7950 §7.9)", () => {
-    const bad = `
-module dup-choice {
-  yang-version 1.1;
-  namespace "urn:dup";
-  prefix d;
-
-  container c {
-    choice interface-type {
-      case a {
-        leaf ethernet {
-          type string;
-        }
-      }
-      case b {
-        container ethernet {
-          leaf x { type string; }
-        }
-      }
-    }
-  }
-}
-`;
-
-    expect(() => parseYangString(bad)).toThrow(YangSemanticError);
-    expect(() => parseYangString(bad)).toThrow(/ethernet/i);
-  });
-
-  it("rejects mandatory as a direct substatement of case (Appendix A)", () => {
-    const bad = `
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    choice protocol {
-      case a {
-        mandatory true;
-        leaf x { type string; }
-      }
-    }
-  }
-}
-`;
-
-    let caught: unknown;
-    try {
-      parseYangString(bad);
-    } catch (e) {
-      caught = e;
-    }
-    expect(caught).toBeInstanceOf(YangSyntaxError);
-    const msg = String(caught).toLowerCase();
-    expect(msg.includes("case") || msg.includes("mandatory")).toBe(true);
-  });
-
   it("parses leaf mandatory true under a case; choice stays non-mandatory (RFC 7950 §7.6.5)", () => {
     const module = parseYangString(`
 module test {
@@ -222,81 +146,6 @@ module test {
     expect(leafX?.keyword).toBe("leaf");
     expect(leafX?.mandatory).toBe(true);
   });
-
-
-  it("enforces mandatory nested choice when outer case has sibling data", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    choice outer {
-      case ca {
-        leaf sibling { type string; }
-        container inner_wrap {
-          choice inner {
-            mandatory true;
-            case ia { leaf a { type string; } }
-            case ib { leaf b { type string; } }
-          }
-        }
-      }
-      case cb {
-        leaf z { type string; }
-      }
-    }
-  }
-}
-`);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        sibling: "x",
-        inner_wrap: {}
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    const joined = result.errors.join(" ").toLowerCase();
-    expect(joined.includes("mandatory") && joined.includes("choice")).toBe(true);
-  });
-
-  it("accepts nested choice when inner branch alone is provided", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    choice outer {
-      case ca {
-        leaf sibling { type string; }
-        container inner_wrap {
-          choice inner {
-            mandatory true;
-            case ia { leaf a { type string; } }
-            case ib { leaf b { type string; } }
-          }
-        }
-      }
-    }
-  }
-}
-`);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        inner_wrap: { a: "only-inner" }
-      }
-    });
-
-    expect(result.isValid).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
 
   it("meta-model.yang: array of primitives satisfies item_type choice", () => {
     const module = parseYangFile(metaModelPath);
@@ -357,7 +206,6 @@ module test {
       })
     );
 
-    // Mirrors Python: placeholder until/unless stricter mandatory inner-choice validation is required.
     expect(typeof result.isValid).toBe("boolean");
   });
 });

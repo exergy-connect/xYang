@@ -5,6 +5,15 @@ module m {
 
   container top {
     leaf name { type string; }
-    leaf target { type instance-identifier; }
+    leaf target {
+      type instance-identifier {
+        require-instance true;
+      }
+    }
+    leaf loose {
+      type instance-identifier {
+        require-instance false;
+      }
+    }
   }
 }

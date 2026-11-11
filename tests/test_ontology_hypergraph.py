@@ -15,6 +15,8 @@ from urllib.parse import urlsplit
 
 import pytest
 
+pytestmark = pytest.mark.ontology
+
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "ontology-hypergraph"
 sys.path.insert(0, str(EXAMPLE))
 spec = importlib.util.spec_from_file_location("ontology_collector", EXAMPLE / "collector.py")
@@ -26,9 +28,14 @@ BASE = "http://ontology.test/documents/"
 A = "example-audit:"
 
 
-@pytest.fixture
-def publications():
+@pytest.fixture(scope="module")
+def _publications_base():
     return {BASE + path.name: json.loads(path.read_text()) for path in (EXAMPLE / "documents").glob("*.json")}
+
+
+@pytest.fixture
+def publications(_publications_base):
+    return copy.deepcopy(_publications_base)
 
 
 def reader(publications, exports=None):
@@ -268,8 +275,13 @@ FIXTURES = EXAMPLE / "fixtures"
 EXPECTED = json.loads((FIXTURES / "expected-errors.json").read_text())
 
 
+@functools.cache
+def _validator():
+    return collector.validator()
+
+
 def _errors(tree):
-    result = collector.validator().validate_detailed(tree)
+    result = _validator().validate_detailed(tree)
     return sorted(
         (e["path"].replace("/" + ROOT, ""), e["code"], e["message"] if e["code"] == "must" else None)
         for e in result["errors"]
@@ -277,7 +289,7 @@ def _errors(tree):
 
 
 def test_checked_in_fixtures_fail_exactly_as_documented():
-    assert collector.validator().validate_detailed(json.loads((FIXTURES / "valid.json").read_text()))["errors"] == []
+    assert _validator().validate_detailed(json.loads((FIXTURES / "valid.json").read_text()))["errors"] == []
     assert {p.stem for p in (FIXTURES / "invalid").glob("*.json")} == set(EXPECTED)
     for name, errors in EXPECTED.items():
         expected = sorted((e["path"], e["code"], e.get("message")) for e in errors)

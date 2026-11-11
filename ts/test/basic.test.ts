@@ -121,32 +121,4 @@ module test {
     expect(isValid).toBe(false);
   });
 
-  it("accepts ordered-by on list and leaf-list", () => {
-    const yangContent = `
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    list items {
-      key "name";
-      ordered-by user;
-      leaf name {
-        type string;
-      }
-    }
-    leaf-list tags {
-      type string;
-      ordered-by system;
-    }
-  }
-}
-`;
-    const module = parseYangString(yangContent);
-    const data = module.findStatement("data");
-    expect(data).toBeDefined();
-    expect(data?.findStatement("items")).toBeDefined();
-    expect(data?.findStatement("tags")).toBeDefined();
-  });
 });

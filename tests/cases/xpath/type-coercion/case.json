@@ -1,0 +1,26 @@
+{
+  "description": "XPath comparisons see typed values without mutating input: boolean string true/false, boolean(), int32 JSON numbers vs numeric strings, and leaf-lists.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "boolean string true equals true()", "data": { "data": { "enabled-eq": "true" } }, "valid": true },
+    { "name": "boolean string false not equal false()", "data": { "data": { "enabled-ne": "false" } }, "valid": true },
+    { "name": "boolean() of string true", "data": { "data": { "enabled-fn": "true" } }, "valid": true },
+    { "name": "boolean() of non-empty string false", "data": { "data": { "enabled-fn": "false" } }, "valid": true },
+    { "name": "int32 numeric string is a type error", "data": { "data": { "count": "123" } }, "valid": false,
+      "errors": [{ "path": "/data/count", "code": "type", "message": "Expected integer, got string" }] },
+    { "name": "int32 negative numeric string", "data": { "data": { "count": "-5" } }, "valid": false,
+      "errors": [{ "path": "/data/count", "code": "type" }, { "path": "/data/count", "code": "must" }] },
+    { "name": "int32 JSON number satisfies must", "data": { "data": { "count": 123 } }, "valid": true },
+    { "name": "int32 JSON number fails must", "data": { "data": { "count": -5 } }, "valid": false,
+      "errors": [{ "path": "/data/count", "code": "must" }] },
+    { "name": "typed boolean true", "data": { "data": { "enabled-eq": true } }, "valid": true },
+    { "name": "typed int32", "data": { "data": { "count": 42 } }, "valid": true },
+    { "name": "leaf-list boolean strings", "data": { "data": { "flags": ["true", "false", "true"] } }, "valid": true },
+    { "name": "leaf-list int32 numeric strings", "data": { "data": { "counts": ["1", "2", "3"] } }, "valid": false,
+      "errors": [
+        { "path": "/data/counts/0", "code": "type" },
+        { "path": "/data/counts/1", "code": "type" },
+        { "path": "/data/counts/2", "code": "type" }
+      ] }
+  ]
+}

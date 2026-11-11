@@ -1,0 +1,32 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf flag {
+      type int32;
+      default 0;
+    }
+    list items {
+      key id;
+      leaf id { type int32; }
+      leaf ref_abs {
+        type string;
+        must "/top/flag = 1";
+      }
+      leaf ref_abs_pred {
+        type string;
+        must "count(/top/items[id = 1]) >= 1";
+      }
+      leaf ref_current {
+        type int32;
+        must "current() = 1";
+      }
+      leaf ref_abs_rel_pred {
+        type string;
+        must "count(/top/items[../flag = 1]) >= 1";
+      }
+    }
+  }
+}

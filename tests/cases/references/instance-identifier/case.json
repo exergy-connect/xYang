@@ -3,6 +3,9 @@
   "module": "m.yang",
   "instances": [
     { "name": "existing node", "data": { "top": { "name": "x", "target": "/top/name" } }, "valid": true },
+    { "name": "require-instance false allows non-path", "data": { "top": { "name": "x", "target": "/top/name", "loose": "not-a-valid-path-syntax-(" } }, "valid": true },
+    { "name": "relative path rejected", "data": { "top": { "name": "x", "target": "top/name" } }, "valid": false,
+      "errors": [{ "path": "/top/target", "code": "instance-identifier" }] },
     { "name": "no such instance", "data": { "top": { "target": "/top/name" } }, "valid": false,
       "errors": [{ "path": "/top/target", "code": "instance-identifier" }] },
     { "name": "not a string", "data": { "top": { "target": 5 } }, "valid": false,

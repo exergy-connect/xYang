@@ -1,11 +1,13 @@
-"""anydata / anyxml: parse, validate arbitrary JSON values, JSON Schema round-trip."""
+"""anydata / anyxml: parse AST and JSON Schema round-trip.
+
+Validation coverage: tests/cases/structure/anydata-anyxml.
+"""
 
 from __future__ import annotations
 
 from xyang import parse_yang_string
 from xyang.ast import YangAnydataStmt, YangAnyxmlStmt
 from xyang.json import generate_json_schema, parse_json_schema
-from xyang.validator.document_validator import DocumentValidator
 
 
 def _module():
@@ -35,29 +37,6 @@ def test_parse_anydata_anyxml_ast():
     legacy = next(s for s in dm.statements if s.name == "legacy")
     assert isinstance(legacy, YangAnyxmlStmt)
     assert legacy.mandatory is True
-
-
-def test_validate_accepts_arbitrary_json_under_anydata_anyxml():
-    m = _module()
-    v = DocumentValidator(m)
-    data = {
-        "data-model": {
-            "payload": {"nested": [1, 2, None], "ok": True},
-            "legacy": "plain string is fine",
-            "tag": "x",
-        }
-    }
-    assert v.validate(data) == []
-
-
-def test_validate_mandatory_anyxml_missing():
-    m = _module()
-    v = DocumentValidator(m)
-    data = {"data-model": {"tag": "x"}}
-    errs = v.validate(data)
-    assert len(errs) == 1
-    assert "anyxml" in errs[0].message.lower()
-    assert "legacy" in errs[0].message
 
 
 def test_generate_parse_json_schema_roundtrip_kinds():

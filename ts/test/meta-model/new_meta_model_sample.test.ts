@@ -155,12 +155,6 @@ describe("python parity: meta-model/test_new_meta_model_sample", () => {
     metaModel = loadMetaModel();
   });
 
-  it("new_meta_model_sample_yaml_validates", () => {
-    const data = loadYamlDataModel("tests/data/new_meta_model_sample.yaml");
-    const { isValid, errors, warnings } = new YangValidator(metaModel).validate(data);
-    expect(isValid, `Validation errors: ${errors}; warnings: ${warnings}`).toBe(true);
-  });
-
   it("new_meta_model_sample_covers_all_primitive_enums_and_type_shapes", () => {
     const data = loadYamlDataModel("tests/data/new_meta_model_sample.yaml");
     const { isValid, errors, warnings } = new YangValidator(metaModel).validate(data);

@@ -1,0 +1,6 @@
+{
+  "description": "Every name in a list key must refer to a child leaf (RFC 7950).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "key leaf 'missing' does not exist"
+}
