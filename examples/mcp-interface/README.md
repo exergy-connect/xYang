@@ -104,6 +104,7 @@ xyang validate --rpc add-link --context examples/mcp-interface/session/valid.jso
   examples/mcp-interface/models/example-topology-tools@2026-11-11.yang call.json
 #   call.json: {"example-topology-tools:input": {"source": "r1", "target": "r9"}}
 #   -> must at /example-topology-tools:input/target
+#   xyang validate --help (or xyang-ts validate --help) explains --rpc, --output and --context
 cd examples/mcp-interface && python check.py
 ```
 
@@ -153,5 +154,5 @@ python -m pytest examples/mcp-interface/test_server.py -q  # 19 tests
 
 - **The session is the whole world.** A verdict covers the calls in this document. It says nothing about server state the document does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
 - **The record check grows.** Step 4 revalidates the whole record on every call, which is fine for a demo but grows with the session.
-- **Unprefixed absolute paths.** The rules write `/session/call`, not `/topo:session/topo:call`. RFC 7950 allows both, but today xYang selects nothing for the prefixed form.
+- **Unprefixed paths.** The rules write `/session/call`, not `/topo:session/topo:call`. RFC 7950 allows both, but today xYang selects nothing for a prefixed step, in `must`, `when` and leafref paths alike ([#152](https://github.com/exergy-connect/xYang/issues/152)).
 - **Optional MCP fields.** In MCP revision [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations` and `execution`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`; the other four are optional and left out. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12.

@@ -64,10 +64,9 @@ def validate_ts(path: Path) -> list[dict[str, str]]:
 
 
 def rpc_supported(cli: list[str]) -> bool:
-    """True unless the CLI rejects --rpc as an unknown flag (xyang-ts has no validate --help)."""
-    proc = subprocess.run([*cli, "validate", "--rpc", "add-node", str(MODULE), "-"],
-                          input="{}", capture_output=True, text=True, cwd=HERE)
-    return "unrecognized argument" not in proc.stderr
+    """True when the CLI's validate --help lists --rpc (both CLIs have --help since #156)."""
+    proc = subprocess.run([*cli, "validate", "--help"], capture_output=True, text=True, cwd=HERE)
+    return "--rpc" in proc.stdout + proc.stderr
 
 
 def validate_rpc(cli: list[str], case: dict, tmp: Path) -> list[dict[str, str]]:
