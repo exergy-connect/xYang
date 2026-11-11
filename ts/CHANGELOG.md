@@ -16,6 +16,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **Leaf-list `leafref`** ([#145](https://github.com/exergy-connect/xYang/issues/145)): the shared case `references/leafref-leaf-list` checks that a relative `leafref` on a nested or direct `leaf-list` accepts existing sibling list keys and rejects dangling items, with an ordinary leaf and an absolute `leaf-list` as controls. TypeScript already started the path at the item; Python did not and now matches. No TypeScript source change.
 - **Typedef names** ([#142](https://github.com/exergy-connect/xYang/issues/142)): shared cases `types/typedef-builtin-like-names` and `types/typedef-builtin-like-names-imported` check that a typedef named `date`, `date-and-time`, or `identifier` keeps its `pattern` and `length`, directly, through a derived typedef, under a narrowing `type`, and when imported with a prefix. TypeScript already enforced them; Python did not and now matches.
 - **Docs:** `qjs/README.md` lists `--format`, `--native-json`, and `--features` among the binary's flags and no longer calls `--format json` a follow-up.
 - **QuickJS binaries:** the release workflow that builds the `xyang-ts` QuickJS executables runs on `ubuntu-24.04`. On `ubuntu-latest` (Ubuntu 26.04) `qemu-user-static` cannot be installed, so the v1.0.0 run built no binaries. The build and smoke tests are unchanged.
