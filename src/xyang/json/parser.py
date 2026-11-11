@@ -16,6 +16,8 @@ from typing import Any
 
 from ..module import YangModule
 from ..identifier_ref import YangIdentifierRef, coerce_identifier_ref
+from ..ext import ensure_builtin_extensions_loaded
+from ..ext.capabilities import ExtensionIdentity, apply_extension_invocations, get_extension_apply_callback
 from ..ast import (
     YangAnydataStmt,
     YangAnyxmlStmt,
@@ -121,6 +123,9 @@ def _set_if_features_from_xyang(stmt: Any, xyang: dict[str, Any]) -> None:
     feats = _if_features_from_xyang(xyang)
     if feats:
         stmt.if_features = feats
+    path = xyang.get(XYangKey.AUGMENT_STRUCTURE)
+    if isinstance(path, str) and path:
+        stmt.augment_structure = path
 
 
 def _units_from_xyang(xyang: dict[str, Any]) -> str:
@@ -162,6 +167,8 @@ def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     if not isinstance(desc, str):
         desc = str(desc)
     when = YangWhenStmt(expression=cond, description=desc)
+    if raw.get("evaluate-with-parent-context") is True or raw.get("evaluate_with_parent_context") is True:
+        when.evaluate_with_parent_context = True
     _bind_recorded(when, raw)
     return when
 
@@ -1013,7 +1020,7 @@ class _JsonParse:
 _PARSING: contextvars.ContextVar[_JsonParse] = contextvars.ContextVar("xyang_json_parse_extensions")
 
 
-def _extension_from_json(name: str, raw: Any) -> YangExtensionStmt:
+def _extension_from_json(name: str, raw: Any, module_name: str = "") -> YangExtensionStmt:
     if raw is None:
         raw = {}
     if not isinstance(raw, dict):
@@ -1033,6 +1040,11 @@ def _extension_from_json(name: str, raw: Any) -> YangExtensionStmt:
     reference = raw.get(XYangKey.REFERENCE)
     if isinstance(reference, str):
         ext.reference = reference
+    if module_name:
+        ensure_builtin_extensions_loaded()
+        callback = get_extension_apply_callback(ExtensionIdentity(module_name=module_name, extension_name=name))
+        if callback is not None:
+            ext.apply_callback = callback
     return ext
 
 
@@ -1044,7 +1056,7 @@ def _load_extension_defs(module: YangModule, raw_xyang: dict[str, Any]) -> None:
     if not isinstance(raw, dict):
         raise ValueError(f'"{XYangKey.EXTENSION}" must map names to extension definitions, got {raw!r}')
     for name, body in raw.items():
-        module.extensions[str(name)] = _extension_from_json(str(name), body)
+        module.extensions[str(name)] = _extension_from_json(str(name), body, module.name)
 
 
 def _invocation_from_json(raw: Any) -> YangExtensionInvocationStmt:
@@ -1137,7 +1149,43 @@ def _module_from_import_stub(key: str, raw: Any) -> YangModule:
             raise ValueError(f'identity {name!r} of import {key!r} is not an identity definition')
         stub.identities[name] = ident
     _load_extension_defs(stub, raw)
+    _load_features(stub, raw)
+    _load_stub_invocations(stub, raw)
     return stub
+
+
+def _load_features(module: YangModule, raw_xyang: dict[str, Any]) -> None:
+    """Bind ``x-yang.features`` so ``if-feature`` matches the module that was exported."""
+    raw = raw_xyang.get(XYangKey.FEATURES)
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ValueError(f'"{XYangKey.FEATURES}" must map feature names to objects, got {raw!r}')
+    for name, body in raw.items():
+        module.features.add(str(name))
+        if not isinstance(body, dict):
+            raise ValueError(f'feature {name!r} must be an object, got {body!r}')
+        guards = body.get(XYangKey.IF_FEATURES)
+        if guards:
+            if not isinstance(guards, list) or not all(isinstance(item, str) for item in guards):
+                raise ValueError(f'feature {name!r} "{XYangKey.IF_FEATURES}" must be a list of strings')
+            module.feature_if_features[str(name)] = list(guards)
+
+
+def _load_stub_invocations(stub: YangModule, raw: dict[str, Any]) -> None:
+    """Rebuild ``sx:structure`` nodes carried on an import stub and index them."""
+    invocations = raw.get(XYangKey.EXTENSIONS)
+    if not invocations:
+        return
+    if not isinstance(invocations, list):
+        raise ValueError(f'"{XYangKey.EXTENSIONS}" of import {stub.name!r} must be a list')
+    token = _PARSING.set(_JsonParse(stub, {}))
+    try:
+        for item in invocations:
+            stub.statements.append(_invocation_from_json(item))
+    finally:
+        _PARSING.reset(token)
+    apply_extension_invocations(stub)
 
 
 def _load_imports(module: YangModule, raw_xyang: dict[str, Any]) -> None:
@@ -1202,6 +1250,7 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
 
     _load_imports(module, root_xyang)
     _load_extension_defs(module, root_xyang)
+    _load_features(module, root_xyang)
     token = _PARSING.set(_JsonParse(module, defs))
     try:
         _parse_json_schema_body(module, data, root_xyang, defs)
@@ -1249,6 +1298,9 @@ def _parse_json_schema_body(
                 module.statements.append(rpc_stmt)
 
     _attach_invocations(module, root_xyang)
+    # Index ``sx:structure`` and apply a cross-module ``sx:augment-structure`` once.
+    # A same-module augment is already merged into the structure body.
+    apply_extension_invocations(module)
 
     _bind_xpath_prefixes(module.statements, module)
     for typedef in module.typedefs.values():

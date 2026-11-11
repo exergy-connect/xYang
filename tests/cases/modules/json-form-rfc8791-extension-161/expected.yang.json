@@ -1,0 +1,46 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "sx": {
+        "module": "ietf-yang-structure-ext",
+        "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+        "prefix": "sx",
+        "extension": {
+          "structure": {
+            "argument": "name"
+          }
+        }
+      }
+    },
+    "extensions": [
+      {
+        "name": "sx:structure",
+        "argument": "msg",
+        "body": [
+          {
+            "node": "n",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255,
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

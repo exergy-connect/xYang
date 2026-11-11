@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "b": {
+        "module": "base",
+        "namespace": "urn:base",
+        "prefix": "b",
+        "extensions": [
+          {
+            "name": "sx:structure",
+            "argument": "msg",
+            "body": [
+              {
+                "node": "box",
+                "schema": {
+                  "type": "object",
+                  "x-yang": {
+                    "type": "container"
+                  },
+                  "properties": {
+                    "id": {
+                      "type": "string",
+                      "x-yang": {
+                        "type": "leaf"
+                      }
+                    }
+                  },
+                  "additionalProperties": false
+                }
+              },
+              {
+                "node": "n",
+                "schema": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 255,
+                  "x-yang": {
+                    "type": "leaf"
+                  }
+                }
+              }
+            ]
+          }
+        ],
+        "imports": {
+          "sx": {
+            "module": "ietf-yang-structure-ext",
+            "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+            "prefix": "sx",
+            "extension": {
+              "structure": {
+                "argument": "name"
+              },
+              "augment-structure": {
+                "argument": "target"
+              }
+            }
+          }
+        }
+      },
+      "sx": {
+        "module": "ietf-yang-structure-ext",
+        "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+        "prefix": "sx",
+        "extension": {
+          "augment-structure": {
+            "argument": "target"
+          }
+        }
+      }
+    },
+    "extensions": [
+      {
+        "name": "sx:augment-structure",
+        "argument": "/b:msg/b:box",
+        "body": [
+          {
+            "node": "extra",
+            "schema": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": "string-length(.) > 0",
+                    "error-message": "empty"
+                  }
+                ]
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {
+    "tag": {
+      "type": "string",
+      "x-yang": {
+        "type": "leaf"
+      }
+    }
+  },
+  "additionalProperties": false
+}

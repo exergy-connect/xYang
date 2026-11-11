@@ -160,6 +160,11 @@ class DocumentValidator:
         encoding: list[ValidationError] = []
         pointer_map: dict[str, str] = {}
         host = module if module is not None else self._if_feature_module
+        # A structure is validated as its own schema root, so the host module is not
+        # ``self``. ``if-feature`` on nodes merged into the structure still uses that module.
+        if isinstance(host, YangModule) and self._if_feature_module is None:
+            self._if_feature_module = host
+            self._enabled_features = build_enabled_features_map(host, self._enabled_features_by_module)
         if from_iterator and host is not None and isinstance(data, dict):
             from ..encoding.instance import encoding_errors, iter_instance, project_instance
 

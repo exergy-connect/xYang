@@ -32,11 +32,15 @@ def _apply_structure(
     context_module,
 ):
     # ``structure`` is represented by the invocation node itself; register it
-    # for fast augment-structure top-level target lookup.
+    # for fast augment-structure top-level target lookup. A second call indexes the
+    # same node again and does not add another entry.
+    if getattr(invocation, "_rfc8791_applied", False):
+        return invocation
     name = (invocation.argument or "").strip()
     if name:
         idx = context_module.extension_runtime.setdefault(_STRUCTURE_INDEX_KEY, {})
         idx[name] = invocation
+    invocation._rfc8791_applied = True  # type: ignore[attr-defined]
     return invocation
 
 

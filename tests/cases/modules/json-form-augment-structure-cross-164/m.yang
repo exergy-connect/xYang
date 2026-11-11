@@ -1,0 +1,21 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  import ietf-yang-structure-ext { prefix sx; }
+  import base { prefix b; }
+
+  leaf tag {
+    type string;
+  }
+
+  sx:augment-structure "/b:msg/b:box" {
+    leaf extra {
+      type string;
+      must "string-length(.) > 0" {
+        error-message "empty";
+      }
+    }
+  }
+}

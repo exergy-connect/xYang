@@ -257,3 +257,44 @@ module demo-sem {
     bad_errors = v.validate({"enabled": "true", "mode": "y", "b": "bad"})
     assert bad_errors, "Expected when-false violation for leaf b"
     assert any("when" in e.message.lower() and "false" in e.message.lower() for e in bad_errors)
+
+
+def test_rfc8791_apply_twice_does_not_duplicate_nodes(tmp_path: Path) -> None:
+    """#164: running the apply callbacks again on a parsed module does not add the nodes twice."""
+    from xyang.ext.capabilities import apply_extension_invocations
+
+    sx = tmp_path / "ietf-yang-structure-ext.yang"
+    sx.write_text(
+        """
+module ietf-yang-structure-ext {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext";
+  prefix sx;
+  extension structure { argument name; }
+  extension augment-structure { argument target; }
+}
+""",
+        encoding="utf-8",
+    )
+    demo = tmp_path / "demo.yang"
+    demo.write_text(
+        """
+module demo {
+  yang-version 1.1;
+  namespace "urn:demo";
+  prefix d;
+  import ietf-yang-structure-ext { prefix sx; }
+  sx:structure msg { leaf a { type string; } }
+  sx:augment-structure "/d:msg" { leaf b { type string; } }
+}
+""",
+        encoding="utf-8",
+    )
+    mod = parse_yang_file(demo)
+    msg = next(s for s in mod.statements if isinstance(s, YangExtensionInvocationStmt))
+    assert {s.name for s in msg.statements if isinstance(s, YangLeafStmt)} == {"a", "b"}
+    apply_extension_invocations(mod)
+    assert {s.name for s in msg.statements if isinstance(s, YangLeafStmt)} == {"a", "b"}
+    index = mod.extension_runtime["ietf-yang-structure-ext:structure-index"]
+    assert list(index) == ["msg"]
+    assert index["msg"] is msg

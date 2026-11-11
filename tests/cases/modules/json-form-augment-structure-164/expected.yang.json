@@ -1,0 +1,106 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "sx": {
+        "module": "ietf-yang-structure-ext",
+        "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+        "prefix": "sx",
+        "extension": {
+          "structure": {
+            "argument": "name"
+          }
+        }
+      }
+    },
+    "features": {
+      "extra": {}
+    },
+    "extensions": [
+      {
+        "name": "sx:structure",
+        "argument": "msg",
+        "body": [
+          {
+            "node": "n",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 10,
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          },
+          {
+            "node": "enabled",
+            "schema": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          },
+          {
+            "node": "box",
+            "schema": {
+              "type": "object",
+              "x-yang": {
+                "type": "container"
+              },
+              "properties": {
+                "id": {
+                  "type": "string",
+                  "x-yang": {
+                    "type": "leaf"
+                  }
+                },
+                "note": {
+                  "type": "string",
+                  "x-yang": {
+                    "type": "leaf",
+                    "must": [
+                      {
+                        "must": "string-length(.) > 0",
+                        "error-message": "empty"
+                      }
+                    ],
+                    "augment-structure": "/m:msg/m:box"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          {
+            "node": "extra-leaf",
+            "schema": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "when": {
+                  "condition": "enabled = 'on'",
+                  "evaluate-with-parent-context": true
+                },
+                "if-features": [
+                  "extra"
+                ],
+                "augment-structure": "/m:msg"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

@@ -3,6 +3,7 @@ import { YangModule, YangStatement, type IdentityBases, type ModuleInit, type Mo
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { YangSyntaxError } from "../core/errors";
+import { applyBuiltinExtensionInvocations } from "../ext/rfc8791";
 import { yangDefaultFromJsonSchema } from "./default-values";
 import {
   decimal64FractionDigitsFromSchema,
@@ -185,7 +186,8 @@ function moduleFromImportStub(key: string, raw: unknown): YangModule {
     }
     identities[name] = identityFromJson(def);
   }
-  return new YangModule(
+  const featureState = featuresFromJson(stub);
+  const imported = new YangModule(
     {
       name: stub.module,
       yang_version: "1.1",
@@ -194,10 +196,60 @@ function moduleFromImportStub(key: string, raw: unknown): YangModule {
       identities,
       import_prefixes: importsFromJson(stub),
       extensions: extensionsFromJson(stub[XYANG_KEYS.extension]),
+      features: featureState.features,
+      feature_if_features: featureState.feature_if_features,
       statements: []
     },
     { kind: "string", value: "", name: "<json-schema-import>" }
   );
+  loadStubInvocations(imported, stub);
+  return imported;
+}
+
+function featuresFromJson(xy: Record<string, unknown>): { features: Set<string>; feature_if_features: Record<string, string[]> } {
+  const features = new Set<string>();
+  const feature_if_features: Record<string, string[]> = {};
+  const raw = xy[XYANG_KEYS.features];
+  if (raw === undefined) {
+    return { features, feature_if_features };
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`"${XYANG_KEYS.features}" must map feature names to objects`);
+  }
+  for (const [name, body] of Object.entries(raw as Record<string, unknown>)) {
+    if (!body || typeof body !== "object" || Array.isArray(body)) {
+      throw new Error(`feature '${name}' must be an object`);
+    }
+    features.add(name);
+    const guards = (body as Record<string, unknown>)["if-features"];
+    if (guards !== undefined) {
+      if (!Array.isArray(guards) || !guards.every((item) => typeof item === "string")) {
+        throw new Error(`feature '${name}' "if-features" must be a list of strings`);
+      }
+      feature_if_features[name] = guards as string[];
+    }
+  }
+  return { features, feature_if_features };
+}
+
+function loadStubInvocations(stub: YangModule, raw: Record<string, unknown>): void {
+  const invocations = raw[XYANG_KEYS.extensions];
+  if (invocations === undefined) {
+    return;
+  }
+  if (!Array.isArray(invocations)) {
+    throw new Error(`"${XYANG_KEYS.extensions}" of import '${stub.name ?? ""}' must be a list`);
+  }
+  const previous = parsingModule;
+  parsingModule = stub;
+  try {
+    for (const item of invocations) {
+      stub.statements.push(invocationFromJson(item));
+    }
+  } finally {
+    parsingModule = previous;
+  }
+  applyBuiltinExtensionInvocations(stub);
 }
 
 /** Bind `x-yang.imports` as import prefixes, so identity bases resolve without files. */
@@ -329,7 +381,8 @@ function whenFromXyang(xy: Record<string, unknown>): YangStatement["when"] | und
   return {
     expression,
     description: typeof o.description === "string" ? o.description : "",
-    evaluate_with_parent_context: Boolean(o.evaluate_with_parent_context),
+    evaluate_with_parent_context:
+      o["evaluate-with-parent-context"] === true || o.evaluate_with_parent_context === true,
     ...(prefixes ? { xpath_prefixes: prefixes } : {})
   };
 }
@@ -1024,6 +1077,17 @@ function attachActions(stmt: YangStatement | null, schema: Record<string, unknow
 }
 
 /** One property. A `module:name` key is a node another module defines (augment). */
+function stampAugmentStructure(stmt: YangStatement | null, schema: Record<string, unknown>): YangStatement | null {
+  if (!stmt) {
+    return stmt;
+  }
+  const path = asRecord(schema[YANG_SCHEMA_KEYS.xYang])[XYANG_KEYS.augmentStructure];
+  if (typeof path === "string" && path.length > 0) {
+    (stmt as { augment_structure?: string }).augment_structure = path;
+  }
+  return stmt;
+}
+
 function jsonSchemaPropertyToStatement(
   name: string,
   schema: Record<string, unknown>,
@@ -1031,7 +1095,7 @@ function jsonSchemaPropertyToStatement(
 ): YangStatement | null {
   const colon = name.indexOf(":");
   if (colon < 0) {
-    return attachActions(localPropertyToStatement(name, schema, defs), schema, defs);
+    return stampAugmentStructure(attachActions(localPropertyToStatement(name, schema, defs), schema, defs), schema);
   }
   const owner = name.slice(0, colon);
   const local = name.slice(colon + 1);
@@ -1042,7 +1106,7 @@ function jsonSchemaPropertyToStatement(
   if (stmt) {
     stmt.defining_module = owner;
   }
-  return attachActions(stmt, schema, defs);
+  return stampAugmentStructure(attachActions(stmt, schema, defs), schema);
 }
 
 function localPropertyToStatement(
@@ -1215,6 +1279,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   attachInvocations(moduleInvocations, rootXy);
   statements.push(...moduleInvocations.statements);
 
+  const featureState = featuresFromJson(rootXy);
   const data: ModuleInit = {
         name: moduleName,
     yang_version: "1.1",
@@ -1226,11 +1291,16 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     import_prefixes: importPrefixes,
     extensions,
     extension_runtime: {},
+    features: featureState.features,
+    feature_if_features: featureState.feature_if_features,
     statements
   };
 
   const modSource: ModuleSource = { kind: "string", value: typeof source === "string" ? source : JSON.stringify(source), name: "<json-schema>" };
-  return new YangModule(data, modSource);
+  const loaded = new YangModule(data, modSource);
+  // Index sx:structure and apply a cross-module sx:augment-structure once.
+  applyBuiltinExtensionInvocations(loaded);
+  return loaded;
   } finally {
     parsingModule = previousModule;
     parsingDefs = previousDefs;

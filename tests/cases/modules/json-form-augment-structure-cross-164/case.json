@@ -1,0 +1,11 @@
+{
+  "description": "#164: an sx:augment-structure of an imported structure is exported as the invocation, and the imported structure is on that import's x-yang.imports stub. Reload applies it once.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "own leaf", "valid": true, "data": { "m:tag": "a" } },
+    { "name": "unknown field", "valid": false,
+      "data": { "m:tag": "a", "m:nope": 1 },
+      "errors": [{ "path": "/m:nope", "code": "unknown-field" }] }
+  ]
+}

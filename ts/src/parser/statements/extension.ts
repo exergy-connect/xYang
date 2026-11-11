@@ -1,5 +1,6 @@
 import * as kw from "../keywords";
 import { YangExtensionStmt } from "../../core/ast";
+import { ensureBuiltinExtensionsLoaded, getExtensionApplyCallback } from "../../ext/capabilities";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
@@ -14,6 +15,12 @@ export class ExtensionStatementParser {
       const child = context.push_parent(ext);
       this.parsers.parseBody(tokens, child, "extension", `extension '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
+    }
+    ensureBuiltinExtensionsLoaded();
+    const moduleName = String((context.module as { name?: string }).name ?? "");
+    const callback = getExtensionApplyCallback(moduleName, name);
+    if (callback) {
+      ext.apply_callback = callback as unknown as typeof ext.apply_callback;
     }
     (context.module as any).extensions[name] = ext;
     this.parsers.add_to_parent_or_module(context, ext);
