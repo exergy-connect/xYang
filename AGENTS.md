@@ -16,6 +16,10 @@ Treat `.yang` as the source and the native JSON as its reversible, canonical for
 
 `xyang` and `xyang-ts` each implement `parse`, `validate`, and `convert`.
 
+Run `xyang --help` or `xyang-ts --help`, or `<command> --help` / `-h`, to list the commands, options, defaults, and examples this revision implements. Help exits 0 and writes to stdout. It does not read a YANG module, a data file, or stdin.
+
+`xyang -V` / `xyang --version` prints the Python package version. `xyang-ts` has no version flag. `xyang convert` writes `<stem>.yang.json` or `-o PATH`. `xyang-ts convert` prints JSON Schema to stdout and has no `-o`.
+
 ## Validate
 
 ```python

@@ -6,6 +6,7 @@ import argparse
 import importlib.metadata
 import json
 import sys
+import textwrap
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
@@ -37,7 +38,10 @@ def _add_include_path_argument(parser: argparse.ArgumentParser) -> None:
         action="append",
         default=[],
         metavar="DIR",
-        help=("Directory to search for imported modules " "(repeatable; after the main file's directory)"),
+        help=(
+            "Directory to search for imported modules "
+            "(repeatable; searched after the main file's directory). Default: none"
+        ),
     )
 
 
@@ -143,7 +147,28 @@ def _load_instance_data(data_path: Path) -> Any:
     return json.loads(text)
 
 
-def main() -> int:
+class _CliHelpFormatter(argparse.RawDescriptionHelpFormatter):
+    """Fixed width so help text does not depend on the terminal size.
+
+    Option names stay intact: the stock wrapper breaks on hyphens, which
+    splits ``--include-path`` across lines.
+    """
+
+    def __init__(self, prog: str) -> None:
+        super().__init__(prog, max_help_position=32, width=88)
+
+    def _split_lines(self, text: str, width: int) -> list[str]:
+        text = self._whitespace_matcher.sub(" ", text).strip()
+        return textwrap.wrap(text, width, break_long_words=False, break_on_hyphens=False)
+
+
+def build_parser() -> argparse.ArgumentParser:
+    """Build the xyang CLI parser.
+
+    This parser is the source of truth for commands, options, defaults, and
+    examples. Add a flag with ``add_argument`` on its subparser. Help and the
+    tests read this parser; do not keep a second command list.
+    """
     try:
         cli_version = importlib.metadata.version("xyang")
     except importlib.metadata.PackageNotFoundError:
@@ -151,6 +176,17 @@ def main() -> int:
     parser = argparse.ArgumentParser(
         prog="xyang",
         description="xYang: Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema",
+        formatter_class=_CliHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  xyang --help\n"
+            "  xyang -h\n"
+            "  xyang -V\n"
+            "  xyang parse module.yang\n"
+            "  xyang validate --format json module.yang data.json\n"
+            "  xyang validate --rpc add-link --output --context state.json module.yang output.json\n"
+            "  xyang convert module.yang -o module.yang.json"
+        ),
     )
     parser.add_argument(
         "-V",
@@ -159,13 +195,25 @@ def main() -> int:
         version=f"%(prog)s {cli_version}",
     )
     subparsers = parser.add_subparsers(dest="cmd", help="Commands")
-    path_parent = argparse.ArgumentParser(add_help=False)
+    path_parent = argparse.ArgumentParser(add_help=False, formatter_class=_CliHelpFormatter)
     _add_include_path_argument(path_parent)
 
     parse_parser = subparsers.add_parser(
         "parse",
         parents=[path_parent],
         help="Parse a YANG file and print module info",
+        description=(
+            "Parse a YANG file and print module name, yang-version, namespace, prefix,\n"
+            "organization (if set), typedef count, and top-level statement count."
+        ),
+        formatter_class=_CliHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  xyang parse --help\n"
+            "  xyang parse -h\n"
+            "  xyang parse module.yang\n"
+            "  xyang parse --include-path ./modules module.yang"
+        ),
     )
     parse_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
 
@@ -173,6 +221,21 @@ def main() -> int:
         "validate",
         parents=[path_parent],
         help="Validate JSON data against a YANG module",
+        description=(
+            "Validate JSON or YAML instance data against a YANG module.\n"
+            "Exit 0 is valid, 1 is invalid, and 2 is a usage or module error."
+        ),
+        formatter_class=_CliHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  xyang validate --help\n"
+            "  xyang validate -h\n"
+            "  xyang validate --format json module.yang data.json\n"
+            "  xyang validate --rpc add-link module.yang rpc-input.json\n"
+            "  xyang validate --rpc add-link --output --context state.json module.yang output.json\n"
+            "  xyang validate --native-json --rpc add-link module.yang params.json\n"
+            "  xyang validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json"
+        ),
     )
     validate_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
     validate_parser.add_argument(
@@ -180,7 +243,10 @@ def main() -> int:
         type=Path,
         nargs="?",
         default=None,
-        help="Path to JSON or YAML data (.yaml/.yml need PyYAML). '-' or omitted reads JSON from stdin",
+        help=(
+            "Path to JSON or YAML data (.yaml/.yml need PyYAML). "
+            "'-' or omitted reads JSON from stdin. Default: stdin"
+        ),
     )
     validate_parser.add_argument(
         "--format",
@@ -191,15 +257,16 @@ def main() -> int:
     validate_parser.add_argument(
         "--native-json",
         action="store_true",
-        help="Accept native dict-style JSON instead of strict RFC 7951 (default)",
+        help="Accept native dict-style JSON instead of strict RFC 7951. Default: off (RFC 7951)",
     )
     validate_parser.add_argument(
         "--rpc",
         metavar="NAME",
         default=None,
         help=(
-            "Validate the data as the input of rpc NAME (RFC 7950 §7.14): the RFC 8040 "
-            '{"module:input": {...}} wrapper, or bare parameters with --native-json'
+            "Validate the data as rpc NAME (RFC 7950 §7.14): the RFC 8040 "
+            '{"module:input": {...}} wrapper, or {"module:output": {...}} with --output, '
+            "or bare parameters with --native-json. Default direction: input"
         ),
     )
     validate_parser.add_argument(
@@ -207,14 +274,18 @@ def main() -> int:
         metavar="PATH",
         default=None,
         help=(
-            "Validate the data as the input of the action at PATH (RFC 7950 §7.15), the RFC 8040 "
-            "§3.5.3 data resource identifier /module:list=key/action. Needs --context with that instance"
+            "Validate the data as the action at PATH (RFC 7950 §7.15): the RFC 8040 "
+            "§3.5.3 data resource identifier /module:list=key/action. Mutually exclusive with --rpc. "
+            "Needs --context containing that instance. Default direction: input"
         ),
     )
     validate_parser.add_argument(
         "--output",
         action="store_true",
-        help="With --rpc or --action, validate the output instead of the input",
+        help=(
+            "With --rpc or --action, validate the output instead of the input. "
+            "Requires --rpc or --action. Default: input"
+        ),
     )
     validate_parser.add_argument(
         "--context",
@@ -222,9 +293,9 @@ def main() -> int:
         default=None,
         metavar="FILE",
         help=(
-            "With --rpc or --action, JSON or YAML server data. It is validated against the module "
-            "first (its errors carry \"document\": \"context\"), then joins the operation node in "
-            "the XPath accessible tree (RFC 7950 §6.4.1) so must and leafref can reach it"
+            "With --rpc or --action, JSON or YAML server data. Validated against the module first "
+            '(errors carry "document": "context"), then joined to the operation node '
+            "(RFC 7950 §6.4.1) so must and leafref can reach it. Required with --action. Default: none"
         ),
     )
     validate_parser.add_argument(
@@ -264,6 +335,19 @@ def main() -> int:
         "convert",
         parents=[path_parent],
         help="Convert .yang to .yang.json (JSON Schema with x-yang)",
+        description=(
+            "Write JSON Schema (2020-12) with x-yang to a file whose name ends in .yang.json.\n"
+            "Default path: <stem>.yang.json beside the input."
+        ),
+        formatter_class=_CliHelpFormatter,
+        epilog=(
+            "examples:\n"
+            "  xyang convert --help\n"
+            "  xyang convert -h\n"
+            "  xyang convert module.yang\n"
+            "  xyang convert module.yang -o module.yang.json\n"
+            "  xyang convert --include-path ./modules module.yang -o out.yang.json"
+        ),
     )
     convert_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
     convert_parser.add_argument(
@@ -271,9 +355,26 @@ def main() -> int:
         "--output",
         type=Path,
         default=None,
-        help="Output path (default: <stem>.yang.json alongside input)",
+        metavar="PATH",
+        help=(
+            "Output file (default: <stem>.yang.json beside the input). "
+            "If the name does not end in .yang.json, that suffix is added"
+        ),
     )
+    return parser
 
+
+def command_parsers(parser: argparse.ArgumentParser | None = None) -> dict[str, argparse.ArgumentParser]:
+    """Subcommand name to parser, in registry order. Tests enumerate help from this."""
+    parser = build_parser() if parser is None else parser
+    for action in parser._actions:
+        if isinstance(action, argparse._SubParsersAction):
+            return dict(action.choices)
+    raise RuntimeError("xyang CLI registered no subcommands")
+
+
+def main() -> int:
+    parser = build_parser()
     args = parser.parse_args()
 
     if args.cmd is None:

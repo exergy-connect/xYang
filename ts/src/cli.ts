@@ -7,28 +7,27 @@ import { ValidatorExtension } from "./validator/validator-extension";
 import { YangValidator } from "./validator/yang-validator";
 import type { ValidateCallOptions, ValidationIssue } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
-import { parseCommonArgs, parseValidateArgs } from "./cli/args";
+import {
+  CliUsageError,
+  commandByName,
+  formatCommandHelp,
+  formatGlobalHelp,
+  parseCommonArgs,
+  parseValidateArgs,
+  requestsHelp
+} from "./cli/args";
 import { loadAnydataModules } from "./cli/load-anydata-modules";
 
-function printUsage(): void {
-  process.stdout.write(
-    [
-      "xyang-ts commands:",
-      "  parse [--include-path DIR]... <file.yang>",
-      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... [--rpc NAME | --action PATH] [--output] [--context data.json] <file.yang> [data.json|-]",
-      "  convert [--include-path DIR]... <file.yang>",
-      "",
-      "  --native-json         native dict-style JSON (default: strict RFC 7951)",
-      "  --format              text (default) or json ({valid, errors} on stdout)",
-      "  --rpc                 validate the data as the input of rpc NAME ({\"module:input\": {...}}, or bare parameters with --native-json)",
-      "  --action              validate the data as the input of the action at PATH, the RFC 8040 data resource identifier /module:list=key/action (needs --context)",
-      "  --output              with --rpc or --action, validate the output instead",
-      "  --context             with --rpc or --action, server data (JSON); validated first (errors carry \"document\": \"context\"), then reachable from must and leafref",
-      "  --features            {\"module\": [\"feature\"]} or null (default: all features)",
-      "  --anydata-validation  off | complete | candidate  (default: off)",
-      "  --anydata-module      additional .yang for anydata subtree validation (repeatable)"
-    ].join("\n") + "\n"
-  );
+function leadingHelp(args: readonly string[]): boolean {
+  for (const arg of args) {
+    if (arg === "--help" || arg === "-h") {
+      return true;
+    }
+    if (!arg.startsWith("-") || arg === "-") {
+      return false;
+    }
+  }
+  return false;
 }
 
 function featureSets(features: Record<string, string[]> | null): Record<string, Set<string>> | undefined {
@@ -139,14 +138,27 @@ function runValidate(rest: string[]): number {
 }
 
 function main(argv: string[]): number {
-  const [, , command, ...rest] = argv;
-  if (!command) {
-    printUsage();
+  const args = argv.slice(2);
+  if (args.length === 0 || leadingHelp(args)) {
+    process.stdout.write(formatGlobalHelp());
+    return 0;
+  }
+
+  const [command, ...rest] = args;
+  if (!command || command.startsWith("-")) {
+    throw new CliUsageError(command ? `unrecognized argument: ${command}` : "Missing command");
+  }
+  const spec = commandByName(command);
+  if (!spec) {
+    throw new CliUsageError(`Unknown command: ${command}`);
+  }
+  if (requestsHelp(spec.options, rest)) {
+    process.stdout.write(formatCommandHelp(spec));
     return 0;
   }
 
   if (command === "parse") {
-    const { includePaths, positional } = parseCommonArgs(rest);
+    const { includePaths, positional } = parseCommonArgs(rest, "parse");
     const file = positional[0];
     if (!file) {
       throw new Error("Missing <file.yang>");
@@ -167,7 +179,7 @@ function main(argv: string[]): number {
   }
 
   if (command === "convert") {
-    const { includePaths, positional } = parseCommonArgs(rest);
+    const { includePaths, positional } = parseCommonArgs(rest, "convert");
     const file = positional[0];
     if (!file) {
       throw new Error("Missing <file.yang>");
@@ -178,7 +190,9 @@ function main(argv: string[]): number {
     return 0;
   }
 
-  throw new Error(`Unknown command: ${command}`);
+  throw new Error(
+    `CLI command ${command} is registered but not implemented. Wire it in main() next to the registry entry in cli/args.ts.`
+  );
 }
 
 /**
@@ -232,5 +246,5 @@ try {
   finish(main(process.argv));
 } catch (error) {
   process.stderr.write(`${(error as Error).message}\n`);
-  finish(1);
+  finish(error instanceof CliUsageError ? 2 : 1);
 }

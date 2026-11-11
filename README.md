@@ -94,6 +94,8 @@ cd ../qjs && ./build.sh linux-x64
 
 ### CLI
 
+Discover the commands and flags this revision implements with `xyang --help`, `xyang-ts --help`, or `<command> --help` / `-h`. Help exits 0, writes to stdout, and does not open a YANG module or a data file. `xyang -V` / `xyang --version` prints the Python package version. `xyang-ts` has no version flag.
+
 ```bash
 # Python
 xyang parse examples/meta-model.yang
