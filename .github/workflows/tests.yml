@@ -119,6 +119,19 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e ".[dev]"
 
+      # The registry parity tests run ts/scripts/dump-*.mjs, which import esbuild.
+      # A bare runner Node has no ts/node_modules, so those tests exit 1.
+      - name: Set up Node.js
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+
+      - name: Install TypeScript dependencies
+        working-directory: ts
+        run: npm ci
+
       - name: Run tests
         run: pytest --tb=short -q
 
