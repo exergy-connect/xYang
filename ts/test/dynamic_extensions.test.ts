@@ -3,6 +3,7 @@ import { mkdtempSync, rmSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { parseYangFile, parseYangString, YangValidator } from "../src";
+import { applyBuiltinExtensionInvocations } from "../src/ext/rfc8791";
 
 describe("python parity: test_dynamic_extensions", () => {
   it("extension definition and prefixed invocation are parsed with resolution metadata", () => {
@@ -221,6 +222,48 @@ module demo-sem {
       const bad = validator.validate({ msg: { enabled: "true", mode: "y", b: "bad" } });
       expect(bad.isValid).toBe(false);
       expect(bad.errors.some((error) => error.toLowerCase().includes("when"))).toBe(true);
+    } finally {
+      rmSync(dir, { recursive: true, force: true });
+    }
+  });
+
+  it("applying RFC 8791 twice does not duplicate nodes (#164)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "xyang-rfc8791-twice-"));
+    try {
+      writeFileSync(
+        join(dir, "ietf-yang-structure-ext.yang"),
+        `module ietf-yang-structure-ext {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext";
+  prefix sx;
+  extension structure { argument name; }
+  extension augment-structure { argument target; }
+}
+`,
+        "utf-8"
+      );
+      writeFileSync(
+        join(dir, "demo.yang"),
+        `module demo {
+  yang-version 1.1;
+  namespace "urn:demo";
+  prefix d;
+  import ietf-yang-structure-ext { prefix sx; }
+  sx:structure msg { leaf a { type string; } }
+  sx:augment-structure "/d:msg" { leaf b { type string; } }
+}
+`,
+        "utf-8"
+      );
+      const mod = parseYangFile(join(dir, "demo.yang"));
+      const msg = mod.statements.find((stmt) => stmt.resolved_extension_name === "structure");
+      const names = () => (msg?.statements ?? []).map((stmt) => stmt.name).filter((name) => name === "a" || name === "b");
+      expect(names()).toEqual(["a", "b"]);
+      applyBuiltinExtensionInvocations(mod);
+      expect(names()).toEqual(["a", "b"]);
+      const index = mod.extension_runtime?.["ietf-yang-structure-ext:structure-index"] as Record<string, unknown>;
+      expect(Object.keys(index)).toEqual(["msg"]);
+      expect(index.msg).toBe(msg);
     } finally {
       rmSync(dir, { recursive: true, force: true });
     }

@@ -105,6 +105,11 @@ class XYangKey:
     #: Nested statements of an extension invocation, in source order. An entry is
     #: ``{"extension": <invocation>}`` or ``{"node": <member name>, "schema": <node schema>}``.
     BODY = "body"
+    #: Declared ``feature`` names of this module (RFC 7950 §7.20.1). Values are ``{}`` or
+    #: ``{"if-features": [...]}`` when the feature itself has ``if-feature``.
+    FEATURES = "features"
+    #: Absolute schema path of the ``sx:augment-structure`` that added this node (RFC 8791).
+    AUGMENT_STRUCTURE = "augment-structure"
 
 
 class XYangTypeValue:

@@ -1189,6 +1189,9 @@ export class StatementParsers {
       out.prefix = stmt.prefix;
       out.resolved_module_name = stmt.resolved_module?.name;
       out.resolved_extension_name = stmt.resolved_extension?.name;
+      if ((stmt.resolved_extension as { apply_callback?: unknown } | undefined)?.apply_callback) {
+        (out as { has_apply_callback?: boolean }).has_apply_callback = true;
+      }
     }
     if (stmt.when && typeof stmt.when.expression === "string") {
       out.when = {

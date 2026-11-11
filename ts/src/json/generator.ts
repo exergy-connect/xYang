@@ -9,6 +9,7 @@ import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { applyAugments } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
 import { YangExportError } from "../core/errors";
+import { applyBuiltinExtensionInvocations } from "../ext/rfc8791";
 import { identityDef, importsForJson, withIdentityExport } from "./identity-export";
 import type { IdentityPair } from "../identity-graph";
 import { jsonSchemaDefaultValue } from "./default-values";
@@ -71,10 +72,14 @@ function extensionLabel(stmt: YangStatement): string {
 function rejectSemanticExtension(stmt: YangStatement): void {
   const owner = stmt.resolved_module_name ?? "";
   const ext = stmt.resolved_extension_name ?? "";
+  // RFC 8791 round-trips (#164). Any other extension with an apply callback does not.
   if (owner === "ietf-yang-structure-ext" && (ext === "structure" || ext === "augment-structure")) {
+    return;
+  }
+  if ((stmt as { has_apply_callback?: boolean }).has_apply_callback === true) {
     throw new YangExportError(
       `cannot export extension invocation '${extensionLabel(stmt)}': ` +
-        `RFC 8791 sx:${ext} is applied when the module is parsed and is not ` +
+        `extension ${owner}:${ext} is applied when the module is parsed and is not ` +
         `re-applied when the native JSON form is loaded`
     );
   }
@@ -162,6 +167,9 @@ function oneExtensionInvocation(
     };
     if (typeof whenShape.description === "string" && whenShape.description.trim().length > 0) {
       whenOut.description = whenShape.description.trim();
+    }
+    if (whenShape.evaluate_with_parent_context === true) {
+      whenOut["evaluate-with-parent-context"] = true;
     }
     out.when = whenOut;
   }
@@ -485,7 +493,14 @@ function withStatementMeta(
     if (wd.length > 0) {
       whenOut.description = wd;
     }
+    if (whenShape.evaluate_with_parent_context === true) {
+      whenOut["evaluate-with-parent-context"] = true;
+    }
     out.when = whenOut;
+  }
+  const augmentStructure = (stmt as { augment_structure?: string }).augment_structure;
+  if (typeof augmentStructure === "string" && augmentStructure.length > 0) {
+    out["augment-structure"] = augmentStructure;
   }
   const presenceRaw = stmt.presence;
   if (typeof presenceRaw === "string" && presenceRaw.trim().length > 0) {
@@ -866,6 +881,10 @@ function statementToSchemaBody(
       xyChoice["if-features"] = ifFeatures;
     }
     stampExtensions(xyChoice, stmt.statements ?? [], module, typedefNames);
+    const choiceAugment = (stmt as { augment_structure?: string }).augment_structure;
+    if (typeof choiceAugment === "string" && choiceAugment.length > 0) {
+      xyChoice["augment-structure"] = choiceAugment;
+    }
     const out: Record<string, unknown> = {
       type: JSON_TYPE_OBJECT,
       [YANG_SCHEMA_KEYS.xYang]: xyChoice
@@ -1116,6 +1135,213 @@ function applyOwnAugments(effective: YangModule): void {
   applyAugments(effective);
 }
 
+const FOREIGN_AUGMENTS = "ietf-yang-structure-ext:foreign-augment-structure";
+const FOREIGN_SLOTS = "ietf-yang-structure-ext:foreign-augment-structure-slots";
+const STRUCTURE_INDEX = "ietf-yang-structure-ext:structure-index";
+
+function isRfc8791(stmt: YangStatement, name: string): boolean {
+  return stmt.resolved_module_name === "ietf-yang-structure-ext" && stmt.resolved_extension_name === name;
+}
+
+function foreignAugmentsOf(module: YangModule): YangStatement[] {
+  const raw = module.extension_runtime?.[FOREIGN_AUGMENTS];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.map((item) => (item instanceof YangStatement ? item : new YangStatement(asRecord(item))));
+}
+
+function foreignSlotsOf(module: YangModule): number[] {
+  const raw = module.extension_runtime?.[FOREIGN_SLOTS];
+  if (!Array.isArray(raw)) {
+    return [];
+  }
+  return raw.filter((item): item is number => typeof item === "number");
+}
+
+function orderedExtensionInvocations(
+  module: YangModule,
+  typedefNames: Set<string>
+): Array<Record<string, unknown>> {
+  const kept = extensionInvocationsJson(module.statements, module, typedefNames);
+  const foreign = foreignAugmentsOf(module);
+  const slots = foreignSlotsOf(module);
+  if (foreign.length === 0) {
+    return kept;
+  }
+  const groups = new Map<number, Array<Record<string, unknown>>>();
+  foreign.forEach((inv, index) => {
+    const slot = slots[index] ?? kept.length;
+    const list = groups.get(slot) ?? [];
+    list.push(oneExtensionInvocation(inv, module, typedefNames));
+    groups.set(slot, list);
+  });
+  const ordered: Array<Record<string, unknown>> = [];
+  kept.forEach((item, index) => {
+    ordered.push(...(groups.get(index) ?? []));
+    groups.delete(index);
+    ordered.push(item);
+  });
+  ordered.push(...(groups.get(kept.length) ?? []));
+  groups.delete(kept.length);
+  for (const slot of [...groups.keys()].sort((a, b) => a - b)) {
+    ordered.push(...(groups.get(slot) ?? []));
+  }
+  return ordered;
+}
+
+function structureInvocations(module: YangModule): YangStatement[] {
+  const found: YangStatement[] = [];
+  const seen = new Set<YangStatement>();
+  for (const stmt of module.statements) {
+    if (isRfc8791(stmt, "structure")) {
+      found.push(stmt);
+      seen.add(stmt);
+    }
+  }
+  const index = asRecord(module.extension_runtime?.[STRUCTURE_INDEX]);
+  for (const stmt of Object.values(index)) {
+    if (stmt instanceof YangStatement && !seen.has(stmt) && isRfc8791(stmt, "structure")) {
+      found.push(stmt);
+    }
+  }
+  return found;
+}
+
+function structureView(module: YangModule): YangModule {
+  if (!module.statements.some((stmt) => isRfc8791(stmt, "augment-structure"))) {
+    return module;
+  }
+  const cloned = new YangModule(
+    {
+      name: module.name,
+      yang_version: module.yang_version,
+      namespace: module.namespace,
+      prefix: module.prefix,
+      import_prefixes: module.import_prefixes,
+      extensions: module.extensions,
+      extension_runtime: {},
+      statements: module.statements.map((stmt) => new YangStatement(JSON.parse(JSON.stringify(stmt))))
+    },
+    module.source
+  );
+  applyBuiltinExtensionInvocations(cloned, { exportView: true });
+  return cloned;
+}
+
+function extensionStub(module: YangModule): Record<string, unknown> {
+  return {
+    module: module.name,
+    namespace: module.namespace ?? "",
+    prefix: module.prefix ?? "",
+    [XYANG_KEYS.extension]: localExtensionDefs(module)
+  };
+}
+
+function stripAugmentedBy(stmt: YangStatement, exporterName: string): YangStatement | undefined {
+  if ((stmt as { augment_structure_module?: string }).augment_structure_module === exporterName) {
+    return undefined;
+  }
+  const cloned = new YangStatement(JSON.parse(JSON.stringify(stmt)));
+  cloned.statements = cloned.statements
+    .map((child) => stripAugmentedBy(child, exporterName))
+    .filter((child): child is YangStatement => child !== undefined);
+  return cloned;
+}
+
+function addImportedStructures(root: YangModule, imports: Record<string, unknown>): void {
+  const seen = new Set<string>();
+  const invocations = root.statements.filter((stmt) => isRfc8791(stmt, "augment-structure"));
+  for (const saved of foreignAugmentsOf(root)) {
+    if (!invocations.includes(saved)) {
+      invocations.push(saved);
+    }
+  }
+  for (const inv of invocations) {
+    const path = String(inv.argument ?? "");
+    if (!path) {
+      continue;
+    }
+    let firstPrefix = "";
+    let firstName = "";
+    try {
+      const first = parseAbsoluteSchemaPath(path)[0];
+      firstPrefix = first?.prefix ?? "";
+      firstName = first?.name ?? "";
+    } catch {
+      continue;
+    }
+    const owner = root.import_prefixes[firstPrefix];
+    if (!owner || owner === root || owner.name === root.name) {
+      continue;
+    }
+    const key = extensionImportKey(root, owner);
+    if (!imports[key]) {
+      imports[key] = {
+        module: owner.name,
+        namespace: owner.namespace ?? "",
+        prefix: owner.prefix ?? ""
+      };
+    }
+    const stub = asRecord(imports[key]);
+    const view = structureView(owner);
+    for (const structure of structureInvocations(view)) {
+      const marker = `${key}:${String(structure.argument ?? "").trim()}`;
+      if (seen.has(marker) || marker.endsWith(":") && !firstName) {
+        continue;
+      }
+      seen.add(marker);
+      const shadow = new YangStatement(JSON.parse(JSON.stringify(structure)));
+      shadow.statements = structure.statements
+        .map((child) => stripAugmentedBy(child, root.name ?? ""))
+        .filter((child): child is YangStatement => child !== undefined);
+      const body = oneExtensionInvocation(shadow, root, new Set());
+      const list = Array.isArray(stub[XYANG_KEYS.extensions])
+        ? (stub[XYANG_KEYS.extensions] as Array<Record<string, unknown>>)
+        : [];
+      list.push(body);
+      stub[XYANG_KEYS.extensions] = list;
+      const prefix = structure.prefix ?? "";
+      const definingName = structure.resolved_module_name ?? "";
+      const defining = prefix ? owner.import_prefixes?.[prefix] : undefined;
+      if (defining && prefix) {
+        const nested = asRecord(stub[XYANG_KEYS.imports]);
+        if (!nested[prefix]) {
+          nested[prefix] = extensionStub(defining);
+        }
+        stub[XYANG_KEYS.imports] = nested;
+      } else if (definingName && prefix) {
+        const nested = asRecord(stub[XYANG_KEYS.imports]);
+        if (!nested[prefix]) {
+          nested[prefix] = {
+            module: definingName,
+            namespace: "",
+            prefix
+          };
+        }
+        stub[XYANG_KEYS.imports] = nested;
+      }
+    }
+  }
+}
+
+function featuresJson(module: YangModule): Record<string, unknown> {
+  const names = [...module.features].sort();
+  if (names.length === 0) {
+    return {};
+  }
+  const out: Record<string, unknown> = {};
+  for (const name of names) {
+    const body: Record<string, unknown> = {};
+    const guards = module.feature_if_features?.[name] ?? [];
+    if (guards.length > 0) {
+      body["if-features"] = [...guards];
+    }
+    out[name] = body;
+  }
+  return out;
+}
+
 /** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
 export function generateJsonSchema(module: YangModule): Record<string, unknown> {
   const previous = extensionUses;
@@ -1135,6 +1361,8 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
     Object.defineProperty(effectiveModule, "module_registry", { value: module.module_registry, enumerable: false });
   }
   applyOwnAugments(effectiveModule);
+  // Merge a same-module sx:augment-structure. A cross-module one stays an invocation.
+  applyBuiltinExtensionInvocations(effectiveModule, { exportView: true });
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   const typedefNames = new Set(Object.keys(effectiveModule.typedefs as Record<string, unknown>));
@@ -1186,14 +1414,20 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
     ...typedefToSchema(effectiveModule),
     ...identityToSchema(effectiveModule, typedefNames)
   };
-  const moduleInvocations = extensionInvocationsJson(effectiveModule.statements, effectiveModule, typedefNames);
+  const moduleInvocations = orderedExtensionInvocations(effectiveModule, typedefNames);
   const imports = mergeExtensionImports(module, { ...importsForJson(module, used) }, extensionUses ?? []);
-  if (Object.keys(imports).length > 0) {
-    rootXYang[XYANG_KEYS.imports] = imports;
+  addImportedStructures(effectiveModule, imports);
+  const sortedImports = Object.fromEntries(Object.entries(imports).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+  if (Object.keys(sortedImports).length > 0) {
+    rootXYang[XYANG_KEYS.imports] = sortedImports;
   }
   const extensionDefs = localExtensionDefs(effectiveModule);
   if (Object.keys(extensionDefs).length > 0) {
     rootXYang[XYANG_KEYS.extension] = extensionDefs;
+  }
+  const features = featuresJson(module);
+  if (Object.keys(features).length > 0) {
+    rootXYang[XYANG_KEYS.features] = features;
   }
   if (moduleInvocations.length > 0) {
     rootXYang[XYANG_KEYS.extensions] = moduleInvocations;

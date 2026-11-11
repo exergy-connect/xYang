@@ -1,0 +1,101 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "sx": {
+        "module": "ietf-yang-structure-ext",
+        "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+        "prefix": "sx",
+        "extension": {
+          "structure": {
+            "argument": "name"
+          }
+        }
+      }
+    },
+    "extensions": [
+      {
+        "name": "sx:structure",
+        "argument": "msg",
+        "body": [
+          {
+            "node": "outer",
+            "schema": {
+              "type": "object",
+              "x-yang": {
+                "type": "container"
+              },
+              "properties": {
+                "row": {
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "id": {
+                        "type": "string",
+                        "x-yang": {
+                          "type": "leaf"
+                        }
+                      },
+                      "n": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 3,
+                        "x-yang": {
+                          "type": "leaf"
+                        }
+                      },
+                      "ref": {
+                        "type": "string",
+                        "x-yang": {
+                          "type": "leafref",
+                          "path": "../id",
+                          "require-instance": true
+                        }
+                      }
+                    },
+                    "additionalProperties": false
+                  },
+                  "x-yang": {
+                    "type": "list",
+                    "key": "id"
+                  }
+                }
+              },
+              "additionalProperties": false
+            }
+          },
+          {
+            "extension": {
+              "name": "sx:structure",
+              "argument": "inner",
+              "body": [
+                {
+                  "node": "b",
+                  "schema": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255,
+                    "x-yang": {
+                      "type": "leaf"
+                    }
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

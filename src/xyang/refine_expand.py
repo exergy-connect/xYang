@@ -239,12 +239,21 @@ def _copy_with_if_features(
     stmt: YangStatement, statements: list[YangStatement], **extra: object
 ) -> YangStatement:
     if_features = list(stmt.if_features) if isinstance(stmt, YangStatementWithWhen) else []
-    return replace(
+    copied = replace(
         stmt,
         statements=statements,
         if_features=if_features,
         **extra,
     )
+    # Provenance of an ``sx:augment-structure`` root. Not a dataclass field: the JSON form
+    # carries it, and a uses/export copy must keep it or the node looks locally defined.
+    path = getattr(stmt, "augment_structure", None)
+    if isinstance(path, str) and path:
+        copied.augment_structure = path  # type: ignore[attr-defined]
+    source = getattr(stmt, "augment_structure_module", None)
+    if isinstance(source, str) and source:
+        copied.augment_structure_module = source  # type: ignore[attr-defined]
+    return copied
 
 
 def _copy_choice(

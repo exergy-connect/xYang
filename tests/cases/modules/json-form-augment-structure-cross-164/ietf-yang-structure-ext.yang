@@ -1,0 +1,13 @@
+module ietf-yang-structure-ext {
+  yang-version 1.1;
+  namespace "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext";
+  prefix sx;
+
+  extension structure {
+    argument name;
+  }
+
+  extension augment-structure {
+    argument target;
+  }
+}

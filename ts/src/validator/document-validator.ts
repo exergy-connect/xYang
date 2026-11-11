@@ -4,7 +4,7 @@ import { modulePrefixResolver } from "../core/ast";
 import { bindXPathPrefixes, parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
-import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
+import { remapPointer, resolveQualifiedTopLevel, resolveStructureInstance } from "../encoding";
 import {
   AnydataValidationConfig,
   AnydataValidationConfigInput,
@@ -372,6 +372,29 @@ export class DocumentValidator {
 
       const root = data as Record<string, unknown>;
       const rootNode: XPathNode = { data: root, schema: ctx.module as unknown as XPathSchema, parent: null };
+      const nested = resolveStructureInstance(root, ctx.module);
+      if (nested && nested.schema.data_node_kind !== "container") {
+        const saved = nested.schema.data_node_kind;
+        nested.schema.data_node_kind = "container";
+        try {
+          this.validateStatement(
+            nested.schema,
+            nested.inner,
+            this.childPath("", nested.schema),
+            errors,
+            rootNode,
+            rootNode
+          );
+        } finally {
+          nested.schema.data_node_kind = saved;
+        }
+        if (this.pointerMap) {
+          for (const item of [...errors, ...warnings]) {
+            item.path = remapPointer(item.path, this.pointerMap);
+          }
+        }
+        return { errors, warnings };
+      }
       for (const stmt of ctx.module.statements) {
         if (!stmt.name) {
           continue;

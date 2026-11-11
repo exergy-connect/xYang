@@ -23,5 +23,9 @@ export const XYANG_KEYS = {
   yinElement: "yin-element",
   reference: "reference",
   /** Nested statements of an invocation: `{extension}` or `{node, schema}`. */
-  body: "body"
+  body: "body",
+  /** Declared feature names. A value is `{}` or `{ "if-features": [...] }`. */
+  features: "features",
+  /** Absolute path of the `sx:augment-structure` that added this node. */
+  augmentStructure: "augment-structure"
 } as const;

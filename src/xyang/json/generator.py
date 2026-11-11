@@ -43,6 +43,8 @@ from ..ast import (
 )
 from ..augment_expand import apply_augmentations
 from ..errors import YangExportError
+from ..ext.capabilities import apply_extension_invocations
+from ..ext.rfc8791.structure_expand import FOREIGN_AUGMENTS, FOREIGN_SLOTS, _STRUCTURE_INDEX_KEY
 from ..identity_graph import (
     IdentityPair,
     descendant_closure,
@@ -458,6 +460,8 @@ def _when_to_xyang_json(when: YangWhenStmt) -> dict[str, Any]:
     _with_xpath_prefixes(out, when.ast)
     if when.description and when.description.strip():
         out[JsonSchemaKey.DESCRIPTION] = when.description
+    if getattr(when, "evaluate_with_parent_context", False):
+        out["evaluate-with-parent-context"] = True
     return out
 
 
@@ -509,10 +513,10 @@ class _ExtensionUse:
 
 _EXT_USED: contextvars.ContextVar[_ExtensionUse] = contextvars.ContextVar("xyang_extension_export")
 
-_SEMANTIC_EXTENSIONS = {
-    ("ietf-yang-structure-ext", "structure"),
-    ("ietf-yang-structure-ext", "augment-structure"),
-}
+# RFC 8791 is exported and re-applied (#164). Any other extension with an apply
+# callback still has no JSON form, so export fails instead of dropping it.
+_RFC8791 = "ietf-yang-structure-ext"
+_RFC8791_EXPORTED = frozenset({"structure", "augment-structure"})
 
 
 def _extension_def_json(ext: YangExtensionStmt) -> dict[str, Any]:
@@ -529,23 +533,27 @@ def _extension_def_json(ext: YangExtensionStmt) -> dict[str, Any]:
     return out
 
 
-def _reject_semantic_extension(inv: YangExtensionInvocationStmt) -> None:
-    """RFC 8791 hooks are applied at parse and are not applied again when JSON is loaded.
+def _is_rfc8791(inv: YangExtensionInvocationStmt, name: str) -> bool:
+    owner = inv.resolved_module
+    ext = inv.resolved_extension
+    return owner is not None and owner.name == _RFC8791 and ext is not None and ext.name == name
 
-    Recording the invocation would not round-trip that effect, so export fails instead of dropping it.
+
+def _reject_semantic_extension(inv: YangExtensionInvocationStmt) -> None:
+    """An extension with an apply callback and no JSON form fails the export.
+
+    RFC 8791 ``structure`` and ``augment-structure`` round-trip (#164). Anything else
+    that is applied at parse time is not dropped.
     """
     ext = inv.resolved_extension
     owner = inv.resolved_module
-    semantic = (owner.name, ext.name) in _SEMANTIC_EXTENSIONS or ext.apply_callback is not None
-    if not semantic:
+    if owner is not None and owner.name == _RFC8791 and ext is not None and ext.name in _RFC8791_EXPORTED:
         return
-    if owner.name == "ietf-yang-structure-ext" and ext.name in ("structure", "augment-structure"):
-        detail = f"RFC 8791 sx:{ext.name}"
-    else:
-        detail = f"extension {owner.name}:{ext.name}"
+    if ext is None or ext.apply_callback is None:
+        return
     raise YangExportError(
         f"cannot export extension invocation {inv.name!r}: "
-        f"{detail} is applied when the module is parsed and is not "
+        f"extension {owner.name}:{ext.name} is applied when the module is parsed and is not "
         f"re-applied when the native JSON form is loaded"
     )
 
@@ -1379,6 +1387,21 @@ def _statement_to_property(
     parent: YangStatement | YangModule | None = None,
 ) -> dict[str, Any] | None:
     """Convert an AST statement to a JSON Schema property. Returns None for unsupported nodes. Expands uses when present."""
+    prop = _statement_to_property_body(stmt, typedef_names, module, parent)
+    if isinstance(prop, dict):
+        path = getattr(stmt, "augment_structure", None)
+        xy = prop.get(JsonSchemaKey.X_YANG)
+        if isinstance(path, str) and path and isinstance(xy, dict):
+            xy[XYangKey.AUGMENT_STRUCTURE] = path
+    return prop
+
+
+def _statement_to_property_body(
+    stmt: YangStatement,
+    typedef_names: set[str],
+    module: YangModule,
+    parent: YangStatement | YangModule | None = None,
+) -> dict[str, Any] | None:
     if isinstance(stmt, YangContainerStmt):
         return _with_actions(_container_stmt_to_property(stmt, typedef_names, module), stmt, typedef_names, module)
     if isinstance(stmt, YangListStmt):
@@ -1453,6 +1476,185 @@ def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, A
     return schema
 
 
+def _features_json(module: YangModule) -> dict[str, Any]:
+    """Declared features, so a reloaded module evaluates ``if-feature`` the same way."""
+    names = sorted(module.features)
+    if not names and not module.feature_if_features:
+        return {}
+    out: dict[str, Any] = {}
+    for name in names:
+        body: dict[str, Any] = {}
+        guards = module.feature_if_features.get(name) or []
+        if guards:
+            body[XYangKey.IF_FEATURES] = list(guards)
+        out[name] = body
+    return out
+
+
+def _detached_runtime(module: YangModule) -> dict[str, Any]:
+    """A runtime dict the export copy can index without editing *module*'s index."""
+    runtime: dict[str, Any] = {}
+    for key, value in module.extension_runtime.items():
+        if isinstance(value, dict):
+            runtime[key] = dict(value)
+        elif isinstance(value, list):
+            runtime[key] = list(value)
+        else:
+            runtime[key] = value
+    return runtime
+
+
+def _ordered_extension_invocations(
+    module: YangModule,
+    typedef_names: set[str],
+) -> list[dict[str, Any]]:
+    """Module-level invocations in source order, including a foreign ``augment-structure`` that was removed."""
+    kept = _extension_invocations_json(module.statements, typedef_names, module)
+    foreign = module.extension_runtime.get(FOREIGN_AUGMENTS) or []
+    slots = module.extension_runtime.get(FOREIGN_SLOTS) or []
+    if not foreign:
+        return kept
+    groups: dict[int, list[dict[str, Any]]] = {}
+    for slot, inv in zip(slots, foreign):
+        if not isinstance(inv, YangExtensionInvocationStmt):
+            continue
+        groups.setdefault(int(slot), []).append(_one_extension_invocation(inv, typedef_names, module))
+    ordered: list[dict[str, Any]] = []
+    for index, item in enumerate(kept):
+        ordered.extend(groups.pop(index, []))
+        ordered.append(item)
+    ordered.extend(groups.pop(len(kept), []))
+    for slot in sorted(groups):
+        ordered.extend(groups[slot])
+    return ordered
+
+
+def _iter_structures(module: YangModule) -> list[YangExtensionInvocationStmt]:
+    """``sx:structure`` nodes of *module*, applied or not."""
+    found: list[YangExtensionInvocationStmt] = []
+    seen: set[int] = set()
+    for stmt in module.statements:
+        if isinstance(stmt, YangExtensionInvocationStmt) and _is_rfc8791(stmt, "structure"):
+            found.append(stmt)
+            seen.add(id(stmt))
+    index = module.extension_runtime.get(_STRUCTURE_INDEX_KEY) or {}
+    if isinstance(index, dict):
+        for stmt in index.values():
+            if isinstance(stmt, YangExtensionInvocationStmt) and id(stmt) not in seen and _is_rfc8791(stmt, "structure"):
+                found.append(stmt)
+                seen.add(id(stmt))
+    return found
+
+
+def _structure_view(module: YangModule) -> YangModule:
+    """*module* with its own ``augment-structure`` merged, without editing *module*."""
+    if not any(
+        isinstance(stmt, YangExtensionInvocationStmt) and _is_rfc8791(stmt, "augment-structure")
+        for stmt in module.statements
+    ):
+        return module
+    cloned = copy(module)
+    cloned.extension_runtime = {}
+    cloned.statements = [copy_yang_statement(stmt) for stmt in module.statements]
+    cloned.import_prefixes = module.import_prefixes
+    apply_extension_invocations(cloned, export_view=True)
+    return cloned
+
+
+def _strip_augmented_by(stmt: YangStatement, exporter_name: str) -> YangStatement | None:
+    """Drop nodes *exporter_name* added, at any depth, without editing *stmt*."""
+    if getattr(stmt, "augment_structure_module", None) == exporter_name:
+        return None
+    cloned = copy_yang_statement(stmt)
+    cloned.statements = [
+        kept
+        for child in cloned.statements
+        if (kept := _strip_augmented_by(child, exporter_name)) is not None
+    ]
+    if isinstance(cloned, YangChoiceStmt):
+        cloned.cases = [
+            kept
+            for case in cloned.cases
+            if (kept := _strip_augmented_by(case, exporter_name)) is not None
+        ]
+    return cloned
+
+
+def _extension_stub(module: YangModule) -> dict[str, Any]:
+    """``x-yang.imports`` entry that carries *module*'s extension definitions."""
+    return {
+        XYangKey.MODULE: module.name,
+        XYangKey.NAMESPACE: module.namespace or "",
+        XYangKey.PREFIX: module.prefix or "",
+        XYangKey.EXTENSION: {
+            name: _extension_def_json(ext)
+            for name, ext in module.extensions.items()
+            if isinstance(ext, YangExtensionStmt)
+        },
+    }
+
+
+def _add_imported_structures(root: YangModule, imports: dict[str, Any], typedef_names: set[str]) -> None:
+    """Put each structure a foreign ``augment-structure`` targets on that import's stub.
+
+    Nodes this module added are omitted: the invocation is exported separately and applied
+    again when the JSON is loaded.
+    """
+    seen: set[tuple[str, str]] = set()
+    invocations = [
+        stmt
+        for stmt in root.statements
+        if isinstance(stmt, YangExtensionInvocationStmt) and _is_rfc8791(stmt, "augment-structure")
+    ]
+    for saved in root.extension_runtime.get(FOREIGN_AUGMENTS) or []:
+        if isinstance(saved, YangExtensionInvocationStmt) and all(saved is not stmt for stmt in invocations):
+            invocations.append(saved)
+    for inv in invocations:
+        if not inv.argument:
+            continue
+        try:
+            first = parse_absolute_schema_path(inv.argument)[0]
+        except ValueError:
+            continue
+        owner = root.resolve_prefixed_module(first.prefix or "")
+        if owner is None or owner is root or owner.name == root.name:
+            continue
+        key = _import_key(root, owner)
+        stub = imports.get(key)
+        if not isinstance(stub, dict):
+            stub = {
+                XYangKey.MODULE: owner.name,
+                XYangKey.NAMESPACE: owner.namespace or "",
+                XYangKey.PREFIX: owner.prefix or "",
+            }
+            imports[key] = stub
+        view = _structure_view(owner)
+        for structure in _iter_structures(view):
+            marker = (key, (structure.argument or "").strip())
+            if marker in seen:
+                continue
+            seen.add(marker)
+            shadow = copy(structure)
+            shadow.statements = [
+                kept
+                for child in structure.statements
+                if (kept := _strip_augmented_by(child, root.name)) is not None
+            ]
+            body = _one_extension_invocation(shadow, typedef_names, root)
+            stub.setdefault(XYangKey.EXTENSIONS, []).append(body)
+            defining = structure.resolved_module
+            prefix = structure.prefix
+            if defining is not None and prefix:
+                nested = stub.setdefault(XYangKey.IMPORTS, {})
+                if prefix not in nested:
+                    nested[prefix] = _extension_stub(defining)
+    if imports:
+        # Keep the key order stable across Python and TypeScript.
+        ordered = dict(sorted(imports.items()))
+        imports.clear()
+        imports.update(ordered)
+
+
 def _apply_own_augments(schema_module: YangModule) -> None:
     """Merge the module's ``augment`` statements into its own (``uses``-expanded) tree.
 
@@ -1503,8 +1705,12 @@ def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[s
     # Resolve absolute/relative leafrefs against a uses-expanded view while keeping
     # CLI/parser behavior (`expand_uses=False`) unchanged for persisted ASTs.
     schema_module = copy(module)
+    schema_module.extension_runtime = _detached_runtime(module)
     schema_module.statements = _expand_uses_for_json(module.statements, module)
     _apply_own_augments(schema_module)
+    # Merge a same-module ``sx:augment-structure`` into the structure. A cross-module one
+    # stays as an invocation. Already-applied modules no-op (the nodes are already there).
+    apply_extension_invocations(schema_module, export_view=True)
 
     properties: dict[str, Any] = {}
     for stmt in schema_module.statements:
@@ -1530,17 +1736,21 @@ def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[s
             rpcs[stmt.name] = _rpc_to_json(stmt, typedef_names, schema_module)
     if rpcs:
         root_xyang[XYangKey.RPCS] = rpcs
-    module_invocations = _extension_invocations_json(schema_module.statements, typedef_names, schema_module)
+    module_invocations = _ordered_extension_invocations(schema_module, typedef_names)
     imports = _merge_extension_imports(
         module,
         _imports_for_json(module, export.used),
         _EXT_USED.get().used,
     )
+    _add_imported_structures(schema_module, imports, set())
     if imports:
         root_xyang[XYangKey.IMPORTS] = imports
     extension_defs = _local_extension_defs(module)
     if extension_defs:
         root_xyang[XYangKey.EXTENSION] = extension_defs
+    features = _features_json(module)
+    if features:
+        root_xyang[XYangKey.FEATURES] = features
     if module_invocations:
         root_xyang[XYangKey.EXTENSIONS] = module_invocations
     _assert_extensions_placed(schema_module)

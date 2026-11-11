@@ -1,0 +1,23 @@
+{
+  "description": "#164: an sx:structure keeps range, must, mandatory and leaf-list length in the native JSON form. The reloaded module validates the same instances as the .yang.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "in range", "valid": true, "data": { "m:msg": { "n": 3, "tags": ["ab"] } } },
+    { "name": "missing mandatory and min-elements", "valid": false,
+      "data": { "m:msg": {} },
+      "errors": [
+        { "path": "/m:msg/n", "code": "mandatory" },
+        { "path": "/m:msg/tags", "code": "min-elements" }
+      ] },
+    { "name": "must", "valid": false,
+      "data": { "m:msg": { "n": 7, "tags": ["ab"] } },
+      "errors": [{ "path": "/m:msg/n", "code": "must", "message": "not seven" }] },
+    { "name": "range", "valid": false,
+      "data": { "m:msg": { "n": 20, "tags": ["ab"] } },
+      "errors": [{ "path": "/m:msg/n", "code": "range" }] },
+    { "name": "leaf-list length", "valid": false,
+      "data": { "m:msg": { "n": 3, "tags": ["toolong"] } },
+      "errors": [{ "path": "/m:msg/tags/0", "code": "length" }] }
+  ]
+}

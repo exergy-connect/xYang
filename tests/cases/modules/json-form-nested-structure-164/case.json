@@ -1,0 +1,22 @@
+{
+  "description": "#164: a structure with nested data nodes, a leafref, and a nested sx:structure round-trips. A nested structure is its own top-level data node, not a child of the outer structure.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "nested list and leafref", "valid": true,
+      "data": { "m:msg": { "outer": { "row": [{ "id": "a", "n": 2, "ref": "a" }] } } } },
+    { "name": "nested range", "valid": false,
+      "data": { "m:msg": { "outer": { "row": [{ "id": "a", "n": 9, "ref": "a" }] } } },
+      "errors": [{ "path": "/m:msg/outer/row/0/n", "code": "range" }] },
+    { "name": "leafref", "valid": false,
+      "data": { "m:msg": { "outer": { "row": [{ "id": "a", "n": 2, "ref": "b" }] } } },
+      "errors": [{ "path": "/m:msg/outer/row/0/ref", "code": "leafref" }] },
+    { "name": "nested structure in range", "valid": true, "data": { "m:inner": { "b": 4 } } },
+    { "name": "nested structure out of range", "valid": false,
+      "data": { "m:inner": { "b": 300 } },
+      "errors": [{ "path": "/m:inner/b", "code": "range" }] },
+    { "name": "nested structure is not a child", "valid": false,
+      "data": { "m:msg": { "inner": { "b": 1 } } },
+      "errors": [{ "path": "/m:msg/inner", "code": "unknown-field" }] }
+  ]
+}

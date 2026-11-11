@@ -1,0 +1,48 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "sx": {
+        "module": "ietf-yang-structure-ext",
+        "namespace": "urn:ietf:params:xml:ns:yang:ietf-yang-structure-ext",
+        "prefix": "sx",
+        "extension": {
+          "structure": {
+            "argument": "name",
+            "yin-element": true,
+            "description": "This extension is used to specify a YANG data structure that\n       represents conceptual data defined in YANG.  It is intended to\n       describe hierarchical data independent of protocol context or\n       specific message encoding format.  Data definition statements\n       within a 'structure' extension statement specify the generic\n       syntax for the specific YANG data structure, whose name is the\n       argument of the 'structure' extension statement.\n\n       Note that this extension does not define a media type.  A\n       specification using this extension MUST specify the message\n       encoding rules, including the content media type, if\n       applicable.\n\n       The mandatory 'name' parameter value identifies the YANG data\n       structure that is being defined.\n\n       This extension is only valid as a top-level statement, i.e.,\n       given as a substatement to 'module' or 'submodule'.\n\n       The substatements of this extension MUST follow the ABNF\n       rules below, where the rules are defined in RFC 7950:\n\n           *must-stmt\n           [status-stmt]\n           [description-stmt]\n           [reference-stmt]\n           *(typedef-stmt / grouping-stmt)\n           *data-def-stmt\n\n       A YANG data structure defined with this extension statement is\n       encoded in the same way as an 'anydata' node.  This means\n       that the name of the structure is encoded as a 'container',\n       with the instantiated child statements encoded as child nodes\n       to this node.\n\n       The module name and namespace value for the YANG module using\n       the extension statement are assigned to each of the data\n       definition statements resulting from the YANG data structure.\n\n       The XPath document element is the extension statement itself,\n       such that the child nodes of the document element are\n       represented by the data-def-stmt substatements within this\n       extension.  This conceptual document is the context for the\n       following YANG statements:\n\n           - must-stmt\n           - when-stmt\n           - path-stmt\n           - min-elements-stmt\n           - max-elements-stmt\n           - mandatory-stmt\n           - unique-stmt\n           - ordered-by\n           - instance-identifier data type\n\n       The following data-def-stmt substatements are constrained\n       when used within a 'structure' extension statement.\n\n          - The list-stmt is not required to have a key-stmt defined.\n          - The config-stmt is ignored if present.\n       "
+          }
+        }
+      }
+    },
+    "extensions": [
+      {
+        "name": "sx:structure",
+        "argument": "msg",
+        "body": [
+          {
+            "node": "n",
+            "schema": {
+              "type": "integer",
+              "minimum": 0,
+              "maximum": 255,
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          }
+        ]
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false
+}

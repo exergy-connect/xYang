@@ -1,0 +1,18 @@
+{
+  "description": "#164: a same-module sx:augment-structure is merged into the structure. Each added node keeps the augment path and the if-feature and when that were merged. The reloaded module does not apply the augment again.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "augmented nodes present", "valid": true,
+      "data": { "m:msg": { "n": 3, "enabled": "on", "extra-leaf": "z", "box": { "id": "a", "note": "hi" } } } },
+    { "name": "when false", "valid": false,
+      "data": { "m:msg": { "enabled": "off", "extra-leaf": "z", "box": { "note": "hi" } } },
+      "errors": [{ "path": "/m:msg/extra-leaf", "code": "when" }] },
+    { "name": "range", "valid": false,
+      "data": { "m:msg": { "n": 20, "box": { "note": "hi" } } },
+      "errors": [{ "path": "/m:msg/n", "code": "range" }] },
+    { "name": "nested augment must", "valid": false,
+      "data": { "m:msg": { "box": { "note": "" } } },
+      "errors": [{ "path": "/m:msg/box/note", "code": "must", "message": "empty" }] }
+  ]
+}

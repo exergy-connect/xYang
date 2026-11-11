@@ -3,6 +3,7 @@
  * The input is never modified. RFC 7951 is the default; native JSON is opt-in.
  */
 import { YangModule, YangStatement } from "../core/model";
+import { resolveStructureInstance } from "./rfc7951";
 import { ExactDecimal } from "../types";
 import {
   DECIMAL_TYPE_NAMES,
@@ -74,6 +75,10 @@ function keywordOf(stmt: YangStatement): string {
     if (kind === "container" || kind === "list") return kind;
   }
   return raw;
+}
+
+function isStructureSchema(stmt: YangStatement): boolean {
+  return stmt.resolved_module_name === "ietf-yang-structure-ext" && stmt.resolved_extension_name === "structure";
 }
 
 function definingModule(stmt: YangStatement, parent: string): string {
@@ -285,6 +290,15 @@ function walkObject(
   native: boolean,
   atRoot: boolean
 ): InstanceNode[] {
+  if (atRoot) {
+    const structure = resolveStructureInstance(data, module);
+    // A nested structure is not a data-node child. A top-level one already is, via data_node_kind.
+    if (structure && structure.schema.data_node_kind !== "container") {
+      return [
+        walkNode(structure.inner, structure.schema, module, checker, parent, join(prefix, structure.key), native)
+      ];
+    }
+  }
   const children = dataNodes(schema);
   const nodes: InstanceNode[] = [];
   const claimed = new Set<YangStatement>();
@@ -354,7 +368,7 @@ function walkNode(
 ): InstanceNode {
   const keyword = keywordOf(stmt);
   if (keyword === "anydata" || keyword === "anyxml") return node(stmt, raw, ptr, "anydata");
-  if (keyword === "container") {
+  if (keyword === "container" || isStructureSchema(stmt)) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
       return node(stmt, null, ptr, "container", { errors: [["type", "container must be an object"]], include: false });
     }
