@@ -1,4 +1,4 @@
-employee_id,name,termination_date
-E1031,R. Vance,2026-07-03
-E1043,J. Marsh,2026-08-14
-E1058,T. Quill,2026-09-22
+employee_id,name,termination_effective
+E1031,R. Vance,2026-07-03T17:00:00Z
+E1043,J. Marsh,2026-08-14T17:00:00Z
+E1058,T. Quill,2026-09-22T17:00:00Z

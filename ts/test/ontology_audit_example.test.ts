@@ -6,15 +6,10 @@ import { parseYangFile, YangValidator } from "../src";
 const example = resolve(__dirname, "..", "..", "examples", "ontology-hypergraph");
 const models = resolve(example, "models");
 const fixtures = resolve(example, "fixtures");
+const root = "/example-audit:graph";
 
-const expected: Record<string, { code: string; message: string }> = {
-  "dangling-evidence": { code: "leafref", message: "" },
-  "assessment-without-evidence": { code: "must", message: "cite at least one evidence" },
-  "reviewer-is-assessor": { code: "must", message: "must not be the assessor" },
-  "review-with-two-reviewers": { code: "must", message: "exactly one reviewer" },
-  "finding-on-supported-assessment": { code: "must", message: "outcome is exception" },
-  "evidence-type-not-accepted": { code: "must", message: "control accepts" }
-};
+type Expected = { path: string; code: string; message?: string };
+const expected = JSON.parse(readFileSync(resolve(fixtures, "expected-errors.json"), "utf8")) as Record<string, Expected[]>;
 
 function validator(): YangValidator {
   return new YangValidator(parseYangFile(resolve(models, "example-audit@2026-11-10.yang"), { includePath: [models] }));
@@ -22,6 +17,11 @@ function validator(): YangValidator {
 
 function load(path: string): unknown {
   return JSON.parse(readFileSync(path, "utf8"));
+}
+
+function key(e: Expected): string {
+  // Built-in messages (leafref, pattern) are worded per language; must messages come from the model.
+  return JSON.stringify([e.path, e.code, e.code === "must" ? e.message : null]);
 }
 
 describe("ontology hypergraph audit example", () => {
@@ -36,11 +36,11 @@ describe("ontology hypergraph audit example", () => {
     expect(names).toEqual(Object.keys(expected).sort());
   });
 
-  for (const [name, { code, message }] of Object.entries(expected)) {
-    it(`rejects ${name}`, () => {
+  for (const [name, errors] of Object.entries(expected)) {
+    it(`rejects ${name} with exactly the documented errors`, () => {
       const result = validator().validateDetailed(load(resolve(fixtures, "invalid", `${name}.json`)));
-      expect(result.valid).toBe(false);
-      expect(result.errors.some((e) => e.code === code && e.message.toLowerCase().includes(message))).toBe(true);
+      const got = result.errors.map((e) => key({ path: e.path.replace(root, ""), code: e.code, message: e.message })).sort();
+      expect(got).toEqual(errors.map(key).sort());
     });
   }
 });

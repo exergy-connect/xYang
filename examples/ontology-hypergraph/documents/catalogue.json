@@ -22,7 +22,7 @@
             "name": "example-audit",
             "revision": "2026-11-10",
             "location": "../models/example-audit@2026-11-10.yang",
-            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+            "sha256": "3953d64c679d475afdaf706d6260bab00e3e360e859d5ab33ccbdb7762a00277"
           }
         ]
       }
@@ -77,6 +77,66 @@
         }
       },
       {
+        "id": "#term-employee",
+        "label": "employee",
+        "type": "example-audit:employee",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A person employed by the client.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000040"
+        }
+      },
+      {
+        "id": "#term-account",
+        "label": "account",
+        "type": "example-audit:account",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A client system account owned by one employee.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-termination-event",
+        "label": "termination-event",
+        "type": "example-audit:termination-event",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "The taking effect of an employee's termination.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        }
+      },
+      {
+        "id": "#term-account-use-event",
+        "label": "account-use-event",
+        "type": "example-audit:account-use-event",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A recorded use of an account.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        }
+      },
+      {
+        "id": "#term-change-event",
+        "label": "change-event",
+        "type": "example-audit:change-event",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A privileged change reaching production.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        }
+      },
+      {
         "id": "#term-collection-agent",
         "label": "collection-agent",
         "type": "example-audit:collection-agent",
@@ -121,23 +181,26 @@
         "evidence": "catalogue.json",
         "engagement": {
           "client": "Alder Ridge Logistics Ltd (fictional)",
-          "period-start": "2026-07-01",
-          "period-end": "2026-09-30"
+          "period-start": 1782864000,
+          "period-end": 1790812799,
+          "as-of": 1791417600,
+          "max-evidence-age": 2592000
         }
       },
       {
         "id": "#ac-01",
-        "label": "Timely removal of leaver access",
+        "label": "No use of leaver accounts",
         "type": "example-audit:control",
         "origin": "catalogue.json",
         "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
         "evidence": "catalogue.json",
         "control": {
           "reference": "AC-01",
-          "statement": "Access for terminated employees is disabled within one business day of termination.",
+          "statement": "No account is used after its owner's termination takes effect.",
+          "rule": "example-audit:leaver-access",
           "accepted-evidence": [
             "example-audit:hr-termination-report",
-            "example-audit:active-account-listing"
+            "example-audit:sign-in-log"
           ]
         }
       },
@@ -150,7 +213,8 @@
         "evidence": "catalogue.json",
         "control": {
           "reference": "CM-02",
-          "statement": "Privileged production changes are approved by someone other than the implementer before deployment.",
+          "statement": "Each privileged production change is approved by someone other than the implementer no later than deployment.",
+          "rule": "example-audit:change-approval",
           "accepted-evidence": [
             "example-audit:change-ticket-export",
             "example-audit:deployment-log"
@@ -167,9 +231,9 @@
         "control": {
           "reference": "AC-04",
           "statement": "Application owners review user access each quarter and record removals.",
+          "rule": "example-audit:manual-review",
           "accepted-evidence": [
-            "example-audit:policy-document",
-            "example-audit:active-account-listing"
+            "example-audit:access-review-record"
           ]
         }
       },

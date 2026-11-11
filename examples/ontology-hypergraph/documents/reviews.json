@@ -22,7 +22,7 @@
             "name": "example-audit",
             "revision": "2026-11-10",
             "location": "../models/example-audit@2026-11-10.yang",
-            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+            "sha256": "3953d64c679d475afdaf706d6260bab00e3e360e859d5ab33ccbdb7762a00277"
           }
         ],
         "requires": [
@@ -40,7 +40,7 @@
         "origin": "reviews.json",
         "asserted-by": "https://larkspur-reed.example/agents/r-okafor",
         "evidence": "assessments.json",
-        "recorded-at": "2026-10-07T10:00:00Z",
+        "recorded-at": 1791367200,
         "sign-off": {
           "decision": "approved",
           "comment": "Exception confirmed against both exports."
@@ -64,7 +64,7 @@
         "origin": "reviews.json",
         "asserted-by": "https://larkspur-reed.example/agents/r-okafor",
         "evidence": "assessments.json",
-        "recorded-at": "2026-10-07T10:20:00Z",
+        "recorded-at": 1791368400,
         "sign-off": {
           "decision": "approved",
           "comment": "Approver differs from implementer for both tickets."
@@ -88,7 +88,7 @@
         "origin": "reviews.json",
         "asserted-by": "https://larkspur-reed.example/agents/m-ito",
         "evidence": "assessments.json",
-        "recorded-at": "2026-10-07T10:40:00Z",
+        "recorded-at": 1791369600,
         "sign-off": {
           "decision": "approved",
           "comment": "Request access review records from the client."

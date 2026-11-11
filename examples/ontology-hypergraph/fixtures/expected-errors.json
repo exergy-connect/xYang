@@ -1,0 +1,215 @@
+{
+  "assessment-without-evidence": [
+    {
+      "path": "/hyperedge/4",
+      "code": "must",
+      "message": "A supported or exception outcome must cite at least one evidence record."
+    }
+  ],
+  "breach-claimed-at-termination-second": [
+    {
+      "path": "/node/42/account-use/breach",
+      "code": "must",
+      "message": "A breach must be reported by a finding."
+    },
+    {
+      "path": "/node/42/account-use/breach",
+      "code": "must",
+      "message": "breach must say whether the account owner's termination took effect before this use."
+    }
+  ],
+  "breach-claimed-for-unterminated-owner": [
+    {
+      "path": "/node/43/account-use/breach",
+      "code": "must",
+      "message": "A breach must be reported by a finding."
+    },
+    {
+      "path": "/node/43/account-use/breach",
+      "code": "must",
+      "message": "breach must say whether the account owner's termination took effect before this use."
+    }
+  ],
+  "breach-declared-no": [
+    {
+      "path": "/hyperedge/3",
+      "code": "must",
+      "message": "A leaver-access outcome is exception exactly when some account was used after its owner's termination."
+    },
+    {
+      "path": "/hyperedge/6/incidence/1",
+      "code": "must",
+      "message": "A violation must reference a fact whose breach is yes."
+    },
+    {
+      "path": "/node/41/account-use/breach",
+      "code": "must",
+      "message": "breach must say whether the account owner's termination took effect before this use."
+    }
+  ],
+  "change-approved-after-deployment-declared-no": [
+    {
+      "path": "/node/45/change/breach",
+      "code": "must",
+      "message": "breach must say whether the change lacked independent approval before deployment."
+    }
+  ],
+  "dangling-evidence": [
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence is older than the engagement's maximum evidence age at its as-of time."
+    },
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must be collected no later than the assessment."
+    },
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must be of a type the assessed control accepts."
+    },
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must come from a collection in the same engagement."
+    },
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Collected and cited evidence must be evidence-record individual nodes."
+    },
+    {
+      "path": "/hyperedge/3/incidence/4/node",
+      "code": "leafref"
+    }
+  ],
+  "evidence-collected-after-assessment": [
+    {
+      "path": "/hyperedge/4/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must be collected no later than the assessment."
+    }
+  ],
+  "evidence-not-collected-for-engagement": [
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must come from a collection in the same engagement."
+    },
+    {
+      "path": "/hyperedge/9",
+      "code": "must",
+      "message": "A collection needs one collector, one source, one engagement, at least one collected record, and no other roles."
+    }
+  ],
+  "evidence-type-not-accepted": [
+    {
+      "path": "/hyperedge/4/incidence/4",
+      "code": "must",
+      "message": "Cited evidence must be of a type the assessed control accepts."
+    }
+  ],
+  "exception-without-breach": [
+    {
+      "path": "/hyperedge/4",
+      "code": "must",
+      "message": "A change-approval outcome is exception exactly when some privileged change lacked independent prior approval."
+    }
+  ],
+  "finding-on-supported-assessment": [
+    {
+      "path": "/hyperedge/6",
+      "code": "must",
+      "message": "A finding must be based on an assessment whose outcome is exception."
+    },
+    {
+      "path": "/hyperedge/6/incidence/1",
+      "code": "must",
+      "message": "A violation's fact kind must match the basis control's rule."
+    }
+  ],
+  "finding-without-approved-review": [
+    {
+      "path": "/hyperedge/6",
+      "code": "must",
+      "message": "A finding's basis assessment needs an approved review."
+    }
+  ],
+  "missing-exception-finding": [
+    {
+      "path": "/node/41/account-use/breach",
+      "code": "must",
+      "message": "A breach must be reported by a finding."
+    }
+  ],
+  "review-after-as-of": [
+    {
+      "path": "/hyperedge/2",
+      "code": "must",
+      "message": "A review cannot be recorded after the engagement's as-of time."
+    }
+  ],
+  "review-before-assessment": [
+    {
+      "path": "/hyperedge/1",
+      "code": "must",
+      "message": "A review cannot be recorded before the assessment it reviews."
+    }
+  ],
+  "review-with-two-reviewers": [
+    {
+      "path": "/hyperedge/0",
+      "code": "must",
+      "message": "A review needs exactly one reviewer and one reviewed assessment."
+    }
+  ],
+  "reviewer-is-assessor": [
+    {
+      "path": "/hyperedge/1",
+      "code": "must",
+      "message": "The reviewer must not be the assessor of the reviewed assessment."
+    }
+  ],
+  "self-approved-change-declared-no": [
+    {
+      "path": "/node/46/change/breach",
+      "code": "must",
+      "message": "breach must say whether the change lacked independent approval before deployment."
+    }
+  ],
+  "stale-evidence": [
+    {
+      "path": "/hyperedge/3/incidence/4",
+      "code": "must",
+      "message": "Cited evidence is older than the engagement's maximum evidence age at its as-of time."
+    }
+  ],
+  "supported-despite-breach": [
+    {
+      "path": "/hyperedge/3",
+      "code": "must",
+      "message": "A leaver-access outcome is exception exactly when some account was used after its owner's termination."
+    },
+    {
+      "path": "/node/41/account-use/breach",
+      "code": "must",
+      "message": "A breach must be reported by a finding."
+    }
+  ],
+  "unsupported-finding": [
+    {
+      "path": "/hyperedge/6/incidence/2",
+      "code": "must",
+      "message": "A violation must reference a fact whose breach is yes."
+    }
+  ],
+  "use-outside-period": [
+    {
+      "path": "/node/44/account-use/at",
+      "code": "must",
+      "message": "An account use must fall within the engagement period."
+    }
+  ]
+}

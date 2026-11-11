@@ -18,6 +18,14 @@ HERE = Path(__file__).resolve().parent
 REVISION = "2026-11-10"
 MODULES = ("example-hypergraph", "example-bfo", "example-audit")
 ROOT = "example-audit:graph"
+# Node fields that hold element URLs: resolved against the publication and followed.
+NODE_REFERENCES = {
+    "evidence-record": ("source-system",),
+    "account": ("owner",),
+    "termination": ("employee", "source"),
+    "account-use": ("account", "source"),
+    "change": ("implementer", "approver", "source", "deployment-source"),
+}
 
 
 class CollectionError(ValueError):
@@ -176,10 +184,19 @@ def _collect(seed: str, *, read=fetch, max_documents: int = 32) -> dict:
                 if element["origin"] != url:
                     raise CollectionError(f"Origin conflicts with publication: {element['id']}")
                 element["evidence"] = absolute(url, element["evidence"])
+                for container, fields in NODE_REFERENCES.items():
+                    content = element.get(container)
+                    if not isinstance(content, dict):
+                        continue
+                    for field in fields:
+                        if field not in content:
+                            continue
+                        values = content[field] if isinstance(content[field], list) else [content[field]]
+                        resolved = [absolute(url, value) for value in values]
+                        pending.extend(urldefrag(value)[0] for value in resolved)
+                        content[field] = resolved if isinstance(content[field], list) else resolved[0]
                 record = element.get("evidence-record")
                 if isinstance(record, dict):
-                    record["source-system"] = absolute(url, record["source-system"])
-                    pending.append(urldefrag(record["source-system"])[0])
                     record["export"] = absolute(url, record["export"])
                     # Byte integrity of the collected export, not truth of its content.
                     if hashlib.sha256(read(record["export"])).hexdigest() != record["sha256"]:
