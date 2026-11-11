@@ -168,6 +168,13 @@ def test_server_bug_is_an_internal_error(built, monkeypatch):
     assert recorded(built) == before
 
 
+def test_corrupt_record_is_an_internal_error(built):
+    built.session[ROOT]["call"][0]["tool"] = "example-topology-tools:delete-node"
+    response = call(built, "add-node", {"name": "r3"})
+    assert response["error"]["code"] == -32603
+    assert "session record is invalid" in response["error"]["message"]
+
+
 # ---- stdio ------------------------------------------------------------------
 
 def test_stdio_round_trip():

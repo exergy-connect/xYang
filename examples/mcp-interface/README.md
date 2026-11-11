@@ -36,9 +36,9 @@ Each tool is one grouping, and the grouping carries the rules:
 ```yang
 grouping add-link-input {
   leaf source {
-    must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok']
-                       [arguments/add-node/name = current()]
-                       [not(current()/../../../id) or id < current()/../../../id]";
+    must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok']
+                                 [arguments/add-node/name = current()]
+                                 [not(current()/../../../id) or id < current()/../../../id]";
   }
   leaf target { must ". != ../source"; must "<same as source>"; }
   leaf bandwidth-mbps { type uint32 { range "1..400000"; } }
@@ -132,6 +132,7 @@ Errors follow MCP 2025-11-25, ["Error Handling"](https://modelcontextprotocol.io
 | Arguments break the tool's schema or a session rule | result, `isError: true`: one line per argument and what is wrong, ending "Fix the arguments and call the tool again." The same errors as data in `_meta["xyang/errors"]` | no |
 | Valid arguments, but the tool cannot do it (no path) | result, `isError: true`, for example `find-path failed: no path from r1 to h2 within 8 hops` | yes, `status: error` |
 | The server's own result breaks the model | `-32603`, with the errors in `error.data` | no |
+| The server's session record is invalid (xYang validates the `--context` first) | `-32603`, with the record's errors in `error.data` | no |
 | Success | result with `structuredContent` when the tool has an `outputSchema`, and the same JSON as text | yes |
 
 Example: an agent links `r1` to a node it never created.
@@ -147,12 +148,11 @@ Error paths are relative to the call (`arguments.target`, `result.hop.1`), not t
 
 ```bash
 python examples/mcp-interface/server.py                    # serve on stdio
-python -m pytest examples/mcp-interface/test_server.py -q  # 19 tests
+python -m pytest examples/mcp-interface/test_server.py -q  # 20 tests
 ```
 
 ## Limits
 
 - **The session is the whole world.** A verdict covers the calls in this document. It says nothing about server state the document does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
-- **The record check grows.** Step 4 revalidates the whole record on every call, which is fine for a demo but grows with the session.
-- **Unprefixed paths.** The rules write `/session/call`, not `/topo:session/topo:call`. RFC 7950 allows both, but today xYang selects nothing for a prefixed step, in `must`, `when` and leafref paths alike ([#152](https://github.com/exergy-connect/xYang/issues/152)).
+- **The record check grows.** xYang validates the context before each rpc check, and step 4 revalidates the whole record. Both are fine for a demo, but they grow with the session.
 - **Optional MCP fields.** In MCP revision [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations` and `execution`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`; the other four are optional and left out. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12.

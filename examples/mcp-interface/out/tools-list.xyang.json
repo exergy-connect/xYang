@@ -14,8 +14,11 @@
               "type": "leaf",
               "must": [
                 {
-                  "must": "not(/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'",
-                  "error-message": "A node with this name already exists."
+                  "must": "not(/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'",
+                  "error-message": "A node with this name already exists.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ],
               "mandatory": true
@@ -97,8 +100,11 @@
               "type": "leaf",
               "must": [
                 {
-                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
-                  "error-message": "source must name a node that an earlier successful add-node call created."
+                  "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "source must name a node that an earlier successful add-node call created.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ],
               "mandatory": true
@@ -115,8 +121,11 @@
                   "error-message": "A link cannot connect a node to itself."
                 },
                 {
-                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
-                  "error-message": "target must name a node that an earlier successful add-node call created."
+                  "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "target must name a node that an earlier successful add-node call created.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ],
               "mandatory": true
@@ -168,8 +177,11 @@
               "type": "leaf",
               "must": [
                 {
-                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
-                  "error-message": "from must name a node that an earlier successful add-node call created."
+                  "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "from must name a node that an earlier successful add-node call created.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ],
               "mandatory": true
@@ -182,8 +194,11 @@
               "type": "leaf",
               "must": [
                 {
-                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
-                  "error-message": "to must name a node that an earlier successful add-node call created."
+                  "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "to must name a node that an earlier successful add-node call created.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ],
               "mandatory": true
@@ -234,8 +249,11 @@
               "type": "leaf-list",
               "must": [
                 {
-                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
-                  "error-message": "Every hop must be a node that an earlier successful add-node call created."
+                  "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "Every hop must be a node that an earlier successful add-node call created.",
+                  "xpath-prefixes": {
+                    "topo": "example-topology-tools"
+                  }
                 }
               ]
             }

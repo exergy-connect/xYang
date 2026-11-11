@@ -179,7 +179,11 @@ class TopologyServer:
         return _tool_ok(structured)
 
     def _rpc_errors(self, name: str, direction: str, body: dict[str, Any], *, label: str) -> list[dict[str, str]]:
-        """Validate an rpc input or output with the session record as context."""
+        """Validate an rpc input or output with the session record as context.
+
+        xYang validates the context first and marks its errors "document": "context".
+        A bad record is the server's fault, never the model's, so it is a -32603.
+        """
         verdict = validate(
             self.module,
             {f"{MODULE}:{direction}": body},
@@ -187,6 +191,13 @@ class TopologyServer:
             direction=direction,
             context=self.session,
         )
+        context_errors = [e for e in verdict["errors"] if e.get("document") == "context"]
+        if context_errors:
+            raise ProtocolError(
+                INTERNAL_ERROR,
+                "Internal error: the server's session record is invalid",
+                {ERRORS_META_KEY: [{k: e[k] for k in ("path", "code", "message")} for e in context_errors]},
+            )
         return [_relative(e, f"/{MODULE}:{direction}", label) for e in verdict["errors"]]
 
     def _record(self, call: dict[str, Any]) -> list[dict[str, str]]:

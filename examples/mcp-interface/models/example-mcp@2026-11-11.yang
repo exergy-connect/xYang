@@ -59,8 +59,7 @@ module example-mcp {
 
     list call {
       key "id";
-      min-elements 1;
-      description "One tools/call request and its outcome, in the order sent.";
+      description "One tools/call request and its outcome, in the order sent. A session starts with none.";
 
       leaf id {
         type uint32;

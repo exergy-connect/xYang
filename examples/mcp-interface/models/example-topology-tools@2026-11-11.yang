@@ -15,7 +15,7 @@ module example-topology-tools {
 
      The grouping also carries the rules, so one rule checks a call in both
      places. Rules that need earlier calls read them from the session with
-     an absolute path, /session/call, and keep only calls with a
+     an absolute path, /topo:session/topo:call, and keep only calls with a
      smaller id than this one:
 
        [not(current()/../../../id) or id < current()/../../../id]
@@ -45,7 +45,7 @@ module example-topology-tools {
     leaf name {
       type node-name;
       mandatory true;
-      must "not(/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'" {
+      must "not(/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'" {
         error-message "A node with this name already exists.";
       }
       description "Name of the new node. Unique in the topology.";
@@ -65,7 +65,7 @@ module example-topology-tools {
     leaf source {
       type node-name;
       mandatory true;
-      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+      must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
         error-message "source must name a node that an earlier successful add-node call created.";
       }
       description "One end of the link.";
@@ -76,7 +76,7 @@ module example-topology-tools {
       must ". != ../source" {
         error-message "A link cannot connect a node to itself.";
       }
-      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+      must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
         error-message "target must name a node that an earlier successful add-node call created.";
       }
       description "The other end of the link. Must differ from source.";
@@ -92,7 +92,7 @@ module example-topology-tools {
     leaf from {
       type node-name;
       mandatory true;
-      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+      must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
         error-message "from must name a node that an earlier successful add-node call created.";
       }
       description "Start node.";
@@ -100,7 +100,7 @@ module example-topology-tools {
     leaf to {
       type node-name;
       mandatory true;
-      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+      must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
         error-message "to must name a node that an earlier successful add-node call created.";
       }
       description "End node.";
@@ -116,7 +116,7 @@ module example-topology-tools {
     leaf-list hop {
       type node-name;
       ordered-by user;
-      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+      must "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
         error-message "Every hop must be a node that an earlier successful add-node call created.";
       }
       description "Nodes on the path, from 'from' to 'to'.";
