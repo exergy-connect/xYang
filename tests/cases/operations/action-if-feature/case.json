@@ -1,0 +1,10 @@
+{
+  "description": "An action whose own if-feature is false, or whose parent's is, is not available: a usage error.",
+  "module": "m.yang",
+  "features": { "m": [] },
+  "instances": [
+    { "name": "action without a feature", "action": "/m:box/open", "context": {}, "data": { "m:input": { "x": "a" } }, "valid": true },
+    { "name": "action behind a disabled feature", "action": "/m:box/fancy-open", "context": {}, "data": { "m:input": {} }, "usage_error": "not available" },
+    { "name": "parent behind a disabled feature", "action": "/m:box/drawer/pull", "context": {}, "data": { "m:input": {} }, "usage_error": "not available" }
+  ]
+}

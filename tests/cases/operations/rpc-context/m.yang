@@ -14,7 +14,7 @@ module m {
   rpc add-link {
     input {
       leaf source {
-        type leafref { path "/topology/node/name"; }
+        type leafref { path "/m:topology/m:node/m:name"; }
         mandatory true;
       }
       leaf target {
@@ -29,13 +29,13 @@ module m {
       }
       leaf via {
         type string;
-        must "/add-link/source != ." {
+        must "/m:add-link/m:source != ." {
           error-message "A link cannot go via its own source.";
         }
       }
       leaf label {
         type string;
-        must "/topology/node[name = current()/../source]/up = true()" {
+        must "/m:topology/m:node[m:name = current()/../m:source]/m:up = true()" {
           error-message "The source node must be up.";
         }
       }

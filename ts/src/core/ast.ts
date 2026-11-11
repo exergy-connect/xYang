@@ -1,6 +1,6 @@
 import { YangSemanticError } from "./errors";
 import type { YangIdentifierRef } from "./identifier-ref";
-import { bindWildcardPrefixes, parseXPath, wildcardPrefixes } from "../xpath/parser";
+import { bindXPathPrefixes, parseXPath, xpathPrefixes } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
 import { warnDeprecatedOnce } from "./deprecation";
 import { translateXsdRegex } from "../xsd-regex";
@@ -204,6 +204,10 @@ export class YangTypeStmt {
   bits: YangBitStmt[];
   types: YangTypeStmt[];
   path?: PathNode;
+  /** Module each prefixed step of `path` is bound to, by prefix (RFC 7950 §9.9.2). */
+  xpath_prefixes?: Record<string, string>;
+  /** Module that wrote this `type`: its prefix and typedef name resolve there (RFC 7950 §7.13). */
+  scope_module?: string;
   require_instance: boolean;
   identityref_bases: YangIdentifierRef[];
   /** ``units`` under ``type`` (accepted; not an RFC 7950 type substatement). */
@@ -228,6 +232,8 @@ export class YangTypeStmt {
     this.bits = init.bits ?? [];
     this.types = init.types ?? [];
     this.path = init.path;
+    if (init.xpath_prefixes) this.xpath_prefixes = init.xpath_prefixes;
+    if (init.scope_module) this.scope_module = init.scope_module;
     this.require_instance = init.require_instance ?? true;
     this.identityref_bases = init.identityref_bases ?? [];
     this.units = init.units ?? "";
@@ -281,6 +287,14 @@ export class YangRpcStmt extends YangStatementWithWhen {
     super(init);
     this.keyword = "rpc";
     this.must_statements = init.must_statements ?? [];
+  }
+}
+
+/** Action statement (RFC 7950 §7.15): an operation on a container or list instance. */
+export class YangActionStmt extends YangRpcStmt {
+  constructor(init: Partial<YangActionStmt> = {}) {
+    super(init);
+    this.keyword = "action";
   }
 }
 
@@ -449,7 +463,7 @@ export class YangParsedXPathBase {
   expression: string;
   description: string;
   ast?: ASTNode;
-  /** Module each `prefix:*` step is bound to, by prefix; recorded by {@link bindPrefixes}. */
+  /** Module each prefixed step (`prefix:name`, `prefix:*`) is bound to, by prefix; recorded by {@link bindPrefixes}. */
   xpath_prefixes?: Record<string, string>;
 
   constructor(init: { expression: string; description?: string }) {
@@ -460,12 +474,12 @@ export class YangParsedXPathBase {
     }
   }
 
-  /** Bind `prefix:*` steps to the modules `module` maps their prefixes to; an unknown prefix throws. */
+  /** Bind prefixed steps to the modules `module` maps their prefixes to; an unknown prefix throws. */
   bindPrefixes(module: unknown): void {
-    const used = wildcardPrefixes(this.ast);
+    const used = xpathPrefixes(this.ast);
     if (used.size === 0) return;
     const resolve = modulePrefixResolver(module);
-    bindWildcardPrefixes(this.ast, resolve, this.expression);
+    bindXPathPrefixes(this.ast, resolve, this.expression);
     this.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
   }
 }

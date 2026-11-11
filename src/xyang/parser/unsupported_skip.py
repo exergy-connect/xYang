@@ -1,8 +1,8 @@
 """
 Skip unsupported YANG constructs after emitting a warning.
 
-Top-level statements (action, …) that are not modeled in the AST have their
-tokens consumed so the rest of the module can parse. ``deviation`` is parsed;
+Statements that are not modeled in the AST (none today) have their tokens
+consumed so the rest of the module can parse. ``deviation`` is parsed;
 only ``deviate add|replace|delete`` is skipped here.
 """
 
@@ -21,11 +21,7 @@ if TYPE_CHECKING:
 logger = logging.getLogger(__name__)
 
 # RFC 7950 / 1.1 statements xYang does not implement — recognize and skip.
-UNSUPPORTED_CONSTRUCT_TYPES = frozenset(
-    {
-        kw.ACTION,
-    }
-)
+UNSUPPORTED_CONSTRUCT_TYPES: frozenset[str] = kw.UNSUPPORTED_CONSTRUCT_KEYWORDS
 
 
 def _consume_balanced_braces(tokens: TokenStream) -> None:

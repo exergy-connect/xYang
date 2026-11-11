@@ -1,0 +1,18 @@
+{
+  "description": "The context of an rpc or action is server data, validated against the module like any instance (types, mandatory, must, when, leafref, choice, unknown members) before the operation relies on it. Its errors carry document \"context\" and a JSON Pointer into the context; the operation is then not checked. A valid context feeds defaults and values to the operation's XPath.",
+  "module": "m.yang",
+  "instances": [
+    {"name": "valid context, valid input", "rpc": "use", "context": {"m:net": {"node": [{"name": "n1", "cap": 10}, {"name": "n2", "cap": 3, "peer": "n1"}]}}, "data": {"m:input": {"node": "n1", "size": 9}}, "valid": true},
+    {"name": "valid context, input must reads it", "rpc": "use", "context": {"m:net": {"node": [{"name": "n1", "cap": 10}, {"name": "n2", "cap": 3, "peer": "n1"}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"path": "/m:input/size", "code": "must", "message": "size exceeds the node capacity."}]},
+    {"name": "context type error: input not checked", "rpc": "use", "context": {"m:net": {"node": [{"name": "n2", "cap": "x"}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:net/node/0/cap", "code": "type"}]},
+    {"name": "context dangling leafref", "rpc": "use", "context": {"m:net": {"node": [{"name": "n2", "cap": 3, "peer": "n9"}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:net/node/0/peer", "code": "leafref"}]},
+    {"name": "context must", "rpc": "use", "context": {"m:net": {"node": [{"name": "n2", "cap": 0}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:net/node/0/cap", "code": "must", "message": "cap must be positive."}]},
+    {"name": "context missing a mandatory leaf", "rpc": "use", "context": {"m:net": {"node": [{"name": "n2"}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:net/node/0/cap", "code": "mandatory"}]},
+    {"name": "context with two cases of a choice", "rpc": "use", "context": {"m:net": {"wired": "w", "wireless": "x", "node": [{"name": "n2", "cap": 3}]}}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:net", "code": "choice-multiple-cases"}]},
+    {"name": "context unknown member", "rpc": "use", "context": {"m:net": {"node": [{"name": "n2", "cap": 3}]}, "m:bogus": 1}, "data": {"m:input": {"node": "n2", "size": 9}}, "valid": false, "errors": [{"document": "context", "path": "/m:bogus", "code": "unknown-field"}]},
+    {"name": "context default reached by when", "rpc": "use", "context": {"m:net": {"node": [{"name": "n1", "cap": 10}, {"name": "n2", "cap": 3, "peer": "n1"}]}}, "data": {"m:input": {"node": "n1", "only-b": "x"}}, "valid": false, "errors": [{"path": "/m:input/only-b", "code": "when"}]},
+    {"name": "context explicit value reached by when", "rpc": "use", "context": {"m:net": {"mode": "b", "node": [{"name": "n1", "cap": 10}]}}, "data": {"m:input": {"node": "n1", "only-b": "x"}}, "valid": true},
+    {"name": "partial context is ordinary data: absent containers are fine", "rpc": "use", "context": {}, "data": {"m:input": {"node": "n1"}}, "valid": false, "errors": [{"path": "/m:input/node", "code": "leafref"}]},
+    {"name": "native JSON context", "rpc": "use", "context": {"net": {"node": {"n1": {"cap": "x"}}}}, "data": {"node": "n1"}, "encoding": "native", "valid": false, "errors": [{"document": "context", "path": "/net/node/n1/cap", "code": "type"}]}
+  ]
+}

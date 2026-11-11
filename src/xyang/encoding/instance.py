@@ -127,15 +127,9 @@ def _unwrap(type_stmt: Optional[YangTypeStmt], module: Optional[YangModule], see
     seen.add(marker)
     if type_stmt.name in _BUILTINS and not type_stmt.prefix:
         return type_stmt
-    target = module
-    if type_stmt.prefix:
-        if module is None or not hasattr(module, "resolve_prefixed_module"):
-            return type_stmt
-        target = module.resolve_prefixed_module(type_stmt.prefix)
-        if target is None:
-            return type_stmt
-    getter = getattr(target, "get_typedef", None)
-    typedef = getter(type_stmt.name) if getter else None
+    from ..module import resolve_typedef
+
+    typedef, target = resolve_typedef(type_stmt, module)
     if typedef is not None and getattr(typedef, "type", None) is not None:
         return _unwrap(typedef.type, target, seen)
     return type_stmt

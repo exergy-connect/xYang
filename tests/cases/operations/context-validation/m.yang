@@ -1,0 +1,45 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container net {
+    leaf mode {
+      type enumeration { enum a; enum b; }
+      default a;
+    }
+    list node {
+      key name;
+      leaf name { type string; }
+      leaf peer { type leafref { path "../../node/name"; } }
+      leaf cap {
+        type uint8;
+        mandatory true;
+        must ". > 0" { error-message "cap must be positive."; }
+      }
+    }
+    choice link {
+      leaf wired { type string; }
+      leaf wireless { type string; }
+    }
+  }
+
+  rpc use {
+    input {
+      leaf node {
+        type leafref { path "/m:net/m:node/m:name"; }
+        mandatory true;
+      }
+      leaf size {
+        type uint8;
+        must ". <= /m:net/m:node[m:name = current()/../node]/m:cap" {
+          error-message "size exceeds the node capacity.";
+        }
+      }
+      leaf only-b {
+        when "/m:net/m:mode = 'b'";
+        type string;
+      }
+    }
+  }
+}

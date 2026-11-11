@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  feature fancy;
+
+  container box {
+    action open { input { leaf x { type string; } } }
+    action fancy-open {
+      if-feature fancy;
+      input { leaf x { type string; } }
+    }
+    container drawer {
+      if-feature fancy;
+      action pull;
+    }
+  }
+}

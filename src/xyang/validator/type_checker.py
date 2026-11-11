@@ -34,7 +34,7 @@ from ..identity_graph import (
 )
 from ..identifier_ref import format_identifier_ref
 from ..xsd_regex import translate
-from ..module import YangModule
+from ..module import YangModule, resolve_typedef
 from ..xpath import XPathParser
 from ..xpath.ast import ASTNode, PathNode
 from ..xpath.node import Context, Node
@@ -155,12 +155,12 @@ class TypeChecker:
         name = type_stmt.name
 
         if type_stmt.prefix:
-            if not isinstance(root_schema, YangModule):
+            if type_stmt.scope is None and not isinstance(root_schema, YangModule):
                 return []
-            ext = root_schema.resolve_prefixed_module(type_stmt.prefix)
-            if ext is None:
+            scope = type_stmt.scope or root_schema
+            if scope.resolve_prefixed_module(type_stmt.prefix) is None:
                 return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
-            typedef = ext.get_typedef(name)
+            typedef, _module = resolve_typedef(type_stmt, root_schema)
             if typedef is not None and typedef.type is not None:
                 return self._check_typedef_reference(
                     value,
@@ -195,8 +195,8 @@ class TypeChecker:
         if name in _DECIMAL_TYPE_NAMES:
             return self._check_decimal(value, type_stmt)
         # Resolve typedef and check against the underlying type
-        if getattr(root_schema, "get_typedef", None) is not None:
-            typedef = root_schema.get_typedef(name)
+        if type_stmt.scope is not None or getattr(root_schema, "get_typedef", None) is not None:
+            typedef, _module = resolve_typedef(type_stmt, root_schema)
             if typedef is not None and typedef.type is not None:
                 return self._check_typedef_reference(
                     value,
@@ -313,15 +313,7 @@ class TypeChecker:
             if key in seen:
                 return name
             seen.add(key)
-            lookup_schema = schema
-            if prefix:
-                if not isinstance(schema, YangModule):
-                    return name
-                lookup_schema = schema.resolve_prefixed_module(prefix)
-                if lookup_schema is None:
-                    return name
-            getter = getattr(lookup_schema, "get_typedef", None)
-            typedef = getter(name) if callable(getter) else None
+            typedef, lookup_schema = resolve_typedef(current, schema)
             if typedef is None or typedef.type is None:
                 return name
             schema = lookup_schema

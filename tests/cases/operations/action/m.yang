@@ -1,0 +1,83 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  identity reason;
+  identity maintenance { base reason; }
+
+  container interfaces {
+    list interface {
+      key name;
+      leaf name { type string; }
+      leaf mtu { type uint16; default 1500; }
+      leaf enabled { type boolean; default true; }
+      action reset {
+        input {
+          leaf delay {
+            type uint16;
+            must ". < ../../mtu" {
+              error-message "delay must be below the interface mtu.";
+            }
+          }
+          leaf peer {
+            type leafref { path "/m:interfaces/m:interface/m:name"; }
+            must ". != ../../m:name" {
+              error-message "An interface cannot be its own peer.";
+            }
+          }
+          leaf why { type identityref { base reason; } }
+          leaf note {
+            when "../../enabled = 'true'";
+            type string;
+          }
+          choice mode {
+            case soft { leaf soft { type empty; } }
+            case hard { leaf hard { type empty; } }
+          }
+          leaf check {
+            type string;
+            must "count(/m:interfaces/m:interface/m:reset) = 1 and . = ../../name" {
+              error-message "check must name the interface the action runs on.";
+            }
+          }
+        }
+        output {
+          leaf result {
+            type enumeration { enum ok; enum failed; }
+            mandatory true;
+          }
+          leaf took {
+            type uint32;
+            must "../../name != 'lo' or . = 0" {
+              error-message "lo resets instantly.";
+            }
+          }
+        }
+      }
+    }
+    container stats {
+      presence "statistics are collected";
+      action clear;
+    }
+    action reset-all {
+      input { leaf force { type boolean; } }
+    }
+  }
+
+  list pair {
+    key "a b";
+    leaf a { type string; }
+    leaf b { type uint8; }
+    action swap {
+      input {
+        leaf ok {
+          type boolean;
+          must "../../b > 0" {
+            error-message "b must be positive to swap.";
+          }
+        }
+      }
+    }
+  }
+}

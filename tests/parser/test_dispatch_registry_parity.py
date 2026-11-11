@@ -32,6 +32,7 @@ _PARENTS = {
     "grouping",
     "notification",
     "rpc",
+    "action",
     "input",
     "output",
     "choice",

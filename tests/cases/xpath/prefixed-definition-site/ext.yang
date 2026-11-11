@@ -1,0 +1,23 @@
+module ext {
+  yang-version 1.1;
+  namespace "urn:ext";
+  prefix e;
+
+  import base { prefix bb; }
+  import lib { prefix lx; }
+
+  augment "/bb:top" {
+    uses lx:picks;
+    leaf tref { type lx:item-ref; }
+  }
+
+  augment "/bb:top/bb:item" {
+    leaf n { type string; }
+    leaf same {
+      type boolean;
+      must "(../e:n = ../bb:n) = current()" {
+        error-message "same must say whether ext:n equals base:n.";
+      }
+    }
+  }
+}

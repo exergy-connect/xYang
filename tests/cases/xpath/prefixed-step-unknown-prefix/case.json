@@ -1,0 +1,6 @@
+{
+  "description": "A prefix in a named must step that the module does not bind fails when the module loads (RFC 7950 §6.4.1), like prefix:* (#147).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "unknown prefix 'x'"
+}

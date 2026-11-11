@@ -12,7 +12,7 @@ describe("python parity: test_unsupported_skip", () => {
     warnSpy.mockRestore();
   });
 
-  it("skips deviate add and action; parses rpc notification and leaf a", () => {
+  it("skips deviate add; parses rpc notification and leaf a", () => {
     const yang = `
 module ex {
   yang-version 1.1;
@@ -28,9 +28,6 @@ module ex {
     input { leaf in-arg { type string; } }
     output { leaf out-arg { type string; } }
   }
-  action "entity" {
-    input { leaf x { type empty; } }
-  }
   notification done { leaf msg { type string; } }
   leaf a { type string; }
 }
@@ -38,7 +35,6 @@ module ex {
     const mod = parseYangString(yang);
     const joined = warnSpy.mock.calls.map((c: unknown[]) => String(c[0])).join(" ").toLowerCase();
     expect(joined).toContain("ignoring unsupported 'deviate add' for /ex:foo");
-    expect(joined).toContain("action");
     expect(joined).not.toContain("rpc");
     expect(joined).not.toContain("input");
     expect(joined).not.toContain("output");
@@ -50,5 +46,16 @@ module ex {
     expect(done?.name).toBe("done");
     const leaf = mod.findStatement("a");
     expect(leaf?.name).toBe("a");
+  });
+
+  it("parses action under a container and rejects it at module level", () => {
+    const mod = parseYangString(
+      'module ex { yang-version 1.1; namespace "urn:ex"; prefix ex; container c { action go { input { leaf x { type empty; } } } } }'
+    );
+    const action = mod.findStatement("c")?.statements.find((s) => s.keyword === "action");
+    expect(action?.name).toBe("go");
+    expect(() => parseYangString('module ex { yang-version 1.1; namespace "urn:ex"; prefix ex; action go { } }')).toThrow(
+      "unknown statement in module body: 'action'"
+    );
   });
 });

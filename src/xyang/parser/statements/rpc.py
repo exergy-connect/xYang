@@ -9,7 +9,7 @@ from typing import TYPE_CHECKING
 from .. import keywords as kw
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
-from ...ast import YangInputStmt, YangOutputStmt, YangRpcStmt
+from ...ast import YangActionStmt, YangInputStmt, YangOutputStmt, YangRpcStmt
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -57,15 +57,24 @@ class RpcStatementParser:
 
     def parse_rpc(self, tokens: TokenStream, context: ParserContext) -> YangRpcStmt:
         """Parse ``rpc`` statement."""
-        tokens.consume(kw.RPC)
-        rpc_name = tokens.consume()
-        rpc_stmt = YangRpcStmt(name=rpc_name)
+        return self._parse_operation(tokens, context, kw.RPC, YangRpcStmt)
+
+    def parse_action(self, tokens: TokenStream, context: ParserContext) -> YangActionStmt:
+        """Parse ``action`` under a container, list, grouping or augment (RFC 7950 §7.15)."""
+        result = self._parse_operation(tokens, context, kw.ACTION, YangActionStmt)
+        assert isinstance(result, YangActionStmt)
+        return result
+
+    def _parse_operation(
+        self, tokens: TokenStream, context: ParserContext, keyword: str, cls: type[YangRpcStmt]
+    ) -> YangRpcStmt:
+        tokens.consume(keyword)
+        name = tokens.consume()
+        stmt = cls(name=name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
-            new_context = context.push_parent(rpc_stmt)
-            self._parsers.parse_body(
-                tokens, new_context, "rpc", error_context=f"rpc '{rpc_name}'"
-            )
+            new_context = context.push_parent(stmt)
+            self._parsers.parse_body(tokens, new_context, keyword, error_context=f"{keyword} '{name}'")
             tokens.consume_type(YangTokenType.RBRACE)
-        self._parsers.add_to_parent_or_module(context, rpc_stmt)
+        self._parsers.add_to_parent_or_module(context, stmt)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
-        return rpc_stmt
+        return stmt

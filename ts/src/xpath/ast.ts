@@ -1,9 +1,15 @@
 export type XPathPathSegment = {
   step: string;
   predicate?: XPathAstNode;
-  /** Module a `prefix:*` step is bound to; set by `bindWildcardPrefixes`. */
+  /** Module a `prefix:name` or `prefix:*` step is bound to; set by `bindXPathPrefixes`. */
   module?: string;
 };
+
+/** Lexical prefix of a `prefix:name` or `prefix:*` step, else undefined. */
+export function stepPrefix(step: string): string | undefined {
+  if (step === "." || step === ".." || !step.includes(":")) return undefined;
+  return step.slice(0, step.indexOf(":"));
+}
 
 export function isWildcardStep(step: string): boolean {
   return step === "*" || step.endsWith(":*");

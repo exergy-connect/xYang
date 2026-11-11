@@ -187,6 +187,9 @@ class YangTypeStmt:
     path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
     require_instance: bool = True  # For leafref
     identityref_bases: List[YangIdentifierRef] = field(default_factory=list)
+    # Module that wrote this ``type`` (RFC 7950 §7.13, §9.9.2): its prefix and typedef name
+    # resolve there, also when a grouping or augment places the node in another module.
+    scope: Any = field(default=None, compare=False, repr=False)
 
 
 @dataclass
@@ -219,6 +222,14 @@ class YangOutputStmt(YangContainerStmt):
 @dataclass
 class YangRpcStmt(YangStatementWithMust, YangStatementWithWhen):
     """RPC statement (RFC 7950 §7.14). Data nodes appear only under ``input`` / ``output``."""
+
+
+@dataclass
+class YangActionStmt(YangRpcStmt):
+    """Action statement (RFC 7950 §7.15): an operation on a container or list instance.
+
+    A subclass of ``YangRpcStmt`` so every walker that skips operations skips actions too.
+    """
 
 
 @dataclass
@@ -325,11 +336,17 @@ class YangParsedXPathBase:
             from .xpath import XPathParser
             self.ast = XPathParser(self.expression).parse()
 
-    def bind_prefixes(self, module: Any) -> None:
-        """Bind ``prefix:*`` steps to the modules *module* maps their prefixes to."""
+    def bind_prefixes(self, module: Any, recorded: Optional[Dict[str, str]] = None) -> None:
+        """Bind prefixed steps to the modules *module* maps their prefixes to.
+
+        *recorded* is a ``{prefix: module}`` map kept in the native JSON form; when given it
+        replaces *module*'s prefixes, which that form does not carry for imports.
+        """
         if self.ast is not None:
-            from .xpath.parser import bind_wildcard_prefixes
-            bind_wildcard_prefixes(self.ast, module.resolve_prefix_to_module_name, self.expression)
+            from .xpath.parser import bind_xpath_prefixes
+
+            resolve = recorded.get if recorded is not None else module.resolve_prefix_to_module_name
+            bind_xpath_prefixes(self.ast, resolve, self.expression)
 
 @dataclass
 class YangMustStmt(YangParsedXPathBase):

@@ -1,0 +1,19 @@
+{
+  "description": "Issue #152: prefixes resolve where the expression is defined. lib's grouping and typedef say bs: for base; ext uses them under its own alias bb:, so bs: must resolve in lib (RFC 7950 §6.4.1, §7.13). ext augments a leaf n next to base's n: the prefix picks the module. instance-identifier values use RFC 7951 module names (§6.11), not YANG prefixes.",
+  "module": "base.yang",
+  "instances": [
+    { "name": "valid", "data": { "base:top": { "item": [{ "n": "x", "ext:n": "x", "ext:same": true }, { "n": "y", "ext:n": "z", "ext:same": false }], "ext:gref": "x", "ext:gmust": "y", "ext:tref": "x", "where": "/base:top/item[n='x']" } }, "valid": true },
+    { "name": "grouping leafref from another module", "data": { "base:top": { "item": [{ "n": "x" }], "ext:gref": "q" } }, "valid": false,
+      "errors": [{ "path": "/base:top/ext:gref", "code": "leafref" }] },
+    { "name": "grouping must from another module", "data": { "base:top": { "item": [{ "n": "x" }], "ext:gmust": "q" } }, "valid": false,
+      "errors": [{ "path": "/base:top/ext:gmust", "code": "must", "message": "gmust must name an item." }] },
+    { "name": "imported typedef leafref", "data": { "base:top": { "item": [{ "n": "x" }], "ext:tref": "q" } }, "valid": false,
+      "errors": [{ "path": "/base:top/ext:tref", "code": "leafref" }] },
+    { "name": "same local name, different modules", "data": { "base:top": { "item": [{ "n": "x", "ext:n": "x", "ext:same": false }] } }, "valid": false,
+      "errors": [{ "path": "/base:top/item/0/ext:same", "code": "must", "message": "same must say whether ext:n equals base:n." }] },
+    { "name": "instance-identifier with a dangling key", "data": { "base:top": { "item": [{ "n": "x" }], "where": "/base:top/item[n='q']" } }, "valid": false,
+      "errors": [{ "path": "/base:top/where", "code": "instance-identifier" }] },
+    { "name": "instance-identifier with a YANG prefix instead of the module name", "data": { "base:top": { "item": [{ "n": "x" }], "where": "/bs:top/item[n='x']" } }, "valid": false,
+      "errors": [{ "path": "/base:top/where", "code": "instance-identifier" }] }
+  ]
+}

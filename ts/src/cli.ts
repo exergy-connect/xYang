@@ -44,7 +44,7 @@ function writeJsonWarnings(warnings: ValidationIssue[]): void {
 }
 
 function runValidate(rest: string[]): number {
-  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, output, contextFile } =
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, action, output, contextFile } =
     parseValidateArgs(rest);
   const yangFile = positional[0];
   if (!yangFile) {
@@ -55,8 +55,8 @@ function runValidate(rest: string[]): number {
   }
 
   let operation: ValidateCallOptions = {};
-  if (rpc !== undefined) {
-    operation = { rpc, direction: output ? "output" : "input" };
+  if (rpc !== undefined || action !== undefined) {
+    operation = { ...(rpc !== undefined ? { rpc } : { action }), direction: output ? "output" : "input" };
     if (contextFile !== undefined) {
       if (!existsSync(contextFile)) {
         throw new Error(`file not found: ${contextFile}`);
@@ -110,6 +110,7 @@ function runValidate(rest: string[]): number {
     const report = {
       valid: detailed.valid,
       errors: detailed.errors.map((issue) => ({
+        ...(issue.document ? { document: issue.document } : {}),
         path: issue.path,
         code: issue.code,
         message: issue.message

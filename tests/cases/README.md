@@ -55,13 +55,14 @@ when they share the schema.
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
 | `instances[].rpc` | Optional. Validate `data` as an instance of this rpc (`validate_detailed(rpc=)` / `{ rpc }`, CLI `--rpc`). |
-| `instances[].direction` | Optional, with `rpc`: `"input"` (default) or `"output"` (CLI `--output`). |
-| `instances[].context` | Optional, with `rpc`: server data next to the operation node (`context=` / `{ context }`, CLI `--context FILE`). Same encoding as `data`. |
+| `instances[].action` | Optional. Validate `data` as an instance of the action at this RFC 8040 §3.5.3 path (`action=` / `{ action }`, CLI `--action`). Needs `context`. |
+| `instances[].direction` | Optional, with `rpc` or `action`: `"input"` (default) or `"output"` (CLI `--output`). |
+| `instances[].context` | Optional, with `rpc` or `action`: server data (`context=` / `{ context }`, CLI `--context FILE`). Same encoding as `data`. Validated first. |
 | `instances[].usage_error` | Optional. Instead of `valid` and `errors`: the call itself must be rejected (Python `ValueError`, TypeScript throw with the text as a substring of the message, CLI exit 2 with empty stdout). |
 
 ### Expected errors
 
-An error is `{ "path", "code", "message"? }`:
+An error is `{ "path", "code", "message"?, "document"? }`. `document: "context"` marks an issue about an rpc's or action's context; its `path` points into the context, and runners compare it as `context:<path>`:
 
 - **`path`** is a [JSON Pointer](https://www.rfc-editor.org/rfc/rfc6901) into the input as written.
   RFC 7951 lists use array indexes (`/m:top/interface/0/mtu`). A native keyed list uses the dict
@@ -73,7 +74,7 @@ An error is `{ "path", "code", "message"? }`:
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
   `max-elements`, `duplicate-key`, `unique`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
   `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
-  `xpath-error`, `xpath-unknown-function`, `rpc-wrapper`.
+  `xpath-error`, `xpath-unknown-function`, `operation-wrapper`, `action-parent`.
   Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
@@ -103,7 +104,7 @@ JSON (`encoding/dict-style`). The two modes do not fall back to each other. Path
 input as written. Other `module` files in the case directory (not `submodule` files) are parsed
 after the primary module so their `augment` statements merge into it.
 
-`rpc-wrapper` — rpc input or output in RFC 7951 mode is not the single member `module:input` / `module:output` (RFC 8040 §3.6); native JSON takes the bare parameters.
+`operation-wrapper` — rpc or action input or output in RFC 7951 mode is not the single member `module:input` / `module:output` (RFC 8040 §3.6); native JSON takes the bare parameters. `action-parent` — the context lacks the instance an action is invoked on (`document: "context"`, path `""`).
 
 `ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a native
 list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
@@ -119,8 +120,9 @@ $XYANG_CLI validate --format json <case-dir>/<module> <instance.json> \
     --include-path <case-dir> --features '<features as JSON, or null>'
 ```
 
-An instance with `rpc` adds `--rpc <name>`, `--output` for `direction: "output"`, and
-`--context <file>` for `context`.
+An instance with `rpc` adds `--rpc <name>` (`action`: `--action <path>`), `--output` for
+`direction: "output"`, and `--context <file>` for `context`. The CLI loads only the primary module, so cases whose
+other modules augment it fail under `XYANG_CLI`; the library runners load them.
 
 and expects stdout to be `{"valid": bool, "errors": [{"path": "<JSON Pointer>", "code": "<code>", "message": "..."}]}`,
 with the error codes listed above. Schema errors exit non-zero without that JSON.

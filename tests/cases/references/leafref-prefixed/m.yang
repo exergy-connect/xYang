@@ -1,0 +1,18 @@
+module b {
+  yang-version 1.1;
+  namespace "urn:b";
+  prefix b;
+
+  container top {
+    list item {
+      key n;
+      leaf n { type string; }
+    }
+    leaf ref {
+      type leafref { path "/b:top/b:item/b:n"; }
+    }
+    leaf rel {
+      type leafref { path "../b:item/b:n"; }
+    }
+  }
+}

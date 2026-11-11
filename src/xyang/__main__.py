@@ -122,7 +122,15 @@ def _features_arg(raw: str | None) -> dict[str, frozenset[str]] | None:
 
 
 def _json_validation_report(result: dict[str, Any]) -> str:
-    errors = [{"path": issue["path"], "code": issue["code"], "message": issue["message"]} for issue in result["errors"]]
+    errors = [
+        {
+            **({"document": issue["document"]} if "document" in issue else {}),
+            "path": issue["path"],
+            "code": issue["code"],
+            "message": issue["message"],
+        }
+        for issue in result["errors"]
+    ]
     return json.dumps({"valid": result["valid"], "errors": errors})
 
 
@@ -158,9 +166,8 @@ def build_parser() -> argparse.ArgumentParser:
     """Build the xyang CLI parser.
 
     This parser is the source of truth for commands, options, defaults, and
-    examples. Add a flag with ``add_argument`` on its subparser (a future
-    ``--action`` belongs on ``validate``). Help and the tests read this
-    parser; do not keep a second command list.
+    examples. Add a flag with ``add_argument`` on its subparser. Help and the
+    tests read this parser; do not keep a second command list.
     """
     try:
         cli_version = importlib.metadata.version("xyang")
@@ -226,7 +233,8 @@ def build_parser() -> argparse.ArgumentParser:
             "  xyang validate --format json module.yang data.json\n"
             "  xyang validate --rpc add-link module.yang rpc-input.json\n"
             "  xyang validate --rpc add-link --output --context state.json module.yang output.json\n"
-            "  xyang validate --native-json --rpc add-link module.yang params.json"
+            "  xyang validate --native-json --rpc add-link module.yang params.json\n"
+            "  xyang validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json"
         ),
     )
     validate_parser.add_argument("yang_file", type=Path, help="Path to .yang file")
@@ -262,9 +270,22 @@ def build_parser() -> argparse.ArgumentParser:
         ),
     )
     validate_parser.add_argument(
+        "--action",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Validate the data as the action at PATH (RFC 7950 §7.15): the RFC 8040 "
+            "§3.5.3 data resource identifier /module:list=key/action. Mutually exclusive with --rpc. "
+            "Needs --context containing that instance. Default direction: input"
+        ),
+    )
+    validate_parser.add_argument(
         "--output",
         action="store_true",
-        help="With --rpc, validate the rpc output instead of its input. Requires --rpc. Default: input",
+        help=(
+            "With --rpc or --action, validate the output instead of the input. "
+            "Requires --rpc or --action. Default: input"
+        ),
     )
     validate_parser.add_argument(
         "--context",
@@ -272,9 +293,9 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="FILE",
         help=(
-            "With --rpc, JSON or YAML server data that joins the operation node in the XPath "
-            "accessible tree (RFC 7950 §6.4.1) so must and leafref can reach it. Not validated. "
-            "Requires --rpc. Default: none"
+            "With --rpc or --action, JSON or YAML server data. Validated against the module first "
+            '(errors carry "document": "context"), then joined to the operation node '
+            "(RFC 7950 §6.4.1) so must and leafref can reach it. Required with --action. Default: none"
         ),
     )
     validate_parser.add_argument(
@@ -392,15 +413,19 @@ def main() -> int:
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
             return 2
-        if args.rpc is None and (args.output or args.context is not None):
-            print("Error: --output and --context apply only together with --rpc", file=sys.stderr)
+        if args.rpc is not None and args.action is not None:
+            print("Error: --rpc and --action are mutually exclusive", file=sys.stderr)
+            return 2
+        if args.rpc is None and args.action is None and (args.output or args.context is not None):
+            print("Error: --output and --context apply only together with --rpc or --action", file=sys.stderr)
             return 2
         try:
             include_path = _include_path_from_args(args)
             features = _features_arg(args.features)
             operation: dict[str, Any] = {}
-            if args.rpc is not None:
-                operation = {"rpc": args.rpc, "direction": "output" if args.output else "input"}
+            if args.rpc is not None or args.action is not None:
+                target = {"rpc": args.rpc} if args.rpc is not None else {"action": args.action}
+                operation = {**target, "direction": "output" if args.output else "input"}
                 if args.context is not None:
                     if not args.context.exists():
                         print(f"Error: file not found: {args.context}", file=sys.stderr)

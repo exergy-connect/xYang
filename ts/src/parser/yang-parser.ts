@@ -95,6 +95,8 @@ export class YangParser {
   readonly expandUses: boolean;
   readonly includePath: string[];
   private readonly moduleCache = new Map<string, YangModule>();
+  /** Every module this parser loaded, by name; shared as each module's `module_registry`. */
+  private readonly modulesByName: Record<string, YangModule> = {};
 
   private readonly tokenizer = new YangTokenizer();
 
@@ -321,6 +323,10 @@ export class YangParser {
       applyBuiltinExtensionInvocations(mod);
       validateSemantics(mod);
     }
+    if (mod.name) {
+      this.modulesByName[mod.name] = mod;
+    }
+    Object.defineProperty(mod, "module_registry", { value: this.modulesByName, enumerable: false });
     return mod;
   }
 

@@ -162,7 +162,7 @@ class XPathEvaluator:
         Only absolute, cacheable paths use ctx.path_cache (global cache).
         Cacheability is determined statically during parsing (path.is_cacheable).
         """
-        key = path.to_string()
+        key = _path_cache_key(path)
         path_cache = ctx.path_cache
         if path_cache is not None and path.is_cacheable:
             self._cache_lookups += 1
@@ -213,7 +213,7 @@ class XPathEvaluator:
             else:
                 next_nodes = []
                 for n in nodes:
-                    next_nodes.extend(self._step(n, seg.step))
+                    next_nodes.extend(self._step_named(n, ctx, seg))
                 nodes = next_nodes
 
             if seg.predicate is not None:
@@ -263,7 +263,31 @@ class XPathEvaluator:
                 result.append(node.step(val, child))
         return result
 
-    def _step(self, node: Node, key: str) -> List[Node]:
+    def _step_named(self, node: Node, ctx: Context, seg: Any) -> List[Node]:
+        """Step to the child named by *seg*.
+
+        An unprefixed step matches the local name. A ``prefix:name`` step matches only a
+        child that module defines (``seg.module``, bound when the module was loaded); an
+        unbound prefix, as in an RFC 7951 ``instance-identifier`` value, is a module name
+        (RFC 7951 §6.11). The data member is the child's RFC 7951 name under the root module.
+        """
+        from ..encoding.rfc7951 import member_keys_cached
+
+        root_schema = ctx.root.schema
+        root_module = root_schema.name if isinstance(root_schema, YangModule) else ""
+        prefix = seg.prefix
+        if prefix is None:
+            return self._step(node, seg.step, root_module)
+        module = seg.module if seg.module is not None else prefix
+        data = node.data
+        if isinstance(data, list) and (SchemaNav.is_list(node.schema) or SchemaNav.is_leaf_list(node.schema)):
+            return [n for item in data for n in self._step_named(node.step(item, node.schema), ctx, seg)]
+        schema_child = SchemaNav.child_in_module(node.schema, seg.local, module, root_module)
+        if schema_child is None:
+            return []
+        return self._step_child(node, next(iter(member_keys_cached(schema_child, root_module))), schema_child)
+
+    def _step(self, node: Node, key: str, root_module: Optional[str] = None) -> List[Node]:
         """
         Step from node into child named key.
         List expansion is determined by schema type (YangListStmt / YangLeafListStmt).
@@ -277,11 +301,20 @@ class XPathEvaluator:
             return [
                 n
                 for item in data
-                for n in self._step(node.step(item, node.schema), key)
+                for n in self._step(node.step(item, node.schema), key, root_module)
             ]
 
         schema_child = SchemaNav.child(node.schema, key)
+        if schema_child is not None and root_module is not None:
+            from ..encoding.rfc7951 import member_keys_cached
 
+            keys = member_keys_cached(schema_child, root_module)
+            if keys and key not in keys:
+                key = next(iter(keys))
+        return self._step_child(node, key, schema_child)
+
+    def _step_child(self, node: Node, key: str, schema_child: Any) -> List[Node]:
+        data = node.data
         if isinstance(data, dict):
             if key in data:
                 val = data[key]
@@ -415,3 +448,34 @@ class XPathEvaluator:
         if fn is None:
             raise unknown_function_error(ast.name)
         return fn(self, ast, ctx, node)
+
+
+def _ast_key(node: Any) -> str:
+    if isinstance(node, PathNode):
+        return _path_cache_key(node)
+    if isinstance(node, BinaryOpNode):
+        return f"({_ast_key(node.left)} {node.operator} {_ast_key(node.right)})"
+    if isinstance(node, FunctionCallNode):
+        return f"{node.name}({', '.join(_ast_key(arg) for arg in node.args)})"
+    if isinstance(node, LiteralNode):
+        return repr(node.value)
+    return repr(node)
+
+
+def _path_cache_key(path: PathNode) -> str:
+    """Path text plus each step's bound module and predicate.
+
+    The same text binds different modules in different modules, and ``to_string`` omits
+    predicates, so neither may share a cache entry.
+    """
+    key = getattr(path, "_cache_key", None)
+    if key is None:
+        steps = []
+        for seg in path.segments:
+            step = seg.step if seg.module is None else f"{seg.step}@{seg.module}"
+            if seg.predicate is not None:
+                step += f"[{_ast_key(seg.predicate)}]"
+            steps.append(step)
+        key = ("/" if path.is_absolute else "") + "/".join(steps)
+        path._cache_key = key  # type: ignore[attr-defined]
+    return key

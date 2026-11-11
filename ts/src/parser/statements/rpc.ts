@@ -1,5 +1,5 @@
 import * as kw from "../keywords";
-import { YangInputStmt, YangOutputStmt, YangRpcStmt } from "../../core/ast";
+import { YangActionStmt, YangInputStmt, YangOutputStmt, YangRpcStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
@@ -33,16 +33,25 @@ export class RpcStatementParser {
   }
 
   parse_rpc(tokens: TokenStream, context: ParserContext): YangRpcStmt {
-    tokens.consume(kw.RPC);
-    const rpcName = tokens.consume();
-    const rpcStmt = new YangRpcStmt({ name: rpcName });
+    return this.parseOperation(tokens, context, kw.RPC, new YangRpcStmt());
+  }
+
+  /** ``action`` under a container, list, grouping or augment (RFC 7950 §7.15). */
+  parse_action(tokens: TokenStream, context: ParserContext): YangActionStmt {
+    return this.parseOperation(tokens, context, kw.ACTION, new YangActionStmt()) as YangActionStmt;
+  }
+
+  private parseOperation(tokens: TokenStream, context: ParserContext, keyword: string, stmt: YangRpcStmt): YangRpcStmt {
+    tokens.consume(keyword);
+    const name = tokens.consume();
+    stmt.name = name;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      const child = context.push_parent(rpcStmt);
-      this.parsers.parseBody(tokens, child, "rpc", `rpc '${rpcName}'`);
+      const child = context.push_parent(stmt);
+      this.parsers.parseBody(tokens, child, keyword, `${keyword} '${name}'`);
       tokens.consume_type(YangTokenType.RBRACE);
     }
-    this.parsers.add_to_parent_or_module(context, rpcStmt);
+    this.parsers.add_to_parent_or_module(context, stmt);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
-    return rpcStmt;
+    return stmt;
   }
 }

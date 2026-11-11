@@ -5,7 +5,7 @@ import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
 import { YangParser, YangValidator } from "../src";
 
-type Expected = { path: string; code: string; message?: string };
+type Expected = { path: string; code: string; message?: string; document?: string };
 type Instance = {
   name: string;
   data: unknown;
@@ -14,6 +14,7 @@ type Instance = {
   xfail?: Record<string, string>;
   encoding?: string;
   rpc?: string;
+  action?: string;
   direction?: "input" | "output";
   context?: Record<string, unknown>;
   usage_error?: string;
@@ -52,6 +53,7 @@ function run(dir: string, c: Case, inst: Instance | undefined): void {
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
   const operation = {
     ...(inst.rpc !== undefined ? { rpc: inst.rpc } : {}),
+    ...(inst.action !== undefined ? { action: inst.action } : {}),
     ...(inst.direction !== undefined ? { direction: inst.direction } : {}),
     ...(inst.context !== undefined ? { context: inst.context } : {})
   };
@@ -64,9 +66,11 @@ function run(dir: string, c: Case, inst: Instance | undefined): void {
   }
   const { errors } = validator.validateDetailed(inst.data, { nativeJson: inst.encoding === "native", ...operation });
   const expected = inst.errors ?? [];
-  const got = new Set(errors.map((e) => `${e.path} ${e.code}`));
+  // An issue about the server data context of an rpc or action is keyed `context:<path>`.
+  const where = (e: { path: string; document?: string }) => (e.document ? `${e.document}:${e.path}` : e.path);
+  const got = new Set(errors.map((e) => `${where(e)} ${e.code}`));
   expect([...got].sort(), `raw errors: ${JSON.stringify(errors)}`).toEqual(
-    [...new Set(expected.map((e) => `${e.path} ${e.code}`))].sort()
+    [...new Set(expected.map((e) => `${where(e)} ${e.code}`))].sort()
   );
   for (const exp of expected) {
     if (exp.message) {
