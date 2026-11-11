@@ -50,6 +50,8 @@ when they share the schema.
 | `module` | Primary module file in the case directory. |
 | `features` | Optional. Module name -> enabled feature names. Omitted: every declared feature is enabled. A module missing from the map keeps all its features. |
 | `schema_error` | Optional. `true` means loading the module must fail; the case then has no `instances`. Optional `code` is a substring the load error must contain, the same in every implementation. |
+| `json_form` | Optional. `true`: every instance must also give the same result against the module reloaded from its native JSON form (convert, serialise, `parse_json_schema` / `parseJsonSchema` with no include path), and `expected.yang.json` in the case directory is the form both libraries must generate (compared as JSON). The case may not rely on another module augmenting the primary one. |
+| `export_error` | Optional. A substring of the error that exporting the primary module to its native JSON form must raise (no `instances`). `convert` exits 2. |
 | `xfail` | Optional, on the case or on an instance (instance entries override case entries). Implementation id (`python`, `ts`, `cli`) -> reason. |
 | `instances[].data` | The JSON instance document. |
 | `instances[].valid` | Whether the implementation must report no errors. |

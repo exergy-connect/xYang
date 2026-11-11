@@ -2,7 +2,7 @@ import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
-import { ModuleSource, YangStatement, YangModule, type ModuleInit } from "../core/model";
+import { ModuleSource, YangStatement, YangModule, type IdentityBases, type ModuleInit } from "../core/model";
 import { ParserContext, TokenStream } from "./parser-context";
 import { StatementParsers } from "./statement-parsers";
 import { YangTokenizer } from "./tokenizer";
@@ -22,9 +22,9 @@ type ParserOptions = {
 };
 
 function serializeIdentities(
-  raw: Record<string, { bases?: unknown }> | undefined
-): Record<string, { bases: YangIdentifierRef[] }> {
-  const out: Record<string, { bases: YangIdentifierRef[] }> = {};
+  raw: Record<string, { bases?: unknown; description?: unknown; if_features?: unknown }> | undefined
+): Record<string, IdentityBases> {
+  const out: Record<string, IdentityBases> = {};
   if (!raw) {
     return out;
   }
@@ -34,7 +34,14 @@ function serializeIdentities(
           .map((b) => coerceIdentifierRef(b))
           .filter((b): b is YangIdentifierRef => Boolean(b))
       : [];
-    out[name] = { bases };
+    const features = Array.isArray(stmt.if_features)
+      ? stmt.if_features.filter((x): x is string => typeof x === "string" && x.length > 0)
+      : [];
+    out[name] = {
+      bases,
+      ...(typeof stmt.description === "string" && stmt.description.length > 0 ? { description: stmt.description } : {}),
+      ...(features.length > 0 ? { if_features: features } : {})
+    };
   }
   return out;
 }

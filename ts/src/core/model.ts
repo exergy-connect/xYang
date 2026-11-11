@@ -40,7 +40,11 @@ export type StatementTypeShape = {
   types?: unknown;
 };
 
-export type IdentityBases = { bases: Array<{ prefix?: string; name: string }> };
+export type IdentityBases = {
+  bases: Array<{ prefix?: string; name: string }>;
+  description?: string;
+  if_features?: string[];
+};
 
 export type YangStatementInit = {
   keyword?: string;

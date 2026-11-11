@@ -1,0 +1,23 @@
+{
+  "description": "#158: an identity whose base is imported and an augment of a node instantiated from an imported grouping reach the native JSON form (json_form), and validate as the .yang sources do.",
+  "module": "ext.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "derived identity and augmented leaf", "valid": true,
+      "data": { "ext:top": { "item": [{ "id": 1, "kind": "ext:widget", "args": { "size": 3 } }] } } },
+    { "name": "identity derived in the imported module", "valid": true,
+      "data": { "ext:top": { "item": [{ "id": 1, "kind": "base:gadget" }] } } },
+    { "name": "identity not derived from the imported base", "valid": false,
+      "data": { "ext:top": { "item": [{ "id": 1, "kind": "ext:plain" }, { "id": 2, "kind": "base:unrelated" }] } },
+      "errors": [
+        { "path": "/ext:top/item/0/kind", "code": "identityref" },
+        { "path": "/ext:top/item/1/kind", "code": "identityref" }
+      ] },
+    { "name": "augmented leaf type", "valid": false,
+      "data": { "ext:top": { "item": [{ "id": 1, "args": { "size": 300 } }] } },
+      "errors": [{ "path": "/ext:top/item/0/args/size", "code": "range" }] },
+    { "name": "member the augment does not add", "valid": false,
+      "data": { "ext:top": { "item": [{ "id": 1, "args": { "other": 1 } }] } },
+      "errors": [{ "path": "/ext:top/item/0/args/other", "code": "unknown-field" }] }
+  ]
+}

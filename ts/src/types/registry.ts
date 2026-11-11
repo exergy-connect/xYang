@@ -10,6 +10,7 @@ import {
   JSON_TYPE_OBJECT,
   JSON_TYPE_STRING
 } from "../json/type-constants";
+import { identityrefSchema } from "../json/identity-export";
 
 export const INT8 = "int8";
 export const INT16 = "int16";
@@ -366,7 +367,10 @@ function emitSchema(spec: Builtin, typeShape: Record<string, unknown>): Record<s
       : [];
     return enums.length > 0 ? { type: JSON_TYPE_STRING, enum: enums } : { type: JSON_TYPE_STRING };
   }
-  if (spec.name === LEAFREF || spec.name === IDENTITYREF || spec.name === INSTANCE_IDENTIFIER) {
+  if (spec.name === IDENTITYREF) {
+    return identityrefSchema(typeShape);
+  }
+  if (spec.name === LEAFREF || spec.name === INSTANCE_IDENTIFIER) {
     return { type: JSON_TYPE_STRING };
   }
   if (spec.name === UNION) {

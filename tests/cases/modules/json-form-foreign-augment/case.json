@@ -1,0 +1,5 @@
+{
+  "description": "#158: an augment of another module's own tree has no place in this module's native JSON form; convert fails and names the augment instead of writing a file that accepts less.",
+  "module": "m.yang",
+  "export_error": "augment '/b:top'"
+}

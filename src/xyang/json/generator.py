@@ -7,9 +7,11 @@ so that parse_json_schema(generate_json_schema(module)) round-trips where suppor
 
 from __future__ import annotations
 
+import contextvars
 import json
 import re
 from copy import copy
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any
 
@@ -19,6 +21,7 @@ from ..ast import (
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
+    YangAugmentStmt,
     YangIdentityStmt,
     YangInputStmt,
     YangLeafListStmt,
@@ -34,8 +37,16 @@ from ..ast import (
     YangTypedefStmt,
     YangWhenStmt,
 )
-from ..identity_graph import descendant_closure, qualified_identity_name
-from ..identifier_ref import coerce_identifier_ref, format_identifier_ref
+from ..augment_expand import apply_augmentations
+from ..errors import YangExportError
+from ..identity_graph import (
+    IdentityPair,
+    descendant_closure,
+    identity_ancestor_closure,
+    qualified_identity_name,
+    resolve_identity_base_ref,
+)
+from ..identifier_ref import coerce_identifier_ref, format_identifier_ref, parse_absolute_schema_path
 from ..module import YangModule
 from ..refine_expand import copy_yang_statement
 from ..uses_expand import ExpandUsesContext, expand_uses_in_statements
@@ -125,6 +136,118 @@ def _format_bases_for_json(bases: list[Any]) -> list[str]:
         if ref is not None:
             out.append(format_identifier_ref(ref))
     return out
+
+
+@dataclass
+class _IdentityExport:
+    """Identity bases one export resolved outside the exported module (see ``x-yang.imports``)."""
+
+    root: YangModule
+    used: list[IdentityPair] = field(default_factory=list)
+
+
+_EXPORT: contextvars.ContextVar[_IdentityExport] = contextvars.ContextVar("xyang_identity_export")
+
+
+def _import_key(root: YangModule, module: YangModule) -> str:
+    """Key of *module* in the root ``x-yang.imports``: the prefix that imports it, else its name."""
+    for prefix, imported in root.import_prefixes.items():
+        if imported is module or imported.name == module.name:
+            return prefix
+    if module.name in root.import_prefixes or module.name == root.own_prefix_stripped():
+        raise YangExportError(
+            f"cannot export identities of module {module.name!r}: the name is also a prefix of module {root.name!r}"
+        )
+    return module.name
+
+
+def identity_base_for_json(base: Any, scope: YangModule, module: YangModule) -> tuple[str, str]:
+    """``(base, $ref)`` of one identity ``base`` written in *scope*, re-expressed in *module*'s scope.
+
+    A base of the exported module is its bare name (``#/$defs/name``). A base of another module is
+    ``key:name`` (``#/x-yang/imports/key/identities/name``), and the module is recorded for
+    ``x-yang.imports``. A base that does not resolve where it is written cannot be exported.
+    """
+    ref = coerce_identifier_ref(base)
+    label = format_identifier_ref(ref) if ref is not None else str(base)
+    pair = resolve_identity_base_ref(scope, ref) if ref is not None else None
+    if pair is None:
+        raise YangExportError(
+            f"cannot export identity base {label!r}: it does not resolve in module {scope.name!r}"
+        )
+    owner, name = pair
+    if owner.name == module.name:
+        return name, f"#/{JsonSchemaKey.DEFS}/{name}"
+    export = _EXPORT.get(None)
+    if export is None:
+        raise YangExportError(f"cannot export identity base {label!r} outside generate_json_schema")
+    export.used.append(pair)
+    key = _import_key(export.root, owner)
+    return f"{key}:{name}", f"#/{JsonSchemaKey.X_YANG}/{XYangKey.IMPORTS}/{key}/{XYangKey.IDENTITIES}/{name}"
+
+
+def _identity_stub(module: YangModule, names: dict[str, set[str]]) -> dict[str, Any]:
+    """``x-yang.imports`` entry: *module*'s identities in *names* and the modules their bases name."""
+    identities: dict[str, Any] = {}
+    imports: dict[str, Any] = {}
+    mine = names[module.name]
+    for name in sorted(mine):
+        identity = module.identities[name]
+        identities[name] = _identity_to_def(name, identity, module, only=mine)
+        for base in identity.bases:
+            ref = coerce_identifier_ref(base)
+            pair = resolve_identity_base_ref(module, ref) if ref is not None else None
+            if ref is None or pair is None:
+                raise YangExportError(
+                    f"cannot export identity {name!r} of module {module.name!r}: base {base!r} does not resolve there"
+                )
+            if pair[0].name != module.name:
+                imports[ref.prefix] = _identity_stub(pair[0], names)
+    stub: dict[str, Any] = {
+        XYangKey.MODULE: module.name,
+        XYangKey.NAMESPACE: module.namespace or "",
+        XYangKey.PREFIX: module.prefix or "",
+    }
+    if imports:
+        stub[XYangKey.IMPORTS] = dict(sorted(imports.items()))
+    stub[XYangKey.IDENTITIES] = identities
+    return stub
+
+
+def _imports_for_json(root: YangModule, used: list[IdentityPair]) -> dict[str, Any]:
+    """Imported identities the exported module needs, so the JSON form resolves them without ``import``.
+
+    Needed: every identity an ``identityref`` base names, the bases of the module's own identities, and
+    the identities of a directly imported module that derive from one of those (an instance value may
+    name them), each with its bases. Nothing else of an import is carried.
+    """
+    used_keys = {(module.name, name) for module, name in used}
+    for name, identity in root.identities.items():
+        for base in identity.bases:
+            if resolve_identity_base_ref(root, base) is None:
+                raise YangExportError(
+                    f"cannot export identity {name!r}: base {format_identifier_ref(coerce_identifier_ref(base))!r} "
+                    f"does not resolve in module {root.name!r}"
+                )
+    names: dict[str, set[str]] = {}
+
+    def need(pairs: list[IdentityPair]) -> None:
+        for module, name in pairs:
+            names.setdefault(module.name, set()).add(name)
+
+    candidates = [(root, name) for name in root.identities]
+    candidates += [(m, name) for m in root.import_prefixes.values() for name in m.identities]
+    for module, name in candidates:
+        closure = identity_ancestor_closure(module, name)
+        if module is root or any((m.name, n) in used_keys for m, n in closure):
+            need(closure)
+    need(used)
+    names.pop(root.name, None)
+    out: dict[str, Any] = {}
+    for module in [*root.import_prefixes.values(), *(m for m, _ in used)]:
+        if module.name in names:
+            out[_import_key(root, module)] = _identity_stub(module, names)
+    return dict(sorted(out.items()))
 
 
 def _leaf_yang_type_name(
@@ -959,9 +1082,14 @@ def _statement_to_property(
     return None
 
 
-def _identity_to_def(name: str, identity: YangIdentityStmt, module: YangModule) -> dict[str, Any]:
-    """Convert YangIdentityStmt to a $defs entry (enum of qualified names + x-yang)."""
-    closure = sorted(descendant_closure(module, name))
+def _identity_to_def(
+    name: str, identity: YangIdentityStmt, module: YangModule, only: set[str] | None = None
+) -> dict[str, Any]:
+    """Convert YangIdentityStmt to a $defs entry (enum of qualified names + x-yang).
+
+    *only* limits the enum to the identities an ``x-yang.imports`` stub carries.
+    """
+    closure = sorted(descendant_closure(module, name) & only if only is not None else descendant_closure(module, name))
     enum_vals = [qualified_identity_name(module, n) for n in closure]
     out = {
         JsonSchemaKey.TYPE: "string",
@@ -1004,13 +1132,42 @@ def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, A
     return schema
 
 
+def _apply_own_augments(schema_module: YangModule) -> None:
+    """Merge the module's ``augment`` statements into its own (``uses``-expanded) tree.
+
+    The native JSON form is the module's schema tree, so an augment of a node this module
+    instantiates (including through an imported grouping) becomes part of that node. An augment of
+    another module's own tree has no place in this module's JSON, so it is an error, not dropped.
+    """
+    for stmt in schema_module.statements:
+        if not isinstance(stmt, YangAugmentStmt):
+            continue
+        first = (stmt.augment_path_segments or parse_absolute_schema_path(stmt.augment_path))[0]
+        if schema_module.resolve_prefixed_module(first.prefix or "") is not schema_module:
+            raise YangExportError(
+                f"cannot export augment {stmt.augment_path!r}: its target belongs to another module, "
+                f"which the native JSON form of module {schema_module.name!r} does not carry"
+            )
+    apply_augmentations(schema_module)
+
+
 def generate_json_schema(module: YangModule) -> dict[str, Any]:
     """
     Build a JSON Schema dict from a YangModule AST.
 
     The output has the structure expected by parse_json_schema: root x-yang (module
     meta), properties (one entry per module-level data node), and $defs (typedefs).
+    Raises :class:`YangExportError` for a construct the form cannot carry.
     """
+    export = _IdentityExport(root=module)
+    token = _EXPORT.set(export)
+    try:
+        return _generate_json_schema(module, export)
+    finally:
+        _EXPORT.reset(token)
+
+
+def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[str, Any]:
     typedef_names = set(module.typedefs.keys())
     root_xyang: dict[str, Any] = {
         XYangKey.MODULE: module.name or "unknown",
@@ -1024,6 +1181,7 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     # CLI/parser behavior (`expand_uses=False`) unchanged for persisted ASTs.
     schema_module = copy(module)
     schema_module.statements = _expand_uses_for_json(module.statements, module)
+    _apply_own_augments(schema_module)
 
     properties: dict[str, Any] = {}
     for stmt in schema_module.statements:
@@ -1049,6 +1207,9 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
             rpcs[stmt.name] = _rpc_to_json(stmt, typedef_names, schema_module)
     if rpcs:
         root_xyang[XYangKey.RPCS] = rpcs
+    imports = _imports_for_json(module, export.used)
+    if imports:
+        root_xyang[XYangKey.IMPORTS] = imports
 
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",

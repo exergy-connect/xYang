@@ -1,0 +1,114 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "b": {
+        "module": "base",
+        "namespace": "urn:base",
+        "prefix": "bs",
+        "identities": {
+          "gadget": {
+            "type": "string",
+            "enum": [
+              "bs:gadget"
+            ],
+            "x-yang": {
+              "type": "identity",
+              "bases": [
+                "thing"
+              ]
+            }
+          },
+          "thing": {
+            "type": "string",
+            "enum": [
+              "bs:gadget",
+              "bs:thing"
+            ],
+            "x-yang": {
+              "type": "identity",
+              "bases": []
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "kind": {
+          "$ref": "#/x-yang/imports/b/identities/thing",
+          "x-yang": {
+            "type": "identityref",
+            "bases": [
+              "b:thing"
+            ]
+          }
+        },
+        "kinds": {
+          "type": "array",
+          "items": {
+            "$ref": "#/x-yang/imports/b/identities/thing",
+            "x-yang": {
+              "type": "identityref",
+              "bases": [
+                "b:thing"
+              ]
+            }
+          },
+          "x-yang": {
+            "type": "leaf-list"
+          }
+        },
+        "own": {
+          "$ref": "#/x-yang/imports/b/identities/thing",
+          "x-yang": {
+            "type": "identityref",
+            "bases": [
+              "b:thing"
+            ]
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "widget": {
+      "type": "string",
+      "enum": [
+        "m:widget"
+      ],
+      "x-yang": {
+        "type": "identity",
+        "bases": [
+          "b:thing"
+        ]
+      }
+    },
+    "plain": {
+      "type": "string",
+      "enum": [
+        "m:plain"
+      ],
+      "x-yang": {
+        "type": "identity",
+        "bases": []
+      }
+    }
+  }
+}

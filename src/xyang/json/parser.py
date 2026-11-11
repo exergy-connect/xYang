@@ -986,6 +986,38 @@ def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
             _bind_xpath_prefixes([case], module)
 
 
+def _module_from_import_stub(key: str, raw: Any) -> YangModule:
+    """Rebuild one ``x-yang.imports`` entry: an imported module reduced to its identities."""
+    if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) for k in (XYangKey.MODULE, XYangKey.PREFIX)):
+        raise ValueError(f'"{XYangKey.IMPORTS}" entry {key!r} must be an object with "module" and "prefix"')
+    stub = YangModule(
+        name=raw[XYangKey.MODULE],
+        namespace=raw.get(XYangKey.NAMESPACE, ""),
+        prefix=raw[XYangKey.PREFIX],
+    )
+    _load_imports(stub, raw)
+    identities = raw.get(XYangKey.IDENTITIES) or {}
+    if not isinstance(identities, dict):
+        raise ValueError(f'"{XYangKey.IDENTITIES}" of import {key!r} must be an object')
+    for name, def_schema in identities.items():
+        ident = _build_identity(name, def_schema) if isinstance(def_schema, dict) else None
+        if ident is None:
+            raise ValueError(f'identity {name!r} of import {key!r} is not an identity definition')
+        stub.identities[name] = ident
+    return stub
+
+
+def _load_imports(module: YangModule, raw_xyang: dict[str, Any]) -> None:
+    """Bind ``x-yang.imports`` as the module's import prefixes, so identity bases resolve without files."""
+    imports = raw_xyang.get(XYangKey.IMPORTS)
+    if imports is None:
+        return
+    if not isinstance(imports, dict):
+        raise ValueError(f'"{XYangKey.IMPORTS}" must map keys to imported modules, got {imports!r}')
+    for key, raw in imports.items():
+        module.import_prefixes[key] = _module_from_import_stub(key, raw)
+
+
 def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     """
     Build a YangModule (and nested AST nodes from xyang.ast) from a JSON Schema
@@ -1034,6 +1066,8 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
         contact=root_xyang.get(XYangKey.CONTACT, ""),
         description=data.get(JsonSchemaKey.DESCRIPTION, ""),
     )
+
+    _load_imports(module, root_xyang)
 
     for def_name, def_schema in defs.items():
         if not isinstance(def_schema, dict):

@@ -7,6 +7,7 @@ import { ValidatorExtension } from "./validator/validator-extension";
 import { YangValidator } from "./validator/yang-validator";
 import type { ValidateCallOptions, ValidationIssue } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
+import { YangExportError } from "./core/errors";
 import {
   CliUsageError,
   commandByName,
@@ -185,7 +186,16 @@ function main(argv: string[]): number {
       throw new Error("Missing <file.yang>");
     }
     const module = new YangParser({ expandUses: false, includePath: includePaths }).parseFile(file);
-    const schema = generateJsonSchema(module);
+    let schema: Record<string, unknown>;
+    try {
+      schema = generateJsonSchema(module);
+    } catch (error) {
+      if (!(error instanceof YangExportError)) {
+        throw error;
+      }
+      process.stderr.write(`${error.message}\n`);
+      return 2;
+    }
     process.stdout.write(`${JSON.stringify(schema, null, 2)}\n`);
     return 0;
   }

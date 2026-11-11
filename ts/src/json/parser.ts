@@ -1,5 +1,5 @@
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
-import { YangModule, YangStatement, type ModuleInit, type ModuleSource } from "../core/model";
+import { YangModule, YangStatement, type IdentityBases, type ModuleInit, type ModuleSource } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { YangSyntaxError } from "../core/errors";
@@ -30,6 +30,65 @@ function basesFromJson(raw: unknown): YangIdentifierRef[] {
   return raw
     .map((b) => coerceIdentifierRef(b))
     .filter((b): b is YangIdentifierRef => Boolean(b));
+}
+
+function identityFromJson(def: unknown): IdentityBases {
+  const d = asRecord(def);
+  const xy = asRecord(d[YANG_SCHEMA_KEYS.xYang]);
+  const features = Array.isArray(xy["if-features"])
+    ? (xy["if-features"] as unknown[]).filter((x): x is string => typeof x === "string" && x.length > 0)
+    : [];
+  return {
+    bases: basesFromJson(xy.bases),
+    ...(typeof d.description === "string" && d.description.length > 0 ? { description: d.description } : {}),
+    ...(features.length > 0 ? { if_features: features } : {})
+  };
+}
+
+/** Rebuild one `x-yang.imports` entry: an imported module reduced to its identities. */
+function moduleFromImportStub(key: string, raw: unknown): YangModule {
+  const stub = asRecord(raw);
+  if (typeof stub.module !== "string" || typeof stub.prefix !== "string") {
+    throw new Error(`"${XYANG_KEYS.imports}" entry '${key}' must be an object with "module" and "prefix"`);
+  }
+  const identitiesRaw = stub[XYANG_KEYS.identities] ?? {};
+  if (!identitiesRaw || typeof identitiesRaw !== "object" || Array.isArray(identitiesRaw)) {
+    throw new Error(`"${XYANG_KEYS.identities}" of import '${key}' must be an object`);
+  }
+  const identities: Record<string, IdentityBases> = {};
+  for (const [name, def] of Object.entries(identitiesRaw as Record<string, unknown>)) {
+    const xy = asRecord(asRecord(def)[YANG_SCHEMA_KEYS.xYang]);
+    if (xy.type !== YangTokenType.IDENTITY) {
+      throw new Error(`identity '${name}' of import '${key}' is not an identity definition`);
+    }
+    identities[name] = identityFromJson(def);
+  }
+  return new YangModule(
+    {
+      name: stub.module,
+      yang_version: "1.1",
+      namespace: typeof stub.namespace === "string" ? stub.namespace : "",
+      prefix: stub.prefix,
+      identities,
+      import_prefixes: importsFromJson(stub),
+      statements: []
+    },
+    { kind: "string", value: "", name: "<json-schema-import>" }
+  );
+}
+
+/** Bind `x-yang.imports` as import prefixes, so identity bases resolve without files. */
+function importsFromJson(xy: Record<string, unknown>): Record<string, YangModule> {
+  const raw = xy[XYANG_KEYS.imports];
+  if (raw === undefined) {
+    return {};
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`"${XYANG_KEYS.imports}" must map keys to imported modules`);
+  }
+  return Object.fromEntries(
+    Object.entries(raw as Record<string, unknown>).map(([key, stub]) => [key, moduleFromImportStub(key, stub)])
+  );
 }
 
 function setConfigFromXyang(stmt: YangStatement, xyang: Record<string, unknown>): void {
@@ -969,7 +1028,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   bindUnrecordedPrefixes(statements, moduleName, prefix);
 
   const typedefs: Record<string, unknown> = {};
-  const identities: Record<string, { bases: YangIdentifierRef[] }> = {};
+  const identities: Record<string, IdentityBases> = {};
   for (const [defName, defSchema] of Object.entries(defs)) {
     if (!defSchema || typeof defSchema !== "object") {
       continue;
@@ -977,7 +1036,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     const d = defSchema as Record<string, unknown>;
     const dxy = asRecord(d[YANG_SCHEMA_KEYS.xYang]);
     if (dxy.type === YangTokenType.IDENTITY) {
-      identities[defName] = { bases: basesFromJson(dxy.bases) };
+      identities[defName] = identityFromJson(d);
       continue;
     }
     // Legacy schemas may omit x-yang typedef metadata in $defs.
@@ -1005,7 +1064,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     description: descriptionOrEmpty(root.description),
     typedefs,
     identities,
-    import_prefixes: {},
+    import_prefixes: importsFromJson(rootXy),
     extensions: {},
     extension_runtime: {},
     statements

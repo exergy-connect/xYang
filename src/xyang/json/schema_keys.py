@@ -88,6 +88,11 @@ class XYangKey:
     #: ``{prefix: module}`` for the prefixed steps of a leafref ``path``, ``must`` or ``when``,
     #: resolved in the module that wrote it (RFC 7950 §6.4.1). The JSON form has no imports.
     XPATH_PREFIXES = "xpath-prefixes"
+    #: ``{key: module stub}``: the imported modules the identities of this module derive from
+    #: (RFC 7950 §7.18.2), so the form needs no ``import`` resolution at load time. A stub has
+    #: ``module``, ``namespace``, ``prefix``, its own ``imports`` and its ``identities``.
+    IMPORTS = "imports"
+    IDENTITIES = "identities"
 
 
 class XYangTypeValue:

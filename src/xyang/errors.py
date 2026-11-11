@@ -179,3 +179,7 @@ class UnsupportedXPathError(ValueError):
     
     def __str__(self):
         return self.message
+
+
+class YangExportError(ValueError):
+    """A construct the native JSON form (``.yang.json``) cannot carry without losing meaning."""

@@ -1,0 +1,10 @@
+module ext {
+  yang-version 1.1;
+  namespace "urn:ext";
+  prefix e;
+  import base { prefix b; }
+  identity widget { base b:thing; }
+  identity plain;
+  container top { uses b:g; }
+  augment "/e:top/e:item/e:args" { leaf size { type uint8; } }
+}

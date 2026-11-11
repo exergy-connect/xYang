@@ -1,0 +1,18 @@
+{
+  "description": "#158: the module is imported under an alias (b) that is neither its name (base) nor its own prefix (bs). Identity bases of an imported grouping resolve where they are written; instance values name modules (RFC 7951 §6.8), not prefixes. Holds from the native JSON form (json_form).",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "values name modules", "valid": true,
+      "data": { "m:top": { "kind": "m:widget", "kinds": ["base:gadget", "m:widget"], "own": "base:gadget" } } },
+    { "name": "a prefix is not a module name", "valid": false,
+      "data": { "m:top": { "kind": "bs:gadget", "own": "b:gadget" } },
+      "errors": [
+        { "path": "/m:top/kind", "code": "identityref" },
+        { "path": "/m:top/own", "code": "identityref" }
+      ] },
+    { "name": "leaf-list item not derived", "valid": false,
+      "data": { "m:top": { "kinds": ["base:gadget", "m:plain"] } },
+      "errors": [{ "path": "/m:top/kinds/1", "code": "identityref" }] }
+  ]
+}
