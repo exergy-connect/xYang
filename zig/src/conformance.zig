@@ -7,8 +7,8 @@
 //! parser rejects a module Python loads.
 //!
 //! What a case needs, and which phase provides it:
-//! - `schema_error`: the load fails with a message containing `code` (phase 1 for parse
-//!   errors). An `unsupported` failure never counts as the expected error.
+//! - `schema_error`: the load (parse and module resolution) fails with a message
+//!   containing `code`. An `unsupported` failure never counts as the expected error.
 //! - `instances`: RFC 7951 validation (phase 3 and later). The module must still parse
 //!   or fail as `unsupported`.
 //! - `json_form` / `export_error`: the native JSON form (phase 6).
@@ -45,6 +45,8 @@ pub fn main(init: std.process.Init) !u8 {
         if (std.mem.eql(u8, a, "--registry-snapshot")) {
             try xyang.dispatch_registry.writeParitySnapshot(out, arena);
             return 0;
+        } else if (std.mem.eql(u8, a, "--dump-case") and i + 1 < argv.len) {
+            return dumpCase(arena, io, cases_dir, argv[i + 1], out);
         } else if (std.mem.eql(u8, a, "--cases") and i + 1 < argv.len) {
             i += 1;
             cases_dir = argv[i];
@@ -54,7 +56,7 @@ pub fn main(init: std.process.Init) !u8 {
         } else if (std.mem.eql(u8, a, "-v") or std.mem.eql(u8, a, "--verbose")) {
             verbose = true;
         } else {
-            try out.print("usage: xyang-zig-conformance [--cases DIR] [--pending FILE] [-v] [--registry-snapshot]\nunknown argument: {s}\n", .{a});
+            try out.print("usage: xyang-zig-conformance [--cases DIR] [--pending FILE] [-v] [--registry-snapshot] [--dump-case CASE]\nunknown argument: {s}\n", .{a});
             return 2;
         }
     }
@@ -185,19 +187,24 @@ fn truthy(v: ?std.json.Value) bool {
 }
 
 const Load = union(enum) {
-    ok,
+    ok: *xyang.Module,
     failed: xyang.Diagnostic,
 };
 
-/// `_load_case_module`: the case module, then every other non-submodule `.yang` file in
-/// the directory. The first failure wins.
+/// `_load_case_module`: one loader with the case directory on its include path. The case
+/// module is loaded and cached, then every other non-submodule `.yang` file in the
+/// directory, so their `augment` statements merge into the cached primary module. The
+/// first failure wins.
 fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_name: []const u8) !Load {
     var diag: xyang.Diagnostic = .{};
     const primary = try std.fs.path.join(arena, &.{ case_dir, module_name });
-    _ = xyang.parseFile(arena, io, primary, &diag) catch |err| switch (err) {
+    const include_path = try arena.dupe([]const u8, &.{case_dir});
+    var loader = xyang.Loader.init(arena, io, &diag, include_path);
+    const parsed = loader.parseFile(primary) catch |err| switch (err) {
         error.YangLoad => return .{ .failed = diag },
         else => return err,
     };
+    try loader.cache(try std.Io.Dir.cwd().realPathFileAlloc(io, primary, arena), parsed);
     var dir = try std.Io.Dir.cwd().openDir(io, case_dir, .{ .iterate = true });
     defer dir.close(io);
     var names: std.ArrayList([]const u8) = .empty;
@@ -216,12 +223,32 @@ fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, m
         const path = try std.fs.path.join(arena, &.{ case_dir, name });
         const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .unlimited);
         if (std.mem.startsWith(u8, std.mem.trimStart(u8, text, &std.ascii.whitespace), "submodule")) continue;
-        _ = xyang.parseFile(arena, io, path, &diag) catch |err| switch (err) {
+        _ = loader.parseFile(path) catch |err| switch (err) {
             error.YangLoad => return .{ .failed = diag },
             else => return err,
         };
     }
-    return .ok;
+    return .{ .ok = parsed };
+}
+
+/// Print the resolved primary module of a case as JSON, or `{"error": message}` when the
+/// load fails. `--cases` must come first.
+fn dumpCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []const u8, out: *std.Io.Writer) !u8 {
+    const case_dir = try std.fs.path.join(arena, &.{ cases_dir, cid });
+    const text = try std.Io.Dir.cwd().readFileAlloc(io, try std.fs.path.join(arena, &.{ case_dir, "case.json" }), arena, .unlimited);
+    const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, text, .{});
+    switch (try loadCaseModules(arena, io, case_dir, root.object.get("module").?.string)) {
+        .ok => |m| try xyang.schema_dump.writeModule(out, arena, m),
+        .failed => |diag| {
+            var s: std.json.Stringify = .{ .writer = out };
+            try s.beginObject();
+            try s.objectField("error");
+            try s.write(try std.fmt.allocPrint(arena, "{f}", .{diag}));
+            try s.endObject();
+        },
+    }
+    try out.writeAll("\n");
+    return 0;
 }
 
 fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []const u8) !Outcome {

@@ -49,8 +49,8 @@ fn parseBelongsTo(p: *Parser) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `import`: the statement is parsed like Python; loading the imported module is
-/// module resolution, which is not implemented yet, so a bound prefix fails loudly.
+/// `import`: load the module and bind its prefix (`register_import`). An import without
+/// a body binds nothing, like Python.
 pub fn parseImport(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.IMPORT);
     const name = try p.ts.consumeType(.identifier);
@@ -60,25 +60,33 @@ pub fn parseImport(p: *Parser, _: Parent) Error!void {
     try p.parseBody(.{ .holder = &acc }, .import, "import");
     _ = try p.ts.consumeType(.rbrace);
     _ = p.ts.consumeIfType(.semicolon);
-    if (acc.prefix != null) {
-        return p.ts.failKind(.unsupported, "xyang-zig cannot load imported module {f} yet (module resolution is phase 2 of #165)", .{repr(name)});
+    if (acc.prefix) |prefix| {
+        if (prefix.len > 0) try p.loader.registerImport(p, name, prefix, acc.revision_date);
     }
 }
 
+/// `include`: load the submodule and merge its definitions (`merge_included_submodule`).
 pub fn parseInclude(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.INCLUDE);
     const name = try p.ts.consumeType(.identifier);
+    var acc: Holder = .{};
     if (p.ts.consumeIfType(.lbrace)) {
-        var acc: Holder = .{};
         try p.parseBody(.{ .holder = &acc }, .include, "include");
         _ = try p.ts.consumeType(.rbrace);
     }
     _ = p.ts.consumeIfType(.semicolon);
-    return p.ts.failKind(.unsupported, "xyang-zig cannot merge included submodule {f} yet (module resolution is phase 2 of #165)", .{repr(name)});
+    try p.loader.mergeIncludedSubmodule(p, name, acc.revision_date);
 }
 
-/// `prefix` inside `import`, `include` or `belongs-to`.
-pub fn parsePrefixValue(p: *Parser, parent: Parent) Error!void {
+/// `prefix` inside `include` or `belongs-to`: syntax-checked, not stored.
+pub fn parsePrefixValue(p: *Parser, _: Parent) Error!void {
+    _ = try p.ts.consume(kw.PREFIX);
+    _ = try p.consumePrefixArgument();
+    _ = p.ts.consumeIfType(.semicolon);
+}
+
+/// `prefix` inside `import`: the local prefix the imported module is bound to.
+pub fn parseImportPrefix(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.PREFIX);
     const prefix = try p.consumePrefixArgument();
     switch (parent) {
@@ -88,23 +96,31 @@ pub fn parsePrefixValue(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-pub fn parseRevisionDate(p: *Parser, _: Parent) Error!void {
+/// `revision-date` inside `import` or `include` (`parse_revision_date_statement`).
+pub fn parseRevisionDate(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REVISION_DATE);
     const tt0 = try p.ts.peekType();
+    var date: []const u8 = undefined;
     if (tt0 == .string) {
-        _ = try p.ts.consumeType(.string);
+        date = try p.ts.consumeType(.string);
     } else {
-        var chunks: usize = 0;
+        var chunks: std.ArrayList(u8) = .empty;
+        var n: usize = 0;
         while (p.ts.hasMore() and !p.ts.at(.semicolon)) {
             switch (try p.ts.peekType()) {
                 .identifier, .dotted_number, .integer => {
-                    _ = try p.ts.consumeAny();
-                    chunks += 1;
+                    try chunks.appendSlice(p.arena, try p.ts.consumeAny());
+                    n += 1;
                 },
                 else => break,
             }
         }
-        if (chunks == 0) return p.ts.fail("Expected revision-date value, got {s}", .{tt0.pyName()});
+        if (n == 0) return p.ts.fail("Expected revision-date value, got {s}", .{tt0.pyName()});
+        date = chunks.items;
+    }
+    switch (parent) {
+        .holder => |h| h.revision_date = date,
+        else => {},
     }
     _ = p.ts.consumeIfType(.semicolon);
 }
@@ -226,7 +242,7 @@ pub fn parseIdentityBase(p: *Parser, parent: Parent) Error!void {
 pub fn parseExtension(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.EXTENSION);
     const name = try p.ts.consumeType(.identifier);
-    const ext = try p.newStatement(name, .{ .extension = .{} });
+    const ext = try p.newStatement(name, .{ .extension = .{ .module_name = p.module.name } });
     try p.parseOptionalBlock(.{ .stmt = ext }, .extension, try p.label("extension '{s}'", .{name}));
     _ = p.ts.consumeIfType(.semicolon);
     try p.module.extensions.put(p.arena, name, ext);
@@ -312,8 +328,9 @@ pub fn parseDeviation(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `deviate not-supported` is recorded. `add`, `replace` and `delete` are refused: Python
-/// skips them with a warning, and this port never drops a statement silently.
+/// `deviate not-supported` is recorded. `add`, `replace` and `delete` are not applied:
+/// like Python, the load warns `Ignoring unsupported 'deviate KIND' for PATH` and skips
+/// the braced body.
 pub fn parseDeviate(p: *Parser, parent: Parent) Error!void {
     const dev = switch (parent) {
         .stmt => |s| switch (s.data) {
@@ -330,8 +347,12 @@ pub fn parseDeviate(p: *Parser, parent: Parent) Error!void {
         _ = p.ts.consumeIfType(.semicolon);
         return;
     }
-    if (std.mem.eql(u8, kind, "add") or std.mem.eql(u8, kind, "delete") or std.mem.eql(u8, kind, "replace")) {
-        return p.ts.failKind(.unsupported, "xyang-zig does not support 'deviate {s}' (for {s})", .{ kind, dev.target_path });
+    for (kw.UNSUPPORTED_DEVIATE_KINDS) |k| {
+        if (!std.mem.eql(u8, kind, k)) continue;
+        try p.loader.warn("Ignoring unsupported 'deviate {s}' for {s}", .{ kind, dev.target_path });
+        if (p.ts.at(.lbrace)) try sp.consumeBalancedBraces(p);
+        _ = p.ts.consumeIfType(.semicolon);
+        return;
     }
     return p.ts.fail("Unknown deviate argument {f}", .{repr(kind)});
 }

@@ -32,6 +32,26 @@ pub const Diagnostic = struct {
     }
 };
 
+/// Where module resolution reports: one failure (the `Diagnostic`) and the warnings Python
+/// logs with `logger.warning` (printed to stderr by the CLI, in order).
+pub const Reporter = struct {
+    arena: std.mem.Allocator,
+    diag: *Diagnostic,
+    warnings: std.ArrayList([]const u8) = .empty,
+
+    /// A failure with no source location: `YangSemanticError(msg)` (`.semantic`) or
+    /// `YangSyntaxError(msg)` (`.syntax`), which print the same text.
+    pub fn fail(self: *Reporter, kind: Kind, comptime fmt: []const u8, args: anytype) Error {
+        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        self.diag.* = .{ .kind = kind, .message = msg };
+        return error.YangLoad;
+    }
+
+    pub fn warn(self: *Reporter, comptime fmt: []const u8, args: anytype) Error!void {
+        try self.warnings.append(self.arena, try std.fmt.allocPrint(self.arena, fmt, args));
+    }
+};
+
 test "headline format matches YangSyntaxError" {
     var buf: [128]u8 = undefined;
     const d = Diagnostic{ .message = "boom", .line = 8, .filename = "/m.yang" };

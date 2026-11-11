@@ -38,7 +38,7 @@ pub fn parseType(p: *Parser, parent: Parent) Error!void {
     } else {
         name = try p.ts.consumeAny();
     }
-    const t = try p.new(ast.TypeStmt, .{ .name = name, .prefix = prefix });
+    const t = try p.new(ast.TypeStmt, .{ .name = name, .prefix = prefix, .scope = p.module });
     if (p.ts.consumeIfType(.lbrace)) {
         const ctx = try p.label("type '{s}'", .{name});
         while (p.ts.hasMore() and !p.ts.at(.rbrace)) {

@@ -151,7 +151,13 @@ fn runParse(ctx: Io, args: []const []const u8) anyerror!u8 {
         return 1;
     };
     var diag: xyang.Diagnostic = .{};
-    const module = xyang.parseFile(ctx.arena, ctx.io, path, &diag) catch |err| switch (err) {
+    var dirs: std.ArrayList([]const u8) = .empty;
+    for (include_path.items) |dir| try dirs.append(ctx.arena, try resolvePath(ctx, dir));
+    var loader = xyang.Loader.init(ctx.arena, ctx.io, &diag, dirs.items);
+    const loaded = loader.parseFile(path);
+    // Python's logger prints each warning to stderr as the load reports it.
+    for (loader.warnings()) |w| try ctx.err.print("{s}\n", .{w});
+    const module = loaded catch |err| switch (err) {
         error.YangLoad => {
             try ctx.err.print("Error: {f}\n", .{diag});
             return 1;
@@ -166,6 +172,14 @@ fn runParse(ctx: Io, args: []const []const u8) anyerror!u8 {
     try ctx.out.print("  typedefs: {d}\n", .{module.typedefs.count()});
     try ctx.out.print("  top-level statements: {d}\n", .{module.statements.items.len});
     return 0;
+}
+
+/// `Path(p).resolve()`: symlinks resolved when the path exists, else made absolute.
+fn resolvePath(ctx: Io, p: []const u8) ![]const u8 {
+    return std.Io.Dir.cwd().realPathFileAlloc(ctx.io, p, ctx.arena) catch {
+        const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
+        return std.fs.path.resolveAlloc(ctx.arena, &.{ cwd, p });
+    };
 }
 
 /// argparse accepts an unambiguous prefix of a long option (`--inc` for `--include-path`).

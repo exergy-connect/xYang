@@ -21,7 +21,6 @@ conditions/when phase-4
 encoding/dict-style phase-3
 encoding/qualified-names phase-3
 encoding/structure phase-5
-modules/deviation-missing-target phase-2
 modules/deviation-not-supported phase-3
 modules/import phase-3
 modules/include phase-3
@@ -51,7 +50,6 @@ parser/arguments/yang-version-1-1 phase-3
 parser/substatements/annotation-type phase-3
 parser/substatements/choice-default phase-3
 parser/substatements/container-grouping phase-3
-parser/substatements/container-grouping-hidden phase-2
 parser/substatements/include-typedef phase-3
 parser/substatements/module-reference phase-3
 parser/substatements/range-length-body phase-3
@@ -67,10 +65,6 @@ references/leafref phase-4
 references/leafref-leaf-list phase-4
 references/leafref-prefixed phase-4
 reuse/augment phase-3
-reuse/circular-uses phase-2
-reuse/circular-uses-generic-field phase-2
-reuse/circular-uses-list-refine phase-2
-reuse/circular-uses-self phase-2
 reuse/grouping-must phase-4
 reuse/grouping-refine phase-3
 reuse/grouping-refine-must phase-4
@@ -79,16 +73,10 @@ reuse/grouping-uses-list phase-3
 reuse/refine-list-cardinality phase-3
 reuse/refine-list-under-choice phase-3
 reuse/refine-mandatory-false phase-3
-reuse/refine-target-missing phase-2
-reuse/refine-target-missing-path phase-2
 reuse/uses-augment phase-3
-reuse/uses-augment-bad-target phase-2
 reuse/uses-in-list-refine-must phase-4
 structure/anydata-anyxml phase-5
 structure/json-shape phase-5
-structure/list-key-if-feature phase-5
-structure/list-key-missing phase-5
-structure/list-key-when phase-5
 structure/list-keys phase-5
 structure/mandatory-presence phase-5
 structure/min-max-elements phase-5
