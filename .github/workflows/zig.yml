@@ -6,15 +6,21 @@
 #
 # Routing: the head-commit trailer `Local-Tests: passed` attests the Python and
 # TypeScript suites listed in AGENTS.md. It does not cover zig/, so this job is never
-# skipped by it; the trailer keeps skipping only the jobs it attests. On pull requests
-# the job runs when zig/, the shared cases, the Python implementation it is compared
-# with, or this workflow changed. Pushes always run it.
+# skipped by it; the trailer keeps skipping only the jobs it attests.
+# Pushes to main and feature/zig run only when zig/, tests/cases/, or this workflow
+# changed (the paths filter below). pull_request stays unfiltered so Detect changes
+# can skip the heavy job, the same way tests.yml does for Python, using that same
+# path set. workflow_dispatch always runs.
 
 name: Zig
 
 on:
   push:
     branches: [main, feature/zig]
+    paths:
+      - "zig/**"
+      - "tests/cases/**"
+      - ".github/workflows/zig.yml"
   pull_request:
   workflow_dispatch:
 
@@ -48,7 +54,7 @@ jobs:
             echo "zig=true" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(zig/|tests/cases/|src/xyang/|\.github/workflows/zig\.yml$)'; then
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(zig/|tests/cases/|\.github/workflows/zig\.yml$)'; then
             echo "zig=true" >> "$GITHUB_OUTPUT"
           else
             echo "zig=false" >> "$GITHUB_OUTPUT"
