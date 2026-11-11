@@ -66,10 +66,10 @@ def test_python_and_typescript_dispatch_registries_agree():
     completed = subprocess.run(
         ["node", "scripts/dump-dispatch-registry.mjs"],
         cwd=_ROOT / "ts",
-        check=True,
         capture_output=True,
         text=True,
     )
+    assert completed.returncode == 0, completed.stderr
     typescript = json.loads(completed.stdout)
     assert list(python) == list(typescript)
     for name, row in python.items():
