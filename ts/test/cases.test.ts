@@ -3,7 +3,7 @@ import { readdirSync, readFileSync } from "node:fs";
 import { dirname, join, resolve } from "node:path";
 import { fileURLToPath } from "node:url";
 import { describe, expect, it } from "vitest";
-import { YangParser, YangValidator } from "../src";
+import { generateJsonSchema, parseJsonSchema, YangParser, YangValidator } from "../src";
 
 type Expected = { path: string; code: string; message?: string; document?: string };
 type Instance = {
@@ -25,6 +25,8 @@ type Case = {
   schema_error?: boolean;
   code?: string;
   xfail?: Record<string, string>;
+  json_form?: boolean;
+  export_error?: string;
   instances?: Instance[];
 };
 
@@ -47,8 +49,14 @@ function loadCaseModule(dir: string, moduleFile: string) {
   return module;
 }
 
-function run(dir: string, c: Case, inst: Instance | undefined): void {
-  const module = loadCaseModule(dir, c.module);
+/** The case module's native JSON form, as a Worker without a filesystem would receive it. */
+function jsonForm(dir: string, moduleFile: string): Record<string, unknown> {
+  const parsed = new YangParser({ include_path: [dir], expand_uses: false }).parseFile(resolve(dir, moduleFile));
+  return JSON.parse(JSON.stringify(generateJsonSchema(parsed)));
+}
+
+function run(dir: string, c: Case, inst: Instance | undefined, form: "yang" | "json" = "yang"): void {
+  const module = form === "json" ? parseJsonSchema(jsonForm(dir, c.module)) : loadCaseModule(dir, c.module);
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
   const operation = {
@@ -89,6 +97,13 @@ for (const file of caseFiles) {
       const reason = { ...c.xfail, ...inst?.xfail }.ts;
       const test = reason ? it.fails : it;
       test(`${inst?.name ?? "schema error"}${reason ? ` (xfail: ${reason})` : ""}`, () => {
+        if (c.export_error) {
+          expect(() => jsonForm(dir, c.module)).toThrow(c.export_error);
+          return;
+        }
+        if (c.json_form) {
+          expect(jsonForm(dir, c.module)).toEqual(readJson(join(dir, "expected.yang.json")));
+        }
         if (c.schema_error) {
           if (c.code) {
             expect(() => run(dir, c, inst)).toThrow(c.code);
@@ -99,6 +114,9 @@ for (const file of caseFiles) {
         }
         run(dir, c, inst);
       });
+      if (c.json_form && inst) {
+        test(`${inst.name} (from the native JSON form)${reason ? ` (xfail: ${reason})` : ""}`, () => run(dir, c, inst, "json"));
+      }
     }
   });
 }

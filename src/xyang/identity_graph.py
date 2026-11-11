@@ -211,9 +211,11 @@ def identityref_value_valid(
     importer: "YangModule",
     value_qname: str,
     identityref_bases: list[YangIdentifierRef],
+    base_scope: Optional["YangModule"] = None,
 ) -> bool:
     """
     RFC 7950: instance value must be derived from **every** ``identityref`` ``base``.
+    The bases resolve in *base_scope*, the module that wrote the ``type`` (default *importer*).
     The value uses RFC 7951 module names; the bases use schema prefixes.
     """
     if not identityref_bases:
@@ -223,7 +225,7 @@ def identityref_value_valid(
         return False
     closure = identity_ancestor_closure(pair_v[0], pair_v[1])
     for b in identityref_bases:
-        br = resolve_identity_base_ref(importer, b)
+        br = resolve_identity_base_ref(base_scope or importer, b)
         if br is None:
             return False
         if not _pair_in_pairs(br, closure):

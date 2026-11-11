@@ -1,0 +1,128 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:ext",
+  "x-yang": {
+    "module": "ext",
+    "yang-version": "1.1",
+    "namespace": "urn:ext",
+    "prefix": "e",
+    "organization": "",
+    "contact": "",
+    "imports": {
+      "b": {
+        "module": "base",
+        "namespace": "urn:base",
+        "prefix": "b",
+        "identities": {
+          "gadget": {
+            "type": "string",
+            "enum": [
+              "b:gadget"
+            ],
+            "x-yang": {
+              "type": "identity",
+              "bases": [
+                "thing"
+              ]
+            }
+          },
+          "thing": {
+            "type": "string",
+            "enum": [
+              "b:gadget",
+              "b:thing"
+            ],
+            "x-yang": {
+              "type": "identity",
+              "bases": []
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "item": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 255,
+                "x-yang": {
+                  "type": "leaf"
+                }
+              },
+              "kind": {
+                "$ref": "#/x-yang/imports/b/identities/thing",
+                "x-yang": {
+                  "type": "identityref",
+                  "bases": [
+                    "b:thing"
+                  ]
+                }
+              },
+              "args": {
+                "type": "object",
+                "x-yang": {
+                  "type": "container"
+                },
+                "properties": {
+                  "size": {
+                    "type": "integer",
+                    "minimum": 0,
+                    "maximum": 255,
+                    "x-yang": {
+                      "type": "leaf"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              }
+            },
+            "additionalProperties": false
+          },
+          "x-yang": {
+            "type": "list",
+            "key": "id"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "widget": {
+      "type": "string",
+      "enum": [
+        "e:widget"
+      ],
+      "x-yang": {
+        "type": "identity",
+        "bases": [
+          "b:thing"
+        ]
+      }
+    },
+    "plain": {
+      "type": "string",
+      "enum": [
+        "e:plain"
+      ],
+      "x-yang": {
+        "type": "identity",
+        "bases": []
+      }
+    }
+  }
+}

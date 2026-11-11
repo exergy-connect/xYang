@@ -74,7 +74,8 @@ export function resolveIdentityValue(moduleData: YangModule, value: unknown): Id
 export function identityrefValueValid(
   moduleData: YangModule,
   value: unknown,
-  bases: Array<string | YangIdentifierRef>
+  bases: Array<string | YangIdentifierRef>,
+  baseScope: YangModule = moduleData
 ): boolean {
   if (bases.length === 0) {
     return false;
@@ -85,7 +86,7 @@ export function identityrefValueValid(
   }
   const closure = identityAncestorClosure(v.mod, v.local);
   return bases.every((b) => {
-    const br = resolveIdentityBaseRef(moduleData, b);
+    const br = resolveIdentityBaseRef(baseScope, b);
     return br !== null && pairInPairs(br, closure);
   });
 }

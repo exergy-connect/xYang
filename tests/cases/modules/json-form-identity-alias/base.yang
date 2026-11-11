@@ -1,0 +1,11 @@
+module base {
+  yang-version 1.1;
+  namespace "urn:base";
+  prefix bs;
+  identity thing;
+  identity gadget { base thing; }
+  grouping g {
+    leaf kind { type identityref { base bs:thing; } }
+    leaf-list kinds { type identityref { base bs:thing; } }
+  }
+}

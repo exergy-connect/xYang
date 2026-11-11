@@ -1,11 +1,16 @@
 import {
   coerceIdentifierRef,
   formatIdentifierRef,
+  parseAbsoluteSchemaPath,
   parseIdentifierRefAtom
 } from "../core/identifier-ref";
 import { YangModule, YangStatement } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
+import { applyAugments } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
+import { YangExportError } from "../core/errors";
+import { identityDef, importsForJson, withIdentityExport } from "./identity-export";
+import type { IdentityPair } from "../identity-graph";
 import { jsonSchemaDefaultValue } from "./default-values";
 import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
@@ -215,10 +220,10 @@ function foreignTypedefResolved(typeShape: Record<string, unknown>, module: Yang
     const label = prefix ? `${prefix}:${typeName}` : typeName;
     const typedef = resolveTypedef(module, current);
     if (!typedef?.type) {
-      throw new Error(`cannot export type '${label}': its typedef is not found where the type is written`);
+      throw new YangExportError(`cannot export type '${label}': its typedef is not found where the type is written`);
     }
     if (current.range || current.length || (Array.isArray(current.patterns) && current.patterns.length > 0)) {
-      throw new Error(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
+      throw new YangExportError(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
     }
     current = typedef.type;
   }
@@ -244,10 +249,10 @@ function typedefRefOrInline(
   const label = prefix ? `${prefix}:${typeName}` : typeName;
   const typedef = resolveTypedef(module, typeShape);
   if (!typedef?.type) {
-    throw new Error(`cannot export type '${label}': its typedef is not found where the type is written`);
+    throw new YangExportError(`cannot export type '${label}': its typedef is not found where the type is written`);
   }
   if (typeShape.range || typeShape.length || (Array.isArray(typeShape.patterns) && typeShape.patterns.length > 0)) {
-    throw new Error(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
+    throw new YangExportError(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
   }
   return typedefRefOrInline(typedef.type, new Set(), module);
 }
@@ -723,69 +728,52 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
   return out;
 }
 
-function identityBaseStrings(bases: unknown): string[] {
-  if (!Array.isArray(bases)) {
-    return [];
-  }
-  return bases
-    .map((b) => coerceIdentifierRef(b))
-    .filter((b): b is NonNullable<typeof b> => Boolean(b))
-    .map((b) => formatIdentifierRef(b));
-}
-
 function identityToSchema(module: YangModule): Record<string, unknown> {
-  const raw = module.identities as Record<string, { bases?: unknown }>;
-  const identityNames = Object.keys(raw);
-  if (identityNames.length === 0) {
-    return {};
-  }
-
-  const childrenByBase: Record<string, string[]> = {};
-  for (const [identityName, info] of Object.entries(raw)) {
-    for (const base of identityBaseStrings(info?.bases)) {
-      if (!childrenByBase[base]) {
-        childrenByBase[base] = [];
-      }
-      childrenByBase[base].push(identityName);
-    }
-  }
-
-  const descendants = (name: string): string[] => {
-    const out = new Set<string>([name]);
-    const stack = [...(childrenByBase[name] ?? [])];
-    while (stack.length > 0) {
-      const next = stack.pop() as string;
-      if (out.has(next)) {
-        continue;
-      }
-      out.add(next);
-      stack.push(...(childrenByBase[next] ?? []));
-    }
-    return [...out].sort();
-  };
-
   const defs: Record<string, unknown> = {};
-  for (const [identityName, info] of Object.entries(raw)) {
-    const bases = identityBaseStrings(info?.bases);
-    defs[identityName] = {
-      type: "string",
-      enum: descendants(identityName),
-      [YANG_SCHEMA_KEYS.xYang]: {
-        type: YangTokenType.IDENTITY,
-        ...(bases.length > 0 ? { bases } : {})
-      }
-    };
+  for (const identityName of Object.keys(module.identities)) {
+    defs[identityName] = identityDef(module, identityName);
   }
   return defs;
 }
 
+/**
+ * Merge the module's `augment` statements into its own (`uses`-expanded) tree. The native JSON form is the
+ * module's schema tree, so an augment of a node it instantiates (including through an imported grouping)
+ * becomes part of that node. An augment of another module's own tree has no place here: an error, not dropped.
+ */
+function applyOwnAugments(effective: YangModule): void {
+  for (const stmt of effective.statements) {
+    if (stmt.keyword !== YangTokenType.AUGMENT) {
+      continue;
+    }
+    const path = String(stmt.augment_path ?? stmt.argument ?? "");
+    const first = (Array.isArray(stmt.augment_path_segments) && stmt.augment_path_segments.length > 0
+      ? stmt.augment_path_segments
+      : parseAbsoluteSchemaPath(path))[0];
+    const own = String(effective.prefix ?? "").replace(/^['"]|['"]$/g, "");
+    if (first?.prefix !== own) {
+      throw new YangExportError(
+        `cannot export augment '${path}': its target belongs to another module, ` +
+          `which the native JSON form of module '${effective.name}' does not carry`
+      );
+    }
+  }
+  applyAugments(effective);
+}
+
+/** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
 export function generateJsonSchema(module: YangModule): Record<string, unknown> {
+  return withIdentityExport(module, (used) => generateSchema(module, used));
+}
+
+function generateSchema(module: YangModule, used: IdentityPair[]): Record<string, unknown> {
   // Preserve parse-time AST shape (reversible YANG <-> yang.json) while still
   // emitting a flattened schema view.
   const effectiveModule = expandUses(module);
   if (effectiveModule !== module && module.module_registry && !effectiveModule.module_registry) {
     Object.defineProperty(effectiveModule, "module_registry", { value: module.module_registry, enumerable: false });
   }
+  applyOwnAugments(effectiveModule);
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   const typedefNames = new Set(Object.keys(effectiveModule.typedefs as Record<string, unknown>));
@@ -831,6 +819,11 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
   }
   if (Object.keys(rpcs).length > 0) {
     rootXYang[XYANG_KEYS.rpcs] = rpcs;
+  }
+
+  const imports = importsForJson(module, used);
+  if (Object.keys(imports).length > 0) {
+    rootXYang[XYANG_KEYS.imports] = imports;
   }
 
   const schema: Record<string, unknown> = {

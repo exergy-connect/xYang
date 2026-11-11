@@ -46,6 +46,7 @@ The root object carries module identity and contact fields only in **`x-yang`** 
 | `prefix` | Prefix string |
 | `organization` | Optional |
 | `contact` | Optional |
+| `imports` | Optional. `{key: stub}` of the imported modules this module's identities need (see **Imported identities** below) |
 
 ---
 
@@ -129,8 +130,18 @@ Each YANG **`identity`** becomes **`$defs/<identity-name>`**:
 
 A leaf of type **`identityref`** is emitted as:
 
-- **One base:** `{ "$ref": "#/$defs/<base>", "x-yang": { "type": "identityref", "bases": ["<base>"] } }` merged with the leaf’s `x-yang` (effective `type` on the leaf becomes `identityref` after merge; the JSON parser treats it as a leaf).
+- **One base:** `{ "$ref": "#/$defs/<base>", "x-yang": { "type": "identityref", "bases": ["<base>"] } }` (a base of another module: `"$ref": "#/x-yang/imports/<key>/identities/<base>"` and `"bases": ["<key>:<base>"]`) merged with the leaf’s `x-yang` (effective `type` on the leaf becomes `identityref` after merge; the JSON parser treats it as a leaf).
 - **Multiple bases:** `{ "allOf": [ {"$ref": "#/$defs/<b1>"}, ... ], "x-yang": { "type": "identityref", "bases": ["...", "..."] } }` so instance values must satisfy every base (intersection), per RFC 7950.
+
+A base is written in the **exported module's** scope: a bare name for its own identity, `key:name` for another module's, even when the `type` was written in an imported grouping or typedef under another prefix. A base that does not resolve where it is written fails the export (`YangExportError`, `xyang convert` exit 2).
+
+### Imported identities (`x-yang.imports`)
+
+The form has no `import` statements and needs no files, so the identities a module derives from or refers to travel with it. Root `x-yang.imports` maps a **key** to a stub: the prefix the module imports it under, or the module name when it is reached only through another module's grouping. A stub is `{ "module", "namespace", "prefix", "imports"?, "identities" }`: `prefix` is the imported module's own prefix, `imports` is the stub's own table (its identities' bases resolve there), and `identities` holds `$defs`-shaped identity entries (`enum` lists the carried descendants in that module). Carried: every identity an `identityref` base names, the bases of the module's own identities, and the identities of a directly imported module that derive from one of those (an instance value may name them), each with its bases. Nothing else of an import is carried. Instance values keep RFC 7951 module names (`base:gadget`), whatever prefix the importer chose. The parser binds the table as the module's import prefixes.
+
+### Augments
+
+The form is the module's own schema tree, with `uses` expanded. An `augment` of a node the module instantiates (through a local or imported grouping) is merged into that node, so its members appear in `properties` (`module:name` when another module wrote the augment). An `augment` whose target belongs to another module's own tree has no place in this module's form and fails the export.
 
 Inside a typedef definition, nested `$ref` to other typedefs is avoided in the generator (`typedef_names` empty in `_typedef_to_def`).
 

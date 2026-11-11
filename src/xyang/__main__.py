@@ -10,7 +10,7 @@ import textwrap
 from pathlib import Path
 from typing import Any, Dict, Iterable
 
-from xyang.errors import YangSemanticError, YangSyntaxError
+from xyang.errors import YangExportError, YangSemanticError, YangSyntaxError
 
 _CLI_ERRORS: tuple[type[BaseException], ...] = (
     YangSyntaxError,
@@ -510,6 +510,9 @@ def main() -> int:
             module = yang_parser.parse_file(p)
             schema_to_yang_json(module, output_path=out)
             print(f"Wrote {out}")
+        except YangExportError as e:
+            _print_cli_error(e)
+            return 2
         except _CLI_ERRORS as e:
             _print_cli_error(e)
             return 1

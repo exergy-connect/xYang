@@ -1,0 +1,16 @@
+module base {
+  yang-version 1.1;
+  namespace "urn:base";
+  prefix b;
+  identity thing;
+  identity gadget { base thing; }
+  identity unrelated;
+  grouping g {
+    list item {
+      key id;
+      leaf id { type uint8; }
+      leaf kind { type identityref { base b:thing; } }
+      container args;
+    }
+  }
+}

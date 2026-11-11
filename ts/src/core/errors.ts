@@ -188,3 +188,11 @@ export class UnsupportedXPathError extends Error {
     return this.messageText;
   }
 }
+
+/** A construct the native JSON form (`.yang.json`) cannot carry without losing meaning. */
+export class YangExportError extends Error {
+  constructor(message: string) {
+    super(message);
+    this.name = "YangExportError";
+  }
+}
