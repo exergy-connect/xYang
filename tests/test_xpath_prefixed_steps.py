@@ -16,7 +16,12 @@ from xyang.parser.yang_parser import YangParser
 
 CASES_DIR = Path(__file__).parent / "cases"
 CASE = CASES_DIR / "xpath" / "prefixed-steps"
-ROUND_TRIP_CASES = ["xpath/prefixed-steps", "xpath/prefixed-definition-site", "xpath/prefixed-table", "references/leafref-prefixed"]
+ROUND_TRIP_CASES = [
+    "xpath/prefixed-steps",
+    "xpath/prefixed-definition-site",
+    "xpath/prefixed-table",
+    "references/leafref-prefixed",
+]
 
 
 def _load_case(case_dir: Path = CASE):

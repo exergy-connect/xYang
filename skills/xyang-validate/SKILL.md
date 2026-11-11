@@ -45,32 +45,39 @@ Example from the xyang-model skill assets (a link whose `source` equals `target`
 {"valid": false, "errors": [{"path": "/topology/links/0", "code": "must", "message": "A link cannot connect a node to itself."}]}
 ```
 
-## Recipe: validate an rpc's input or output
+## Recipe: validate an rpc's or action's input or output
 
 ```bash
 xyang validate --format json --rpc add-link module.yang rpc-input.json              # input is the default
 xyang validate --format json --rpc add-link --output module.yang rpc-output.json
 xyang validate --format json --rpc add-link --context state.json module.yang rpc-input.json
 xyang validate --format json --native-json --rpc add-link module.yang params.json   # bare parameters
+xyang validate --format json --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json
 ```
 
-- `rpc-input.json` is `{"example-topology-tools:input": {"source": "r1", "target": "r1"}}` (RFC 8040 §3.6: `module:input` or `module:output`) in the default RFC 7951 mode; with `--native-json` it is the parameter object itself. Anything else at the top is an `rpc-wrapper` error.
-- Without `--rpc`, the same document is an `unknown-field` error: the validator cannot tell it is an rpc instance.
-- `--context` is server data (JSON or YAML in Python, JSON in `xyang-ts`) next to the operation node (RFC 7950 §6.4.1). `must` and `leafref` reach it with absolute paths; relative paths such as `../source` stay inside the operation, which is a child of the root with the parameters as its children (the wrapper adds no level). It is not validated. Without it, references outside the operation are unresolved: `leafref` fails and `must` is false.
-- Errors keep the encoded path: `{"path": "/example-topology-tools:input/target", "code": "must", "message": "A link cannot connect a node to itself."}`.
-- Exit 2 (usage error, stdout empty): unknown rpc, `--output` or `--context` without `--rpc`, an rpc whose own `if-feature` is false, a context file that is missing or not instance data.
+- `rpc-input.json` is `{"example-topology-tools:input": {"source": "r1", "target": "r1"}}` (RFC 8040 §3.6: `module:input` or `module:output`, the module that defines the operation) in the default RFC 7951 mode; with `--native-json` it is the parameter object itself. Anything else at the top is an `operation-wrapper` error.
+- Without `--rpc` / `--action`, the same document is an `unknown-field` error: the validator cannot tell it is an operation instance.
+- `--action` takes the RFC 8040 §3.5.3 data resource identifier of the action node, the path RESTCONF POSTs to: first segment `module:`, every list with all its keys (`list=k1,k2`, percent-encoded). It needs `--context` holding that instance; a missing instance is `{"document": "context", "path": "", "code": "action-parent"}`.
+- Accessible tree (RFC 7950 §6.4.1): the context plus the operation node, a child of the root (rpc) or of the selected container or list instance (action), with the parameters as its children. `../source` (rpc) and `../../mtu` (action, the parent entry) are relative paths; absolute paths reach the server data. The wrapper adds no level. Without a context, references outside an rpc are unresolved: `leafref` fails and `must` is false.
+- `--context` (JSON or YAML in Python, JSON in `xyang-ts`) is validated against the module first, like any instance. If it is invalid, only its errors come back, each with `"document": "context"` and a pointer into the context: `{"document": "context", "path": "/ex:interfaces/interface/0/mtu", "code": "type", ...}`. Fix the context before reading the operation's errors.
+- Operation errors keep the encoded path: `{"path": "/example-topology-tools:input/target", "code": "must", "message": "A link cannot connect a node to itself."}`.
+- Exit 2 (usage error, stdout empty): unknown rpc or action, malformed action path or missing keys, `--rpc` with `--action`, `--output` or `--context` alone, `--action` without `--context`, an operation (or action parent) whose `if-feature` is false, a missing context file.
 
 ```python
 validate(module, data, rpc="add-link", direction="input", context=state)   # direction "output" for the output
+validate(module, data, action="/ex:interfaces/interface=eth0/reset", context=state)
 YangValidator(module).validate_detailed(data, rpc="add-link", context=state)
 ```
 
 ```typescript
 validate(module, data, { rpc: "add-link", direction: "input", context: state });
+validate(module, data, { action: "/ex:interfaces/interface=eth0/reset", context: state });
 new YangValidator(module).validateDetailed(data, { rpc: "add-link", context: state });
 ```
 
-An unknown rpc or a bad option combination raises `ValueError` (Python) or throws (TypeScript). `action` is not validated yet.
+An unknown rpc or action or a bad option combination raises `ValueError` (Python) or throws (TypeScript).
+
+Prefixed names in `must`, `when` and leafref paths (`/ex:interfaces/ex:interface/ex:name`) resolve through the prefixes of the module that wrote them (#152); an undeclared prefix fails the load with exit 2. `instance-identifier` values use module names (`/ex-module:top/item[n='x']`), not import aliases.
 
 ## Recipe: validate from code
 
@@ -140,6 +147,6 @@ Integer bounds and other built-in type facts live in the type registry: Python `
 
 ## Limits to keep in mind
 
-- `deviate add|replace|delete` and `action` are skipped with a warning (rpc input and output are validated, see above); see the RFC deviations table in `FEATURES.md`.
+- `deviate add|replace|delete` are skipped with a warning; see the RFC deviations table in `FEATURES.md`.
 - `must` / `when` use xYang's XPath 1.0 subset (`FEATURES.md`).
 - Per-language known differences: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.

@@ -108,13 +108,16 @@ xyang-ts convert examples/meta-model.yang
 
 Python `convert` writes `<file>.yang.json` (or `-o PATH`); `xyang-ts convert` prints to stdout.
 
-Validate one rpc's input or output with `--rpc NAME` (input by default, `--output` for the output) and optional server data with `--context data.json`:
+Validate one rpc's or action's input or output with `--rpc NAME` or `--action PATH` (input by default, `--output` for the output) and server data with `--context data.json` (required for an action). The context is validated first; its errors carry `"document": "context"`.
 
 ```bash
 xyang validate --format json --rpc add-link model.yang rpc-input.json            # {"module:input": {...}}
 xyang validate --rpc add-link --output --context state.json model.yang out.json
 xyang validate --native-json --rpc add-link model.yang params.json              # bare parameters
+xyang validate --action /ex:interfaces/interface=eth0/reset --context state.json model.yang in.json
 ```
+
+`PATH` is the RFC 8040 §3.5.3 data resource identifier of the action node; the action node is a child of that instance in the XPath accessible tree (RFC 7950 §6.4.1). Details: [FEATURES.md](FEATURES.md#rpc-and-action-instances).
 
 Shared flags: `--include-path DIR` (repeatable) for imports; on **validate**, `--anydata-validation off|complete|candidate` and `--anydata-module PATH` for validating RFC 7951 qualified JSON under `anydata` (see below).
 
@@ -132,7 +135,7 @@ is_valid, errors, warnings = validator.validate(data)
 
 `validate()` returns a tuple `(is_valid, errors, warnings)`; each error is a string `"<path>: <message>"` with paths like `/top/items[id='a']/v`.
 
-To validate an rpc's input or output, name it: `validator.validate_detailed(data, rpc="add-link", direction="input", context=state)` (also `validate`, and `xyang.validate(schema, data, rpc=..., direction=..., context=...)`). `data` is `{"module:input": {...}}` (RFC 8040 §3.6), or the bare parameters with `native_json=True`. `context` is optional server data that `must` and `leafref` can reach next to the operation (RFC 7950 §6.4.1); it is not validated. An unknown rpc raises `ValueError`.
+To validate an rpc's or action's input or output, name it: `validator.validate_detailed(data, rpc="add-link", direction="input", context=state)` or `action="/ex:interfaces/interface=eth0/reset"` (also `validate`, and `xyang.validate(schema, data, rpc=... | action=..., direction=..., context=...)`). `data` is `{"module:input": {...}}` (RFC 8040 §3.6), or the bare parameters with `native_json=True`. `context` is server data (required for an action), validated first; its issues carry `"document": "context"`. An unknown rpc or action raises `ValueError`.
 
 ### TypeScript API
 
@@ -147,7 +150,7 @@ const result = validator.validate({ "data-model": { name: "example", entities: [
 
 `validate()` returns `{ isValid, errors, warnings }`; paths look like `top.items[0].v`.
 
-To validate an rpc's input or output, name it: `validator.validateDetailed(data, { rpc: "add-link", direction: "input", context })` (also `validate`, and the top-level `validate(schema, data, { rpc, direction, context })`). `data` is `{"module:input": {...}}` (RFC 8040 §3.6), or the bare parameters with `nativeJson: true`. `context` is optional server data for `must` and `leafref`, not validated. An unknown rpc throws.
+To validate an rpc's or action's input or output, name it: `validator.validateDetailed(data, { rpc: "add-link", direction: "input", context })` or `{ action: "/ex:interfaces/interface=eth0/reset", context }` (also `validate`, and the top-level `validate(schema, data, { rpc | action, direction, context })`). `data` is `{"module:input": {...}}` (RFC 8040 §3.6), or the bare parameters with `nativeJson: true`. `context` is server data (required for an action), validated first; its issues carry `document: "context"`. An unknown rpc or action throws.
 
 RFC 7951 JSON is the default for instance input (the JSON document, not the schema `.yang.json` file). There is no fallback between encodings. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. `--native-json` (Python `native_json=True`, TypeScript `{ nativeJson: true }`, case.json `"encoding": "native"`) enables native dict-style input: keyed objects for single-key lists, bare names, JSON numbers, and `null` for empty. Error paths point at the input as written (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
 
@@ -213,7 +216,7 @@ The [ontology hypergraph example](examples/ontology-hypergraph/README.md) models
 **Does not (today)**
 
 - NETCONF/RESTCONF servers, XML instance encoding, or incremental edit validation.
-- Full RFC 7950 surface (`action`, `notification`, and `deviation` instance validation is limited or skipped—see **FEATURES.md**).
+- Full RFC 7950 surface (`notification` instance validation and `deviate add|replace|delete` are limited or skipped—see **FEATURES.md**).
 - A generic XPath 1.0 engine; expressions are evaluated in **schema context** for `must` / `when` (subset documented in **FEATURES.md**).
 
 Supported subset and RFC deviations: [FEATURES.md](FEATURES.md#deviations-from-rfc-7950--rfc-7951).

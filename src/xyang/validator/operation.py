@@ -171,7 +171,11 @@ def resolve_action(module: YangModule, path: str) -> OperationTarget:
     if keys is not None:
         raise ValueError(f"action {path!r}: the action segment takes no key values")
     for stmt in schema.statements:
-        if isinstance(stmt, YangActionStmt) and stmt.name == name and defining_module_name(stmt, module.name) == namespace:
+        if (
+            isinstance(stmt, YangActionStmt)
+            and stmt.name == name
+            and defining_module_name(stmt, module.name) == namespace
+        ):
             return OperationTarget(stmt, namespace, f"action {path!r}", parents)
     known = sorted(s.name for s in schema.statements if isinstance(s, YangActionStmt) and s.name)
     raise ValueError(
