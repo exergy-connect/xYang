@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from xyang import parse_yang_string
 from xyang.json import generate_json_schema, parse_json_schema
-from xyang.json.integer_bounds import YANG_INTEGER_BOUNDS
+from xyang.types.registry import YANG_INTEGER_BOUNDS
 
 
 def test_uint16_full_range_round_trips_without_builtin_type_key():
@@ -82,3 +82,22 @@ module m {
     td = mod2.typedefs["t"]
     assert td.type.name == "int32"
     assert td.type.range == "0..max"
+
+
+def test_integer_bounds_shim_is_removed():
+    import importlib
+
+    import pytest
+
+    from xyang.types.registry import (
+        YANG_INTEGER_BUILTIN_NAMES,
+        json_integer_bounds_for_builtin,
+        yang_integer_from_json_bounds,
+    )
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("xyang.json.integer_bounds")
+    assert YANG_INTEGER_BOUNDS["uint16"] == (0, 65535)
+    assert "uint16" in YANG_INTEGER_BUILTIN_NAMES
+    assert json_integer_bounds_for_builtin("uint16", None) == (0, 65535)
+    assert yang_integer_from_json_bounds(0, 65535)[0] == "uint16"
