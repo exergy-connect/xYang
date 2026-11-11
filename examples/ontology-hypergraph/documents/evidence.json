@@ -1,0 +1,220 @@
+{
+  "example-audit:graph": {
+    "document": [
+      {
+        "id": "evidence.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "../models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "../models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "../models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ],
+        "requires": [
+          {
+            "id": "catalogue.json",
+            "version": "1"
+          }
+        ]
+      }
+    ],
+    "node": [
+      {
+        "id": "#peoplecore",
+        "label": "PeopleCore HR (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#gatekeeper",
+        "label": "Gatekeeper IAM (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#changedesk",
+        "label": "ChangeDesk (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#hr-leavers-q3",
+        "label": "Q3 leavers",
+        "type": "example-audit:evidence-record",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:hr-termination-report",
+          "source-system": "#peoplecore",
+          "collected-at": "2026-10-02T09:00:00Z",
+          "export": "exports/hr-leavers-q3.csv",
+          "sha256": "236824893bf7e50a59402e347c540adec1b0ba31f85a1b71085840686fbd519a"
+        }
+      },
+      {
+        "id": "#iam-active-users",
+        "label": "Enabled accounts",
+        "type": "example-audit:evidence-record",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-active-users.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:active-account-listing",
+          "source-system": "#gatekeeper",
+          "collected-at": "2026-10-02T09:05:00Z",
+          "export": "exports/iam-active-users.csv",
+          "sha256": "5a8d3bd4a65893e004b01239daad685afc60b65b6947646e915d6dda986b12cc"
+        }
+      },
+      {
+        "id": "#change-tickets-q3",
+        "label": "Q3 privileged change tickets",
+        "type": "example-audit:evidence-record",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/change-tickets-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:change-ticket-export",
+          "source-system": "#changedesk",
+          "collected-at": "2026-10-02T09:10:00Z",
+          "export": "exports/change-tickets-q3.csv",
+          "sha256": "d1d2b495df06caea327ddbb4cb1e0604efeb32a510bf0757aa59da8a6b6dc6dc"
+        }
+      },
+      {
+        "id": "#deploy-log-q3",
+        "label": "Q3 production deployments",
+        "type": "example-audit:evidence-record",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/deploy-log-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:deployment-log",
+          "source-system": "#changedesk",
+          "collected-at": "2026-10-02T09:12:00Z",
+          "export": "exports/deploy-log-q3.csv",
+          "sha256": "98ba62225b816f87109c223db8b3838e0b7756b646e9743b7af99f54ac1a4109"
+        }
+      }
+    ],
+    "hyperedge": [
+      {
+        "id": "#col-hr",
+        "type": "example-audit:collection",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "recorded-at": "2026-10-02T09:01:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "#peoplecore"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-hr-leavers-q3",
+            "role": "example-audit:collected",
+            "node": "#hr-leavers-q3"
+          }
+        ]
+      },
+      {
+        "id": "#col-iam",
+        "type": "example-audit:collection",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-active-users.csv",
+        "recorded-at": "2026-10-02T09:06:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "#gatekeeper"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-iam-active-users",
+            "role": "example-audit:collected",
+            "node": "#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "#col-change",
+        "type": "example-audit:collection",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/change-tickets-q3.csv",
+        "recorded-at": "2026-10-02T09:13:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "#changedesk"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-change-tickets-q3",
+            "role": "example-audit:collected",
+            "node": "#change-tickets-q3"
+          },
+          {
+            "id": "got-deploy-log-q3",
+            "role": "example-audit:collected",
+            "node": "#deploy-log-q3"
+          }
+        ]
+      }
+    ]
+  }
+}

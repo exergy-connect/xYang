@@ -1,0 +1,5 @@
+# Optional independent schema and semantic tools; not xYang runtime dependencies.
+pyang==2.7.1
+yangson==1.7.9
+rdflib==7.5.0
+owlrl==7.1.4

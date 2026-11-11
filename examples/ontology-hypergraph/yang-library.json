@@ -1,0 +1,35 @@
+{
+  "ietf-yang-library:yang-library": {
+    "module-set": [
+      {
+        "name": "audit-2026.1",
+        "module": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:hypergraph"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:bfo"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:audit"
+          }
+        ]
+      }
+    ],
+    "schema": [
+      {
+        "name": "audit",
+        "module-set": [
+          "audit-2026.1"
+        ]
+      }
+    ],
+    "content-id": "b20cb329c3e5c91854775159d21f5973625058850352867379a419137491d7af"
+  }
+}

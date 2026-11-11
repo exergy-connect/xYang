@@ -1,0 +1,35 @@
+module example-bfo {
+  yang-version 1.1;
+  namespace "urn:example:bfo";
+  prefix bfo;
+  import example-hypergraph { prefix hg; revision-date 2026-11-10; }
+  organization "xYang example authors";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Small BFO-2020 alignment vocabulary, not a reimplementation of BFO.
+     These YANG identities denote classification tags, not OWL classes.
+     SPDX-License-Identifier: MIT";
+  reference "ISO/IEC 21838-1:2021; ISO/IEC 21838-2:2021; https://github.com/BFO-ontology/BFO-2020";
+  revision 2026-11-10 { description "Initial example revision.";
+    reference "xYang examples/ontology-hypergraph/README.md"; }
+
+  identity entity { base hg:element-kind; description "Aligned with BFO_0000001 (entity)."; }
+  identity continuant { base entity; description "Aligned with BFO_0000002 (continuant)."; }
+  identity occurrent { base entity; description "Aligned with BFO_0000003 (occurrent)."; }
+  identity material-entity { base continuant; description "Aligned with BFO_0000040 (material entity)."; }
+  identity process { base occurrent; description "Aligned with BFO_0000015 (process)."; }
+
+  grouping additional-classification {
+    description "Additional asserted classifications, for semantic consistency checks.";
+    leaf-list also-type {
+      type identityref { base bfo:entity; }
+      description "BFO classification tag; disjointness is evaluated outside YANG.";
+    }
+  }
+
+  grouping term-description {
+    description "Documentation for a domain universal; does not assert a formal definition.";
+    leaf definition { type string { length "1..max"; } mandatory true; description "Textual domain definition."; }
+    leaf bfo-class { type string; mandatory true; description "Canonical BFO class IRI for alignment review."; }
+  }
+}

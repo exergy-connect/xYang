@@ -1,0 +1,721 @@
+{
+  "example-audit:graph": {
+    "document": [
+      {
+        "id": "http://audit.test/documents/reviews.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ],
+        "requires": [
+          {
+            "id": "http://audit.test/documents/assessments.json",
+            "version": "1"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ],
+        "requires": [
+          {
+            "id": "http://audit.test/documents/evidence.json",
+            "version": "1"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "http://audit.test/models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ],
+        "requires": [
+          {
+            "id": "http://audit.test/documents/catalogue.json",
+            "version": "1"
+          }
+        ]
+      }
+    ],
+    "node": [
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-engagement",
+        "label": "engagement",
+        "type": "example-audit:engagement",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "An engagement assessing a client's controls for a period.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-control",
+        "label": "control",
+        "type": "example-audit:control",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "A documented control the client asserts it operates.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-evidence-record",
+        "label": "evidence-record",
+        "type": "example-audit:evidence-record",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "An artifact collected from a client system.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-source-system",
+        "label": "source-system",
+        "type": "example-audit:source-system",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "A client information system that produces artifacts.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-collection-agent",
+        "label": "collection-agent",
+        "type": "example-audit:collection-agent",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "Software that retrieves client artifacts.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-assessment-agent",
+        "label": "assessment-agent",
+        "type": "example-audit:assessment-agent",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "Software that drafts control assessments.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#term-audit-professional",
+        "label": "audit-professional",
+        "type": "example-audit:audit-professional",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "term": {
+          "definition": "A person on the engagement team.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000040"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#eng-2026",
+        "label": "Alder Ridge Logistics access and change controls 2026",
+        "type": "example-audit:engagement",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "engagement": {
+          "client": "Alder Ridge Logistics Ltd (fictional)",
+          "period-start": "2026-07-01",
+          "period-end": "2026-09-30"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#ac-01",
+        "label": "Timely removal of leaver access",
+        "type": "example-audit:control",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "control": {
+          "reference": "AC-01",
+          "statement": "Access for terminated employees is disabled within one business day of termination.",
+          "accepted-evidence": [
+            "example-audit:hr-termination-report",
+            "example-audit:active-account-listing"
+          ]
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#cm-02",
+        "label": "Independent approval of privileged changes",
+        "type": "example-audit:control",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "control": {
+          "reference": "CM-02",
+          "statement": "Privileged production changes are approved by someone other than the implementer before deployment.",
+          "accepted-evidence": [
+            "example-audit:change-ticket-export",
+            "example-audit:deployment-log"
+          ]
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#ac-04",
+        "label": "Quarterly user access review",
+        "type": "example-audit:control",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "control": {
+          "reference": "AC-04",
+          "statement": "Application owners review user access each quarter and record removals.",
+          "accepted-evidence": [
+            "example-audit:policy-document",
+            "example-audit:active-account-listing"
+          ]
+        }
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#collector",
+        "label": "Evidence collection agent",
+        "type": "example-audit:collection-agent",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#drafting-agent",
+        "label": "Assessment drafting agent",
+        "type": "example-audit:assessment-agent",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#m-ito",
+        "label": "M. Ito (fictional senior)",
+        "type": "example-audit:audit-professional",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/catalogue.json#r-okafor",
+        "label": "R. Okafor (fictional manager)",
+        "type": "example-audit:audit-professional",
+        "origin": "http://audit.test/documents/catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#peoplecore",
+        "label": "PeopleCore HR (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#gatekeeper",
+        "label": "Gatekeeper IAM (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#changedesk",
+        "label": "ChangeDesk (fictional)",
+        "type": "example-audit:source-system",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/catalogue.json"
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#hr-leavers-q3",
+        "label": "Q3 leavers",
+        "type": "example-audit:evidence-record",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/hr-leavers-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:hr-termination-report",
+          "source-system": "http://audit.test/documents/evidence.json#peoplecore",
+          "collected-at": "2026-10-02T09:00:00Z",
+          "export": "http://audit.test/documents/exports/hr-leavers-q3.csv",
+          "sha256": "236824893bf7e50a59402e347c540adec1b0ba31f85a1b71085840686fbd519a"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#iam-active-users",
+        "label": "Enabled accounts",
+        "type": "example-audit:evidence-record",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/iam-active-users.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:active-account-listing",
+          "source-system": "http://audit.test/documents/evidence.json#gatekeeper",
+          "collected-at": "2026-10-02T09:05:00Z",
+          "export": "http://audit.test/documents/exports/iam-active-users.csv",
+          "sha256": "5a8d3bd4a65893e004b01239daad685afc60b65b6947646e915d6dda986b12cc"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#change-tickets-q3",
+        "label": "Q3 privileged change tickets",
+        "type": "example-audit:evidence-record",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/change-tickets-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:change-ticket-export",
+          "source-system": "http://audit.test/documents/evidence.json#changedesk",
+          "collected-at": "2026-10-02T09:10:00Z",
+          "export": "http://audit.test/documents/exports/change-tickets-q3.csv",
+          "sha256": "d1d2b495df06caea327ddbb4cb1e0604efeb32a510bf0757aa59da8a6b6dc6dc"
+        }
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#deploy-log-q3",
+        "label": "Q3 production deployments",
+        "type": "example-audit:evidence-record",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/deploy-log-q3.csv",
+        "evidence-record": {
+          "evidence-type": "example-audit:deployment-log",
+          "source-system": "http://audit.test/documents/evidence.json#changedesk",
+          "collected-at": "2026-10-02T09:12:00Z",
+          "export": "http://audit.test/documents/exports/deploy-log-q3.csv",
+          "sha256": "98ba62225b816f87109c223db8b3838e0b7756b646e9743b7af99f54ac1a4109"
+        }
+      }
+    ],
+    "hyperedge": [
+      {
+        "id": "http://audit.test/documents/reviews.json#rv-ac-01",
+        "type": "example-audit:review",
+        "origin": "http://audit.test/documents/reviews.json",
+        "asserted-by": "https://larkspur-reed.example/agents/r-okafor",
+        "evidence": "http://audit.test/documents/assessments.json",
+        "recorded-at": "2026-10-07T10:00:00Z",
+        "sign-off": {
+          "decision": "approved",
+          "comment": "Exception confirmed against both exports."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:reviewer",
+            "node": "http://audit.test/documents/catalogue.json#r-okafor"
+          },
+          {
+            "id": "of",
+            "role": "example-audit:reviewed",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-ac-01"
+          },
+          {
+            "id": "by-2",
+            "role": "example-audit:reviewer",
+            "node": "http://audit.test/documents/catalogue.json#m-ito"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/reviews.json#rv-cm-02",
+        "type": "example-audit:review",
+        "origin": "http://audit.test/documents/reviews.json",
+        "asserted-by": "https://larkspur-reed.example/agents/r-okafor",
+        "evidence": "http://audit.test/documents/assessments.json",
+        "recorded-at": "2026-10-07T10:20:00Z",
+        "sign-off": {
+          "decision": "approved",
+          "comment": "Approver differs from implementer for both tickets."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:reviewer",
+            "node": "http://audit.test/documents/catalogue.json#r-okafor"
+          },
+          {
+            "id": "of",
+            "role": "example-audit:reviewed",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-cm-02"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/reviews.json#rv-ac-04",
+        "type": "example-audit:review",
+        "origin": "http://audit.test/documents/reviews.json",
+        "asserted-by": "https://larkspur-reed.example/agents/m-ito",
+        "evidence": "http://audit.test/documents/assessments.json",
+        "recorded-at": "2026-10-07T10:40:00Z",
+        "sign-off": {
+          "decision": "approved",
+          "comment": "Request access review records from the client."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:reviewer",
+            "node": "http://audit.test/documents/catalogue.json#m-ito"
+          },
+          {
+            "id": "of",
+            "role": "example-audit:reviewed",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-ac-04"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json#as-ac-01",
+        "type": "example-audit:assessment",
+        "origin": "http://audit.test/documents/assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "recorded-at": "2026-10-05T11:00:00Z",
+        "result": {
+          "outcome": "exception",
+          "rationale": "E1043 left on 2026-08-14; account jmarsh was still enabled and logged in on 2026-08-26."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "http://audit.test/documents/catalogue.json#drafting-agent"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "http://audit.test/documents/catalogue.json#ac-01"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          },
+          {
+            "id": "ev-hr-leavers-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#hr-leavers-q3"
+          },
+          {
+            "id": "ev-iam-active-users",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json#as-cm-02",
+        "type": "example-audit:assessment",
+        "origin": "http://audit.test/documents/assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/m-ito",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "recorded-at": "2026-10-05T14:30:00Z",
+        "result": {
+          "outcome": "supported",
+          "rationale": "Both privileged changes were approved by a different person before deployment."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "http://audit.test/documents/catalogue.json#m-ito"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "http://audit.test/documents/catalogue.json#cm-02"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          },
+          {
+            "id": "ev-change-tickets-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#change-tickets-q3"
+          },
+          {
+            "id": "ev-deploy-log-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#deploy-log-q3"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json#as-ac-04",
+        "type": "example-audit:assessment",
+        "origin": "http://audit.test/documents/assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "recorded-at": "2026-10-05T15:10:00Z",
+        "result": {
+          "outcome": "insufficient-evidence",
+          "rationale": "No quarterly access review records were provided for the period."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "http://audit.test/documents/catalogue.json#drafting-agent"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "http://audit.test/documents/catalogue.json#ac-04"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json#fd-ac-01",
+        "type": "example-audit:finding",
+        "origin": "http://audit.test/documents/assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "http://audit.test/documents/exports/iam-active-users.csv",
+        "recorded-at": "2026-10-05T11:20:00Z",
+        "detail": {
+          "severity": "high",
+          "condition": "A terminated employee's account remained enabled and was used 12 days after termination."
+        },
+        "incidence": [
+          {
+            "id": "basis",
+            "role": "example-audit:basis",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-ac-01"
+          },
+          {
+            "id": "ev-hr",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#hr-leavers-q3"
+          },
+          {
+            "id": "ev-iam",
+            "role": "example-audit:cited-evidence",
+            "node": "http://audit.test/documents/evidence.json#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/assessments.json#wp-2026",
+        "type": "example-audit:workpaper-bundle",
+        "origin": "http://audit.test/documents/assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "http://audit.test/documents/catalogue.json",
+        "incidence": [
+          {
+            "id": "m1",
+            "role": "example-audit:member",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-ac-01"
+          },
+          {
+            "id": "m2",
+            "role": "example-audit:member",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-cm-02"
+          },
+          {
+            "id": "m3",
+            "role": "example-audit:member",
+            "hyperedge": "http://audit.test/documents/assessments.json#as-ac-04"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#col-hr",
+        "type": "example-audit:collection",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/hr-leavers-q3.csv",
+        "recorded-at": "2026-10-02T09:01:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "http://audit.test/documents/catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "http://audit.test/documents/evidence.json#peoplecore"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-hr-leavers-q3",
+            "role": "example-audit:collected",
+            "node": "http://audit.test/documents/evidence.json#hr-leavers-q3"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#col-iam",
+        "type": "example-audit:collection",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/iam-active-users.csv",
+        "recorded-at": "2026-10-02T09:06:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "http://audit.test/documents/catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "http://audit.test/documents/evidence.json#gatekeeper"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-iam-active-users",
+            "role": "example-audit:collected",
+            "node": "http://audit.test/documents/evidence.json#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "http://audit.test/documents/evidence.json#col-change",
+        "type": "example-audit:collection",
+        "origin": "http://audit.test/documents/evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "http://audit.test/documents/exports/change-tickets-q3.csv",
+        "recorded-at": "2026-10-02T09:13:00Z",
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:collector",
+            "node": "http://audit.test/documents/catalogue.json#collector"
+          },
+          {
+            "id": "from",
+            "role": "example-audit:source",
+            "node": "http://audit.test/documents/evidence.json#changedesk"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "http://audit.test/documents/catalogue.json#eng-2026"
+          },
+          {
+            "id": "got-change-tickets-q3",
+            "role": "example-audit:collected",
+            "node": "http://audit.test/documents/evidence.json#change-tickets-q3"
+          },
+          {
+            "id": "got-deploy-log-q3",
+            "role": "example-audit:collected",
+            "node": "http://audit.test/documents/evidence.json#deploy-log-q3"
+          }
+        ]
+      }
+    ]
+  }
+}
