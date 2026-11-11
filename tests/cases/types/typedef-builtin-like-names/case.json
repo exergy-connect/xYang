@@ -1,0 +1,154 @@
+{
+  "description": "A module's own typedef named like a type in another model (date, date-and-time, identifier) is an ordinary typedef: its pattern and length apply, including through a derived typedef that narrows it and a refining type statement. Only real YANG built-ins are built in (RFC 7950 section 7.3).",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "all values match",
+      "data": {
+        "top": {
+          "d": "2026-11-10",
+          "dt": "2026-11-10T01:02:03Z",
+          "id": "abc",
+          "refined": "2026-01-02",
+          "this-year": "2026-11-10"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "date typedef pattern",
+      "data": {
+        "top": {
+          "d": "yesterday"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/d",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "date-and-time typedef pattern",
+      "data": {
+        "top": {
+          "dt": "2026-11-10"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/dt",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "constraint inherited through a derived typedef",
+      "data": {
+        "top": {
+          "this-year": "10/11/2026"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/this-year",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "inherited base pattern still applies under the narrowing pattern",
+      "data": {
+        "top": {
+          "this-year": "2026-oops"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/this-year",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "derived typedef narrows the pattern",
+      "data": {
+        "top": {
+          "this-year": "2025-01-02"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/this-year",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "identifier typedef length",
+      "data": {
+        "top": {
+          "id": "abcdefghij"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/id",
+          "code": "length"
+        }
+      ]
+    },
+    {
+      "name": "identifier typedef pattern",
+      "data": {
+        "top": {
+          "id": "ABC"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/id",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "refining pattern on the leaf narrows the typedef",
+      "data": {
+        "top": {
+          "refined": "2025-01-02"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/refined",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "refining pattern keeps the typedef pattern",
+      "data": {
+        "top": {
+          "refined": "2026-oops"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/refined",
+          "code": "pattern"
+        }
+      ]
+    }
+  ]
+}

@@ -129,17 +129,6 @@ def _type_has_restrictions(type_stmt: YangTypeStmt) -> bool:
 
 _INTEGER_TYPE_NAMES = INTEGER_TYPE_NAMES
 _DECIMAL_TYPE_NAMES = DECIMAL_TYPE_NAMES
-_STRING_TYPE_NAMES = frozenset(
-    {
-        "string",
-        "entity-name",
-        "field-name",
-        "identifier",
-        "date",
-        "date-and-time",
-        "qualified-source",
-    }
-)
 
 
 class TypeChecker:
@@ -199,9 +188,8 @@ class TypeChecker:
                 evaluator,
                 leafref_current,
             )
-        if name in _STRING_TYPE_NAMES:
-            return self._check_string(value, type_stmt)
-        # version-string and other typedefs: resolve via get_typedef so pattern/constraints apply
+        # Typedefs (including ones named like built-ins in other models, such as ``date``)
+        # resolve through get_typedef so their pattern/length/range constraints apply.
         if name in _INTEGER_TYPE_NAMES:
             return self._check_integer(value, type_stmt)
         if name in _DECIMAL_TYPE_NAMES:
@@ -354,7 +342,7 @@ class TypeChecker:
             return self._check_decimal(value, type_stmt)
         if builtin == "binary":
             return self._check_binary(value, type_stmt)
-        if builtin in _STRING_TYPE_NAMES:
+        if builtin == STRING:
             return self._check_string(value, type_stmt)
         return []
 
