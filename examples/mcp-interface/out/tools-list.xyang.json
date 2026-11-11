@@ -60,6 +60,12 @@
                   "pattern": "ses_[0-9a-f]{32}",
                   "invert-match": false
                 }
+              ],
+              "extensions": [
+                {
+                  "name": "mcp:http-header",
+                  "argument": "Session"
+                }
               ]
             },
             "x-mcp-header": "Session"
@@ -172,6 +178,12 @@
                   "pattern": "ses_[0-9a-f]{32}",
                   "invert-match": false
                 }
+              ],
+              "extensions": [
+                {
+                  "name": "mcp:http-header",
+                  "argument": "Session"
+                }
               ]
             },
             "x-mcp-header": "Session"
@@ -274,6 +286,12 @@
                 {
                   "pattern": "ses_[0-9a-f]{32}",
                   "invert-match": false
+                }
+              ],
+              "extensions": [
+                {
+                  "name": "mcp:http-header",
+                  "argument": "Session"
                 }
               ]
             },

@@ -154,6 +154,12 @@
                               }
                             }
                           ],
+                          "extensions": [
+                            {
+                              "name": "mcp:http-header",
+                              "argument": "Session"
+                            }
+                          ],
                           "mandatory": true,
                           "string-patterns": [
                             {
@@ -223,6 +229,12 @@
                               "xpath-prefixes": {
                                 "topo": "example-topology-tools"
                               }
+                            }
+                          ],
+                          "extensions": [
+                            {
+                              "name": "mcp:http-header",
+                              "argument": "Session"
                             }
                           ],
                           "mandatory": true,
@@ -313,6 +325,12 @@
                               "xpath-prefixes": {
                                 "topo": "example-topology-tools"
                               }
+                            }
+                          ],
+                          "extensions": [
+                            {
+                              "name": "mcp:http-header",
+                              "argument": "Session"
                             }
                           ],
                           "mandatory": true,
@@ -558,6 +576,12 @@
                     }
                   }
                 ],
+                "extensions": [
+                  {
+                    "name": "mcp:http-header",
+                    "argument": "Session"
+                  }
+                ],
                 "mandatory": true,
                 "string-patterns": [
                   {
@@ -644,6 +668,12 @@
                     "xpath-prefixes": {
                       "topo": "example-topology-tools"
                     }
+                  }
+                ],
+                "extensions": [
+                  {
+                    "name": "mcp:http-header",
+                    "argument": "Session"
                   }
                 ],
                 "mandatory": true,
@@ -735,6 +765,12 @@
                     "xpath-prefixes": {
                       "topo": "example-topology-tools"
                     }
+                  }
+                ],
+                "extensions": [
+                  {
+                    "name": "mcp:http-header",
+                    "argument": "Session"
                   }
                 ],
                 "mandatory": true,
@@ -848,6 +884,13 @@
               "type": "identity",
               "bases": []
             }
+          }
+        },
+        "extension": {
+          "http-header": {
+            "argument": "name",
+            "description": "Mirror this tool argument into the HTTP header Mcp-Param-<name> on the\n       Streamable HTTP transport. compile_mcp.py emits it as the property's\n       x-mcp-header. Only for string, integer and boolean leaves directly\n       below the rpc input.",
+            "reference": "Model Context Protocol 2026-07-28, server/tools, x-mcp-header"
           }
         }
       }
