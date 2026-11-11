@@ -1,0 +1,122 @@
+{
+  "example-topology-tools:session": {
+    "handle": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+    "protocol-version": "2026-07-28",
+    "server": {
+      "name": "topology-builder",
+      "version": "0.1.0"
+    },
+    "view": {
+      "caller": "agent:planner-1",
+      "snapshot": "3b5d5c3712955042212316173ccf37be800ef6f1d9ad5b6c1ff0f7ef2f9e16a4"
+    },
+    "call": [
+      {
+        "id": 1,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "name": "r1"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 2,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "name": "r2",
+            "role": "router"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 3,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "name": "h1",
+            "role": "host"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 4,
+        "tool": "example-topology-tools:add-link",
+        "arguments": {
+          "add-link": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "source": "r1",
+            "target": "r2"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 5,
+        "tool": "example-topology-tools:add-link",
+        "arguments": {
+          "add-link": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "source": "r2",
+            "target": "h1",
+            "bandwidth-mbps": 100
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 6,
+        "tool": "example-topology-tools:delete-node",
+        "arguments": {
+          "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "name": "r1"
+          }
+        },
+        "result": {
+          "status": "error",
+          "message": "node r1 already exists"
+        }
+      },
+      {
+        "id": 7,
+        "tool": "example-topology-tools:find-path",
+        "arguments": {
+          "find-path": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+            "from": "r1",
+            "to": "h1",
+            "max-hops": 4
+          }
+        },
+        "result": {
+          "status": "ok",
+          "find-path": {
+            "hop": [
+              "r1",
+              "r2",
+              "h1"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

@@ -1,0 +1,19 @@
+# Cloudflare Worker for the topology MCP server (MCP 2026-07-28), checked by xYang.
+# HTTP/3 is not configured here: Cloudflare terminates it at the edge. Enable it on
+# the zone (Speed > Settings > Protocol Optimization > HTTP/3 (with QUIC)).
+name = "xyang-mcp-topology"
+main = "src/index.ts"
+compatibility_date = "2026-11-01"
+
+[vars]
+# Comma-separated browser origins allowed to call /mcp. Requests without an
+# Origin header (agents, CLIs) are always allowed.
+ALLOWED_ORIGINS = ""
+
+[[durable_objects.bindings]]
+name = "SESSIONS"
+class_name = "SessionObject"
+
+[[migrations]]
+tag = "v1"
+new_sqlite_classes = ["SessionObject"]

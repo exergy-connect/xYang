@@ -1,0 +1,224 @@
+{
+  "add-node-new": {
+    "rpc": "add-node",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "name": "r3",
+        "role": "switch"
+      }
+    },
+    "errors": []
+  },
+  "add-node-duplicate": {
+    "rpc": "add-node",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "name": "r1"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/name",
+        "code": "must",
+        "message": "A node with this name already exists."
+      }
+    ]
+  },
+  "add-node-missing-name": {
+    "rpc": "add-node",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/name",
+        "code": "mandatory",
+        "message": "Mandatory leaf 'name' is missing"
+      }
+    ]
+  },
+  "add-link-new": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "source": "r1",
+        "target": "h1"
+      }
+    },
+    "errors": []
+  },
+  "add-link-hallucinated-target": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "source": "r1",
+        "target": "r9"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/target",
+        "code": "must",
+        "message": "target must name a node that an earlier successful add-node call created."
+      }
+    ]
+  },
+  "add-link-self-loop": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "source": "r1",
+        "target": "r1"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/target",
+        "code": "must",
+        "message": "A link cannot connect a node to itself."
+      }
+    ]
+  },
+  "add-link-bandwidth-zero": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "source": "r1",
+        "target": "h1",
+        "bandwidth-mbps": 0
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/bandwidth-mbps",
+        "code": "range",
+        "message": "Value 0 is less than minimum 1"
+      }
+    ]
+  },
+  "add-link-without-context": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": null,
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "source": "r1",
+        "target": "r2"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/session",
+        "code": "must",
+        "message": "session must be the handle of the session this call belongs to."
+      },
+      {
+        "path": "/example-topology-tools:input/source",
+        "code": "must",
+        "message": "source must name a node that an earlier successful add-node call created."
+      },
+      {
+        "path": "/example-topology-tools:input/target",
+        "code": "must",
+        "message": "target must name a node that an earlier successful add-node call created."
+      }
+    ]
+  },
+  "find-path-unknown-end": {
+    "rpc": "find-path",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+        "from": "r1",
+        "to": "r9"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/to",
+        "code": "must",
+        "message": "to must name a node that an earlier successful add-node call created."
+      }
+    ]
+  },
+  "find-path-output": {
+    "rpc": "find-path",
+    "direction": "output",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:output": {
+        "hop": [
+          "r1",
+          "r2",
+          "h1"
+        ]
+      }
+    },
+    "errors": []
+  },
+  "find-path-output-hallucinated-hop": {
+    "rpc": "find-path",
+    "direction": "output",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:output": {
+        "hop": [
+          "r1",
+          "r9",
+          "h1"
+        ]
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:output/hop/1",
+        "code": "must",
+        "message": "Every hop must be a node that an earlier successful add-node call created."
+      }
+    ]
+  },
+  "add-link-other-session": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_00000000000000000000000000000000",
+        "source": "r1",
+        "target": "h1"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/session",
+        "code": "must",
+        "message": "session must be the handle of the session this call belongs to."
+      }
+    ]
+  }
+}

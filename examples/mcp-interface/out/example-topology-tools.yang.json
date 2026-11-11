@@ -1,0 +1,911 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:example:topology-tools",
+  "type": "object",
+  "properties": {
+    "session": {
+      "type": "object",
+      "properties": {
+        "handle": {
+          "type": "string",
+          "pattern": "^ses_[0-9a-f]{32}$",
+          "x-yang": {
+            "type": "leaf",
+            "mandatory": true,
+            "string-patterns": [
+              {
+                "pattern": "ses_[0-9a-f]{32}",
+                "invert-match": false
+              }
+            ]
+          },
+          "description": "The handle this record is kept under."
+        },
+        "protocol-version": {
+          "type": "string",
+          "pattern": "^[0-9]{4}-[0-9]{2}-[0-9]{2}$",
+          "x-yang": {
+            "type": "leaf",
+            "mandatory": true,
+            "string-patterns": [
+              {
+                "pattern": "[0-9]{4}-[0-9]{2}-[0-9]{2}",
+                "invert-match": false
+              }
+            ]
+          },
+          "description": "MCP protocol revision the calls were made in."
+        },
+        "server": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "x-yang": {
+                "type": "leaf",
+                "mandatory": true
+              },
+              "description": "Server name."
+            },
+            "version": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 64,
+              "x-yang": {
+                "type": "leaf",
+                "mandatory": true
+              },
+              "description": "Server version."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "name",
+            "version"
+          ],
+          "x-yang": {
+            "type": "container"
+          },
+          "description": "serverInfo the server reports in each result's _meta."
+        },
+        "view": {
+          "type": "object",
+          "properties": {
+            "caller": {
+              "type": "string",
+              "minLength": 1,
+              "maxLength": 128,
+              "x-yang": {
+                "type": "leaf",
+                "mandatory": true
+              },
+              "description": "Who made the calls."
+            },
+            "snapshot": {
+              "type": "string",
+              "pattern": "^[0-9a-f]{64}$",
+              "x-yang": {
+                "type": "leaf",
+                "mandatory": true,
+                "string-patterns": [
+                  {
+                    "pattern": "[0-9a-f]{64}",
+                    "invert-match": false
+                  }
+                ]
+              },
+              "description": "Digest of the server-side context the calls ran against."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "caller",
+            "snapshot"
+          ],
+          "x-yang": {
+            "type": "container"
+          },
+          "description": "The local context this record was checked in. No validator has a global\n         view, so a verdict names the view it was made in."
+        },
+        "call": {
+          "type": "array",
+          "items": {
+            "type": "object",
+            "properties": {
+              "id": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 4294967295,
+                "x-yang": {
+                  "type": "leaf"
+                },
+                "description": "Sequence number the server assigns in receive order, so rules compare ids to mean 'earlier'."
+              },
+              "tool": {
+                "$ref": "#/x-yang/imports/mcp/identities/tool",
+                "x-yang": {
+                  "type": "identityref",
+                  "mandatory": true,
+                  "bases": [
+                    "mcp:tool"
+                  ]
+                },
+                "description": "params.name of the request, as a tool identity. An undeclared tool is rejected here."
+              },
+              "arguments": {
+                "type": "object",
+                "properties": {
+                  "add-node": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "string",
+                        "pattern": "^ses_[0-9a-f]{32}$",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": ". = /topo:session/topo:handle",
+                              "error-message": "session must be the handle of the session this call belongs to.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true,
+                          "string-patterns": [
+                            {
+                              "pattern": "ses_[0-9a-f]{32}",
+                              "invert-match": false
+                            }
+                          ]
+                        },
+                        "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+                      },
+                      "name": {
+                        "$ref": "#/$defs/node-name",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": "not(/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'",
+                              "error-message": "A node with this name already exists.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true
+                        },
+                        "description": "Name of the new node. Unique in the topology."
+                      },
+                      "role": {
+                        "type": "string",
+                        "enum": [
+                          "router",
+                          "switch",
+                          "host"
+                        ],
+                        "x-yang": {
+                          "type": "leaf"
+                        },
+                        "description": "What the node does.",
+                        "default": "router"
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "session",
+                      "name"
+                    ],
+                    "x-yang": {
+                      "type": "container",
+                      "when": {
+                        "condition": "derived-from-or-self(../../tool, 'topo:add-node')"
+                      }
+                    },
+                    "description": "Arguments of an add-node call."
+                  },
+                  "add-link": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "string",
+                        "pattern": "^ses_[0-9a-f]{32}$",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": ". = /topo:session/topo:handle",
+                              "error-message": "session must be the handle of the session this call belongs to.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true,
+                          "string-patterns": [
+                            {
+                              "pattern": "ses_[0-9a-f]{32}",
+                              "invert-match": false
+                            }
+                          ]
+                        },
+                        "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+                      },
+                      "source": {
+                        "$ref": "#/$defs/node-name",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                              "error-message": "source must name a node that an earlier successful add-node call created.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true
+                        },
+                        "description": "One end of the link."
+                      },
+                      "target": {
+                        "$ref": "#/$defs/node-name",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": ". != ../source",
+                              "error-message": "A link cannot connect a node to itself."
+                            },
+                            {
+                              "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                              "error-message": "target must name a node that an earlier successful add-node call created.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true
+                        },
+                        "description": "The other end of the link. Must differ from source."
+                      },
+                      "bandwidth-mbps": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 400000,
+                        "x-yang": {
+                          "type": "leaf"
+                        },
+                        "description": "Link capacity in megabits per second.",
+                        "default": 1000
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "session",
+                      "source",
+                      "target"
+                    ],
+                    "x-yang": {
+                      "type": "container",
+                      "when": {
+                        "condition": "derived-from-or-self(../../tool, 'topo:add-link')"
+                      }
+                    },
+                    "description": "Arguments of an add-link call."
+                  },
+                  "find-path": {
+                    "type": "object",
+                    "properties": {
+                      "session": {
+                        "type": "string",
+                        "pattern": "^ses_[0-9a-f]{32}$",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": ". = /topo:session/topo:handle",
+                              "error-message": "session must be the handle of the session this call belongs to.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true,
+                          "string-patterns": [
+                            {
+                              "pattern": "ses_[0-9a-f]{32}",
+                              "invert-match": false
+                            }
+                          ]
+                        },
+                        "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+                      },
+                      "from": {
+                        "$ref": "#/$defs/node-name",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                              "error-message": "from must name a node that an earlier successful add-node call created.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true
+                        },
+                        "description": "Start node."
+                      },
+                      "to": {
+                        "$ref": "#/$defs/node-name",
+                        "x-yang": {
+                          "type": "leaf",
+                          "must": [
+                            {
+                              "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                              "error-message": "to must name a node that an earlier successful add-node call created.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ],
+                          "mandatory": true
+                        },
+                        "description": "End node."
+                      },
+                      "max-hops": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 16,
+                        "x-yang": {
+                          "type": "leaf"
+                        },
+                        "description": "Longest path to consider, in hops.",
+                        "default": 8
+                      }
+                    },
+                    "additionalProperties": false,
+                    "required": [
+                      "session",
+                      "from",
+                      "to"
+                    ],
+                    "x-yang": {
+                      "type": "container",
+                      "when": {
+                        "condition": "derived-from-or-self(../../tool, 'topo:find-path')"
+                      }
+                    },
+                    "description": "Arguments of a find-path call."
+                  }
+                },
+                "additionalProperties": false,
+                "x-yang": {
+                  "type": "container",
+                  "must": [
+                    {
+                      "must": "count(*) = 1",
+                      "error-message": "arguments must hold exactly one container: the one for the called tool."
+                    }
+                  ]
+                },
+                "description": "params.arguments. Tool modules augment one container per tool. A call\n           carries the called tool's container, even when it is empty, so a\n           missing or extra one is caught here without this module knowing\n           which tools exist."
+              },
+              "result": {
+                "type": "object",
+                "properties": {
+                  "status": {
+                    "type": "string",
+                    "enum": [
+                      "ok",
+                      "error"
+                    ],
+                    "x-yang": {
+                      "type": "leaf",
+                      "mandatory": true
+                    },
+                    "description": "Whether the call succeeded."
+                  },
+                  "message": {
+                    "type": "string",
+                    "x-yang": {
+                      "type": "leaf"
+                    },
+                    "description": "Error text when status is error."
+                  },
+                  "find-path": {
+                    "type": "object",
+                    "properties": {
+                      "hop": {
+                        "type": "array",
+                        "items": {
+                          "$ref": "#/$defs/node-name"
+                        },
+                        "x-yang": {
+                          "type": "leaf-list",
+                          "must": [
+                            {
+                              "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                              "error-message": "Every hop must be a node that an earlier successful add-node call created.",
+                              "xpath-prefixes": {
+                                "topo": "example-topology-tools"
+                              }
+                            }
+                          ]
+                        },
+                        "description": "Nodes on the path, from 'from' to 'to'."
+                      }
+                    },
+                    "additionalProperties": false,
+                    "x-yang": {
+                      "type": "container",
+                      "when": {
+                        "condition": "derived-from-or-self(../../tool, 'topo:find-path') and ../status = 'ok'"
+                      },
+                      "must": [
+                        {
+                          "must": "hop = ../../arguments/find-path/from and hop = ../../arguments/find-path/to",
+                          "error-message": "A path must contain its 'from' and 'to' nodes."
+                        },
+                        {
+                          "must": "count(hop) <= ../../arguments/find-path/max-hops + 1",
+                          "error-message": "A path may not be longer than max-hops."
+                        }
+                      ]
+                    },
+                    "description": "structuredContent of a successful find-path call."
+                  }
+                },
+                "additionalProperties": false,
+                "required": [
+                  "status"
+                ],
+                "x-yang": {
+                  "type": "container"
+                },
+                "description": "Outcome of the call."
+              }
+            },
+            "additionalProperties": false,
+            "required": [
+              "tool"
+            ]
+          },
+          "x-yang": {
+            "type": "list",
+            "key": "id"
+          },
+          "description": "One tools/call request and its outcome, in the order sent. A session starts with none."
+        }
+      },
+      "additionalProperties": false,
+      "required": [
+        "handle",
+        "protocol-version"
+      ],
+      "x-yang": {
+        "type": "container",
+        "presence": "One side's record of an MCP session with this server."
+      },
+      "description": "A session of calls to the topology tools."
+    }
+  },
+  "additionalProperties": false,
+  "x-yang": {
+    "module": "example-topology-tools",
+    "yang-version": "1.1",
+    "namespace": "urn:example:topology-tools",
+    "prefix": "topo",
+    "organization": "xYang example authors",
+    "contact": "https://github.com/exergy-connect/xYang",
+    "rpcs": {
+      "open-session": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string",
+              "pattern": "^ses_[0-9a-f]{32}$",
+              "x-yang": {
+                "type": "leaf",
+                "mandatory": true,
+                "string-patterns": [
+                  {
+                    "pattern": "ses_[0-9a-f]{32}",
+                    "invert-match": false
+                  }
+                ]
+              },
+              "description": "Pass this handle as 'session' on every later call."
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "session"
+          ],
+          "x-yang": {
+            "type": "output"
+          }
+        }
+      },
+      "add-node": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string",
+              "pattern": "^ses_[0-9a-f]{32}$",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": ". = /topo:session/topo:handle",
+                    "error-message": "session must be the handle of the session this call belongs to.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true,
+                "string-patterns": [
+                  {
+                    "pattern": "ses_[0-9a-f]{32}",
+                    "invert-match": false
+                  }
+                ]
+              },
+              "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+            },
+            "name": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": "not(/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'",
+                    "error-message": "A node with this name already exists.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true
+              },
+              "description": "Name of the new node. Unique in the topology."
+            },
+            "role": {
+              "type": "string",
+              "enum": [
+                "router",
+                "switch",
+                "host"
+              ],
+              "x-yang": {
+                "type": "leaf"
+              },
+              "description": "What the node does.",
+              "default": "router"
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "session",
+            "name"
+          ],
+          "x-yang": {
+            "type": "input"
+          }
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "name": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf"
+              },
+              "description": "Name of the node that was added."
+            }
+          },
+          "additionalProperties": false,
+          "x-yang": {
+            "type": "output"
+          }
+        }
+      },
+      "add-link": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string",
+              "pattern": "^ses_[0-9a-f]{32}$",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": ". = /topo:session/topo:handle",
+                    "error-message": "session must be the handle of the session this call belongs to.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true,
+                "string-patterns": [
+                  {
+                    "pattern": "ses_[0-9a-f]{32}",
+                    "invert-match": false
+                  }
+                ]
+              },
+              "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+            },
+            "source": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                    "error-message": "source must name a node that an earlier successful add-node call created.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true
+              },
+              "description": "One end of the link."
+            },
+            "target": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": ". != ../source",
+                    "error-message": "A link cannot connect a node to itself."
+                  },
+                  {
+                    "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                    "error-message": "target must name a node that an earlier successful add-node call created.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true
+              },
+              "description": "The other end of the link. Must differ from source."
+            },
+            "bandwidth-mbps": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 400000,
+              "x-yang": {
+                "type": "leaf"
+              },
+              "description": "Link capacity in megabits per second.",
+              "default": 1000
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "session",
+            "source",
+            "target"
+          ],
+          "x-yang": {
+            "type": "input"
+          }
+        }
+      },
+      "find-path": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "input": {
+          "type": "object",
+          "properties": {
+            "session": {
+              "type": "string",
+              "pattern": "^ses_[0-9a-f]{32}$",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": ". = /topo:session/topo:handle",
+                    "error-message": "session must be the handle of the session this call belongs to.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true,
+                "string-patterns": [
+                  {
+                    "pattern": "ses_[0-9a-f]{32}",
+                    "invert-match": false
+                  }
+                ]
+              },
+              "description": "Handle returned by open-session. Sessions expire after 24 hours without a call."
+            },
+            "from": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                    "error-message": "from must name a node that an earlier successful add-node call created.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true
+              },
+              "description": "Start node."
+            },
+            "to": {
+              "$ref": "#/$defs/node-name",
+              "x-yang": {
+                "type": "leaf",
+                "must": [
+                  {
+                    "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                    "error-message": "to must name a node that an earlier successful add-node call created.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ],
+                "mandatory": true
+              },
+              "description": "End node."
+            },
+            "max-hops": {
+              "type": "integer",
+              "minimum": 1,
+              "maximum": 16,
+              "x-yang": {
+                "type": "leaf"
+              },
+              "description": "Longest path to consider, in hops.",
+              "default": 8
+            }
+          },
+          "additionalProperties": false,
+          "required": [
+            "session",
+            "from",
+            "to"
+          ],
+          "x-yang": {
+            "type": "input"
+          }
+        },
+        "output": {
+          "type": "object",
+          "properties": {
+            "hop": {
+              "type": "array",
+              "items": {
+                "$ref": "#/$defs/node-name"
+              },
+              "x-yang": {
+                "type": "leaf-list",
+                "must": [
+                  {
+                    "must": "/topo:session/topo:call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                    "error-message": "Every hop must be a node that an earlier successful add-node call created.",
+                    "xpath-prefixes": {
+                      "topo": "example-topology-tools"
+                    }
+                  }
+                ]
+              },
+              "description": "Nodes on the path, from 'from' to 'to'."
+            }
+          },
+          "additionalProperties": false,
+          "x-yang": {
+            "type": "output"
+          }
+        }
+      }
+    },
+    "imports": {
+      "mcp": {
+        "module": "example-mcp",
+        "namespace": "urn:example:mcp",
+        "prefix": "mcp",
+        "identities": {
+          "tool": {
+            "type": "string",
+            "enum": [
+              "mcp:tool"
+            ],
+            "description": "Base of every MCP tool. A tool module derives one identity per rpc, with the same name.",
+            "x-yang": {
+              "type": "identity",
+              "bases": []
+            }
+          }
+        }
+      }
+    }
+  },
+  "description": "A small MCP tool set for building a network topology: add-node,\n     add-link and find-path.\n\n     open-session mints a handle; every other tool takes it as its\n     'session' argument and checks that it names the record the call is\n     checked against (MCP 2026-07-28 has no protocol sessions).\n\n     Each tool is a grouping used twice: as its rpc's input (or output),\n     which compile_mcp.py turns into the tool's inputSchema (or\n     outputSchema), and as a recorded call in a session.\n\n     The grouping also carries the rules, so one rule checks a call in both\n     places. Rules that need earlier calls read them from the session with\n     an absolute path, /topo:session/topo:call, and keep only calls with a\n     smaller id than this one:\n\n       [not(current()/../../../id) or id < current()/../../../id]\n\n     For a recorded call, current()/../../../id is the call's own id. When\n     an rpc input is validated with the session as context, the input's\n     parameters sit under the operation node, directly below the root\n     (RFC 7950, section 6.4.1), so that path selects nothing and every\n     recorded call counts as earlier. A link may therefore only join nodes\n     that an earlier successful call created, whether the link is a request\n     arriving now or a line in the record.\n     SPDX-License-Identifier: MIT",
+  "$defs": {
+    "node-name": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,31}$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "[a-z][a-z0-9-]{0,31}",
+            "invert-match": false
+          }
+        ]
+      },
+      "description": "Lowercase node name, 1 to 32 characters."
+    },
+    "add-node": {
+      "type": "string",
+      "enum": [
+        "topo:add-node"
+      ],
+      "description": "The add-node tool.",
+      "x-yang": {
+        "type": "identity",
+        "bases": [
+          "mcp:tool"
+        ]
+      }
+    },
+    "add-link": {
+      "type": "string",
+      "enum": [
+        "topo:add-link"
+      ],
+      "description": "The add-link tool.",
+      "x-yang": {
+        "type": "identity",
+        "bases": [
+          "mcp:tool"
+        ]
+      }
+    },
+    "find-path": {
+      "type": "string",
+      "enum": [
+        "topo:find-path"
+      ],
+      "description": "The find-path tool.",
+      "x-yang": {
+        "type": "identity",
+        "bases": [
+          "mcp:tool"
+        ]
+      }
+    }
+  }
+}
