@@ -1,0 +1,83 @@
+{
+  "description": "Identity functions use predicate cursor, not the fixed current() node (RFC 7950 10.4).",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "self and strict descendant",
+      "valid": true,
+      "data": {
+        "top": {
+          "item": [
+            {
+              "id": "a",
+              "type": "m:material"
+            },
+            {
+              "id": "b",
+              "type": "m:sample"
+            },
+            {
+              "id": "c",
+              "type": "m:process"
+            }
+          ],
+          "selected": "a"
+        }
+      }
+    },
+    {
+      "name": "missing descendant",
+      "valid": false,
+      "data": {
+        "top": {
+          "item": [
+            {
+              "id": "a",
+              "type": "m:material"
+            },
+            {
+              "id": "b",
+              "type": "m:process"
+            }
+          ],
+          "selected": "a"
+        }
+      },
+      "errors": [
+        {
+          "path": "/top",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "too many descendants",
+      "valid": false,
+      "data": {
+        "top": {
+          "item": [
+            {
+              "id": "a",
+              "type": "m:material"
+            },
+            {
+              "id": "b",
+              "type": "m:sample"
+            },
+            {
+              "id": "c",
+              "type": "m:sample"
+            }
+          ],
+          "selected": "a"
+        }
+      },
+      "errors": [
+        {
+          "path": "/top",
+          "code": "must"
+        }
+      ]
+    }
+  ]
+}

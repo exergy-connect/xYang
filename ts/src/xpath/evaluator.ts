@@ -508,7 +508,8 @@ export class XPathEvaluator {
         return false;
       }
       const importer = rootSchema;
-      const start = context.current ?? node;
+      // Predicate arguments use the cursor; current() retains the expression origin.
+      const start = node;
       let v1: unknown = this.eval(args[0], context, start);
       if (isNodeSet(v1)) {
         if (v1.length === 0) {
