@@ -20,7 +20,6 @@ sys.path.insert(0, str(EXAMPLE))
 spec = importlib.util.spec_from_file_location("ontology_collector", EXAMPLE / "collector.py")
 collector = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(collector)
-import audit_checks  # noqa: E402
 
 ROOT = collector.ROOT
 BASE = "http://ontology.test/documents/"
@@ -77,19 +76,22 @@ def test_projection_has_engagement_records_with_provenance(publications):
     tree = collect(publications)
     graph = tree[ROOT]
     assert len(graph["document"]) == 4
-    assert len(graph["node"]) == 22
+    assert len(graph["node"]) == 47
     assert len(graph["hyperedge"]) == 11
     exception = projected(tree, "as-ac-01")
     assert exception["result"]["outcome"] == "exception"
     assert [i["node"] for i in exception["incidence"] if i["role"] == A + "cited-evidence"] == [
         BASE + "evidence.json#hr-leavers-q3",
-        BASE + "evidence.json#iam-active-users",
+        BASE + "evidence.json#iam-signins-q3",
     ]
     assert projected(tree, "as-cm-02")["result"]["outcome"] == "supported"
     assert projected(tree, "fd-ac-01")["incidence"][0]["hyperedge"] == exception["id"]
-    record = projected(tree, "iam-active-users")["evidence-record"]
+    record = projected(tree, "iam-signins-q3")["evidence-record"]
     assert record["source-system"] == BASE + "evidence.json#gatekeeper"
-    assert record["export"] == BASE + "exports/iam-active-users.csv"
+    assert record["export"] == BASE + "exports/iam-signins-q3.csv"
+    use = projected(tree, "use-jmarsh")["account-use"]
+    assert use["account"] == BASE + "evidence.json#jmarsh" and use["breach"] == "yes"
+    assert projected(tree, "fd-ac-01")["incidence"][1]["node"] == BASE + "evidence.json#use-jmarsh"
     assert exception["origin"] == BASE + "assessments.json"
     assert exception["asserted-by"].endswith("/drafting-agent")
     assert projected(tree, "rv-ac-01")["sign-off"]["decision"] == "approved"
@@ -143,7 +145,10 @@ def _cited(e):
         (lambda p: edge(p, "evidence.json", "col-hr")["incidence"][0].update(node="catalogue.json#m-ito"), "collection-agent"),
         (lambda p: edge(p, "evidence.json", "col-hr")["incidence"].pop(1), "one source"),
         (lambda p: node(p, "evidence.json", "hr-leavers-q3")["evidence-record"].update(**{"source-system": "catalogue.json#m-ito"}), "source-system node"),
-        (lambda p: node(p, "evidence.json", "hr-leavers-q3")["evidence-record"].update(**{"collected-at": "yesterday"}), "pattern"),
+        (lambda p: node(p, "evidence.json", "hr-leavers-q3")["evidence-record"].update(**{"collected-at": "yesterday"}), "integer|uint32"),
+        (lambda p: node(p, "evidence.json", "jmarsh")["account"].update(owner="#peoplecore"), "owner must be an employee"),
+        (lambda p: node(p, "evidence.json", "term-e1043")["termination"].update(source="#jmarsh"), "source must be an evidence-record"),
+        (lambda p: node(p, "evidence.json", "chg-chg-2207")["change"].pop("approved-at"), "approved-at"),
         (lambda p: _as(p)["result"].update(outcome="pass"), "enumeration|outcome"),
         (lambda p: _as(p).pop("result"), "outcome|result"),
         (lambda p: _as(p).pop("recorded-at"), "recorded-at"),
@@ -218,7 +223,7 @@ def test_served_model_bytes_must_match_trusted_schema(publications):
 
 def test_export_bytes_must_match_declared_digest(publications):
     with pytest.raises(collector.CollectionError, match="Export digest mismatch"):
-        collect(publications, exports={"iam-active-users.csv": b"account,employee_id,enabled\n"})
+        collect(publications, exports={"iam-signins-q3.csv": b"account,employee_id,signed_in_at\n"})
 
 
 def test_cycles_in_document_dependencies_and_automatic_discovery(publications):
@@ -260,50 +265,76 @@ def test_leafrefs_are_enforced_after_projection(publications):
 
 
 FIXTURES = EXAMPLE / "fixtures"
-EXPECTED_INVALID = {
-    "dangling-evidence": "leafref",
-    "assessment-without-evidence": "cite at least one evidence",
-    "reviewer-is-assessor": "must not be the assessor",
-    "review-with-two-reviewers": "exactly one reviewer",
-    "finding-on-supported-assessment": "outcome is exception",
-    "evidence-type-not-accepted": "control accepts",
-}
+EXPECTED = json.loads((FIXTURES / "expected-errors.json").read_text())
 
 
-def test_checked_in_fixtures_validate_as_documented():
-    collector.validate(json.loads((FIXTURES / "valid.json").read_text()))
-    assert {p.stem for p in (FIXTURES / "invalid").glob("*.json")} == set(EXPECTED_INVALID)
-    for name, message in EXPECTED_INVALID.items():
-        with pytest.raises(collector.CollectionError) as excinfo:
-            collector.validate(json.loads((FIXTURES / "invalid" / f"{name}.json").read_text()))
-        assert message.lower() in str(excinfo.value).lower(), (name, str(excinfo.value))
+def _errors(tree):
+    result = collector.validator().validate_detailed(tree)
+    return sorted(
+        (e["path"].replace("/" + ROOT, ""), e["code"], e["message"] if e["code"] == "must" else None)
+        for e in result["errors"]
+    )
 
 
-def test_audit_checks_are_separate_from_yang(publications):
-    tree = collect(publications)
-    report = audit_checks.check(tree)
-    assert report["issues"] == []
-    assert {(c["control"], c["outcome"]) for c in report["conclusions"]} == {
-        ("AC-01", "exception"),
-        ("CM-02", "supported"),
-        ("AC-04", "insufficient-evidence"),
-    }
-    assert [f["severity"] for f in report["findings"]] == ["high"]
+def test_checked_in_fixtures_fail_exactly_as_documented():
+    assert collector.validator().validate_detailed(json.loads((FIXTURES / "valid.json").read_text()))["errors"] == []
+    assert {p.stem for p in (FIXTURES / "invalid").glob("*.json")} == set(EXPECTED)
+    for name, errors in EXPECTED.items():
+        expected = sorted((e["path"], e["code"], e.get("message")) for e in errors)
+        assert _errors(json.loads((FIXTURES / "invalid" / f"{name}.json").read_text())) == expected, name
 
-    stale = copy.deepcopy(tree)
-    projected(stale, "iam-active-users")["evidence-record"]["collected-at"] = "2026-06-01T00:00:00Z"
-    collector.validate(stale)  # structurally valid
-    assert any("stale" in issue for issue in audit_checks.check(stale)["issues"])
 
-    rejected = copy.deepcopy(tree)
-    projected(rejected, "rv-ac-01")["sign-off"]["decision"] = "rejected"
-    collector.validate(rejected)
-    assert any("no approved review" in issue for issue in audit_checks.check(rejected)["issues"])
+def _valid():
+    return json.loads((FIXTURES / "valid.json").read_text())
 
-    early = copy.deepcopy(tree)
-    projected(early, "rv-cm-02")["recorded-at"] = "2026-10-01T00:00:00Z"
-    collector.validate(early)
-    assert any("before the assessment" in issue for issue in audit_checks.check(early)["issues"])
+
+def test_equal_times_are_on_the_permitted_side():
+    tree = _valid()
+    # tquill signs in at the exact second the termination takes effect: not a breach.
+    assert projected(tree, "use-tquill")["account-use"]["at"] == projected(tree, "term-e1058")["termination"]["effective-at"]
+    assert projected(tree, "use-tquill")["account-use"]["breach"] == "no"
+    # CHG-2241 is approved at the second it deploys: independent and prior enough.
+    change = projected(tree, "chg-chg-2241")["change"]
+    assert change["approved-at"] == change["deployed-at"] and change["breach"] == "no"
+    engagement = projected(tree, "eng-2026")["engagement"]
+    projected(tree, "iam-signins-q3")["evidence-record"]["collected-at"] = engagement["as-of"] - engagement["max-evidence-age"]
+    projected(tree, "deploy-log-q3")["evidence-record"]["collected-at"] = projected(tree, "as-cm-02")["recorded-at"]
+    projected(tree, "rv-cm-02")["recorded-at"] = projected(tree, "as-cm-02")["recorded-at"]
+    projected(tree, "rv-ac-04")["recorded-at"] = engagement["as-of"]
+    assert _errors(tree) == []
+
+
+def test_breach_join_is_per_owner():
+    tree = _valid()
+    # Moving jmarsh's sign-in to before the termination removes the breach; the
+    # still-declared yes then fails, and so does the exception that relied on it.
+    projected(tree, "use-jmarsh")["account-use"]["at"] = projected(tree, "term-e1043")["termination"]["effective-at"] - 1
+    assert ("/node/41/account-use/breach", "must", "breach must say whether the account owner's termination took effect before this use.") in _errors(tree)
+    # Reassigning the terminated account to a never-terminated owner also removes it.
+    tree = _valid()
+    projected(tree, "jmarsh")["account"]["owner"] = "http://audit.test/documents/evidence.json#e0977"
+    assert ("/node/41/account-use/breach", "must", "breach must say whether the account owner's termination took effect before this use.") in _errors(tree)
+
+
+def test_change_exception_with_fact_grounded_finding_is_valid():
+    tree = _valid()
+    graph = tree[ROOT]
+    base = "http://audit.test/documents/"
+    change = projected(tree, "chg-chg-2241")["change"]
+    change.update(approver=base + "evidence.json#e0912", breach="yes")
+    projected(tree, "as-cm-02")["result"]["outcome"] = "exception"
+    finding = copy.deepcopy(projected(tree, "fd-ac-01"))
+    finding["id"] = base + "assessments.json#fd-cm-02"
+    finding["incidence"] = [
+        {"id": "basis", "role": A + "basis", "hyperedge": base + "assessments.json#as-cm-02"},
+        {"id": "v", "role": A + "violation", "node": base + "evidence.json#chg-chg-2241"},
+        {"id": "ev", "role": A + "cited-evidence", "node": base + "evidence.json#change-tickets-q3"},
+    ]
+    graph["hyperedge"].append(finding)
+    assert _errors(tree) == []
+    # The same finding without the ticket export it was taken from is rejected.
+    finding["incidence"][2]["node"] = base + "evidence.json#deploy-log-q3"
+    assert ("/hyperedge/11/incidence/1", "must", "A finding must cite the evidence its violation was taken from.") in _errors(tree)
 
 
 def test_real_http_publication_and_cli(tmp_path):
@@ -326,10 +357,6 @@ def test_real_http_publication_and_cli(tmp_path):
             assert result.returncode == 0, result.stderr
             tree = json.loads(output.read_text())
             assert projected(tree, "fd-ac-01")["id"] == base + "assessments.json#fd-ac-01"
-            checks = subprocess.run(
-                [sys.executable, str(EXAMPLE / "audit_checks.py"), str(output)], capture_output=True, text=True
-            )
-            assert checks.returncode == 0, checks.stdout + checks.stderr
             with pytest.raises(collector.CollectionError, match="Cannot fetch"):
                 collector.fetch(base + "reviews.json.missing")
         finally:
@@ -365,7 +392,7 @@ def test_independent_yang_tools(publications):
     )
     model = DataModel.from_file(str(EXAMPLE / "yangson-library.json"), [str(EXAMPLE / "models")])
     model.from_raw(collect(publications)).validate()
-    for name in EXPECTED_INVALID:
+    for name in EXPECTED:
         with pytest.raises(YangsonException):
             model.from_raw(json.loads((FIXTURES / "invalid" / f"{name}.json").read_text())).validate()
 
@@ -405,7 +432,7 @@ def test_optional_semantic_evaluation_is_separate(publications, monkeypatch):
     _, errors = evaluate(tree)
     assert not errors
     # Structurally legal classifications can still contradict BFO disjointness.
-    projected(tree, "iam-active-users")["also-type"] = ["example-bfo:occurrent"]
+    projected(tree, "iam-signins-q3")["also-type"] = ["example-bfo:occurrent"]
     collector.validate(tree)
     _, errors = evaluate(tree)
     assert errors and any("disjoint" in error.lower() for error in errors)
@@ -426,8 +453,9 @@ def test_client_hosted_evidence_on_another_origin(publications):
                 inc["node"] = BASE + inc["node"]
     evidence["document"][0]["requires"][0]["id"] = BASE + "catalogue.json"
     tree = collect(publications)
-    assert projected(tree, "iam-active-users")["origin"] == client + "evidence.json"
-    assert projected(tree, "iam-active-users")["evidence-record"]["export"] == client + "exports/iam-active-users.csv"
+    assert projected(tree, "iam-signins-q3")["origin"] == client + "evidence.json"
+    assert projected(tree, "iam-signins-q3")["evidence-record"]["export"] == client + "exports/iam-signins-q3.csv"
+    assert projected(tree, "use-jmarsh")["account-use"]["account"] == client + "evidence.json#jmarsh"
 
 
 def test_review_of_assessment_in_another_document_must_resolve(publications):

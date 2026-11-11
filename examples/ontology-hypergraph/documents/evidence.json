@@ -22,7 +22,7 @@
             "name": "example-audit",
             "revision": "2026-11-10",
             "location": "../models/example-audit@2026-11-10.yang",
-            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+            "sha256": "3953d64c679d475afdaf706d6260bab00e3e360e859d5ab33ccbdb7762a00277"
           }
         ],
         "requires": [
@@ -68,24 +68,24 @@
         "evidence-record": {
           "evidence-type": "example-audit:hr-termination-report",
           "source-system": "#peoplecore",
-          "collected-at": "2026-10-02T09:00:00Z",
+          "collected-at": 1790931600,
           "export": "exports/hr-leavers-q3.csv",
-          "sha256": "236824893bf7e50a59402e347c540adec1b0ba31f85a1b71085840686fbd519a"
+          "sha256": "2aaaec8c3d9fa1ad482628eef676fc1edab14859d2ef4c61730fb228f7899780"
         }
       },
       {
-        "id": "#iam-active-users",
-        "label": "Enabled accounts",
+        "id": "#iam-signins-q3",
+        "label": "Q3 sign-ins",
         "type": "example-audit:evidence-record",
         "origin": "evidence.json",
         "asserted-by": "https://larkspur-reed.example/agents/collector",
-        "evidence": "exports/iam-active-users.csv",
+        "evidence": "exports/iam-signins-q3.csv",
         "evidence-record": {
-          "evidence-type": "example-audit:active-account-listing",
+          "evidence-type": "example-audit:sign-in-log",
           "source-system": "#gatekeeper",
-          "collected-at": "2026-10-02T09:05:00Z",
-          "export": "exports/iam-active-users.csv",
-          "sha256": "5a8d3bd4a65893e004b01239daad685afc60b65b6947646e915d6dda986b12cc"
+          "collected-at": 1790931900,
+          "export": "exports/iam-signins-q3.csv",
+          "sha256": "74ecf0968091880ea12b8e8f637299e137b34b6ea9c4f0cdecf6311faa6e03f4"
         }
       },
       {
@@ -98,9 +98,9 @@
         "evidence-record": {
           "evidence-type": "example-audit:change-ticket-export",
           "source-system": "#changedesk",
-          "collected-at": "2026-10-02T09:10:00Z",
+          "collected-at": 1790932200,
           "export": "exports/change-tickets-q3.csv",
-          "sha256": "d1d2b495df06caea327ddbb4cb1e0604efeb32a510bf0757aa59da8a6b6dc6dc"
+          "sha256": "f417d78558dfe65df9621c7ed3b9de53d1e3811b8b167d61b0839781c76799f7"
         }
       },
       {
@@ -113,9 +113,269 @@
         "evidence-record": {
           "evidence-type": "example-audit:deployment-log",
           "source-system": "#changedesk",
-          "collected-at": "2026-10-02T09:12:00Z",
+          "collected-at": 1790932320,
           "export": "exports/deploy-log-q3.csv",
           "sha256": "98ba62225b816f87109c223db8b3838e0b7756b646e9743b7af99f54ac1a4109"
+        }
+      },
+      {
+        "id": "#e0912",
+        "label": "L. Chen (fictional)",
+        "type": "example-audit:employee",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "employee": {
+          "staff-id": "E0912"
+        }
+      },
+      {
+        "id": "#e0977",
+        "label": "A. Patel (fictional)",
+        "type": "example-audit:employee",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "employee": {
+          "staff-id": "E0977"
+        }
+      },
+      {
+        "id": "#e1031",
+        "label": "R. Vance (fictional)",
+        "type": "example-audit:employee",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "employee": {
+          "staff-id": "E1031"
+        }
+      },
+      {
+        "id": "#e1043",
+        "label": "J. Marsh (fictional)",
+        "type": "example-audit:employee",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "employee": {
+          "staff-id": "E1043"
+        }
+      },
+      {
+        "id": "#e1058",
+        "label": "T. Quill (fictional)",
+        "type": "example-audit:employee",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "employee": {
+          "staff-id": "E1058"
+        }
+      },
+      {
+        "id": "#lchen",
+        "label": "lchen",
+        "type": "example-audit:account",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account": {
+          "login": "lchen",
+          "owner": "#e0912"
+        }
+      },
+      {
+        "id": "#apatel",
+        "label": "apatel",
+        "type": "example-audit:account",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account": {
+          "login": "apatel",
+          "owner": "#e0977"
+        }
+      },
+      {
+        "id": "#rvance",
+        "label": "rvance",
+        "type": "example-audit:account",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account": {
+          "login": "rvance",
+          "owner": "#e1031"
+        }
+      },
+      {
+        "id": "#jmarsh",
+        "label": "jmarsh",
+        "type": "example-audit:account",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account": {
+          "login": "jmarsh",
+          "owner": "#e1043"
+        }
+      },
+      {
+        "id": "#tquill",
+        "label": "tquill",
+        "type": "example-audit:account",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account": {
+          "login": "tquill",
+          "owner": "#e1058"
+        }
+      },
+      {
+        "id": "#term-e1031",
+        "label": "R. Vance leaves",
+        "type": "example-audit:termination-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "termination": {
+          "employee": "#e1031",
+          "effective-at": 1783098000,
+          "source": "#hr-leavers-q3"
+        }
+      },
+      {
+        "id": "#term-e1043",
+        "label": "J. Marsh leaves",
+        "type": "example-audit:termination-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "termination": {
+          "employee": "#e1043",
+          "effective-at": 1786726800,
+          "source": "#hr-leavers-q3"
+        }
+      },
+      {
+        "id": "#term-e1058",
+        "label": "T. Quill leaves",
+        "type": "example-audit:termination-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/hr-leavers-q3.csv",
+        "termination": {
+          "employee": "#e1058",
+          "effective-at": 1790096400,
+          "source": "#hr-leavers-q3"
+        }
+      },
+      {
+        "id": "#use-rvance",
+        "label": "rvance signs in",
+        "type": "example-audit:account-use-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account-use": {
+          "account": "#rvance",
+          "at": 1782979200,
+          "source": "#iam-signins-q3",
+          "breach": "no"
+        }
+      },
+      {
+        "id": "#use-jmarsh",
+        "label": "jmarsh signs in",
+        "type": "example-audit:account-use-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account-use": {
+          "account": "#jmarsh",
+          "at": 1787735564,
+          "source": "#iam-signins-q3",
+          "breach": "yes"
+        }
+      },
+      {
+        "id": "#use-tquill",
+        "label": "tquill signs in",
+        "type": "example-audit:account-use-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account-use": {
+          "account": "#tquill",
+          "at": 1790096400,
+          "source": "#iam-signins-q3",
+          "breach": "no"
+        }
+      },
+      {
+        "id": "#use-apatel",
+        "label": "apatel signs in",
+        "type": "example-audit:account-use-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account-use": {
+          "account": "#apatel",
+          "at": 1790697790,
+          "source": "#iam-signins-q3",
+          "breach": "no"
+        }
+      },
+      {
+        "id": "#use-lchen",
+        "label": "lchen signs in",
+        "type": "example-audit:account-use-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/iam-signins-q3.csv",
+        "account-use": {
+          "account": "#lchen",
+          "at": 1790757715,
+          "source": "#iam-signins-q3",
+          "breach": "no"
+        }
+      },
+      {
+        "id": "#chg-chg-2207",
+        "label": "CHG-2207",
+        "type": "example-audit:change-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/change-tickets-q3.csv",
+        "change": {
+          "ticket": "CHG-2207",
+          "implementer": "#e0977",
+          "approver": "#e0912",
+          "approved-at": 1785752100,
+          "deployed-at": 1785781800,
+          "source": "#change-tickets-q3",
+          "deployment-source": "#deploy-log-q3",
+          "breach": "no"
+        }
+      },
+      {
+        "id": "#chg-chg-2241",
+        "label": "CHG-2241",
+        "type": "example-audit:change-event",
+        "origin": "evidence.json",
+        "asserted-by": "https://larkspur-reed.example/agents/collector",
+        "evidence": "exports/change-tickets-q3.csv",
+        "change": {
+          "ticket": "CHG-2241",
+          "implementer": "#e0912",
+          "approver": "#e0977",
+          "approved-at": 1789155900,
+          "deployed-at": 1789155900,
+          "source": "#change-tickets-q3",
+          "deployment-source": "#deploy-log-q3",
+          "breach": "no"
         }
       }
     ],
@@ -126,7 +386,7 @@
         "origin": "evidence.json",
         "asserted-by": "https://larkspur-reed.example/agents/collector",
         "evidence": "exports/hr-leavers-q3.csv",
-        "recorded-at": "2026-10-02T09:01:00Z",
+        "recorded-at": 1790931660,
         "incidence": [
           {
             "id": "by",
@@ -155,8 +415,8 @@
         "type": "example-audit:collection",
         "origin": "evidence.json",
         "asserted-by": "https://larkspur-reed.example/agents/collector",
-        "evidence": "exports/iam-active-users.csv",
-        "recorded-at": "2026-10-02T09:06:00Z",
+        "evidence": "exports/iam-signins-q3.csv",
+        "recorded-at": 1790931960,
         "incidence": [
           {
             "id": "by",
@@ -174,9 +434,9 @@
             "node": "catalogue.json#eng-2026"
           },
           {
-            "id": "got-iam-active-users",
+            "id": "got-iam-signins-q3",
             "role": "example-audit:collected",
-            "node": "#iam-active-users"
+            "node": "#iam-signins-q3"
           }
         ]
       },
@@ -186,7 +446,7 @@
         "origin": "evidence.json",
         "asserted-by": "https://larkspur-reed.example/agents/collector",
         "evidence": "exports/change-tickets-q3.csv",
-        "recorded-at": "2026-10-02T09:13:00Z",
+        "recorded-at": 1790932380,
         "incidence": [
           {
             "id": "by",

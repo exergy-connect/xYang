@@ -22,7 +22,7 @@
             "name": "example-audit",
             "revision": "2026-11-10",
             "location": "../models/example-audit@2026-11-10.yang",
-            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+            "sha256": "3953d64c679d475afdaf706d6260bab00e3e360e859d5ab33ccbdb7762a00277"
           }
         ],
         "requires": [
@@ -40,10 +40,10 @@
         "origin": "assessments.json",
         "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
         "evidence": "catalogue.json",
-        "recorded-at": "2026-10-05T11:00:00Z",
+        "recorded-at": 1791198000,
         "result": {
           "outcome": "exception",
-          "rationale": "E1043 left on 2026-08-14; account jmarsh was still enabled and logged in on 2026-08-26."
+          "rationale": "E1043's termination took effect 2026-08-14T17:00Z; account jmarsh signed in 2026-08-26T09:12:44Z."
         },
         "incidence": [
           {
@@ -67,9 +67,9 @@
             "node": "evidence.json#hr-leavers-q3"
           },
           {
-            "id": "ev-iam-active-users",
+            "id": "ev-iam-signins-q3",
             "role": "example-audit:cited-evidence",
-            "node": "evidence.json#iam-active-users"
+            "node": "evidence.json#iam-signins-q3"
           }
         ]
       },
@@ -79,10 +79,10 @@
         "origin": "assessments.json",
         "asserted-by": "https://larkspur-reed.example/agents/m-ito",
         "evidence": "catalogue.json",
-        "recorded-at": "2026-10-05T14:30:00Z",
+        "recorded-at": 1791210600,
         "result": {
           "outcome": "supported",
-          "rationale": "Both privileged changes were approved by a different person before deployment."
+          "rationale": "Both privileged changes were approved by a different person no later than deployment."
         },
         "incidence": [
           {
@@ -118,7 +118,7 @@
         "origin": "assessments.json",
         "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
         "evidence": "catalogue.json",
-        "recorded-at": "2026-10-05T15:10:00Z",
+        "recorded-at": 1791213000,
         "result": {
           "outcome": "insufficient-evidence",
           "rationale": "No quarterly access review records were provided for the period."
@@ -146,17 +146,22 @@
         "type": "example-audit:finding",
         "origin": "assessments.json",
         "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
-        "evidence": "exports/iam-active-users.csv",
-        "recorded-at": "2026-10-05T11:20:00Z",
+        "evidence": "exports/iam-signins-q3.csv",
+        "recorded-at": 1791372000,
         "detail": {
           "severity": "high",
-          "condition": "A terminated employee's account remained enabled and was used 12 days after termination."
+          "condition": "Account jmarsh was used 12 days after its owner's termination took effect."
         },
         "incidence": [
           {
             "id": "basis",
             "role": "example-audit:basis",
             "hyperedge": "#as-ac-01"
+          },
+          {
+            "id": "v-jmarsh",
+            "role": "example-audit:violation",
+            "node": "evidence.json#use-jmarsh"
           },
           {
             "id": "ev-hr",
@@ -166,7 +171,7 @@
           {
             "id": "ev-iam",
             "role": "example-audit:cited-evidence",
-            "node": "evidence.json#iam-active-users"
+            "node": "evidence.json#iam-signins-q3"
           }
         ]
       },

@@ -187,7 +187,7 @@ Use `candidate` instead of `complete` for structural checks only (no `must` / `w
 
 ## Example: audit engagement as a distributed hypergraph
 
-The [ontology hypergraph example](examples/ontology-hypergraph/README.md) models a fictional audit of a fictional client's access and change controls. A firm catalogue, a collection agent's evidence locker, assessments, and independent reviews are published separately over HTTP. The collector merges them, verifies model and export digests, and validates the result with xYang. YANG enforces evidence references, role cardinality, reviewer independence, and finding basis; a separate checker handles evidence age and review order. A valid record can still report a failed control: schema validity is not an audit opinion. Optional pyang/Yangson and OWL RL checks and a [traceability matrix](examples/ontology-hypergraph/TRACEABILITY.md) are included.
+The [ontology hypergraph example](examples/ontology-hypergraph/README.md) models a fictional audit of a fictional client in one YANG model: employees, accounts, terminations, sign-ins, privileged changes, controls, evidence, assessments, findings, and reviews. Times are numeric, so `must` expressions compare them. Each fact's declared breach is checked against the facts, and every outcome and finding must agree with them: the sample is valid because it reports a real breach, and hiding or inventing one is invalid. Four parties publish over HTTP; the collector merges them, verifies model and export digests, and validates with xYang. Optional pyang/Yangson and OWL RL checks and a [traceability matrix](examples/ontology-hypergraph/TRACEABILITY.md) are included.
 
 ## What xYang does (and does not)
 

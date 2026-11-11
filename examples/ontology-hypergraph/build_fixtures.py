@@ -1,42 +1,60 @@
 #!/usr/bin/env python3
 """Regenerate the synthetic audit publications, exports, projections, and schema inventory.
 
-All names, people, systems, and records are fictional.
+All names, people, systems, and records are fictional. The same tables produce
+the CSV exports and the structured facts, so the facts match the exported rows.
 """
 
 import copy
 import hashlib
 import json
+from datetime import datetime
 
 from collector import HERE, MODULES, REVISION, ROOT, collect, model_inventory
 
 FIXTURE_BASE = "http://audit.test/documents/"
 SUITE = "audit-2026.1"
 FIRM = "https://larkspur-reed.example/agents/"
+DAY = 86_400
+
+
+def at(iso: str) -> int:
+    """UTC ISO 8601 timestamp to the model's epoch seconds."""
+    return int(datetime.fromisoformat(iso.replace("Z", "+00:00")).timestamp())
+
+
+# Client facts. Times are UTC.
+EMPLOYEES = [("e0912", "E0912", "L. Chen"), ("e0977", "E0977", "A. Patel"), ("e1031", "E1031", "R. Vance"),
+             ("e1043", "E1043", "J. Marsh"), ("e1058", "E1058", "T. Quill")]  # fmt: skip
+TERMINATIONS = [("e1031", "2026-07-03T17:00:00Z"), ("e1043", "2026-08-14T17:00:00Z"), ("e1058", "2026-09-22T17:00:00Z")]
+ACCOUNTS = [("lchen", "e0912"), ("apatel", "e0977"), ("rvance", "e1031"), ("jmarsh", "e1043"), ("tquill", "e1058")]
+# (account, time): rvance before termination, jmarsh 12 days after, tquill at the exact
+# termination second (not after it), apatel and lchen never terminated.
+SIGN_INS = [("rvance", "2026-07-02T08:00:00Z"), ("jmarsh", "2026-08-26T09:12:44Z"), ("tquill", "2026-09-22T17:00:00Z"),
+            ("apatel", "2026-09-29T16:03:10Z"), ("lchen", "2026-09-30T08:41:55Z")]  # fmt: skip
+CHANGES = [  # (ticket, implementer, approver, approved, deployed)
+    ("CHG-2207", "e0977", "e0912", "2026-08-03T10:15:00Z", "2026-08-03T18:30:00Z"),
+    ("CHG-2241", "e0912", "e0977", "2026-09-11T19:45:00Z", "2026-09-11T19:45:00Z"),
+]
+NAMES = {key: name for key, _, name in EMPLOYEES}
+STAFF = {key: staff for key, staff, _ in EMPLOYEES}
+OWNERS = dict(ACCOUNTS)
+ENGAGEMENT = {
+    "client": "Alder Ridge Logistics Ltd (fictional)",
+    "period-start": at("2026-07-01T00:00:00Z"),
+    "period-end": at("2026-09-30T23:59:59Z"),
+    "as-of": at("2026-10-08T00:00:00Z"),
+    "max-evidence-age": 30 * DAY,
+}
 
 EXPORTS = {
-    "hr-leavers-q3.csv": (
-        "employee_id,name,termination_date\n"
-        "E1031,R. Vance,2026-07-03\n"
-        "E1043,J. Marsh,2026-08-14\n"
-        "E1058,T. Quill,2026-09-22\n"
-    ),
-    "iam-active-users.csv": (
-        "account,employee_id,enabled,last_login\n"
-        "jmarsh,E1043,true,2026-08-26T09:12:44Z\n"
-        "apatel,E0977,true,2026-09-29T16:03:10Z\n"
-        "lchen,E0912,true,2026-09-30T08:41:55Z\n"
-    ),
-    "change-tickets-q3.csv": (
-        "ticket,privileged,implementer,approver,approved_at\n"
-        "CHG-2207,yes,A. Patel,L. Chen,2026-08-03T10:15:00Z\n"
-        "CHG-2241,yes,L. Chen,A. Patel,2026-09-11T14:02:00Z\n"
-    ),
-    "deploy-log-q3.csv": (
-        "ticket,deployed_by,deployed_at\n"
-        "CHG-2207,A. Patel,2026-08-03T18:30:00Z\n"
-        "CHG-2241,L. Chen,2026-09-11T19:45:00Z\n"
-    ),
+    "hr-leavers-q3.csv": "employee_id,name,termination_effective\n"
+    + "".join(f"{STAFF[e]},{NAMES[e]},{t}\n" for e, t in TERMINATIONS),
+    "iam-signins-q3.csv": "account,employee_id,signed_in_at\n"
+    + "".join(f"{a},{STAFF[OWNERS[a]]},{t}\n" for a, t in SIGN_INS),
+    "change-tickets-q3.csv": "ticket,privileged,implementer,approver,approved_at\n"
+    + "".join(f"{c},yes,{NAMES[i]},{NAMES[a]},{ap}\n" for c, i, a, ap, _ in CHANGES),
+    "deploy-log-q3.csv": "ticket,deployed_by,deployed_at\n" + "".join(f"{c},{NAMES[i]},{d}\n" for c, i, _, _, d in CHANGES),
 }
 
 
@@ -78,6 +96,22 @@ def term(kind, definition, bfo):
     )
 
 
+def control(fragment, label, reference, statement, rule, accepted):
+    return node(
+        "catalogue.json",
+        "methodology-desk",
+        fragment,
+        label,
+        "control",
+        control={
+            "reference": reference,
+            "statement": statement,
+            "rule": "example-audit:" + rule,
+            "accepted-evidence": ["example-audit:" + kind for kind in accepted],
+        },
+    )
+
+
 def build_publications():
     catalogue = publication(
         "catalogue.json",
@@ -86,6 +120,11 @@ def build_publications():
             term("control", "A documented control the client asserts it operates.", "0000002"),
             term("evidence-record", "An artifact collected from a client system.", "0000002"),
             term("source-system", "A client information system that produces artifacts.", "0000002"),
+            term("employee", "A person employed by the client.", "0000040"),
+            term("account", "A client system account owned by one employee.", "0000002"),
+            term("termination-event", "The taking effect of an employee's termination.", "0000015"),
+            term("account-use-event", "A recorded use of an account.", "0000015"),
+            term("change-event", "A privileged change reaching production.", "0000015"),
             term("collection-agent", "Software that retrieves client artifacts.", "0000002"),
             term("assessment-agent", "Software that drafts control assessments.", "0000002"),
             term("audit-professional", "A person on the engagement team.", "0000040"),
@@ -95,44 +134,16 @@ def build_publications():
                 "eng-2026",
                 "Alder Ridge Logistics access and change controls 2026",
                 "engagement",
-                engagement={"client": "Alder Ridge Logistics Ltd (fictional)", "period-start": "2026-07-01", "period-end": "2026-09-30"},
+                engagement=ENGAGEMENT,
             ),
-            node(
-                "catalogue.json",
-                "methodology-desk",
-                "ac-01",
-                "Timely removal of leaver access",
-                "control",
-                control={
-                    "reference": "AC-01",
-                    "statement": "Access for terminated employees is disabled within one business day of termination.",
-                    "accepted-evidence": ["example-audit:hr-termination-report", "example-audit:active-account-listing"],
-                },
-            ),
-            node(
-                "catalogue.json",
-                "methodology-desk",
-                "cm-02",
-                "Independent approval of privileged changes",
-                "control",
-                control={
-                    "reference": "CM-02",
-                    "statement": "Privileged production changes are approved by someone other than the implementer before deployment.",
-                    "accepted-evidence": ["example-audit:change-ticket-export", "example-audit:deployment-log"],
-                },
-            ),
-            node(
-                "catalogue.json",
-                "methodology-desk",
-                "ac-04",
-                "Quarterly user access review",
-                "control",
-                control={
-                    "reference": "AC-04",
-                    "statement": "Application owners review user access each quarter and record removals.",
-                    "accepted-evidence": ["example-audit:policy-document", "example-audit:active-account-listing"],
-                },
-            ),
+            control("ac-01", "No use of leaver accounts", "AC-01", "No account is used after its owner's termination takes effect.",
+                    "leaver-access", ["hr-termination-report", "sign-in-log"]),  # fmt: skip
+            control("cm-02", "Independent approval of privileged changes", "CM-02",
+                    "Each privileged production change is approved by someone other than the implementer no later than deployment.",
+                    "change-approval", ["change-ticket-export", "deployment-log"]),  # fmt: skip
+            control("ac-04", "Quarterly user access review", "AC-04",
+                    "Application owners review user access each quarter and record removals.",
+                    "manual-review", ["access-review-record"]),  # fmt: skip
             node("catalogue.json", "engagement-office", "collector", "Evidence collection agent", "collection-agent"),
             node("catalogue.json", "engagement-office", "drafting-agent", "Assessment drafting agent", "assessment-agent"),
             node("catalogue.json", "engagement-office", "m-ito", "M. Ito (fictional senior)", "audit-professional"),
@@ -153,19 +164,22 @@ def build_publications():
                 "evidence-record": {
                     "evidence-type": "example-audit:" + kind,
                     "source-system": "#" + system,
-                    "collected-at": collected_at,
+                    "collected-at": at(collected_at),
                     "export": "exports/" + export,
                     "sha256": hashlib.sha256(data).hexdigest(),
                 }
             },
         )
 
-    def collection(fragment, system, records, at):
+    def fact(fragment, label, kind, export, **content):
+        return node("evidence.json", "collector", fragment, label, kind, evidence="exports/" + export, **content)
+
+    def collection(fragment, system, records, recorded):
         return {
             "id": "#" + fragment,
             "type": "example-audit:collection",
             **provenance("evidence.json", "collector", "exports/" + EVIDENCE_FILES[records[0]]),
-            "recorded-at": at,
+            "recorded-at": at(recorded),
             "incidence": [
                 incidence("by", "collector", "catalogue.json#collector"),
                 incidence("from", "source", "#" + system),
@@ -174,6 +188,7 @@ def build_publications():
             ],
         }
 
+    terminated = {e: at(t) for e, t in TERMINATIONS}
     evidence_doc = publication(
         "evidence.json",
         requires=("catalogue.json",),
@@ -182,27 +197,47 @@ def build_publications():
             node("evidence.json", "collector", "gatekeeper", "Gatekeeper IAM (fictional)", "source-system"),
             node("evidence.json", "collector", "changedesk", "ChangeDesk (fictional)", "source-system"),
             evidence("hr-leavers-q3", "Q3 leavers", "hr-termination-report", "peoplecore", "2026-10-02T09:00:00Z", "hr-leavers-q3.csv"),
-            evidence("iam-active-users", "Enabled accounts", "active-account-listing", "gatekeeper", "2026-10-02T09:05:00Z", "iam-active-users.csv"),
+            evidence("iam-signins-q3", "Q3 sign-ins", "sign-in-log", "gatekeeper", "2026-10-02T09:05:00Z", "iam-signins-q3.csv"),
             evidence("change-tickets-q3", "Q3 privileged change tickets", "change-ticket-export", "changedesk", "2026-10-02T09:10:00Z", "change-tickets-q3.csv"),
             evidence("deploy-log-q3", "Q3 production deployments", "deployment-log", "changedesk", "2026-10-02T09:12:00Z", "deploy-log-q3.csv"),
+            *[fact(e, f"{NAMES[e]} (fictional)", "employee", "hr-leavers-q3.csv", employee={"staff-id": STAFF[e]}) for e, _, _ in EMPLOYEES],
+            *[fact(a, a, "account", "iam-signins-q3.csv", account={"login": a, "owner": "#" + o}) for a, o in ACCOUNTS],
+            *[
+                fact(f"term-{e}", f"{NAMES[e]} leaves", "termination-event", "hr-leavers-q3.csv",
+                     termination={"employee": "#" + e, "effective-at": at(t), "source": "#hr-leavers-q3"})  # fmt: skip
+                for e, t in TERMINATIONS
+            ],
+            *[
+                fact(f"use-{a}", f"{a} signs in", "account-use-event", "iam-signins-q3.csv",
+                     **{"account-use": {"account": "#" + a, "at": at(t), "source": "#iam-signins-q3",
+                                        "breach": "yes" if OWNERS[a] in terminated and terminated[OWNERS[a]] < at(t) else "no"}})  # fmt: skip
+                for a, t in SIGN_INS
+            ],
+            *[
+                fact(f"chg-{c.lower()}", c, "change-event", "change-tickets-q3.csv",
+                     change={"ticket": c, "implementer": "#" + i, "approver": "#" + ap, "approved-at": at(apt),
+                             "deployed-at": at(dep), "source": "#change-tickets-q3", "deployment-source": "#deploy-log-q3",
+                             "breach": "yes" if ap == i or at(apt) > at(dep) else "no"})  # fmt: skip
+                for c, i, ap, apt, dep in CHANGES
+            ],
         ],
         hyperedge=[
             collection("col-hr", "peoplecore", ["hr-leavers-q3"], "2026-10-02T09:01:00Z"),
-            collection("col-iam", "gatekeeper", ["iam-active-users"], "2026-10-02T09:06:00Z"),
+            collection("col-iam", "gatekeeper", ["iam-signins-q3"], "2026-10-02T09:06:00Z"),
             collection("col-change", "changedesk", ["change-tickets-q3", "deploy-log-q3"], "2026-10-02T09:13:00Z"),
         ],
     )
 
-    def assessment(fragment, control, assessor, outcome, rationale, cited, at):
+    def assessment(fragment, ctl, assessor, outcome, rationale, cited, recorded):
         return {
             "id": "#" + fragment,
             "type": "example-audit:assessment",
             **provenance("assessments.json", assessor, "catalogue.json"),
-            "recorded-at": at,
+            "recorded-at": at(recorded),
             "result": {"outcome": outcome, "rationale": rationale},
             "incidence": [
                 incidence("by", "assessor", "catalogue.json#" + assessor),
-                incidence("ctl", "assessed-control", "catalogue.json#" + control),
+                incidence("ctl", "assessed-control", "catalogue.json#" + ctl),
                 incidence("for", "in-engagement", "catalogue.json#eng-2026"),
                 *[incidence("ev-" + r, "cited-evidence", "evidence.json#" + r) for r in cited],
             ],
@@ -212,43 +247,25 @@ def build_publications():
         "assessments.json",
         requires=("evidence.json",),
         hyperedge=[
-            assessment(
-                "as-ac-01",
-                "ac-01",
-                "drafting-agent",
-                "exception",
-                "E1043 left on 2026-08-14; account jmarsh was still enabled and logged in on 2026-08-26.",
-                ["hr-leavers-q3", "iam-active-users"],
-                "2026-10-05T11:00:00Z",
-            ),
-            assessment(
-                "as-cm-02",
-                "cm-02",
-                "m-ito",
-                "supported",
-                "Both privileged changes were approved by a different person before deployment.",
-                ["change-tickets-q3", "deploy-log-q3"],
-                "2026-10-05T14:30:00Z",
-            ),
-            assessment(
-                "as-ac-04",
-                "ac-04",
-                "drafting-agent",
-                "insufficient-evidence",
-                "No quarterly access review records were provided for the period.",
-                [],
-                "2026-10-05T15:10:00Z",
-            ),
+            assessment("as-ac-01", "ac-01", "drafting-agent", "exception",
+                       "E1043's termination took effect 2026-08-14T17:00Z; account jmarsh signed in 2026-08-26T09:12:44Z.",
+                       ["hr-leavers-q3", "iam-signins-q3"], "2026-10-05T11:00:00Z"),  # fmt: skip
+            assessment("as-cm-02", "cm-02", "m-ito", "supported",
+                       "Both privileged changes were approved by a different person no later than deployment.",
+                       ["change-tickets-q3", "deploy-log-q3"], "2026-10-05T14:30:00Z"),  # fmt: skip
+            assessment("as-ac-04", "ac-04", "drafting-agent", "insufficient-evidence",
+                       "No quarterly access review records were provided for the period.", [], "2026-10-05T15:10:00Z"),  # fmt: skip
             {
                 "id": "#fd-ac-01",
                 "type": "example-audit:finding",
-                **provenance("assessments.json", "drafting-agent", "exports/iam-active-users.csv"),
-                "recorded-at": "2026-10-05T11:20:00Z",
-                "detail": {"severity": "high", "condition": "A terminated employee's account remained enabled and was used 12 days after termination."},
+                **provenance("assessments.json", "drafting-agent", "exports/iam-signins-q3.csv"),
+                "recorded-at": at("2026-10-07T11:20:00Z"),
+                "detail": {"severity": "high", "condition": "Account jmarsh was used 12 days after its owner's termination took effect."},
                 "incidence": [
                     incidence("basis", "basis", "#as-ac-01", "hyperedge"),
+                    incidence("v-jmarsh", "violation", "evidence.json#use-jmarsh"),
                     incidence("ev-hr", "cited-evidence", "evidence.json#hr-leavers-q3"),
-                    incidence("ev-iam", "cited-evidence", "evidence.json#iam-active-users"),
+                    incidence("ev-iam", "cited-evidence", "evidence.json#iam-signins-q3"),
                 ],
             },
             {
@@ -260,12 +277,12 @@ def build_publications():
         ],
     )
 
-    def review(fragment, assessment_id, reviewer, decision, at, comment):
+    def review(fragment, assessment_id, reviewer, decision, recorded, comment):
         return {
             "id": "#" + fragment,
             "type": "example-audit:review",
             **provenance("reviews.json", reviewer, "assessments.json"),
-            "recorded-at": at,
+            "recorded-at": at(recorded),
             "sign-off": {"decision": decision, "comment": comment},
             "incidence": [
                 incidence("by", "reviewer", "catalogue.json#" + reviewer),
@@ -287,7 +304,7 @@ def build_publications():
 
 EVIDENCE_FILES = {
     "hr-leavers-q3": "hr-leavers-q3.csv",
-    "iam-active-users": "iam-active-users.csv",
+    "iam-signins-q3": "iam-signins-q3.csv",
     "change-tickets-q3": "change-tickets-q3.csv",
     "deploy-log-q3": "deploy-log-q3.csv",
 }
@@ -307,29 +324,59 @@ def offline_reader(publications):
     return read
 
 
-def _edge(tree, fragment):
-    return next(e for e in tree[ROOT]["hyperedge"] if e["id"].endswith("#" + fragment))
+def _find(tree, fragment):
+    graph = tree[ROOT]
+    return next(e for e in graph["hyperedge"] + graph["node"] if e["id"].endswith("#" + fragment))
 
 
-def _set_target(tree, fragment, incidence_id, target):
-    for inc in _edge(tree, fragment)["incidence"]:
+def _set_target(tree, fragment, incidence_id, target, kind="node"):
+    for inc in _find(tree, fragment)["incidence"]:
         if inc["id"] == incidence_id:
-            inc["node"] = target
+            inc[kind] = target
 
 
+def _drop(tree, fragment):
+    graph = tree[ROOT]
+    graph["hyperedge"] = [e for e in graph["hyperedge"] if not e["id"].endswith("#" + fragment)]
+
+
+def _drop_incidence(tree, fragment, prefix):
+    edge = _find(tree, fragment)
+    edge["incidence"] = [i for i in edge["incidence"] if not i["id"].startswith(prefix)]
+
+
+B = FIXTURE_BASE
+# One rule each. Expected errors are asserted exactly in tests/test_ontology_hypergraph.py.
 INVALID = {
-    "dangling-evidence": lambda t: _set_target(t, "as-ac-01", "ev-iam-active-users", FIXTURE_BASE + "evidence.json#iam-export-missing"),
-    "assessment-without-evidence": lambda t: _edge(t, "as-cm-02").__setitem__(
-        "incidence", [i for i in _edge(t, "as-cm-02")["incidence"] if not i["id"].startswith("ev-")]
+    # Reference integrity and structure.
+    "dangling-evidence": lambda t: _set_target(t, "as-ac-01", "ev-iam-signins-q3", B + "evidence.json#iam-export-missing"),
+    "assessment-without-evidence": lambda t: _drop_incidence(t, "as-cm-02", "ev-"),
+    "reviewer-is-assessor": lambda t: _set_target(t, "rv-cm-02", "by", B + "catalogue.json#m-ito"),
+    "review-with-two-reviewers": lambda t: _find(t, "rv-ac-01")["incidence"].append(
+        {"id": "by-2", "role": "example-audit:reviewer", "node": B + "catalogue.json#m-ito"}
     ),
-    "reviewer-is-assessor": lambda t: _set_target(t, "rv-cm-02", "by", FIXTURE_BASE + "catalogue.json#m-ito"),
-    "review-with-two-reviewers": lambda t: _edge(t, "rv-ac-01")["incidence"].append(
-        {"id": "by-2", "role": "example-audit:reviewer", "node": FIXTURE_BASE + "catalogue.json#m-ito"}
+    "evidence-type-not-accepted": lambda t: _set_target(t, "as-cm-02", "ev-deploy-log-q3", B + "evidence.json#hr-leavers-q3"),
+    "finding-on-supported-assessment": lambda t: _set_target(t, "fd-ac-01", "basis", B + "assessments.json#as-cm-02", "hyperedge"),
+    # Conclusions must agree with facts.
+    "supported-despite-breach": lambda t: (_find(t, "as-ac-01")["result"].update(outcome="supported"), _drop(t, "fd-ac-01")),
+    "breach-declared-no": lambda t: _find(t, "use-jmarsh")["account-use"].update(breach="no"),
+    "missing-exception-finding": lambda t: _drop(t, "fd-ac-01"),
+    "unsupported-finding": lambda t: _find(t, "fd-ac-01")["incidence"].insert(
+        2, {"id": "v-apatel", "role": "example-audit:violation", "node": B + "evidence.json#use-apatel"}
     ),
-    "finding-on-supported-assessment": lambda t: _edge(t, "fd-ac-01")["incidence"][0].__setitem__(
-        "hyperedge", FIXTURE_BASE + "assessments.json#as-cm-02"
-    ),
-    "evidence-type-not-accepted": lambda t: _set_target(t, "as-cm-02", "ev-deploy-log-q3", FIXTURE_BASE + "evidence.json#hr-leavers-q3"),
+    "breach-claimed-for-unterminated-owner": lambda t: _find(t, "use-apatel")["account-use"].update(breach="yes"),
+    "breach-claimed-at-termination-second": lambda t: _find(t, "use-tquill")["account-use"].update(breach="yes"),
+    "exception-without-breach": lambda t: _find(t, "as-cm-02")["result"].update(outcome="exception"),
+    "self-approved-change-declared-no": lambda t: _find(t, "chg-chg-2241")["change"].update(approver=B + "evidence.json#e0912"),
+    "change-approved-after-deployment-declared-no": lambda t: _find(t, "chg-chg-2207")["change"].update(**{"approved-at": at("2026-08-03T18:30:01Z")}),
+    "finding-without-approved-review": lambda t: _find(t, "rv-ac-01")["sign-off"].update(decision="rejected"),
+    # Time and provenance.
+    "stale-evidence": lambda t: _find(t, "iam-signins-q3")["evidence-record"].update(**{"collected-at": ENGAGEMENT["as-of"] - 30 * DAY - 1}),
+    "evidence-collected-after-assessment": lambda t: _find(t, "deploy-log-q3")["evidence-record"].update(**{"collected-at": at("2026-10-05T14:30:01Z")}),
+    "review-before-assessment": lambda t: _find(t, "rv-cm-02").update(**{"recorded-at": at("2026-10-05T14:29:59Z")}),
+    "review-after-as-of": lambda t: _find(t, "rv-ac-04").update(**{"recorded-at": ENGAGEMENT["as-of"] + 1}),
+    "evidence-not-collected-for-engagement": lambda t: _drop_incidence(t, "col-iam", "got-"),
+    "use-outside-period": lambda t: _find(t, "use-lchen")["account-use"].update(at=ENGAGEMENT["period-end"] + 1),
 }
 
 
@@ -337,10 +384,18 @@ def build():
     publications = build_publications()
     for name, value in publications.items():
         write("documents/" + name, value)
+    exports = HERE / "documents" / "exports"
+    for stale in exports.glob("*.csv"):
+        if stale.name not in EXPORTS:
+            stale.unlink()
     for name, text in EXPORTS.items():
-        (HERE / "documents" / "exports" / name).write_text(text, encoding="utf-8")
+        (exports / name).write_text(text, encoding="utf-8")
     valid = collect(FIXTURE_BASE + "reviews.json", read=offline_reader(publications))
     write("fixtures/valid.json", valid)
+    invalid_dir = HERE / "fixtures" / "invalid"
+    for stale in invalid_dir.glob("*.json"):
+        if stale.stem not in INVALID:
+            stale.unlink()
     for name, mutate in INVALID.items():
         tree = copy.deepcopy(valid)
         mutate(tree)
