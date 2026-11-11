@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { generateJsonSchema, parseJsonSchema, parseYangString } from "../../src";
-import { YANG_INTEGER_BOUNDS } from "../../src/json/integer-bounds";
+import { YANG_INTEGER_BOUNDS } from "../../src/types/registry";
 
 describe("integer built-in JSON bounds round-trip", () => {
   it("uint16 uses minimum/maximum and no builtin-type", () => {

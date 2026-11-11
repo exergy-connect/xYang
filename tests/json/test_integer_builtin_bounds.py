@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from xyang import parse_yang_string
 from xyang.json import generate_json_schema, parse_json_schema
-from xyang.json.integer_bounds import YANG_INTEGER_BOUNDS
+from xyang.types.registry import YANG_INTEGER_BOUNDS
 
 
 def test_uint16_full_range_round_trips_without_builtin_type_key():
@@ -82,3 +82,18 @@ module m {
     td = mod2.typedefs["t"]
     assert td.type.name == "int32"
     assert td.type.range == "0..max"
+
+
+def test_deprecated_integer_bounds_module_still_warns():
+    """The shim stays, and importing it is the warning. The tests above use the registry."""
+    import importlib
+    import sys
+    import warnings
+
+    sys.modules.pop("xyang.json.integer_bounds", None)
+    with warnings.catch_warnings(record=True) as caught:
+        warnings.simplefilter("always", DeprecationWarning)
+        mod = importlib.import_module("xyang.json.integer_bounds")
+    messages = [str(item.message) for item in caught if issubclass(item.category, DeprecationWarning)]
+    assert "xyang.json.integer_bounds is deprecated; import from xyang.types.registry" in messages
+    assert mod.YANG_INTEGER_BOUNDS is YANG_INTEGER_BOUNDS

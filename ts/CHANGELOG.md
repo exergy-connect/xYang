@@ -19,6 +19,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- **Tests:** the integer-bounds round-trip test imports `YANG_INTEGER_BOUNDS` from `types/registry` instead of the deprecated `json/integer-bounds` re-export. The re-export is unchanged.
 - **Boolean arguments:** `mandatory`, `config`, `require-instance`, and `yin-element` accept quoted and unquoted `true` and `false`, matching Python. Any other value, including `TRUE`, `yes`, `1`, and a missing argument, is a `YangSyntaxError` naming the statement and the value.
 - **`range` and `length` bodies:** `range` and `length` accept `description`, `reference`, `error-message`, and `error-app-tag`, plus a prefixed extension, matching Python. An unknown child is a `YangSyntaxError`. The constraint string is unchanged, and `error-message` / `error-app-tag` are reported on a miss.
 - **Types:** `YangTokenType` is a const object, so its type includes punctuation such as `"+"`. `Array.includes` rejected that wider type, and `YangTokenType.INPUT` is not a type. `hasTokenType` does the same membership check and narrows, and input/output parameters use `typeof YangTokenType.INPUT`. `tsc --noEmit` passes. The checks are unchanged.

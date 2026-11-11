@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Tests:** `tests/json/test_integer_builtin_bounds.py` imports `YANG_INTEGER_BOUNDS` from `xyang.types.registry`. Importing `xyang.json.integer_bounds` warns `xyang.json.integer_bounds is deprecated; import from xyang.types.registry`. The shim still warns; `test_deprecated_integer_bounds_module_still_warns` checks that. The bounds and the schema round-trip are unchanged.
 - **Boolean arguments:** `mandatory`, `config`, `require-instance`, and `yin-element` accept `true` and `false` whether or not they are quoted. `"true"` and `true` are the same value. `TRUE`, `yes`, `1`, and a missing argument are a `YangSyntaxError` naming the statement and the value.
 - **`range` and `length` bodies:** `range` and `length` accept `description`, `reference`, `error-message`, and `error-app-tag` (RFC 7950 §9.2.4, §9.4.4), plus a prefixed extension. An unknown child is a `YangSyntaxError` naming the parent and the keyword. The constraint string is unchanged. `error-message` and `error-app-tag` are reported on a range or length miss, the same way as `pattern`.
 - **`enum` names:** an unquoted enum name such as `enum 100GE` or `enum 50|100GE` (`huawei-ifm.yang`) is read as one argument. `100GE` was split into `100` and `GE`, and `GE` was rejected as an unknown statement in the `type` body. The tokenizer also dropped characters it did not recognize, such as `|`. They are now part of an unquoted argument, and a parse error anywhere else. Python and TypeScript match.
