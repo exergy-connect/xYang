@@ -195,7 +195,9 @@ def f_derived_from(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, no
     if not isinstance(root_schema, YangModule):
         return False
     mod = root_schema
-    start = ctx.current if ctx.current is not None else node
+    # XPath function arguments use the evaluation cursor; only current()
+    # uses the fixed expression origin (RFC 7950 section 10.1.1).
+    start = node
     v1 = ev.eval(ast.args[0], ctx, start)
     if is_nodeset(v1):
         if not v1:
@@ -224,7 +226,9 @@ def f_derived_from_or_self(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Con
     if not isinstance(root_schema, YangModule):
         return False
     mod = root_schema
-    start = ctx.current if ctx.current is not None else node
+    # XPath function arguments use the evaluation cursor; only current()
+    # uses the fixed expression origin (RFC 7950 section 10.1.1).
+    start = node
     v1 = ev.eval(ast.args[0], ctx, start)
     if is_nodeset(v1):
         if not v1:

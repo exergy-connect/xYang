@@ -1,0 +1,20 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  identity kind;
+  identity material { base kind; }
+  identity sample { base material; }
+  identity process { base kind; }
+  container top {
+    leaf selected { type string; mandatory true; }
+    must "count(item[id = current()/selected][derived-from-or-self(type, 'm:material')]) = 1";
+    must "count(item[derived-from(type, 'm:material')]) = 1";
+    must "count(item[derived-from-or-self(type, 'm:material')]) = 2";
+    list item {
+      key id;
+      leaf id { type string; }
+      leaf type { type identityref { base kind; } mandatory true; }
+    }
+  }
+}
