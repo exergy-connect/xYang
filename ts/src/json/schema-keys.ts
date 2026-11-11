@@ -14,5 +14,14 @@ export const XYANG_KEYS = {
   /** `{key: module stub}` of the imported modules the identities of this module derive from (RFC 7950 §7.18.2). */
   imports: "imports",
   /** Identities of an `imports` stub, keyed by name. */
-  identities: "identities"
+  identities: "identities",
+  /** Extension definitions (RFC 7950 §7.19) of this module, keyed by name. */
+  extension: "extension",
+  /** Invocations on this node, in source order: `{name, argument?, ...}`. `name` is `prefix:ext`. */
+  extensions: "extensions",
+  argument: "argument",
+  yinElement: "yin-element",
+  reference: "reference",
+  /** Nested statements of an invocation: `{extension}` or `{node, schema}`. */
+  body: "body"
 } as const;

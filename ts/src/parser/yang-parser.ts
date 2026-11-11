@@ -321,6 +321,16 @@ export class YangParser {
     if (Object.keys(serializedGroupings).length > 0) {
       data.groupings = serializedGroupings;
     }
+    const rawIdentities = (moduleState.identities ?? {}) as Record<string, { statements?: unknown[] }>;
+    const serializedIdentities = (data.identities ?? {}) as Record<string, { statements?: YangStatement[] }>;
+    for (const [name, raw] of Object.entries(rawIdentities)) {
+      const invocations = (raw.statements ?? [])
+        .map((child) => this.parsers.serializeAstStatement(child))
+        .filter((stmt) => typeof stmt.resolved_extension_name === "string" && stmt.resolved_extension_name.length > 0);
+      if (invocations.length > 0 && serializedIdentities[name]) {
+        serializedIdentities[name].statements = invocations;
+      }
+    }
     // Python order, gated on expandUses: uses, then augment, then extensions.
     let mod = new YangModule(data, source);
     if (this.expandUses) {

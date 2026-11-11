@@ -44,6 +44,8 @@ export type IdentityBases = {
   bases: Array<{ prefix?: string; name: string }>;
   description?: string;
   if_features?: string[];
+  /** Extension invocations on this identity. Present after a native JSON reload. */
+  statements?: YangStatement[];
 };
 
 export type YangStatementInit = {

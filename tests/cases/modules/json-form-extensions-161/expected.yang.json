@@ -1,0 +1,407 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "rpcs": {
+      "f": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "input": {
+          "type": "object",
+          "x-yang": {
+            "type": "input"
+          },
+          "additionalProperties": false,
+          "properties": {
+            "s": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Session"
+                  }
+                ]
+              }
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "x-yang": {
+            "type": "output"
+          },
+          "additionalProperties": false,
+          "properties": {
+            "out": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Out"
+                  }
+                ]
+              }
+            }
+          }
+        }
+      }
+    },
+    "imports": {
+      "e": {
+        "module": "ext",
+        "namespace": "urn:ext",
+        "prefix": "ext",
+        "extension": {
+          "tag": {
+            "argument": "value",
+            "description": "Imported tag.",
+            "reference": "ext"
+          }
+        }
+      }
+    },
+    "extension": {
+      "http-header": {
+        "argument": "name",
+        "description": "Mirror into an HTTP header.",
+        "reference": "RFC 7950"
+      },
+      "note": {
+        "argument": "text",
+        "yin-element": true,
+        "description": "A note."
+      }
+    },
+    "extensions": [
+      {
+        "name": "m:http-header",
+        "argument": "module"
+      }
+    ]
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container",
+        "choice": {
+          "name": "pick",
+          "mandatory": false,
+          "extensions": [
+            {
+              "name": "m:http-header",
+              "argument": "Pick"
+            }
+          ]
+        },
+        "extensions": [
+          {
+            "name": "m:http-header",
+            "argument": "Top"
+          },
+          {
+            "name": "m:note",
+            "argument": "kept",
+            "description": "Attached note.",
+            "body": [
+              {
+                "node": "extra",
+                "schema": {
+                  "type": "string",
+                  "x-yang": {
+                    "type": "leaf"
+                  }
+                }
+              }
+            ]
+          }
+        ]
+      },
+      "oneOf": [
+        {
+          "type": "object",
+          "properties": {
+            "s": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Session"
+                  }
+                ]
+              }
+            },
+            "imported": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "e:tag",
+                    "argument": "from-ext"
+                  }
+                ]
+              }
+            },
+            "row": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "x-yang": {
+                      "type": "leaf"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "x-yang": {
+                "type": "list",
+                "key": "id",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Row"
+                  }
+                ]
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-yang": {
+                "type": "leaf-list",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Tags"
+                  }
+                ]
+              }
+            }
+          },
+          "required": [],
+          "additionalProperties": false
+        },
+        {
+          "type": "object",
+          "properties": {
+            "s": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Session"
+                  }
+                ]
+              }
+            },
+            "imported": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "e:tag",
+                    "argument": "from-ext"
+                  }
+                ]
+              }
+            },
+            "row": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "x-yang": {
+                      "type": "leaf"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "x-yang": {
+                "type": "list",
+                "key": "id",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Row"
+                  }
+                ]
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-yang": {
+                "type": "leaf-list",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Tags"
+                  }
+                ]
+              }
+            },
+            "a": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          },
+          "required": [
+            "a"
+          ],
+          "additionalProperties": false,
+          "x-yang": {
+            "name": "a",
+            "extensions": [
+              {
+                "name": "m:http-header",
+                "argument": "A"
+              }
+            ]
+          }
+        },
+        {
+          "type": "object",
+          "properties": {
+            "s": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Session"
+                  }
+                ]
+              }
+            },
+            "imported": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf",
+                "extensions": [
+                  {
+                    "name": "e:tag",
+                    "argument": "from-ext"
+                  }
+                ]
+              }
+            },
+            "row": {
+              "type": "array",
+              "items": {
+                "type": "object",
+                "properties": {
+                  "id": {
+                    "type": "string",
+                    "x-yang": {
+                      "type": "leaf"
+                    }
+                  }
+                },
+                "additionalProperties": false
+              },
+              "x-yang": {
+                "type": "list",
+                "key": "id",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Row"
+                  }
+                ]
+              }
+            },
+            "tags": {
+              "type": "array",
+              "items": {
+                "type": "string"
+              },
+              "x-yang": {
+                "type": "leaf-list",
+                "extensions": [
+                  {
+                    "name": "m:http-header",
+                    "argument": "Tags"
+                  }
+                ]
+              }
+            },
+            "b": {
+              "type": "string",
+              "x-yang": {
+                "type": "leaf"
+              }
+            }
+          },
+          "required": [
+            "b"
+          ],
+          "additionalProperties": false,
+          "x-yang": {
+            "name": "b"
+          }
+        }
+      ]
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "name": {
+      "type": "string",
+      "x-yang": {
+        "extensions": [
+          {
+            "name": "m:http-header",
+            "argument": "Name"
+          }
+        ]
+      }
+    },
+    "kind": {
+      "type": "string",
+      "enum": [
+        "m:kind"
+      ],
+      "x-yang": {
+        "type": "identity",
+        "bases": [],
+        "extensions": [
+          {
+            "name": "m:http-header",
+            "argument": "Kind"
+          }
+        ]
+      }
+    }
+  }
+}
