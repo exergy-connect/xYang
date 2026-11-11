@@ -9,6 +9,16 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-11
+
+Changes since 0.1.11. Breaking changes for upgrading code and data:
+
+- `json/integer-bounds.ts` is removed; import from `types/registry` (below).
+- `YangModule.data` and `YangStatement.data` are removed (see Changed).
+- Statement bodies reject keywords their parent does not accept, and statement arguments are stricter (`yang-version`, `value`, `min-elements` / `max-elements`, boolean arguments).
+- Validation is stricter in several places listed under Fixed, including JSON strings for 8/16/32-bit integers, `min-elements` on absent nodes, `unique`, and `identityref` values.
+- The `xyang-ts` GitHub Action takes `version` instead of `ref`, and `path` / `xyang-root` are removed.
+
 ### Removed
 
 - **Breaking:** `json/integer-bounds.ts` is removed. There is no compatibility re-export. Import `YANG_INTEGER_BOUNDS`, `YANG_INTEGER_BUILTIN_NAMES`, `jsonIntegerBoundsForBuiltin`, and `yangIntegerFromJsonBounds` from `types/registry`. Integer bounds behavior is unchanged.
@@ -211,7 +221,10 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.0...HEAD
+[1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0
+[0.1.11]: https://github.com/exergy-connect/xYang/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/exergy-connect/xYang/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/exergy-connect/xYang/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/exergy-connect/xYang/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/exergy-connect/xYang/compare/v0.1.6...v0.1.7

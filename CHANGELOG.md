@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.0] — 2026-11-11
+
+Changes since 0.1.11. Breaking changes for upgrading code and data:
+
+- `xyang.json.integer_bounds` is removed; import from `xyang.types.registry` (below).
+- TypeScript: `YangModule.data` and `YangStatement.data` are removed (see Changed).
+- The parser rejects substatements its parent does not accept (keyword dispatch, below), and statement arguments are stricter (`yang-version`, `value`, `min-elements` / `max-elements`, boolean arguments).
+- Validation is stricter in several places listed under Fixed, including JSON strings for 8/16/32-bit integers, `min-elements` and `mandatory` under absent containers, `unique`, and Python container/list shapes and leaf types.
+- The `xyang-ts` GitHub Action takes `version` instead of `ref`, and `path` / `xyang-root` are removed.
+
 ### Removed
 
 - **Breaking:** `xyang.json.integer_bounds` is removed. There is no compatibility shim and no deprecation warning. Import `YANG_INTEGER_BOUNDS`, `YANG_INTEGER_BUILTIN_NAMES`, `json_integer_bounds_for_builtin`, and `yang_integer_from_json_bounds` from `xyang.types.registry`. Integer bounds behavior is unchanged.
