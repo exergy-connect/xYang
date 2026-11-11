@@ -4,7 +4,7 @@ import {
   parseAbsoluteSchemaPath,
   parseIdentifierRefAtom
 } from "../core/identifier-ref";
-import { YangModule, YangStatement } from "../core/model";
+import { YangModule, YangStatement, type YangStatementInit } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { applyAugments } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
@@ -46,6 +46,338 @@ function isSchemaDataNode(stmt: YangStatement): boolean {
     YangTokenType.ANYDATA,
     YangTokenType.ANYXML
   ]);
+}
+
+/** Imported extensions the export invoked. Restored around {@link generateJsonSchema}. */
+let extensionUses: Array<{ owner: YangModule; name: string }> | undefined;
+
+function isExtensionInvocation(stmt: YangStatement): boolean {
+  return typeof stmt.prefix === "string" && stmt.prefix.length > 0
+    && typeof stmt.resolved_extension_name === "string" && stmt.resolved_extension_name.length > 0;
+}
+
+function asStatement(value: unknown): YangStatement {
+  return value instanceof YangStatement ? value : new YangStatement((value ?? {}) as YangStatementInit);
+}
+
+function statementListOf(value: unknown): YangStatement[] {
+  return Array.isArray(value) ? value.map(asStatement) : [];
+}
+
+function extensionLabel(stmt: YangStatement): string {
+  return `${stmt.prefix}:${stmt.resolved_extension_name}`;
+}
+
+function rejectSemanticExtension(stmt: YangStatement): void {
+  const owner = stmt.resolved_module_name ?? "";
+  const ext = stmt.resolved_extension_name ?? "";
+  if (owner === "ietf-yang-structure-ext" && (ext === "structure" || ext === "augment-structure")) {
+    throw new YangExportError(
+      `cannot export extension invocation '${extensionLabel(stmt)}': ` +
+        `RFC 8791 sx:${ext} is applied when the module is parsed and is not ` +
+        `re-applied when the native JSON form is loaded`
+    );
+  }
+}
+
+function lookupImportedModule(root: YangModule, name: string): YangModule | undefined {
+  for (const imported of Object.values(root.import_prefixes)) {
+    if (imported.name === name) {
+      return imported;
+    }
+  }
+  return root.module_registry?.[name];
+}
+
+function recordImportedExtension(stmt: YangStatement, root: YangModule): void {
+  if (!extensionUses) {
+    throw new YangExportError(`cannot export extension invocation '${extensionLabel(stmt)}' outside generateJsonSchema`);
+  }
+  const ownerName = stmt.resolved_module_name ?? "";
+  if (!ownerName || ownerName === root.name) {
+    return;
+  }
+  const owner = lookupImportedModule(root, ownerName);
+  if (!owner) {
+    throw new YangExportError(
+      `cannot export extension invocation '${extensionLabel(stmt)}': module '${ownerName}' is not loaded`
+    );
+  }
+  const extName = stmt.resolved_extension_name ?? "";
+  if (!extensionUses.some((item) => item.owner === owner && item.name === extName)) {
+    extensionUses.push({ owner, name: extName });
+  }
+}
+
+function extensionDefJson(ext: unknown): Record<string, unknown> {
+  const raw = asRecord(ext);
+  const out: Record<string, unknown> = {};
+  const argument = typeof raw.argument_name === "string" ? raw.argument_name : "";
+  if (argument.length > 0) {
+    out[XYANG_KEYS.argument] = argument;
+  }
+  if (typeof raw.argument_yin_element === "boolean") {
+    out[XYANG_KEYS.yinElement] = raw.argument_yin_element;
+  }
+  const description = typeof raw.description === "string" ? raw.description : "";
+  if (description.length > 0) {
+    out.description = description;
+  }
+  const reference = typeof raw.reference === "string" ? raw.reference : "";
+  if (reference.length > 0) {
+    out[XYANG_KEYS.reference] = reference;
+  }
+  return out;
+}
+
+function oneExtensionInvocation(
+  stmt: YangStatement,
+  module: YangModule,
+  typedefNames: Set<string>
+): Record<string, unknown> {
+  rejectSemanticExtension(stmt);
+  recordImportedExtension(stmt, module);
+  const out: Record<string, unknown> = { name: extensionLabel(stmt) };
+  if (typeof stmt.argument === "string") {
+    out[XYANG_KEYS.argument] = stmt.argument;
+  }
+  if (typeof stmt.description === "string" && stmt.description.length > 0) {
+    out.description = stmt.description;
+  }
+  if (typeof stmt.reference === "string" && stmt.reference.length > 0) {
+    out[XYANG_KEYS.reference] = stmt.reference;
+  }
+  const features = Array.isArray(stmt.if_features)
+    ? stmt.if_features.filter((item): item is string => typeof item === "string" && item.trim().length > 0)
+    : [];
+  if (features.length > 0) {
+    out["if-features"] = features;
+  }
+  const whenShape = asRecord(stmt.when);
+  const whenExpression = typeof whenShape.expression === "string" ? whenShape.expression : "";
+  if (whenExpression.trim().length > 0) {
+    const whenOut: Record<string, unknown> = {
+      condition: whenExpression,
+      ...xpathPrefixesEntry(whenShape.xpath_prefixes)
+    };
+    if (typeof whenShape.description === "string" && whenShape.description.trim().length > 0) {
+      whenOut.description = whenShape.description.trim();
+    }
+    out.when = whenOut;
+  }
+  const must = mustToXYang(stmt);
+  if (must.length > 0) {
+    out.must = must;
+  }
+  if (typeof stmt.config === "boolean") {
+    out[XYANG_KEYS.config] = stmt.config;
+  }
+  const body: Array<Record<string, unknown>> = [];
+  for (const child of stmt.statements ?? []) {
+    if (child.keyword === YangTokenType.MUST) {
+      continue;
+    }
+    if (isExtensionInvocation(child)) {
+      body.push({ [XYANG_KEYS.extension]: oneExtensionInvocation(child, module, typedefNames) });
+      continue;
+    }
+    if (isSchemaDataNode(child) && child.keyword !== YangTokenType.CASE) {
+      body.push({
+        node: propertyKey(child, module),
+        schema: statementToSchema(child, module, typedefNames)
+      });
+      continue;
+    }
+    throw new YangExportError(
+      `cannot export extension invocation '${extensionLabel(stmt)}': nested statement ${child.keyword ?? ""} '${child.name ?? ""}' is not representable in the native JSON form`
+    );
+  }
+  if (body.length > 0) {
+    out[XYANG_KEYS.body] = body;
+  }
+  return out;
+}
+
+function extensionInvocationsJson(
+  statements: YangStatement[],
+  module: YangModule,
+  typedefNames: Set<string>
+): Array<Record<string, unknown>> {
+  return statements.filter(isExtensionInvocation).map((stmt) => oneExtensionInvocation(stmt, module, typedefNames));
+}
+
+function stampExtensions(
+  xyang: Record<string, unknown>,
+  statements: YangStatement[],
+  module: YangModule,
+  typedefNames: Set<string>
+): void {
+  const invocations = extensionInvocationsJson(statements, module, typedefNames);
+  if (invocations.length > 0) {
+    xyang[XYANG_KEYS.extensions] = invocations;
+  }
+}
+
+function ownPrefixOf(module: YangModule): string {
+  return String(module.prefix ?? "").replace(/^['"]|['"]$/g, "");
+}
+
+function extensionImportKey(root: YangModule, module: YangModule): string {
+  for (const [prefix, imported] of Object.entries(root.import_prefixes)) {
+    if (imported === module || imported.name === module.name) {
+      return prefix;
+    }
+  }
+  const name = module.name ?? "";
+  if (name in root.import_prefixes || name === ownPrefixOf(root)) {
+    throw new YangExportError(
+      `cannot export extensions of module '${name}': the name is also a prefix of module '${root.name}'`
+    );
+  }
+  return name;
+}
+
+function localExtensionDefs(module: YangModule): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [name, ext] of Object.entries(module.extensions ?? {})) {
+    out[name] = extensionDefJson(ext);
+  }
+  return out;
+}
+
+function mergeExtensionImports(
+  root: YangModule,
+  imports: Record<string, unknown>,
+  used: Array<{ owner: YangModule; name: string }>
+): Record<string, unknown> {
+  const byOwner = new Map<string, { owner: YangModule; names: string[] }>();
+  for (const item of used) {
+    const key = item.owner.name ?? "";
+    const bucket = byOwner.get(key) ?? { owner: item.owner, names: [] };
+    if (!bucket.names.includes(item.name)) {
+      bucket.names.push(item.name);
+    }
+    byOwner.set(key, bucket);
+  }
+  for (const { owner, names } of byOwner.values()) {
+    const key = extensionImportKey(root, owner);
+    const stub = asRecord(imports[key]);
+    if (!imports[key]) {
+      imports[key] = {
+        module: owner.name,
+        namespace: owner.namespace ?? "",
+        prefix: owner.prefix ?? ""
+      };
+    }
+    const target = asRecord(imports[key]);
+    if (Object.keys(stub).length === 0 && imports[key] !== target) {
+      Object.assign(target, stub);
+    }
+    const extMap: Record<string, unknown> = {};
+    for (const name of [...names].sort()) {
+      const ext = (owner.extensions ?? {})[name];
+      if (!ext) {
+        throw new YangExportError(
+          `cannot export extension ${owner.name}:${name}: the extension definition is not in that module`
+        );
+      }
+      extMap[name] = extensionDefJson(ext);
+    }
+    target[XYANG_KEYS.extension] = extMap;
+  }
+  return Object.fromEntries(Object.entries(imports).sort(([a], [b]) => (a < b ? -1 : a > b ? 1 : 0)));
+}
+
+const PLACED_KEYWORDS = new Set([
+  YangTokenType.CONTAINER,
+  YangTokenType.LIST,
+  YangTokenType.LEAF,
+  YangTokenType.LEAF_LIST,
+  YangTokenType.CHOICE,
+  YangTokenType.CASE,
+  YangTokenType.ANYDATA,
+  YangTokenType.ANYXML,
+  YangTokenType.RPC,
+  YangTokenType.ACTION,
+  YangTokenType.INPUT,
+  YangTokenType.OUTPUT,
+  YangTokenType.TYPEDEF,
+  "identity"
+]);
+
+function findExtensionInvocation(stmt: YangStatement): YangStatement | undefined {
+  if (isExtensionInvocation(stmt)) {
+    return stmt;
+  }
+  for (const child of stmt.statements ?? []) {
+    const found = findExtensionInvocation(child);
+    if (found) {
+      return found;
+    }
+  }
+  return undefined;
+}
+
+function assertExtensionsPlaced(module: YangModule): void {
+  const walk = (owner: YangStatement, placed: boolean): void => {
+    for (const child of owner.statements ?? []) {
+      if (isExtensionInvocation(child)) {
+        rejectSemanticExtension(child);
+        if (!placed) {
+          throw new YangExportError(
+            `cannot export extension invocation '${extensionLabel(child)}': ` +
+              `it is on ${owner.keyword ?? ""} '${owner.name ?? ""}', which the native JSON form does not carry`
+          );
+        }
+        walk(child, true);
+        continue;
+      }
+      if (child.keyword === "grouping" || child.keyword === YangTokenType.EXTENSION) {
+        continue;
+      }
+      if (child.keyword === YangTokenType.USES) {
+        const found = findExtensionInvocation(child);
+        if (found) {
+          throw new YangExportError(
+            `cannot export extension invocation '${extensionLabel(found)}': ` +
+              `it is inside uses '${child.argument ?? child.name ?? ""}', which the native JSON form does not carry`
+          );
+        }
+        continue;
+      }
+      walk(child, PLACED_KEYWORDS.has(child.keyword ?? ""));
+    }
+  };
+  for (const stmt of module.statements) {
+    if (isExtensionInvocation(stmt)) {
+      rejectSemanticExtension(stmt);
+      walk(stmt, true);
+      continue;
+    }
+    if (stmt.keyword === "grouping" || stmt.keyword === YangTokenType.EXTENSION) {
+      continue;
+    }
+    if (stmt.keyword === YangTokenType.USES) {
+      const found = findExtensionInvocation(stmt);
+      if (found) {
+        throw new YangExportError(
+          `cannot export extension invocation '${extensionLabel(found)}': ` +
+            `it is inside uses '${stmt.argument ?? stmt.name ?? ""}', which the native JSON form does not carry`
+        );
+      }
+      continue;
+    }
+    walk(stmt, PLACED_KEYWORDS.has(stmt.keyword ?? ""));
+  }
+  for (const raw of Object.values(module.identities)) {
+    for (const stmt of statementListOf((raw as { statements?: unknown }).statements)) {
+      if (!isExtensionInvocation(stmt)) {
+        continue;
+      }
+      rejectSemanticExtension(stmt);
+      walk(stmt, true);
+    }
+  }
 }
 
 /** Paths with predicates cannot be cache-resolved (matches Python JSON generator). */
@@ -124,7 +456,9 @@ function explicitConfig(stmt: YangStatement): boolean | undefined {
 
 function withStatementMeta(
   stmt: YangStatement,
-  meta: Record<string, unknown>
+  meta: Record<string, unknown>,
+  module?: YangModule,
+  typedefNames?: Set<string>
 ): Record<string, unknown> {
   const out = { ...meta };
   const config = explicitConfig(stmt);
@@ -160,6 +494,9 @@ function withStatementMeta(
   const must = mustToXYang(stmt);
   if (must.length > 0) {
     out.must = must;
+  }
+  if (module && typedefNames) {
+    stampExtensions(out, stmt.statements ?? [], module, typedefNames);
   }
   return out;
 }
@@ -315,7 +652,11 @@ function mergeOneOfBranchesWithBase(
 }
 
 /** Match Python `_choice_meta_xyang` (hoisted choice on container/list only). */
-function choiceMetaForXYang(choice: YangStatement): Record<string, unknown> {
+function choiceMetaForXYang(
+  choice: YangStatement,
+  module: YangModule,
+  typedefNames: Set<string>
+): Record<string, unknown> {
   const meta: Record<string, unknown> = {
     name: choice.name ?? "",
     mandatory: choice.mandatory === true
@@ -327,6 +668,7 @@ function choiceMetaForXYang(choice: YangStatement): Record<string, unknown> {
   if (ifFeatures.length > 0) {
     meta["if-features"] = ifFeatures;
   }
+  stampExtensions(meta, choice.statements ?? [], module, typedefNames);
   return meta;
 }
 
@@ -370,7 +712,7 @@ function ioBlockToSchema(
   const body = buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
   const out: Record<string, unknown> = {
     ...body,
-    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: ioType })
+    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: ioType }, module, typedefNames)
   };
   withDescription(out, stmt.description);
   return out;
@@ -384,7 +726,7 @@ function rpcToJson(
   kind: string = YangTokenType.RPC
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: kind })
+    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: kind }, module, typedefNames)
   };
   const inp = stmt.findStatement("input");
   if (inp?.keyword === YangTokenType.INPUT) {
@@ -465,7 +807,7 @@ function buildChoiceOneOf(
       properties,
       additionalProperties: false,
       required,
-      [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(c, { name: c.name ?? "case" })
+      [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(c, { name: c.name ?? "case" }, module, typedefNames)
     };
     withDescription(branch, c.description);
     branches.push(branch);
@@ -523,6 +865,7 @@ function statementToSchemaBody(
     if (ifFeatures.length > 0) {
       xyChoice["if-features"] = ifFeatures;
     }
+    stampExtensions(xyChoice, stmt.statements ?? [], module, typedefNames);
     const out: Record<string, unknown> = {
       type: JSON_TYPE_OBJECT,
       [YANG_SCHEMA_KEYS.xYang]: xyChoice
@@ -536,9 +879,9 @@ function statementToSchemaBody(
 
   if (keyword === YangTokenType.CONTAINER) {
     const { others, soleChoice } = partitionChoiceSiblings(stmt.statements);
-    const xYang = withStatementMeta(stmt, { type: keyword }) as Record<string, unknown>;
+    const xYang = withStatementMeta(stmt, { type: keyword }, module, typedefNames) as Record<string, unknown>;
     if (soleChoice) {
-      xYang.choice = choiceMetaForXYang(soleChoice);
+      xYang.choice = choiceMetaForXYang(soleChoice, module, typedefNames);
     }
     const body = soleChoice
       ? buildSoleChoiceObjectSchema(others, soleChoice, module, typedefNames)
@@ -556,9 +899,9 @@ function statementToSchemaBody(
     const listXY = withStatementMeta(stmt, {
       type: keyword,
       key: typeof stmt.key === "string" ? stmt.key : undefined
-    }) as Record<string, unknown>;
+    }, module, typedefNames) as Record<string, unknown>;
     if (soleChoice) {
-      listXY.choice = choiceMetaForXYang(soleChoice);
+      listXY.choice = choiceMetaForXYang(soleChoice, module, typedefNames);
     }
     const unique = stmt.unique;
     if (Array.isArray(unique) && unique.length > 0) {
@@ -591,7 +934,7 @@ function statementToSchemaBody(
       items: itemSchema,
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, {
         type: keyword
-      })
+      }, module, typedefNames)
     };
     withDescription(out, stmt.description);
     if (typeName === YangTokenType.LEAFREF) {
@@ -639,7 +982,7 @@ function statementToSchemaBody(
 
     const xYang = withStatementMeta(stmt, {
       type: keyword
-    });
+    }, module, typedefNames);
     if (stmt.mandatory === true) {
       xYang.mandatory = true;
     }
@@ -687,7 +1030,7 @@ function statementToSchemaBody(
       type: JSON_TYPE_FREE_FORM,
       [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, {
         type: keyword
-      })
+      }, module, typedefNames)
     };
     withDescription(out, stmt.description);
     return out;
@@ -723,15 +1066,27 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
     if (Object.keys(schemaXy).length > 0 || Object.keys(typedefXy).length > 0) {
       def[YANG_SCHEMA_KEYS.xYang] = { ...schemaXy, ...typedefXy };
     }
+    const invocations = extensionInvocationsJson(statementListOf((entry as { statements?: unknown }).statements), module, names);
+    if (invocations.length > 0) {
+      const xy = asRecord(def[YANG_SCHEMA_KEYS.xYang]);
+      xy[XYANG_KEYS.extensions] = invocations;
+      def[YANG_SCHEMA_KEYS.xYang] = xy;
+    }
     out[name] = def;
   }
   return out;
 }
 
-function identityToSchema(module: YangModule): Record<string, unknown> {
+function identityToSchema(module: YangModule, typedefNames: Set<string>): Record<string, unknown> {
   const defs: Record<string, unknown> = {};
   for (const identityName of Object.keys(module.identities)) {
-    defs[identityName] = identityDef(module, identityName);
+    const def = identityDef(module, identityName);
+    const raw = (module.identities as Record<string, { statements?: unknown }>)[identityName];
+    const invocations = extensionInvocationsJson(statementListOf(raw?.statements), module, typedefNames);
+    if (invocations.length > 0) {
+      asRecord(def[YANG_SCHEMA_KEYS.xYang])[XYANG_KEYS.extensions] = invocations;
+    }
+    defs[identityName] = def;
   }
   return defs;
 }
@@ -763,7 +1118,13 @@ function applyOwnAugments(effective: YangModule): void {
 
 /** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
 export function generateJsonSchema(module: YangModule): Record<string, unknown> {
-  return withIdentityExport(module, (used) => generateSchema(module, used));
+  const previous = extensionUses;
+  extensionUses = [];
+  try {
+    return withIdentityExport(module, (used) => generateSchema(module, used));
+  } finally {
+    extensionUses = previous;
+  }
 }
 
 function generateSchema(module: YangModule, used: IdentityPair[]): Record<string, unknown> {
@@ -821,10 +1182,23 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
     rootXYang[XYANG_KEYS.rpcs] = rpcs;
   }
 
-  const imports = importsForJson(module, used);
+  const defs = {
+    ...typedefToSchema(effectiveModule),
+    ...identityToSchema(effectiveModule, typedefNames)
+  };
+  const moduleInvocations = extensionInvocationsJson(effectiveModule.statements, effectiveModule, typedefNames);
+  const imports = mergeExtensionImports(module, { ...importsForJson(module, used) }, extensionUses ?? []);
   if (Object.keys(imports).length > 0) {
     rootXYang[XYANG_KEYS.imports] = imports;
   }
+  const extensionDefs = localExtensionDefs(effectiveModule);
+  if (Object.keys(extensionDefs).length > 0) {
+    rootXYang[XYANG_KEYS.extension] = extensionDefs;
+  }
+  if (moduleInvocations.length > 0) {
+    rootXYang[XYANG_KEYS.extensions] = moduleInvocations;
+  }
+  assertExtensionsPlaced(effectiveModule);
 
   const schema: Record<string, unknown> = {
     $schema: JSON_SCHEMA_DRAFT_2020_12,
@@ -839,10 +1213,6 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
   if (required.length > 0) {
     schema.required = required;
   }
-  const defs = {
-    ...typedefToSchema(effectiveModule),
-    ...identityToSchema(effectiveModule)
-  };
   if (Object.keys(defs).length > 0) {
     schema.$defs = defs;
   }

@@ -1,0 +1,81 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  import ext { prefix e; }
+
+  extension http-header {
+    argument name;
+    description "Mirror into an HTTP header.";
+    reference "RFC 7950";
+  }
+
+  extension note {
+    argument text {
+      yin-element true;
+    }
+    description "A note.";
+  }
+
+  m:http-header "module";
+
+  container top {
+    m:http-header "Top";
+    m:note "kept" {
+      description "Attached note.";
+      leaf extra { type string; }
+    }
+    leaf s {
+      type string;
+      m:http-header "Session";
+    }
+    leaf imported {
+      type string;
+      e:tag "from-ext";
+    }
+    list row {
+      key "id";
+      m:http-header "Row";
+      leaf id { type string; }
+    }
+    leaf-list tags {
+      type string;
+      m:http-header "Tags";
+    }
+    choice pick {
+      m:http-header "Pick";
+      case a {
+        m:http-header "A";
+        leaf a { type string; }
+      }
+      case b {
+        leaf b { type string; }
+      }
+    }
+  }
+
+  typedef name {
+    type string;
+    m:http-header "Name";
+  }
+
+  identity kind {
+    m:http-header "Kind";
+  }
+
+  rpc f {
+    input {
+      leaf s {
+        type string;
+        m:http-header "Session";
+      }
+    }
+    output {
+      leaf out {
+        type string;
+        m:http-header "Out";
+      }
+    }
+  }
+}

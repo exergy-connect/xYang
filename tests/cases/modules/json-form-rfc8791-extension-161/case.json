@@ -1,0 +1,5 @@
+{
+  "description": "#161: RFC 8791 sx:structure is applied at parse and is not re-applied when native JSON is loaded, so convert fails instead of recording the invocation.",
+  "module": "m.yang",
+  "export_error": "RFC 8791 sx:structure"
+}

@@ -38,11 +38,133 @@ function identityFromJson(def: unknown): IdentityBases {
   const features = Array.isArray(xy["if-features"])
     ? (xy["if-features"] as unknown[]).filter((x): x is string => typeof x === "string" && x.length > 0)
     : [];
+  const holder = new YangStatement({ statements: [] });
+  if (Array.isArray(xy[XYANG_KEYS.extensions])) {
+    attachInvocations(holder, xy);
+  }
   return {
     bases: basesFromJson(xy.bases),
     ...(typeof d.description === "string" && d.description.length > 0 ? { description: d.description } : {}),
-    ...(features.length > 0 ? { if_features: features } : {})
+    ...(features.length > 0 ? { if_features: features } : {}),
+    ...(holder.statements.length > 0 ? { statements: holder.statements } : {})
   };
+}
+
+/** Module whose extensions an invocation resolves against while {@link parseJsonSchema} runs. */
+let parsingModule: YangModule | undefined;
+
+function extensionRecord(name: string, raw: unknown): Record<string, unknown> {
+  const body = asRecord(raw);
+  const record: Record<string, unknown> = { name };
+  if (typeof body[XYANG_KEYS.argument] === "string" && (body[XYANG_KEYS.argument] as string).length > 0) {
+    record.argument_name = body[XYANG_KEYS.argument];
+  }
+  if (XYANG_KEYS.yinElement in body) {
+    if (typeof body[XYANG_KEYS.yinElement] !== "boolean") {
+      throw new Error(`extension '${name}' "${XYANG_KEYS.yinElement}" must be a boolean`);
+    }
+    record.argument_yin_element = body[XYANG_KEYS.yinElement];
+  }
+  if (typeof body.description === "string") {
+    record.description = body.description;
+  }
+  if (typeof body[XYANG_KEYS.reference] === "string") {
+    record.reference = body[XYANG_KEYS.reference];
+  }
+  return record;
+}
+
+function extensionsFromJson(raw: unknown): Record<string, unknown> {
+  if (raw === undefined) {
+    return {};
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
+    throw new Error(`"${XYANG_KEYS.extension}" must map names to extension definitions`);
+  }
+  const out: Record<string, unknown> = {};
+  for (const [name, body] of Object.entries(raw as Record<string, unknown>)) {
+    out[name] = extensionRecord(name, body);
+  }
+  return out;
+}
+
+function invocationFromJson(raw: unknown): YangStatement {
+  const body = asRecord(raw);
+  const name = body.name;
+  if (typeof name !== "string" || !name.includes(":")) {
+    throw new Error(`extension invocation must be an object with "name" of the form "prefix:ext"`);
+  }
+  if (!parsingModule) {
+    throw new Error("extension invocations require parseJsonSchema");
+  }
+  const prefix = name.slice(0, name.indexOf(":"));
+  const extName = name.slice(name.indexOf(":") + 1);
+  const own = String(parsingModule.prefix ?? "").replace(/^['"]|['"]$/g, "");
+  const owner = prefix === own ? parsingModule : parsingModule.import_prefixes[prefix];
+  if (!owner) {
+    throw new Error(`extension invocation '${name}': unknown prefix '${prefix}'`);
+  }
+  const ext = (owner.extensions ?? {})[extName];
+  if (!ext) {
+    throw new Error(`extension invocation '${name}': unknown extension '${extName}' in module '${owner.name ?? ""}'`);
+  }
+  if (body[XYANG_KEYS.argument] !== undefined && typeof body[XYANG_KEYS.argument] !== "string") {
+    throw new Error(`extension invocation '${name}': argument must be a string`);
+  }
+  const statements = [...mustStatementsFromXyang(body)];
+  const nested = body[XYANG_KEYS.body];
+  if (nested !== undefined && !Array.isArray(nested)) {
+    throw new Error(`extension invocation '${name}': "${XYANG_KEYS.body}" must be a list`);
+  }
+  for (const item of Array.isArray(nested) ? nested : []) {
+    const entry = asRecord(item);
+    if (entry[XYANG_KEYS.extension] !== undefined) {
+      statements.push(invocationFromJson(entry[XYANG_KEYS.extension]));
+      continue;
+    }
+    if (typeof entry.node === "string" && entry.schema && typeof entry.schema === "object") {
+      const child = jsonSchemaPropertyToStatement(entry.node, entry.schema as Record<string, unknown>, parsingDefs);
+      if (!child) {
+        throw new Error(`extension invocation '${name}': body node '${entry.node}' is not a schema node`);
+      }
+      statements.push(child);
+      continue;
+    }
+    throw new Error(`extension invocation '${name}': body entry must be an extension or a node`);
+  }
+  const features = Array.isArray(body["if-features"])
+    ? body["if-features"].filter((item): item is string => typeof item === "string")
+    : undefined;
+  const when = whenFromXyang(body);
+  return new YangStatement({
+    keyword: name,
+    name,
+    argument: typeof body[XYANG_KEYS.argument] === "string" ? (body[XYANG_KEYS.argument] as string) : undefined,
+    prefix,
+    resolved_module_name: owner.name,
+    resolved_extension_name: extName,
+    description: typeof body.description === "string" ? body.description : undefined,
+    reference: typeof body[XYANG_KEYS.reference] === "string" ? (body[XYANG_KEYS.reference] as string) : undefined,
+    ...(features && features.length > 0 ? { if_features: features } : {}),
+    ...(when ? { when } : {}),
+    ...(typeof body[XYANG_KEYS.config] === "boolean" ? { config: body[XYANG_KEYS.config] as boolean } : {}),
+    statements
+  });
+}
+
+let parsingDefs: Record<string, unknown> = {};
+
+function attachInvocations(stmt: YangStatement, xy: Record<string, unknown>): void {
+  const raw = xy[XYANG_KEYS.extensions];
+  if (raw === undefined) {
+    return;
+  }
+  if (!Array.isArray(raw)) {
+    throw new Error(`"${XYANG_KEYS.extensions}" must be a list of invocations`);
+  }
+  for (const item of raw) {
+    stmt.statements.push(invocationFromJson(item));
+  }
 }
 
 /** Rebuild one `x-yang.imports` entry: an imported module reduced to its identities. */
@@ -71,6 +193,7 @@ function moduleFromImportStub(key: string, raw: unknown): YangModule {
       prefix: stub.prefix,
       identities,
       import_prefixes: importsFromJson(stub),
+      extensions: extensionsFromJson(stub[XYANG_KEYS.extension]),
       statements: []
     },
     { kind: "string", value: "", name: "<json-schema-import>" }
@@ -443,6 +566,7 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
     }
   }
   setConfigFromXyang(out, xy);
+  attachInvocations(out, xy);
   return out;
 }
 
@@ -591,10 +715,12 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
       }
       (caseStmt.statements as YangStatement[]).push(childStmt);
     }
+    attachInvocations(caseStmt, branchXy);
     if ((caseStmt.statements as YangStatement[]).length > 0) {
       (choiceStmt.statements as YangStatement[]).push(caseStmt);
     }
   }
+  attachInvocations(choiceStmt, xy);
   return choiceStmt;
 }
 
@@ -615,6 +741,7 @@ function parseAnydataOrAnyxml(name: string, schema: Record<string, unknown>, key
   if (when) {
     out.when = when;
   }
+  attachInvocations(out, xy);
   return out;
 }
 
@@ -674,6 +801,7 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
         name: typeof ch.name === "string" && ch.name.length > 0 ? ch.name : "choice",
         mandatory: ch.mandatory === true,
         ...(Array.isArray(ch["if-features"]) ? { "if-features": ch["if-features"] } : {}),
+        ...(Array.isArray(ch[XYANG_KEYS.extensions]) ? { [XYANG_KEYS.extensions]: ch[XYANG_KEYS.extensions] } : {}),
         description: descriptionOrEmpty(ch.description)
       }
     };
@@ -686,6 +814,7 @@ function parseContainer(name: string, schema: Record<string, unknown>, defs: Rec
       children.push(choiceStmt);
     }
   }
+  attachInvocations(out, xy);
   if (Array.isArray(schema.allOf)) {
     out.allOf = schema.allOf;
   }
@@ -766,6 +895,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
         name: typeof ch.name === "string" && ch.name.length > 0 ? ch.name : "choice",
         mandatory: ch.mandatory === true,
         ...(Array.isArray(ch["if-features"]) ? { "if-features": ch["if-features"] } : {}),
+        ...(Array.isArray(ch[XYANG_KEYS.extensions]) ? { [XYANG_KEYS.extensions]: ch[XYANG_KEYS.extensions] } : {}),
         description: descriptionOrEmpty(ch.description)
       }
     };
@@ -778,6 +908,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       children.push(choiceStmt);
     }
   }
+  attachInvocations(out, xy);
   out.description = descriptionOrEmpty(schema.description);
   if (when) {
     out.when = when;
@@ -818,6 +949,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
     }
   }
   setConfigFromXyang(out, xy);
+  attachInvocations(out, xy);
   return out;
 }
 
@@ -860,6 +992,7 @@ function parseRpc(
     statements
   });
   applyStatementMetaFromXyang(out, xy);
+  attachInvocations(out, xy);
   return out;
 }
 
@@ -989,6 +1122,26 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   const defsRaw = root.$defs;
   const defs = defsRaw && typeof defsRaw === "object" && !Array.isArray(defsRaw) ? (defsRaw as Record<string, unknown>) : {};
 
+  const importPrefixes = importsFromJson(rootXy);
+  const extensions = extensionsFromJson(rootXy[XYANG_KEYS.extension]);
+  const shell = new YangModule(
+    {
+      name: moduleName,
+      yang_version: "1.1",
+      namespace,
+      prefix,
+      import_prefixes: importPrefixes,
+      extensions,
+      statements: []
+    },
+    { kind: "string", value: "", name: "<json-schema>" }
+  );
+  const previousModule = parsingModule;
+  const previousDefs = parsingDefs;
+  parsingModule = shell;
+  parsingDefs = defs;
+  try {
+
   const properties = asRecord(root.properties);
   const statements: YangStatement[] = [];
   for (const [propName, propSchema] of Object.entries(properties)) {
@@ -1040,11 +1193,13 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
       continue;
     }
     // Legacy schemas may omit x-yang typedef metadata in $defs.
+    const holder = new YangStatement({ statements: [] });
+    attachInvocations(holder, dxy);
     typedefs[defName] = {
       name: defName,
       description: descriptionOrEmpty(d.description),
       type: typeShapeFromJsonLeaf(d, dxy),
-      statements: []
+      statements: holder.statements
     };
   }
 
@@ -1056,6 +1211,10 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     }
   }
 
+  const moduleInvocations = new YangStatement({ statements: [] });
+  attachInvocations(moduleInvocations, rootXy);
+  statements.push(...moduleInvocations.statements);
+
   const data: ModuleInit = {
         name: moduleName,
     yang_version: "1.1",
@@ -1064,12 +1223,16 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     description: descriptionOrEmpty(root.description),
     typedefs,
     identities,
-    import_prefixes: importsFromJson(rootXy),
-    extensions: {},
+    import_prefixes: importPrefixes,
+    extensions,
     extension_runtime: {},
     statements
   };
 
   const modSource: ModuleSource = { kind: "string", value: typeof source === "string" ? source : JSON.stringify(source), name: "<json-schema>" };
   return new YangModule(data, modSource);
+  } finally {
+    parsingModule = previousModule;
+    parsingDefs = previousDefs;
+  }
 }

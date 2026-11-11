@@ -22,6 +22,9 @@ from ..ast import (
     YangChoiceStmt,
     YangContainerStmt,
     YangAugmentStmt,
+    YangExtensionStmt,
+    YangExtensionInvocationStmt,
+    YangGroupingStmt,
     YangIdentityStmt,
     YangInputStmt,
     YangLeafListStmt,
@@ -35,6 +38,7 @@ from ..ast import (
     YangStatement,
     YangTypeStmt,
     YangTypedefStmt,
+    YangUsesStmt,
     YangWhenStmt,
 )
 from ..augment_expand import apply_augmentations
@@ -495,6 +499,296 @@ def _build_xyang(
     return xyang
 
 
+@dataclass
+class _ExtensionUse:
+    """Imported extensions one export invoked (see ``x-yang.imports``)."""
+
+    root: YangModule
+    used: list[tuple[YangModule, str]] = field(default_factory=list)
+
+
+_EXT_USED: contextvars.ContextVar[_ExtensionUse] = contextvars.ContextVar("xyang_extension_export")
+
+_SEMANTIC_EXTENSIONS = {
+    ("ietf-yang-structure-ext", "structure"),
+    ("ietf-yang-structure-ext", "augment-structure"),
+}
+
+
+def _extension_def_json(ext: YangExtensionStmt) -> dict[str, Any]:
+    """One extension definition: argument, yin-element, description, reference. Absent fields stay absent."""
+    out: dict[str, Any] = {}
+    if ext.argument_name:
+        out[XYangKey.ARGUMENT] = ext.argument_name
+    if ext.argument_yin_element is not None:
+        out[XYangKey.YIN_ELEMENT] = ext.argument_yin_element
+    if ext.description:
+        out[JsonSchemaKey.DESCRIPTION] = ext.description
+    if ext.reference:
+        out[XYangKey.REFERENCE] = ext.reference
+    return out
+
+
+def _reject_semantic_extension(inv: YangExtensionInvocationStmt) -> None:
+    """RFC 8791 hooks are applied at parse and are not applied again when JSON is loaded.
+
+    Recording the invocation would not round-trip that effect, so export fails instead of dropping it.
+    """
+    ext = inv.resolved_extension
+    owner = inv.resolved_module
+    semantic = (owner.name, ext.name) in _SEMANTIC_EXTENSIONS or ext.apply_callback is not None
+    if not semantic:
+        return
+    if owner.name == "ietf-yang-structure-ext" and ext.name in ("structure", "augment-structure"):
+        detail = f"RFC 8791 sx:{ext.name}"
+    else:
+        detail = f"extension {owner.name}:{ext.name}"
+    raise YangExportError(
+        f"cannot export extension invocation {inv.name!r}: "
+        f"{detail} is applied when the module is parsed and is not "
+        f"re-applied when the native JSON form is loaded"
+    )
+
+
+def _record_imported_extension(inv: YangExtensionInvocationStmt) -> None:
+    """An extension defined in another module travels on that module's ``x-yang.imports`` stub."""
+    export = _EXT_USED.get(None)
+    if export is None:
+        raise YangExportError(f"cannot export extension invocation {inv.name!r} outside generate_json_schema")
+    owner = inv.resolved_module
+    if owner.name == export.root.name:
+        return
+    pair = (owner, inv.resolved_extension.name)
+    if pair not in export.used:
+        export.used.append(pair)
+
+
+def _one_extension_invocation(
+    inv: YangExtensionInvocationStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
+    """One invocation: ``{name: prefix:ext, argument?, ...}`` plus a nested body, in source order."""
+    _reject_semantic_extension(inv)
+    _record_imported_extension(inv)
+    out: dict[str, Any] = {JsonSchemaKey.NAME: inv.name}
+    if inv.argument is not None:
+        out[XYangKey.ARGUMENT] = inv.argument
+    if inv.description:
+        out[JsonSchemaKey.DESCRIPTION] = inv.description
+    if inv.reference:
+        out[XYangKey.REFERENCE] = inv.reference
+    features = _if_features_for_xyang(inv)
+    if features:
+        out[XYangKey.IF_FEATURES] = features
+    if inv.when is not None and inv.when.expression:
+        out[XYangKey.WHEN] = _when_to_xyang_json(inv.when)
+    if inv.must_statements:
+        out[XYangKey.MUST] = [_must_to_json(m) for m in inv.must_statements]
+    config = _explicit_config(inv)
+    if config is not None:
+        out[XYangKey.CONFIG] = config
+    body = _extension_body_json(inv, typedef_names, module)
+    if body:
+        out[XYangKey.BODY] = body
+    return out
+
+
+def _extension_body_json(
+    inv: YangExtensionInvocationStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> list[dict[str, Any]]:
+    """Nested statements of *inv*, kept in source order. Anything else fails the export."""
+    body: list[dict[str, Any]] = []
+    for stmt in inv.statements:
+        if isinstance(stmt, YangExtensionInvocationStmt):
+            body.append({XYangKey.EXTENSION: _one_extension_invocation(stmt, typedef_names, module)})
+            continue
+        if isinstance(
+            stmt,
+            (
+                YangContainerStmt,
+                YangListStmt,
+                YangLeafStmt,
+                YangLeafListStmt,
+                YangChoiceStmt,
+                YangAnydataStmt,
+                YangAnyxmlStmt,
+            ),
+        ):
+            prop = _statement_to_property(stmt, typedef_names, module, parent=inv)
+            if prop is None:
+                raise YangExportError(
+                    f"cannot export extension invocation {inv.name!r}: "
+                    f"nested statement {stmt.name!r} is not representable in the native JSON form"
+                )
+            body.append({"node": _property_key(stmt, module), "schema": prop})
+            continue
+        kind = type(stmt).__name__
+        raise YangExportError(
+            f"cannot export extension invocation {inv.name!r}: "
+            f"nested statement {kind} {getattr(stmt, 'name', '')!r} is not representable in the native JSON form"
+        )
+    return body
+
+
+def _extension_invocations_json(
+    statements: list[YangStatement],
+    typedef_names: set[str],
+    module: YangModule,
+) -> list[dict[str, Any]]:
+    """Invocations that are direct children of one node, in source order."""
+    return [
+        _one_extension_invocation(stmt, typedef_names, module)
+        for stmt in statements
+        if isinstance(stmt, YangExtensionInvocationStmt)
+    ]
+
+
+def _stamp_extensions(
+    xyang: dict[str, Any],
+    statements: list[YangStatement],
+    typedef_names: set[str],
+    module: YangModule,
+) -> None:
+    """Attach ``x-yang.extensions`` when *statements* invokes an extension."""
+    invocations = _extension_invocations_json(statements, typedef_names, module)
+    if invocations:
+        xyang[XYangKey.EXTENSIONS] = invocations
+
+
+def _local_extension_defs(module: YangModule) -> dict[str, Any]:
+    """This module's extension definitions, in source order."""
+    out: dict[str, Any] = {}
+    for name, ext in module.extensions.items():
+        if isinstance(ext, YangExtensionStmt):
+            out[name] = _extension_def_json(ext)
+    return out
+
+
+def _merge_extension_imports(
+    root: YangModule,
+    imports: dict[str, Any],
+    used: list[tuple[YangModule, str]],
+) -> dict[str, Any]:
+    """Add invoked imported extensions to the ``x-yang.imports`` stubs identities already use."""
+    by_owner: dict[str, tuple[YangModule, list[str]]] = {}
+    for owner, name in used:
+        _owner, names = by_owner.setdefault(owner.name, (owner, []))
+        if name not in names:
+            names.append(name)
+    for owner, names in by_owner.values():
+        key = _import_key(root, owner)
+        stub = imports.get(key)
+        if stub is None:
+            stub = {
+                XYangKey.MODULE: owner.name,
+                XYangKey.NAMESPACE: owner.namespace or "",
+                XYangKey.PREFIX: owner.prefix or "",
+            }
+            imports[key] = stub
+        ext_map: dict[str, Any] = {}
+        for name in sorted(names):
+            ext = owner.extensions.get(name)
+            if not isinstance(ext, YangExtensionStmt):
+                raise YangExportError(
+                    f"cannot export extension {owner.name}:{name}: the extension definition is not in that module"
+                )
+            ext_map[name] = _extension_def_json(ext)
+        stub[XYangKey.EXTENSION] = ext_map
+    return dict(sorted(imports.items()))
+
+
+def _find_extension_invocation(stmt: YangStatement) -> YangExtensionInvocationStmt | None:
+    if isinstance(stmt, YangExtensionInvocationStmt):
+        return stmt
+    for child in stmt.statements:
+        found = _find_extension_invocation(child)
+        if found is not None:
+            return found
+    if isinstance(stmt, YangChoiceStmt):
+        for case in stmt.cases:
+            found = _find_extension_invocation(case)
+            if found is not None:
+                return found
+    return None
+
+
+def _placement_node(stmt: YangStatement) -> bool:
+    """A node the native JSON form already carries, so an invocation on it has a place."""
+    return isinstance(
+        stmt,
+        (
+            YangContainerStmt,
+            YangListStmt,
+            YangLeafStmt,
+            YangLeafListStmt,
+            YangChoiceStmt,
+            YangCaseStmt,
+            YangAnydataStmt,
+            YangAnyxmlStmt,
+            YangRpcStmt,
+            YangTypedefStmt,
+            YangIdentityStmt,
+        ),
+    )
+
+
+def _assert_extensions_placed(module: YangModule) -> None:
+    """Fail when an invocation sits on a construct the form does not carry. Groupings are expanded."""
+
+    def walk(owner: YangStatement, placed: bool) -> None:
+        for child in owner.statements:
+            if isinstance(child, YangExtensionInvocationStmt):
+                _reject_semantic_extension(child)
+                if not placed:
+                    raise YangExportError(
+                        f"cannot export extension invocation {child.name!r}: "
+                        f"it is on {type(owner).__name__} {getattr(owner, 'name', '')!r}, "
+                        f"which the native JSON form does not carry"
+                    )
+                walk(child, True)
+                continue
+            if isinstance(child, (YangGroupingStmt, YangExtensionStmt)):
+                continue
+            if isinstance(child, YangUsesStmt):
+                found = _find_extension_invocation(child)
+                if found is not None:
+                    raise YangExportError(
+                        f"cannot export extension invocation {found.name!r}: "
+                        f"it is inside uses {child.grouping_qname()!r}, which the native JSON form does not carry"
+                    )
+                continue
+            walk(child, _placement_node(child))
+        if isinstance(owner, YangChoiceStmt):
+            for case in owner.cases:
+                walk(case, True)
+
+    for stmt in module.statements:
+        if isinstance(stmt, YangExtensionInvocationStmt):
+            _reject_semantic_extension(stmt)
+            walk(stmt, True)
+            continue
+        if isinstance(stmt, (YangGroupingStmt, YangExtensionStmt)):
+            continue
+        if isinstance(stmt, YangUsesStmt):
+            found = _find_extension_invocation(stmt)
+            if found is not None:
+                raise YangExportError(
+                    f"cannot export extension invocation {found.name!r}: "
+                    f"it is inside uses {stmt.grouping_qname()!r}, which the native JSON form does not carry"
+                )
+            continue
+        walk(stmt, _placement_node(stmt))
+    for typedef in module.typedefs.values():
+        if isinstance(typedef, YangTypedefStmt):
+            walk(typedef, True)
+    for identity in module.identities.values():
+        if isinstance(identity, YangIdentityStmt):
+            walk(identity, True)
+
+
 def _copy_statement(stmt: YangStatement) -> YangStatement:
     """Deep-copy a statement subtree for uses expansion."""
     return copy_yang_statement(stmt)
@@ -564,7 +858,11 @@ def _merge_oneof_branches_with_base(
     return merged
 
 
-def _choice_meta_xyang(choice_stmt: YangChoiceStmt) -> dict[str, Any]:
+def _choice_meta_xyang(
+    choice_stmt: YangChoiceStmt,
+    typedef_names: set[str],
+    module: YangModule,
+) -> dict[str, Any]:
     """x-yang.choice metadata for hoisted (sibling-less or merged) choices."""
     meta: dict[str, Any] = {JsonSchemaKey.NAME: choice_stmt.name}
     _with_description(meta, choice_stmt.description)
@@ -575,6 +873,7 @@ def _choice_meta_xyang(choice_stmt: YangChoiceStmt) -> dict[str, Any]:
     cfg = _explicit_config(choice_stmt)
     if cfg is not None:
         meta[XYangKey.CONFIG] = cfg
+    _stamp_extensions(meta, choice_stmt.statements, typedef_names, module)
     return meta
 
 
@@ -614,6 +913,7 @@ def _choice_to_object_body(
         ff = _if_features_for_xyang(case_st)
         if ff:
             case_xy[XYangKey.IF_FEATURES] = ff
+        _stamp_extensions(case_xy, case_st.statements, typedef_names, module)
         case_obj: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
         _with_description(case_obj, case_st.description)
         case_obj[JsonSchemaKey.PROPERTIES] = cp
@@ -680,8 +980,9 @@ def _container_stmt_to_property(
                 if_features=_if_features_for_xyang(stmt),
                 config=_explicit_config(stmt),
             ),
-            XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch),
+            XYangKey.CHOICE: _choice_meta_xyang(hoisted_ch, typedef_names, module),
         }
+        _stamp_extensions(xy_container, children, typedef_names, module)
         out: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
         _with_description(out, stmt.description)
         out[JsonSchemaKey.X_YANG] = xy_container
@@ -717,8 +1018,9 @@ def _container_stmt_to_property(
                 if_features=_if_features_for_xyang(stmt),
                 config=_explicit_config(stmt),
             ),
-            XYangKey.CHOICE: _choice_meta_xyang(ch0),
+            XYangKey.CHOICE: _choice_meta_xyang(ch0, typedef_names, module),
         }
+        _stamp_extensions(xy_container, children, typedef_names, module)
         out = {JsonSchemaKey.TYPE: "object"}
         # Choice text lives in x-yang.choice.description; do not merge onto the container.
         _with_description(out, stmt.description)
@@ -741,6 +1043,7 @@ def _container_stmt_to_property(
         if_features=_if_features_for_xyang(stmt),
         config=_explicit_config(stmt),
     )
+    _stamp_extensions(out[JsonSchemaKey.X_YANG], children, typedef_names, module)
     if props:
         out[JsonSchemaKey.PROPERTIES] = props
     out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
@@ -780,7 +1083,7 @@ def _list_items_object_schema(
                 req = sorted(set(req) | set(ch_body[JsonSchemaKey.REQUIRED]))
             if req:
                 items[JsonSchemaKey.REQUIRED] = req
-        overlay = {XYangKey.CHOICE: _choice_meta_xyang(hoisted_list_ch)}
+        overlay = {XYangKey.CHOICE: _choice_meta_xyang(hoisted_list_ch, typedef_names, module)}
         return items, overlay
     if len(list_children) == 1 and isinstance(list_children[0], YangChoiceStmt):
         ch0 = list_children[0]
@@ -793,7 +1096,7 @@ def _list_items_object_schema(
         else:
             items[JsonSchemaKey.PROPERTIES] = ch_body.get(JsonSchemaKey.PROPERTIES) or {}
             items[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
-        overlay = {XYangKey.CHOICE: _choice_meta_xyang(ch0)}
+        overlay = {XYangKey.CHOICE: _choice_meta_xyang(ch0, typedef_names, module)}
         return items, overlay
     props, item_required = _child_property_map(
         list_children, typedef_names, module, stmt
@@ -835,6 +1138,7 @@ def _list_stmt_to_property(
         list_xy = {**list_xy, **choice_overlay}
     if stmt.unique:
         list_xy[XYangKey.UNIQUE] = [list(paths) for paths in stmt.unique]
+    _stamp_extensions(list_xy, list_children, typedef_names, module)
     out = {
         JsonSchemaKey.TYPE: "array",
         JsonSchemaKey.ITEMS: items,
@@ -870,6 +1174,7 @@ def _leaf_stmt_to_property(
             units=stmt.units or None,
             config=_explicit_config(stmt),
         )
+        _stamp_extensions(out[JsonSchemaKey.X_YANG], stmt.statements, typedef_names, module)
     else:
         lr_anchor = _leafref_context_parent(module, parent)
         type_schema = _type_to_schema(
@@ -896,6 +1201,7 @@ def _leaf_stmt_to_property(
             if k not in (JsonSchemaKey.X_YANG, JsonSchemaKey.DESCRIPTION)
         }
         _with_description(out, stmt.description)
+        _stamp_extensions(leaf_xyang, stmt.statements, typedef_names, module)
         out[JsonSchemaKey.X_YANG] = leaf_xyang
     if stmt.default is not None:
         yang_type = _leaf_yang_type_name(type_stmt, typedef_names, module)
@@ -910,6 +1216,8 @@ def _leaf_stmt_to_property(
 
 def _anydata_anyxml_stmt_to_property(
     stmt: YangAnydataStmt | YangAnyxmlStmt,
+    typedef_names: set[str],
+    module: YangModule,
 ) -> dict[str, Any]:
     when_stmt = getattr(stmt, "when", None)
     xy_type = (
@@ -926,6 +1234,7 @@ def _anydata_anyxml_stmt_to_property(
         mandatory=stmt.mandatory or None,
         if_features=_if_features_for_xyang(stmt),
     )
+    _stamp_extensions(out[JsonSchemaKey.X_YANG], stmt.statements, typedef_names, module)
     return out
 
 
@@ -957,6 +1266,7 @@ def _leaf_list_stmt_to_property(
         units=stmt.units or None,
         config=_explicit_config(stmt),
     )
+    _stamp_extensions(out[JsonSchemaKey.X_YANG], stmt.statements, typedef_names, module)
     if getattr(stmt, "min_elements", None) is not None and stmt.min_elements is not None:
         out[JsonSchemaKey.MIN_ITEMS] = stmt.min_elements
     if getattr(stmt, "max_elements", None) is not None and stmt.max_elements is not None:
@@ -985,6 +1295,7 @@ def _choice_stmt_to_property(
     ff = _if_features_for_xyang(stmt)
     if ff:
         xy_choice[XYangKey.IF_FEATURES] = ff
+    _stamp_extensions(xy_choice, stmt.statements, typedef_names, module)
     out = {JsonSchemaKey.TYPE: "object"}
     _with_description(out, body.get(JsonSchemaKey.DESCRIPTION, ""))
     out[JsonSchemaKey.X_YANG] = xy_choice
@@ -1014,6 +1325,7 @@ def _io_block_to_property(
         when_stmt=getattr(stmt, "when", None),
         if_features=_if_features_for_xyang(stmt),
     )
+    _stamp_extensions(out[JsonSchemaKey.X_YANG], children, typedef_names, module)
     out[JsonSchemaKey.ADDITIONAL_PROPERTIES] = False
     if props:
         out[JsonSchemaKey.PROPERTIES] = props
@@ -1043,14 +1355,14 @@ def _rpc_to_json(
     kind: str = XYangTypeValue.RPC,
 ) -> dict[str, Any]:
     """Encode one module-level ``rpc`` for ``x-yang.rpcs``, or one ``action`` for ``x-yang.actions``."""
-    out: dict[str, Any] = {
-        JsonSchemaKey.X_YANG: _build_xyang(
-            kind,
-            must_list=getattr(stmt, "must_statements", None) or [],
-            when_stmt=getattr(stmt, "when", None),
-            if_features=_if_features_for_xyang(stmt),
-        ),
-    }
+    xyang = _build_xyang(
+        kind,
+        must_list=getattr(stmt, "must_statements", None) or [],
+        when_stmt=getattr(stmt, "when", None),
+        if_features=_if_features_for_xyang(stmt),
+    )
+    _stamp_extensions(xyang, stmt.statements, typedef_names, module)
+    out: dict[str, Any] = {JsonSchemaKey.X_YANG: xyang}
     inp = stmt.find_statement("input")
     if isinstance(inp, YangInputStmt):
         out["input"] = _io_block_to_property(inp, typedef_names, module)
@@ -1074,7 +1386,7 @@ def _statement_to_property(
     if isinstance(stmt, YangLeafStmt):
         return _leaf_stmt_to_property(stmt, typedef_names, module, parent)
     if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
-        return _anydata_anyxml_stmt_to_property(stmt)
+        return _anydata_anyxml_stmt_to_property(stmt, typedef_names, module)
     if isinstance(stmt, YangLeafListStmt):
         return _leaf_list_stmt_to_property(stmt, typedef_names, module, parent)
     if isinstance(stmt, YangChoiceStmt):
@@ -1105,6 +1417,8 @@ def _identity_to_def(
             else {}
         ),
     }
+    if only is None:
+        _stamp_extensions(out[JsonSchemaKey.X_YANG], identity.statements, set(module.typedefs), module)
     return out
 
 
@@ -1129,6 +1443,13 @@ def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, A
             yang_type_name=yang_type,
             json_schema_type=schema_type if isinstance(schema_type, str) else None,
         )
+    invocations = _extension_invocations_json(typedef.statements, set(module.typedefs), module)
+    if invocations:
+        xy = schema.get(JsonSchemaKey.X_YANG)
+        if not isinstance(xy, dict):
+            xy = {}
+            schema[JsonSchemaKey.X_YANG] = xy
+        xy[XYangKey.EXTENSIONS] = invocations
     return schema
 
 
@@ -1161,10 +1482,12 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     """
     export = _IdentityExport(root=module)
     token = _EXPORT.set(export)
+    ext_token = _EXT_USED.set(_ExtensionUse(root=module))
     try:
         return _generate_json_schema(module, export)
     finally:
         _EXPORT.reset(token)
+        _EXT_USED.reset(ext_token)
 
 
 def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[str, Any]:
@@ -1207,9 +1530,20 @@ def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[s
             rpcs[stmt.name] = _rpc_to_json(stmt, typedef_names, schema_module)
     if rpcs:
         root_xyang[XYangKey.RPCS] = rpcs
-    imports = _imports_for_json(module, export.used)
+    module_invocations = _extension_invocations_json(schema_module.statements, typedef_names, schema_module)
+    imports = _merge_extension_imports(
+        module,
+        _imports_for_json(module, export.used),
+        _EXT_USED.get().used,
+    )
     if imports:
         root_xyang[XYangKey.IMPORTS] = imports
+    extension_defs = _local_extension_defs(module)
+    if extension_defs:
+        root_xyang[XYangKey.EXTENSION] = extension_defs
+    if module_invocations:
+        root_xyang[XYangKey.EXTENSIONS] = module_invocations
+    _assert_extensions_placed(schema_module)
 
     root: dict[str, Any] = {
         JsonSchemaKey.SCHEMA: "https://json-schema.org/draft/2020-12/schema",

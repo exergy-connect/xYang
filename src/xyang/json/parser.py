@@ -8,6 +8,7 @@ YangLeafStmt, YangLeafListStmt, YangTypedefStmt, YangTypeStmt, YangMustStmt.
 
 from __future__ import annotations
 
+import contextvars
 import json
 from decimal import Decimal, InvalidOperation
 from pathlib import Path
@@ -21,6 +22,8 @@ from ..ast import (
     YangCaseStmt,
     YangChoiceStmt,
     YangContainerStmt,
+    YangExtensionInvocationStmt,
+    YangExtensionStmt,
     YangIdentityStmt,
     YangInputStmt,
     YangListStmt,
@@ -279,6 +282,7 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
     units = _units_from_xyang(xyang)
     if units:
         stmt.units = units
+    _attach_invocations(stmt, xyang)
     return stmt
 
 
@@ -291,6 +295,7 @@ def _build_identity(def_name: str, def_schema: dict[str, Any]) -> YangIdentitySt
     desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
     ident = YangIdentityStmt(name=def_name, description=desc, bases=bases)
     _set_if_features_from_xyang(ident, xyang)
+    _attach_invocations(ident, xyang)
     return ident
 
 
@@ -474,6 +479,7 @@ def _parse_hoisted_choice_oneof(
                 name=case_name, description=case_desc, statements=case_statements
             )
             _set_if_features_from_xyang(case_stmt, b_xyang)
+            _attach_invocations(case_stmt, b_xyang if isinstance(b_xyang, dict) else None)
             cases.append(case_stmt)
 
     choice_stmt = YangChoiceStmt(
@@ -483,6 +489,7 @@ def _parse_hoisted_choice_oneof(
         cases=cases,
     )
     _set_if_features_from_xyang(choice_stmt, meta)
+    _attach_invocations(choice_stmt, meta)
     choice_stmt.validate_case_unique_child_names()
     return [*common_children, choice_stmt]
 
@@ -536,6 +543,7 @@ def _convert_container(
         c.presence = xyang.get(XYangKey.PRESENCE)
     _set_if_features_from_xyang(c, xyang)
     _set_config_from_xyang(c, xyang)
+    _attach_invocations(c, xyang)
     return c
 
 
@@ -594,6 +602,7 @@ def _convert_list(
         lst.max_elements = int(schema[JsonSchemaKey.MAX_ITEMS])
     _set_if_features_from_xyang(lst, xyang)
     _set_config_from_xyang(lst, xyang)
+    _attach_invocations(lst, xyang)
     return lst
 
 
@@ -663,6 +672,7 @@ def _convert_leaf(
     if units:
         leaf.units = units
     _set_config_from_xyang(leaf, xyang)
+    _attach_invocations(leaf, xyang)
     return leaf
 
 
@@ -690,6 +700,7 @@ def _convert_anydata_anyxml(
     if when_stmt is not None:
         node.when = when_stmt
     _set_if_features_from_xyang(node, xyang)
+    _attach_invocations(node, xyang)
     return node
 
 
@@ -733,6 +744,7 @@ def _convert_leaf_list(
     if units:
         ll.units = units
     _set_config_from_xyang(ll, xyang)
+    _attach_invocations(ll, xyang)
     return ll
 
 
@@ -781,12 +793,14 @@ def _convert_choice(
             name=case_name, description=case_desc, statements=case_statements
         )
         _set_if_features_from_xyang(case_stmt, case_xyang)
+        _attach_invocations(case_stmt, case_xyang)
         cases.append(case_stmt)
     choice_stmt = YangChoiceStmt(
         name=name, description=description, mandatory=mandatory, cases=cases
     )
     _set_if_features_from_xyang(choice_stmt, xyang)
     _set_config_from_xyang(choice_stmt, xyang)
+    _attach_invocations(choice_stmt, xyang)
     choice_stmt.validate_case_unique_child_names()
     return choice_stmt
 
@@ -828,6 +842,7 @@ def _convert_io_block(
     if when_stmt is not None:
         stmt.when = when_stmt
     _set_if_features_from_xyang(stmt, xyang)
+    _attach_invocations(stmt, xyang)
     return stmt
 
 
@@ -859,6 +874,7 @@ def _convert_rpc(
     if when_stmt is not None:
         rpc.when = when_stmt
     _set_if_features_from_xyang(rpc, xyang)
+    _attach_invocations(rpc, xyang)
     return rpc
 
 
@@ -986,6 +1002,122 @@ def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
             _bind_xpath_prefixes([case], module)
 
 
+class _JsonParse:
+    """Module and ``$defs`` while ``parse_json_schema`` rebuilds extension invocations."""
+
+    def __init__(self, module: YangModule, defs: dict[str, Any]) -> None:
+        self.module = module
+        self.defs = defs
+
+
+_PARSING: contextvars.ContextVar[_JsonParse] = contextvars.ContextVar("xyang_json_parse_extensions")
+
+
+def _extension_from_json(name: str, raw: Any) -> YangExtensionStmt:
+    if raw is None:
+        raw = {}
+    if not isinstance(raw, dict):
+        raise ValueError(f'extension {name!r} must be an object, got {raw!r}')
+    ext = YangExtensionStmt(name=name)
+    argument = raw.get(XYangKey.ARGUMENT)
+    if isinstance(argument, str) and argument:
+        ext.argument_name = argument
+    if XYangKey.YIN_ELEMENT in raw:
+        yin = raw[XYangKey.YIN_ELEMENT]
+        if not isinstance(yin, bool):
+            raise ValueError(f'extension {name!r} "{XYangKey.YIN_ELEMENT}" must be a boolean')
+        ext.argument_yin_element = yin
+    description = raw.get(JsonSchemaKey.DESCRIPTION)
+    if isinstance(description, str):
+        ext.description = description
+    reference = raw.get(XYangKey.REFERENCE)
+    if isinstance(reference, str):
+        ext.reference = reference
+    return ext
+
+
+def _load_extension_defs(module: YangModule, raw_xyang: dict[str, Any]) -> None:
+    """Bind ``x-yang.extension`` as the module's extension definitions. No apply callbacks."""
+    raw = raw_xyang.get(XYangKey.EXTENSION)
+    if raw is None:
+        return
+    if not isinstance(raw, dict):
+        raise ValueError(f'"{XYangKey.EXTENSION}" must map names to extension definitions, got {raw!r}')
+    for name, body in raw.items():
+        module.extensions[str(name)] = _extension_from_json(str(name), body)
+
+
+def _invocation_from_json(raw: Any) -> YangExtensionInvocationStmt:
+    """One ``x-yang.extensions`` entry, including a nested body. Not re-applied."""
+    if not isinstance(raw, dict) or not isinstance(raw.get(JsonSchemaKey.NAME), str) or ":" not in raw[JsonSchemaKey.NAME]:
+        raise ValueError(f'extension invocation must be an object with "name" of the form "prefix:ext", got {raw!r}')
+    ctx = _PARSING.get(None)
+    if ctx is None:
+        raise ValueError("extension invocations require parse_json_schema")
+    name = raw[JsonSchemaKey.NAME]
+    prefix, _, ext_name = name.partition(":")
+    if prefix == ctx.module.own_prefix_stripped():
+        owner: YangModule | None = ctx.module
+    else:
+        owner = ctx.module.import_prefixes.get(prefix)
+    if owner is None:
+        raise ValueError(f"extension invocation {name!r}: unknown prefix {prefix!r}")
+    ext = owner.get_extension(ext_name)
+    if ext is None:
+        raise ValueError(f"extension invocation {name!r}: unknown extension {ext_name!r} in module {owner.name!r}")
+    argument = raw[XYangKey.ARGUMENT] if XYangKey.ARGUMENT in raw else None
+    if argument is not None and not isinstance(argument, str):
+        raise ValueError(f"extension invocation {name!r}: argument must be a string")
+    inv = YangExtensionInvocationStmt(
+        name=name,
+        prefix=prefix,
+        resolved_module=owner,
+        resolved_extension=ext,
+        argument=argument,
+        description=raw.get(JsonSchemaKey.DESCRIPTION) or "",
+        reference=raw.get(XYangKey.REFERENCE) or "",
+    )
+    _set_if_features_from_xyang(inv, raw)
+    when_stmt = _when_from_xyang(raw)
+    if when_stmt is not None:
+        inv.when = when_stmt
+    inv.must_statements = _build_must_list(raw)
+    if XYangKey.CONFIG in raw and isinstance(raw[XYangKey.CONFIG], bool):
+        inv.config = raw[XYangKey.CONFIG]
+    body = raw.get(XYangKey.BODY) or []
+    if not isinstance(body, list):
+        raise ValueError(f'extension invocation {name!r}: "{XYangKey.BODY}" must be a list')
+    for item in body:
+        if not isinstance(item, dict):
+            raise ValueError(f"extension invocation {name!r}: body entry must be an object")
+        if XYangKey.EXTENSION in item:
+            inv.statements.append(_invocation_from_json(item[XYangKey.EXTENSION]))
+            continue
+        node = item.get("node")
+        schema = item.get("schema")
+        if isinstance(node, str) and isinstance(schema, dict):
+            child = _convert_property(node, schema, ctx.defs, f"/{node}")
+            if child is None:
+                raise ValueError(f"extension invocation {name!r}: body node {node!r} is not a schema node")
+            inv.statements.append(child)
+            continue
+        raise ValueError(f"extension invocation {name!r}: body entry must be an extension or a node")
+    return inv
+
+
+def _attach_invocations(stmt: Any, xyang: dict[str, Any] | None) -> None:
+    """Append ``x-yang.extensions`` onto *stmt*, in the order they were exported."""
+    if not isinstance(xyang, dict):
+        return
+    raw = xyang.get(XYangKey.EXTENSIONS)
+    if not raw:
+        return
+    if not isinstance(raw, list):
+        raise ValueError(f'"{XYangKey.EXTENSIONS}" must be a list of invocations, got {raw!r}')
+    for item in raw:
+        stmt.statements.append(_invocation_from_json(item))
+
+
 def _module_from_import_stub(key: str, raw: Any) -> YangModule:
     """Rebuild one ``x-yang.imports`` entry: an imported module reduced to its identities."""
     if not isinstance(raw, dict) or not all(isinstance(raw.get(k), str) for k in (XYangKey.MODULE, XYangKey.PREFIX)):
@@ -1004,6 +1136,7 @@ def _module_from_import_stub(key: str, raw: Any) -> YangModule:
         if ident is None:
             raise ValueError(f'identity {name!r} of import {key!r} is not an identity definition')
         stub.identities[name] = ident
+    _load_extension_defs(stub, raw)
     return stub
 
 
@@ -1068,7 +1201,21 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     )
 
     _load_imports(module, root_xyang)
+    _load_extension_defs(module, root_xyang)
+    token = _PARSING.set(_JsonParse(module, defs))
+    try:
+        _parse_json_schema_body(module, data, root_xyang, defs)
+    finally:
+        _PARSING.reset(token)
+    return module
 
+
+def _parse_json_schema_body(
+    module: YangModule,
+    data: dict[str, Any],
+    root_xyang: dict[str, Any],
+    defs: dict[str, Any],
+) -> None:
     for def_name, def_schema in defs.items():
         if not isinstance(def_schema, dict):
             continue
@@ -1101,7 +1248,8 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
             if rpc_stmt is not None:
                 module.statements.append(rpc_stmt)
 
+    _attach_invocations(module, root_xyang)
+
     _bind_xpath_prefixes(module.statements, module)
     for typedef in module.typedefs.values():
         _bind_type_paths(getattr(typedef, "type", None), module)
-    return module

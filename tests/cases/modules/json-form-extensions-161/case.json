@@ -1,0 +1,12 @@
+{
+  "description": "#161: extension definitions and invocations survive the native JSON form (json_form), including a local extension on a leaf and in an rpc input, an imported extension, an invocation with a nested body, and the round trip.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "annotated leaf", "valid": true,
+      "data": { "m:top": { "s": "x", "imported": "y", "row": [{ "id": "1" }], "tags": ["t"], "a": "A" } } },
+    { "name": "unknown field", "valid": false,
+      "data": { "m:top": { "nope": 1 } },
+      "errors": [{ "path": "/m:top/nope", "code": "unknown-field" }] }
+  ]
+}

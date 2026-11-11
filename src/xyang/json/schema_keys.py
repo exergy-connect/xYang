@@ -93,6 +93,18 @@ class XYangKey:
     #: ``module``, ``namespace``, ``prefix``, its own ``imports`` and its ``identities``.
     IMPORTS = "imports"
     IDENTITIES = "identities"
+    #: Extension definitions (RFC 7950 §7.19) of this module, keyed by name. An imported
+    #: extension this module invokes is the same object on that import's stub.
+    EXTENSION = "extension"
+    #: Invocations of an extension on this node, in source order. Each entry is
+    #: ``{name, argument?, description?, reference?, body?}``. ``name`` is ``prefix:ext``.
+    EXTENSIONS = "extensions"
+    ARGUMENT = "argument"
+    YIN_ELEMENT = "yin-element"
+    REFERENCE = "reference"
+    #: Nested statements of an extension invocation, in source order. An entry is
+    #: ``{"extension": <invocation>}`` or ``{"node": <member name>, "schema": <node schema>}``.
+    BODY = "body"
 
 
 class XYangTypeValue:
