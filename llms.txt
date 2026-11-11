@@ -4,7 +4,7 @@
 
 ## Docs
 
-- [README](README.md): install, CLI (`parse`, `validate`, `convert`), and library usage
+- [README](README.md): install, CLI (`parse`, `validate`, `convert`; discover flags with `xyang --help` / `xyang-ts --help`), and library usage
 - [FEATURES](FEATURES.md): YANG features implemented in xYang
 - [Conformance cases](tests/cases/README.md): language-neutral cases and the Python and TypeScript runners
 - [JSON Schema profile](design/json-schema-xyang-profile.md): JSON Schema (2020-12) with `x-yang`
