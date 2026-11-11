@@ -1,0 +1,6 @@
+{
+  "description": "A 'prefix:*' whose prefix the module does not bind is rejected when the module is loaded, like an unknown prefix in an augment path.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "unknown prefix"
+}

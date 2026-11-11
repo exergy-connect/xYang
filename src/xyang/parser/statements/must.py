@@ -26,6 +26,7 @@ class MustStatementParser:
         tokens.consume(kw.MUST)
         expression = self._parsers.parse_string_concatenation(tokens)
         must_stmt = YangMustStmt(expression=expression)
+        must_stmt.bind_prefixes(context.module)
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(must_stmt)

@@ -325,6 +325,12 @@ class YangParsedXPathBase:
             from .xpath import XPathParser
             self.ast = XPathParser(self.expression).parse()
 
+    def bind_prefixes(self, module: Any) -> None:
+        """Bind ``prefix:*`` steps to the modules *module* maps their prefixes to."""
+        if self.ast is not None:
+            from .xpath.parser import bind_wildcard_prefixes
+            bind_wildcard_prefixes(self.ast, module.resolve_prefix_to_module_name, self.expression)
+
 @dataclass
 class YangMustStmt(YangParsedXPathBase):
     """Must statement (constraint)."""

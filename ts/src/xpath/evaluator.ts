@@ -1,7 +1,7 @@
 import { XPathEvaluationError } from "../core/errors";
 import { YangModule } from "../core/model";
 import { isDerivedFromOrSelfQNames, isDerivedFromStrictQNames } from "../identity-graph";
-import { XPathAstNode, XPathBinaryNode, XPathPathNode } from "./ast";
+import { XPathAstNode, XPathBinaryNode, XPathPathNode, isWildcardStep } from "./ast";
 import { unknownFunctionError } from "./functions";
 
 export type XPathSchema = {
@@ -168,6 +168,69 @@ function findSchemaChild(schema: XPathSchema | null, name: string): XPathSchema 
   return null;
 }
 
+const WILDCARD_DATA_KEYWORDS = new Set(["container", "list", "leaf", "leaf-list", "anydata", "anyxml"]);
+
+function dataChildren(schema: XPathSchema | null, out: XPathSchema[] = []): XPathSchema[] {
+  for (const child of getSchemaChildren(schema)) {
+    if (child.keyword === "choice" || child.keyword === "case") {
+      dataChildren(child, out);
+    } else if (WILDCARD_DATA_KEYWORDS.has(child.keyword ?? "")) {
+      out.push(child);
+    }
+  }
+  return out;
+}
+
+/** `*` / `prefix:*`: every data-node child present in the instance (or by default). With `module`, only that module's children. */
+function stepWildcard(node: XPathNode, context: XPathContext, module: string | undefined): XPathNode[] {
+  const data = node.data;
+  const schema = node.schema;
+
+  if (Array.isArray(data) && (schema?.keyword === "list" || schema?.keyword === "leaf-list")) {
+    const expanded: XPathNode[] = [];
+    for (const item of data) {
+      expanded.push(...stepWildcard({ data: item, schema, parent: node }, context, module));
+    }
+    return expanded;
+  }
+  if (!data || typeof data !== "object") {
+    return [];
+  }
+
+  const record = data as Record<string, unknown>;
+  const rootModule = (context.root.schema as { name?: string } | null)?.name ?? "";
+  const result: XPathNode[] = [];
+  for (const child of dataChildren(schema)) {
+    const local = child.name ?? "";
+    const definedIn = (child as { defining_module?: string }).defining_module || rootModule;
+    if (module !== undefined && definedIn !== module) {
+      continue;
+    }
+    const key = !rootModule || definedIn === rootModule ? local : `${definedIn}:${local}`;
+    let value: unknown;
+    if (Object.prototype.hasOwnProperty.call(record, key)) {
+      value = record[key];
+      if (value === null) {
+        value = true;
+      }
+    } else {
+      value = defaultValue(child);
+    }
+    if (value === undefined) {
+      continue;
+    }
+    if (child.keyword === "list" || child.keyword === "leaf-list") {
+      const items = Array.isArray(value) ? value : [value];
+      for (const item of items) {
+        result.push({ data: item, schema: child, parent: node });
+      }
+    } else {
+      result.push({ data: value, schema: child, parent: node });
+    }
+  }
+  return result;
+}
+
 function defaultValue(schema: XPathSchema | null): unknown {
   if (!schema || schema.keyword !== "leaf") {
     return undefined;
@@ -248,6 +311,15 @@ export class XPathEvaluator {
         // keep current nodes
       } else if (segment.step === "..") {
         nodes = nodes.map((entry) => entry.parent).filter((entry): entry is XPathNode => Boolean(entry));
+      } else if (isWildcardStep(segment.step)) {
+        if (segment.step !== "*" && segment.module === undefined) {
+          throw new XPathEvaluationError(`Prefix of '${segment.step}' is not bound to a module`);
+        }
+        const next: XPathNode[] = [];
+        for (const entry of nodes) {
+          next.push(...stepWildcard(entry, context, segment.module));
+        }
+        nodes = next;
       } else {
         const next: XPathNode[] = [];
         for (const entry of nodes) {

@@ -26,6 +26,7 @@ class WhenStatementParser:
         tokens.consume(kw.WHEN)
         condition = self._parsers.parse_string_concatenation(tokens)
         when_stmt = YangWhenStmt(expression=condition)
+        when_stmt.bind_prefixes(context.module)
         parent_for_when = context.current_parent
 
         if tokens.consume_if_type(YangTokenType.LBRACE):

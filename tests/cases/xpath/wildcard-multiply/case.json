@@ -1,0 +1,17 @@
+{
+  "description": "XPath 1.0 3.7: '*' is the multiply operator after an operand (number, name, ')' or ']') and a NameTest otherwise, so 2 * 3, a * b, a*b, count(x) * 2 and count(*) * 2 all multiply while the first '*' of count(*) * 2 selects children.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "every product holds",
+      "data": { "top": { "a": 3, "b": 4, "items": [{ "id": "i1" }, { "id": "i2" }], "tags": ["t"], "c": "x", "d": "y" } },
+      "valid": true },
+    { "name": "a product on leaves fails",
+      "data": { "top": { "a": 3, "b": 5, "items": [{ "id": "i1" }, { "id": "i2" }], "tags": ["t"], "c": "x", "d": "y" } },
+      "valid": false,
+      "errors": [{ "path": "/top", "code": "must" }] },
+    { "name": "mixed wildcard and multiply fails with a different child count",
+      "data": { "top": { "a": 3, "b": 4, "items": [{ "id": "i1" }, { "id": "i2" }], "tags": ["t"], "c": "x" } },
+      "valid": false,
+      "errors": [{ "path": "/top", "code": "must" }] }
+  ]
+}

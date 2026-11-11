@@ -900,6 +900,19 @@ def _convert_property(
     return None
 
 
+def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
+    """Bind ``prefix:*`` steps in every ``must`` and ``when`` to *module*'s prefixes."""
+    for stmt in stmts:
+        for must in getattr(stmt, "must_statements", None) or []:
+            must.bind_prefixes(module)
+        when = getattr(stmt, "when", None)
+        if when is not None:
+            when.bind_prefixes(module)
+        _bind_xpath_prefixes(stmt.statements, module)
+        for case in getattr(stmt, "cases", None) or []:
+            _bind_xpath_prefixes([case], module)
+
+
 def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
     """
     Build a YangModule (and nested AST nodes from xyang.ast) from a JSON Schema
@@ -981,4 +994,5 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
             if rpc_stmt is not None:
                 module.statements.append(rpc_stmt)
 
+    _bind_xpath_prefixes(module.statements, module)
     return module

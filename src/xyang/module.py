@@ -51,6 +51,13 @@ class YangModule(YangStatementList):
             return self
         return self.import_prefixes.get(prefix)
 
+    def resolve_prefix_to_module_name(self, prefix: str) -> Optional[str]:
+        """Name of the module ``prefix`` is bound to here (a submodule resolves to its parent module)."""
+        target = self.resolve_prefixed_module(prefix)
+        if target is None:
+            return None
+        return target.belongs_to_module or target.name
+
     def get_typedef(self, name: str) -> Optional['YangTypedefStmt']:
         """Get a typedef by name."""
         return self.typedefs.get(name)

@@ -19,6 +19,26 @@ export type XPathToken = {
   position: number;
 };
 
+const OPERATOR_NAMES = new Set(["and", "or", "div", "mod"]);
+
+/** XPath 1.0 §3.7: `*` is a NameTest unless an operand precedes it. */
+function starIsNameTest(tokens: XPathToken[]): boolean {
+  const prev = tokens[tokens.length - 1];
+  if (!prev) return true;
+  switch (prev.kind) {
+    case "operator":
+    case "slash":
+    case "paren_open":
+    case "bracket_open":
+    case "comma":
+      return true;
+    case "identifier":
+      return OPERATOR_NAMES.has(prev.value.toLowerCase());
+    default:
+      return false;
+  }
+}
+
 const OPERATORS = ["<=", ">=", "!=", "==", "//", "=", "<", ">", "+", "-", "*", "/"];
 
 export function tokenizeXPath(expr: string): XPathToken[] {
@@ -85,7 +105,17 @@ export function tokenizeXPath(expr: string): XPathToken[] {
         value += expr[position];
         position += 1;
       }
+      if (value.endsWith(":") && expr[position] === "*") {
+        value += "*";
+        position += 1;
+      }
       add("identifier", value, start);
+      continue;
+    }
+
+    if (ch === "*" && starIsNameTest(tokens)) {
+      add("identifier", "*");
+      position += 1;
       continue;
     }
 

@@ -1,0 +1,27 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    must "2 * 3 = 6";
+    must "a * b = 12";
+    must "a*b = 12";
+    must "count(items) * 2 = 4";
+    must "count(*) * 2 = 14";
+    must "count(*) * count(items) = 14";
+    must "(count(*)) * 2 = 14";
+    must "a div 3 * 2 = 2";
+    must "a * 2 * b = 24";
+    must "count(*) * 2 > a * 2 and count(*) = 7";
+    leaf a { type uint8; }
+    leaf b { type uint8; }
+    list items {
+      key id;
+      leaf id { type string; }
+    }
+    leaf-list tags { type string; }
+    leaf c { type string; }
+    leaf d { type string; }
+  }
+}

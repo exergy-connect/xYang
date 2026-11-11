@@ -1,6 +1,6 @@
 import { YangSemanticError } from "./errors";
 import type { YangIdentifierRef } from "./identifier-ref";
-import { parseXPath } from "../xpath/parser";
+import { bindWildcardPrefixes, parseXPath, wildcardPrefixes } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
 import { warnDeprecatedOnce } from "./deprecation";
 import { translateXsdRegex } from "../xsd-regex";
@@ -428,10 +428,29 @@ export class YangExtensionInvocationStmt extends YangStatementWithWhen {
   }
 }
 
+type PrefixScope = {
+  name?: string;
+  prefix?: string;
+  belongs_to_module?: string;
+  import_prefixes?: Record<string, PrefixScope>;
+};
+
+/** Prefix -> module name in `module`'s scope: its own prefix or an `import`; a submodule names its parent. */
+export function modulePrefixResolver(module: unknown): (prefix: string) => string | undefined {
+  const scope = module as PrefixScope;
+  return (prefix) => {
+    const own = (scope.prefix ?? "").replace(/^['"]|['"]$/g, "");
+    const target = prefix === own ? scope : scope.import_prefixes?.[prefix];
+    return target ? target.belongs_to_module || target.name : undefined;
+  };
+}
+
 export class YangParsedXPathBase {
   expression: string;
   description: string;
   ast?: ASTNode;
+  /** Module each `prefix:*` step is bound to, by prefix; recorded by {@link bindPrefixes}. */
+  xpath_prefixes?: Record<string, string>;
 
   constructor(init: { expression: string; description?: string }) {
     this.expression = init.expression;
@@ -439,6 +458,15 @@ export class YangParsedXPathBase {
     if (this.expression) {
       this.ast = parseXPath(this.expression);
     }
+  }
+
+  /** Bind `prefix:*` steps to the modules `module` maps their prefixes to; an unknown prefix throws. */
+  bindPrefixes(module: unknown): void {
+    const used = wildcardPrefixes(this.ast);
+    if (used.size === 0) return;
+    const resolve = modulePrefixResolver(module);
+    bindWildcardPrefixes(this.ast, resolve, this.expression);
+    this.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
   }
 }
 

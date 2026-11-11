@@ -1,0 +1,6 @@
+{
+  "description": "A leafref path is a schema path; a wildcard step is not allowed there. It is an XPath node test in must and when only.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "not allowed in a schema path"
+}

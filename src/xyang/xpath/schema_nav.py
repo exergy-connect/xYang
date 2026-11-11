@@ -10,11 +10,17 @@ from typing import Any, List, Optional
 
 from .ast import PathNode
 from ..ast import (
+    YangAnydataStmt,
+    YangAnyxmlStmt,
     YangCaseStmt,
     YangChoiceStmt,
+    YangContainerStmt,
+    YangInputStmt,
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
+    YangNotificationStmt,
+    YangOutputStmt,
 )
 from .utils import coerce_default_value
 
@@ -48,6 +54,32 @@ class SchemaNav:
                 if found is not None:
                     return found
         return None
+
+    @staticmethod
+    def data_children(schema: Any) -> List[Any]:
+        """Data-node children of *schema*, in schema order, descending through choice and case."""
+        if schema is None:
+            return []
+        out: List[Any] = []
+        SchemaNav._collect_data_children(getattr(schema, "statements", []), out)
+        return out
+
+    @staticmethod
+    def _collect_data_children(stmts: list, out: List[Any]) -> None:
+        for stmt in stmts:
+            if isinstance(stmt, YangChoiceStmt):
+                for case in stmt.cases:
+                    SchemaNav._collect_data_children(getattr(case, "statements", []), out)
+            elif isinstance(stmt, YangCaseStmt):
+                SchemaNav._collect_data_children(stmt.statements, out)
+            elif isinstance(stmt, (YangNotificationStmt, YangInputStmt, YangOutputStmt)):
+                continue
+            elif isinstance(
+                stmt,
+                (YangContainerStmt, YangListStmt, YangLeafStmt, YangLeafListStmt,
+                 YangAnydataStmt, YangAnyxmlStmt),
+            ):
+                out.append(stmt)
 
     @staticmethod
     def default(schema: Any) -> Any:

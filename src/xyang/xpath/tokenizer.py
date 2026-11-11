@@ -8,6 +8,7 @@ from .tokens import Token, TokenType
 
 QUOTE_CHARS: Set[str] = {'"', "'"}
 OPERATOR_CHARS: Set[str] = {'=', '<', '>', '!', '+', '-', '*', '/'}
+OPERATOR_NAMES: Set[str] = {'and', 'or', 'div', 'mod'}
 
 
 def normalize_yang_escaped_quotes(expression: str) -> str:
@@ -175,10 +176,27 @@ class XPathTokenizer:
                 break
 
         identifier = ''.join(value)
+        if identifier.endswith(':') and self._peek_char() == '*':
+            identifier += '*'
+            self.position += 1
         self.tokens.append(Token(TokenType.IDENTIFIER, identifier, start_pos))
+
+    def _star_is_name_test(self) -> bool:
+        """XPath 1.0 §3.7: ``*`` is a NameTest unless an operand precedes it."""
+        if not self.tokens:
+            return True
+        prev = self.tokens[-1]
+        if prev.type in (TokenType.OPERATOR, TokenType.SLASH, TokenType.PAREN_OPEN,
+                         TokenType.BRACKET_OPEN, TokenType.COMMA):
+            return True
+        return prev.type == TokenType.IDENTIFIER and prev.value.lower() in OPERATOR_NAMES
 
     def _tokenize_operator(self):
         start_pos = self.position
+        if self.expression[self.position] == '*' and self._star_is_name_test():
+            self.tokens.append(Token(TokenType.IDENTIFIER, '*', start_pos))
+            self.position += 1
+            return
         remaining = self.expression[self.position:]
 
         for op in self.OPERATORS:

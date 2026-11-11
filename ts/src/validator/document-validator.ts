@@ -1,6 +1,7 @@
 import { YangModule, YangStatement } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
-import { parseXPath, parseXPathPath } from "../xpath/parser";
+import { modulePrefixResolver } from "../core/ast";
+import { bindWildcardPrefixes, parseXPath, parseXPathPath, wildcardPrefixes } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
 import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
@@ -930,22 +931,41 @@ export class DocumentValidator {
     }
   }
 
+  /**
+   * Parse a `must` / `when` expression once per distinct `prefix:*` binding. A statement with
+   * no recorded binding (native JSON) binds against the root module.
+   */
+  private compileXPath(expression: string, recorded: Record<string, string> | undefined): XPathAstNode {
+    const key = recorded ? `${expression}\u0000${JSON.stringify(recorded)}` : expression;
+    const cached = this.xpathCache.get(key);
+    if (cached) {
+      return cached;
+    }
+    const ast = parseXPath(expression);
+    if (wildcardPrefixes(ast).size > 0) {
+      const resolve = recorded ? (prefix: string) => recorded[prefix] : modulePrefixResolver(this.ctx.module);
+      bindWildcardPrefixes(ast, resolve, expression);
+    }
+    this.xpathCache.set(key, ast);
+    return ast;
+  }
+
   private checkMust(stmt: YangStatement, currentNode: XPathNode, rootNode: XPathNode, path: string, errors: InternalIssue[]): void {
     const mustStatements = stmt.statements.filter((child) => child.keyword === "must" && typeof child.argument === "string");
 
     for (const mustStmt of mustStatements) {
       const expression = mustStmt.argument as string;
-      let ast = this.xpathCache.get(expression);
+      let ast: XPathAstNode | undefined;
+      try {
+        ast = this.compileXPath(expression, mustStmt.xpath_prefixes);
+      } catch {
+        ast = undefined;
+      }
       if (!ast) {
-        try {
-          ast = parseXPath(expression);
-          this.xpathCache.set(expression, ast);
-        } catch {
-          errors.push(
-            issue(path, "xpath-error", `Error evaluating must expression on '${stmt.name ?? "node"}'`, expression)
-          );
-          continue;
-        }
+        errors.push(
+          issue(path, "xpath-error", `Error evaluating must expression on '${stmt.name ?? "node"}'`, expression)
+        );
+        continue;
       }
       try {
         const context: XPathContext = { current: currentNode, root: rootNode };
@@ -978,15 +998,15 @@ export class DocumentValidator {
       return true;
     }
 
-    let ast = this.xpathCache.get(expression);
+    let ast: XPathAstNode | undefined;
+    try {
+      ast = this.compileXPath(expression, whenShape?.xpath_prefixes as Record<string, string> | undefined);
+    } catch {
+      ast = undefined;
+    }
     if (!ast) {
-      try {
-        ast = parseXPath(expression);
-        this.xpathCache.set(expression, ast);
-      } catch {
-        errors.push(issue(path, "xpath-error", `Error evaluating when expression on '${stmt.name ?? "node"}'`, expression));
-        return false;
-      }
+      errors.push(issue(path, "xpath-error", `Error evaluating when expression on '${stmt.name ?? "node"}'`, expression));
+      return false;
     }
 
     try {
