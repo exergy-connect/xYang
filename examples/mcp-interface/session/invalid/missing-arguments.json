@@ -1,6 +1,7 @@
 {
   "example-topology-tools:session": {
-    "protocol-version": "2025-11-25",
+    "handle": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
+    "protocol-version": "2026-07-28",
     "server": {
       "name": "topology-builder",
       "version": "0.1.0"
@@ -23,6 +24,7 @@
         "tool": "example-topology-tools:add-node",
         "arguments": {
           "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "name": "r2",
             "role": "router"
           }
@@ -36,6 +38,7 @@
         "tool": "example-topology-tools:add-node",
         "arguments": {
           "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "name": "h1",
             "role": "host"
           }
@@ -49,6 +52,7 @@
         "tool": "example-topology-tools:add-link",
         "arguments": {
           "add-link": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "source": "r1",
             "target": "r2"
           }
@@ -62,6 +66,7 @@
         "tool": "example-topology-tools:add-link",
         "arguments": {
           "add-link": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "source": "r2",
             "target": "h1",
             "bandwidth-mbps": 100
@@ -76,6 +81,7 @@
         "tool": "example-topology-tools:add-node",
         "arguments": {
           "add-node": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "name": "r1"
           }
         },
@@ -89,6 +95,7 @@
         "tool": "example-topology-tools:find-path",
         "arguments": {
           "find-path": {
+            "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
             "from": "r1",
             "to": "h1",
             "max-hops": 4

@@ -15,15 +15,60 @@ module example-mcp {
      container and augments call/arguments with one container per tool,
      gated by 'when' on the call's tool identity.
 
+     MCP 2026-07-28 has no protocol-level session. A server that keeps
+     state across calls mints an explicit handle from a creation tool and
+     takes it as an ordinary argument on later calls. This module supplies
+     the handle type, the argument every tool uses, and the output of the
+     tool that mints it. The 'http-header' extension marks the argument to
+     be mirrored into an HTTP header (MCP x-mcp-header), so intermediaries
+     can route a call to its session without parsing the body.
+
      A valid session is consistent with its own calls. It is a local view:
      it says nothing about state outside this document.
      SPDX-License-Identifier: MIT";
-  reference "RFC 7950; RFC 7951; Model Context Protocol, tools/list and tools/call";
+  reference "RFC 7950; RFC 7951; Model Context Protocol 2026-07-28, server/tools (Stateful Tools, x-mcp-header)";
   revision 2026-11-11 { description "Initial example revision.";
     reference "xYang examples/mcp-interface/README.md"; }
 
   identity tool {
     description "Base of every MCP tool. A tool module derives one identity per rpc, with the same name.";
+  }
+
+  extension http-header {
+    argument name;
+    description
+      "Mirror this tool argument into the HTTP header Mcp-Param-<name> on the
+       Streamable HTTP transport. compile_mcp.py emits it as the property's
+       x-mcp-header. Only for string, integer and boolean leaves directly
+       below the rpc input.";
+    reference "Model Context Protocol 2026-07-28, server/tools, x-mcp-header";
+  }
+
+  typedef session-handle {
+    type string { pattern 'ses_[0-9a-f]{32}'; }
+    description
+      "Opaque handle minted by the server's session-creating tool: 'ses_'
+       followed by 128 random bits in hex. It is a bearer token on an
+       unauthenticated server, so it carries no structure.";
+  }
+
+  grouping session-argument {
+    description "The handle argument every stateful tool takes.";
+    leaf session {
+      type mcp:session-handle;
+      mandatory true;
+      mcp:http-header "Session";
+      description "Handle returned by open-session. Sessions expire after 24 hours without a call.";
+    }
+  }
+
+  grouping session-created {
+    description "Output of the tool that mints a session handle.";
+    leaf session {
+      type mcp:session-handle;
+      mandatory true;
+      description "Pass this handle as 'session' on every later call.";
+    }
   }
 
   typedef sha256-hex {
@@ -37,14 +82,20 @@ module example-mcp {
        tools/call requests made. A tool module instantiates it as its own
        top-level 'session' container and augments call/arguments.";
 
+    leaf handle {
+      type mcp:session-handle;
+      mandatory true;
+      description "The handle this record is kept under.";
+    }
+
     leaf protocol-version {
       type string { pattern '[0-9]{4}-[0-9]{2}-[0-9]{2}'; }
       mandatory true;
-      description "MCP protocol revision negotiated at initialize.";
+      description "MCP protocol revision the calls were made in.";
     }
 
     container server {
-      description "serverInfo from the initialize result.";
+      description "serverInfo the server reports in each result's _meta.";
       leaf name { type string { length "1..128"; } mandatory true; description "Server name."; }
       leaf version { type string { length "1..64"; } mandatory true; description "Server version."; }
     }
@@ -63,7 +114,7 @@ module example-mcp {
 
       leaf id {
         type uint32;
-        description "JSON-RPC request id. Ids increase in send order, so rules compare them to mean 'earlier'.";
+        description "Sequence number the server assigns in receive order, so rules compare ids to mean 'earlier'.";
       }
       leaf tool {
         type identityref { base mcp:tool; }

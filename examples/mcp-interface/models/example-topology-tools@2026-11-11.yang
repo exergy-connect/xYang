@@ -9,6 +9,10 @@ module example-topology-tools {
     "A small MCP tool set for building a network topology: add-node,
      add-link and find-path.
 
+     open-session mints a handle; every other tool takes it as its
+     'session' argument and checks that it names the record the call is
+     checked against (MCP 2026-07-28 has no protocol sessions).
+
      Each tool is a grouping used twice: as its rpc's input (or output),
      which compile_mcp.py turns into the tool's inputSchema (or
      outputSchema), and as a recorded call in a session.
@@ -42,6 +46,13 @@ module example-topology-tools {
   }
 
   grouping add-node-input {
+    uses mcp:session-argument {
+      refine session {
+        must ". = /topo:session/topo:handle" {
+          error-message "session must be the handle of the session this call belongs to.";
+        }
+      }
+    }
     leaf name {
       type node-name;
       mandatory true;
@@ -62,6 +73,13 @@ module example-topology-tools {
   }
 
   grouping add-link-input {
+    uses mcp:session-argument {
+      refine session {
+        must ". = /topo:session/topo:handle" {
+          error-message "session must be the handle of the session this call belongs to.";
+        }
+      }
+    }
     leaf source {
       type node-name;
       mandatory true;
@@ -89,6 +107,13 @@ module example-topology-tools {
   }
 
   grouping find-path-input {
+    uses mcp:session-argument {
+      refine session {
+        must ". = /topo:session/topo:handle" {
+          error-message "session must be the handle of the session this call belongs to.";
+        }
+      }
+    }
     leaf from {
       type node-name;
       mandatory true;
@@ -121,6 +146,14 @@ module example-topology-tools {
       }
       description "Nodes on the path, from 'from' to 'to'.";
     }
+  }
+
+  rpc open-session {
+    description
+      "Start a session and return its handle. Pass the handle as 'session' on
+       every other call. A session keeps the nodes and links its calls create,
+       and expires after 24 hours without a call.";
+    output { uses mcp:session-created; }
   }
 
   rpc add-node {

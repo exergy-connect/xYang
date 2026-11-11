@@ -44,7 +44,7 @@ def undeclared_tool(d):
 
 
 def arguments_for_other_tool(d):
-    call(d, 4)["arguments"] = {"add-node": {"name": "r3"}}
+    call(d, 4)["arguments"] = {"add-node": {"session": d[ROOT]["handle"], "name": "r3"}}
 
 
 def missing_arguments(d):
@@ -61,6 +61,10 @@ def path_missing_endpoint(d):
 
 def path_too_long(d):
     call(d, 7)["arguments"]["find-path"]["max-hops"] = 1
+
+
+def call_in_other_session(d):
+    call(d, 4)["arguments"]["add-link"]["session"] = "ses_00000000000000000000000000000000"
 
 
 def bandwidth_out_of_range(d):
@@ -82,6 +86,7 @@ MUTATIONS: dict[str, Callable[[dict[str, Any]], None]] = {
         path_missing_endpoint,
         path_too_long,
         bandwidth_out_of_range,
+        call_in_other_session,
     )
 }
 

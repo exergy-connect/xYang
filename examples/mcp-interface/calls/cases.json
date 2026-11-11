@@ -5,6 +5,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "name": "r3",
         "role": "switch"
       }
@@ -17,6 +18,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "name": "r1"
       }
     },
@@ -33,7 +35,9 @@
     "direction": "input",
     "context": "session/valid.json",
     "data": {
-      "example-topology-tools:input": {}
+      "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7"
+      }
     },
     "errors": [
       {
@@ -49,6 +53,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "source": "r1",
         "target": "h1"
       }
@@ -61,6 +66,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "source": "r1",
         "target": "r9"
       }
@@ -79,6 +85,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "source": "r1",
         "target": "r1"
       }
@@ -97,6 +104,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "source": "r1",
         "target": "h1",
         "bandwidth-mbps": 0
@@ -116,11 +124,17 @@
     "context": null,
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "source": "r1",
         "target": "r2"
       }
     },
     "errors": [
+      {
+        "path": "/example-topology-tools:input/session",
+        "code": "must",
+        "message": "session must be the handle of the session this call belongs to."
+      },
       {
         "path": "/example-topology-tools:input/source",
         "code": "must",
@@ -139,6 +153,7 @@
     "context": "session/valid.json",
     "data": {
       "example-topology-tools:input": {
+        "session": "ses_3f2a9c0e7b1d4e8fa6c5d2b1e0f9a8c7",
         "from": "r1",
         "to": "r9"
       }
@@ -184,6 +199,25 @@
         "path": "/example-topology-tools:output/hop/1",
         "code": "must",
         "message": "Every hop must be a node that an earlier successful add-node call created."
+      }
+    ]
+  },
+  "add-link-other-session": {
+    "rpc": "add-link",
+    "direction": "input",
+    "context": "session/valid.json",
+    "data": {
+      "example-topology-tools:input": {
+        "session": "ses_00000000000000000000000000000000",
+        "source": "r1",
+        "target": "h1"
+      }
+    },
+    "errors": [
+      {
+        "path": "/example-topology-tools:input/session",
+        "code": "must",
+        "message": "session must be the handle of the session this call belongs to."
       }
     ]
   }

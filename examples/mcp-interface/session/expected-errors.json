@@ -2,6 +2,11 @@
   "valid": [],
   "arguments-for-other-tool": [
     {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/session",
+      "code": "mandatory",
+      "message": "Mandatory leaf 'session' is missing"
+    },
+    {
       "path": "/example-topology-tools:session/call/3/arguments/add-link/source",
       "code": "mandatory",
       "message": "Mandatory leaf 'source' is missing"
@@ -22,6 +27,13 @@
       "path": "/example-topology-tools:session/call/4/arguments/add-link/bandwidth-mbps",
       "code": "range",
       "message": "Value 0 is less than minimum 1"
+    }
+  ],
+  "call-in-other-session": [
+    {
+      "path": "/example-topology-tools:session/call/3/arguments/add-link/session",
+      "code": "must",
+      "message": "session must be the handle of the session this call belongs to."
     }
   ],
   "duplicate-node": [
@@ -89,6 +101,11 @@
       "path": "/example-topology-tools:session/call/0/arguments/add-node/name",
       "code": "mandatory",
       "message": "Mandatory leaf 'name' is missing"
+    },
+    {
+      "path": "/example-topology-tools:session/call/0/arguments/add-node/session",
+      "code": "mandatory",
+      "message": "Mandatory leaf 'session' is missing"
     },
     {
       "path": "/example-topology-tools:session/call/3/arguments/add-link/source",

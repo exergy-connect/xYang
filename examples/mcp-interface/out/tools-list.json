@@ -1,12 +1,40 @@
 {
   "tools": [
     {
+      "name": "open-session",
+      "description": "Start a session and return its handle. Pass the handle as 'session' on every other call. A session keeps the nodes and links its calls create, and expires after 24 hours without a call.",
+      "inputSchema": {
+        "additionalProperties": false,
+        "type": "object"
+      },
+      "outputSchema": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "session": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-f]{32}$",
+            "description": "Pass this handle as 'session' on every later call."
+          }
+        },
+        "required": [
+          "session"
+        ]
+      }
+    },
+    {
       "name": "add-node",
       "description": "Add a node to the topology.",
       "inputSchema": {
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "session": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-f]{32}$",
+            "description": "Handle returned by open-session. Sessions expire after 24 hours without a call.",
+            "x-mcp-header": "Session"
+          },
           "name": {
             "$ref": "#/$defs/node-name",
             "description": "Name of the new node. Unique in the topology."
@@ -23,6 +51,7 @@
           }
         },
         "required": [
+          "session",
           "name"
         ],
         "$defs": {
@@ -58,6 +87,12 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "session": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-f]{32}$",
+            "description": "Handle returned by open-session. Sessions expire after 24 hours without a call.",
+            "x-mcp-header": "Session"
+          },
           "source": {
             "$ref": "#/$defs/node-name",
             "description": "One end of the link."
@@ -75,6 +110,7 @@
           }
         },
         "required": [
+          "session",
           "source",
           "target"
         ],
@@ -94,6 +130,12 @@
         "type": "object",
         "additionalProperties": false,
         "properties": {
+          "session": {
+            "type": "string",
+            "pattern": "^ses_[0-9a-f]{32}$",
+            "description": "Handle returned by open-session. Sessions expire after 24 hours without a call.",
+            "x-mcp-header": "Session"
+          },
           "from": {
             "$ref": "#/$defs/node-name",
             "description": "Start node."
@@ -111,6 +153,7 @@
           }
         },
         "required": [
+          "session",
           "from",
           "to"
         ],

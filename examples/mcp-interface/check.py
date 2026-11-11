@@ -114,11 +114,20 @@ def main() -> int:
     # 2. Well-formed MCP tools.
     for t in standard["tools"]:
         assert TOOL_NAME.match(t["name"]), t["name"]
+        seen: set[str] = set()
+        for prop, spec in t["inputSchema"].get("properties", {}).items():
+            header = spec.get("x-mcp-header")
+            if header is None:
+                continue
+            # MCP 2026-07-28: an RFC 9110 token, unique ignoring case, on a primitive top-level property.
+            assert re.fullmatch(r"[!#$%&'*+.^_`|~0-9A-Za-z-]+", header), (t["name"], prop)
+            assert header.lower() not in seen and spec.get("type") in ("string", "integer", "boolean"), (t["name"], prop)
+            seen.add(header.lower())
         for key in ("inputSchema", "outputSchema"):
             if key in t:
                 assert t[key].get("type") == "object", (t["name"], key)
                 jsonschema.Draft202012Validator.check_schema(t[key])
-    print("ok  every tool schema is JSON Schema 2020-12 with type object")
+    print("ok  every tool schema is JSON Schema 2020-12 with type object; x-mcp-header values are valid")
 
     # 3. The valid session agrees with the standard interface.
     valid = json.loads((HERE / "session" / "valid.json").read_text())
