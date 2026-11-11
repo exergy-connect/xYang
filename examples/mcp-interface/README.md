@@ -6,7 +6,7 @@ A toy example of xYang behind an MCP server. One YANG source gives:
 2. **A gate on each call.** The server checks a call's arguments as the rpc's input, with the session so far as context, before running it. A link may only join nodes that an earlier successful call created.
 3. **A record checked against itself.** The same rules check every call in a stored session against the calls before it.
 
-It speaks MCP revision **[2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog)**: no `initialize`, no protocol sessions, version and client information in every request's `_meta`, and `server/discover`. A sample agent drives it over stdio, HTTP/1.1 or HTTP/3, makes a mistake, and repairs it from the structured errors.
+It speaks MCP revision **[2026-07-28](https://modelcontextprotocol.io/specification/2026-07-28/changelog)**: no `initialize`, no protocol sessions, version and client information in every request's `_meta`, and `server/discover`. It runs locally in Python (stdio or HTTP), or as a **Cloudflare Worker** that loads the model from xYang's native JSON and keeps each session in a Durable Object. A sample agent drives either one over stdio, HTTP/1.1 or HTTP/3, makes a mistake, and repairs it from the structured errors.
 
 Plain JSON Schema checks each call alone. In this example, 9 of the 13 invalid sessions pass that check, and xYang rejects all 13.
 
@@ -23,6 +23,7 @@ All names and data are synthetic.
 | [`compile_mcp.py`](compile_mcp.py) | rpcs → `tools/list` tools, in two profiles |
 | [`out/tools-list.json`](out/tools-list.json) | Standard profile: plain JSON Schema, with `x-mcp-header` |
 | [`out/tools-list.xyang.json`](out/tools-list.xyang.json) | xYang profile: the same schemas with `x-yang` kept |
+| [`out/example-topology-tools.yang.json`](out/example-topology-tools.yang.json) | The model as native JSON (`xyang convert`), which the Worker loads: no filesystem and no YANG parsing at runtime |
 | [`session/valid.json`](session/valid.json) | One session's record: seven calls that build a three-node topology and find a path |
 | [`session/invalid/`](session/invalid/) | One mutation of the valid record per rule, made by [`build_fixtures.py`](build_fixtures.py) |
 | [`session/expected-errors.json`](session/expected-errors.json) | The exact xYang errors for every fixture |
@@ -31,7 +32,8 @@ All names and data are synthetic.
 | [`server.py`](server.py) | The MCP server: stdio, or Streamable HTTP with `--http` |
 | [`agent_client.py`](agent_client.py) | The sample agent: stdio, HTTP/1.1, or HTTP/3 |
 | [`h3_dev_server.py`](h3_dev_server.py) | A local HTTP/3 endpoint for testing the agent's HTTP/3 transport (self-signed) |
-| [`test_server.py`](test_server.py), [`test_agent.py`](test_agent.py) | Server rules, one test per error kind; the agent's run over every transport |
+| [`worker/`](worker/) | The Cloudflare Worker: [`src/index.ts`](worker/src/index.ts) (HTTP and routing), [`src/session.ts`](worker/src/session.ts) (one Durable Object per session), [`src/mcp.ts`](worker/src/mcp.ts) (protocol rules), [`wrangler.toml`](worker/wrangler.toml) |
+| [`test_server.py`](test_server.py), [`test_agent.py`](test_agent.py), [`test_http.py`](test_http.py) | Server rules, one test per error kind; the agent's run over every transport; the HTTP rules against any deployment (`MCP_URL`) |
 
 ## Sessions are handles
 
@@ -201,9 +203,50 @@ python examples/mcp-interface/agent_client.py https://127.0.0.1:4433/mcp --insec
 
 `h3_dev_server.py` passes each request to the same Streamable HTTP handler as `server.py --http`, so both apply the same rules. It is for testing only. Behind Cloudflare, HTTP/3 is terminated at the edge. It is a setting on the zone (Speed › Settings › Protocol Optimization, per [Cloudflare's docs](https://developers.cloudflare.com/workers/reference/protocols/)), not something the Worker implements.
 
-## Cloudflare Worker: waiting on #158
+## Cloudflare Worker
 
-A Worker has no filesystem, so it cannot resolve `import example-mcp` from `.yang` text. The natural way to ship the model there is xYang's native `.yang.json`. Today, converting a module that imports another loses imported identity bases and augments onto imported groupings ([#158](https://github.com/exergy-connect/xYang/issues/158)), and this example uses both. The Worker will follow once that is fixed. It will apply the same rules as `server.py --http`, and keep one Durable Object per session handle.
+[`worker/`](worker/) runs the same server on Cloudflare. It applies the same rules and messages as `server.py --http`, and the same HTTP tests pass against both.
+
+- **Model:** `out/example-topology-tools.yang.json`, loaded with `parseJsonSchema` from `@exergy-connect/xyang/browser`. A Worker has no filesystem, so it can't resolve `import example-mcp` from `.yang` text. Native JSON carries the imported identities and the applied augments ([#160](https://github.com/exergy-connect/xYang/pull/160)), so one file is the whole model. `check.py` fails if the file is stale.
+- **Routing:** `server/discover` and `tools/list` are answered by the Worker itself. Each `tools/call` goes to the Durable Object named by its session handle (`idFromName(handle)`). That object holds the session's record and validates the call against it.
+- **Sessions:** `open-session` mints the handle and creates the object. Each call resets an alarm for 24 hours later, and the alarm deletes the record. The objects use SQLite-backed storage (`new_sqlite_classes`).
+- **Size:** the bundle, including xYang and the model, is about 249 KiB (55 KiB gzipped).
+
+Run it locally with Wrangler, which uses the same runtime (workerd) and a local Durable Object:
+
+```bash
+cd examples/mcp-interface/worker
+npm install                  # wrangler, workers-types, and xYang from ../../../ts (build it first: cd ts && npm ci && npm run build)
+npm run dev                  # http://127.0.0.1:8787/mcp
+python ../agent_client.py http://127.0.0.1:8787/mcp
+MCP_URL=http://127.0.0.1:8787/mcp python -m pytest ../test_http.py -q
+npm run check                # type-check, and bundle with a dry-run deploy
+```
+
+After changing the YANG, run `npm run model` to regenerate the native JSON, and `python ../compile_mcp.py ...` for `out/tools-list*.json`.
+
+### Deploy, and HTTP/3
+
+```bash
+npx wrangler login           # or set CLOUDFLARE_API_TOKEN
+npm run deploy               # prints the workers.dev URL
+```
+
+HTTP/3 is not something the Worker implements. Cloudflare terminates QUIC at its edge and passes the Worker an ordinary request. It is a zone setting: **Speed › Settings › Protocol Optimization › HTTP/3 (with QUIC)** ([Cloudflare docs](https://developers.cloudflare.com/workers/reference/protocols/)). So to serve MCP over HTTP/3:
+
+1. Add a route or custom domain on a zone you control, for example in `wrangler.toml`: `routes = [{ pattern = "mcp.example.com", custom_domain = true }]`.
+2. Turn on HTTP/3 for that zone.
+3. Run the agent against it. An `https://` target uses HTTP/3:
+
+```bash
+python examples/mcp-interface/agent_client.py https://mcp.example.com/mcp            # over HTTP/3 (QUIC)
+python examples/mcp-interface/agent_client.py https://mcp.example.com/mcp --http1    # the same, over HTTP/1.1
+MCP_URL=https://mcp.example.com/mcp python -m pytest examples/mcp-interface/test_http.py -q
+```
+
+Whether the `workers.dev` hostname also answers over HTTP/3 depends on Cloudflare's settings for that domain. The docs page above describes the zone setting only. Browser clients need their origin listed in `ALLOWED_ORIGINS` in `wrangler.toml`; agents and CLIs send no `Origin` and are always allowed.
+
+Not tested from here: deployment to Cloudflare and HTTP/3 at Cloudflare's edge. This sandbox can't reach Cloudflare. The local runs above use the real Workers runtime over HTTP/1.1, and the agent's HTTP/3 transport is tested against `h3_dev_server.py`.
 
 ## Run the checks
 
@@ -212,12 +255,12 @@ From the repository root, with Python 3.11 or newer:
 ```bash
 pip install -e . jsonschema pytest aioquic
 cd examples/mcp-interface
-python check.py                                   # model, interface and fixtures
-python -m pytest test_server.py test_agent.py -q  # server rules and the agent's run over every transport
+python check.py                                                 # model, interface and fixtures
+python -m pytest test_server.py test_agent.py test_http.py -q   # server rules, the agent over every transport, HTTP rules
 ```
 
 `check.py` confirms:
-- `out/` matches a fresh compile.
+- `out/` matches a fresh compile and a fresh native JSON conversion.
 - Every tool schema is JSON Schema 2020-12 with `type: object`, and its `x-mcp-header` values follow the spec.
 - The valid session passes the standard interface.
 - xYang gives exactly the expected errors for every fixture, and `xyang-ts` gives the same paths and codes if `ts/dist` is built.
@@ -238,5 +281,6 @@ xyang validate --rpc add-link --context session/valid.json --include-path models
 
 - **The session is the whole world.** A verdict covers the calls in one session's record. It says nothing about state the record does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
 - **The record check grows.** xYang validates the context before each rpc check, and step 4 revalidates the whole record. Both are fine for a demo, but they grow with the session.
-- **Handles are bearer tokens.** The server is unauthenticated, so anyone holding a handle can use its session, as the spec's guidance on handles notes. Sessions live in memory and are dropped after 24 hours without a call.
+- **Handles are bearer tokens.** Both servers are unauthenticated, so anyone holding a handle can use its session, as the spec's guidance on handles notes. Sessions are dropped after 24 hours without a call: from memory in Python, and by a Durable Object alarm in the Worker.
+- **No rate limiting.** The spec says servers MUST rate-limit tool calls. This example doesn't. On Cloudflare, a rate-limiting rule on the route would do it.
 - **Optional MCP fields.** In revision 2026-07-28, a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema` and `annotations`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12. There is no `subscriptions/listen`, since the tool list never changes.

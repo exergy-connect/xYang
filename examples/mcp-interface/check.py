@@ -1,6 +1,7 @@
 """Check the MCP interface example end to end.
 
-1. The checked-in out/tools-list*.json match a fresh compile (no drift).
+1. The checked-in out/tools-list*.json match a fresh compile, and
+   out/example-topology-tools.yang.json (the Worker's model) a fresh `xyang convert`.
 2. Each tool is a well-formed MCP tool whose schemas are valid JSON Schema 2020-12.
 3. Every call in session/valid.json passes the compiled standard interface.
 4. xYang (Python, and TypeScript when ts/dist is built) gives exactly the
@@ -107,9 +108,17 @@ def main() -> int:
         fresh = compile_tools(MODULE, (MODELS,), profile)
         checked_in = json.loads((HERE / "out" / name).read_text())
         assert fresh == checked_in, f"out/{name} is stale: rerun compile_mcp.py"
+    # The Worker loads the model from native JSON; it must be a fresh conversion of the YANG.
+    native = json.loads((HERE / "out" / "example-topology-tools.yang.json").read_text())
+    with tempfile.TemporaryDirectory() as tmp:
+        fresh_path = Path(tmp) / "m.yang.json"
+        subprocess.run([sys.executable, "-m", "xyang", "convert", "--include-path", str(MODELS), str(MODULE),
+                        "-o", str(fresh_path)], check=True, capture_output=True)
+        assert json.loads(fresh_path.read_text()) == native, \
+            "out/example-topology-tools.yang.json is stale: rerun 'npm run model' in worker/"
     standard = json.loads((HERE / "out" / "tools-list.json").read_text())
     tools = {t["name"]: t for t in standard["tools"]}
-    print(f"ok  out/ matches a fresh compile ({len(tools)} tools)")
+    print(f"ok  out/ matches a fresh compile ({len(tools)} tools) and a fresh native JSON conversion")
 
     # 2. Well-formed MCP tools.
     for t in standard["tools"]:
