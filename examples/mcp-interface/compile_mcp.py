@@ -81,35 +81,36 @@ def _self_contained(body: dict[str, Any], defs: dict[str, Any]) -> dict[str, Any
     return out
 
 
-def _http_headers(module_path: Path, include_path: tuple[Path, ...]) -> dict[str, dict[str, str]]:
-    """{rpc: {input leaf: header name}} from mcp:http-header invocations.
+def _http_headers(schema: dict[str, Any]) -> dict[str, dict[str, str]]:
+    """{rpc: {input leaf: header name}} from mcp:http-header invocations in the native JSON.
 
-    Read from the AST with groupings expanded: xYang's JSON Schema does not carry
-    extension invocations.
+    Each invocation is recorded on its property as x-yang.extensions (xYang #162). Its
+    prefix is resolved through the module's own prefix or its x-yang.imports.
     """
-    module = YangParser(expand_uses=True, include_path=include_path).parse_file(module_path)
+    root = schema.get(XYANG, {})
+    modules = {root.get("prefix"): root.get("module")}
+    modules.update({prefix: imp.get("module") for prefix, imp in root.get("imports", {}).items()})
     out: dict[str, dict[str, str]] = {}
-    for rpc in (s for s in module.statements if type(s).__name__ == "YangRpcStmt"):
-        for io in (s for s in rpc.statements if type(s).__name__ == "YangInputStmt"):
-            for leaf in io.statements:
-                for ext in getattr(leaf, "statements", []):
-                    if type(ext).__name__ != "YangExtensionInvocationStmt" or ext.resolved_extension is None:
-                        continue
-                    if (getattr(ext.resolved_module, "name", None), ext.resolved_extension.name) != HTTP_HEADER:
-                        continue
-                    if type(leaf).__name__ != "YangLeafStmt" or not TOKEN.match(ext.argument or ""):
-                        raise ValueError(f"{rpc.name}/{leaf.name}: http-header needs a leaf and a token name")
-                    names = out.setdefault(rpc.name, {})
-                    if (ext.argument or "").lower() in (n.lower() for n in names.values()):
-                        raise ValueError(f"{rpc.name}: duplicate http-header {ext.argument!r}")
-                    names[leaf.name] = ext.argument
+    for rpc, body in root.get("rpcs", {}).items():
+        for leaf, prop in ((body.get("input") or {}).get("properties") or {}).items():
+            for ext in prop.get(XYANG, {}).get("extensions", []):
+                prefix, _, name = ext.get("name", "").partition(":")
+                if (modules.get(prefix), name) != HTTP_HEADER:
+                    continue
+                header = ext.get("argument") or ""
+                if prop.get(XYANG, {}).get("type") != "leaf" or not TOKEN.match(header):
+                    raise ValueError(f"{rpc}/{leaf}: http-header needs a leaf and a token name")
+                names = out.setdefault(rpc, {})
+                if header.lower() in (n.lower() for n in names.values()):
+                    raise ValueError(f"{rpc}: duplicate http-header {header!r}")
+                names[leaf] = header
     return out
 
 
 def compile_tools(module_path: Path, include_path: tuple[Path, ...], profile: str) -> dict[str, Any]:
-    headers = _http_headers(module_path, include_path)
     module = YangParser(expand_uses=False, include_path=include_path).parse_file(module_path)
     schema = generate_json_schema(module)
+    headers = _http_headers(schema)
     rpcs: dict[str, Any] = schema.get(XYANG, {}).get("rpcs", {})
     defs: dict[str, Any] = schema.get("$defs", {})
     descriptions = {

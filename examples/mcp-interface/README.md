@@ -90,7 +90,7 @@ One rule can't move into the grouping: "a path contains its `from` and `to`" com
 | `mcp:http-header "Session"` | `"x-mcp-header": "Session"`, checked against the spec's rules (a token, unique ignoring case, on a string, integer or boolean property) |
 | `must`, `when`, `leafref` | `x-yang` (xYang profile only; generic validators ignore it). The cross-call rules travel here too, so an xYang-aware client can check a call against its own copy of the session before sending it. |
 
-xYang's JSON Schema does not carry extension invocations, so the compiler reads `mcp:http-header` from the parsed YANG.
+The compiler reads `mcp:http-header` from the extension invocations xYang records in the JSON (`x-yang.extensions`, [#162](https://github.com/exergy-connect/xYang/pull/162)), resolving its prefix through `x-yang.imports`.
 
 ## Rules
 
@@ -210,7 +210,7 @@ python examples/mcp-interface/agent_client.py https://127.0.0.1:4433/mcp --insec
 - **Model:** `out/example-topology-tools.yang.json`, loaded with `parseJsonSchema` from `@exergy-connect/xyang/browser`. A Worker has no filesystem, so it can't resolve `import example-mcp` from `.yang` text. Native JSON carries the imported identities and the applied augments ([#160](https://github.com/exergy-connect/xYang/pull/160)), so one file is the whole model. `check.py` fails if the file is stale.
 - **Routing:** `server/discover` and `tools/list` are answered by the Worker itself. Each `tools/call` goes to the Durable Object named by its session handle (`idFromName(handle)`). That object holds the session's record and validates the call against it.
 - **Sessions:** `open-session` mints the handle and creates the object. Each call resets an alarm for 24 hours later, and the alarm deletes the record. The objects use SQLite-backed storage (`new_sqlite_classes`).
-- **Size:** the bundle, including xYang and the model, is about 249 KiB (55 KiB gzipped).
+- **Size:** the bundle, including xYang and the model, is about 256 KiB (56 KiB gzipped).
 
 Run it locally with Wrangler, which uses the same runtime (workerd) and a local Durable Object:
 
