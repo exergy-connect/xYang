@@ -72,10 +72,14 @@ module example-mcp {
         description "params.name of the request, as a tool identity. An undeclared tool is rejected here.";
       }
       container arguments {
+        must "count(*) = 1" {
+          error-message "arguments must hold exactly one container: the one for the called tool.";
+        }
         description
-          "params.arguments. Tool modules augment one container per tool and
-           refine this node to require exactly one of them. A call carries the
-           called tool's container, even when it is empty.";
+          "params.arguments. Tool modules augment one container per tool. A call
+           carries the called tool's container, even when it is empty, so a
+           missing or extra one is caught here without this module knowing
+           which tools exist.";
       }
       container result {
         description "Outcome of the call.";

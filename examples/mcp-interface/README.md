@@ -22,6 +22,8 @@ All names and data are synthetic.
 | [`session/invalid/`](session/invalid/) | One mutation of the valid session per rule, made by [`build_fixtures.py`](build_fixtures.py) |
 | [`session/expected-errors.json`](session/expected-errors.json) | The exact xYang errors for every fixture |
 | [`check.py`](check.py) | End-to-end check (see below) |
+| [`server.py`](server.py) | A minimal MCP server over stdio that checks every `tools/call` with xYang before running it |
+| [`test_server.py`](test_server.py) | One test per error kind, plus a stdio round trip |
 
 ## How one tool is declared
 
@@ -61,7 +63,7 @@ Rules about one call's own arguments, such as "no self-loop", sit in the groupin
 | Rule | Where | Fixture |
 | --- | --- | --- |
 | A call names a declared tool | `tool` is an identityref with base `mcp:tool` | `undeclared-tool` |
-| A call carries exactly its own tool's arguments | `when` on each argument container; a `refine` counts them | `arguments-for-other-tool`, `missing-arguments` |
+| A call carries exactly its own tool's arguments | base: `count(*) = 1` on `arguments`; tools: `when` on each argument container | `arguments-for-other-tool`, `missing-arguments` |
 | A node name is added successfully at most once | `add-node/name` | `duplicate-node` |
 | A link joins two different nodes | grouping: `target != source` | `self-loop` |
 | Link ends, path ends and path hops are nodes that an earlier successful `add-node` created | `must` joins on `id <` and `status = 'ok'` | `hallucinated-link-target`, `link-before-node`, `link-to-failed-node`, `hallucinated-path-hop` |
@@ -87,9 +89,41 @@ cd examples/mcp-interface && python check.py
 
 `check.py` confirms that `out/` matches a fresh compile, that every tool schema is JSON Schema 2020-12 with `type: object`, and that the valid session passes the standard interface. It then confirms that xYang gives exactly the expected errors for every fixture. If `ts/dist` is built, it also checks that `xyang-ts` reports the same paths and codes.
 
+## The server and its errors
+
+`server.py` handles `initialize`, `ping`, `tools/list` and `tools/call` as JSON-RPC 2.0, one message per line on stdin and stdout. It needs no MCP SDK. It keeps one session record. For each `tools/call`, it appends the call to a copy of the record and validates the whole record with xYang. The call runs and is kept only if the record stays valid, so the record is always a valid session.
+
+Errors follow MCP 2025-11-25, ["Error Handling"](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#error-handling): problems the model can fix come back as a result with `isError: true`, and malformed requests come back as JSON-RPC errors.
+
+| Situation | Response | Recorded? |
+| --- | --- | --- |
+| Line is not JSON | JSON-RPC error `-32700` | no |
+| Not a JSON-RPC 2.0 request | `-32600` | no |
+| Unknown method | `-32601` | no |
+| Unknown tool, missing `name`, `arguments` not an object | `-32602`, for example `Unknown tool: delete-node` | no |
+| Arguments break the tool's schema or a session rule | result, `isError: true`: one line per argument and what is wrong, ending "Fix the arguments and call the tool again." The same errors as data in `_meta["xyang/errors"]` | no |
+| Valid arguments, but the tool cannot do it (no path) | result, `isError: true`, for example `find-path failed: no path from r1 to h2 within 8 hops` | yes, `status: error` |
+| The server's own result breaks the model | `-32603`, with the errors in `error.data` | no |
+| Success | result with `structuredContent` when the tool has an `outputSchema`, and the same JSON as text | yes |
+
+Example: an agent links `r1` to a node it never created.
+
+```json
+{"jsonrpc": "2.0", "id": 3, "result": {
+  "content": [{"type": "text", "text": "add-link was not run: its arguments break 1 rule.\n- arguments.target: target must name a node that an earlier successful add-node call created.\nFix the arguments and call the tool again."}],
+  "isError": true,
+  "_meta": {"xyang/errors": [{"path": "arguments.target", "code": "must", "message": "target must name a node that an earlier successful add-node call created."}]}}}
+```
+
+Error paths are relative to the call (`arguments.target`, `result.hop.1`), not to the session record.
+
+```bash
+python examples/mcp-interface/server.py                    # serve on stdio
+python -m pytest examples/mcp-interface/test_server.py -q  # 19 tests
+```
+
 ## Limits
 
 - **The session is the whole world.** A verdict covers the calls in this document. It says nothing about server state the document does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
-- **One call alone.** The xYang profile carries a tool's own `must` rules in `x-yang`. xYang does not yet validate rpc input instances directly (FEATURES.md, "rpc"), so this example checks calls inside a session document.
-- **No `*` node test yet.** The base module should say "exactly one argument container" as `count(*) = 1`. xYang's XPath does not support `*` yet ([#148](https://github.com/exergy-connect/xYang/issues/148)), so the tools module restates the rule with its own tool names in a `refine`.
+- **One call alone.** The xYang profile carries a tool's own `must` rules in `x-yang`. xYang does not yet validate rpc input instances directly ([#149](https://github.com/exergy-connect/xYang/issues/149)), so the server checks each call inside its session record. It revalidates the whole record on every call, which is fine for a demo but grows with the session.
 - **Optional MCP fields.** In MCP revision [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations` and `execution`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`; the other four are optional and left out. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12.

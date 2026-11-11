@@ -1,0 +1,254 @@
+"""A minimal MCP server for the topology tools, checked by xYang.
+
+Speaks JSON-RPC 2.0 over stdio, one JSON message per line, and handles
+initialize, ping, tools/list and tools/call. No MCP SDK is needed.
+
+Each tools/call is appended to the server's session record as a candidate and
+the whole record is validated against example-topology-tools. A call is
+executed and kept only if the record stays valid, so the record is always a
+valid session (see session/valid.json for the shape).
+
+Errors follow MCP 2025-11-25, "Tools > Error Handling":
+
+  Protocol errors (JSON-RPC "error", the call is not run):
+    -32700  the line is not JSON
+    -32600  not a JSON-RPC 2.0 request
+    -32601  unknown method
+    -32602  malformed tools/call params, or an unknown tool
+    -32603  the server produced a result its own model rejects
+
+  Tool execution errors (a normal "result" with "isError": true):
+    - the arguments fail the tool's inputSchema or a session rule. The text
+      names each argument and says what is wrong, so the model can retry.
+      "_meta" carries the same errors as data. The call is not recorded.
+    - the arguments are valid but the tool cannot do it (find-path finds no
+      path). The call is recorded with status "error".
+
+Run:  python server.py        (reads requests on stdin)
+"""
+
+from __future__ import annotations
+
+import copy
+import json
+import sys
+from collections import deque
+from pathlib import Path
+from typing import Any
+
+from xyang import YangValidator, parse_yang_file
+
+from compile_mcp import compile_tools
+
+HERE = Path(__file__).resolve().parent
+MODELS = HERE / "models"
+MODULE_PATH = MODELS / "example-topology-tools@2026-11-11.yang"
+MODULE = "example-topology-tools"
+ROOT = f"{MODULE}:session"
+PROTOCOL_VERSION = "2025-11-25"
+SERVER_INFO = {"name": "topology-builder", "version": "0.1.0"}
+ERRORS_META_KEY = "xyang/errors"
+
+PARSE_ERROR = -32700
+INVALID_REQUEST = -32600
+METHOD_NOT_FOUND = -32601
+INVALID_PARAMS = -32602
+INTERNAL_ERROR = -32603
+
+
+class ToolFailed(Exception):
+    """The arguments were valid, but the tool could not do what was asked."""
+
+
+class ProtocolError(Exception):
+    def __init__(self, code: int, message: str, data: Any = None) -> None:
+        super().__init__(message)
+        self.code, self.message, self.data = code, message, data
+
+
+class TopologyServer:
+    def __init__(self, caller: str = "stdio-client", snapshot: str = "0" * 64) -> None:
+        self.validator = YangValidator(parse_yang_file(MODULE_PATH, include_path=(str(MODELS),)))
+        self.tools = {t["name"]: t for t in compile_tools(MODULE_PATH, (MODELS,), "standard")["tools"]}
+        self.session: dict[str, Any] = {
+            ROOT: {
+                "protocol-version": PROTOCOL_VERSION,
+                "server": dict(SERVER_INFO),
+                "view": {"caller": caller, "snapshot": snapshot},
+                "call": [],
+            }
+        }
+        self.next_id = 1
+
+    # ---- JSON-RPC ---------------------------------------------------------
+
+    def handle_line(self, line: str) -> dict[str, Any] | None:
+        try:
+            message = json.loads(line)
+        except json.JSONDecodeError as e:
+            return _error(None, PARSE_ERROR, f"Parse error: {e.msg}")
+        return self.handle(message)
+
+    def handle(self, message: Any) -> dict[str, Any] | None:
+        if not isinstance(message, dict) or message.get("jsonrpc") != "2.0" or not isinstance(message.get("method"), str):
+            rid = message.get("id") if isinstance(message, dict) else None
+            return _error(rid, INVALID_REQUEST, "Invalid request: expected a JSON-RPC 2.0 request object")
+        if "id" not in message:
+            return None  # notification, e.g. notifications/initialized
+        rid, method, params = message["id"], message["method"], message.get("params") or {}
+        try:
+            if method == "initialize":
+                result = {
+                    "protocolVersion": PROTOCOL_VERSION,
+                    "capabilities": {"tools": {"listChanged": False}},
+                    "serverInfo": dict(SERVER_INFO),
+                }
+            elif method == "ping":
+                result = {}
+            elif method == "tools/list":
+                result = {"tools": list(self.tools.values())}
+            elif method == "tools/call":
+                result = self.call_tool(params)
+            else:
+                raise ProtocolError(METHOD_NOT_FOUND, f"Method not found: {method}")
+        except ProtocolError as e:
+            return _error(rid, e.code, e.message, e.data)
+        return {"jsonrpc": "2.0", "id": rid, "result": result}
+
+    # ---- tools/call -------------------------------------------------------
+
+    def call_tool(self, params: Any) -> dict[str, Any]:
+        if not isinstance(params, dict):
+            raise ProtocolError(INVALID_PARAMS, "Invalid params: expected an object")
+        name = params.get("name")
+        if not isinstance(name, str):
+            raise ProtocolError(INVALID_PARAMS, "Invalid params: 'name' must be a string")
+        if name not in self.tools:
+            raise ProtocolError(INVALID_PARAMS, f"Unknown tool: {name}")
+        arguments = params.get("arguments", {})
+        if not isinstance(arguments, dict):
+            raise ProtocolError(INVALID_PARAMS, "Invalid params: 'arguments' must be an object")
+
+        call_id = self.next_id
+        call = {"id": call_id, "tool": f"{MODULE}:{name}", "arguments": {name: copy.deepcopy(arguments)}}
+
+        # 1. Check the arguments against the tool and every earlier call.
+        candidate = self._with_call(call | {"result": {"status": "ok"}})
+        errors = self._errors(candidate)
+        if errors:
+            return _tool_error(name, errors)
+
+        # 2. Run the tool. The model already guarantees the arguments make sense.
+        try:
+            structured = self._execute(name, arguments)
+        except ToolFailed as e:
+            # A business-logic failure: record it, and tell the model.
+            self.session = self._with_call(call | {"result": {"status": "error", "message": str(e)}})
+            self.next_id += 1
+            return {"content": [{"type": "text", "text": f"{name} failed: {e}"}], "isError": True}
+
+        # 3. Check what the server is about to return, then keep the call.
+        result: dict[str, Any] = {"status": "ok"}
+        if name == "find-path":
+            result["find-path"] = structured
+        recorded = self._with_call(call | {"result": result})
+        server_errors = self._errors(recorded)
+        if server_errors:
+            raise ProtocolError(INTERNAL_ERROR, f"Internal error: {name} produced a result the model rejects",
+                                {ERRORS_META_KEY: server_errors})
+        self.session = recorded
+        self.next_id += 1
+        return _tool_ok(structured)
+
+    def _with_call(self, call: dict[str, Any]) -> dict[str, Any]:
+        doc = copy.deepcopy(self.session)
+        doc[ROOT]["call"].append(call)
+        return doc
+
+    def _errors(self, doc: dict[str, Any]) -> list[dict[str, str]]:
+        """xYang errors, with paths made relative to the newest call where possible."""
+        index = len(doc[ROOT]["call"]) - 1
+        name = doc[ROOT]["call"][-1]["tool"].split(":", 1)[1]
+        prefixes = {
+            f"/{ROOT}/call/{index}/arguments/{name}": "arguments",
+            f"/{ROOT}/call/{index}/arguments": "arguments",
+            f"/{ROOT}/call/{index}/result/{name}": "result",
+            f"/{ROOT}/call/{index}": "call",
+        }
+        out = []
+        for e in self.validator.validate_detailed(doc)["errors"]:
+            where = e["path"]
+            for prefix, label in prefixes.items():
+                if where == prefix or where.startswith(prefix + "/"):
+                    rest = where[len(prefix):].lstrip("/").replace("/", ".")
+                    where = f"{label}.{rest}" if rest else label
+                    break
+            out.append({"path": where, "code": e["code"], "message": e["message"]})
+        return out
+
+    def _execute(self, name: str, args: dict[str, Any]) -> dict[str, Any] | None:
+        calls = self.session[ROOT]["call"]
+        if name == "add-node":
+            return {"name": args["name"]}
+        if name == "add-link":
+            return None
+        # find-path: breadth-first search over the links added so far.
+        neighbours: dict[str, set[str]] = {}
+        for c in calls:
+            link = c["arguments"].get("add-link")
+            if link:
+                neighbours.setdefault(link["source"], set()).add(link["target"])
+                neighbours.setdefault(link["target"], set()).add(link["source"])
+        start, goal, limit = args["from"], args["to"], args.get("max-hops", 8)
+        queue, seen = deque([[start]]), {start}
+        while queue:
+            path = queue.popleft()
+            if path[-1] == goal:
+                return {"hop": path}
+            if len(path) - 1 < limit:
+                for nxt in sorted(neighbours.get(path[-1], ())):
+                    if nxt not in seen:
+                        seen.add(nxt)
+                        queue.append(path + [nxt])
+        raise ToolFailed(f"no path from {start} to {goal} within {limit} hops")
+
+
+def _error(rid: Any, code: int, message: str, data: Any = None) -> dict[str, Any]:
+    err: dict[str, Any] = {"code": code, "message": message}
+    if data is not None:
+        err["data"] = data
+    return {"jsonrpc": "2.0", "id": rid, "error": err}
+
+
+def _tool_ok(structured: dict[str, Any] | None) -> dict[str, Any]:
+    if structured is None:
+        return {"content": [{"type": "text", "text": "ok"}]}
+    # Structured result plus the same JSON as text, for older clients (MCP 2025-11-25, "Structured Content").
+    return {"content": [{"type": "text", "text": json.dumps(structured)}], "structuredContent": structured}
+
+
+def _tool_error(name: str, errors: list[dict[str, str]]) -> dict[str, Any]:
+    lines = [f"{name} was not run: its arguments break {len(errors)} rule{'s' if len(errors) != 1 else ''}."]
+    lines += [f"- {e['path']}: {e['message']}" for e in errors]
+    lines.append("Fix the arguments and call the tool again.")
+    return {
+        "content": [{"type": "text", "text": "\n".join(lines)}],
+        "isError": True,
+        "_meta": {ERRORS_META_KEY: errors},
+    }
+
+
+def main() -> int:
+    server = TopologyServer()
+    for line in sys.stdin:
+        if not line.strip():
+            continue
+        response = server.handle_line(line)
+        if response is not None:
+            sys.stdout.write(json.dumps(response) + "\n")
+            sys.stdout.flush()
+    return 0
+
+
+if __name__ == "__main__":
+    raise SystemExit(main())

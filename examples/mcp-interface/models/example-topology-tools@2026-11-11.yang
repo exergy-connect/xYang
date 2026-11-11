@@ -97,13 +97,7 @@ module example-topology-tools {
   container session {
     presence "One side's record of an MCP session with this server.";
     description "A session of calls to the topology tools.";
-    uses mcp:session {
-      refine "call/arguments" {
-        must "count(add-node) + count(add-link) + count(find-path) = 1" {
-          error-message "arguments must hold exactly one container: the one for the called tool.";
-        }
-      }
-    }
+    uses mcp:session;
   }
 
   augment "/topo:session/topo:call/topo:arguments" {
