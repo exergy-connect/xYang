@@ -60,6 +60,31 @@ TypeScript has none. The three Python skips are the same (Huawei directory unset
 14 ms; validating one projected graph takes about 0.19 s, and almost every test validates one.
 Speeding that up is a validator change, which is out of scope here.
 
+## Ontology tests run on release
+
+The 400-case target is still not met. The logical count is unchanged at 1,495, and the 93
+ontology tests stay inside it.
+
+Pull requests and pushes no longer run them. `tests.yml` passes `-m "not ontology"` (69 Python
+items deselected, not skipped). `npm test` excludes `test/ontology_audit_example.test.ts` (24
+TypeScript tests). Nothing else is deselected: the same command still runs the other 1,051
+passing Python tests, the Huawei skip, and the two xfails.
+
+| | consolidation head, before this split | pull-request CI after it |
+|---|---:|---:|
+| Logical cases | 1,495 | 1,495 |
+| CI executions per PR | 8,867 | 8,474 |
+| `pytest -q -m "not ontology" -W error::DeprecationWarning` | (not used; full `pytest -q` was 33.9 / 34.5 s) | 9.75 / 9.40 s: 1051 passed, 1 skipped, 69 deselected, 2 xfailed |
+| `npm test` | 999 passed, 1 skipped, about 7.5 s | 975 passed, 1 skipped, 7.33 s |
+
+A published release (`release: published`, the event used by the PyPI, npm, artifact, QuickJS,
+and benchmark workflows) runs the 93 ontology tests once: 69 Python and 24 TypeScript.
+`workflow_dispatch` runs the same jobs and publishes nothing. With the optional tools installed,
+the Python file was 69 passed and 0 skipped in 29.1 s. `npm run test:ontology` was 24 passed in
+1.0 s. The release job fails if the Python run skips anything, so a missing pyang or OWL RL
+install does not pass. Those two checks no longer show up as skips in pull-request pytest,
+because the whole file is deselected there.
+
 ## What changed
 
 - **Mirrored tests moved into shared cases.** When a Python test and its TypeScript twin only

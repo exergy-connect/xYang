@@ -10,6 +10,10 @@ items count individually. Collection only: runtime skips (missing optional tools
 show up in the runners' own ``-rs`` output, not here.
 
 The TypeScript count needs ``ts/node_modules`` (``cd ts && npm ci``).
+
+Ontology example tests stay in the logical count. Pull-request CI deselects them
+(``pytest -m "not ontology"``, ``npm test`` excludes the TypeScript file) and a published
+release runs them; those two execution totals are printed separately.
 """
 
 from __future__ import annotations
@@ -31,15 +35,16 @@ SHARED_TS = "test/cases.test.ts"
 
 class _Collector:
     def __init__(self) -> None:
-        self.items: list[tuple[str, bool]] = []
+        self.items: list[tuple[str, bool, bool]] = []
 
     def pytest_collection_finish(self, session) -> None:
         for item in session.items:
             xfail = item.get_closest_marker("xfail") is not None
-            self.items.append((item.nodeid, xfail))
+            ontology = item.get_closest_marker("ontology") is not None
+            self.items.append((item.nodeid, xfail, ontology))
 
 
-def python_items() -> list[tuple[str, bool]]:
+def python_items() -> list[tuple[str, bool, bool]]:
     collector = _Collector()
     args = ["--collect-only", "-p", "no:cacheprovider", "-p", "no:terminal", str(ROOT / "tests")]
     code = pytest.main(args, plugins=[collector])
@@ -66,12 +71,39 @@ def shared_instances() -> set[str]:
     return out
 
 
-def _workflow_matrix_size(name: str, job: str) -> int:
+def _workflow(name: str) -> dict:
     import yaml
 
-    wf = yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text())
-    matrix = wf["jobs"][job]["strategy"]["matrix"]
+    loaded = yaml.safe_load((ROOT / ".github" / "workflows" / name).read_text())
+    # PyYAML treats the YAML 1.1 key `on` as True.
+    if True in loaded and "on" not in loaded:
+        loaded["on"] = loaded.pop(True)
+    return loaded
+
+
+def _workflow_matrix_size(name: str, job: str) -> int:
+    matrix = _workflow(name)["jobs"][job]["strategy"]["matrix"]
     return len(matrix.get("include") or next(iter(matrix.values())))
+
+
+def _job_script(name: str, job: str) -> str:
+    return "\n".join(step.get("run", "") for step in _workflow(name)["jobs"][job].get("steps") or [])
+
+
+def _release_runs_ontology() -> bool:
+    """True when Ontology example runs on ``release: published`` and executes both suites."""
+    wf = _workflow("ontology-example.yml")
+    event = wf.get("on") or {}
+    types = (event.get("release") or {}).get("types") or []
+    if "published" not in types or "pull_request" in event or "push" in event:
+        return False
+    python = _job_script("ontology-example.yml", "python")
+    typescript = _job_script("ontology-example.yml", "typescript")
+    return (
+        "tests/test_ontology_hypergraph.py" in python
+        and "requirements-tools.txt" in python
+        and "test:ontology" in typescript
+    )
 
 
 def inventory() -> dict:
@@ -79,10 +111,17 @@ def inventory() -> dict:
     ts = ts_items()
     shared = shared_instances()
 
-    py_shared = {nid.split("[", 1)[1][: -1].split(":", 1)[1] for nid, _ in py if nid.startswith(SHARED_PY + "::")}
+    py_shared = {nid.split("[", 1)[1][: -1].split(":", 1)[1] for nid, _, _ in py if nid.startswith(SHARED_PY + "::")}
     ts_shared_n = sum(1 for f, _ in ts if f == SHARED_TS)
-    py_other = [(nid, x) for nid, x in py if not nid.startswith(SHARED_PY + "::")]
+    py_other = [(nid, x) for nid, x, _ in py if not nid.startswith(SHARED_PY + "::")]
     ts_other = [(f, n) for f, n in ts if f != SHARED_TS]
+    ontology_py = sum(1 for _, _, ontology in py if ontology)
+    package = json.loads((ROOT / "ts" / "package.json").read_text())
+    pr_test_script = package["scripts"]["test"]
+    ontology_ts_file = "test/ontology_audit_example.test.ts"
+    ontology_ts = sum(1 for f, _ in ts if f == ontology_ts_file)
+    pr_excludes_ontology_ts = ontology_ts_file in pr_test_script and "--exclude" in pr_test_script
+    pr_excludes_ontology_py = '-m "not ontology"' in _job_script("tests.yml", "pytest")
 
     if py_shared != shared or ts_shared_n != len(shared):
         raise SystemExit(
@@ -90,8 +129,17 @@ def inventory() -> dict:
             f"python {len(py_shared)}, typescript {ts_shared_n}"
         )
 
+    if not pr_excludes_ontology_py or not pr_excludes_ontology_ts or not _release_runs_ontology():
+        raise SystemExit(
+            "ontology routing drifted: "
+            f"pytest deselects={pr_excludes_ontology_py}, npm test excludes={pr_excludes_ontology_ts}, "
+            f"release runs both={_release_runs_ontology()}"
+        )
+
     py_matrix = _workflow_matrix_size("tests.yml", "pytest")
     ts_matrix = _workflow_matrix_size("tests-ts.yml", "test")
+    pr_py = len(py) - ontology_py
+    pr_ts = len(ts) - ontology_ts
     return {
         "logical": {
             "total": len(shared) + len(py_other) + len(ts_other),
@@ -101,14 +149,22 @@ def inventory() -> dict:
         },
         "runner_items": {"python": len(py), "typescript": len(ts)},
         "expected_failures": {
-            "python": sum(1 for _, x in py if x),
+            "python": sum(1 for _, x, _ in py if x),
             "typescript": sum(1 for _, n in ts if "(xfail:" in n),
         },
+        "ontology_release_only": {"python": ontology_py, "typescript": ontology_ts},
         "ci_executions_per_pr": {
-            "python_matrix": f"{py_matrix} x {len(py)}",
-            "node_matrix": f"{ts_matrix} x {len(ts)}",
+            "python_matrix": f"{py_matrix} x {pr_py}",
+            "node_matrix": f"{ts_matrix} x {pr_ts}",
             "conformance_jobs": f"2 x {len(shared)} (shared cases again, outside the matrices)",
-            "total": py_matrix * len(py) + ts_matrix * len(ts) + 2 * len(shared),
+            "ontology_not_included": ontology_py + ontology_ts,
+            "total": py_matrix * pr_py + ts_matrix * pr_ts + 2 * len(shared),
+        },
+        "ci_executions_per_release": {
+            "event": "release: published",
+            "ontology_python": ontology_py,
+            "ontology_typescript": ontology_ts,
+            "total": ontology_py + ontology_ts,
         },
         "python_by_file": collections.Counter(nid.split("::", 1)[0] for nid, _ in py_other),
         "typescript_by_file": collections.Counter(f for f, _ in ts_other),
@@ -124,15 +180,20 @@ def main(argv: list[str] | None = None) -> int:
     if args.json:
         print(json.dumps(inv, indent=2))
         return 0
-    lg, ri, xf, ci = inv["logical"], inv["runner_items"], inv["expected_failures"], inv["ci_executions_per_pr"]
+    lg, ri, xf = inv["logical"], inv["runner_items"], inv["expected_failures"]
+    ci, rel, ont = inv["ci_executions_per_pr"], inv["ci_executions_per_release"], inv["ontology_release_only"]
     print(f"logical cases        {lg['total']}")
     print(f"  shared instances   {lg['shared_instances']}  (tests/cases, run by both runtimes)")
     print(f"  python only        {lg['python_only']}")
     print(f"  typescript only    {lg['typescript_only']}")
     print(f"runner items         python {ri['python']}, typescript {ri['typescript']}")
     print(f"expected failures    python {xf['python']}, typescript {xf['typescript']}")
+    print(f"ontology, release    python {ont['python']}, typescript {ont['typescript']}  "
+          f"(counted above; not run on pull requests)")
     print(f"CI executions per PR {ci['total']}  (python {ci['python_matrix']}, node {ci['node_matrix']}, "
           f"conformance {ci['conformance_jobs']})")
+    print(f"CI executions per release ({rel['event']}) {rel['total']}  "
+          f"(ontology python {rel['ontology_python']}, typescript {rel['ontology_typescript']})")
     if args.by_file:
         for key in ("python_by_file", "typescript_by_file"):
             print(f"\n{key.replace('_', ' ')}:")

@@ -18,7 +18,29 @@ python tests/inventory.py --by-file  # plus runtime-specific counts per file
 The script reads the runners' own collection (`pytest --collect-only`, `vitest list`) and the
 `case.json` files; there is no list to keep up to date. A shared instance counts once, although
 both runtimes run it. Every other collected pytest item or vitest test counts once for its
-runtime. CI prints the summary in the Python 3.13 job.
+runtime. CI prints the summary in the Python 3.13 job. Ontology tests are in that count and are
+reported again as release-only executions, so they are not inside the per-PR total.
+
+## Ontology example
+
+Pull requests and pushes do not run these tests. The pytest matrix uses `-m "not ontology"`,
+and `npm test` excludes `test/ontology_audit_example.test.ts`.
+
+A published release runs them. The event is `release: published`, the same event as Publish to
+PyPI, Publish to npm, Release TypeScript artifacts, QuickJS release, and Benchmark
+([`.github/workflows/ontology-example.yml`](../.github/workflows/ontology-example.yml)). The
+Python job installs `examples/ontology-hypergraph/requirements-tools.txt` and fails if any test
+is skipped, so the pyang and OWL RL checks run. The TypeScript job runs `npm run test:ontology`.
+A failure fails that workflow on the release. `workflow_dispatch` runs the same two jobs and
+publishes nothing.
+
+Locally, any time:
+
+```bash
+pytest -m ontology
+pip install -r examples/ontology-hypergraph/requirements-tools.txt   # pyang and owlrl checks
+cd ts && npm run test:ontology
+```
 
 ## Adding a test
 

@@ -15,6 +15,8 @@ from urllib.parse import urlsplit
 
 import pytest
 
+pytestmark = pytest.mark.ontology
+
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "ontology-hypergraph"
 sys.path.insert(0, str(EXAMPLE))
 spec = importlib.util.spec_from_file_location("ontology_collector", EXAMPLE / "collector.py")
