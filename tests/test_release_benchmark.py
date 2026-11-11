@@ -115,8 +115,8 @@ def test_memory_processes_are_separate_from_timing(monkeypatch: pytest.MonkeyPat
         lambda d: d.__setitem__("schema_version", 99),
         lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["timing"].__setitem__("iterations", 7),
         lambda d: d["results"]["python"]["workloads"]["small"]["validate"]["timing"]["time_ms"].__setitem__("median", -1),
-        # operations_per_process and warmup_per_process share one schema check; keep one.
         lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["memory"].__setitem__("operations_per_process", 30),
+        lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["memory"].__setitem__("warmup_per_process", 5),
         lambda d: d["results"]["python"]["workloads"]["small"]["parse"]["timing"].__setitem__("peak_rss_mib", {}),
         lambda d: d["results"]["python"]["workloads"]["small"]["parse"].pop("memory"),
         lambda d: d["results"]["python"]["workloads"].pop("small"),

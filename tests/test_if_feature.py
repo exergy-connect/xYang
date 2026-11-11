@@ -41,7 +41,6 @@ def _parse(yang: str, source_path: Path) -> YangModule:
 
 
 def test_if_feature_on_leaf_stores_expression(yang_source: Path) -> None:
-    """Plain and braced ``if-feature`` on a leaf store the expression."""
     yang = """
 module m {
   yang-version 1.1;
@@ -49,14 +48,54 @@ module m {
   prefix x;
 
   feature f;
-  feature baz;
 
   leaf a {
     if-feature "f";
     type string;
   }
+}
+"""
+    mod = _parse(yang, yang_source)
+    leaf = mod.find_statement("a")
+    assert isinstance(leaf, YangLeafStmt)
+    assert leaf.if_features == ["f"]
 
-  leaf b {
+
+def test_if_feature_braced_with_description(yang_source: Path) -> None:
+    yang = """
+module m {
+  yang-version 1.1;
+  namespace "urn:test:if-feature";
+  prefix x;
+
+  feature bar;
+
+  container c {
+    if-feature "bar" {
+      description "needs bar";
+    }
+    leaf x {
+      type string;
+    }
+  }
+}
+"""
+    mod = _parse(yang, yang_source)
+    c = mod.find_statement("c")
+    assert isinstance(c, YangContainerStmt)
+    assert c.if_features == ["bar"]
+
+
+def test_if_feature_braced_with_reference(yang_source: Path) -> None:
+    yang = """
+module m {
+  yang-version 1.1;
+  namespace "urn:test:if-feature";
+  prefix x;
+
+  feature baz;
+
+  leaf L {
     if-feature "baz" {
       description "d";
       reference "RFC 7950";
@@ -66,12 +105,9 @@ module m {
 }
 """
     mod = _parse(yang, yang_source)
-    leaf_a = mod.find_statement("a")
-    assert isinstance(leaf_a, YangLeafStmt)
-    assert leaf_a.if_features == ["f"]
-    leaf_b = mod.find_statement("b")
-    assert isinstance(leaf_b, YangLeafStmt)
-    assert leaf_b.if_features == ["baz"]
+    leaf = mod.find_statement("L")
+    assert isinstance(leaf, YangLeafStmt)
+    assert leaf.if_features == ["baz"]
 
 
 def test_multiple_if_feature_and_on_same_node(yang_source: Path) -> None:
@@ -98,43 +134,46 @@ module m {
     assert leaf.if_features == ["p", "q"]
 
 
-def test_if_feature_on_container_leaf_list_and_list(yang_source: Path) -> None:
-    """``if-feature`` is stored on container, leaf-list, and list (including braced form)."""
+def test_if_feature_on_leaf_list(yang_source: Path) -> None:
     yang = """
 module m {
   yang-version 1.1;
   namespace "urn:test:if-feature";
   prefix x;
 
-  feature c;
   feature fl;
-  feature lst;
 
-  container root {
-    if-feature "c" {
-      description "needs c";
-    }
-    leaf-list tags {
-      if-feature "fl";
-      type string;
-    }
-    list items {
-      if-feature "lst";
-      key "id";
-      leaf id { type string; }
-      leaf val { type uint8; }
-    }
+  leaf-list tags {
+    if-feature "fl";
+    type string;
   }
 }
 """
     mod = _parse(yang, yang_source)
-    root = mod.find_statement("root")
-    assert isinstance(root, YangContainerStmt)
-    assert root.if_features == ["c"]
-    ll = root.find_statement("tags")
+    ll = mod.find_statement("tags")
     assert isinstance(ll, YangLeafListStmt)
     assert ll.if_features == ["fl"]
-    lst = root.find_statement("items")
+
+
+def test_if_feature_on_list(yang_source: Path) -> None:
+    yang = """
+module m {
+  yang-version 1.1;
+  namespace "urn:test:if-feature";
+  prefix x;
+
+  feature lst;
+
+  list items {
+    if-feature "lst";
+    key "id";
+    leaf id { type string; }
+    leaf val { type uint8; }
+  }
+}
+"""
+    mod = _parse(yang, yang_source)
+    lst = mod.find_statement("items")
     assert isinstance(lst, YangListStmt)
     assert lst.if_features == ["lst"]
 

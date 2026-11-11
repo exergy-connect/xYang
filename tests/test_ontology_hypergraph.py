@@ -141,6 +141,7 @@ def _cited(e):
         (lambda p: _as(p)["incidence"][1].update(node="catalogue.json#term-control"), "control individual"),
         (lambda p: _cited(_as(p))[0].update(node="evidence.json#hr-leavers-q3"), "accepts"),
         (lambda p: _cited(_as(p))[0].update(node="evidence.json#peoplecore"), "evidence-record individual"),
+        (lambda p: _as(p)["incidence"][0].update(role=A + "reviewer"), "one assessor"),
         (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#m-ito"), "must not be the assessor"),
         (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#drafting-agent"), "audit-professional"),
         (lambda p: _rv(p)["incidence"].append(dict(_rv(p)["incidence"][0], id="by-2")), "exactly one reviewer"),
@@ -270,14 +271,11 @@ def test_leafrefs_are_enforced_after_projection(publications):
 
 FIXTURES = EXAMPLE / "fixtures"
 EXPECTED = json.loads((FIXTURES / "expected-errors.json").read_text())
-_VALIDATOR = None
 
 
+@functools.cache
 def _validator():
-    global _VALIDATOR
-    if _VALIDATOR is None:
-        _VALIDATOR = collector.validator()
-    return _VALIDATOR
+    return collector.validator()
 
 
 def _errors(tree):
