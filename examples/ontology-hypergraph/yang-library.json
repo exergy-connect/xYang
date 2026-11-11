@@ -2,7 +2,7 @@
   "ietf-yang-library:yang-library": {
     "module-set": [
       {
-        "name": "lab-2026.1",
+        "name": "audit-2026.1",
         "module": [
           {
             "name": "example-hypergraph",
@@ -15,26 +15,21 @@
             "namespace": "urn:example:bfo"
           },
           {
-            "name": "example-lab",
+            "name": "example-audit",
             "revision": "2026-11-10",
-            "namespace": "urn:example:lab"
-          },
-          {
-            "name": "example-lab-evidence",
-            "revision": "2026-11-10",
-            "namespace": "urn:example:lab-evidence"
+            "namespace": "urn:example:audit"
           }
         ]
       }
     ],
     "schema": [
       {
-        "name": "lab",
+        "name": "audit",
         "module-set": [
-          "lab-2026.1"
+          "audit-2026.1"
         ]
       }
     ],
-    "content-id": "4d2c933765dd2038a8bd4d86f4fe14a9b06e10b8df00c0ad51efd1bf6cd8292c"
+    "content-id": "b20cb329c3e5c91854775159d21f5973625058850352867379a419137491d7af"
   }
 }

@@ -1,0 +1,222 @@
+module example-audit {
+  yang-version 1.1;
+  namespace "urn:example:audit";
+  prefix audit;
+  import example-hypergraph { prefix hg; revision-date 2026-11-10; }
+  import example-bfo { prefix bfo; revision-date 2026-11-10; }
+  organization "xYang example authors";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Fictional audit engagement profile: controls, collected client evidence,
+     assessments, independent review, and findings as hypergraph records.
+     A valid tree is a well-formed record, not an audit opinion: an approved
+     assessment may legitimately report a failed control.
+     SPDX-License-Identifier: MIT";
+  reference "RFC 7950; RFC 7951; xYang examples/ontology-hypergraph/README.md";
+  revision 2026-11-10 { description "Initial example revision.";
+    reference "xYang examples/ontology-hypergraph/README.md"; }
+
+  typedef timestamp {
+    type string {
+      pattern '\d{4}-\d{2}-\d{2}T\d{2}:\d{2}:\d{2}(\.\d+)?(Z|[+\-]\d{2}:\d{2})';
+    }
+    description "RFC 3339 timestamp; not checked against a clock.";
+  }
+  typedef calendar-date {
+    type string { pattern '\d{4}-\d{2}-\d{2}'; }
+    description "Calendar date.";
+  }
+
+  identity engagement { base bfo:process; description "An audit or assurance engagement for one client."; }
+  identity control { base bfo:continuant; description "A client control statement in the firm catalogue."; }
+  identity evidence-record { base bfo:continuant; description "A collected client artifact, such as a system export."; }
+  identity source-system { base bfo:continuant; description "A client system that produced evidence."; }
+  identity actor { base bfo:continuant; description "A participant in the engagement."; }
+  identity collection-agent { base actor; description "Software that collects client evidence."; }
+  identity practitioner { base actor; description "May assess controls."; }
+  identity assessment-agent { base practitioner; description "Software that drafts assessments."; }
+  identity audit-professional { base bfo:material-entity; description "A person on the engagement team; may assess and review."; }
+
+  identity evidence-type { description "Kind of collected artifact."; }
+  identity hr-termination-report { base evidence-type; description "Leavers exported from the HR system."; }
+  identity active-account-listing { base evidence-type; description "Enabled accounts exported from identity management."; }
+  identity change-ticket-export { base evidence-type; description "Change tickets with approvals."; }
+  identity deployment-log { base evidence-type; description "Production deployment records."; }
+  identity policy-document { base evidence-type; description "Approved client policy."; }
+
+  identity collection { base hg:relation; description "Evidence collected from one source system."; }
+  identity assessment { base hg:relation; description "Conclusion on one control for one engagement."; }
+  identity review { base hg:relation; description "Independent sign-off of one assessment."; }
+  identity finding { base hg:relation; description "Reportable exception based on one assessment."; }
+  identity workpaper-bundle { base hg:relation; description "Unconstrained grouping of records."; }
+
+  identity collector { base hg:role; description "Collecting agent."; }
+  identity source { base hg:role; description "System the evidence came from."; }
+  identity collected { base hg:role; description "Evidence produced by a collection."; }
+  identity in-engagement { base hg:role; description "Engagement the record belongs to."; }
+  identity assessor { base hg:role; description "Practitioner who concluded."; }
+  identity assessed-control { base hg:role; description "Control concluded on."; }
+  identity cited-evidence { base hg:role; description "Evidence relied on."; }
+  identity reviewer { base hg:role; description "Independent human reviewer."; }
+  identity reviewed { base hg:role; description "Assessment under review."; }
+  identity basis { base hg:role; description "Assessment a finding is based on."; }
+  identity member { base hg:role; description "Bundled record."; }
+
+  container graph {
+    presence "A local graph projection is supplied.";
+    description "Collected engagement records from the firm, the client evidence locker, and reviewers.";
+    uses hg:hypergraph {
+      refine hyperedge {
+        must "not(derived-from-or-self(type, 'audit:collection')) or (count(incidence[derived-from-or-self(role, 'audit:collector')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:source')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:in-engagement')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:collected')]) >= 1 and count(incidence) = count(incidence[derived-from-or-self(role, 'audit:collector') or derived-from-or-self(role, 'audit:source') or derived-from-or-self(role, 'audit:in-engagement') or derived-from-or-self(role, 'audit:collected')]))" {
+          error-message "A collection needs one collector, one source, one engagement, at least one collected record, and no other roles.";
+        }
+        must "not(derived-from-or-self(type, 'audit:assessment')) or (count(incidence[derived-from-or-self(role, 'audit:assessor')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:assessed-control')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:in-engagement')]) = 1 and count(incidence) = count(incidence[derived-from-or-self(role, 'audit:assessor') or derived-from-or-self(role, 'audit:assessed-control') or derived-from-or-self(role, 'audit:in-engagement') or derived-from-or-self(role, 'audit:cited-evidence')]))" {
+          error-message "An assessment needs one assessor, one control, one engagement, and only cited-evidence otherwise.";
+        }
+        must "not(derived-from-or-self(type, 'audit:assessment')) or result/outcome = 'insufficient-evidence' or count(incidence[derived-from-or-self(role, 'audit:cited-evidence')]) >= 1" {
+          error-message "A supported or exception outcome must cite at least one evidence record.";
+        }
+        must "not(derived-from-or-self(type, 'audit:review')) or (count(incidence[derived-from-or-self(role, 'audit:reviewer')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:reviewed')]) = 1 and count(incidence) = 2)" {
+          error-message "A review needs exactly one reviewer and one reviewed assessment.";
+        }
+        must "not(derived-from-or-self(type, 'audit:review')) or not(incidence[derived-from-or-self(role, 'audit:reviewer')]/node = ../hyperedge[id = current()/incidence[derived-from-or-self(role, 'audit:reviewed')]/hyperedge]/incidence[derived-from-or-self(role, 'audit:assessor')]/node)" {
+          error-message "The reviewer must not be the assessor of the reviewed assessment.";
+        }
+        must "not(derived-from-or-self(type, 'audit:finding')) or (count(incidence[derived-from-or-self(role, 'audit:basis')]) = 1 and count(incidence[derived-from-or-self(role, 'audit:cited-evidence')]) >= 1 and count(incidence) = count(incidence[derived-from-or-self(role, 'audit:basis') or derived-from-or-self(role, 'audit:cited-evidence')]))" {
+          error-message "A finding needs one basis assessment and at least one cited evidence record.";
+        }
+        must "not(derived-from-or-self(type, 'audit:finding')) or ../hyperedge[id = current()/incidence[derived-from-or-self(role, 'audit:basis')]/hyperedge]/result/outcome = 'exception'" {
+          error-message "A finding must be based on an assessment whose outcome is exception.";
+        }
+      }
+      refine hyperedge/incidence {
+        must "not(derived-from-or-self(role, 'audit:collector')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:collection-agent')]" {
+          error-message "A collector must be a collection-agent node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:source')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:source-system')]" {
+          error-message "A source must be a source-system node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:collected') or derived-from-or-self(role, 'audit:cited-evidence')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:evidence-record')][not(term)]" {
+          error-message "Collected and cited evidence must be evidence-record individual nodes.";
+        }
+        must "not(derived-from-or-self(role, 'audit:in-engagement')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:engagement')]" {
+          error-message "An engagement participant must be an engagement node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:assessor')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:practitioner') or derived-from-or-self(type, 'audit:audit-professional')]" {
+          error-message "An assessor must be a practitioner or audit-professional node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:assessed-control')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:control')][not(term)]" {
+          error-message "An assessed control must be a control individual node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:reviewer')) or ../../node[id = current()/node][derived-from-or-self(type, 'audit:audit-professional')]" {
+          error-message "A reviewer must be an audit-professional node.";
+        }
+        must "not(derived-from-or-self(role, 'audit:reviewed') or derived-from-or-self(role, 'audit:basis')) or ../../hyperedge[id = current()/hyperedge][derived-from-or-self(type, 'audit:assessment')]" {
+          error-message "Reviews and findings must reference an assessment hyperedge.";
+        }
+        must "not(derived-from-or-self(role, 'audit:cited-evidence')) or not(derived-from-or-self(../type, 'audit:assessment')) or ../../node[id = current()/node]/evidence-record/evidence-type = ../../node[id = current()/../incidence[derived-from-or-self(role, 'audit:assessed-control')]/node]/control/accepted-evidence" {
+          error-message "Cited evidence must be of a type the assessed control accepts.";
+        }
+      }
+    }
+  }
+
+  augment "/audit:graph/audit:node" {
+    description "Domain records keyed by node type, and optional term documentation.";
+    uses bfo:additional-classification;
+    container term {
+      presence "This node documents a domain universal, not an individual.";
+      description "BFO-aligned term documentation.";
+      uses bfo:term-description;
+    }
+    container engagement {
+      when "derived-from-or-self(../type, 'audit:engagement') and not(../term)";
+      description "Engagement scope.";
+      leaf client { type string { length "1..max"; } mandatory true; description "Fictional client name."; }
+      leaf period-start { type calendar-date; mandatory true; description "First day of the period under review."; }
+      leaf period-end { type calendar-date; mandatory true; description "Last day of the period under review."; }
+    }
+    container control {
+      when "derived-from-or-self(../type, 'audit:control') and not(../term)";
+      description "Catalogue control statement.";
+      leaf reference { type string { length "1..max"; } mandatory true; description "Catalogue identifier."; }
+      leaf statement { type string { length "1..max"; } mandatory true; description "Control statement."; }
+      leaf-list accepted-evidence {
+        type identityref { base evidence-type; }
+        min-elements 1;
+        description "Evidence types that can support a conclusion on this control.";
+      }
+    }
+    container evidence-record {
+      when "derived-from-or-self(../type, 'audit:evidence-record') and not(../term)";
+      description "Collected artifact metadata.";
+      leaf evidence-type { type identityref { base evidence-type; } mandatory true; description "Artifact kind."; }
+      leaf source-system {
+        type leafref { path "../../../node/id"; }
+        must "../../../node[id = current()][derived-from-or-self(type, 'audit:source-system')]" {
+          error-message "An evidence record's source-system must be a source-system node.";
+        }
+        mandatory true;
+        description "Producing client system.";
+      }
+      leaf collected-at { type timestamp; mandatory true; description "When the artifact was collected."; }
+      leaf export { type string; mandatory true; description "URI reference of the exported bytes."; }
+      leaf sha256 {
+        type string { pattern '[0-9a-f]{64}'; }
+        mandatory true;
+        description "Digest of the export bytes. Byte integrity only, not truth of content.";
+      }
+    }
+  }
+
+  augment "/audit:graph/audit:hyperedge" {
+    description "Engagement record details keyed by relation type.";
+    leaf recorded-at {
+      when "not(derived-from-or-self(../type, 'audit:workpaper-bundle'))";
+      type timestamp;
+      mandatory true;
+      description "When this record was made.";
+    }
+    container result {
+      when "derived-from-or-self(../type, 'audit:assessment')";
+      description "Assessment conclusion.";
+      leaf outcome {
+        type enumeration {
+          enum supported { description "Evidence supports the control operating as described."; }
+          enum exception { description "Evidence shows the control did not operate as described."; }
+          enum insufficient-evidence { description "Evidence is not sufficient to conclude."; }
+        }
+        mandatory true;
+        description "Conclusion on the control.";
+      }
+      leaf rationale { type string { length "1..max"; } mandatory true; description "Why the assessor concluded this."; }
+    }
+    container sign-off {
+      when "derived-from-or-self(../type, 'audit:review')";
+      description "Reviewer decision.";
+      leaf decision {
+        type enumeration {
+          enum approved { description "The reviewer accepts the assessment as recorded."; }
+          enum rejected { description "The reviewer sends the assessment back."; }
+        }
+        mandatory true;
+        description "Review outcome.";
+      }
+      leaf comment { type string; description "Reviewer comment."; }
+    }
+    container detail {
+      when "derived-from-or-self(../type, 'audit:finding')";
+      description "Finding detail.";
+      leaf severity {
+        type enumeration {
+          enum low { description "Low severity."; }
+          enum medium { description "Medium severity."; }
+          enum high { description "High severity."; }
+        }
+        mandatory true;
+        description "Engagement team's severity rating.";
+      }
+      leaf condition { type string { length "1..max"; } mandatory true; description "What was found."; }
+    }
+  }
+}

@@ -1,4 +1,4 @@
-"""Self-contained distributed ontology example; optional independent tools are opt-in dependencies."""
+"""Distributed audit-engagement hypergraph example; optional independent tools are opt-in dependencies."""
 
 from __future__ import annotations
 
@@ -16,11 +16,15 @@ from urllib.parse import urlsplit
 import pytest
 
 EXAMPLE = Path(__file__).resolve().parents[1] / "examples" / "ontology-hypergraph"
+sys.path.insert(0, str(EXAMPLE))
 spec = importlib.util.spec_from_file_location("ontology_collector", EXAMPLE / "collector.py")
 collector = importlib.util.module_from_spec(spec)
 spec.loader.exec_module(collector)
+import audit_checks  # noqa: E402
+
 ROOT = collector.ROOT
 BASE = "http://ontology.test/documents/"
+A = "example-audit:"
 
 
 @pytest.fixture
@@ -28,126 +32,159 @@ def publications():
     return {BASE + path.name: json.loads(path.read_text()) for path in (EXAMPLE / "documents").glob("*.json")}
 
 
-def reader(publications):
+def reader(publications, exports=None):
     def read(url):
         if url in publications:
             return json.dumps(publications[url]).encode()
-        if urlsplit(url).path.startswith("/models/"):
-            return (EXAMPLE / "models" / Path(urlsplit(url).path).name).read_bytes()
+        path = urlsplit(url).path
+        if path.startswith("/models/"):
+            return (EXAMPLE / "models" / Path(path).name).read_bytes()
+        if "/exports/" in path:
+            name = Path(path).name
+            if exports and name in exports:
+                return exports[name]
+            return (EXAMPLE / "documents" / "exports" / name).read_bytes()
         raise collector.CollectionError("Missing publication: " + url)
 
     return read
 
 
-def collect(publications):
-    return collector.collect(BASE + "relations.json", read=reader(publications))
+def collect(publications, **kwargs):
+    return collector.collect(BASE + "reviews.json", read=reader(publications, **kwargs))
 
 
-def edge(publications):
-    return publications[BASE + "relations.json"][ROOT]["hyperedge"][0]
+def edges(publications, name):
+    return publications[BASE + name][ROOT]["hyperedge"]
 
 
-def document(publications, name="entities.json"):
+def edge(publications, name, fragment):
+    return next(e for e in edges(publications, name) if e["id"] == "#" + fragment)
+
+
+def node(publications, name, fragment):
+    return next(n for n in publications[BASE + name][ROOT]["node"] if n["id"] == "#" + fragment)
+
+
+def document(publications, name="evidence.json"):
     return publications[BASE + name][ROOT]["document"][0]
 
 
-def test_projection_preserves_identity_occurrences_provenance_and_extensions(publications):
+def projected(tree, fragment):
+    return next(e for e in tree[ROOT]["hyperedge"] + tree[ROOT]["node"] if e["id"].endswith("#" + fragment))
+
+
+def test_projection_has_engagement_records_with_provenance(publications):
     tree = collect(publications)
     graph = tree[ROOT]
-    assert len(graph["document"]) == 3
-    assert len(graph["node"]) == 5
-    reaction, bundle = graph["hyperedge"]
-    assert reaction["id"] == BASE + "relations.json#reaction"
-    assert [i["node"] for i in reaction["incidence"][:2]] == [BASE + "entities.json#sample"] * 2
-    assert bundle["incidence"][0]["hyperedge"] == reaction["id"]
-    assert reaction["origin"] == BASE + "relations.json"
-    assert reaction["asserted-by"] == "https://example.org/agents/lab"
-    assert reaction["evidence"] == BASE + "evidence.txt"
-    assert reaction["attachment"][0]["url"] == BASE + "evidence.txt"
-    assert reaction["experiment"] == {"accession": "EXP-17"}
-    assert reaction["example-lab-evidence:reviewed"] is True
-    assert graph["node"][0]["attribute"][0]["value"] == "B-17"
-    assert graph["node"][-2]["term"]["bfo-class"].endswith("BFO_0000040")
+    assert len(graph["document"]) == 4
+    assert len(graph["node"]) == 22
+    assert len(graph["hyperedge"]) == 11
+    exception = projected(tree, "as-ac-01")
+    assert exception["result"]["outcome"] == "exception"
+    assert [i["node"] for i in exception["incidence"] if i["role"] == A + "cited-evidence"] == [
+        BASE + "evidence.json#hr-leavers-q3",
+        BASE + "evidence.json#iam-active-users",
+    ]
+    assert projected(tree, "as-cm-02")["result"]["outcome"] == "supported"
+    assert projected(tree, "fd-ac-01")["incidence"][0]["hyperedge"] == exception["id"]
+    record = projected(tree, "iam-active-users")["evidence-record"]
+    assert record["source-system"] == BASE + "evidence.json#gatekeeper"
+    assert record["export"] == BASE + "exports/iam-active-users.csv"
+    assert exception["origin"] == BASE + "assessments.json"
+    assert exception["asserted-by"].endswith("/drafting-agent")
+    assert projected(tree, "rv-ac-01")["sign-off"]["decision"] == "approved"
 
 
 def test_unbounded_arity_and_repeated_participants(publications):
-    incidence = edge(publications)["incidence"]
+    incidence = edge(publications, "assessments.json", "as-ac-01")["incidence"]
     incidence.extend(
-        {"id": f"repeat-{n}", "role": "example-lab:input", "node": "entities.json#sample"} for n in range(64)
+        {"id": f"repeat-{n}", "role": A + "cited-evidence", "node": "evidence.json#hr-leavers-q3"} for n in range(64)
     )
-    assert len(collect(publications)[ROOT]["hyperedge"][0]["incidence"]) == 68
+    assert len(projected(collect(publications), "as-ac-01")["incidence"]) == 69
 
 
 def test_generic_allows_zero_arity_and_cycles(publications):
-    bundle = publications[BASE + "relations.json"][ROOT]["hyperedge"][1]
+    bundle = edge(publications, "assessments.json", "wp-2026")
     bundle["incidence"] = []
     collect(publications)
-    bundle["incidence"] = [{"id": "self", "role": "example-lab:member", "hyperedge": "#bundle"}]
+    bundle["incidence"] = [{"id": "self", "role": A + "member", "hyperedge": "#wp-2026"}]
     collect(publications)
+
+
+def _as(publications, fragment="as-cm-02"):
+    return edge(publications, "assessments.json", fragment)
+
+
+def _rv(publications, fragment="rv-cm-02"):
+    return edge(publications, "reviews.json", fragment)
+
+
+def _cited(e):
+    return [i for i in e["incidence"] if i["role"] == A + "cited-evidence"]
 
 
 @pytest.mark.parametrize(
     "change,match",
     [
-        (lambda e: e["incidence"].pop(2), "exactly one output"),
-        (
-            lambda e: e["incidence"].append(
-                {"id": "extra", "role": "example-lab:output", "node": "entities.json#product"}
-            ),
-            "exactly one output",
-        ),
-        (lambda e: e["incidence"][0].update(role="example-lab:member"), "only input/output/context"),
-        (lambda e: e["incidence"][0].update(node="entities.json#assay"), "material-entity"),
-        (lambda e: e["incidence"][0].update(node="terms.json#specimen"), "material-entity"),
-        (lambda e: e["incidence"][0].update(node="entities.json#absent"), "Leafref"),
-        (lambda e: e["incidence"][0].update(hyperedge="#bundle"), "[Cc]hoice"),
-        (lambda e: e["incidence"][0].pop("node"), "choice"),
-        (lambda e: e["incidence"][0].update(role="example-lab:specimen"), "identityref"),
-        (lambda e: e.update(type="example-lab:specimen"), "identityref"),
-        (lambda e: e["incidence"][1].update(id="i1"), "Duplicate"),
-        (lambda e: e.update(unknown="never drop this"), "Unknown field"),
-        (lambda e: e.update(reviewed=True), "Unknown field"),
-        (lambda e: e.update(**{"example-lab-evidence:reviewed": "true"}), "boolean"),
-        (lambda e: e["incidence"][0].update(role="lab:input"), "identityref"),
-        (lambda e: e["incidence"][0].update(node="missing.json#sample"), "Missing publication"),
-        (lambda e: e.update(id="entities.json#sample"), "identity"),
-        (lambda e: e.update(origin="entities.json"), "Origin"),
+        (lambda p: _cited(_as(p))[0].update(node="evidence.json#absent"), "Leafref"),
+        (lambda p: _as(p).__setitem__("incidence", [i for i in _as(p)["incidence"] if i not in _cited(_as(p))]), "cite at least one"),
+        (lambda p: _as(p)["incidence"].append(dict(_as(p)["incidence"][0], id="by-2")), "one assessor"),
+        (lambda p: _as(p)["incidence"][1].update(node="catalogue.json#ac-01", id="ctl") or _as(p)["incidence"].append({"id": "ctl-2", "role": A + "assessed-control", "node": "catalogue.json#cm-02"}), "one control"),
+        (lambda p: _as(p)["incidence"][0].update(node="catalogue.json#collector"), "practitioner"),
+        (lambda p: _as(p)["incidence"][1].update(node="catalogue.json#term-control"), "control individual"),
+        (lambda p: _cited(_as(p))[0].update(node="evidence.json#hr-leavers-q3"), "accepts"),
+        (lambda p: _cited(_as(p))[0].update(node="evidence.json#peoplecore"), "evidence-record individual"),
+        (lambda p: _as(p)["incidence"][0].update(role=A + "reviewer"), "one assessor"),
+        (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#m-ito"), "must not be the assessor"),
+        (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#drafting-agent"), "audit-professional"),
+        (lambda p: _rv(p)["incidence"].append(dict(_rv(p)["incidence"][0], id="by-2")), "exactly one reviewer"),
+        (lambda p: _rv(p)["incidence"][1].update(hyperedge="assessments.json#fd-ac-01"), "assessment hyperedge"),
+        (lambda p: edge(p, "assessments.json", "fd-ac-01")["incidence"][0].update(hyperedge="#as-cm-02"), "outcome is exception"),
+        (lambda p: edge(p, "evidence.json", "col-hr")["incidence"][0].update(node="catalogue.json#m-ito"), "collection-agent"),
+        (lambda p: edge(p, "evidence.json", "col-hr")["incidence"].pop(1), "one source"),
+        (lambda p: node(p, "evidence.json", "hr-leavers-q3")["evidence-record"].update(**{"source-system": "catalogue.json#m-ito"}), "source-system node"),
+        (lambda p: node(p, "evidence.json", "hr-leavers-q3")["evidence-record"].update(**{"collected-at": "yesterday"}), "pattern"),
+        (lambda p: _as(p)["result"].update(outcome="pass"), "enumeration|outcome"),
+        (lambda p: _as(p).pop("result"), "outcome|result"),
+        (lambda p: _as(p).pop("recorded-at"), "recorded-at"),
+        (lambda p: _rv(p).update(**{"sign-off": {"decision": "maybe"}}), "enumeration|decision"),
+        (lambda p: node(p, "catalogue.json", "cm-02")["control"].update(**{"accepted-evidence": []}), "accepted-evidence|min-elements"),
+        (lambda p: _as(p)["incidence"][0].pop("node"), "[Cc]hoice"),
+        (lambda p: _as(p)["incidence"][0].update(role=A + "control"), "identityref"),
+        (lambda p: _as(p).update(type=A + "control"), "identityref"),
+        (lambda p: _as(p)["incidence"][1].update(id="by"), "Duplicate"),
+        (lambda p: _as(p).update(unknown="never drop this"), "Unknown field"),
+        (lambda p: _as(p)["incidence"][0].update(role="audit:assessor"), "identityref"),
+        (lambda p: _cited(_as(p))[0].update(node="missing.json#x"), "Missing publication"),
+        (lambda p: _as(p).update(id="evidence.json#deploy-log-q3"), "identity"),
+        (lambda p: _as(p).update(origin="evidence.json"), "Origin"),
     ],
 )
 def test_invalid_graphs_fail_loudly(publications, change, match):
-    change(edge(publications))
+    change(publications)
     with pytest.raises(collector.CollectionError, match=match):
         collect(publications)
 
 
-def test_no_inputs_rejected(publications):
-    edge(publications)["incidence"] = edge(publications)["incidence"][2:]
-    with pytest.raises(collector.CollectionError, match="inputs"):
-        collect(publications)
-
-
-def test_when_constraint_and_term_grouping(publications):
-    bundle = publications[BASE + "relations.json"][ROOT]["hyperedge"][1]
-    bundle["experiment"] = {"accession": "not-a-reaction"}
+def test_when_constraints_and_term_grouping(publications):
+    bundle = edge(publications, "assessments.json", "wp-2026")
+    bundle["result"] = {"outcome": "supported", "rationale": "not an assessment"}
     with pytest.raises(collector.CollectionError, match="when"):
         collect(publications)
-    del bundle["experiment"]
-    publications[BASE + "terms.json"][ROOT]["node"][0]["term"].pop("definition")
+    del bundle["result"]
+    node(publications, "catalogue.json", "term-control")["term"].pop("definition")
     with pytest.raises(collector.CollectionError, match="definition"):
         collect(publications)
 
 
+def test_insufficient_evidence_may_cite_nothing(publications):
+    tree = collect(publications)
+    assert [i for i in projected(tree, "as-ac-04")["incidence"] if i["role"] == A + "cited-evidence"] == []
+
+
 def test_entity_identity_conflict_between_kinds(publications):
-    relations = publications[BASE + "relations.json"][ROOT]
-    relations["node"] = [
-        {
-            "id": "#reaction",
-            "label": "collision",
-            "type": "example-lab:specimen",
-            "origin": "relations.json",
-            "asserted-by": "https://example.org/lab",
-            "evidence": "evidence.txt",
-        }
+    publications[BASE + "assessments.json"][ROOT]["node"] = [
+        dict(node(publications, "catalogue.json", "m-ito"), id="#as-ac-01", origin="assessments.json")
     ]
     with pytest.raises(collector.CollectionError, match="identity conflict"):
         collect(publications)
@@ -156,7 +193,7 @@ def test_entity_identity_conflict_between_kinds(publications):
 @pytest.mark.parametrize(
     "change,match",
     [
-        (lambda p: document(p).update(id="terms.json"), "identity conflict"),
+        (lambda p: document(p).update(id="catalogue.json"), "identity conflict"),
         (lambda p: document(p).update(**{"ontology-version": "other"}), "Ontology version"),
         (lambda p: document(p).update(version="2"), "Document version"),
         (lambda p: document(p)["model"][0].update(revision="1999-01-01"), "Model version"),
@@ -175,29 +212,35 @@ def test_served_model_bytes_must_match_trusted_schema(publications):
     original = reader(publications)
     with pytest.raises(collector.CollectionError, match="Published model digest"):
         collector.collect(
-            BASE + "relations.json", read=lambda url: b"module counterfeit {}" if "/models/" in url else original(url)
+            BASE + "reviews.json", read=lambda url: b"module counterfeit {}" if "/models/" in url else original(url)
         )
 
 
+def test_export_bytes_must_match_declared_digest(publications):
+    with pytest.raises(collector.CollectionError, match="Export digest mismatch"):
+        collect(publications, exports={"iam-active-users.csv": b"account,employee_id,enabled\n"})
+
+
 def test_cycles_in_document_dependencies_and_automatic_discovery(publications):
-    # No explicit dependency for the entity document: participant links discover it.
-    document(publications, "relations.json").pop("requires")
-    document(publications, "terms.json")["requires"] = [{"id": "relations.json", "version": "1"}]
-    assert len(collect(publications)[ROOT]["document"]) == 3
+    # Participant links discover the catalogue and evidence locker without explicit dependencies.
+    document(publications, "assessments.json").pop("requires")
+    document(publications, "evidence.json").pop("requires")
+    document(publications, "catalogue.json")["requires"] = [{"id": "reviews.json", "version": "1"}]
+    assert len(collect(publications)[ROOT]["document"]) == 4
 
 
 def test_collection_limits(publications):
     with pytest.raises(collector.CollectionError, match="limit"):
-        collector.collect(BASE + "relations.json", read=reader(publications), max_documents=1)
+        collector.collect(BASE + "reviews.json", read=reader(publications), max_documents=1)
 
 
 def test_json_encoding_arrays_namespace_and_duplicate_members(publications):
     bad = copy.deepcopy(publications)
-    bad[BASE + "entities.json"][ROOT]["node"] = {"sample": {}}
+    bad[BASE + "evidence.json"][ROOT]["node"] = {"x": {}}
     with pytest.raises(collector.CollectionError, match="array"):
         collect(bad)
     bad = copy.deepcopy(publications)
-    bad[BASE + "entities.json"]["lab:graph"] = bad[BASE + "entities.json"].pop(ROOT)
+    bad[BASE + "evidence.json"]["audit:graph"] = bad[BASE + "evidence.json"].pop(ROOT)
     with pytest.raises(collector.CollectionError, match="RFC 7951 root"):
         collect(bad)
     for raw in (b'{"a":1,"a":2}', b'{"x":NaN}', b'{"x":Infinity}', b"no JSON"):
@@ -207,13 +250,60 @@ def test_json_encoding_arrays_namespace_and_duplicate_members(publications):
 
 def test_leafrefs_are_enforced_after_projection(publications):
     tree = collect(publications)
-    tree[ROOT]["node"] = []
+    tree[ROOT]["node"] = [n for n in tree[ROOT]["node"] if not n["id"].endswith("#gatekeeper")]
     with pytest.raises(collector.CollectionError, match="Leafref"):
         collector.validate(tree)
     tree = collect(publications)
     tree[ROOT]["document"] = tree[ROOT]["document"][:1]
     with pytest.raises(collector.CollectionError, match="Leafref"):
         collector.validate(tree)
+
+
+FIXTURES = EXAMPLE / "fixtures"
+EXPECTED_INVALID = {
+    "dangling-evidence": "leafref",
+    "assessment-without-evidence": "cite at least one evidence",
+    "reviewer-is-assessor": "must not be the assessor",
+    "review-with-two-reviewers": "exactly one reviewer",
+    "finding-on-supported-assessment": "outcome is exception",
+    "evidence-type-not-accepted": "control accepts",
+}
+
+
+def test_checked_in_fixtures_validate_as_documented():
+    collector.validate(json.loads((FIXTURES / "valid.json").read_text()))
+    assert {p.stem for p in (FIXTURES / "invalid").glob("*.json")} == set(EXPECTED_INVALID)
+    for name, message in EXPECTED_INVALID.items():
+        with pytest.raises(collector.CollectionError) as excinfo:
+            collector.validate(json.loads((FIXTURES / "invalid" / f"{name}.json").read_text()))
+        assert message.lower() in str(excinfo.value).lower(), (name, str(excinfo.value))
+
+
+def test_audit_checks_are_separate_from_yang(publications):
+    tree = collect(publications)
+    report = audit_checks.check(tree)
+    assert report["issues"] == []
+    assert {(c["control"], c["outcome"]) for c in report["conclusions"]} == {
+        ("AC-01", "exception"),
+        ("CM-02", "supported"),
+        ("AC-04", "insufficient-evidence"),
+    }
+    assert [f["severity"] for f in report["findings"]] == ["high"]
+
+    stale = copy.deepcopy(tree)
+    projected(stale, "iam-active-users")["evidence-record"]["collected-at"] = "2026-06-01T00:00:00Z"
+    collector.validate(stale)  # structurally valid
+    assert any("stale" in issue for issue in audit_checks.check(stale)["issues"])
+
+    rejected = copy.deepcopy(tree)
+    projected(rejected, "rv-ac-01")["sign-off"]["decision"] = "rejected"
+    collector.validate(rejected)
+    assert any("no approved review" in issue for issue in audit_checks.check(rejected)["issues"])
+
+    early = copy.deepcopy(tree)
+    projected(early, "rv-cm-02")["recorded-at"] = "2026-10-01T00:00:00Z"
+    collector.validate(early)
+    assert any("before the assessment" in issue for issue in audit_checks.check(early)["issues"])
 
 
 def test_real_http_publication_and_cli(tmp_path):
@@ -225,26 +315,32 @@ def test_real_http_publication_and_cli(tmp_path):
     with ThreadingHTTPServer(("127.0.0.1", 0), handler) as server:
         thread = threading.Thread(target=server.serve_forever, daemon=True)
         thread.start()
-        seed = f"http://127.0.0.1:{server.server_port}/documents/relations.json"
+        base = f"http://127.0.0.1:{server.server_port}/documents/"
         try:
             output = tmp_path / "projection.json"
             result = subprocess.run(
-                [sys.executable, str(EXAMPLE / "collector.py"), seed, "-o", str(output)], capture_output=True, text=True
+                [sys.executable, str(EXAMPLE / "collector.py"), base + "reviews.json", "-o", str(output)],
+                capture_output=True,
+                text=True,
             )
             assert result.returncode == 0, result.stderr
             tree = json.loads(output.read_text())
-            assert tree[ROOT]["hyperedge"][0]["id"] == seed + "#reaction"
+            assert projected(tree, "fd-ac-01")["id"] == base + "assessments.json#fd-ac-01"
+            checks = subprocess.run(
+                [sys.executable, str(EXAMPLE / "audit_checks.py"), str(output)], capture_output=True, text=True
+            )
+            assert checks.returncode == 0, checks.stdout + checks.stderr
             with pytest.raises(collector.CollectionError, match="Cannot fetch"):
-                collector.fetch(seed + ".missing")
+                collector.fetch(base + "reviews.json.missing")
         finally:
             server.shutdown()
             thread.join()
 
 
 def test_fixtures_are_reproducible():
-    before = {path: path.read_bytes() for path in (EXAMPLE / "documents").glob("*.json")}
-    for name in ("yang-library.json", "yangson-library.json"):
-        before[EXAMPLE / name] = (EXAMPLE / name).read_bytes()
+    paths = [*(EXAMPLE / "documents").rglob("*.json"), *(EXAMPLE / "documents" / "exports").glob("*.csv")]
+    paths += [*FIXTURES.rglob("*.json"), EXAMPLE / "yang-library.json", EXAMPLE / "yangson-library.json"]
+    before = {path: path.read_bytes() for path in paths}
     subprocess.run([sys.executable, str(EXAMPLE / "build_fixtures.py")], check=True)
     assert before == {path: path.read_bytes() for path in before}
 
@@ -268,23 +364,11 @@ def test_independent_yang_tools(publications):
         check=True,
     )
     model = DataModel.from_file(str(EXAMPLE / "yangson-library.json"), [str(EXAMPLE / "models")])
-    tree = collect(publications)
-    model.from_raw(tree).validate()
-    # Independent evidence for the same negative constraints.
-    for mutation in (
-        lambda t: t[ROOT]["hyperedge"][0]["incidence"].pop(2),
-        lambda t: t[ROOT]["hyperedge"][0]["incidence"][0].update(node=BASE + "entities.json#assay"),
-        lambda t: t[ROOT]["hyperedge"][0]["incidence"][0].update(node=BASE + "entities.json#missing"),
-        lambda t: t[ROOT]["hyperedge"][0].update(reviewed=True),
-        lambda t: t[ROOT]["hyperedge"][0].update(**{"example-lab-evidence:reviewed": "true"}),
-    ):
-        bad = copy.deepcopy(tree)
-        mutation(bad)
+    model.from_raw(collect(publications)).validate()
+    for name in EXPECTED_INVALID:
         with pytest.raises(YangsonException):
-            model.from_raw(bad).validate()
+            model.from_raw(json.loads((FIXTURES / "invalid" / f"{name}.json").read_text())).validate()
 
-    # Reuse the repository's official IETF modules to check the published modern
-    # inventory, independently of the compatibility file used to load our model.
     from yangson.enumerations import ContentType
 
     standards = EXAMPLE.parent / "ietf-yang-push" / "modules"
@@ -321,39 +405,35 @@ def test_optional_semantic_evaluation_is_separate(publications, monkeypatch):
     _, errors = evaluate(tree)
     assert not errors
     # Structurally legal classifications can still contradict BFO disjointness.
-    tree[ROOT]["node"][0]["also-type"] = ["example-bfo:occurrent"]
+    projected(tree, "iam-active-users")["also-type"] = ["example-bfo:occurrent"]
     collector.validate(tree)
     _, errors = evaluate(tree)
     assert errors and any("disjoint" in error.lower() for error in errors)
 
 
-def test_references_across_origins(publications):
-    remote = "https://second-publisher.test/documents/"
-    for name in ("entities.json", "terms.json"):
-        publications[remote + name] = publications.pop(BASE + name)
-    document(publications, "relations.json")["requires"][0]["id"] = remote + "entities.json"
-    for incidence in edge(publications)["incidence"]:
-        incidence["node"] = remote + incidence["node"]
+def test_client_hosted_evidence_on_another_origin(publications):
+    client = "https://evidence.alder-ridge.example/locker/"
+    publications[client + "evidence.json"] = publications.pop(BASE + "evidence.json")
+    document(publications, "assessments.json")["requires"][0]["id"] = client + "evidence.json"
+    for e in edges(publications, "assessments.json"):
+        for inc in e["incidence"]:
+            if "node" in inc and inc["node"].startswith("evidence.json"):
+                inc["node"] = client + inc["node"]
+    evidence = publications[client + "evidence.json"][ROOT]
+    for item in evidence["node"] + evidence["hyperedge"]:
+        for inc in item.get("incidence", []):
+            if inc["node"].startswith("catalogue.json"):
+                inc["node"] = BASE + inc["node"]
+    evidence["document"][0]["requires"][0]["id"] = BASE + "catalogue.json"
     tree = collect(publications)
-    assert tree[ROOT]["hyperedge"][0]["incidence"][0]["node"] == remote + "entities.json#sample"
-    assert {node["origin"] for node in tree[ROOT]["node"]} == {remote + "entities.json", remote + "terms.json"}
+    assert projected(tree, "iam-active-users")["origin"] == client + "evidence.json"
+    assert projected(tree, "iam-active-users")["evidence-record"]["export"] == client + "exports/iam-active-users.csv"
 
 
-def test_nested_hyperedge_in_another_document(publications):
-    original = publications[BASE + "relations.json"]
-    bundle = original[ROOT]["hyperedge"].pop()
-    publication = copy.deepcopy(original)
-    publication[ROOT]["document"][0]["id"] = "bundle.json"
-    publication[ROOT]["hyperedge"] = [bundle]
-    bundle["origin"] = "bundle.json"
-    bundle["incidence"][0]["hyperedge"] = "relations.json#reaction"
-    publications[BASE + "bundle.json"] = publication
-    tree = collector.collect(BASE + "bundle.json", read=reader(publications))
-    assert len(tree[ROOT]["document"]) == 4
-    assert tree[ROOT]["hyperedge"][0]["incidence"][0]["hyperedge"] == BASE + "relations.json#reaction"
-    bundle["incidence"][0]["hyperedge"] = "relations.json#absent"
+def test_review_of_assessment_in_another_document_must_resolve(publications):
+    _rv(publications)["incidence"][1]["hyperedge"] = "assessments.json#absent"
     with pytest.raises(collector.CollectionError, match="Leafref"):
-        collector.collect(BASE + "bundle.json", read=reader(publications))
+        collect(publications)
 
 
 def test_projection_does_not_modify_publications(publications):
@@ -363,7 +443,7 @@ def test_projection_does_not_modify_publications(publications):
 
 
 @pytest.mark.parametrize(
-    "value", ["file:///tmp/ontology.json", "ftp://example.org/ontology.json", BASE + "entities.json#sample"]
+    "value", ["file:///tmp/ontology.json", "ftp://example.org/ontology.json", BASE + "evidence.json#hr-leavers-q3"]
 )
 def test_invalid_seed_references(value):
     with pytest.raises(collector.CollectionError):
