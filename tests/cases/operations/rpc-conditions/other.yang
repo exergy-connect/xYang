@@ -1,0 +1,13 @@
+module other {
+  yang-version 1.1;
+  namespace "urn:other";
+  prefix o;
+
+  typedef short-name {
+    type string { length "1..4"; }
+  }
+
+  identity proto;
+  identity tcp { base proto; }
+  identity unrelated;
+}

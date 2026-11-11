@@ -5,7 +5,7 @@ import { AnydataValidationMode } from "./ext/anydata_validation";
 import { parseYangFile, YangParser } from "./parser";
 import { ValidatorExtension } from "./validator/validator-extension";
 import { YangValidator } from "./validator/yang-validator";
-import type { ValidationIssue } from "./validator/yang-validator";
+import type { ValidateCallOptions, ValidationIssue } from "./validator/yang-validator";
 import { generateJsonSchema } from "./json";
 import { parseCommonArgs, parseValidateArgs } from "./cli/args";
 import { loadAnydataModules } from "./cli/load-anydata-modules";
@@ -15,11 +15,14 @@ function printUsage(): void {
     [
       "xyang-ts commands:",
       "  parse [--include-path DIR]... <file.yang>",
-      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... <file.yang> [data.json|-]",
+      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... [--rpc NAME [--output] [--context data.json]] <file.yang> [data.json|-]",
       "  convert [--include-path DIR]... <file.yang>",
       "",
       "  --native-json         native dict-style JSON (default: strict RFC 7951)",
       "  --format              text (default) or json ({valid, errors} on stdout)",
+      "  --rpc                 validate the data as the input of rpc NAME ({\"module:input\": {...}}, or bare parameters with --native-json)",
+      "  --output              with --rpc, validate the rpc output instead",
+      "  --context             with --rpc, server data (JSON) that joins the operation node for must and leafref; not validated",
       "  --features            {\"module\": [\"feature\"]} or null (default: all features)",
       "  --anydata-validation  off | complete | candidate  (default: off)",
       "  --anydata-module      additional .yang for anydata subtree validation (repeatable)"
@@ -41,7 +44,7 @@ function writeJsonWarnings(warnings: ValidationIssue[]): void {
 }
 
 function runValidate(rest: string[]): number {
-  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson } =
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, output, contextFile } =
     parseValidateArgs(rest);
   const yangFile = positional[0];
   if (!yangFile) {
@@ -49,6 +52,17 @@ function runValidate(rest: string[]): number {
   }
   if (!existsSync(yangFile)) {
     throw new Error(`file not found: ${yangFile}`);
+  }
+
+  let operation: ValidateCallOptions = {};
+  if (rpc !== undefined) {
+    operation = { rpc, direction: output ? "output" : "input" };
+    if (contextFile !== undefined) {
+      if (!existsSync(contextFile)) {
+        throw new Error(`file not found: ${contextFile}`);
+      }
+      operation.context = JSON.parse(readFileSync(contextFile, "utf-8"));
+    }
   }
 
   const parseOpts = includePaths.length > 0 ? { includePath: includePaths } : {};
@@ -91,7 +105,7 @@ function runValidate(rest: string[]): number {
     data = JSON.parse(readFileSync(0, "utf-8"));
   }
   if (format === "json") {
-    const detailed = validator.validateDetailed(data, { nativeJson });
+    const detailed = validator.validateDetailed(data, { nativeJson, ...operation });
     writeJsonWarnings(detailed.warnings);
     const report = {
       valid: detailed.valid,
@@ -105,7 +119,7 @@ function runValidate(rest: string[]): number {
     return detailed.valid ? 0 : 1;
   }
 
-  const result = validator.validate(data, { nativeJson });
+  const result = validator.validate(data, { nativeJson, ...operation });
   if (result.warnings?.length) {
     for (const line of result.warnings) {
       process.stderr.write(`Warning: ${line}\n`);

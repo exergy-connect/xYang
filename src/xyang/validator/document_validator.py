@@ -193,6 +193,69 @@ class DocumentValidator:
                 err.pointer = remap_pointer(err.pointer, pointer_map)
         return encoding + self._errors
 
+    def validate_operation(
+        self,
+        params: Any,
+        *,
+        rpc: YangStatement,
+        operation: YangContainerStmt,
+        host: YangModule,
+        context: Optional[Dict[str, Any]] = None,
+        leafref_severity: Severity = Severity.ERROR,
+        native_json: bool = False,
+    ) -> List[ValidationError]:
+        """Validate the parameters of one rpc ``input`` or ``output`` (RFC 7950 §7.14).
+
+        This validator's root schema is the accessible module of RFC 7950 §6.4.1 (see
+        ``operation.accessible_module``). ``params`` is the parameter object without the
+        RFC 8040 wrapper. ``context`` is optional server data, in the same encoding, that
+        sits next to the operation node. It is not validated. Pointers address ``params``.
+        """
+        from ..encoding.instance import encoding_errors, iter_instance, project_instance, remap_pointer
+
+        if not self._if_features_active(rpc):
+            raise ValueError(f"rpc '{rpc.name}' is not available: its 'if-feature' condition is false")
+        if not isinstance(params, dict):
+            return [
+                ValidationError(path="/", message="rpc parameters must be an object", code="type", pointer="")
+            ]
+        parent = host.name
+        nodes = list(
+            iter_instance(
+                params, host, native_json=native_json, schema=operation, parent_module=parent, at_root=False
+            )
+        )
+        canonical, pointer_map = project_instance(nodes, parent)
+        encoding = [
+            ValidationError(path=ptr or "/", message=message, code=code, pointer=ptr)
+            for ptr, code, message in encoding_errors(nodes)
+        ]
+        root_data: Dict[str, Any] = {}
+        if context is not None:
+            context_nodes = list(iter_instance(context, host, native_json=native_json))
+            problems = encoding_errors(context_nodes)
+            if problems:
+                ptr, _code, message = problems[0]
+                raise ValueError(f"context is not valid instance data at {ptr or '/'}: {message}")
+            root_data, _ = project_instance(context_nodes, parent)
+        root_data[operation.name] = canonical
+
+        self._leafref_severity = leafref_severity
+        self._root_data = root_data
+        self._errors = []
+        self._case_stack = []
+        self._case_level_data_stack = []
+        self._evaluator.clear_cache_stats()
+        root = Node(root_data, self._root_schema, None)
+        op_node = root.step(canonical, operation)
+        op_ctx = Context(current=op_node, root=root, path_cache={})
+        if self._constraint_checks:
+            self._check_must(operation, op_ctx, op_node, "/", "")
+        self._visit_children(canonical, operation, (op_ctx, op_node), PathBuilder(), enforce_mandatory_choice=True)
+        for err in self._errors:
+            err.pointer = remap_pointer(err.pointer, pointer_map)
+        return encoding + self._errors
+
     def _add(
         self,
         *,

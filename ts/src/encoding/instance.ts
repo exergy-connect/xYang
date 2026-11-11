@@ -470,20 +470,27 @@ function walkList(
   return node(stmt, null, ptr, "list", { children });
 }
 
-export type IterInstanceOptions = { nativeJson?: boolean; schema?: { statements?: YangStatement[] } };
+export type IterInstanceOptions = {
+  nativeJson?: boolean;
+  schema?: { statements?: YangStatement[] };
+  /** Module whose children are unqualified under `schema` (default: the module itself, none for another schema). */
+  parentModule?: string;
+  /** False when `data` is the body of a container such as an rpc `input` (RFC 7951 §4). Default true. */
+  atRoot?: boolean;
+};
 
 /** Yield a node for each top-level instance node in `data` as written. */
 export function* iterInstance(data: unknown, module: YangModule, options: IterInstanceOptions = {}): Generator<InstanceNode> {
   if (!data || typeof data !== "object" || Array.isArray(data)) return;
   const native = options.nativeJson === true;
   const schema = options.schema ?? module;
-  const parent = schema === module ? (module.name ?? "") : "";
+  const parent = options.parentModule ?? (schema === module ? (module.name ?? "") : "");
   const checker = new TypeChecker(module);
   const outer = walkCache;
   walkCache = { nodes: new WeakMap(), resolved: new WeakMap(), unwrapped: new WeakMap() };
   let nodes: InstanceNode[];
   try {
-    nodes = walkObject(data as Record<string, unknown>, schema, module, checker, parent, "", native, true);
+    nodes = walkObject(data as Record<string, unknown>, schema, module, checker, parent, "", native, options.atRoot ?? true);
   } finally {
     walkCache = outer;
   }

@@ -14,6 +14,12 @@ export type ValidateCliArgs = CommonCliArgs & {
   /** ``null`` enables every declared feature. */
   features: Record<string, string[]> | null;
   nativeJson: boolean;
+  /** `--rpc NAME`: validate the data as an instance of that rpc. */
+  rpc: string | undefined;
+  /** `--output`: with `--rpc`, the output instead of the input. */
+  output: boolean;
+  /** `--context FILE`: server data next to the operation node. */
+  contextFile: string | undefined;
 };
 
 export function parseCommonArgs(rest: string[]): CommonCliArgs {
@@ -68,6 +74,9 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
   let format: "text" | "json" = "text";
   let features: Record<string, string[]> | null = null;
   let nativeJson = false;
+  let rpc: string | undefined;
+  let output = false;
+  let contextFile: string | undefined;
 
   for (let i = 0; i < rest.length; i += 1) {
     const arg = rest[i];
@@ -81,6 +90,24 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     }
     if (arg === "--native-json") {
       nativeJson = true;
+      continue;
+    }
+    if (arg === "--rpc") {
+      rpc = rest[++i];
+      if (!rpc) {
+        throw new Error("Missing rpc name after --rpc");
+      }
+      continue;
+    }
+    if (arg === "--output") {
+      output = true;
+      continue;
+    }
+    if (arg === "--context") {
+      contextFile = rest[++i];
+      if (!contextFile) {
+        throw new Error("Missing file after --context");
+      }
       continue;
     }
     if (arg === "--format") {
@@ -117,5 +144,9 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     positional.push(arg!);
   }
 
-  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson };
+  if (rpc === undefined && (output || contextFile !== undefined)) {
+    throw new Error("--output and --context apply only together with --rpc");
+  }
+
+  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, output, contextFile };
 }

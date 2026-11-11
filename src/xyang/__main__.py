@@ -186,6 +186,30 @@ def main() -> int:
         help="Accept native dict-style JSON instead of strict RFC 7951 (default)",
     )
     validate_parser.add_argument(
+        "--rpc",
+        metavar="NAME",
+        default=None,
+        help=(
+            "Validate the data as the input of rpc NAME (RFC 7950 §7.14): the RFC 8040 "
+            '{"module:input": {...}} wrapper, or bare parameters with --native-json'
+        ),
+    )
+    validate_parser.add_argument(
+        "--output",
+        action="store_true",
+        help="With --rpc, validate the rpc output instead of its input",
+    )
+    validate_parser.add_argument(
+        "--context",
+        type=Path,
+        default=None,
+        metavar="FILE",
+        help=(
+            "With --rpc, JSON or YAML server data that joins the operation node in the XPath "
+            "accessible tree (RFC 7950 §6.4.1) so must and leafref can reach it. Not validated"
+        ),
+    )
+    validate_parser.add_argument(
         "--features",
         default=None,
         metavar="JSON",
@@ -270,9 +294,20 @@ def main() -> int:
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
             return 2
+        if args.rpc is None and (args.output or args.context is not None):
+            print("Error: --output and --context apply only together with --rpc", file=sys.stderr)
+            return 2
         try:
             include_path = _include_path_from_args(args)
             features = _features_arg(args.features)
+            operation: dict[str, Any] = {}
+            if args.rpc is not None:
+                operation = {"rpc": args.rpc, "direction": "output" if args.output else "input"}
+                if args.context is not None:
+                    if not args.context.exists():
+                        print(f"Error: file not found: {args.context}", file=sys.stderr)
+                        return 2
+                    operation["context"] = _load_instance_data(args.context)
             module = parse_yang_file(str(p), include_path=include_path)
             validator = YangValidator(module, enabled_features_by_module=features)
             if args.anydata_validation != "off":
@@ -312,12 +347,12 @@ def main() -> int:
             else:
                 data = json.load(sys.stdin)
             if args.format == "json":
-                result = validator.validate_detailed(data, native_json=args.native_json)
+                result = validator.validate_detailed(data, native_json=args.native_json, **operation)
                 for warning in result["warnings"]:
                     print(f"Warning: {warning['path']}: {warning['message']}", file=sys.stderr)
                 print(_json_validation_report(result))
                 return 0 if result["valid"] else 1
-            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json)
+            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json, **operation)
             if is_valid:
                 print("Valid.")
                 for w in warnings:

@@ -210,6 +210,83 @@ export class DocumentValidator {
     return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
+  /**
+   * Validate the parameters of one rpc `input` or `output` (RFC 7950 §7.14). This validator's
+   * module is the accessible module of RFC 7950 §6.4.1 (see `accessibleModule`). `params` is the
+   * parameter object without the RFC 8040 wrapper, `rootData` the accessible tree's root object
+   * (server data plus the operation node) and `operation` the operation node.
+   */
+  validateOperationDetailed(
+    rpc: YangStatement,
+    operation: YangStatement,
+    params: Record<string, unknown>,
+    rootData: Record<string, unknown>,
+    wrapper: string | null
+  ): DetailedValidationResult {
+    const errors = this.collectOperation(rpc, operation, params, rootData, wrapper);
+    return { valid: errors.length === 0, errors: errors.map(toPublicIssue), warnings: [] };
+  }
+
+  /** Same as `validateOperationDetailed`, as `[isValid, errors, warnings]` display strings. */
+  validateOperationText(
+    rpc: YangStatement,
+    operation: YangStatement,
+    params: Record<string, unknown>,
+    rootData: Record<string, unknown>,
+    wrapper: string | null
+  ): [boolean, string[], string[]] {
+    const errors = this.collectOperation(rpc, operation, params, rootData, wrapper);
+    return [errors.length === 0, errors.map(formatIssue), []];
+  }
+
+  private collectOperation(
+    rpc: YangStatement,
+    operation: YangStatement,
+    params: Record<string, unknown>,
+    rootData: Record<string, unknown>,
+    wrapper: string | null
+  ): InternalIssue[] {
+    const ctx = this.rootCtx;
+    const ifFeatures = Array.isArray(rpc.if_features) ? (rpc.if_features as string[]) : [];
+    if (!stmtIfFeaturesSatisfied(ifFeatures, ctx.ifFeatureCtx, ctx.enabledByModule)) {
+      throw new Error(`rpc '${rpc.name}' is not available: its 'if-feature' condition is false`);
+    }
+    this.contextStack.push(ctx);
+    try {
+      const errors: InternalIssue[] = [];
+      const rootNode: XPathNode = { data: rootData, schema: ctx.module as unknown as XPathSchema, parent: null };
+      const opNode: XPathNode = { data: params, schema: operation as unknown as XPathSchema, parent: rootNode };
+      if (ctx.constraintChecks) {
+        this.checkMust(operation, opNode, rootNode, "", errors);
+      }
+      for (const child of operation.statements) {
+        if (this.effectiveKeyword(child) === YangTokenType.CHOICE) {
+          this.validateChoice(child, params, "", errors, opNode, rootNode);
+          continue;
+        }
+        if (!child.name) {
+          continue;
+        }
+        this.validateStatement(child, this.instanceValue(params, child), this.childPath("", child), errors, opNode, rootNode);
+      }
+      if (ctx.constraintChecks) {
+        this.rejectUnknownContainerKeys(operation, params, "", errors);
+      }
+      for (const item of errors) {
+        if (this.pointerMap) {
+          item.path = remapPointer(item.path, this.pointerMap);
+        }
+        if (wrapper !== null) {
+          item.path = joinPointer("", wrapper) + item.path;
+          item.pathLabel = item.pathLabel ? `${wrapper}.${item.pathLabel}` : wrapper;
+        }
+      }
+      return errors;
+    } finally {
+      this.contextStack.pop();
+    }
+  }
+
   private pointerMap: Map<string, string> | null = null;
 
   /** Map canonical walker pointers back to the input JSON as written. */

@@ -13,6 +13,10 @@ type Instance = {
   errors?: Expected[];
   xfail?: Record<string, string>;
   encoding?: string;
+  rpc?: string;
+  direction?: "input" | "output";
+  context?: Record<string, unknown>;
+  usage_error?: string;
 };
 type Case = {
   module: string;
@@ -46,9 +50,19 @@ function run(dir: string, c: Case, inst: Instance | undefined): void {
   const module = loadCaseModule(dir, c.module);
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
-  const { errors } = new YangValidator(module, { enabledFeaturesByModule: features }).validateDetailed(inst.data, {
-    nativeJson: inst.encoding === "native"
-  });
+  const operation = {
+    ...(inst.rpc !== undefined ? { rpc: inst.rpc } : {}),
+    ...(inst.direction !== undefined ? { direction: inst.direction } : {}),
+    ...(inst.context !== undefined ? { context: inst.context } : {})
+  };
+  const validator = new YangValidator(module, { enabledFeaturesByModule: features });
+  if (inst.usage_error) {
+    expect(() => validator.validateDetailed(inst.data, { nativeJson: inst.encoding === "native", ...operation })).toThrow(
+      inst.usage_error
+    );
+    return;
+  }
+  const { errors } = validator.validateDetailed(inst.data, { nativeJson: inst.encoding === "native", ...operation });
   const expected = inst.errors ?? [];
   const got = new Set(errors.map((e) => `${e.path} ${e.code}`));
   expect([...got].sort(), `raw errors: ${JSON.stringify(errors)}`).toEqual(
