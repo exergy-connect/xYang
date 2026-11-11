@@ -1,0 +1,7 @@
+{
+  "description": "Nested choice inside uses/refine keeps sibling mandatory leaves (name/description) when refining the legacy type leaf.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "legacy type with siblings", "data": { "data": { "fields": [{ "name": "id", "description": "identifier", "type": "integer", "required": true }] } }, "valid": true }
+  ]
+}

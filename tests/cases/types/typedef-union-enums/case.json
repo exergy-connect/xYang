@@ -1,0 +1,10 @@
+{
+  "description": "A typedef union of enumeration typedefs accepts any member enum and rejects other values.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "primitive member", "data": { "data": { "type": "string" } }, "valid": true },
+    { "name": "composite member", "data": { "data": { "type": "composite" } }, "valid": true },
+    { "name": "no member matches", "data": { "data": { "type": "invalid_type" } }, "valid": false,
+      "errors": [{ "path": "/data/type", "code": "union" }] }
+  ]
+}

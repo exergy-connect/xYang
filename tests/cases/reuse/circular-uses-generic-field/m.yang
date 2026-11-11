@@ -1,0 +1,47 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef primitive-type-name {
+    type enumeration {
+      enum string;
+      enum integer;
+    }
+  }
+
+  grouping generic-field {
+    leaf name {
+      type string {
+        length "1..128";
+      }
+      mandatory true;
+    }
+    container type {
+      choice choice-type {
+        mandatory true;
+        case primitive {
+          leaf primitive {
+            type primitive-type-name;
+            mandatory true;
+          }
+        }
+        case case-composite {
+          list fields {
+            key name;
+            min-elements 1;
+            uses generic-field {
+              refine type/choice-type/case-composite/fields {
+                max-elements 0;
+              }
+            }
+          }
+        }
+      }
+    }
+  }
+
+  container field {
+    uses generic-field;
+  }
+}

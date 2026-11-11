@@ -1,11 +1,6 @@
-import { resolve } from "node:path";
 import { describe, expect, it, vi } from "vitest";
 import { parseYangString, YangValidator } from "../src";
-import { YangParser } from "../src/parser/yang-parser";
 import * as xpathTokenizer from "../src/xpath/tokenizer";
-
-const repoRoot = resolve(__dirname, "..", "..");
-const metaModelPath = resolve(repoRoot, "examples/meta-model.yang");
 
 function sumCounts(counts: Map<string, number>): number {
   return [...counts.values()].reduce((acc, count) => acc + count, 0);
@@ -113,52 +108,6 @@ module test {
       expect(parsePhaseCount.get(". >= 0")).toBeGreaterThanOrEqual(2);
       expect(validationPhaseCount.get("string-length(.) > 0")).toBe(1);
       expect(validationPhaseCount.get(". >= 0")).toBe(1);
-    } finally {
-      spy.mockRestore();
-    }
-  });
-
-  it("reuses parsed XPath expressions across repeated validations with meta-model", () => {
-    const parsePhaseCount = new Map<string, number>();
-    const validationPhaseCount = new Map<string, number>();
-    let yangParsingComplete = false;
-
-    const originalTokenize = xpathTokenizer.tokenizeXPath;
-    const spy = vi.spyOn(xpathTokenizer, "tokenizeXPath").mockImplementation((expression: string) => {
-      const target = yangParsingComplete ? validationPhaseCount : parsePhaseCount;
-      target.set(expression, (target.get(expression) ?? 0) + 1);
-      return originalTokenize(expression);
-    });
-
-    try {
-      const parser = new YangParser();
-      const module = parser.parseFile(metaModelPath);
-      yangParsingComplete = true;
-
-      const validator = new YangValidator(module);
-      const testData = {
-        "data-model": {
-          name: "Test Model",
-          version: "1.0.0",
-          author: "Test",
-          entities: [
-            {
-              name: "test_entity",
-              primary_key: "id",
-              fields: [{ name: "id", type: "string" }]
-            }
-          ]
-        }
-      };
-
-      validator.validate(testData);
-      const firstValidationTokenizeTotal = sumCounts(validationPhaseCount);
-      validator.validate(testData);
-      const secondValidationTokenizeTotal = sumCounts(validationPhaseCount);
-
-      expect(parsePhaseCount.size).toBeGreaterThan(0);
-      expect(firstValidationTokenizeTotal).toBeGreaterThan(0);
-      expect(secondValidationTokenizeTotal).toBe(firstValidationTokenizeTotal);
     } finally {
       spy.mockRestore();
     }

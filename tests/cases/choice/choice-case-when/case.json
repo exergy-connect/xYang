@@ -1,0 +1,12 @@
+{
+  "description": "when on choice and case: false when skips the branch; present data under a false when is an error (RFC 7950 §7.21.5).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "choice when false and no branch data", "data": { "root": { "mode": "off" } }, "valid": true },
+    { "name": "choice when true with case b", "data": { "root": { "mode": "on", "b": "y" } }, "valid": true },
+    { "name": "branch data while choice when is false", "data": { "root": { "mode": "off", "a": "x" } }, "valid": false,
+      "errors": [{ "path": "/root", "code": "when" }] },
+    { "name": "case data while case when is false", "data": { "root": { "mode": "on", "a": "x" } }, "valid": false,
+      "errors": [{ "path": "/root", "code": "when" }] }
+  ]
+}

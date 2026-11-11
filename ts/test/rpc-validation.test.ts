@@ -8,7 +8,8 @@ import { beforeAll, describe, expect, it } from "vitest";
 import { parseYangString, validate, YangValidator } from "../src";
 import { parseValidateArgs } from "../src/cli/args";
 
-// Validate rpc input and output instances (issue #149). Shared cases: tests/cases/operations.
+// RPC validate API contracts and CLI --rpc/--output/--context (issue #149).
+// Validation outcomes live in tests/cases/operations/.
 
 const tsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -41,43 +42,9 @@ module example-topology-tools {
 
 const SELF_LINK = { "example-topology-tools:input": { source: "r1", target: "r1" } };
 const OTHER_LINK = { "example-topology-tools:input": { source: "r1", target: "r2" } };
-const pairs = (errors: Array<{ path: string; code: string }>) => errors.map((e) => [e.path, e.code]);
 
 describe("rpc input and output", () => {
   const module = parseYangString(MODULE);
-
-  it("without rpc the wrapper is an unknown field (the old behavior)", () => {
-    expect(pairs(validate(module, SELF_LINK).errors)).toEqual([["/example-topology-tools:input", "unknown-field"]]);
-  });
-
-  it("a self link fails must with the error message", () => {
-    const result = validate(module, SELF_LINK, { rpc: "add-link" });
-    expect(result.valid).toBe(false);
-    expect(result.errors.map((e) => [e.path, e.code, e.message])).toEqual([
-      ["/example-topology-tools:input/target", "must", "A link cannot connect a node to itself."]
-    ]);
-    expect(validate(module, OTHER_LINK, { rpc: "add-link", direction: "input" }).valid).toBe(true);
-  });
-
-  it("takes bare parameters with nativeJson", () => {
-    const result = validate(module, { source: "r1", target: "r1" }, { rpc: "add-link", nativeJson: true });
-    expect(pairs(result.errors)).toEqual([["/target", "must"]]);
-  });
-
-  it("validates the output", () => {
-    expect(validate(module, { "example-topology-tools:output": { "link-id": "l1" } }, { rpc: "add-link", direction: "output" }).valid).toBe(true);
-    const bad = validate(module, { "example-topology-tools:output": {} }, { rpc: "add-link", direction: "output" });
-    expect(pairs(bad.errors)).toEqual([["/example-topology-tools:output/link-id", "mandatory"]]);
-  });
-
-  it("joins the context to the operation node", () => {
-    const data = { "example-topology-tools:input": { source: "r1", target: "r2", via: "r3" } };
-    const context = { "example-topology-tools:topology": { node: [{ name: "r3" }] } };
-    expect(validate(module, data, { rpc: "add-link", context }).valid).toBe(true);
-    expect(pairs(validate(module, data, { rpc: "add-link" }).errors)).toEqual([
-      ["/example-topology-tools:input/via", "leafref"]
-    ]);
-  });
 
   it("does not mutate the module or the caller's data", () => {
     const statements = [...module.statements];
@@ -100,17 +67,6 @@ describe("rpc input and output", () => {
     const result = new YangValidator(module).validate(SELF_LINK, { rpc: "add-link" });
     expect(result.isValid).toBe(false);
     expect(result.errors[0]).toContain("A link cannot connect a node to itself.");
-  });
-
-  it.each([
-    [{ rpc: "nope" }, "no rpc 'nope'"],
-    [{ direction: "output" as const }, "direction applies only together with rpc"],
-    [{ context: {} }, "context applies only together with rpc"],
-    [{ rpc: "add-link", direction: "sideways" as never }, "direction must be 'input' or 'output'"],
-    [{ rpc: "add-link", context: [] as never }, "context must be a JSON object"],
-    [{ rpc: "" }, "rpc must be a non-empty rpc name"]
-  ])("rejects options %j", (options, message) => {
-    expect(() => validate(module, OTHER_LINK, options)).toThrow(message);
   });
 });
 

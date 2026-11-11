@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef version-string {
+    type string {
+      pattern '\d{2}\.\d{2}\.\d{2}\.\d+' {
+        description "Version format: YY.MM.DD.N";
+      }
+    }
+  }
+
+  container top {
+    leaf version {
+      type version-string;
+    }
+  }
+}

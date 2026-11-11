@@ -1,0 +1,21 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    leaf min_value {
+      type int32;
+    }
+    leaf single_value {
+      type int32;
+      must "current() > 0";
+    }
+    leaf-list values {
+      type int32;
+      must "current() > 0";
+      must "current() <= 100";
+      must "current() >= ../min_value";
+    }
+  }
+}

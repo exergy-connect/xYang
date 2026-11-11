@@ -1,0 +1,13 @@
+{
+  "description": "must on a leaf inside a list uses the leaf as context, so ../../flag reaches the ancestor container (RFC 7950 §7.5.3).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "flag set",
+      "data": { "top": { "flag": 1, "items": [{ "id": 1, "ref_rel": "ok" }] } },
+      "valid": true },
+    { "name": "flag unset",
+      "data": { "top": { "flag": 0, "items": [{ "id": 1, "ref_rel": "bad" }] } },
+      "valid": false,
+      "errors": [{ "path": "/top/items/0/ref_rel", "code": "must" }] }
+  ]
+}

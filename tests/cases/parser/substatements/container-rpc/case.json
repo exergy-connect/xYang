@@ -1,0 +1,6 @@
+{
+  "description": "rpc inside a container is a syntax error.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Invalid or unknown statement in container 'c': 'rpc'"
+}

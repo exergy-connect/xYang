@@ -1,0 +1,22 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    list entities {
+      key name;
+      leaf name { type string; }
+      leaf primary_key {
+        type string;
+        must "../fields[name = current()]" {
+          error-message "primary_key must reference existing field";
+        }
+      }
+      list fields {
+        key name;
+        leaf name { type string; }
+      }
+    }
+  }
+}

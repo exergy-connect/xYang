@@ -2,7 +2,6 @@ import { mkdtempSync, writeFileSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
 import { describe, expect, it } from "vitest";
-import { YangSemanticError } from "../src/core/errors";
 import { YangParser } from "../src/parser/yang-parser";
 import { YangValidator } from "../src/validator/yang-validator";
 
@@ -15,7 +14,7 @@ function writeModule(dir: string, name: string, text: string): string {
 describe("deviate not-supported", () => {
   it("removes an imported leaf so the base module rejects it as an unknown field", () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-deviation-"));
-    const basePath = writeModule(
+    writeModule(
       dir,
       "base.yang",
       `
@@ -97,23 +96,5 @@ module dev {
     const kept = new YangValidator(alone).validate({ top: { a: "x" } });
     expect(kept.isValid).toBe(true);
     expect(alone).not.toBe(deviated);
-  });
-
-  it("reports a missing not-supported target as a schema error", () => {
-    const dir = mkdtempSync(join(tmpdir(), "xyang-deviation-missing-"));
-    const path = writeModule(
-      dir,
-      "m.yang",
-      `
-module m {
-  yang-version 1.1;
-  namespace "urn:m";
-  prefix m;
-  container top { leaf b { type uint8; } }
-  deviation "/m:top/m:a" { deviate not-supported; }
-}
-`
-    );
-    expect(() => new YangParser().parseFile(path)).toThrow(YangSemanticError);
   });
 });

@@ -1,15 +1,21 @@
 import { dirname, join } from "node:path";
 import { fileURLToPath } from "node:url";
-import { describe, expect, it } from "vitest";
-import { generateJsonSchema, parseJsonSchema, parseYangFile } from "../../src";
+import { beforeAll, describe, expect, it } from "vitest";
+import { generateJsonSchema, parseJsonSchema, parseYangFile, type YangModule } from "../../src";
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const MINIMAL_YANG = join(__dirname, "../../../examples/identity_roundtrip.yang");
 
 describe("python parity: json/test_identity_json", () => {
+  let module: YangModule;
+  let schema: Record<string, unknown>;
+
+  beforeAll(() => {
+    module = parseYangFile(MINIMAL_YANG);
+    schema = generateJsonSchema(module);
+  });
+
   it("generateJsonSchema includes identity defs and identityref metadata", () => {
-    const module = parseYangFile(MINIMAL_YANG);
-    const schema = generateJsonSchema(module);
     const defs = (schema.$defs ?? {}) as Record<string, unknown>;
 
     expect(defs.animal).toBeDefined();
@@ -25,8 +31,6 @@ describe("python parity: json/test_identity_json", () => {
   });
 
   it("parseJsonSchema round-trip restores identities and identityref leaf type", () => {
-    const module = parseYangFile(MINIMAL_YANG);
-    const schema = generateJsonSchema(module);
     const round = parseJsonSchema(schema);
 
     expect(round.identities.animal).toBeDefined();

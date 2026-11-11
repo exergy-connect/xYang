@@ -1,0 +1,9 @@
+{
+  "description": "Typedef string pattern restrictions apply to leaf values.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid version", "data": { "top": { "version": "25.03.11.1" } }, "valid": true },
+    { "name": "pattern mismatch", "data": { "top": { "version": "invalid" } }, "valid": false,
+      "errors": [{ "path": "/top/version", "code": "pattern" }] }
+  ]
+}

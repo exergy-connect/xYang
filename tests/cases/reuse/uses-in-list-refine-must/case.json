@@ -1,0 +1,9 @@
+{
+  "description": "uses inside a list with refine applies must to the grouping leaf.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "leaf absent", "data": { "c": { "L": [{ "k": "a" }] } }, "valid": true },
+    { "name": "refined must", "data": { "c": { "L": [{ "k": "a", "payload_leaf": "x" }] } }, "valid": false,
+      "errors": [{ "path": "/c/L/0/payload_leaf", "code": "must" }] }
+  ]
+}

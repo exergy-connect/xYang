@@ -1,0 +1,6 @@
+{
+  "description": "A grouping that uses itself is a schema error.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "a -> a"
+}

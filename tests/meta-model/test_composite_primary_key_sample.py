@@ -13,7 +13,7 @@ META_MODEL_YANG = REPO_ROOT / "examples" / "meta-model.yang"
 SAMPLE_YAML = REPO_ROOT / "tests" / "data" / "composite_primary_key_sample.yaml"
 
 
-@pytest.fixture
+@pytest.fixture(scope="module")
 def meta_model_module():
     assert META_MODEL_YANG.is_file(), f"Missing {META_MODEL_YANG}"
     return parse_yang_file(str(META_MODEL_YANG))
@@ -25,14 +25,6 @@ def _load_sample() -> dict:
     tree = yaml.safe_load(SAMPLE_YAML.read_text(encoding="utf-8"))
     assert isinstance(tree, dict)
     return {"data-model": tree}
-
-
-def test_composite_primary_key_sample_validates(meta_model_module):
-    """Full YAML validates against examples/meta-model.yang."""
-    data = _load_sample()
-    validator = YangValidator(meta_model_module)
-    is_valid, errors, warnings = validator.validate(data)
-    assert is_valid, f"errors={errors} warnings={warnings}"
 
 
 def test_composite_primary_key_points_at_composite_field(meta_model_module):

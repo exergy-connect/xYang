@@ -1,0 +1,35 @@
+{
+  "description": "Unknown members inside a choice case are rejected; choice and case names are not instance members; anydata/anyxml stay opaque.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "unknown member inside choice case",
+      "data": { "topology": { "routing": { "enable": true } } },
+      "valid": false,
+      "errors": [{ "path": "/topology/routing/enable", "code": "unknown-field", "message": "Unknown field 'enable'" }]
+    },
+    {
+      "name": "modeled choice children and opaque payloads",
+      "data": {
+        "topology": {
+          "device": "frr",
+          "empty": {},
+          "routing": { "enabled": true },
+          "nodes": [{ "name": "a" }],
+          "metadata": { "arbitrary": { "nested": true } },
+          "payload": { "arbitrary": true }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "choice and case names are not members",
+      "data": { "topology": { "mode": {}, "routed": {} } },
+      "valid": false,
+      "errors": [
+        { "path": "/topology/mode", "code": "unknown-field", "message": "Unknown field 'mode'" },
+        { "path": "/topology/routed", "code": "unknown-field", "message": "Unknown field 'routed'" }
+      ]
+    }
+  ]
+}

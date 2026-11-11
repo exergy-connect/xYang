@@ -1,0 +1,6 @@
+{
+  "description": "Top-level output is invalid; output is only a substatement of rpc or action.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "'output' is only valid as a substatement of 'rpc' or 'action'"
+}

@@ -5,6 +5,10 @@
     { "name": "rfc qualified list and empty", "data": { "m:top": { "interface": [{ "name": "eth0", "mtu": "1500" }], "marker": [null] } }, "valid": true },
     { "name": "rfc array", "data": { "top": { "interface": [{ "name": "eth0", "mtu": "1500" }] } }, "valid": true },
     { "name": "native keyed list, key omitted", "encoding": "native", "data": { "top": { "interface": { "eth0": { "mtu": 1500 } } } }, "valid": true },
+    { "name": "native keyed list with empty null", "encoding": "native", "data": { "top": { "interface": { "eth0": { "mtu": 1500 } }, "marker": null } }, "valid": true },
+    { "name": "rfc rejects native keyed list with empty null", "data": { "top": { "interface": { "eth0": { "mtu": 1500 } }, "marker": null } }, "valid": false,
+      "errors": [{ "path": "/top/interface", "code": "type" }, { "path": "/top/marker", "code": "type" }] },
+
     { "name": "native keyed list, key present and equal", "encoding": "native", "data": { "top": { "interface": { "eth0": { "name": "eth0", "mtu": 1500 } } } }, "valid": true },
     { "name": "native array", "encoding": "native", "data": { "top": { "interface": [{ "name": "eth0", "mtu": 1500 }] } }, "valid": true },
     { "name": "native key mismatch", "encoding": "native", "data": { "top": { "interface": { "eth0": { "name": "eth1", "mtu": 1500 } } } }, "valid": false,

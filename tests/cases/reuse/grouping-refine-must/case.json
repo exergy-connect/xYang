@@ -1,0 +1,9 @@
+{
+  "description": "refine adds a must on a leaf from the used grouping.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "allowed type", "data": { "data": { "name": "field1", "type": "string" } }, "valid": true },
+    { "name": "refined must", "data": { "data": { "name": "field1", "type": "invalid" } }, "valid": false,
+      "errors": [{ "path": "/data/type", "code": "must", "message": "Type cannot be invalid" }] }
+  ]
+}

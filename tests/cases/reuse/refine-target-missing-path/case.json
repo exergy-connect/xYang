@@ -1,0 +1,6 @@
+{
+  "description": "refine path with a missing intermediate node is a schema error.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "missing/list"
+}

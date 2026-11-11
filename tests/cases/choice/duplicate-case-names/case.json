@@ -1,0 +1,6 @@
+{
+  "description": "Identifiers of nodes in the cases of a choice must be unique across cases (RFC 7950 §7.9).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "ethernet"
+}

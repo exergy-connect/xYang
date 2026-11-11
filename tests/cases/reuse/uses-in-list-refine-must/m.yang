@@ -1,0 +1,25 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping payload {
+    leaf payload_leaf {
+      type string;
+    }
+  }
+
+  container c {
+    list L {
+      key k;
+      leaf k {
+        type string;
+      }
+      uses payload {
+        refine payload_leaf {
+          must "false()";
+        }
+      }
+    }
+  }
+}

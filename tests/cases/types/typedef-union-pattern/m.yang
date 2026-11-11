@@ -1,0 +1,32 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  typedef string-pattern {
+    type string {
+      pattern '[A-Z][a-z]+';
+    }
+  }
+
+  typedef status-enum {
+    type enumeration {
+      enum active;
+      enum inactive;
+      enum pending;
+    }
+  }
+
+  typedef status-type {
+    type union {
+      type string-pattern;
+      type status-enum;
+    }
+  }
+
+  container data {
+    leaf status {
+      type status-type;
+    }
+  }
+}

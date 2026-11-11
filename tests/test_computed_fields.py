@@ -94,13 +94,14 @@ module meta-model {
 """
 
 
-def _validator():
+@pytest.fixture(scope="module")
+def subset_validator():
     return YangValidator(parse_yang_string(META_MODEL_SUBSET))
 
 
-def test_computed_field_missing_field_same_entity():
+def test_computed_field_missing_field_same_entity(subset_validator):
     """Computed field referencing non-existent field in same entity should fail."""
-    validator = _validator()
+    validator = subset_validator
     invalid_data = {
         "data-model": {
             "consolidated": True,
@@ -132,9 +133,9 @@ def test_computed_field_missing_field_same_entity():
     assert any("exist" in e.lower() or "field" in e.lower() for e in errors), f"Errors: {errors}"
 
 
-def test_computed_field_valid_same_entity():
+def test_computed_field_valid_same_entity(subset_validator):
     """Valid computed field with fields in same entity should pass."""
-    validator = _validator()
+    validator = subset_validator
     valid_data = {
         "data-model": {
             "entities": [
@@ -165,9 +166,9 @@ def test_computed_field_valid_same_entity():
     assert is_valid, f"Valid data should pass. Errors: {errors}"
 
 
-def test_computed_field_missing_field_cross_entity():
+def test_computed_field_missing_field_cross_entity(subset_validator):
     """Computed field referencing non-existent field in cross-entity should fail."""
-    validator = _validator()
+    validator = subset_validator
     invalid_data = {
         "data-model": {
             "consolidated": True,
@@ -206,9 +207,9 @@ def test_computed_field_missing_field_cross_entity():
     assert not is_valid, "Validation should fail for missing field in cross-entity reference"
 
 
-def test_computed_field_cross_entity_no_foreign_key():
+def test_computed_field_cross_entity_no_foreign_key(subset_validator):
     """Cross-entity computed field reference without foreign key should fail."""
-    validator = _validator()
+    validator = subset_validator
     invalid_data = {
         "data-model": {
             "consolidated": True,
@@ -243,9 +244,9 @@ def test_computed_field_cross_entity_no_foreign_key():
     assert not is_valid
 
 
-def test_computed_field_cross_entity_with_foreign_key():
+def test_computed_field_cross_entity_with_foreign_key(subset_validator):
     """Valid cross-entity computed field with foreign key should pass."""
-    validator = _validator()
+    validator = subset_validator
     valid_data = {
         "data-model": {
             "entities": [
@@ -280,9 +281,9 @@ def test_computed_field_cross_entity_with_foreign_key():
     assert is_valid, f"Valid data should pass. Errors: {errors}"
 
 
-def test_computed_field_wrong_field_count_binary():
+def test_computed_field_wrong_field_count_binary(subset_validator):
     """Binary operation with wrong field count should fail."""
-    validator = _validator()
+    validator = subset_validator
     invalid_data = {
         "data-model": {
             "entities": [
@@ -307,9 +308,9 @@ def test_computed_field_wrong_field_count_binary():
     assert any("2" in e or "binary" in e.lower() or "field" in e.lower() for e in errors), f"Errors: {errors}"
 
 
-def test_computed_field_valid_aggregation():
+def test_computed_field_valid_aggregation(subset_validator):
     """Valid aggregation (e.g. max) with multiple fields should pass."""
-    validator = _validator()
+    validator = subset_validator
     valid_data = {
         "data-model": {
             "entities": [

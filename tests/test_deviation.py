@@ -1,13 +1,14 @@
-"""``deviate not-supported`` removes the target, including across an import."""
+"""``deviate not-supported`` removes the target, including across an import.
+
+Same-module not-supported validation and missing-target schema errors live in
+``tests/cases/modules/``.
+"""
 
 from __future__ import annotations
 
 from pathlib import Path
 
-import pytest
-
 from xyang import YangValidator
-from xyang.errors import YangSemanticError
 from xyang.parser import YangParser
 
 
@@ -100,21 +101,3 @@ module dev {
     ok, errors, _warnings = YangValidator(alone).validate({"top": {"a": "x"}})
     assert ok, errors
     assert alone is not deviated
-
-
-def test_missing_not_supported_target_is_schema_error(tmp_path: Path) -> None:
-    _write(
-        tmp_path,
-        "m.yang",
-        """
-module m {
-  yang-version 1.1;
-  namespace "urn:m";
-  prefix m;
-  container top { leaf b { type uint8; } }
-  deviation "/m:top/m:a" { deviate not-supported; }
-}
-""",
-    )
-    with pytest.raises(YangSemanticError):
-        YangParser().parse_file(tmp_path / "m.yang")

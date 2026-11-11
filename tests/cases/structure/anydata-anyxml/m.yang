@@ -1,0 +1,11 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data-model {
+    anydata payload { description "free-form"; }
+    anyxml legacy { mandatory true; }
+    leaf tag { type string; }
+  }
+}

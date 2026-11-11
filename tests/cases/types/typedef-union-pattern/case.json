@@ -1,0 +1,12 @@
+{
+  "description": "A typedef union of a patterned string and an enumeration accepts either member and rejects values that match neither.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "enumeration member", "data": { "data": { "status": "active" } }, "valid": true },
+    { "name": "pattern member", "data": { "data": { "status": "Hello" } }, "valid": true },
+    { "name": "matches neither", "data": { "data": { "status": "invalid" } }, "valid": false,
+      "errors": [{ "path": "/data/status", "code": "union" }] },
+    { "name": "lowercase fails pattern", "data": { "data": { "status": "hello" } }, "valid": false,
+      "errors": [{ "path": "/data/status", "code": "union" }] }
+  ]
+}

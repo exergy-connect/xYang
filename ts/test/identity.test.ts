@@ -1,5 +1,5 @@
 import { describe, expect, it } from "vitest";
-import { parseYangString, YangValidator } from "../src";
+import { parseYangString } from "../src";
 
 /** Minimal YANG 1.1 module: base identity, derived identity, leaf with identityref. */
 const MINIMAL_IDENTITY_YANG = `
@@ -85,37 +85,10 @@ module identity-must-derived-from-or-self {
 }
 `;
 
-const IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING = `
-module identity-must-sibling {
-  yang-version 1.1;
-  namespace "urn:identity-must-sibling";
-  prefix "is";
-
-  identity animal;
-
-  identity mammal {
-    base animal;
-  }
-
-  identity dog {
-    base mammal;
-  }
-
-  container data {
-    leaf kind {
-      type identityref {
-        base animal;
-      }
-    }
-    leaf label {
-      type string;
-      must "derived-from(../kind, 'is:mammal')";
-    }
-  }
-}
-`;
-
 describe("python parity: test_identity", () => {
+  // Validation coverage: tests/cases/references/identityref,
+  // tests/cases/references/identityref-must-derived-from
+
   it("parses a module with identity statements and an identityref leaf", () => {
     const module = parseYangString(MINIMAL_IDENTITY_YANG);
     expect(module.name).toBe("identity-test");
@@ -131,26 +104,5 @@ describe("python parity: test_identity", () => {
   it("parses must using derived-from-or-self(identityref, identity) (RFC 7950)", () => {
     const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_OR_SELF);
     expect(module.name).toBe("identity-must-derived-from-or-self");
-  });
-
-  it("parses must on a leaf that constrains a sibling identityref via derived-from", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);
-    expect(module.name).toBe("identity-must-sibling");
-  });
-
-
-  it("validate must on sibling when identityref satisfies derived-from", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);
-    const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "identity-must-sibling:dog", label: "x" } });
-    expect(result.isValid, result.errors.join("\n")).toBe(true);
-  });
-
-  it("validate must on sibling fails when identityref not mammal lineage", () => {
-    const module = parseYangString(IDENTITY_YANG_MUST_DERIVED_FROM_SIBLING);
-    const validator = new YangValidator(module);
-    const result = validator.validate({ data: { kind: "identity-must-sibling:animal", label: "x" } });
-    expect(result.isValid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
   });
 });

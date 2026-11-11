@@ -28,36 +28,7 @@ module iid-test {
 `;
 
 describe("python parity: test_instance_identifier", () => {
-  it("accepts absolute path when target exists and require-instance is true", () => {
-    const module = parseYangString(MINIMAL_MODULE_YANG);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      "data-model": {
-        top: { x: "hello" },
-        ptr: "/data-model/top/x",
-        ptr_loose: "not-a-valid-path-syntax-("
-      }
-    });
-
-    expect(result.isValid, result.errors.join("\n")).toBe(true);
-    expect(result.errors).toEqual([]);
-  });
-
-
-  it("rejects non-absolute paths when require-instance is true", () => {
-    const module = parseYangString(MINIMAL_MODULE_YANG);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      "data-model": {
-        top: { x: "hello" },
-        ptr: "top/x",
-        ptr_loose: "x"
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    expect(result.errors.some((e) => e.toLowerCase().includes("absolute"))).toBe(true);
-  });
+  // Validation coverage: tests/cases/references/instance-identifier
 
   it("generateJsonSchema → parseJsonSchema preserves instance-identifier and require-instance", () => {
     const module = parseYangString(MINIMAL_MODULE_YANG);

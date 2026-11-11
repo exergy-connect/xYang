@@ -1,0 +1,9 @@
+{
+  "description": "Mandatory nested choice is enforced when another node from the same outer case exists; the inner branch alone is enough (RFC 7950 §7.9.4).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "sibling with empty inner wrap", "data": { "data": { "sibling": "x", "inner_wrap": {} } }, "valid": false,
+      "errors": [{ "path": "/data/inner_wrap", "code": "mandatory-choice" }] },
+    { "name": "inner branch alone", "data": { "data": { "inner_wrap": { "a": "only-inner" } } }, "valid": true }
+  ]
+}

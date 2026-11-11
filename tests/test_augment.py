@@ -13,36 +13,6 @@ from xyang.parser import YangParser
 from xyang.validator.document_validator import DocumentValidator
 
 
-def test_augment_same_module_merges_into_container(tmp_path: Path) -> None:
-    path = tmp_path / "m.yang"
-    path.write_text(
-        """
-module m {
-  yang-version 1.1;
-  namespace "urn:m";
-  prefix m;
-  container a {
-    leaf x { type string; }
-  }
-  augment "/m:a" {
-    leaf y { type int32; }
-  }
-}
-""",
-        encoding="utf-8",
-    )
-    mod = YangParser(expand_uses=True).parse_file(path)
-    assert not any(isinstance(s, YangAugmentStmt) for s in mod.statements)
-    a = mod.find_statement("a")
-    assert a is not None
-    assert a.find_statement("x") is not None
-    y = a.find_statement("y")
-    assert isinstance(y, YangLeafStmt)
-    v = YangValidator(mod)
-    ok, errors, _ = v.validate({"a": {"x": "hi", "y": 42}})
-    assert ok, errors
-
-
 def test_augment_cross_file_import_merges_into_imported_container(tmp_path: Path) -> None:
     (tmp_path / "lib.yang").write_text(
         """

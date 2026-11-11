@@ -1,6 +1,6 @@
 import { resolve } from "node:path";
 import { describe, expect, it } from "vitest";
-import { parseYangFile, parseYangString, YangValidator } from "../src";
+import { parseYangFile, YangValidator } from "../src";
 
 const repoRoot = resolve(__dirname, "..", "..");
 const metaModelPath = resolve(repoRoot, "examples/meta-model.yang");
@@ -50,53 +50,6 @@ describe("python parity: test_leafref_relative_path", () => {
     });
 
     expect(leafrefResolutionErrors(result.errors)).toHaveLength(0);
-  });
-
-  it("invalid relative-path leafref reference is rejected", () => {
-    const module = parseYangString(`
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    list entities {
-      key name;
-      leaf name { type string; }
-      list fields {
-        key name;
-        leaf name { type string; }
-      }
-      leaf ref {
-        type leafref {
-          path "../fields/name";
-          require-instance true;
-        }
-        must "../fields[name = current()]" {
-          error-message "leafref value must resolve to an existing field";
-        }
-      }
-    }
-  }
-}
-`);
-    const validator = new YangValidator(module);
-    const result = validator.validate({
-      data: {
-        entities: [
-          {
-            name: "e1",
-            fields: [{ name: "id" }, { name: "other" }],
-            ref: "nonexistent_field"
-          }
-        ]
-      }
-    });
-
-    expect(result.isValid).toBe(false);
-    expect(result.errors.length).toBeGreaterThan(0);
-    const joined = result.errors.join(" ").toLowerCase();
-    expect(joined.includes("leafref") || joined.includes("nonexistent_field") || joined.includes("field")).toBe(true);
   });
 
   it("with multiple entities, relative path resolution stays scoped to the current entity context", () => {

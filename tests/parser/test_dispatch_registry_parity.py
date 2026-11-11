@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import json
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 from xyang.parser.dispatch_registry import DISPATCH_REGISTRY, dispatch_registry_parity_snapshot
@@ -54,6 +55,18 @@ _PARENTS = {
 }
 
 
+@lru_cache(maxsize=1)
+def _typescript_dispatch_snapshot() -> dict:
+    completed = subprocess.run(
+        ["node", "scripts/dump-dispatch-registry.mjs"],
+        cwd=_ROOT / "ts",
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout)
+
+
 def test_every_parent_is_in_the_registry():
     assert set(DISPATCH_REGISTRY) == _PARENTS
     for spec in DISPATCH_REGISTRY.values():
@@ -63,14 +76,7 @@ def test_every_parent_is_in_the_registry():
 
 def test_python_and_typescript_dispatch_registries_agree():
     python = dispatch_registry_parity_snapshot()
-    completed = subprocess.run(
-        ["node", "scripts/dump-dispatch-registry.mjs"],
-        cwd=_ROOT / "ts",
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, completed.stderr
-    typescript = json.loads(completed.stdout)
+    typescript = _typescript_dispatch_snapshot()
     assert list(python) == list(typescript)
     for name, row in python.items():
         assert typescript[name] == row

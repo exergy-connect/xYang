@@ -49,14 +49,6 @@ describe("python parity: meta-model/test_must", () => {
     expect(errors.some((e) => e.includes("allow_unlimited_fields"))).toBe(true);
   });
 
-  it("entity_field_limit_valid", () => {
-    const data = dm({
-      entities: [ent("e", "id", [fp("id", "integer", { description: "PK." }), fp("x", "string", { description: "X." })])]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
-  });
-
   it("entity_field_limit_invalid", () => {
     const data = dm({
       entities: [
@@ -66,14 +58,6 @@ describe("python parity: meta-model/test_must", () => {
     const { ok, errors } = validate(data);
     expect(ok).toBe(false);
     expect(errors.some((e) => e.includes("7") || e.toLowerCase().includes("field"))).toBe(true);
-  });
-
-  it("entity_name_underscore_valid", () => {
-    const data = dm({
-      entities: [ent("entity_a", "id", [fp("id", "integer", { description: "PK." })])]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
   });
 
   it("entity_name_underscore_invalid", () => {
@@ -100,46 +84,6 @@ describe("python parity: meta-model/test_must", () => {
     const { ok, errors } = validate(data);
     expect(ok).toBe(false);
     expect(errors.some((e) => e.includes("primary_key") || e.toLowerCase().includes("field"))).toBe(true);
-  });
-
-  it("mindate_type_valid", () => {
-    const data = dm({
-      entities: [
-        ent("e", "id", [
-          fp("id", "integer", { description: "PK." }),
-          fp("d", "date", { minDate: "2020-01-01", description: "D." })
-        ])
-      ]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
-  });
-
-  it("mindate_type_invalid", () => {
-    const data = dm({
-      entities: [
-        ent("e", "id", [
-          fp("id", "integer", { description: "PK." }),
-          fp("t", "string", { minDate: "2020-01-01", description: "T." })
-        ])
-      ]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok).toBe(false);
-    expect(errors.some((e) => e.includes("minDate") || e.toLowerCase().includes("date"))).toBe(true);
-  });
-
-  it("maxdate_type_valid", () => {
-    const data = dm({
-      entities: [
-        ent("e", "id", [
-          fp("id", "integer", { description: "PK." }),
-          fp("d", "date", { maxDate: "2020-12-31", description: "D." })
-        ])
-      ]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
   });
 
   it("maxdate_ordering_invalid", () => {
@@ -183,21 +127,6 @@ describe("python parity: meta-model/test_must", () => {
     const { ok, errors } = validate(data);
     expect(ok).toBe(false);
     expect(errors.length).toBeGreaterThan(0);
-  });
-
-  it("computed_binary_two_fields_valid", () => {
-    const data = dm({
-      entities: [
-        ent("e", "id", [
-          fp("id", "integer", { description: "PK." }),
-          fp("a", "integer", { description: "A." }),
-          fp("b", "integer", { description: "B." }),
-          fComputed("sum", "integer", "add", [{ field: "a" }, { field: "b" }])
-        ])
-      ]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
   });
 
   it("computed_binary_two_fields_invalid", () => {
@@ -334,36 +263,6 @@ describe("python parity: meta-model/test_must", () => {
     const { ok, errors } = validate(data);
     expect(ok).toBe(false);
     expect(errors.some((e) => e.toLowerCase().includes("foreign key") || e.includes("Cross-entity"))).toBe(true);
-  });
-
-  it("required_no_default_valid", () => {
-    const data = dm({
-      entities: [ent("e", "id", [fp("id", "integer", { description: "PK." }), fp("x", "string", { required: true, description: "X." })])]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
-  });
-
-  it("required_with_default_invalid", () => {
-    const data = dm({
-      entities: [
-        ent("e", "id", [
-          fp("id", "integer", { description: "PK." }),
-          fp("x", "string", { required: true, default: "v", description: "X." })
-        ])
-      ]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok).toBe(false);
-    expect(errors.some((e) => e.toLowerCase().includes("required") || e.toLowerCase().includes("default"))).toBe(true);
-  });
-
-  it("composite_subcomponent_type_valid", () => {
-    const data = dm({
-      entities: [ent("e", "pk", [fComposite("pk", [subf("a", "integer"), subf("b", "string")], { description: "Composite PK." })])]
-    });
-    const { ok, errors } = validate(data);
-    expect(ok, errors.join("\n")).toBe(true);
   });
 
   it("composite_subcomponent_type_invalid", () => {

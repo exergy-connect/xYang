@@ -88,29 +88,6 @@ module m {
 });
 
 describe("python parity: test_augment (schema merge, expandUses=true)", () => {
-  it("merges same-module augment into container and validates", () => {
-    const module = parseYangString(`
-module m {
-  yang-version 1.1;
-  namespace "urn:m";
-  prefix m;
-  container a {
-    leaf x { type string; }
-  }
-  augment "/m:a" {
-    leaf y { type int32; }
-  }
-}
-`);
-
-    expect(module.statements.some((s) => s.keyword === "augment")).toBe(false);
-    const a = module.findStatement("a");
-    expect(a?.findStatement("x")?.keyword).toBe("leaf");
-    expect(a?.findStatement("y")?.keyword).toBe("leaf");
-    const { isValid, errors } = new YangValidator(module).validate({ a: { x: "hi", y: 42 } });
-    expect(isValid, errors.join("; ")).toBe(true);
-  });
-
   it("merges cross-file import augment into imported container", () => {
     const dir = tempYangDir();
     writeFileSync(

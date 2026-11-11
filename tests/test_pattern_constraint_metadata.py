@@ -6,7 +6,7 @@ Parsed on ``YangTypeStmt``, surfaced in validation errors and in JSON Schema ``x
 
 from __future__ import annotations
 
-from xyang import parse_yang_string, YangValidator
+from xyang import parse_yang_string
 from xyang.json import generate_json_schema, parse_json_schema
 from xyang.json.schema_keys import JsonSchemaKey, XYangKey
 
@@ -37,35 +37,6 @@ module t {
     assert td.type.patterns[0].pattern == "[0-9]+"
     assert td.type.patterns[0].error_message == "Must be decimal digits."
     assert td.type.patterns[0].error_app_tag == "t:bad-id"
-
-
-def test_validate_uses_pattern_error_message_and_app_tag():
-    yang = """
-module t {
-  yang-version 1.1;
-  namespace "urn:t";
-  prefix "t";
-  typedef id {
-    type string {
-      pattern '[0-9]+' {
-        error-message "Must be decimal digits.";
-        error-app-tag "t:bad-id";
-      }
-    }
-  }
-  container data-model {
-    leaf x { type id; }
-  }
-}
-"""
-    module = parse_yang_string(yang)
-    v = YangValidator(module)
-    ok, errors, _warnings = v.validate({"data-model": {"x": "abc"}})
-    assert not ok
-    assert len(errors) >= 1
-    joined = " ".join(errors)
-    assert "Must be decimal digits." in joined
-    assert "error-app-tag: t:bad-id" in joined
 
 
 def test_json_schema_x_yang_carries_pattern_metadata():

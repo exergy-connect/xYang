@@ -1,0 +1,47 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data-model {
+    list entities {
+      key name;
+      leaf name { type string; mandatory true; }
+      leaf primary_key { type string; mandatory true; }
+      list fields {
+        key name;
+        leaf name { type string; mandatory true; }
+        leaf type { type string; }
+        list foreignKeys {
+          key entity;
+          leaf entity {
+            type leafref {
+              path "/data-model/entities/name";
+              require-instance true;
+            }
+            mandatory true;
+          }
+          must "count(deref(current()/entity)) = 1" {
+            error-message "deref() in path expression must resolve to exactly one node";
+          }
+          must "/data-model/entities[name = string(deref(current()/entity))]" {
+            error-message "deref() in predicate: referenced entity must exist";
+          }
+        }
+      }
+      list parents {
+        key child_fk;
+        leaf child_fk {
+          type leafref {
+            path "../../fields/name";
+            require-instance true;
+          }
+          mandatory true;
+          must "deref(current())/../foreignKeys" {
+            error-message "Child foreign key field must have a foreignKeys definition";
+          }
+        }
+      }
+    }
+  }
+}

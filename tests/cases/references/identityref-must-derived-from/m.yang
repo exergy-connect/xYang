@@ -1,0 +1,27 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  identity animal;
+
+  identity mammal {
+    base animal;
+  }
+
+  identity dog {
+    base mammal;
+  }
+
+  container data {
+    leaf kind {
+      type identityref {
+        base animal;
+      }
+    }
+    leaf label {
+      type string;
+      must "derived-from(../kind, 'm:mammal')";
+    }
+  }
+}

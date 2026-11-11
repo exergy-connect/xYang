@@ -1,32 +1,12 @@
-"""Semantic error when ``uses`` forms a cyclic grouping chain (compile-time expansion)."""
+"""Semantic error when ``uses`` forms a cyclic grouping chain (compile-time expansion).
+
+Self-referential and mutual cycles are shared schema_error cases under
+``tests/cases/reuse/``. This file keeps the expand_uses=False API contract.
+"""
 
 from __future__ import annotations
 
-import pytest
-
-from xyang.errors import YangCircularUsesError
 from xyang.parser.yang_parser import YangParser
-
-
-def test_self_referential_grouping_raises():
-    """``uses`` of the same grouping inside that grouping is a cycle."""
-    yang = """
-module c {
-  yang-version 1.1;
-  namespace "urn:test:c";
-  prefix "c";
-  grouping a {
-    uses a;
-    leaf x { type string; }
-  }
-  container r { uses a; }
-}
-"""
-    with pytest.raises(YangCircularUsesError) as exc_info:
-        YangParser().parse_string(yang)
-    err = exc_info.value
-    assert err.repeated == "a"
-    assert "a" in str(err)
 
 
 def test_expand_uses_false_skips_expansion_no_error():

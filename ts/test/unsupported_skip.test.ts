@@ -51,31 +51,4 @@ module ex {
     const leaf = mod.findStatement("a");
     expect(leaf?.name).toBe("a");
   });
-
-  it.each(["input", "output"])("rejects top-level %s", (keyword) => {
-    const yang = `
-module ex {
-  yang-version 1.1;
-  namespace "urn:ex";
-  prefix ex;
-  ${keyword} { leaf x { type empty; } }
-}
-`;
-    expect(() => parseYangString(yang)).toThrow(new RegExp(`${keyword}.*rpc.*action`, "i"));
-  });
-
-  it("rejects rpc inside container", () => {
-    const yang = `
-module ex {
-  yang-version 1.1;
-  namespace "urn:ex";
-  prefix ex;
-  container c {
-    rpc inner { }
-    leaf x { type int8; }
-  }
-}
-`;
-    expect(() => parseYangString(yang)).toThrow(/rpc/i);
-  });
 });

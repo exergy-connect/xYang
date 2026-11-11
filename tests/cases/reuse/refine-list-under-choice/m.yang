@@ -1,0 +1,27 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping g {
+    choice ch {
+      case only {
+        list rows {
+          key id;
+          leaf id {
+            type string;
+          }
+        }
+      }
+    }
+  }
+
+  container root {
+    uses g {
+      refine ch/only/rows {
+        max-elements 0;
+        min-elements 0;
+      }
+    }
+  }
+}

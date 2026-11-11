@@ -1,0 +1,29 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping composite-field {
+    leaf name {
+      type string;
+      mandatory true;
+    }
+    leaf type {
+      type string;
+      mandatory true;
+    }
+  }
+
+  grouping field-definition {
+    uses composite-field;
+    leaf required {
+      type boolean;
+      default false;
+    }
+  }
+
+  list fields {
+    key name;
+    uses field-definition;
+  }
+}

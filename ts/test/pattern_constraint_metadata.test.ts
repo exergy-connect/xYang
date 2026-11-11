@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import type { YangPatternSpec } from "../src/core/ast";
-import { generateJsonSchema, parseJsonSchema, parseYangString, YangValidator } from "../src";
+import { generateJsonSchema, parseJsonSchema, parseYangString } from "../src";
 import { YANG_SCHEMA_KEYS } from "../src/json/schema-keys";
 
 /** Parsed typedef shape from `YangModule.typedefs` (values are untyped `unknown`). */
@@ -35,17 +35,6 @@ describe("python parity: test_pattern_constraint_metadata", () => {
     expect(pats[0]?.pattern).toBe("[0-9]+");
     expect(pats[0]?.error_message).toBe("Must be decimal digits.");
     expect(pats[0]?.error_app_tag).toBe("t:bad-id");
-  });
-
-  it("validate uses pattern error-message and error-app-tag", () => {
-    const module = parseYangString(PATTERN_TYPEDEF_MODULE);
-    const v = new YangValidator(module);
-    const { isValid, errors } = v.validate({ "data-model": { x: "abc" } });
-    expect(isValid).toBe(false);
-    expect(errors.length).toBeGreaterThan(0);
-    const joined = errors.join(" ");
-    expect(joined).toContain("Must be decimal digits.");
-    expect(joined).toContain("error-app-tag: t:bad-id");
   });
 
   it("JSON Schema x-yang carries pattern metadata on typedef $def", () => {

@@ -1,0 +1,23 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  feature f;
+
+  container root {
+    leaf enabled {
+      type boolean;
+    }
+    list items {
+      key name;
+      leaf name {
+        when "../enabled = 'true'";
+        type string;
+      }
+      leaf value {
+        type string;
+      }
+    }
+  }
+}

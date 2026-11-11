@@ -9,12 +9,6 @@ describe("python parity: meta-model/test_composite_primary_key_sample", () => {
     metaModel = loadMetaModel();
   });
 
-  it("composite_primary_key_sample_validates", () => {
-    const data = loadYamlDataModel("tests/data/composite_primary_key_sample.yaml");
-    const { isValid, errors, warnings } = new YangValidator(metaModel).validate(data);
-    expect(isValid, `errors=${errors} warnings=${warnings}`).toBe(true);
-  });
-
   it("composite_primary_key_points_at_composite_field", () => {
     const data = loadYamlDataModel("tests/data/composite_primary_key_sample.yaml");
     const { isValid, errors } = new YangValidator(metaModel).validate(data);

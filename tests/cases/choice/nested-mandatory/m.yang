@@ -1,0 +1,23 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container data {
+    choice outer {
+      case ca {
+        leaf sibling { type string; }
+        container inner_wrap {
+          choice inner {
+            mandatory true;
+            case ia { leaf a { type string; } }
+            case ib { leaf b { type string; } }
+          }
+        }
+      }
+      case cb {
+        leaf z { type string; }
+      }
+    }
+  }
+}

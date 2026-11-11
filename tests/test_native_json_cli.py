@@ -1,11 +1,9 @@
-"""Default validation is RFC 7951. --native-json accepts the dict-style repro."""
+"""CLI --native-json accepts dict-style instance data. Library encoding: tests/cases/encoding/dict-style."""
 
 import json
 import subprocess
 import sys
 from pathlib import Path
-
-from xyang import parse_yang_string, validate
 
 MODULE = """
 module m {
@@ -24,15 +22,6 @@ module m {
 """
 
 NATIVE = {"top": {"interface": {"eth0": {"mtu": 1500}}, "marker": None}}
-
-
-def test_library_default_rejects_native_repro():
-    module = parse_yang_string(MODULE)
-    rejected = validate(module, NATIVE)
-    assert rejected["valid"] is False
-    accepted = validate(module, NATIVE, native_json=True)
-    assert accepted["valid"] is True
-    assert accepted["errors"] == []
 
 
 def test_cli_native_json_flag(tmp_path: Path):

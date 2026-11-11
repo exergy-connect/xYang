@@ -1,0 +1,23 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  grouping g {
+    list items {
+      key k;
+      leaf k {
+        type string;
+      }
+    }
+  }
+
+  container c {
+    uses g {
+      refine items {
+        max-elements 3;
+        min-elements 1;
+      }
+    }
+  }
+}

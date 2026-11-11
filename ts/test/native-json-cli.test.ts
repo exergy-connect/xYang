@@ -5,7 +5,6 @@ import { fileURLToPath } from "node:url";
 import { spawnSync } from "node:child_process";
 import { build } from "esbuild";
 import { describe, expect, it } from "vitest";
-import { parseYangString, validate } from "../src";
 
 const tsRoot = resolve(dirname(fileURLToPath(import.meta.url)), "..");
 
@@ -29,10 +28,6 @@ const NATIVE = { top: { interface: { eth0: { mtu: 1500 } }, marker: null } };
 
 describe("native json", () => {
   it("rejects the repro by default and accepts --native-json", async () => {
-    const module = parseYangString(MODULE);
-    expect(validate(module, NATIVE).valid).toBe(false);
-    expect(validate(module, NATIVE, { nativeJson: true }).valid).toBe(true);
-
     const dir = mkdtempSync(join(tmpdir(), "xyang-native-"));
     const yang = join(dir, "m.yang");
     const data = join(dir, "data.json");

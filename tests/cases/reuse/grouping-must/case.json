@@ -1,0 +1,9 @@
+{
+  "description": "must inside a grouping is evaluated in the expanded sibling context.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "type allows min", "data": { "data": { "name": "age", "type": "integer", "min": 0 } }, "valid": true },
+    { "name": "type rejects min", "data": { "data": { "name": "name", "type": "string", "min": 0 } }, "valid": false,
+      "errors": [{ "path": "/data/min", "code": "must", "message": "min can only be used with integer or number types" }] }
+  ]
+}

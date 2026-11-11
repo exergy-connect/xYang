@@ -1,0 +1,6 @@
+{
+  "description": "Top-level input is invalid; input is only a substatement of rpc or action.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "'input' is only valid as a substatement of 'rpc' or 'action'"
+}

@@ -1,0 +1,7 @@
+{
+  "description": "refine mandatory false overrides mandatory true on a grouping leaf.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "leaf omitted", "data": { "c": {} }, "valid": true }
+  ]
+}

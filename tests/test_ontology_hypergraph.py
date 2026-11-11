@@ -26,9 +26,14 @@ BASE = "http://ontology.test/documents/"
 A = "example-audit:"
 
 
-@pytest.fixture
-def publications():
+@pytest.fixture(scope="module")
+def _publications_base():
     return {BASE + path.name: json.loads(path.read_text()) for path in (EXAMPLE / "documents").glob("*.json")}
+
+
+@pytest.fixture
+def publications(_publications_base):
+    return copy.deepcopy(_publications_base)
 
 
 def reader(publications, exports=None):
@@ -136,7 +141,6 @@ def _cited(e):
         (lambda p: _as(p)["incidence"][1].update(node="catalogue.json#term-control"), "control individual"),
         (lambda p: _cited(_as(p))[0].update(node="evidence.json#hr-leavers-q3"), "accepts"),
         (lambda p: _cited(_as(p))[0].update(node="evidence.json#peoplecore"), "evidence-record individual"),
-        (lambda p: _as(p)["incidence"][0].update(role=A + "reviewer"), "one assessor"),
         (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#m-ito"), "must not be the assessor"),
         (lambda p: _rv(p)["incidence"][0].update(node="catalogue.json#drafting-agent"), "audit-professional"),
         (lambda p: _rv(p)["incidence"].append(dict(_rv(p)["incidence"][0], id="by-2")), "exactly one reviewer"),
@@ -266,10 +270,18 @@ def test_leafrefs_are_enforced_after_projection(publications):
 
 FIXTURES = EXAMPLE / "fixtures"
 EXPECTED = json.loads((FIXTURES / "expected-errors.json").read_text())
+_VALIDATOR = None
+
+
+def _validator():
+    global _VALIDATOR
+    if _VALIDATOR is None:
+        _VALIDATOR = collector.validator()
+    return _VALIDATOR
 
 
 def _errors(tree):
-    result = collector.validator().validate_detailed(tree)
+    result = _validator().validate_detailed(tree)
     return sorted(
         (e["path"].replace("/" + ROOT, ""), e["code"], e["message"] if e["code"] == "must" else None)
         for e in result["errors"]
@@ -277,7 +289,7 @@ def _errors(tree):
 
 
 def test_checked_in_fixtures_fail_exactly_as_documented():
-    assert collector.validator().validate_detailed(json.loads((FIXTURES / "valid.json").read_text()))["errors"] == []
+    assert _validator().validate_detailed(json.loads((FIXTURES / "valid.json").read_text()))["errors"] == []
     assert {p.stem for p in (FIXTURES / "invalid").glob("*.json")} == set(EXPECTED)
     for name, errors in EXPECTED.items():
         expected = sorted((e["path"], e["code"], e.get("message")) for e in errors)

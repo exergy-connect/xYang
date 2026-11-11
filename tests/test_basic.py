@@ -135,35 +135,5 @@ def test_type_constraints():
     assert not is_valid
 
 
-def test_parse_ordered_by_accepted_on_list_and_leaf_list():
-    """ordered-by user|system is parsed and ignored (no ordering semantics in xYang)."""
-    yang_content = """
-module test {
-  yang-version 1.1;
-  namespace "urn:test";
-  prefix "t";
-
-  container data {
-    list items {
-      key "name";
-      ordered-by user;
-      leaf name {
-        type string;
-      }
-    }
-    leaf-list tags {
-      type string;
-      ordered-by system;
-    }
-  }
-}
-"""
-    module = parse_yang_string(yang_content)
-    data = module.find_statement("data")
-    assert data is not None
-    assert data.find_statement("items") is not None
-    assert data.find_statement("tags") is not None
-
-
 if __name__ == "__main__":
     pytest.main([__file__, "-v"])

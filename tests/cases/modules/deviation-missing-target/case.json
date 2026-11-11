@@ -1,0 +1,6 @@
+{
+  "description": "deviate not-supported whose target path matches no node is a schema error.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "no child 'a'"
+}

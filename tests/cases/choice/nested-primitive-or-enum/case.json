@@ -1,0 +1,8 @@
+{
+  "description": "Nested choice with leaf vs leaf-list cases: both branches under the same parent is choice-multiple-cases.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "primitive and enum list together", "data": { "root": { "primitive": "string", "enum": ["G", "O"] } }, "valid": false,
+      "errors": [{ "path": "/root", "code": "choice-multiple-cases" }] }
+  ]
+}

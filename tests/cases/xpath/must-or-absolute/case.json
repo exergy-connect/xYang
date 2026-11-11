@@ -1,0 +1,19 @@
+{
+  "description": "must with an absolute path OR relative sibling/self checks: any true clause satisfies the constraint.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "consolidated false",
+      "data": { "data-model": { "consolidated": false, "items": [{ "id": "1", "type": "other", "value": "" }] } },
+      "valid": true },
+    { "name": "type test",
+      "data": { "data-model": { "consolidated": true, "items": [{ "id": "1", "type": "test", "value": "" }] } },
+      "valid": true },
+    { "name": "nonempty value",
+      "data": { "data-model": { "consolidated": true, "items": [{ "id": "1", "type": "other", "value": "x" }] } },
+      "valid": true },
+    { "name": "all clauses false",
+      "data": { "data-model": { "consolidated": true, "items": [{ "id": "1", "type": "other", "value": "" }] } },
+      "valid": false,
+      "errors": [{ "path": "/data-model/items/0/value", "code": "must" }] }
+  ]
+}

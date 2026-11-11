@@ -1,0 +1,12 @@
+{
+  "description": "uses of a nested grouping inside a list; mandatory leaves from the grouping apply per entry.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "list entries", "data": { "fields": [
+      { "name": "field1", "type": "string", "required": true },
+      { "name": "field2", "type": "integer" }
+    ] }, "valid": true },
+    { "name": "missing mandatory name", "data": { "fields": [{ "type": "string" }] }, "valid": false,
+      "errors": [{ "path": "/fields/0/name", "code": "mandatory" }] }
+  ]
+}

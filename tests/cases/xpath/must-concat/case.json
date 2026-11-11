@@ -1,0 +1,16 @@
+{
+  "description": "must using concat() for string concatenation (XPath + is numeric only).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "type test",
+      "data": { "data": { "items": [{ "id": "1", "type": "test", "value": "" }] } },
+      "valid": true },
+    { "name": "nonempty value",
+      "data": { "data": { "items": [{ "id": "2", "type": "other", "value": "non-empty" }] } },
+      "valid": true },
+    { "name": "other with empty value",
+      "data": { "data": { "items": [{ "id": "3", "type": "other", "value": "" }] } },
+      "valid": false,
+      "errors": [{ "path": "/data/items/0", "code": "must", "message": "When type is 'other', value must not be empty" }] }
+  ]
+}

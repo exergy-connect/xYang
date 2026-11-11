@@ -1,0 +1,20 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf flag {
+      type int32;
+      default 0;
+    }
+    list items {
+      key id;
+      leaf id { type int32; }
+      leaf ref_rel {
+        type string;
+        must "../../flag = 1";
+      }
+    }
+  }
+}

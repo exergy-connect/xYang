@@ -1,0 +1,6 @@
+{
+  "description": "Recursive generic-field uses under a list is a schema error even when refine sets max-elements 0.",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "generic-field"
+}

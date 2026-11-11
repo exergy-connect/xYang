@@ -1,0 +1,6 @@
+{
+  "description": "if-feature is illegal on a list key leaf (RFC 7950).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "key leaf 'name' must not have 'if-feature'"
+}

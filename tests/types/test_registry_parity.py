@@ -4,11 +4,24 @@ from __future__ import annotations
 
 import json
 import subprocess
+from functools import lru_cache
 from pathlib import Path
 
 from xyang.types.registry import REGISTRY, registry_parity_snapshot
 
 _ROOT = Path(__file__).resolve().parents[2]
+
+
+@lru_cache(maxsize=1)
+def _typescript_registry_snapshot() -> dict:
+    completed = subprocess.run(
+        ["node", "scripts/dump-builtin-registry.mjs"],
+        cwd=_ROOT / "ts",
+        capture_output=True,
+        text=True,
+    )
+    assert completed.returncode == 0, completed.stderr
+    return json.loads(completed.stdout)
 
 
 def test_every_builtin_is_in_the_registry():
@@ -43,14 +56,7 @@ def test_every_builtin_is_in_the_registry():
 
 def test_python_and_typescript_registries_agree():
     python = registry_parity_snapshot()
-    completed = subprocess.run(
-        ["node", "scripts/dump-builtin-registry.mjs"],
-        cwd=_ROOT / "ts",
-        capture_output=True,
-        text=True,
-    )
-    assert completed.returncode == 0, completed.stderr
-    typescript = json.loads(completed.stdout)
+    typescript = _typescript_registry_snapshot()
     assert list(python) == list(typescript)
     for name, row in python.items():
         assert typescript[name] == row
