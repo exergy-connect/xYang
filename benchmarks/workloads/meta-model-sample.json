@@ -1,0 +1,181 @@
+{
+  "data-model": {
+    "name": "New meta-model sample",
+    "version": "26.03.25.1",
+    "author": "xYang tests",
+    "description": "Showcase of field type shapes for validator tests.",
+    "consolidated": true,
+    "entities": [
+      {
+        "name": "demo",
+        "brief": "All field type shapes",
+        "description": "Demo entity with many field types.",
+        "primary_key": "pk",
+        "field_definitions": [
+          {
+            "name": "reusable_string",
+            "description": "Reusable string definition.",
+            "type": {
+              "primitive": "string"
+            }
+          }
+        ],
+        "fields": [
+          {
+            "name": "pk",
+            "description": "Primary key.",
+            "type": {
+              "primitive": "string"
+            }
+          },
+          {
+            "name": "via_definition",
+            "description": "Field using definition reference.",
+            "type": {
+              "definition": "reusable_string"
+            }
+          },
+          {
+            "name": "prim_string",
+            "description": "Primitive string.",
+            "type": {
+              "primitive": "string"
+            }
+          },
+          {
+            "name": "prim_integer",
+            "description": "Primitive integer.",
+            "type": {
+              "primitive": "integer"
+            }
+          },
+          {
+            "name": "prim_number",
+            "description": "Primitive number.",
+            "type": {
+              "primitive": "number"
+            }
+          },
+          {
+            "name": "prim_boolean",
+            "description": "Primitive boolean.",
+            "type": {
+              "primitive": "boolean"
+            }
+          },
+          {
+            "name": "prim_array",
+            "description": "Primitive array type name.",
+            "type": {
+              "primitive": "array"
+            }
+          },
+          {
+            "name": "prim_datetime",
+            "description": "Primitive datetime.",
+            "type": {
+              "primitive": "datetime"
+            }
+          },
+          {
+            "name": "prim_date",
+            "description": "Primitive date.",
+            "type": {
+              "primitive": "date"
+            }
+          },
+          {
+            "name": "prim_year",
+            "description": "Primitive year.",
+            "type": {
+              "primitive": "year"
+            }
+          },
+          {
+            "name": "prim_duration_in_days",
+            "description": "Primitive duration in days.",
+            "type": {
+              "primitive": "duration_in_days"
+            }
+          },
+          {
+            "name": "prim_qualified_string",
+            "description": "Primitive qualified_string.",
+            "type": {
+              "primitive": "qualified_string"
+            }
+          },
+          {
+            "name": "prim_qualified_integer",
+            "description": "Primitive qualified_integer.",
+            "type": {
+              "primitive": "qualified_integer"
+            }
+          },
+          {
+            "name": "prim_qualified_number",
+            "description": "Primitive qualified_number.",
+            "type": {
+              "primitive": "qualified_number"
+            }
+          },
+          {
+            "name": "arr_items_primitive",
+            "description": "Array of integers.",
+            "type": {
+              "array": {
+                "primitive": "integer"
+              }
+            }
+          },
+          {
+            "name": "arr_items_composite",
+            "description": "Array of composite lat/lon.",
+            "type": {
+              "array": {
+                "composite": [
+                  {
+                    "name": "lat",
+                    "description": "Latitude.",
+                    "type": {
+                      "primitive": "number"
+                    }
+                  },
+                  {
+                    "name": "lon",
+                    "description": "Longitude.",
+                    "type": {
+                      "primitive": "number"
+                    }
+                  }
+                ]
+              }
+            }
+          },
+          {
+            "name": "top_composite",
+            "description": "Top-level composite field.",
+            "type": {
+              "composite": [
+                {
+                  "name": "part_a",
+                  "description": "Part A.",
+                  "type": {
+                    "primitive": "string"
+                  }
+                },
+                {
+                  "name": "part_b",
+                  "description": "Part B.",
+                  "type": {
+                    "primitive": "boolean"
+                  }
+                }
+              ]
+            }
+          }
+        ]
+      }
+    ]
+  }
+}

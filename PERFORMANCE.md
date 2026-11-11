@@ -1,5 +1,7 @@
 # xYang Performance Benchmarks
 
+Current release measurements (time, peak memory, code size for Python and TypeScript) are in the README [Benchmarks](README.md#benchmarks) section; see [benchmarks/README.md](benchmarks/README.md). The figures below are historical.
+
 ## Benchmark Results
 
 ### Parsing Performance
