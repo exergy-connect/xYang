@@ -21,6 +21,19 @@ To check instance data, read errors programmatically, or run xYang in CI, a brow
 
 From the xYang repo (or an environment with `xyang` / `pip install -e .`):
 
+List the flags this install accepts before guessing them. Help exits 0 and does not read a model:
+
+```bash
+xyang --help
+xyang parse --help
+xyang validate -h
+xyang convert --help
+xyang-ts --help
+xyang-ts convert -h
+```
+
+`xyang -V` prints the Python package version. `xyang-ts` has no version flag. Python `convert` accepts `-o PATH`; `xyang-ts convert` prints the schema to stdout and has no `-o`.
+
 ```bash
 # Parse YANG (syntax + supported semantics)
 xyang parse path/to/module.yang

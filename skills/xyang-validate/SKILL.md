@@ -28,6 +28,17 @@ The Python and TypeScript CLIs take the same `validate` flags and give the same 
 
 ## Recipe: validate from a shell and branch on the result
 
+List the flags this install accepts before guessing them. Help exits 0, writes usage to stdout, and does not read a module or instance:
+
+```bash
+xyang --help
+xyang validate --help
+xyang-ts --help
+xyang-ts validate -h
+```
+
+`xyang -V` prints the Python package version. `xyang-ts` has no version flag. `xyang convert` accepts `-o PATH`; `xyang-ts convert` prints JSON Schema to stdout and has no `-o`.
+
 ```bash
 xyang validate --format json [--include-path DIR]... module.yang data.json
 # xyang-ts validate --format json …   (same flags)
