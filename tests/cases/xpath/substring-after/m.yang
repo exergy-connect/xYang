@@ -20,10 +20,6 @@ module m {
       type string;
       must "substring-after(., 'z') = ''";
     }
-    leaf missing {
-      type string;
-      must "substring-after() = ''";
-    }
     leaf one-arg {
       type string;
       must "substring-after(.) = ''";

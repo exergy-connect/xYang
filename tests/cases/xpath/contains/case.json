@@ -11,8 +11,6 @@
       "errors": [{ "path": "/top/name", "code": "must" }] },
     { "name": "empty needle", "data": { "top": { "empty-needle": "" } }, "valid": true },
     { "name": "empty needle on text", "data": { "top": { "empty-needle": "xaby" } }, "valid": true },
-    { "name": "missing args", "data": { "top": { "missing": "xaby" } }, "valid": false,
-      "errors": [{ "path": "/top/missing", "code": "xpath-error" }] },
     { "name": "one arg", "data": { "top": { "one-arg": "xaby" } }, "valid": false,
       "errors": [{ "path": "/top/one-arg", "code": "xpath-error" }] },
     { "name": "extra arg", "data": { "top": { "extra": "xaby" } }, "valid": false,

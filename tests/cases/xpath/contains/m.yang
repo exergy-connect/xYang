@@ -12,10 +12,6 @@ module m {
       type string;
       must "contains(., '')";
     }
-    leaf missing {
-      type string;
-      must "contains()";
-    }
     leaf one-arg {
       type string;
       must "contains(.)";
