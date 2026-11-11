@@ -1,0 +1,94 @@
+module example-mcp {
+  yang-version 1.1;
+  namespace "urn:example:mcp";
+  prefix mcp;
+  organization "xYang example authors";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Base model for an MCP server interface and a session of tools/call
+     requests, as seen by one side.
+
+     A tool is declared twice from one source: as a YANG rpc (which
+     compile_mcp.py turns into a standard MCP tools/list entry) and as an
+     identity derived from 'tool' (which a session's calls must name).
+     A tool module instantiates the 'session' grouping as its top-level
+     container and augments call/arguments with one container per tool,
+     gated by 'when' on the call's tool identity.
+
+     A valid session is consistent with its own calls. It is a local view:
+     it says nothing about state outside this document.
+     SPDX-License-Identifier: MIT";
+  reference "RFC 7950; RFC 7951; Model Context Protocol, tools/list and tools/call";
+  revision 2026-11-11 { description "Initial example revision.";
+    reference "xYang examples/mcp-interface/README.md"; }
+
+  identity tool {
+    description "Base of every MCP tool. A tool module derives one identity per rpc, with the same name.";
+  }
+
+  typedef sha256-hex {
+    type string { pattern '[0-9a-f]{64}'; }
+    description "Lowercase hexadecimal SHA-256 digest.";
+  }
+
+  grouping session {
+    description
+      "Server identity, the local view the session was checked in, and the
+       tools/call requests made. A tool module instantiates it as its own
+       top-level 'session' container and augments call/arguments.";
+
+    leaf protocol-version {
+      type string { pattern '[0-9]{4}-[0-9]{2}-[0-9]{2}'; }
+      mandatory true;
+      description "MCP protocol revision negotiated at initialize.";
+    }
+
+    container server {
+      description "serverInfo from the initialize result.";
+      leaf name { type string { length "1..128"; } mandatory true; description "Server name."; }
+      leaf version { type string { length "1..64"; } mandatory true; description "Server version."; }
+    }
+
+    container view {
+      description
+        "The local context this record was checked in. No validator has a global
+         view, so a verdict names the view it was made in.";
+      leaf caller { type string { length "1..128"; } mandatory true; description "Who made the calls."; }
+      leaf snapshot { type sha256-hex; mandatory true; description "Digest of the server-side context the calls ran against."; }
+    }
+
+    list call {
+      key "id";
+      min-elements 1;
+      description "One tools/call request and its outcome, in the order sent.";
+
+      leaf id {
+        type uint32;
+        description "JSON-RPC request id. Ids increase in send order, so rules compare them to mean 'earlier'.";
+      }
+      leaf tool {
+        type identityref { base mcp:tool; }
+        mandatory true;
+        description "params.name of the request, as a tool identity. An undeclared tool is rejected here.";
+      }
+      container arguments {
+        description
+          "params.arguments. Tool modules augment one container per tool and
+           refine this node to require exactly one of them. A call carries the
+           called tool's container, even when it is empty.";
+      }
+      container result {
+        description "Outcome of the call.";
+        leaf status {
+          type enumeration {
+            enum ok { description "result.isError is false or absent."; }
+            enum error { description "result.isError is true, or a JSON-RPC error."; }
+          }
+          mandatory true;
+          description "Whether the call succeeded.";
+        }
+        leaf message { type string; description "Error text when status is error."; }
+      }
+    }
+  }
+}

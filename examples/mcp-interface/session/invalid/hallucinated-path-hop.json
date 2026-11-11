@@ -1,0 +1,114 @@
+{
+  "example-topology-tools:session": {
+    "protocol-version": "2025-11-25",
+    "server": {
+      "name": "topology-builder",
+      "version": "0.1.0"
+    },
+    "view": {
+      "caller": "agent:planner-1",
+      "snapshot": "3b5d5c3712955042212316173ccf37be800ef6f1d9ad5b6c1ff0f7ef2f9e16a4"
+    },
+    "call": [
+      {
+        "id": 1,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "name": "r1"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 2,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "name": "r2",
+            "role": "router"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 3,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "name": "h1",
+            "role": "host"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 4,
+        "tool": "example-topology-tools:add-link",
+        "arguments": {
+          "add-link": {
+            "source": "r1",
+            "target": "r2"
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 5,
+        "tool": "example-topology-tools:add-link",
+        "arguments": {
+          "add-link": {
+            "source": "r2",
+            "target": "h1",
+            "bandwidth-mbps": 100
+          }
+        },
+        "result": {
+          "status": "ok"
+        }
+      },
+      {
+        "id": 6,
+        "tool": "example-topology-tools:add-node",
+        "arguments": {
+          "add-node": {
+            "name": "r1"
+          }
+        },
+        "result": {
+          "status": "error",
+          "message": "node r1 already exists"
+        }
+      },
+      {
+        "id": 7,
+        "tool": "example-topology-tools:find-path",
+        "arguments": {
+          "find-path": {
+            "from": "r1",
+            "to": "h1",
+            "max-hops": 4
+          }
+        },
+        "result": {
+          "status": "ok",
+          "find-path": {
+            "hop": [
+              "r1",
+              "r9",
+              "h1"
+            ]
+          }
+        }
+      }
+    ]
+  }
+}

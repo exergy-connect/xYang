@@ -1,0 +1,176 @@
+module example-topology-tools {
+  yang-version 1.1;
+  namespace "urn:example:topology-tools";
+  prefix topo;
+  import example-mcp { prefix mcp; revision-date 2026-11-11; }
+  organization "xYang example authors";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "A small MCP tool set for building a network topology: add-node,
+     add-link and find-path.
+
+     Each tool is one grouping used three times: as the rpc input that
+     compile_mcp.py turns into the tool's inputSchema, as the arguments of
+     a call in a session, and (for find-path) as the shape of its result.
+     The rpc is the interface. The augment is where calls in a session are
+     checked against each other: a link may only join nodes that an earlier
+     successful call created, and a path may only pass through such nodes.
+     SPDX-License-Identifier: MIT";
+  reference "RFC 7950; xYang examples/mcp-interface/README.md";
+  revision 2026-11-11 { description "Initial example revision.";
+    reference "xYang examples/mcp-interface/README.md"; }
+
+  identity add-node { base mcp:tool; description "The add-node tool."; }
+  identity add-link { base mcp:tool; description "The add-link tool."; }
+  identity find-path { base mcp:tool; description "The find-path tool."; }
+
+  typedef node-name {
+    type string { pattern '[a-z][a-z0-9-]{0,31}'; }
+    description "Lowercase node name, 1 to 32 characters.";
+  }
+
+  grouping add-node-input {
+    leaf name { type node-name; mandatory true; description "Name of the new node. Unique in the topology."; }
+    leaf role {
+      type enumeration {
+        enum router { description "Routes between subnets."; }
+        enum switch { description "Switches within a subnet."; }
+        enum host { description "An end host."; }
+      }
+      default "router";
+      description "What the node does.";
+    }
+  }
+
+  grouping add-link-input {
+    leaf source { type node-name; mandatory true; description "One end of the link."; }
+    leaf target { type node-name; mandatory true; description "The other end of the link. Must differ from source."; }
+    leaf bandwidth-mbps {
+      type uint32 { range "1..400000"; }
+      default "1000";
+      description "Link capacity in megabits per second.";
+    }
+  }
+
+  grouping find-path-input {
+    leaf from { type node-name; mandatory true; description "Start node."; }
+    leaf to { type node-name; mandatory true; description "End node."; }
+    leaf max-hops {
+      type uint8 { range "1..16"; }
+      default "8";
+      description "Longest path to consider, in hops.";
+    }
+  }
+
+  grouping find-path-output {
+    leaf-list hop {
+      type node-name;
+      ordered-by user;
+      description "Nodes on the path, from 'from' to 'to'.";
+    }
+  }
+
+  rpc add-node {
+    description "Add a node to the topology.";
+    input { uses add-node-input; }
+    output { leaf name { type node-name; description "Name of the node that was added."; } }
+  }
+
+  rpc add-link {
+    description "Connect two existing nodes with a link.";
+    input { uses add-link-input; }
+  }
+
+  rpc find-path {
+    description "Find a path between two nodes, as a list of hops.";
+    input { uses find-path-input; }
+    output { uses find-path-output; }
+  }
+
+  container session {
+    presence "One side's record of an MCP session with this server.";
+    description "A session of calls to the topology tools.";
+    uses mcp:session {
+      refine "call/arguments" {
+        must "count(add-node) + count(add-link) + count(find-path) = 1" {
+          error-message "arguments must hold exactly one container: the one for the called tool.";
+        }
+      }
+    }
+  }
+
+  augment "/topo:session/topo:call/topo:arguments" {
+    description "Arguments of each tool, present only on a call to that tool.";
+
+    container add-node {
+      when "derived-from-or-self(../../tool, 'topo:add-node')";
+      description "Arguments of an add-node call.";
+      uses add-node-input {
+        refine name {
+          must "count(../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()]) <= 1" {
+            error-message "A node name may be added successfully only once in a session.";
+          }
+        }
+      }
+    }
+
+    container add-link {
+      when "derived-from-or-self(../../tool, 'topo:add-link')";
+      description "Arguments of an add-link call.";
+      uses add-link-input {
+        refine source {
+          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
+            error-message "source must name a node that an earlier successful add-node call created.";
+          }
+        }
+        refine target {
+          must ". != ../source" {
+            error-message "A link cannot connect a node to itself.";
+          }
+          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
+            error-message "target must name a node that an earlier successful add-node call created.";
+          }
+        }
+      }
+    }
+
+    container find-path {
+      when "derived-from-or-self(../../tool, 'topo:find-path')";
+      description "Arguments of a find-path call.";
+      uses find-path-input {
+        refine from {
+          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
+            error-message "from must name a node that an earlier successful add-node call created.";
+          }
+        }
+        refine to {
+          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
+            error-message "to must name a node that an earlier successful add-node call created.";
+          }
+        }
+      }
+    }
+  }
+
+  augment "/topo:session/topo:call/topo:result" {
+    description "Structured results that the session can check against its own calls.";
+
+    container find-path {
+      when "derived-from-or-self(../../tool, 'topo:find-path') and ../status = 'ok'";
+      description "structuredContent of a successful find-path call.";
+      must "hop = ../../arguments/find-path/from and hop = ../../arguments/find-path/to" {
+        error-message "A path must contain its 'from' and 'to' nodes.";
+      }
+      must "count(hop) <= ../../arguments/find-path/max-hops + 1" {
+        error-message "A path may not be longer than max-hops.";
+      }
+      uses find-path-output {
+        refine hop {
+          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
+            error-message "Every hop must be a node that an earlier successful add-node call created.";
+          }
+        }
+      }
+    }
+  }
+}
