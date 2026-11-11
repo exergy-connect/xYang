@@ -7,6 +7,8 @@ export const XYANG_KEYS = {
   config: "config",
   /** Module-level RPC definitions (RFC 7950 §7.14), keyed by RPC name. */
   rpcs: "rpcs",
+  /** Actions of a container or list (RFC 7950 §7.15), keyed by action name; same shape as `rpcs`. */
+  actions: "actions",
   /** `{prefix: module}` for the prefixed steps of a leafref `path`, `must` or `when` (RFC 7950 §6.4.1). */
   xpathPrefixes: "xpath-prefixes"
 } as const;

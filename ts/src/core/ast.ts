@@ -206,6 +206,8 @@ export class YangTypeStmt {
   path?: PathNode;
   /** Module each prefixed step of `path` is bound to, by prefix (RFC 7950 §9.9.2). */
   xpath_prefixes?: Record<string, string>;
+  /** Module that wrote this `type`: its prefix and typedef name resolve there (RFC 7950 §7.13). */
+  scope_module?: string;
   require_instance: boolean;
   identityref_bases: YangIdentifierRef[];
   /** ``units`` under ``type`` (accepted; not an RFC 7950 type substatement). */
@@ -231,6 +233,7 @@ export class YangTypeStmt {
     this.types = init.types ?? [];
     this.path = init.path;
     if (init.xpath_prefixes) this.xpath_prefixes = init.xpath_prefixes;
+    if (init.scope_module) this.scope_module = init.scope_module;
     this.require_instance = init.require_instance ?? true;
     this.identityref_bases = init.identityref_bases ?? [];
     this.units = init.units ?? "";
@@ -284,6 +287,14 @@ export class YangRpcStmt extends YangStatementWithWhen {
     super(init);
     this.keyword = "rpc";
     this.must_statements = init.must_statements ?? [];
+  }
+}
+
+/** Action statement (RFC 7950 §7.15): an operation on a container or list instance. */
+export class YangActionStmt extends YangRpcStmt {
+  constructor(init: Partial<YangActionStmt> = {}) {
+    super(init);
+    this.keyword = "action";
   }
 }
 

@@ -1,7 +1,7 @@
 import * as kw from "./keywords";
 import { TokenStream, YangTokenType } from "./parser-context";
 
-export const UNSUPPORTED_CONSTRUCT_TYPES = new Set<string>([kw.ACTION]);
+export const UNSUPPORTED_CONSTRUCT_TYPES: ReadonlySet<string> = kw.UNSUPPORTED_CONSTRUCT_KEYWORDS;
 
 export function _consume_balanced_braces(tokens: TokenStream): void {
   let depth = 0;

@@ -44,6 +44,7 @@ from ..ast import (
     YangLeafListStmt,
     YangLeafStmt,
     YangListStmt,
+    YangRpcStmt,
     YangStatement,
     YangStatementList,
     YangStatementWithMust,
@@ -197,32 +198,40 @@ class DocumentValidator:
         self,
         params: Any,
         *,
-        rpc: YangStatement,
+        target: Any,
         operation: YangContainerStmt,
+        parent_copies: List[YangStatement],
         host: YangModule,
         context: Optional[Dict[str, Any]] = None,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
     ) -> List[ValidationError]:
-        """Validate the parameters of one rpc ``input`` or ``output`` (RFC 7950 §7.14).
+        """Validate the parameters of one rpc or action ``input`` or ``output`` (RFC 7950 §7.14, §7.15).
 
-        This validator's root schema is the accessible module of RFC 7950 §6.4.1 (see
-        ``operation.accessible_module``). ``params`` is the parameter object without the
-        RFC 8040 wrapper. ``context`` is optional server data, in the same encoding, that
-        sits next to the operation node. It is not validated. Pointers address ``params``.
+        This validator's root schema is the accessible module of RFC 7950 §6.4.1 and
+        ``parent_copies`` are its copies of ``target.parents`` (see ``operation.accessible_module``).
+        ``params`` is the parameter object without the RFC 8040 wrapper. ``context`` is server
+        data in the same encoding, already validated against the module; it is not validated
+        again. Pointers address ``params``.
         """
-        from ..encoding.instance import encoding_errors, iter_instance, project_instance, remap_pointer
+        from ..encoding.instance import iter_instance, encoding_errors, project_instance, remap_pointer
+        from ..encoding.rfc7951 import member_keys_cached
+        from .operation import lexical
 
-        if not self._if_features_active(rpc):
-            raise ValueError(f"rpc '{rpc.name}' is not available: its 'if-feature' condition is false")
+        for step in target.parents:
+            for stmt in (*step.wrappers, step.stmt):
+                if not self._if_features_active(stmt):
+                    raise ValueError(
+                        f"{target.label} is not available: '{stmt.name}' has a false 'if-feature' condition"
+                    )
+        if not self._if_features_active(target.operation):
+            raise ValueError(f"{target.label} is not available: its 'if-feature' condition is false")
         if not isinstance(params, dict):
-            return [
-                ValidationError(path="/", message="rpc parameters must be an object", code="type", pointer="")
-            ]
+            return [ValidationError(path="/", message="operation parameters must be an object", code="type", pointer="")]
         parent = host.name
         nodes = list(
             iter_instance(
-                params, host, native_json=native_json, schema=operation, parent_module=parent, at_root=False
+                params, host, native_json=native_json, schema=operation, parent_module=target.module_name, at_root=False
             )
         )
         canonical, pointer_map = project_instance(nodes, parent)
@@ -232,13 +241,34 @@ class DocumentValidator:
         ]
         root_data: Dict[str, Any] = {}
         if context is not None:
-            context_nodes = list(iter_instance(context, host, native_json=native_json))
-            problems = encoding_errors(context_nodes)
-            if problems:
-                ptr, _code, message = problems[0]
-                raise ValueError(f"context is not valid instance data at {ptr or '/'}: {message}")
-            root_data, _ = project_instance(context_nodes, parent)
-        root_data[operation.name] = canonical
+            root_data, _ = project_instance(list(iter_instance(context, host, native_json=native_json)), parent)
+
+        root = Node(root_data, self._root_schema, None)
+        holder: Dict[str, Any] = root_data
+        holder_node = root
+        for step, copied in zip(target.parents, parent_copies):
+            member = next(iter(member_keys_cached(step.stmt, parent)))
+            value = holder.get(member)
+            if isinstance(step.stmt, YangListStmt):
+                key_leaves = [SchemaNav.child(step.stmt, name) for name in step.stmt.key.split()]
+                key_members = [next(iter(member_keys_cached(leaf, parent))) for leaf in key_leaves]
+                rows = [
+                    row
+                    for row in (value if isinstance(value, list) else [])
+                    if isinstance(row, dict)
+                    and all(k in row and lexical(row[k]) == want for k, want in zip(key_members, step.keys))
+                ]
+                if not rows:
+                    return [self._missing_parent(target, f"no '{step.stmt.name}' entry with key {', '.join(step.keys)}")]
+                holder, holder_node = rows[0], Node(rows[0], copied, holder_node)
+            else:
+                if value is None:
+                    if step.stmt.presence is not None:
+                        return [self._missing_parent(target, f"presence container '{step.stmt.name}' is absent")]
+                    # RFC 7950 §7.5.1: a non-presence container exists implicitly.
+                    value = holder[member] = {}
+                holder, holder_node = value, Node(value, copied, holder_node)
+        holder[next(iter(member_keys_cached(operation, parent)))] = canonical
 
         self._leafref_severity = leafref_severity
         self._root_data = root_data
@@ -246,8 +276,7 @@ class DocumentValidator:
         self._case_stack = []
         self._case_level_data_stack = []
         self._evaluator.clear_cache_stats()
-        root = Node(root_data, self._root_schema, None)
-        op_node = root.step(canonical, operation)
+        op_node = holder_node.step(canonical, operation)
         op_ctx = Context(current=op_node, root=root, path_cache={})
         if self._constraint_checks:
             self._check_must(operation, op_ctx, op_node, "/", "")
@@ -255,6 +284,16 @@ class DocumentValidator:
         for err in self._errors:
             err.pointer = remap_pointer(err.pointer, pointer_map)
         return encoding + self._errors
+
+    @staticmethod
+    def _missing_parent(target: Any, detail: str) -> ValidationError:
+        return ValidationError(
+            path="/",
+            pointer="",
+            document="context",
+            code="action-parent",
+            message=f"{target.label} is invoked on an instance that is not in the context: {detail}",
+        )
 
     def _add(
         self,
@@ -369,19 +408,12 @@ class DocumentValidator:
         module = self._typedef_module()
         if module is None:
             return None
-        name = getattr(type_stmt, "name", None)
-        if not name:
+        if not getattr(type_stmt, "name", None):
             return None
-        prefix = getattr(type_stmt, "prefix", None)
-        if prefix:
-            module = module.resolve_prefixed_module(prefix)
-            if module is None:
-                return None
-        getter = getattr(module, "get_typedef", None)
-        typedef = getter(name) if callable(getter) else None
-        if typedef is None:
-            return None
-        return getattr(typedef, "type", None)
+        from ..module import resolve_typedef
+
+        typedef, _scope = resolve_typedef(type_stmt, module)
+        return getattr(typedef, "type", None) if typedef is not None else None
 
     def _default_accepted(self, value: Any, type_stmt: Any) -> bool:
         module = self._typedef_module()
@@ -512,6 +544,9 @@ class DocumentValidator:
         parent_mod = self._encoding_parent_module()
         visited_names: set[str] = set()
         for stmt in schema.statements:
+            if isinstance(stmt, YangRpcStmt):
+                # rpc and action are operations, not data nodes (RFC 7950 §7.14, §7.15).
+                continue
             if isinstance(stmt, YangChoiceStmt):
                 visited_names.update(self._choice_instance_keys(stmt, data))
             else:

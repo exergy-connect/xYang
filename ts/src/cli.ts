@@ -15,14 +15,15 @@ function printUsage(): void {
     [
       "xyang-ts commands:",
       "  parse [--include-path DIR]... <file.yang>",
-      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... [--rpc NAME [--output] [--context data.json]] <file.yang> [data.json|-]",
+      "  validate [--native-json] [--format text|json] [--features JSON|null] [--include-path DIR]... [--anydata-validation MODE] [--anydata-module PATH]... [--rpc NAME | --action PATH] [--output] [--context data.json] <file.yang> [data.json|-]",
       "  convert [--include-path DIR]... <file.yang>",
       "",
       "  --native-json         native dict-style JSON (default: strict RFC 7951)",
       "  --format              text (default) or json ({valid, errors} on stdout)",
       "  --rpc                 validate the data as the input of rpc NAME ({\"module:input\": {...}}, or bare parameters with --native-json)",
-      "  --output              with --rpc, validate the rpc output instead",
-      "  --context             with --rpc, server data (JSON) that joins the operation node for must and leafref; not validated",
+      "  --action              validate the data as the input of the action at PATH, the RFC 8040 data resource identifier /module:list=key/action (needs --context)",
+      "  --output              with --rpc or --action, validate the output instead",
+      "  --context             with --rpc or --action, server data (JSON); validated first (errors carry \"document\": \"context\"), then reachable from must and leafref",
       "  --features            {\"module\": [\"feature\"]} or null (default: all features)",
       "  --anydata-validation  off | complete | candidate  (default: off)",
       "  --anydata-module      additional .yang for anydata subtree validation (repeatable)"
@@ -44,7 +45,7 @@ function writeJsonWarnings(warnings: ValidationIssue[]): void {
 }
 
 function runValidate(rest: string[]): number {
-  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, output, contextFile } =
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, action, output, contextFile } =
     parseValidateArgs(rest);
   const yangFile = positional[0];
   if (!yangFile) {
@@ -55,8 +56,8 @@ function runValidate(rest: string[]): number {
   }
 
   let operation: ValidateCallOptions = {};
-  if (rpc !== undefined) {
-    operation = { rpc, direction: output ? "output" : "input" };
+  if (rpc !== undefined || action !== undefined) {
+    operation = { ...(rpc !== undefined ? { rpc } : { action }), direction: output ? "output" : "input" };
     if (contextFile !== undefined) {
       if (!existsSync(contextFile)) {
         throw new Error(`file not found: ${contextFile}`);
@@ -110,6 +111,7 @@ function runValidate(rest: string[]): number {
     const report = {
       valid: detailed.valid,
       errors: detailed.errors.map((issue) => ({
+        ...(issue.document ? { document: issue.document } : {}),
         path: issue.path,
         code: issue.code,
         message: issue.message

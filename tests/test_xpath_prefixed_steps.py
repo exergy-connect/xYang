@@ -1,6 +1,6 @@
-"""Prefixed XPath steps resolve by module, also after the native JSON round trip.
+"""Prefixed XPath steps resolve by module, also after the native JSON round trip (issue #152).
 
-Shared cases: tests/cases/xpath/prefixed-steps (and the unknown-prefix cases next to it).
+Shared cases: tests/cases/xpath/prefixed-*, tests/cases/references/leafref-prefixed.
 """
 
 import copy
@@ -14,23 +14,32 @@ from xyang.errors import YangSyntaxError
 from xyang.json import generate_json_schema, parse_json_schema
 from xyang.parser.yang_parser import YangParser
 
-CASE = Path(__file__).parent / "cases" / "xpath" / "prefixed-steps"
-INSTANCES = json.loads((CASE / "case.json").read_text())["instances"]
+CASES_DIR = Path(__file__).parent / "cases"
+CASE = CASES_DIR / "xpath" / "prefixed-steps"
+ROUND_TRIP_CASES = ["xpath/prefixed-steps", "xpath/prefixed-definition-site", "xpath/prefixed-table", "references/leafref-prefixed"]
 
 
-def _load_case():
-    parser = YangParser(include_path=(CASE,))
-    primary = (CASE / "m.yang").resolve()
+def _load_case(case_dir: Path = CASE):
+    spec = json.loads((case_dir / "case.json").read_text())
+    parser = YangParser(include_path=(case_dir,))
+    primary = (case_dir / spec["module"]).resolve()
     module = parser.parse_file(primary)
     parser._module_cache[primary] = module
-    parser.parse_file(CASE / "lib.yang")
-    parser.parse_file(CASE / "ext.yang")
+    for sibling in sorted(case_dir.glob("*.yang")):
+        if sibling.resolve() != primary:
+            parser.parse_file(sibling)
     return module
 
 
 @pytest.fixture(scope="module")
 def schema():
     return generate_json_schema(_load_case())
+
+
+def _round_trip_params():
+    for case in ROUND_TRIP_CASES:
+        for inst in json.loads((CASES_DIR / case / "case.json").read_text())["instances"]:
+            yield pytest.param(case, inst, id=f"{case}:{inst['name']}")
 
 
 def test_json_records_prefix_modules_and_qualifies_augmented_members(schema):
@@ -41,8 +50,10 @@ def test_json_records_prefix_modules_and_qualifies_augmented_members(schema):
     assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))) == schema
 
 
-@pytest.mark.parametrize("inst", INSTANCES, ids=[i["name"] for i in INSTANCES])
-def test_round_tripped_module_validates_like_the_yang(schema, inst):
+@pytest.mark.parametrize("case,inst", list(_round_trip_params()))
+def test_round_tripped_module_validates_like_the_yang(case, inst):
+    schema = generate_json_schema(_load_case(CASES_DIR / case))
+    assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))) == schema
     result = YangValidator(parse_json_schema(copy.deepcopy(schema))).validate_detailed(
         inst["data"], native_json=inst.get("encoding") == "native"
     )

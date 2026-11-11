@@ -28,6 +28,7 @@ from ..ast import (
     YangOutputStmt,
     YangRefineStmt,
     YangRpcStmt,
+    YangActionStmt,
     YangStatement,
     YangTypeStmt,
     YangTypedefStmt,
@@ -898,15 +899,30 @@ def _io_block_to_property(
     return out
 
 
+def _with_actions(
+    prop: dict[str, Any], stmt: YangStatement, typedef_names: set[str], module: YangModule
+) -> dict[str, Any]:
+    """Add ``x-yang.actions`` (RFC 7950 §7.15) to a container or list property."""
+    actions = {
+        _property_key(child, module): _rpc_to_json(child, typedef_names, module, XYangTypeValue.ACTION)
+        for child in _expand_uses_for_json(stmt.statements, module)
+        if isinstance(child, YangActionStmt) and child.name
+    }
+    if actions:
+        prop[JsonSchemaKey.X_YANG][XYangKey.ACTIONS] = actions
+    return prop
+
+
 def _rpc_to_json(
     stmt: YangRpcStmt,
     typedef_names: set[str],
     module: YangModule,
+    kind: str = XYangTypeValue.RPC,
 ) -> dict[str, Any]:
-    """Encode one module-level ``rpc`` for ``x-yang.rpcs``."""
+    """Encode one module-level ``rpc`` for ``x-yang.rpcs``, or one ``action`` for ``x-yang.actions``."""
     out: dict[str, Any] = {
         JsonSchemaKey.X_YANG: _build_xyang(
-            XYangTypeValue.RPC,
+            kind,
             must_list=getattr(stmt, "must_statements", None) or [],
             when_stmt=getattr(stmt, "when", None),
             if_features=_if_features_for_xyang(stmt),
@@ -929,9 +945,9 @@ def _statement_to_property(
 ) -> dict[str, Any] | None:
     """Convert an AST statement to a JSON Schema property. Returns None for unsupported nodes. Expands uses when present."""
     if isinstance(stmt, YangContainerStmt):
-        return _container_stmt_to_property(stmt, typedef_names, module)
+        return _with_actions(_container_stmt_to_property(stmt, typedef_names, module), stmt, typedef_names, module)
     if isinstance(stmt, YangListStmt):
-        return _list_stmt_to_property(stmt, typedef_names, module)
+        return _with_actions(_list_stmt_to_property(stmt, typedef_names, module), stmt, typedef_names, module)
     if isinstance(stmt, YangLeafStmt):
         return _leaf_stmt_to_property(stmt, typedef_names, module, parent)
     if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):

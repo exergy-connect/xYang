@@ -943,16 +943,29 @@ def type_to_schema(
 ) -> dict[str, Any]:
     """JSON Schema fragment for a type. Typedef names become ``$ref``."""
     name = type_stmt.name
-    if name in typedef_names:
+    if name in typedef_names and not type_stmt.prefix:
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
     spec = REGISTRY.get(name)
-    if spec is None:
-        return {JsonSchemaKey.TYPE: "string"}
+    if spec is None or type_stmt.prefix:
+        return _imported_typedef_schema(type_stmt, module, leafref_anchor)
     token = _EMIT.set((typedef_names, module, leafref_anchor))
     try:
         return spec.to_schema(type_stmt)
     finally:
         _EMIT.reset(token)
+
+
+def _imported_typedef_schema(type_stmt: YangTypeStmt, module: Any, leafref_anchor: Any) -> dict[str, Any]:
+    """Inline a typedef from another module; the JSON form's ``$defs`` hold only this module's."""
+    from ..module import resolve_typedef
+
+    typedef, target = resolve_typedef(type_stmt, module)
+    label = f"{type_stmt.prefix}:{type_stmt.name}" if type_stmt.prefix else type_stmt.name
+    if typedef is None or typedef.type is None:
+        raise ValueError(f"cannot export type {label!r}: its typedef is not found where the type is written")
+    if type_stmt.range or type_stmt.length or type_stmt.patterns:
+        raise ValueError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
+    return type_to_schema(typedef.type, set(), target, leafref_anchor)
 
 
 def _singleton_enum_string(fragment: SchemaFragment) -> YangTypeStmt | None:

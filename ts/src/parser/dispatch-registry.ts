@@ -190,7 +190,8 @@ const PARENTS: Array<[string, DispatchParent]> = [
         kw.WHEN,
         kw.MUST,
         kw.IF_FEATURE,
-        kw.NOTIFICATION
+        kw.NOTIFICATION,
+        kw.ACTION
       ])
     )
   ],
@@ -200,7 +201,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
       "7.5.2",
       DATA_NODE_SUBSTATEMENTS,
       DATA_DEF_SUBSTATEMENTS,
-      new Set([kw.PRESENCE, kw.WHEN, kw.MUST, kw.GROUPING, kw.IF_FEATURE, kw.NOTIFICATION])
+      new Set([kw.PRESENCE, kw.WHEN, kw.MUST, kw.GROUPING, kw.IF_FEATURE, kw.NOTIFICATION, kw.ACTION])
     )
   ],
   [
@@ -209,7 +210,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
       "7.12.1",
       METADATA_SUBSTATEMENTS,
       DATA_DEF_SUBSTATEMENTS,
-      new Set([kw.TYPEDEF, kw.GROUPING, kw.IF_FEATURE, kw.WHEN, kw.MUST, kw.NOTIFICATION])
+      new Set([kw.TYPEDEF, kw.GROUPING, kw.IF_FEATURE, kw.WHEN, kw.MUST, kw.NOTIFICATION, kw.ACTION])
     )
   ],
   [
@@ -225,6 +226,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
     "rpc",
     parent("7.14.1", METADATA_SUBSTATEMENTS, new Set([kw.WHEN, kw.MUST, kw.INPUT, kw.OUTPUT, kw.IF_FEATURE]))
   ],
+  ["action", parent("7.15.1", METADATA_SUBSTATEMENTS, new Set([kw.INPUT, kw.OUTPUT, kw.IF_FEATURE]))],
   ["input", ioBody],
   ["output", { rfc: "7.14.3", keywords: ioBody.keywords }],
   [
@@ -242,7 +244,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
       "7.17.1",
       DATA_NODE_SUBSTATEMENTS,
       DATA_DEF_SUBSTATEMENTS,
-      new Set([kw.IF_FEATURE, kw.CASE, kw.WHEN, kw.MUST, kw.NOTIFICATION])
+      new Set([kw.IF_FEATURE, kw.CASE, kw.WHEN, kw.MUST, kw.NOTIFICATION, kw.ACTION])
     )
   ],
   ["uses", parent("7.13.1", METADATA_SUBSTATEMENTS, new Set([kw.WHEN, kw.IF_FEATURE, kw.REFINE, kw.AUGMENT]))],

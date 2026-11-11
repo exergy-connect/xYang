@@ -54,6 +54,7 @@ class TypeStatementParser:
         else:
             type_name = tokens.consume()
         type_stmt = YangTypeStmt(name=type_name, prefix=type_prefix)
+        type_stmt.scope = context.module
         if tokens.consume_if_type(YangTokenType.LBRACE):
             type_context = context.push_parent(type_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:

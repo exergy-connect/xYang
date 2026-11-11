@@ -28,6 +28,7 @@ from ..ast import (
     YangLeafListStmt,
     YangOutputStmt,
     YangRpcStmt,
+    YangActionStmt,
     YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
@@ -834,11 +835,13 @@ def _convert_rpc(
     name: str,
     rpc_value: dict[str, Any],
     defs: dict[str, Any],
+    cls: type[YangRpcStmt] = YangRpcStmt,
+    kind: str = XYangTypeValue.RPC,
 ) -> YangRpcStmt | None:
-    """Convert one ``x-yang.rpcs`` entry to ``YangRpcStmt``."""
+    """Convert one ``x-yang.rpcs`` (or ``x-yang.actions``) entry to ``YangRpcStmt`` (``YangActionStmt``)."""
     xyang = _get_xyang(rpc_value)
-    if xyang.get(XYangKey.TYPE) != XYangTypeValue.RPC:
-        return None
+    if xyang.get(XYangKey.TYPE) != kind:
+        raise ValueError(f"{kind} '{name}' must have x-yang type '{kind}', got {xyang.get(XYangKey.TYPE)!r}")
     must_list = _build_must_list(xyang)
     statements: list[YangStatement] = []
     for io_key, io_type in (
@@ -850,7 +853,7 @@ def _convert_rpc(
             io_stmt = _convert_io_block(io_raw, defs, f"/{name}/{io_key}", io_type=io_type)
             if io_stmt is not None:
                 statements.append(io_stmt)
-    rpc = YangRpcStmt(name=name, statements=statements)
+    rpc = cls(name=name, statements=statements)
     rpc.must_statements = must_list
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
@@ -869,12 +872,34 @@ def _convert_property(
     """Convert one property. A ``module:name`` key is a node another module defines (augment)."""
     module_name, sep, local = name.partition(":")
     if not sep:
-        return _convert_property_local(name, prop_value, defs, parent_path, mandatory_override)
+        stmt = _convert_property_local(name, prop_value, defs, parent_path, mandatory_override)
+        return _attach_actions(stmt, prop_value, defs, parent_path)
     if not module_name or not local:
         raise ValueError(f"property name {name!r} must be 'name' or 'module:name'")
     stmt = _convert_property_local(local, prop_value, defs, parent_path, mandatory_override)
     if stmt is not None:
         stmt.defining_module = module_name
+    return _attach_actions(stmt, prop_value, defs, parent_path)
+
+
+def _attach_actions(stmt: Any, prop_value: dict[str, Any], defs: dict[str, Any], parent_path: str) -> Any:
+    """Add the ``x-yang.actions`` of a container or list property as ``YangActionStmt`` children."""
+    if not isinstance(stmt, (YangContainerStmt, YangListStmt)):
+        return stmt
+    _schema, xyang = _property_schema_and_xyang(prop_value, defs)
+    actions = xyang.get(XYangKey.ACTIONS)
+    if actions is None:
+        return stmt
+    if not isinstance(actions, dict):
+        raise ValueError(f'x-yang "actions" at {parent_path} must be an object keyed by action name')
+    for action_name, action_value in actions.items():
+        if not isinstance(action_value, dict):
+            raise ValueError(f"action '{action_name}' at {parent_path} must be an object")
+        owner, colon, local = str(action_name).rpartition(":")
+        action = _convert_rpc(local, action_value, defs, YangActionStmt, XYangTypeValue.ACTION)
+        if colon:
+            action.defining_module = owner
+        stmt.statements.append(action)
     return stmt
 
 

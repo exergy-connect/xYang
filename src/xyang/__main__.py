@@ -118,7 +118,15 @@ def _features_arg(raw: str | None) -> dict[str, frozenset[str]] | None:
 
 
 def _json_validation_report(result: dict[str, Any]) -> str:
-    errors = [{"path": issue["path"], "code": issue["code"], "message": issue["message"]} for issue in result["errors"]]
+    errors = [
+        {
+            **({"document": issue["document"]} if "document" in issue else {}),
+            "path": issue["path"],
+            "code": issue["code"],
+            "message": issue["message"],
+        }
+        for issue in result["errors"]
+    ]
     return json.dumps({"valid": result["valid"], "errors": errors})
 
 
@@ -195,9 +203,18 @@ def main() -> int:
         ),
     )
     validate_parser.add_argument(
+        "--action",
+        metavar="PATH",
+        default=None,
+        help=(
+            "Validate the data as the input of the action at PATH (RFC 7950 §7.15), the RFC 8040 "
+            "§3.5.3 data resource identifier /module:list=key/action. Needs --context with that instance"
+        ),
+    )
+    validate_parser.add_argument(
         "--output",
         action="store_true",
-        help="With --rpc, validate the rpc output instead of its input",
+        help="With --rpc or --action, validate the output instead of the input",
     )
     validate_parser.add_argument(
         "--context",
@@ -205,8 +222,9 @@ def main() -> int:
         default=None,
         metavar="FILE",
         help=(
-            "With --rpc, JSON or YAML server data that joins the operation node in the XPath "
-            "accessible tree (RFC 7950 §6.4.1) so must and leafref can reach it. Not validated"
+            "With --rpc or --action, JSON or YAML server data. It is validated against the module "
+            "first (its errors carry \"document\": \"context\"), then joins the operation node in "
+            "the XPath accessible tree (RFC 7950 §6.4.1) so must and leafref can reach it"
         ),
     )
     validate_parser.add_argument(
@@ -294,15 +312,19 @@ def main() -> int:
         if not p.exists():
             print(f"Error: file not found: {p}", file=sys.stderr)
             return 2
-        if args.rpc is None and (args.output or args.context is not None):
-            print("Error: --output and --context apply only together with --rpc", file=sys.stderr)
+        if args.rpc is not None and args.action is not None:
+            print("Error: --rpc and --action are mutually exclusive", file=sys.stderr)
+            return 2
+        if args.rpc is None and args.action is None and (args.output or args.context is not None):
+            print("Error: --output and --context apply only together with --rpc or --action", file=sys.stderr)
             return 2
         try:
             include_path = _include_path_from_args(args)
             features = _features_arg(args.features)
             operation: dict[str, Any] = {}
-            if args.rpc is not None:
-                operation = {"rpc": args.rpc, "direction": "output" if args.output else "input"}
+            if args.rpc is not None or args.action is not None:
+                target = {"rpc": args.rpc} if args.rpc is not None else {"action": args.action}
+                operation = {**target, "direction": "output" if args.output else "input"}
                 if args.context is not None:
                     if not args.context.exists():
                         print(f"Error: file not found: {args.context}", file=sys.stderr)

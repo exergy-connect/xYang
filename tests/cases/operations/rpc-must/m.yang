@@ -41,7 +41,7 @@ module m {
       }
       leaf cost {
         type uint32;
-        must "/add-link/link-id != 'free' or . = 0" {
+        must "/m:add-link/m:link-id != 'free' or . = 0" {
           error-message "A free link has no cost.";
         }
       }

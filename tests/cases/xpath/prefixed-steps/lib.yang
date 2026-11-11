@@ -10,7 +10,7 @@ module lib {
   grouping endpoint {
     leaf host { type string; }
     leaf port {
-      type uint16;
+      type l:port;
       must ". > 0 or ../host = 'any'" {
         error-message "port 0 needs host any.";
       }

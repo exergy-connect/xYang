@@ -24,6 +24,9 @@ export class TypeStatementParser {
       name = tokens.consume().trim();
     }
     const type_stmt = new YangTypeStmt({ name, prefix });
+    const writer = context.module as { name?: string; belongs_to_module?: string };
+    const scope = writer.belongs_to_module || writer.name;
+    if (scope) type_stmt.scope_module = scope;
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(type_stmt);

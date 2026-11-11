@@ -777,10 +777,15 @@ function parseIoBlock(
   return parsed;
 }
 
-function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<string, unknown>): YangStatement | null {
+function parseRpc(
+  name: string,
+  rpcValue: Record<string, unknown>,
+  defs: Record<string, unknown>,
+  kind: string = YangTokenType.RPC
+): YangStatement {
   const xy = asRecord(rpcValue[YANG_SCHEMA_KEYS.xYang]);
-  if (xy.type !== YangTokenType.RPC) {
-    return null;
+  if (xy.type !== kind) {
+    throw new Error(`${kind} '${name}' must have x-yang type '${kind}', got ${JSON.stringify(xy.type)}`);
   }
   const statements: YangStatement[] = [...mustStatementsFromXyang(xy)];
   for (const ioKey of [YangTokenType.INPUT, YangTokenType.OUTPUT] as const) {
@@ -790,13 +795,40 @@ function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<
     }
   }
   const out: YangStatement = new YangStatement({
-    keyword: YangTokenType.RPC,
+    keyword: kind,
     name,
     argument: name,
     statements
   });
   applyStatementMetaFromXyang(out, xy);
   return out;
+}
+
+/** Add the `x-yang.actions` of a container or list property as `action` children. */
+function attachActions(stmt: YangStatement | null, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement | null {
+  if (!stmt || (stmt.keyword !== YangTokenType.CONTAINER && stmt.keyword !== YangTokenType.LIST)) {
+    return stmt;
+  }
+  const xy = asRecord(resolveSchemaWithOverlay(schema, defs)[YANG_SCHEMA_KEYS.xYang]);
+  const actions = xy[XYANG_KEYS.actions];
+  if (actions === undefined) {
+    return stmt;
+  }
+  if (!actions || typeof actions !== "object" || Array.isArray(actions)) {
+    throw new Error(`x-yang "actions" of '${stmt.name}' must be an object keyed by action name`);
+  }
+  for (const [key, value] of Object.entries(actions as Record<string, unknown>)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`action '${key}' of '${stmt.name}' must be an object`);
+    }
+    const colon = key.lastIndexOf(":");
+    const action = parseRpc(colon < 0 ? key : key.slice(colon + 1), value as Record<string, unknown>, defs, YangTokenType.ACTION);
+    if (colon >= 0) {
+      action.defining_module = key.slice(0, colon);
+    }
+    stmt.statements.push(action);
+  }
+  return stmt;
 }
 
 /** One property. A `module:name` key is a node another module defines (augment). */
@@ -807,7 +839,7 @@ function jsonSchemaPropertyToStatement(
 ): YangStatement | null {
   const colon = name.indexOf(":");
   if (colon < 0) {
-    return localPropertyToStatement(name, schema, defs);
+    return attachActions(localPropertyToStatement(name, schema, defs), schema, defs);
   }
   const owner = name.slice(0, colon);
   const local = name.slice(colon + 1);
@@ -818,7 +850,7 @@ function jsonSchemaPropertyToStatement(
   if (stmt) {
     stmt.defining_module = owner;
   }
-  return stmt;
+  return attachActions(stmt, schema, defs);
 }
 
 function localPropertyToStatement(

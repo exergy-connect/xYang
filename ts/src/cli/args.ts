@@ -16,7 +16,9 @@ export type ValidateCliArgs = CommonCliArgs & {
   nativeJson: boolean;
   /** `--rpc NAME`: validate the data as an instance of that rpc. */
   rpc: string | undefined;
-  /** `--output`: with `--rpc`, the output instead of the input. */
+  /** `--action PATH`: validate the data as an instance of the action at that data resource identifier. */
+  action: string | undefined;
+  /** `--output`: with `--rpc` or `--action`, the output instead of the input. */
   output: boolean;
   /** `--context FILE`: server data next to the operation node. */
   contextFile: string | undefined;
@@ -75,6 +77,7 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
   let features: Record<string, string[]> | null = null;
   let nativeJson = false;
   let rpc: string | undefined;
+  let action: string | undefined;
   let output = false;
   let contextFile: string | undefined;
 
@@ -96,6 +99,13 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
       rpc = rest[++i];
       if (!rpc) {
         throw new Error("Missing rpc name after --rpc");
+      }
+      continue;
+    }
+    if (arg === "--action") {
+      action = rest[++i];
+      if (!action) {
+        throw new Error("Missing data resource identifier after --action");
       }
       continue;
     }
@@ -144,9 +154,12 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     positional.push(arg!);
   }
 
-  if (rpc === undefined && (output || contextFile !== undefined)) {
-    throw new Error("--output and --context apply only together with --rpc");
+  if (rpc !== undefined && action !== undefined) {
+    throw new Error("--rpc and --action are mutually exclusive");
+  }
+  if (rpc === undefined && action === undefined && (output || contextFile !== undefined)) {
+    throw new Error("--output and --context apply only together with --rpc or --action");
   }
 
-  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, output, contextFile };
+  return { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, action, output, contextFile };
 }

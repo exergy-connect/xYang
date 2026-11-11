@@ -15,6 +15,8 @@
       "errors": [{ "path": "/m:top/mtu-copy", "code": "must", "message": "mtu-copy must equal the mtu of ifref." }] },
     { "name": "when with an absolute prefixed path", "data": { "m:sys": { "name": "edge" }, "m:top": { "core-only": "x" } }, "valid": false,
       "errors": [{ "path": "/m:top/core-only", "code": "when" }] },
+    { "name": "typedef with the grouping module's own prefix", "data": { "m:top": { "port": 70000 } }, "valid": false,
+      "errors": [{ "path": "/m:top/port", "code": "range" }] },
     { "name": "grouping from an imported module", "data": { "m:top": { "host": "h", "port": 0 } }, "valid": false,
       "errors": [{ "path": "/m:top/port", "code": "must", "message": "port 0 needs host any." }] },
     { "name": "native JSON", "encoding": "native", "data": { "sys": { "m:name": "core", "ext:name": "core", "ext:tag": "t" } }, "valid": false,

@@ -1,4 +1,7 @@
-"""Validate rpc input and output instances (issue #149). Shared cases: tests/cases/operations."""
+"""Validate rpc and action input and output instances (issue #149) with a validated context.
+
+Shared cases: tests/cases/operations.
+"""
 
 import copy
 import json
@@ -117,8 +120,8 @@ def test_validate_text_output_uses_the_wrapper_path(module):
     "kwargs,message",
     [
         ({"rpc": "nope"}, "no rpc 'nope'"),
-        ({"direction": "output"}, "direction applies only together with rpc"),
-        ({"context": {}}, "context applies only together with rpc"),
+        ({"direction": "output"}, "direction applies only together with rpc or action"),
+        ({"context": {}}, "context applies only together with rpc or action"),
         ({"rpc": "add-link", "direction": "sideways"}, "direction must be 'input' or 'output'"),
         ({"rpc": "add-link", "context": []}, "context must be a JSON object"),
         ({"rpc": ""}, "rpc must be a non-empty rpc name"),
@@ -214,3 +217,161 @@ def test_cli_missing_context_file_exits_2(files):
     yang, write = files
     proc = _cli("--rpc", "add-link", "--context", "/nonexistent/ctx.json", yang, write("in.json", OTHER_LINK))
     assert proc.returncode == 2
+
+
+ACTION_MODULE = """
+module ex {
+  yang-version 1.1;
+  namespace "urn:ex";
+  prefix ex;
+
+  container interfaces {
+    list interface {
+      key name;
+      leaf name { type string; }
+      leaf mtu { type uint16; }
+      action reset {
+        input {
+          leaf delay {
+            type uint16;
+            must ". < ../../ex:mtu" { error-message "delay must be below the interface mtu."; }
+          }
+        }
+        output { leaf ok { type boolean; mandatory true; } }
+      }
+    }
+  }
+}
+"""
+
+SERVER = {"ex:interfaces": {"interface": [{"name": "eth0", "mtu": 1500}, {"name": "eth1", "mtu": 9000}]}}
+ETH0 = "/ex:interfaces/interface=eth0/reset"
+
+
+@pytest.fixture
+def action_module():
+    return parse_yang_string(ACTION_MODULE)
+
+
+def test_action_must_reads_the_selected_parent_entry(action_module):
+    data = {"ex:input": {"delay": 1600}}
+    bad = validate(action_module, data, action=ETH0, context=SERVER)
+    assert [(e["path"], e["code"], e["message"]) for e in bad["errors"]] == [
+        ("/ex:input/delay", "must", "delay must be below the interface mtu.")
+    ]
+    assert validate(action_module, data, action="/ex:interfaces/interface=eth1/reset", context=SERVER)["valid"]
+
+
+def test_action_output(action_module):
+    result = validate(action_module, {"ex:output": {}}, action=ETH0, direction="output", context=SERVER)
+    assert [(e["path"], e["code"]) for e in result["errors"]] == [("/ex:output/ok", "mandatory")]
+
+
+def test_action_parent_missing_from_context(action_module):
+    result = validate(action_module, {"ex:input": {}}, action="/ex:interfaces/interface=eth9/reset", context=SERVER)
+    assert result["errors"][0]["document"] == "context"
+    assert (result["errors"][0]["path"], result["errors"][0]["code"]) == ("", "action-parent")
+
+
+@pytest.mark.parametrize(
+    "kwargs,message",
+    [
+        ({"action": ETH0}, "action needs context"),
+        ({"action": ETH0, "rpc": "x", "context": {}}, "mutually exclusive"),
+        ({"action": "/ex:interfaces/interface/reset", "context": {}}, "needs its 1 key value"),
+        ({"action": "/ex:interfaces/interface=eth0/nope", "context": {}}, "has no action 'ex:nope'"),
+        ({"action": "interfaces/interface=eth0/reset", "context": {}}, "data resource identifier"),
+    ],
+)
+def test_action_usage_errors(action_module, kwargs, message):
+    with pytest.raises(ValueError, match=message):
+        validate(action_module, {"ex:input": {}}, **kwargs)
+
+
+def test_invalid_context_is_reported_before_the_operation(action_module):
+    bad_server = {"ex:interfaces": {"interface": [{"name": "eth0", "mtu": "big"}]}}
+    result = validate(action_module, {"ex:input": {"delay": 99999}}, action=ETH0, context=bad_server)
+    assert result["errors"] == [
+        {
+            "document": "context",
+            "code": "type",
+            "path": "/ex:interfaces/interface/0/mtu",
+            "message": result["errors"][0]["message"],
+            "severity": "error",
+        }
+    ]
+    ok, messages, _warnings = YangValidator(action_module).validate({"ex:input": {}}, action=ETH0, context=bad_server)
+    assert not ok and messages[0].startswith("context /interfaces/interface")
+
+
+def test_action_does_not_mutate_module_or_context(action_module):
+    server = copy.deepcopy(SERVER)
+    interface = action_module.statements[0].statements[0]
+    before = list(interface.statements)
+    validate(action_module, {"ex:input": {"delay": 1}}, action=ETH0, context=server)
+    assert server == SERVER
+    assert interface.statements == before and all(a is b for a, b in zip(interface.statements, before))
+
+
+@pytest.fixture
+def action_files(tmp_path: Path):
+    yang = tmp_path / "ex.yang"
+    yang.write_text(ACTION_MODULE, encoding="utf-8")
+
+    def write(name: str, value) -> str:
+        path = tmp_path / name
+        path.write_text(json.dumps(value), encoding="utf-8")
+        return str(path)
+
+    return str(yang), write
+
+
+def test_cli_action(action_files):
+    yang, write = action_files
+    ctx = write("server.json", SERVER)
+    bad = _cli(
+        "--format", "json", "--action", ETH0, "--context", ctx, yang, write("in.json", {"ex:input": {"delay": 1600}})
+    )
+    assert bad.returncode == 1
+    assert json.loads(bad.stdout)["errors"][0]["path"] == "/ex:input/delay"
+    out = _cli("--action", ETH0, "--output", "--context", ctx, yang, write("out.json", {"ex:output": {"ok": True}}))
+    assert out.returncode == 0
+
+
+def test_cli_context_errors_carry_the_document(action_files):
+    yang, write = action_files
+    ctx = write("bad.json", {"ex:interfaces": {"interface": [{"name": "eth0", "mtu": "big"}]}})
+    proc = _cli("--format", "json", "--action", ETH0, "--context", ctx, yang, write("in.json", {"ex:input": {}}))
+    assert proc.returncode == 1
+    (issue,) = json.loads(proc.stdout)["errors"]
+    assert (issue["document"], issue["path"], issue["code"]) == ("context", "/ex:interfaces/interface/0/mtu", "type")
+
+
+@pytest.mark.parametrize(
+    "extra",
+    [
+        ["--action", ETH0],
+        ["--action", ETH0, "--rpc", "x"],
+        ["--action", "/ex:interfaces/interface/reset", "--context", "CTX"],
+    ],
+)
+def test_cli_action_usage_errors_exit_2(action_files, extra):
+    yang, write = action_files
+    ctx = write("server.json", SERVER)
+    proc = _cli(*[ctx if item == "CTX" else item for item in extra], yang, write("in.json", {"ex:input": {}}))
+    assert proc.returncode == 2
+    assert proc.stdout == ""
+
+
+def test_cli_undeclared_xpath_prefix_exits_2(tmp_path: Path):
+    yang = tmp_path / "m.yang"
+    yang.write_text(
+        'module m { yang-version 1.1; namespace "urn:m"; prefix m;'
+        ' container top { leaf a { type leafref { path "/x:top/x:b"; } } leaf b { type string; } } }',
+        encoding="utf-8",
+    )
+    data = tmp_path / "d.json"
+    data.write_text("{}", encoding="utf-8")
+    proc = _cli("--format", "json", str(yang), str(data))
+    assert proc.returncode == 2
+    assert "unknown prefix 'x'" in proc.stderr

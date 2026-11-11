@@ -14,7 +14,8 @@ import {
   JSON_TYPE_FREE_FORM,
   JSON_TYPE_OBJECT,
 } from "./type-constants";
-import { leafTypeToSchema } from "../types/registry";
+import { leafTypeToSchema, REGISTRY } from "../types/registry";
+import { resolveTypedef } from "../validator/type-checker";
 
 /** Emit ``description`` only when *text* is a non-empty string. */
 function withDescription(out: Record<string, unknown>, text: unknown): void {
@@ -197,15 +198,58 @@ function resolveAbsoluteLeafTypePath(module: YangModule, path: unknown): Record<
   return asRecord(current.type);
 }
 
+/**
+ * Follow a `type` that names a typedef of another module to that typedef's own type; the JSON form's
+ * `$defs` hold only this module's typedefs. Restrictions on such a `type` cannot be kept, so they fail.
+ */
+function foreignTypedefResolved(typeShape: Record<string, unknown>, module: YangModule): Record<string, unknown> {
+  let current = typeShape;
+  for (let depth = 0; depth < 64; depth += 1) {
+    const typeName = typeof current.name === "string" ? current.name : "";
+    const prefix = typeof current.prefix === "string" && current.prefix ? current.prefix : undefined;
+    const scope = typeof current.scope_module === "string" ? current.scope_module : undefined;
+    const foreign = prefix !== undefined || (scope !== undefined && scope !== module.name);
+    if (!foreign || (!prefix && Object.prototype.hasOwnProperty.call(REGISTRY, typeName))) {
+      return current;
+    }
+    const label = prefix ? `${prefix}:${typeName}` : typeName;
+    const typedef = resolveTypedef(module, current);
+    if (!typedef?.type) {
+      throw new Error(`cannot export type '${label}': its typedef is not found where the type is written`);
+    }
+    if (current.range || current.length || (Array.isArray(current.patterns) && current.patterns.length > 0)) {
+      throw new Error(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
+    }
+    current = typedef.type;
+  }
+  return current;
+}
+
 function typedefRefOrInline(
   typeShape: Record<string, unknown>,
-  typedefNames: Set<string>
+  typedefNames: Set<string>,
+  module: YangModule
 ): Record<string, unknown> {
   const typeName = typeof typeShape.name === "string" ? typeShape.name : "";
-  if (typedefNames.has(typeName)) {
+  const prefix = typeof typeShape.prefix === "string" && typeShape.prefix ? typeShape.prefix : undefined;
+  const scope = typeof typeShape.scope_module === "string" ? typeShape.scope_module : undefined;
+  const local = !prefix && (scope === undefined || scope === module.name);
+  if (local && typedefNames.has(typeName)) {
     return { $ref: `#/$defs/${typeName}` };
   }
-  return leafTypeToSchema(typeShape);
+  if (!prefix && Object.prototype.hasOwnProperty.call(REGISTRY, typeName)) {
+    return leafTypeToSchema(typeShape);
+  }
+  // A typedef from another module is inlined; the JSON form's `$defs` hold only this module's.
+  const label = prefix ? `${prefix}:${typeName}` : typeName;
+  const typedef = resolveTypedef(module, typeShape);
+  if (!typedef?.type) {
+    throw new Error(`cannot export type '${label}': its typedef is not found where the type is written`);
+  }
+  if (typeShape.range || typeShape.length || (Array.isArray(typeShape.patterns) && typeShape.patterns.length > 0)) {
+    throw new Error(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
+  }
+  return typedefRefOrInline(typedef.type, new Set(), module);
 }
 
 function partitionChoiceSiblings(children: YangStatement[]): {
@@ -327,13 +371,15 @@ function ioBlockToSchema(
   return out;
 }
 
+/** One rpc for `x-yang.rpcs`, or one action for `x-yang.actions` (RFC 7950 §7.15). */
 function rpcToJson(
   stmt: YangStatement,
   module: YangModule,
-  typedefNames: Set<string>
+  typedefNames: Set<string>,
+  kind: string = YangTokenType.RPC
 ): Record<string, unknown> {
   const out: Record<string, unknown> = {
-    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: YangTokenType.RPC })
+    [YANG_SCHEMA_KEYS.xYang]: withStatementMeta(stmt, { type: kind })
   };
   const inp = stmt.findStatement("input");
   if (inp?.keyword === YangTokenType.INPUT) {
@@ -433,6 +479,27 @@ function statementToSchema(
   module: YangModule,
   typedefNames: Set<string>
 ): Record<string, unknown> {
+  const out = statementToSchemaBody(stmt, module, typedefNames);
+  if (stmt.keyword !== YangTokenType.CONTAINER && stmt.keyword !== YangTokenType.LIST) {
+    return out;
+  }
+  const actions: Record<string, unknown> = {};
+  for (const child of stmt.statements) {
+    if (child.keyword === YangTokenType.ACTION && child.name) {
+      actions[propertyKey(child, module)] = rpcToJson(child, module, typedefNames, YangTokenType.ACTION);
+    }
+  }
+  if (Object.keys(actions).length > 0) {
+    asRecord(out[YANG_SCHEMA_KEYS.xYang])[XYANG_KEYS.actions] = actions;
+  }
+  return out;
+}
+
+function statementToSchemaBody(
+  stmt: YangStatement,
+  module: YangModule,
+  typedefNames: Set<string>
+): Record<string, unknown> {
   const keyword = stmt.keyword ?? "";
 
   if (keyword === YangTokenType.CHOICE) {
@@ -511,8 +578,8 @@ function statementToSchema(
   }
 
   if (keyword === YangTokenType.LEAF_LIST) {
-    const typeShape = asRecord(stmt.type);
-    const itemSchema = typedefRefOrInline(typeShape, typedefNames);
+    const typeShape = foreignTypedefResolved(asRecord(stmt.type), module);
+    const itemSchema = typedefRefOrInline(typeShape, typedefNames, module);
     const typeName = (typeShape.name as string | undefined) ?? YangTokenType.STRING_KW;
     const out: Record<string, unknown> = {
       type: JSON_TYPE_ARRAY,
@@ -554,14 +621,14 @@ function statementToSchema(
   }
 
   if (keyword === YangTokenType.LEAF) {
-    const typeShape = asRecord(stmt.type);
+    const typeShape = foreignTypedefResolved(asRecord(stmt.type), module);
     const typeName = (typeShape.name as string | undefined) ?? YangTokenType.STRING_KW;
-    let leafSchema = typedefRefOrInline(typeShape, typedefNames);
+    let leafSchema = typedefRefOrInline(typeShape, typedefNames, module);
 
     if (typeName === YangTokenType.LEAFREF) {
       const targetType = resolveAbsoluteLeafTypePath(module, typeShape.path);
       leafSchema = targetType
-        ? typedefRefOrInline(targetType, typedefNames)
+        ? typedefRefOrInline(targetType, typedefNames, module)
         : leafTypeToSchema({ name: YangTokenType.STRING_KW });
     }
 
@@ -632,7 +699,7 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
   const names = new Set(Object.keys(typedefs));
   for (const [name, entry] of Object.entries(typedefs)) {
     const typeShape = asRecord(entry.type);
-    const schema = typedefRefOrInline(typeShape, names);
+    const schema = typedefRefOrInline(typeShape, names, module);
     const { description: _typedefTypeDescription, ...schemaRest } = schema;
     const def: Record<string, unknown> = {
       ...schemaRest
@@ -716,6 +783,9 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
   // Preserve parse-time AST shape (reversible YANG <-> yang.json) while still
   // emitting a flattened schema view.
   const effectiveModule = expandUses(module);
+  if (effectiveModule !== module && module.module_registry && !effectiveModule.module_registry) {
+    Object.defineProperty(effectiveModule, "module_registry", { value: module.module_registry, enumerable: false });
+  }
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   const typedefNames = new Set(Object.keys(effectiveModule.typedefs as Record<string, unknown>));

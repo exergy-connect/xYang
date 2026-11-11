@@ -155,6 +155,7 @@ export class StatementParsers {
     [kw.NOTIFICATION]: (tokens, context) =>
       this.fromAst(this.notification_parser.parse_notification(tokens, context)),
     [kw.RPC]: (tokens, context) => this.fromAst(this.rpc_parser.parse_rpc(tokens, context)),
+    [kw.ACTION]: (tokens, context) => this.fromAst(this.rpc_parser.parse_action(tokens, context)),
     [kw.ANYDATA]: (tokens, context) => this.fromAst(this.anydata_parser.parse_anydata(tokens, context)),
     [kw.ANYXML]: (tokens, context) => this.fromAst(this.anyxml_parser.parse_anyxml(tokens, context)),
     [kw.CHOICE]: (tokens, context) => this.fromAst(this.choice_parser.parse_choice(tokens, context)),
@@ -654,6 +655,9 @@ export class StatementParsers {
       },
       [kw.RPC]: (t, c) => {
         this.rpc_parser.parse_rpc(t, c);
+      },
+      [kw.ACTION]: (t, c) => {
+        this.rpc_parser.parse_action(t, c);
       },
       [kw.ANYDATA]: (t, c) => {
         this.anydata_parser.parse_anydata(t, c);
@@ -1312,6 +1316,7 @@ export class StatementParsers {
       fraction_digits: type_stmt.fraction_digits,
       path: type_stmt.path,
       ...(type_stmt.xpath_prefixes ? { xpath_prefixes: type_stmt.xpath_prefixes } : {}),
+      ...(type_stmt.scope_module ? { scope_module: type_stmt.scope_module } : {}),
       require_instance: type_stmt.require_instance,
       identityref_bases: type_stmt.identityref_bases.map((b) =>
         b.prefix ? { prefix: b.prefix, name: b.name } : { name: b.name }

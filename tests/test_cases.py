@@ -69,7 +69,7 @@ def _write_json(value):
 def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
     """Returns [(json_pointer, code, message)]; raises if the schema is rejected.
 
-    ``operation`` is ``{"rpc", "direction", "context"}`` (each optional, absent keys unset).
+    ``operation`` is ``{"rpc", "action", "direction", "context"}`` (each optional, absent keys unset).
     A rejected call raises ``UsageError``.
     """
     module = case_dir / case["module"]
@@ -82,6 +82,8 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
             cmd.insert(2, "--native-json")
         if operation.get("rpc") is not None:
             cmd += ["--rpc", operation["rpc"]]
+        if operation.get("action") is not None:
+            cmd += ["--action", operation["action"]]
         if operation.get("direction", "input") == "output":
             cmd.append("--output")
         if context_path:
@@ -102,11 +104,11 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
         if not isinstance(out, dict) or not isinstance(out.get("errors"), list):
             detail = (proc.stderr or proc.stdout).strip() or f"CLI exited {proc.returncode} without a validation result"
             raise RuntimeError(detail)
-        return [(e["path"], e["code"], e.get("message", "")) for e in out["errors"]]
+        return [(_where(e), e["code"], e.get("message", "")) for e in out["errors"]]
     parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
-    options = {key: operation[key] for key in ("rpc", "direction", "context") if key in operation}
+    options = {key: operation[key] for key in ("rpc", "action", "direction", "context") if key in operation}
     try:
         result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
             data, native_json=native_json, **options
@@ -115,7 +117,13 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
         if operation:
             raise UsageError(str(exc)) from exc
         raise
-    return [(e["path"], e["code"], e.get("message", "")) for e in result["errors"]]
+    return [(_where(e), e["code"], e.get("message", "")) for e in result["errors"]]
+
+
+def _where(issue):
+    """``path`` for the instance; ``context:path`` for an issue about the server data context."""
+    document = issue.get("document", "data")
+    return issue["path"] if document == "data" else f"{document}:{issue['path']}"
 
 
 @pytest.mark.parametrize("case_dir,case,inst,impl", list(_params()))
@@ -127,7 +135,7 @@ def test_case(case_dir, case, inst, impl):
             assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
-    operation = {key: inst[key] for key in ("rpc", "direction", "context") if key in inst}
+    operation = {key: inst[key] for key in ("rpc", "action", "direction", "context") if key in inst}
     native = inst.get("encoding") == "native"
     if inst.get("usage_error"):
         with pytest.raises(UsageError) as excinfo:
@@ -137,7 +145,7 @@ def test_case(case_dir, case, inst, impl):
         return
     raw = _validate(impl, case_dir, case, inst["data"], native_json=native, operation=operation)
     got = sorted({(p, c) for p, c, _m in raw})
-    assert got == sorted({(e["path"], e["code"]) for e in expected}), f"raw errors: {raw}"
+    assert got == sorted({(_where(e), e["code"]) for e in expected}), f"raw errors: {raw}"
     for exp in expected:
         if exp.get("message"):
             assert any(exp["message"] in m for _p, c, m in raw if c == exp["code"]), f"raw errors: {raw}"

@@ -1,0 +1,20 @@
+module aug {
+  yang-version 1.1;
+  namespace "urn:aug";
+  prefix a;
+
+  import m { prefix mm; }
+
+  augment "/mm:interfaces/mm:interface" {
+    action probe {
+      input {
+        leaf count {
+          type uint8;
+          must ". <= ../../mm:mtu div 100" {
+            error-message "count too high for the mtu.";
+          }
+        }
+      }
+    }
+  }
+}

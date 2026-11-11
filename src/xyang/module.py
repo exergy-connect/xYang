@@ -73,3 +73,21 @@ class YangModule(YangStatementList):
     def get_extension(self, name: str) -> Optional["YangExtensionStmt"]:
         """Get an extension definition by local name."""
         return self.extensions.get(name)
+
+
+def resolve_typedef(type_stmt: Any, fallback: Any) -> tuple[Optional["YangTypedefStmt"], Optional["YangModule"]]:
+    """``(typedef, module)`` a derived ``type`` names, resolved where the ``type`` was written.
+
+    The writing module (``type_stmt.scope``, set by the parser) owns the prefix and the
+    unprefixed name (RFC 7950 §7.13). A ``type`` without a scope (built from the native JSON
+    form) resolves in *fallback*. ``(None, None)`` when the prefix or the typedef is unknown.
+    """
+    scope = getattr(type_stmt, "scope", None) or fallback
+    if not isinstance(scope, YangModule):
+        return None, None
+    prefix = getattr(type_stmt, "prefix", None)
+    target = scope.resolve_prefixed_module(prefix) if prefix else scope
+    if target is None:
+        return None, None
+    typedef = target.get_typedef(type_stmt.name)
+    return (typedef, target) if typedef is not None else (None, None)

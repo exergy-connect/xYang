@@ -67,15 +67,17 @@ def validate(
     include_path: Iterable[str | Path] = (),
     native_json: bool = False,
     rpc: str | None = None,
+    action: str | None = None,
     direction: str = "input",
     context: dict[str, Any] | None = None,
 ) -> dict[str, Any]:
     """Validate ``data`` against ``schema`` and return ``validate_detailed``'s dict.
 
-    With ``rpc`` set, ``data`` is that rpc's ``direction`` (``"input"`` or ``"output"``)
-    instance: ``{"module:input": {...}}`` (RFC 8040 §3.6) in RFC 7951 mode, the bare
-    parameter object with ``native_json=True``. ``context`` is optional server data next to
-    the operation node (RFC 7950 §6.4.1) for ``must`` and ``leafref``; it is not validated.
+    With ``rpc`` (a name) or ``action`` (``/module:list=key/action``, RFC 8040 §3.5.3) set,
+    ``data`` is that operation's ``direction`` (``"input"`` or ``"output"``) instance:
+    ``{"module:input": {...}}`` (RFC 8040 §3.6) in RFC 7951 mode, the bare parameter object
+    with ``native_json=True``. ``context`` is server data (required for an action); it is
+    validated first, and the operation's ``must`` and ``leafref`` reach it (RFC 7950 §6.4.1).
 
     ``schema`` is a YANG file path or a parsed module. ``features`` is the
     case-file shape ``{"module": ["feature", ...]}``; ``None`` enables every
@@ -93,5 +95,5 @@ def validate(
     else:
         raise TypeError(f"schema must be a path or YangModule, got {type(schema).__name__}")
     return YangValidator(module, enabled_features_by_module=enabled).validate_detailed(
-        data, native_json=native_json, rpc=rpc, direction=direction, context=context
+        data, native_json=native_json, rpc=rpc, action=action, direction=direction, context=context
     )
