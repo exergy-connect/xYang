@@ -135,6 +135,11 @@ jobs:
       - name: Run tests
         run: pytest --tb=short -q
 
+      - name: Test inventory
+        if: matrix.python-version == '3.13'
+        run: |
+          { echo '```'; python tests/inventory.py; echo '```'; } >> "$GITHUB_STEP_SUMMARY"
+
   required-check:
     name: Required Checks
     runs-on: ubuntu-latest
