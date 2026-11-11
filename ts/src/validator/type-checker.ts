@@ -167,7 +167,7 @@ export class TypeChecker {
     return this.system.issues(value, typeName, constraint);
   }
 
-  /** RFC 7951 §6.8 value, derived from every base (bases resolve in the host module, as in Python). */
+  /** RFC 7951 §6.8 value, derived from every base (bases resolve in the module that wrote the `type`). */
   private checkIdentityref(value: unknown, shape: Record<string, unknown>): TypeIssue[] {
     if (typeof value !== "string") {
       return [[
@@ -183,7 +183,9 @@ export class TypeChecker {
     if (!resolveIdentityValue(moduleData, value)) {
       return [["identityref", `identityref value '${value}' does not resolve to a known identity`]];
     }
-    if (!identityrefValueValid(moduleData, value, bases)) {
+    const scopeName = typeof shape.scope_module === "string" ? shape.scope_module : undefined;
+    const baseScope = scopeName && scopeName !== moduleData.name ? moduleData.module_registry?.[scopeName] : undefined;
+    if (!identityrefValueValid(moduleData, value, bases, baseScope ?? moduleData)) {
       const shown = bases.map((b) => `'${formatIdentifierRef(b)}'`).join(", ");
       return [["identityref", `identityref value '${value}' is not derived from all bases [${shown}]`]];
     }

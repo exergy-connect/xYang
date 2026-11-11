@@ -10,5 +10,9 @@ export const XYANG_KEYS = {
   /** Actions of a container or list (RFC 7950 §7.15), keyed by action name; same shape as `rpcs`. */
   actions: "actions",
   /** `{prefix: module}` for the prefixed steps of a leafref `path`, `must` or `when` (RFC 7950 §6.4.1). */
-  xpathPrefixes: "xpath-prefixes"
+  xpathPrefixes: "xpath-prefixes",
+  /** `{key: module stub}` of the imported modules the identities of this module derive from (RFC 7950 §7.18.2). */
+  imports: "imports",
+  /** Identities of an `imports` stub, keyed by name. */
+  identities: "identities"
 } as const;

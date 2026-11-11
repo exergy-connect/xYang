@@ -9,6 +9,7 @@ from pathlib import Path
 import pytest
 
 from xyang import YangValidator
+from xyang.json import generate_json_schema, parse_json_schema
 from xyang.parser.yang_parser import YangParser
 
 CASES = Path(__file__).parent / "cases"
@@ -36,7 +37,17 @@ def _params():
             for inst in case.get("instances") or [{"name": "schema error"}]:
                 reason = _xfail_reason(case, inst, impl)
                 marks = [pytest.mark.xfail(reason=reason, strict=True)] if reason else []
-                yield pytest.param(f.parent, case, inst, impl, id=f"{impl}:{cid}:{inst['name']}", marks=marks)
+                yield pytest.param(f.parent, case, inst, impl, "yang", id=f"{impl}:{cid}:{inst['name']}", marks=marks)
+                if impl == "python" and case.get("json_form") and "name" in inst and "data" in inst:
+                    yield pytest.param(
+                        f.parent, case, inst, impl, "json", id=f"python-json:{cid}:{inst['name']}", marks=marks
+                    )
+
+
+def _json_form(case_dir: Path, module: Path) -> dict:
+    """The case module's native JSON form, as a Worker without a filesystem would receive it."""
+    parsed = YangParser(expand_uses=False, include_path=(case_dir,)).parse_file(module.resolve())
+    return json.loads(json.dumps(generate_json_schema(parsed)))
 
 
 def _load_case_module(case_dir: Path, module: Path):
@@ -66,7 +77,7 @@ def _write_json(value):
         return fh.name
 
 
-def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
+def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, form="yang"):
     """Returns [(json_pointer, code, message)]; raises if the schema is rejected.
 
     ``operation`` is ``{"rpc", "action", "direction", "context"}`` (each optional, absent keys unset).
@@ -105,7 +116,10 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
             detail = (proc.stderr or proc.stdout).strip() or f"CLI exited {proc.returncode} without a validation result"
             raise RuntimeError(detail)
         return [(_where(e), e["code"], e.get("message", "")) for e in out["errors"]]
-    parsed = _load_case_module(case_dir, module)
+    if form == "json":
+        parsed = parse_json_schema(_json_form(case_dir, module))
+    else:
+        parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
     options = {key: operation[key] for key in ("rpc", "action", "direction", "context") if key in operation}
@@ -126,8 +140,18 @@ def _where(issue):
     return issue["path"] if document == "data" else f"{document}:{issue['path']}"
 
 
-@pytest.mark.parametrize("case_dir,case,inst,impl", list(_params()))
-def test_case(case_dir, case, inst, impl):
+@pytest.mark.parametrize("case_dir,case,inst,impl,form", list(_params()))
+def test_case(case_dir, case, inst, impl, form):
+    if case.get("export_error"):
+        if impl != "python":
+            pytest.skip("the native JSON form is exported by the libraries")
+        with pytest.raises(Exception) as excinfo:
+            _json_form(case_dir, case_dir / case["module"])
+        assert case["export_error"] in str(excinfo.value)
+        return
+    if case.get("json_form") and form == "yang" and impl == "python":
+        golden = case_dir / "expected.yang.json"
+        assert _json_form(case_dir, case_dir / case["module"]) == json.loads(golden.read_text())
     if case.get("schema_error"):
         with pytest.raises(Exception) as excinfo:
             _validate(impl, case_dir, case, None)
@@ -143,7 +167,7 @@ def test_case(case_dir, case, inst, impl):
         if impl != "cli":
             assert inst["usage_error"] in str(excinfo.value)
         return
-    raw = _validate(impl, case_dir, case, inst["data"], native_json=native, operation=operation)
+    raw = _validate(impl, case_dir, case, inst["data"], native_json=native, operation=operation, form=form)
     got = sorted({(p, c) for p, c, _m in raw})
     assert got == sorted({(_where(e), e["code"]) for e in expected}), f"raw errors: {raw}"
     for exp in expected:

@@ -349,7 +349,10 @@ class TypeChecker:
             return [_issue("identityref", "identityref type has no base identities")]
         if resolve_identity_value(root_schema, value) is None:
             return [_issue("identityref", f"identityref value {value!r} does not resolve to a known identity")]
-        if not identityref_value_valid(root_schema, value, bases):
+        scope = type_stmt.scope
+        if scope is not None and scope.name == root_schema.name:
+            scope = None
+        if not identityref_value_valid(root_schema, value, bases, scope):
             bases_fmt = [format_identifier_ref(b) for b in bases]
             return [
                 _issue(

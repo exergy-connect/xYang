@@ -13,6 +13,7 @@ from types import MappingProxyType
 from typing import Any, Callable, Mapping, Optional
 
 from ..ast import YangBitStmt, YangPatternSpec, YangTypeStmt
+from ..errors import YangExportError
 from ..identifier_ref import coerce_identifier_ref
 from ..json.schema_keys import (
     JsonSchemaKey,
@@ -310,22 +311,24 @@ def _to_union(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
 
 
 def _to_identityref(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    from ..json.generator import _format_bases_for_json
+    from ..json.generator import identity_base_for_json
 
-    bases = _format_bases_for_json(list(type_stmt.identityref_bases or []))
-    if not bases:
+    _typedef_names, module, _anchor = _EMIT.get()
+    scope = type_stmt.scope or module
+    exported = [identity_base_for_json(base, scope, module) for base in type_stmt.identityref_bases or []]
+    if not exported:
         return {JsonSchemaKey.TYPE: "string"}
     xyang = {
         XYangKey.TYPE: XYangTypeValue.IDENTITYREF,
-        XYangKey.BASES: bases,
+        XYangKey.BASES: [base for base, _ref in exported],
     }
-    if len(bases) == 1:
+    if len(exported) == 1:
         return {
-            JsonSchemaKey.REF: json_schema_defs_uri(bases[0]),
+            JsonSchemaKey.REF: exported[0][1],
             JsonSchemaKey.X_YANG: xyang,
         }
     return {
-        JsonSchemaKey.ALL_OF: [{JsonSchemaKey.REF: json_schema_defs_uri(base)} for base in bases],
+        JsonSchemaKey.ALL_OF: [{JsonSchemaKey.REF: ref} for _base, ref in exported],
         JsonSchemaKey.X_YANG: xyang,
     }
 
@@ -962,9 +965,9 @@ def _imported_typedef_schema(type_stmt: YangTypeStmt, module: Any, leafref_ancho
     typedef, target = resolve_typedef(type_stmt, module)
     label = f"{type_stmt.prefix}:{type_stmt.name}" if type_stmt.prefix else type_stmt.name
     if typedef is None or typedef.type is None:
-        raise ValueError(f"cannot export type {label!r}: its typedef is not found where the type is written")
+        raise YangExportError(f"cannot export type {label!r}: its typedef is not found where the type is written")
     if type_stmt.range or type_stmt.length or type_stmt.patterns:
-        raise ValueError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
+        raise YangExportError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
     return type_to_schema(typedef.type, set(), target, leafref_anchor)
 
 
