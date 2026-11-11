@@ -15,7 +15,12 @@ import pytest
 HERE = Path(__file__).resolve().parent
 sys.path.insert(0, str(HERE))
 
-from server import ERRORS_META_KEY, ROOT, TopologyServer  # noqa: E402
+from server import ERRORS_META_KEY, ROOT, RPC_VALIDATION, TopologyServer  # noqa: E402
+
+pytestmark = pytest.mark.skipif(
+    not RPC_VALIDATION,
+    reason="needs rpc validation in xYang: https://github.com/exergy-connect/xYang/issues/149",
+)
 
 
 def req(rid, method, params=None):

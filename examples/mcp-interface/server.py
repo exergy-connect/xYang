@@ -3,10 +3,17 @@
 Speaks JSON-RPC 2.0 over stdio, one JSON message per line, and handles
 initialize, ping, tools/list and tools/call. No MCP SDK is needed.
 
-Each tools/call is appended to the server's session record as a candidate and
-the whole record is validated against example-topology-tools. A call is
-executed and kept only if the record stays valid, so the record is always a
-valid session (see session/valid.json for the shape).
+Each tools/call is checked with xYang rpc validation (xYang #149):
+
+  1. the arguments, as the tool's rpc input, with the session record as
+     context, so rules can reach earlier calls;
+  2. the tool runs;
+  3. a structured result, as the rpc's output, with the same context;
+  4. the call is appended to the record, and the whole record is
+     validated. This catches rules that compare a result with its own
+     arguments, which an rpc output cannot see.
+
+The record is therefore always a valid session (see session/valid.json).
 
 Errors follow MCP 2025-11-25, "Tools > Error Handling":
 
@@ -30,13 +37,14 @@ Run:  python server.py        (reads requests on stdin)
 from __future__ import annotations
 
 import copy
+import inspect
 import json
 import sys
 from collections import deque
 from pathlib import Path
 from typing import Any
 
-from xyang import YangValidator, parse_yang_file
+from xyang import YangValidator, parse_yang_file, validate
 
 from compile_mcp import compile_tools
 
@@ -56,6 +64,10 @@ INVALID_PARAMS = -32602
 INTERNAL_ERROR = -32603
 
 
+# validate(module, data, rpc=, direction=, context=) as proposed in xYang #149.
+RPC_VALIDATION = "rpc" in inspect.signature(validate).parameters
+
+
 class ToolFailed(Exception):
     """The arguments were valid, but the tool could not do what was asked."""
 
@@ -68,7 +80,11 @@ class ProtocolError(Exception):
 
 class TopologyServer:
     def __init__(self, caller: str = "stdio-client", snapshot: str = "0" * 64) -> None:
-        self.validator = YangValidator(parse_yang_file(MODULE_PATH, include_path=(str(MODELS),)))
+        if not RPC_VALIDATION:
+            raise RuntimeError("server.py needs rpc validation in xYang (validate(..., rpc=...)): "
+                               "https://github.com/exergy-connect/xYang/issues/149")
+        self.module = parse_yang_file(MODULE_PATH, include_path=(str(MODELS),))
+        self.validator = YangValidator(self.module)
         self.tools = {t["name"]: t for t in compile_tools(MODULE_PATH, (MODELS,), "standard")["tools"]}
         self.session: dict[str, Any] = {
             ROOT: {
@@ -129,62 +145,68 @@ class TopologyServer:
         if not isinstance(arguments, dict):
             raise ProtocolError(INVALID_PARAMS, "Invalid params: 'arguments' must be an object")
 
-        call_id = self.next_id
-        call = {"id": call_id, "tool": f"{MODULE}:{name}", "arguments": {name: copy.deepcopy(arguments)}}
-
-        # 1. Check the arguments against the tool and every earlier call.
-        candidate = self._with_call(call | {"result": {"status": "ok"}})
-        errors = self._errors(candidate)
+        # 1. Gate: the arguments are the rpc's input, checked against the session so far.
+        errors = self._rpc_errors(name, "input", arguments, label="arguments")
         if errors:
             return _tool_error(name, errors)
 
         # 2. Run the tool. The model already guarantees the arguments make sense.
+        call = {"id": self.next_id, "tool": f"{MODULE}:{name}", "arguments": {name: copy.deepcopy(arguments)}}
         try:
             structured = self._execute(name, arguments)
         except ToolFailed as e:
             # A business-logic failure: record it, and tell the model.
-            self.session = self._with_call(call | {"result": {"status": "error", "message": str(e)}})
-            self.next_id += 1
+            self._record(call | {"result": {"status": "error", "message": str(e)}})
             return {"content": [{"type": "text", "text": f"{name} failed: {e}"}], "isError": True}
 
-        # 3. Check what the server is about to return, then keep the call.
+        # 3. Check what the server is about to return: the rpc's output, against the session so far.
+        if structured is not None:
+            bad = self._rpc_errors(name, "output", structured, label="result")
+            if bad:
+                raise ProtocolError(INTERNAL_ERROR, f"Internal error: {name} produced a result the model rejects",
+                                    {ERRORS_META_KEY: bad})
+
+        # 4. Keep the call. Rules that compare a result with its own arguments
+        #    (a path contains its from and to) can only be checked here, because an
+        #    rpc output cannot see its input (RFC 7950, section 6.4.1).
         result: dict[str, Any] = {"status": "ok"}
         if name == "find-path":
             result["find-path"] = structured
-        recorded = self._with_call(call | {"result": result})
-        server_errors = self._errors(recorded)
-        if server_errors:
+        bad = self._record(call | {"result": result})
+        if bad:
             raise ProtocolError(INTERNAL_ERROR, f"Internal error: {name} produced a result the model rejects",
-                                {ERRORS_META_KEY: server_errors})
-        self.session = recorded
-        self.next_id += 1
+                                {ERRORS_META_KEY: bad})
         return _tool_ok(structured)
 
-    def _with_call(self, call: dict[str, Any]) -> dict[str, Any]:
+    def _rpc_errors(self, name: str, direction: str, body: dict[str, Any], *, label: str) -> list[dict[str, str]]:
+        """Validate an rpc input or output with the session record as context (xYang #149)."""
+        verdict = validate(
+            self.module,
+            {f"{MODULE}:{direction}": body},
+            rpc=name,
+            direction=direction,
+            context=self.session,
+        )
+        return [_relative(e, f"/{MODULE}:{direction}", label) for e in verdict["errors"]]
+
+    def _record(self, call: dict[str, Any]) -> list[dict[str, str]]:
+        """Append the call if the whole record stays valid; else return the errors on that call."""
         doc = copy.deepcopy(self.session)
         doc[ROOT]["call"].append(call)
-        return doc
-
-    def _errors(self, doc: dict[str, Any]) -> list[dict[str, str]]:
-        """xYang errors, with paths made relative to the newest call where possible."""
         index = len(doc[ROOT]["call"]) - 1
-        name = doc[ROOT]["call"][-1]["tool"].split(":", 1)[1]
-        prefixes = {
-            f"/{ROOT}/call/{index}/arguments/{name}": "arguments",
-            f"/{ROOT}/call/{index}/arguments": "arguments",
-            f"/{ROOT}/call/{index}/result/{name}": "result",
-            f"/{ROOT}/call/{index}": "call",
-        }
-        out = []
-        for e in self.validator.validate_detailed(doc)["errors"]:
-            where = e["path"]
-            for prefix, label in prefixes.items():
-                if where == prefix or where.startswith(prefix + "/"):
-                    rest = where[len(prefix):].lstrip("/").replace("/", ".")
-                    where = f"{label}.{rest}" if rest else label
-                    break
-            out.append({"path": where, "code": e["code"], "message": e["message"]})
-        return out
+        name = call["tool"].split(":", 1)[1]
+        errors = self.validator.validate_detailed(doc)["errors"]
+        if errors:
+            out = []
+            for e in errors:
+                r = _relative(e, f"/{ROOT}/call/{index}/result/{name}", "result")
+                if r["path"] == e["path"]:
+                    r = _relative(e, f"/{ROOT}/call/{index}", "call")
+                out.append(r)
+            return out
+        self.session = doc
+        self.next_id += 1
+        return []
 
     def _execute(self, name: str, args: dict[str, Any]) -> dict[str, Any] | None:
         calls = self.session[ROOT]["call"]
@@ -211,6 +233,15 @@ class TopologyServer:
                         seen.add(nxt)
                         queue.append(path + [nxt])
         raise ToolFailed(f"no path from {start} to {goal} within {limit} hops")
+
+
+def _relative(e: dict[str, Any], prefix: str, label: str) -> dict[str, str]:
+    """Turn an xYang path into one relative to the call: /m:input/target -> arguments.target."""
+    where = e["path"]
+    if where == prefix or where.startswith(prefix + "/"):
+        rest = where[len(prefix):].lstrip("/").replace("/", ".")
+        where = f"{label}.{rest}" if rest else label
+    return {"path": where, "code": e["code"], "message": e["message"]}
 
 
 def _error(rid: Any, code: int, message: str, data: Any = None) -> dict[str, Any]:

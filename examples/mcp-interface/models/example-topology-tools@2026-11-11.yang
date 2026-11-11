@@ -9,12 +9,24 @@ module example-topology-tools {
     "A small MCP tool set for building a network topology: add-node,
      add-link and find-path.
 
-     Each tool is one grouping used three times: as the rpc input that
-     compile_mcp.py turns into the tool's inputSchema, as the arguments of
-     a call in a session, and (for find-path) as the shape of its result.
-     The rpc is the interface. The augment is where calls in a session are
-     checked against each other: a link may only join nodes that an earlier
-     successful call created, and a path may only pass through such nodes.
+     Each tool is a grouping used twice: as its rpc's input (or output),
+     which compile_mcp.py turns into the tool's inputSchema (or
+     outputSchema), and as a recorded call in a session.
+
+     The grouping also carries the rules, so one rule checks a call in both
+     places. Rules that need earlier calls read them from the session with
+     an absolute path, /session/call, and keep only calls with a
+     smaller id than this one:
+
+       [not(current()/../../../id) or id < current()/../../../id]
+
+     For a recorded call, current()/../../../id is the call's own id. When
+     an rpc input is validated with the session as context, the input's
+     parameters sit under the operation node, directly below the root
+     (RFC 7950, section 6.4.1), so that path selects nothing and every
+     recorded call counts as earlier. A link may therefore only join nodes
+     that an earlier successful call created, whether the link is a request
+     arriving now or a line in the record.
      SPDX-License-Identifier: MIT";
   reference "RFC 7950; xYang examples/mcp-interface/README.md";
   revision 2026-11-11 { description "Initial example revision.";
@@ -30,7 +42,14 @@ module example-topology-tools {
   }
 
   grouping add-node-input {
-    leaf name { type node-name; mandatory true; description "Name of the new node. Unique in the topology."; }
+    leaf name {
+      type node-name;
+      mandatory true;
+      must "not(/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'" {
+        error-message "A node with this name already exists.";
+      }
+      description "Name of the new node. Unique in the topology.";
+    }
     leaf role {
       type enumeration {
         enum router { description "Routes between subnets."; }
@@ -43,12 +62,22 @@ module example-topology-tools {
   }
 
   grouping add-link-input {
-    leaf source { type node-name; mandatory true; description "One end of the link."; }
+    leaf source {
+      type node-name;
+      mandatory true;
+      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+        error-message "source must name a node that an earlier successful add-node call created.";
+      }
+      description "One end of the link.";
+    }
     leaf target {
       type node-name;
       mandatory true;
       must ". != ../source" {
         error-message "A link cannot connect a node to itself.";
+      }
+      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+        error-message "target must name a node that an earlier successful add-node call created.";
       }
       description "The other end of the link. Must differ from source.";
     }
@@ -60,8 +89,22 @@ module example-topology-tools {
   }
 
   grouping find-path-input {
-    leaf from { type node-name; mandatory true; description "Start node."; }
-    leaf to { type node-name; mandatory true; description "End node."; }
+    leaf from {
+      type node-name;
+      mandatory true;
+      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+        error-message "from must name a node that an earlier successful add-node call created.";
+      }
+      description "Start node.";
+    }
+    leaf to {
+      type node-name;
+      mandatory true;
+      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+        error-message "to must name a node that an earlier successful add-node call created.";
+      }
+      description "End node.";
+    }
     leaf max-hops {
       type uint8 { range "1..16"; }
       default "8";
@@ -73,6 +116,9 @@ module example-topology-tools {
     leaf-list hop {
       type node-name;
       ordered-by user;
+      must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]" {
+        error-message "Every hop must be a node that an earlier successful add-node call created.";
+      }
       description "Nodes on the path, from 'from' to 'to'.";
     }
   }
@@ -106,52 +152,25 @@ module example-topology-tools {
     container add-node {
       when "derived-from-or-self(../../tool, 'topo:add-node')";
       description "Arguments of an add-node call.";
-      uses add-node-input {
-        refine name {
-          must "count(../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()]) <= 1" {
-            error-message "A node name may be added successfully only once in a session.";
-          }
-        }
-      }
+      uses add-node-input;
     }
-
     container add-link {
       when "derived-from-or-self(../../tool, 'topo:add-link')";
       description "Arguments of an add-link call.";
-      uses add-link-input {
-        refine source {
-          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
-            error-message "source must name a node that an earlier successful add-node call created.";
-          }
-        }
-        refine target {
-          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
-            error-message "target must name a node that an earlier successful add-node call created.";
-          }
-        }
-      }
+      uses add-link-input;
     }
-
     container find-path {
       when "derived-from-or-self(../../tool, 'topo:find-path')";
       description "Arguments of a find-path call.";
-      uses find-path-input {
-        refine from {
-          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
-            error-message "from must name a node that an earlier successful add-node call created.";
-          }
-        }
-        refine to {
-          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
-            error-message "to must name a node that an earlier successful add-node call created.";
-          }
-        }
-      }
+      uses find-path-input;
     }
   }
 
   augment "/topo:session/topo:call/topo:result" {
-    description "Structured results that the session can check against its own calls.";
+    description
+      "Structured results. Rules that compare a result with its own call's
+       arguments live here: an rpc output cannot see its input
+       (RFC 7950, section 6.4.1).";
 
     container find-path {
       when "derived-from-or-self(../../tool, 'topo:find-path') and ../status = 'ok'";
@@ -162,13 +181,7 @@ module example-topology-tools {
       must "count(hop) <= ../../arguments/find-path/max-hops + 1" {
         error-message "A path may not be longer than max-hops.";
       }
-      uses find-path-output {
-        refine hop {
-          must "../../../../call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][id < current()/../../../id][arguments/add-node/name = current()]" {
-            error-message "Every hop must be a node that an earlier successful add-node call created.";
-          }
-        }
-      }
+      uses find-path-output;
     }
   }
 }

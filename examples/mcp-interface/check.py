@@ -6,6 +6,10 @@
 4. xYang (Python, and TypeScript when ts/dist is built) gives exactly the
    errors in session/expected-errors.json for every session fixture.
 5. Reports how many invalid sessions a plain JSON Schema check accepts.
+6. rpc validation (xYang #149): each case in calls/cases.json, an rpc input
+   or output checked with the session as context, gives exactly its errors,
+   through the CLI's --rpc / --output / --context flags. Skipped, with a
+   message, while xYang lacks rpc validation.
 
 Usage: python check.py [--write]   (--write regenerates expected-errors.json)
 Needs: pip install jsonschema
@@ -18,6 +22,7 @@ import re
 import shutil
 import subprocess
 import sys
+import tempfile
 from pathlib import Path
 
 import jsonschema
@@ -56,6 +61,22 @@ def validate_py(path: Path) -> list[dict[str, str]]:
 def validate_ts(path: Path) -> list[dict[str, str]]:
     return run(["node", str(TS_CLI), "validate", "--format", "json",
                 "--include-path", str(MODELS), str(MODULE), str(path)])
+
+
+def rpc_supported(cli: list[str]) -> bool:
+    proc = subprocess.run([*cli, "validate", "--help"], capture_output=True, text=True, cwd=HERE)
+    return "--rpc" in proc.stdout
+
+
+def validate_rpc(cli: list[str], case: dict, tmp: Path) -> list[dict[str, str]]:
+    data = tmp / "data.json"
+    data.write_text(json.dumps(case["data"]))
+    cmd = [*cli, "validate", "--format", "json", "--include-path", str(MODELS), "--rpc", case["rpc"]]
+    if case["direction"] == "output":
+        cmd.append("--output")
+    if case["context"]:
+        cmd += ["--context", str(HERE / case["context"])]
+    return run([*cmd, str(MODULE), str(data)])
 
 
 def plain_errors(session: dict, tools: dict[str, dict]) -> list[str]:
@@ -123,6 +144,25 @@ def main() -> int:
         print("ok  TypeScript: same paths and codes for every fixture")
     else:
         print("--  TypeScript skipped (build ts/ first: cd ts && npm ci && npm run build)")
+
+    # 6. rpc input and output, with the session as context.
+    cases = json.loads((HERE / "calls" / "cases.json").read_text())
+    clis = {"Python": [sys.executable, "-m", "xyang"]}
+    if TS_CLI.exists() and shutil.which("node"):
+        clis["TypeScript"] = ["node", str(TS_CLI)]
+    for label, cli in clis.items():
+        if not rpc_supported(cli):
+            print(f"--  {label}: rpc cases skipped, needs rpc validation "
+                  "(https://github.com/exergy-connect/xYang/issues/149)")
+            continue
+        with tempfile.TemporaryDirectory() as tmp:
+            for name, case in cases.items():
+                got = validate_rpc(cli, case, Path(tmp))
+                want = sorted(case["errors"], key=lambda e: (e["path"], e["code"], e["message"]))
+                if label == "TypeScript":  # built-in type messages may be worded differently
+                    got, want = [(e["path"], e["code"]) for e in got], [(e["path"], e["code"]) for e in want]
+                assert got == want, f"{label} rpc case {name}: {got}"
+        print(f"ok  {label}: {len(cases)} rpc cases give their expected errors")
 
     # 5. What plain JSON Schema misses.
     missed = [p.stem for p in fixtures()[1:]

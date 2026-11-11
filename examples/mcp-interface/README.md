@@ -1,9 +1,12 @@
 # MCP interface from YANG: a tool set and a checked session
 
-One YANG source gives two things:
+One YANG source gives three things:
 
 1. **A standard MCP interface.** Each `rpc` compiles into an MCP `tools/list` entry: name, description, `inputSchema`, and `outputSchema` when the rpc has an output. Any MCP client can use it.
-2. **A session that is checked against itself.** A record of `tools/call` requests validates with xYang. Each call must agree with the calls before it: a link may only join nodes that an earlier successful call created, and a path may only pass through such nodes.
+2. **A gate on each call.** The server checks a call's arguments as the rpc's input, with the session so far as context, before running it. A link may only join nodes that an earlier successful call created.
+3. **A record checked against itself.** The same rules check every call in a stored session against the calls before it.
+
+> **Needs rpc validation in xYang ([#149](https://github.com/exergy-connect/xYang/issues/149)), which is in progress.** Until it lands, the server refuses to start, `test_server.py` is skipped, and `check.py` skips its rpc cases, each with a message pointing here. The compiler and the session checks work today.
 
 Plain JSON Schema checks each call alone. In this example, 8 of the 12 invalid sessions pass that check, and xYang rejects all 12.
 
@@ -14,37 +17,48 @@ All names and data are synthetic.
 | File | What it is |
 | --- | --- |
 | [`models/example-mcp@2026-11-11.yang`](models/example-mcp@2026-11-11.yang) | Base: the `tool` identity and the `session` grouping (protocol version, server, the local view, the list of calls) |
-| [`models/example-topology-tools@2026-11-11.yang`](models/example-topology-tools@2026-11-11.yang) | A tool set: `add-node`, `add-link`, `find-path` as rpcs, plus the session container and its cross-call rules |
+| [`models/example-topology-tools@2026-11-11.yang`](models/example-topology-tools@2026-11-11.yang) | A tool set: `add-node`, `add-link`, `find-path` as rpcs whose groupings carry the rules, plus the session container |
 | [`compile_mcp.py`](compile_mcp.py) | rpcs → `tools/list` result, in two profiles |
 | [`out/tools-list.json`](out/tools-list.json) | Standard profile: plain JSON Schema |
 | [`out/tools-list.xyang.json`](out/tools-list.xyang.json) | xYang profile: the same schemas with `x-yang` kept |
 | [`session/valid.json`](session/valid.json) | Seven calls that build a three-node topology and find a path |
 | [`session/invalid/`](session/invalid/) | One mutation of the valid session per rule, made by [`build_fixtures.py`](build_fixtures.py) |
 | [`session/expected-errors.json`](session/expected-errors.json) | The exact xYang errors for every fixture |
+| [`calls/cases.json`](calls/cases.json) | Single calls: an rpc input or output, the context it is checked in, and its exact expected errors |
 | [`check.py`](check.py) | End-to-end check (see below) |
-| [`server.py`](server.py) | A minimal MCP server over stdio that checks every `tools/call` with xYang before running it |
+| [`server.py`](server.py) | A minimal MCP server over stdio that checks every `tools/call` with xYang rpc validation before running it |
 | [`test_server.py`](test_server.py) | One test per error kind, plus a stdio round trip |
 
 ## How one tool is declared
 
-Each tool is one grouping, used in three places:
+Each tool is one grouping, and the grouping carries the rules:
 
 ```yang
-grouping add-link-input { leaf source {...} leaf target { must ". != ../source"; ... } leaf bandwidth-mbps {...} }
-
-rpc add-link { input { uses add-link-input; } }        // → MCP tool and its inputSchema
-
-identity add-link { base mcp:tool; }                   // → a value a call's 'tool' may name
-
-augment "/topo:session/topo:call/topo:arguments" {      // → arguments of a call in a session
-  container add-link {
-    when "derived-from-or-self(../../tool, 'topo:add-link')";
-    uses add-link-input { refine source { must "<an earlier successful add-node created it>"; } ... }
+grouping add-link-input {
+  leaf source {
+    must "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok']
+                       [arguments/add-node/name = current()]
+                       [not(current()/../../../id) or id < current()/../../../id]";
   }
+  leaf target { must ". != ../source"; must "<same as source>"; }
+  leaf bandwidth-mbps { type uint32 { range "1..400000"; } }
+}
+
+rpc add-link { input { uses add-link-input; } }        // → MCP tool, inputSchema, and the per-call gate
+identity add-link { base mcp:tool; }                   // → a value a recorded call's 'tool' may name
+augment "/topo:session/topo:call/topo:arguments" {      // → a recorded call's arguments
+  container add-link { when "derived-from-or-self(../../tool, 'topo:add-link')"; uses add-link-input; }
 }
 ```
 
-Rules about one call's own arguments, such as "no self-loop", sit in the grouping, so they travel with the tool's `inputSchema` in the xYang profile. Rules that need other calls sit in the session, because that is where the other calls are.
+**One rule, two contexts.** The `source` rule reads earlier calls from the session with an absolute path, and keeps those whose `id` is smaller than this call's own:
+
+- For a **recorded call**, `current()/../../../id` is that call's id, so only calls before it count.
+- For an **rpc input** checked with the session as context, the parameters sit under the operation node, directly below the root (RFC 7950 §6.4.1). So `current()/../../../id` selects nothing, and every recorded call counts as earlier.
+
+The rule doesn't need to know whether it is gating a request that just arrived or auditing a line in the record. Each verdict is relative to the local view it was given.
+
+One rule can't move into the grouping: "a path contains its `from` and `to`" compares a result with its own arguments. An rpc output cannot see its input (RFC 7950 §6.4.1), so that rule stays on the recorded call's result.
 
 ## Mapping
 
@@ -56,17 +70,17 @@ Rules about one call's own arguments, such as "no self-loop", sit in the groupin
 | `rpc output` | `outputSchema` |
 | `mandatory true` | `required` |
 | `range`, `pattern`, `enumeration`, `default` | `minimum`/`maximum`, `pattern`, `enum`, `default` |
-| `must`, `when`, `leafref` | `x-yang` (xYang profile only; generic validators ignore it) |
+| `must`, `when`, `leafref` | `x-yang` (xYang profile only; generic validators ignore it). The cross-call rules travel here too, so an xYang-aware client can check a call against its own copy of the session before sending it. |
 
-## Session rules
+## Rules
 
 | Rule | Where | Fixture |
 | --- | --- | --- |
 | A call names a declared tool | `tool` is an identityref with base `mcp:tool` | `undeclared-tool` |
 | A call carries exactly its own tool's arguments | base: `count(*) = 1` on `arguments`; tools: `when` on each argument container | `arguments-for-other-tool`, `missing-arguments` |
-| A node name is added successfully at most once | `add-node/name` | `duplicate-node` |
+| A node name is added successfully at most once (a later attempt may be recorded as failed) | grouping: `add-node/name` | `duplicate-node` |
 | A link joins two different nodes | grouping: `target != source` | `self-loop` |
-| Link ends, path ends and path hops are nodes that an earlier successful `add-node` created | `must` joins on `id <` and `status = 'ok'` | `hallucinated-link-target`, `link-before-node`, `link-to-failed-node`, `hallucinated-path-hop` |
+| Link ends, path ends and path hops are nodes that an earlier successful `add-node` created | groupings: the absolute-path rule above | `hallucinated-link-target`, `link-before-node`, `link-to-failed-node`, `hallucinated-path-hop` |
 | A path contains its `from` and `to` and is at most `max-hops` long | `find-path` result | `path-missing-endpoint`, `path-too-long` |
 | Argument types and ranges | YANG types | `bandwidth-out-of-range` |
 
@@ -84,14 +98,27 @@ python examples/mcp-interface/compile_mcp.py \
 xyang validate --include-path examples/mcp-interface/models \
   examples/mcp-interface/models/example-topology-tools@2026-11-11.yang \
   examples/mcp-interface/session/invalid/hallucinated-link-target.json
+# with rpc validation (#149): check one call against the session so far
+xyang validate --rpc add-link --context examples/mcp-interface/session/valid.json \
+  --include-path examples/mcp-interface/models \
+  examples/mcp-interface/models/example-topology-tools@2026-11-11.yang call.json
+#   call.json: {"example-topology-tools:input": {"source": "r1", "target": "r9"}}
+#   -> must at /example-topology-tools:input/target
 cd examples/mcp-interface && python check.py
 ```
 
-`check.py` confirms that `out/` matches a fresh compile, that every tool schema is JSON Schema 2020-12 with `type: object`, and that the valid session passes the standard interface. It then confirms that xYang gives exactly the expected errors for every fixture. If `ts/dist` is built, it also checks that `xyang-ts` reports the same paths and codes.
+`check.py` confirms that `out/` matches a fresh compile, that every tool schema is JSON Schema 2020-12 with `type: object`, and that the valid session passes the standard interface. It then confirms that xYang gives exactly the expected errors for every fixture. If `ts/dist` is built, it also checks that `xyang-ts` reports the same paths and codes. Finally, it runs every case in `calls/cases.json` through `--rpc`, `--output` and `--context`, in both CLIs, and compares the errors exactly.
 
 ## The server and its errors
 
-`server.py` handles `initialize`, `ping`, `tools/list` and `tools/call` as JSON-RPC 2.0, one message per line on stdin and stdout. It needs no MCP SDK. It keeps one session record. For each `tools/call`, it appends the call to a copy of the record and validates the whole record with xYang. The call runs and is kept only if the record stays valid, so the record is always a valid session.
+`server.py` handles `initialize`, `ping`, `tools/list` and `tools/call` as JSON-RPC 2.0, one message per line on stdin and stdout. It needs no MCP SDK. It keeps one session record, and handles each `tools/call` in four steps:
+
+1. **Gate.** It validates the arguments as the tool's rpc input, with the record as context. If any rule fails, the call is not run.
+2. **Run.** It runs the tool.
+3. **Output.** It validates a structured result as the rpc's output, with the same context.
+4. **Record.** It appends the call and validates the whole record. This catches result rules that need the arguments, such as a path containing its `from` and `to`.
+
+Steps 3 and 4 check the server's own work, so a failure there is a server bug, not the model's.
 
 Errors follow MCP 2025-11-25, ["Error Handling"](https://modelcontextprotocol.io/specification/2025-11-25/server/tools#error-handling): problems the model can fix come back as a result with `isError: true`, and malformed requests come back as JSON-RPC errors.
 
@@ -125,5 +152,7 @@ python -m pytest examples/mcp-interface/test_server.py -q  # 19 tests
 ## Limits
 
 - **The session is the whole world.** A verdict covers the calls in this document. It says nothing about server state the document does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
-- **One call alone.** The xYang profile carries a tool's own `must` rules in `x-yang`. xYang does not yet validate rpc input instances directly ([#149](https://github.com/exergy-connect/xYang/issues/149)), so the server checks each call inside its session record. It revalidates the whole record on every call, which is fine for a demo but grows with the session.
+- **rpc validation is assumed.** The server, `test_server.py` and the rpc cases use the API proposed in [#149](https://github.com/exergy-connect/xYang/issues/149): Python `validate(module, data, rpc=, direction=, context=)` and CLI `--rpc`, `--output`, `--context`. Expected errors in `calls/cases.json` follow that proposal, with paths like `/example-topology-tools:input/target`. If the final API differs, these files are what to adjust.
+- **The record check grows.** Step 4 revalidates the whole record on every call, which is fine for a demo but grows with the session.
+- **Unprefixed absolute paths.** The rules write `/session/call`, not `/topo:session/topo:call`. RFC 7950 allows both, but today xYang selects nothing for the prefixed form.
 - **Optional MCP fields.** In MCP revision [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations` and `execution`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`; the other four are optional and left out. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12.

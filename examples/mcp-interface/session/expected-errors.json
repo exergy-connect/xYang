@@ -26,14 +26,9 @@
   ],
   "duplicate-node": [
     {
-      "path": "/example-topology-tools:session/call/0/arguments/add-node/name",
-      "code": "must",
-      "message": "A node name may be added successfully only once in a session."
-    },
-    {
       "path": "/example-topology-tools:session/call/5/arguments/add-node/name",
       "code": "must",
-      "message": "A node name may be added successfully only once in a session."
+      "message": "A node with this name already exists."
     }
   ],
   "hallucinated-link-target": [

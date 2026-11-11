@@ -12,6 +12,12 @@
             "description": "Name of the new node. Unique in the topology.",
             "x-yang": {
               "type": "leaf",
+              "must": [
+                {
+                  "must": "not(/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]) or current()/../../../result/status = 'error'",
+                  "error-message": "A node with this name already exists."
+                }
+              ],
               "mandatory": true
             }
           },
@@ -89,6 +95,12 @@
             "description": "One end of the link.",
             "x-yang": {
               "type": "leaf",
+              "must": [
+                {
+                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "source must name a node that an earlier successful add-node call created."
+                }
+              ],
               "mandatory": true
             }
           },
@@ -101,6 +113,10 @@
                 {
                   "must": ". != ../source",
                   "error-message": "A link cannot connect a node to itself."
+                },
+                {
+                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "target must name a node that an earlier successful add-node call created."
                 }
               ],
               "mandatory": true
@@ -150,6 +166,12 @@
             "description": "Start node.",
             "x-yang": {
               "type": "leaf",
+              "must": [
+                {
+                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "from must name a node that an earlier successful add-node call created."
+                }
+              ],
               "mandatory": true
             }
           },
@@ -158,6 +180,12 @@
             "description": "End node.",
             "x-yang": {
               "type": "leaf",
+              "must": [
+                {
+                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "to must name a node that an earlier successful add-node call created."
+                }
+              ],
               "mandatory": true
             }
           },
@@ -203,7 +231,13 @@
             },
             "description": "Nodes on the path, from 'from' to 'to'.",
             "x-yang": {
-              "type": "leaf-list"
+              "type": "leaf-list",
+              "must": [
+                {
+                  "must": "/session/call[derived-from-or-self(tool, 'topo:add-node')][result/status = 'ok'][arguments/add-node/name = current()][not(current()/../../../id) or id < current()/../../../id]",
+                  "error-message": "Every hop must be a node that an earlier successful add-node call created."
+                }
+              ]
             }
           }
         },
