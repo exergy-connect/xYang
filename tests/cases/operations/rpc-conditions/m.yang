@@ -1,0 +1,50 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  import other { prefix ot; }
+
+  identity udp { base ot:proto; }
+
+  rpc configure {
+    input {
+      leaf mode {
+        type enumeration { enum basic; enum advanced; }
+        default basic;
+      }
+      leaf level {
+        type uint8;
+        when "../mode = 'advanced'";
+      }
+      leaf retries {
+        type uint8;
+        default 3;
+      }
+      leaf limit {
+        type uint8;
+        must ". <= ../retries" {
+          error-message "limit must not exceed retries.";
+        }
+      }
+      leaf proto { type identityref { base ot:proto; } }
+      leaf name { type ot:short-name; }
+      choice transport {
+        case stream {
+          leaf port { type uint16; }
+        }
+        case socket {
+          leaf path { type string; }
+        }
+      }
+      choice kind {
+        mandatory true;
+        case a { leaf a { type string; } }
+        case b { leaf b { type string; } }
+      }
+    }
+    output {
+      leaf applied { type boolean; mandatory true; }
+    }
+  }
+}

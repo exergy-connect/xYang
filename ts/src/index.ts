@@ -1,13 +1,27 @@
 import { parseYangFile, parseYangString } from "./parser";
 import { YangModule, YangStatement } from "./core/model";
 import { YangValidator } from "./validator/yang-validator";
-import type { DetailedValidationResult, ValidationIssue, YangValidatorOptions } from "./validator/yang-validator";
+import type {
+  DetailedValidationResult,
+  OperationDirection,
+  OperationOptions,
+  ValidateCallOptions,
+  ValidationIssue,
+  YangValidatorOptions
+} from "./validator/yang-validator";
 
 export { parseYangFile, parseYangString };
 export type { ParseYangFileOptions, ParseYangStringOptions } from "./parser";
 export { YangParser } from "./parser/yang-parser";
 export { YangValidator };
-export type { DetailedValidationResult, ValidationIssue, YangValidatorOptions };
+export type {
+  DetailedValidationResult,
+  OperationDirection,
+  OperationOptions,
+  ValidateCallOptions,
+  ValidationIssue,
+  YangValidatorOptions
+};
 export {
   buildEnabledFeaturesMap,
   evaluateIfFeatureExpression,
@@ -44,6 +58,12 @@ export type ValidateOptions = {
   includePath?: readonly string[];
   /** Opt in to native dict-style JSON. Default is strict RFC 7951. */
   nativeJson?: boolean;
+  /** Validate `data` as an instance of this rpc (RFC 7950 §7.14): `{"module:input": {...}}`, or bare parameters with `nativeJson`. */
+  rpc?: string;
+  /** Which instance of `rpc`. Default `"input"`. */
+  direction?: "input" | "output";
+  /** Server data next to the operation node (RFC 7950 §6.4.1) for `must` and `leafref`. Not validated. */
+  context?: Record<string, unknown>;
 };
 
 function featureMap(
@@ -84,5 +104,10 @@ export function validate(schema: string | YangModule, data: unknown, options: Va
     throw new TypeError("schema must be a path or YangModule");
   }
   const validator = new YangValidator(module, enabled ? { enabledFeaturesByModule: enabled } : {});
-  return validator.validateDetailed(data, { nativeJson: options.nativeJson === true });
+  return validator.validateDetailed(data, {
+    nativeJson: options.nativeJson === true,
+    ...(options.rpc !== undefined ? { rpc: options.rpc } : {}),
+    ...(options.direction !== undefined ? { direction: options.direction } : {}),
+    ...(options.context !== undefined ? { context: options.context } : {})
+  });
 }

@@ -1,0 +1,49 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container topology {
+    list node {
+      key name;
+      leaf name { type string; }
+      leaf up { type boolean; default true; }
+    }
+  }
+
+  rpc add-link {
+    input {
+      leaf source {
+        type leafref { path "/topology/node/name"; }
+        mandatory true;
+      }
+      leaf target {
+        type leafref { path "/topology/node/name"; }
+        mandatory true;
+      }
+      leaf backup {
+        type leafref { path "/topology/node/name"; require-instance false; }
+      }
+      leaf peer {
+        type leafref { path "../source"; }
+      }
+      leaf via {
+        type string;
+        must "/add-link/source != ." {
+          error-message "A link cannot go via its own source.";
+        }
+      }
+      leaf label {
+        type string;
+        must "/topology/node[name = current()/../source]/up = true()" {
+          error-message "The source node must be up.";
+        }
+      }
+    }
+    output {
+      leaf node {
+        type leafref { path "/topology/node/name"; }
+      }
+    }
+  }
+}

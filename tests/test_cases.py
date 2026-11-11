@@ -56,21 +56,45 @@ def _load_case_module(case_dir: Path, module: Path):
     return parsed
 
 
-def _validate(impl, case_dir, case, data, *, native_json=False):
-    """Returns [(json_pointer, code, message)]; raises if the schema is rejected."""
+class UsageError(Exception):
+    """The implementation rejected the call itself (the CLI exits 2)."""
+
+
+def _write_json(value):
+    with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
+        json.dump(value, fh)
+        return fh.name
+
+
+def _validate(impl, case_dir, case, data, *, native_json=False, operation=None):
+    """Returns [(json_pointer, code, message)]; raises if the schema is rejected.
+
+    ``operation`` is ``{"rpc", "direction", "context"}`` (each optional, absent keys unset).
+    A rejected call raises ``UsageError``.
+    """
     module = case_dir / case["module"]
+    operation = operation or {}
     if impl == "cli":
-        with tempfile.NamedTemporaryFile("w", suffix=".json", delete=False) as fh:
-            json.dump(data, fh)
-            data_path = fh.name
+        data_path = _write_json(data)
+        context_path = _write_json(operation["context"]) if "context" in operation else None
         cmd = [os.environ["XYANG_CLI"], "validate", "--format", "json", str(module), data_path]
         if native_json:
             cmd.insert(2, "--native-json")
+        if operation.get("rpc") is not None:
+            cmd += ["--rpc", operation["rpc"]]
+        if operation.get("direction", "input") == "output":
+            cmd.append("--output")
+        if context_path:
+            cmd += ["--context", context_path]
         cmd += ["--include-path", str(case_dir), "--features", json.dumps(case.get("features"))]
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
         finally:
             os.unlink(data_path)
+            if context_path:
+                os.unlink(context_path)
+        if proc.returncode == 2 and not proc.stdout.strip():
+            raise UsageError(proc.stderr.strip())
         try:
             out = json.loads(proc.stdout)
         except json.JSONDecodeError:
@@ -82,9 +106,15 @@ def _validate(impl, case_dir, case, data, *, native_json=False):
     parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
-    result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
-        data, native_json=native_json
-    )
+    options = {key: operation[key] for key in ("rpc", "direction", "context") if key in operation}
+    try:
+        result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
+            data, native_json=native_json, **options
+        )
+    except ValueError as exc:
+        if operation:
+            raise UsageError(str(exc)) from exc
+        raise
     return [(e["path"], e["code"], e.get("message", "")) for e in result["errors"]]
 
 
@@ -97,7 +127,15 @@ def test_case(case_dir, case, inst, impl):
             assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
-    raw = _validate(impl, case_dir, case, inst["data"], native_json=inst.get("encoding") == "native")
+    operation = {key: inst[key] for key in ("rpc", "direction", "context") if key in inst}
+    native = inst.get("encoding") == "native"
+    if inst.get("usage_error"):
+        with pytest.raises(UsageError) as excinfo:
+            _validate(impl, case_dir, case, inst["data"], native_json=native, operation=operation)
+        if impl != "cli":
+            assert inst["usage_error"] in str(excinfo.value)
+        return
+    raw = _validate(impl, case_dir, case, inst["data"], native_json=native, operation=operation)
     got = sorted({(p, c) for p, c, _m in raw})
     assert got == sorted({(e["path"], e["code"]) for e in expected}), f"raw errors: {raw}"
     for exp in expected:

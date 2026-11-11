@@ -520,14 +520,23 @@ def iter_instance(
     *,
     native_json: bool = False,
     schema: Any = None,
+    parent_module: Optional[str] = None,
+    at_root: bool = True,
 ) -> Iterator[InstanceNode]:
-    """Yield a node for each top-level instance node in ``data`` as written."""
+    """Yield a node for each top-level instance node in ``data`` as written.
+
+    ``parent_module`` names the module whose children are unqualified under ``schema``
+    (default: ``schema``'s module, or none for a non-module schema). ``at_root`` is false
+    when ``data`` is the body of a container such as an rpc ``input``, whose members are
+    never namespace-qualified by their own module (RFC 7951 §4).
+    """
     if not isinstance(data, dict):
         return
         yield  # pragma: no cover
     root = module if schema is None else schema
-    walk = _Walk(module, _parent_module(module, root), native_json)
-    yield from walk.walk_object(data, root, "", True)
+    owner = _parent_module(module, root) if parent_module is None else parent_module
+    walk = _Walk(module, owner, native_json)
+    yield from walk.walk_object(data, root, "", at_root)
 
 
 def encoding_errors(nodes: list[InstanceNode]) -> list[tuple[str, str, str]]:

@@ -1,0 +1,11 @@
+{
+  "description": "if-feature on an rpc parameter makes the parameter invalid when the feature is off. An rpc whose own if-feature is false is not available, a usage error.",
+  "module": "m.yang",
+  "features": { "m": [] },
+  "instances": [
+    { "name": "parameter without the feature", "rpc": "plain", "data": { "m:input": { "x": "a" } }, "valid": true },
+    { "name": "parameter behind a disabled feature", "rpc": "plain", "data": { "m:input": { "x": "a", "fancy-opt": "b" } }, "valid": false,
+      "errors": [{ "path": "/m:input/fancy-opt", "code": "if-feature" }] },
+    { "name": "rpc behind a disabled feature", "rpc": "fancy-op", "data": { "m:input": {} }, "usage_error": "not available" }
+  ]
+}

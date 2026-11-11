@@ -24,7 +24,7 @@ tests/cases/
 ```
 
 Areas: `syntax`, `types`, `structure`, `choice`, `conditions`, `xpath`, `references`, `reuse`,
-`modules`, `encoding`. One case directory per schema; put several instances in one case
+`modules`, `encoding`, `operations`. One case directory per schema; put several instances in one case
 when they share the schema.
 
 ## `case.json`
@@ -54,6 +54,10 @@ when they share the schema.
 | `instances[].data` | The JSON instance document. |
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
+| `instances[].rpc` | Optional. Validate `data` as an instance of this rpc (`validate_detailed(rpc=)` / `{ rpc }`, CLI `--rpc`). |
+| `instances[].direction` | Optional, with `rpc`: `"input"` (default) or `"output"` (CLI `--output`). |
+| `instances[].context` | Optional, with `rpc`: server data next to the operation node (`context=` / `{ context }`, CLI `--context FILE`). Same encoding as `data`. |
+| `instances[].usage_error` | Optional. Instead of `valid` and `errors`: the call itself must be rejected (Python `ValueError`, TypeScript throw with the text as a substring of the message, CLI exit 2 with empty stdout). |
 
 ### Expected errors
 
@@ -69,7 +73,7 @@ An error is `{ "path", "code", "message"? }`:
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
   `max-elements`, `duplicate-key`, `unique`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
   `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
-  `xpath-error`, `xpath-unknown-function`.
+  `xpath-error`, `xpath-unknown-function`, `rpc-wrapper`.
   Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
@@ -99,6 +103,8 @@ JSON (`encoding/dict-style`). The two modes do not fall back to each other. Path
 input as written. Other `module` files in the case directory (not `submodule` files) are parsed
 after the primary module so their `augment` statements merge into it.
 
+`rpc-wrapper` — rpc input or output in RFC 7951 mode is not the single member `module:input` / `module:output` (RFC 8040 §3.6); native JSON takes the bare parameters.
+
 `ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a native
 list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
 than one key was given as an object; multi-key lists are arrays only.
@@ -112,6 +118,9 @@ The Python runner adds a `cli` implementation when
 $XYANG_CLI validate --format json <case-dir>/<module> <instance.json> \
     --include-path <case-dir> --features '<features as JSON, or null>'
 ```
+
+An instance with `rpc` adds `--rpc <name>`, `--output` for `direction: "output"`, and
+`--context <file>` for `context`.
 
 and expects stdout to be `{"valid": bool, "errors": [{"path": "<JSON Pointer>", "code": "<code>", "message": "..."}]}`,
 with the error codes listed above. Schema errors exit non-zero without that JSON.

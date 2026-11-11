@@ -1,0 +1,24 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  feature fancy;
+
+  rpc plain {
+    input {
+      leaf x { type string; }
+      leaf fancy-opt {
+        if-feature fancy;
+        type string;
+      }
+    }
+  }
+
+  rpc fancy-op {
+    if-feature fancy;
+    input {
+      leaf x { type string; }
+    }
+  }
+}
