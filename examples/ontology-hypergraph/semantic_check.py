@@ -19,7 +19,15 @@ ALIGNMENTS = {
     "example-bfo:material-entity": BFO + "0000040",
     "example-bfo:process": BFO + "0000015",
 }
-DOMAIN_BASES = {"example-lab:specimen": "example-bfo:material-entity", "example-lab:assay": "example-bfo:process"}
+DOMAIN_BASES = {
+    "example-audit:engagement": "example-bfo:process",
+    "example-audit:control": "example-bfo:continuant",
+    "example-audit:evidence-record": "example-bfo:continuant",
+    "example-audit:source-system": "example-bfo:continuant",
+    "example-audit:collection-agent": "example-bfo:continuant",
+    "example-audit:assessment-agent": "example-bfo:continuant",
+    "example-audit:audit-professional": "example-bfo:material-entity",
+}
 
 
 def evaluate(tree):
@@ -36,7 +44,7 @@ def evaluate(tree):
                 raise ValueError(f"Unsupported or duplicate domain term {node['type']!r}")
             alignments[node["type"]] = node["id"]
     if not set(DOMAIN_BASES) <= alignments.keys():
-        raise ValueError("Semantic evaluation requires both published domain term definitions")
+        raise ValueError("Semantic evaluation requires every published domain term definition")
     prov = Namespace("http://www.w3.org/ns/prov#")
     # Explicit, reviewable subset of BFO class relationships, plus local domain
     # subclass assertions. See README; full BFO temporal axioms are not included.

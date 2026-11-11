@@ -1,0 +1,210 @@
+{
+  "example-audit:graph": {
+    "document": [
+      {
+        "id": "catalogue.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "../models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "../models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "../models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ]
+      }
+    ],
+    "node": [
+      {
+        "id": "#term-engagement",
+        "label": "engagement",
+        "type": "example-audit:engagement",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "An engagement assessing a client's controls for a period.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        }
+      },
+      {
+        "id": "#term-control",
+        "label": "control",
+        "type": "example-audit:control",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A documented control the client asserts it operates.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-evidence-record",
+        "label": "evidence-record",
+        "type": "example-audit:evidence-record",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "An artifact collected from a client system.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-source-system",
+        "label": "source-system",
+        "type": "example-audit:source-system",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A client information system that produces artifacts.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-collection-agent",
+        "label": "collection-agent",
+        "type": "example-audit:collection-agent",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "Software that retrieves client artifacts.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-assessment-agent",
+        "label": "assessment-agent",
+        "type": "example-audit:assessment-agent",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "Software that drafts control assessments.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000002"
+        }
+      },
+      {
+        "id": "#term-audit-professional",
+        "label": "audit-professional",
+        "type": "example-audit:audit-professional",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "term": {
+          "definition": "A person on the engagement team.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000040"
+        }
+      },
+      {
+        "id": "#eng-2026",
+        "label": "Alder Ridge Logistics access and change controls 2026",
+        "type": "example-audit:engagement",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "catalogue.json",
+        "engagement": {
+          "client": "Alder Ridge Logistics Ltd (fictional)",
+          "period-start": "2026-07-01",
+          "period-end": "2026-09-30"
+        }
+      },
+      {
+        "id": "#ac-01",
+        "label": "Timely removal of leaver access",
+        "type": "example-audit:control",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "control": {
+          "reference": "AC-01",
+          "statement": "Access for terminated employees is disabled within one business day of termination.",
+          "accepted-evidence": [
+            "example-audit:hr-termination-report",
+            "example-audit:active-account-listing"
+          ]
+        }
+      },
+      {
+        "id": "#cm-02",
+        "label": "Independent approval of privileged changes",
+        "type": "example-audit:control",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "control": {
+          "reference": "CM-02",
+          "statement": "Privileged production changes are approved by someone other than the implementer before deployment.",
+          "accepted-evidence": [
+            "example-audit:change-ticket-export",
+            "example-audit:deployment-log"
+          ]
+        }
+      },
+      {
+        "id": "#ac-04",
+        "label": "Quarterly user access review",
+        "type": "example-audit:control",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/methodology-desk",
+        "evidence": "catalogue.json",
+        "control": {
+          "reference": "AC-04",
+          "statement": "Application owners review user access each quarter and record removals.",
+          "accepted-evidence": [
+            "example-audit:policy-document",
+            "example-audit:active-account-listing"
+          ]
+        }
+      },
+      {
+        "id": "#collector",
+        "label": "Evidence collection agent",
+        "type": "example-audit:collection-agent",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#drafting-agent",
+        "label": "Assessment drafting agent",
+        "type": "example-audit:assessment-agent",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#m-ito",
+        "label": "M. Ito (fictional senior)",
+        "type": "example-audit:audit-professional",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "catalogue.json"
+      },
+      {
+        "id": "#r-okafor",
+        "label": "R. Okafor (fictional manager)",
+        "type": "example-audit:audit-professional",
+        "origin": "catalogue.json",
+        "asserted-by": "https://larkspur-reed.example/agents/engagement-office",
+        "evidence": "catalogue.json"
+      }
+    ]
+  }
+}

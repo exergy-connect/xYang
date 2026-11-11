@@ -1,0 +1,199 @@
+{
+  "example-audit:graph": {
+    "document": [
+      {
+        "id": "assessments.json",
+        "version": "1",
+        "ontology-version": "audit-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "../models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "../models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-audit",
+            "revision": "2026-11-10",
+            "location": "../models/example-audit@2026-11-10.yang",
+            "sha256": "6df5fc77bebba4af34098f9ff75691991633fef0ead78d19595d7df34f9b9ab4"
+          }
+        ],
+        "requires": [
+          {
+            "id": "evidence.json",
+            "version": "1"
+          }
+        ]
+      }
+    ],
+    "hyperedge": [
+      {
+        "id": "#as-ac-01",
+        "type": "example-audit:assessment",
+        "origin": "assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "catalogue.json",
+        "recorded-at": "2026-10-05T11:00:00Z",
+        "result": {
+          "outcome": "exception",
+          "rationale": "E1043 left on 2026-08-14; account jmarsh was still enabled and logged in on 2026-08-26."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "catalogue.json#drafting-agent"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "catalogue.json#ac-01"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          },
+          {
+            "id": "ev-hr-leavers-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#hr-leavers-q3"
+          },
+          {
+            "id": "ev-iam-active-users",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "#as-cm-02",
+        "type": "example-audit:assessment",
+        "origin": "assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/m-ito",
+        "evidence": "catalogue.json",
+        "recorded-at": "2026-10-05T14:30:00Z",
+        "result": {
+          "outcome": "supported",
+          "rationale": "Both privileged changes were approved by a different person before deployment."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "catalogue.json#m-ito"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "catalogue.json#cm-02"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          },
+          {
+            "id": "ev-change-tickets-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#change-tickets-q3"
+          },
+          {
+            "id": "ev-deploy-log-q3",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#deploy-log-q3"
+          }
+        ]
+      },
+      {
+        "id": "#as-ac-04",
+        "type": "example-audit:assessment",
+        "origin": "assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "catalogue.json",
+        "recorded-at": "2026-10-05T15:10:00Z",
+        "result": {
+          "outcome": "insufficient-evidence",
+          "rationale": "No quarterly access review records were provided for the period."
+        },
+        "incidence": [
+          {
+            "id": "by",
+            "role": "example-audit:assessor",
+            "node": "catalogue.json#drafting-agent"
+          },
+          {
+            "id": "ctl",
+            "role": "example-audit:assessed-control",
+            "node": "catalogue.json#ac-04"
+          },
+          {
+            "id": "for",
+            "role": "example-audit:in-engagement",
+            "node": "catalogue.json#eng-2026"
+          }
+        ]
+      },
+      {
+        "id": "#fd-ac-01",
+        "type": "example-audit:finding",
+        "origin": "assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "exports/iam-active-users.csv",
+        "recorded-at": "2026-10-05T11:20:00Z",
+        "detail": {
+          "severity": "high",
+          "condition": "A terminated employee's account remained enabled and was used 12 days after termination."
+        },
+        "incidence": [
+          {
+            "id": "basis",
+            "role": "example-audit:basis",
+            "hyperedge": "#as-ac-01"
+          },
+          {
+            "id": "ev-hr",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#hr-leavers-q3"
+          },
+          {
+            "id": "ev-iam",
+            "role": "example-audit:cited-evidence",
+            "node": "evidence.json#iam-active-users"
+          }
+        ]
+      },
+      {
+        "id": "#wp-2026",
+        "type": "example-audit:workpaper-bundle",
+        "origin": "assessments.json",
+        "asserted-by": "https://larkspur-reed.example/agents/drafting-agent",
+        "evidence": "catalogue.json",
+        "incidence": [
+          {
+            "id": "m1",
+            "role": "example-audit:member",
+            "hyperedge": "#as-ac-01"
+          },
+          {
+            "id": "m2",
+            "role": "example-audit:member",
+            "hyperedge": "#as-cm-02"
+          },
+          {
+            "id": "m3",
+            "role": "example-audit:member",
+            "hyperedge": "#as-ac-04"
+          }
+        ]
+      }
+    ]
+  }
+}

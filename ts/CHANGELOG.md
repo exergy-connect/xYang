@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
+- **Audit engagement example:** `test/ontology_audit_example.test.ts` validates the checked-in projections of the fictional audit example in `examples/ontology-hypergraph`, with the same errors as Python: dangling evidence (`leafref`), an assessment without evidence, reviewer equal to assessor, two reviewers, a finding on a supported assessment, and evidence of a type the control does not accept (`must`). The TypeScript workflow also runs when that example changes.
 - **Agent skills:** the repository skill `skills/xyang-validate/SKILL.md` documents `xyang-ts validate --format json`, its exit codes, `validate` / `validateDetailed`, `{ nativeJson: true }`, `--features`, the `xyang-ts` Action, `@exergy-connect/xyang/browser`, and QuickJS binaries. It notes that parsed modules are typed objects with no `.data`, and that the type registry is not a package export. `skills/xyang-model/SKILL.md` now runs the CLI with `npx -p @exergy-connect/xyang xyang-ts`; `npx xyang-ts` names a package that does not exist.
 
 ### Fixed

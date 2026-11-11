@@ -16,8 +16,8 @@ from xyang import YangValidator, parse_yang_file
 
 HERE = Path(__file__).resolve().parent
 REVISION = "2026-11-10"
-MODULES = ("example-hypergraph", "example-bfo", "example-lab", "example-lab-evidence")
-ROOT = "example-lab:graph"
+MODULES = ("example-hypergraph", "example-bfo", "example-audit")
+ROOT = "example-audit:graph"
 
 
 class CollectionError(ValueError):
@@ -84,17 +84,10 @@ def model_inventory(base: str) -> list[dict]:
 def validator() -> YangValidator:
     # Imports, grouping instantiation, refine constraints and augments are expanded
     # by xYang itself. No schema rewriting or JSON Schema approximation is needed.
-    extension = parse_yang_file(HERE / "models" / f"example-lab-evidence@{REVISION}.yang")
-    return YangValidator(extension.import_prefixes["lab"])
+    return YangValidator(parse_yang_file(HERE / "models" / f"example-audit@{REVISION}.yang"))
 
 
 def validate(tree: dict) -> None:
-    # xYang currently accepts lexical boolean strings as well as JSON booleans.
-    # Enforce RFC 7951 section 6.3 for this profile's one boolean at the boundary.
-    for edge in tree.get(ROOT, {}).get("hyperedge", []):
-        key = "example-lab-evidence:reviewed"
-        if key in edge and type(edge[key]) is not bool:
-            raise CollectionError(f"RFC 7951 requires a JSON boolean for {key}")
     valid, errors, warnings = validator().validate(tree)
     if not valid or warnings:
         raise CollectionError("YANG validation failed:\n" + "\n".join(errors + warnings))
@@ -183,6 +176,14 @@ def _collect(seed: str, *, read=fetch, max_documents: int = 32) -> dict:
                 if element["origin"] != url:
                     raise CollectionError(f"Origin conflicts with publication: {element['id']}")
                 element["evidence"] = absolute(url, element["evidence"])
+                record = element.get("evidence-record")
+                if isinstance(record, dict):
+                    record["source-system"] = absolute(url, record["source-system"])
+                    pending.append(urldefrag(record["source-system"])[0])
+                    record["export"] = absolute(url, record["export"])
+                    # Byte integrity of the collected export, not truth of its content.
+                    if hashlib.sha256(read(record["export"])).hexdigest() != record["sha256"]:
+                        raise CollectionError(f"Export digest mismatch: {record['export']}")
                 for attachment in element.get("attachment", []):
                     attachment["url"] = absolute(url, attachment["url"])
                 for incidence in element.get("incidence", []):
