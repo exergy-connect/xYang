@@ -40,6 +40,16 @@ class SchemaNav:
         return SchemaNav._find(getattr(schema, "statements", []), name)
 
     @staticmethod
+    def child_in_module(schema: Any, name: str, module: str, root_module: str) -> Optional[Any]:
+        """Data-node child named *name* that *module* defines (RFC 7951 namespace of the child)."""
+        from ..encoding.rfc7951 import defining_module_name
+
+        for child in SchemaNav.data_children(schema):
+            if child.name == name and defining_module_name(child, root_module) == module:
+                return child
+        return None
+
+    @staticmethod
     def _find(stmts: list, name: str) -> Optional[Any]:
         for stmt in stmts:
             if getattr(stmt, "name", None) == name:

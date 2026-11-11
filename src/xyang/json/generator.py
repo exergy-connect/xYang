@@ -310,13 +310,24 @@ def _must_to_json(must: YangMustStmt) -> dict[str, Any]:
         XYangMustEntryKey.MUST: must.expression,
         XYangMustEntryKey.ERROR_MESSAGE: must.error_message or "",
     }
+    _with_xpath_prefixes(out, must.ast)
     _with_description(out, must.description)
     return out
+
+
+def _with_xpath_prefixes(out: dict[str, Any], ast: Any) -> None:
+    """Record the module each prefixed step is bound to; the JSON form carries no imports."""
+    from ..xpath.parser import xpath_prefix_map
+
+    bound = xpath_prefix_map(ast)
+    if bound:
+        out[XYangKey.XPATH_PREFIXES] = dict(sorted(bound.items()))
 
 
 def _when_to_xyang_json(when: YangWhenStmt) -> dict[str, Any]:
     """Serialize ``when`` as object: ``condition`` (required) and optional ``description``."""
     out: dict[str, Any] = {XYangWhenEntryKey.CONDITION: when.expression}
+    _with_xpath_prefixes(out, when.ast)
     if when.description and when.description.strip():
         out[JsonSchemaKey.DESCRIPTION] = when.description
     return out
@@ -466,8 +477,8 @@ def _choice_to_object_body(
                 s, typedef_names, module, parent=leafref_parent
             )
             if child_prop is not None:
-                case_props[s.name] = child_prop
-                case_keys.append(s.name)
+                case_props[_property_key(s, module)] = child_prop
+                case_keys.append(_property_key(s, module))
         if case_keys:
             case_entries.append((case, case_props, case_keys))
     out: dict[str, Any] = {}
@@ -496,6 +507,14 @@ def _choice_to_object_body(
     return out
 
 
+def _property_key(stmt: YangStatement, module: YangModule) -> str:
+    """RFC 7951 member name: ``module:name`` for a node another module defines (augment)."""
+    owner = getattr(stmt, "defining_module", None)
+    if owner and owner != module.name:
+        return f"{owner}:{stmt.name}"
+    return stmt.name or ""
+
+
 def _child_property_map(
     children: list[YangStatement],
     typedef_names: set[str],
@@ -508,9 +527,9 @@ def _child_property_map(
     for child in children:
         child_prop = _statement_to_property(child, typedef_names, module, parent=parent)
         if child_prop is not None:
-            props[child.name] = child_prop
+            props[_property_key(child, module)] = child_prop
             if _mandatory_schema_child(child):
-                required.append(child.name)
+                required.append(_property_key(child, module))
     return props, required
 
 
@@ -998,7 +1017,7 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
             stmt, typedef_names, schema_module, parent=schema_module
         )
         if prop is not None:
-            properties[stmt.name] = prop
+            properties[_property_key(stmt, module)] = prop
 
     defs: dict[str, Any] = {}
     for name, typedef in schema_module.typedefs.items():

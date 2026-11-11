@@ -16,7 +16,7 @@ export type WhenShape = {
   expression?: string;
   description?: string;
   evaluate_with_parent_context?: boolean;
-  /** Module each `prefix:*` step in `expression` is bound to, by prefix. */
+  /** Module each prefixed step in `expression` is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
 };
 
@@ -29,6 +29,8 @@ export type StatementTypeShape = {
   range?: string;
   fraction_digits?: number;
   path?: unknown;
+  /** Module each prefixed step of a leafref `path` is bound to, by prefix. */
+  xpath_prefixes?: Record<string, string>;
   require_instance?: boolean;
   identityref_bases?: unknown;
   enums?: string[];
@@ -60,7 +62,7 @@ export type YangStatementInit = {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
-  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  /** Module each prefixed step in a `must` expression is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
@@ -114,7 +116,7 @@ export class YangStatement {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
-  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  /** Module each prefixed step in a `must` expression is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;

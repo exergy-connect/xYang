@@ -1,7 +1,7 @@
 import { YangModule, YangStatement } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { modulePrefixResolver } from "../core/ast";
-import { bindWildcardPrefixes, parseXPath, parseXPathPath, wildcardPrefixes } from "../xpath/parser";
+import { bindXPathPrefixes, parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
 import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
@@ -786,7 +786,8 @@ export class DocumentValidator {
     if (kw === YangTokenType.CHOICE || kw === YangTokenType.CASE) {
       return path;
     }
-    return path ? `${path}.${child.name}` : (child.name ?? "");
+    const member = this.instanceKeys(child)[0] ?? child.name ?? "";
+    return path ? `${path}.${member}` : member;
   }
 
   private effectiveKeyword(stmt: YangStatement): string {
@@ -893,11 +894,24 @@ export class DocumentValidator {
   private leafrefPathAst(typeShape: Record<string, unknown>): XPathAstNode | null {
     const rawPath = typeShape.path;
     if (typeof rawPath === "string" && rawPath.trim().length > 0) {
+      const recorded = typeShape.xpath_prefixes as Record<string, string> | undefined;
+      const text = rawPath.trim();
+      const key = `path\u0000${text}\u0000${recorded ? JSON.stringify(recorded) : this.ctx.module.name ?? ""}`;
+      const cached = this.xpathCache.get(key);
+      if (cached) {
+        return cached;
+      }
+      let ast: XPathAstNode;
       try {
-        return parseXPathPath(rawPath.trim());
+        ast = parseXPathPath(text);
       } catch {
         return null;
       }
+      if (xpathPrefixes(ast).size > 0) {
+        bindXPathPrefixes(ast, recorded ? (prefix: string) => recorded[prefix] : modulePrefixResolver(this.ctx.module), text);
+      }
+      this.xpathCache.set(key, ast);
+      return ast;
     }
     if (rawPath && typeof rawPath === "object" && !Array.isArray(rawPath) && (rawPath as { kind?: string }).kind === "path") {
       return rawPath as XPathAstNode;
@@ -1009,8 +1023,8 @@ export class DocumentValidator {
   }
 
   /**
-   * Parse a `must` / `when` expression once per distinct `prefix:*` binding. A statement with
-   * no recorded binding (native JSON) binds against the root module.
+   * Parse a `must` / `when` expression once per distinct prefix binding. A statement with no
+   * recorded binding binds against the root module's own prefix and imports.
    */
   private compileXPath(expression: string, recorded: Record<string, string> | undefined): XPathAstNode {
     const key = recorded ? `${expression}\u0000${JSON.stringify(recorded)}` : expression;
@@ -1019,9 +1033,9 @@ export class DocumentValidator {
       return cached;
     }
     const ast = parseXPath(expression);
-    if (wildcardPrefixes(ast).size > 0) {
+    if (xpathPrefixes(ast).size > 0) {
       const resolve = recorded ? (prefix: string) => recorded[prefix] : modulePrefixResolver(this.ctx.module);
-      bindWildcardPrefixes(ast, resolve, expression);
+      bindXPathPrefixes(ast, resolve, expression);
     }
     this.xpathCache.set(key, ast);
     return ast;

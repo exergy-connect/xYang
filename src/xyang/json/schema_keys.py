@@ -83,6 +83,9 @@ class XYangKey:
     STRING_PATTERNS = "string-patterns"
     #: RFC 7950 §7.21.4 ``units`` (e.g. ``"kbit/s"``).
     UNITS = "units"
+    #: ``{prefix: module}`` for the prefixed steps of a leafref ``path``, ``must`` or ``when``,
+    #: resolved in the module that wrote it (RFC 7950 §6.4.1). The JSON form has no imports.
+    XPATH_PREFIXES = "xpath-prefixes"
 
 
 class XYangTypeValue:

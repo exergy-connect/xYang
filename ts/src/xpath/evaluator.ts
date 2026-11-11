@@ -1,7 +1,7 @@
 import { XPathEvaluationError } from "../core/errors";
 import { YangModule } from "../core/model";
 import { isDerivedFromOrSelfQNames, isDerivedFromStrictQNames } from "../identity-graph";
-import { XPathAstNode, XPathBinaryNode, XPathPathNode, isWildcardStep } from "./ast";
+import { XPathAstNode, XPathBinaryNode, XPathPathNode, XPathPathSegment, isWildcardStep, stepPrefix } from "./ast";
 import { unknownFunctionError } from "./functions";
 
 export type XPathSchema = {
@@ -245,7 +245,43 @@ function defaultValue(schema: XPathSchema | null): unknown {
   return raw;
 }
 
-function stepNode(node: XPathNode, step: string): XPathNode[] {
+function definingModule(child: XPathSchema, rootModule: string): string {
+  return (child as { defining_module?: string }).defining_module || rootModule;
+}
+
+/** RFC 7951 member name of `child` in the canonical tree, whose top-level module is `rootModule`. */
+function memberName(child: XPathSchema, rootModule: string): string {
+  const local = child.name ?? "";
+  const owner = definingModule(child, rootModule);
+  return !rootModule || owner === rootModule ? local : `${owner}:${local}`;
+}
+
+/**
+ * Step to the child a named segment selects. An unprefixed step matches the local name. A
+ * `prefix:name` step matches only a child that module defines (`segment.module`, bound when the
+ * module was loaded); an unbound prefix, as in an RFC 7951 `instance-identifier`, is a module name
+ * (RFC 7951 §6.11).
+ */
+function stepNamed(node: XPathNode, segment: XPathPathSegment, rootModule: string): XPathNode[] {
+  const prefix = stepPrefix(segment.step);
+  if (prefix === undefined) {
+    return stepNode(node, segment.step, rootModule);
+  }
+  const data = node.data;
+  const schema = node.schema;
+  if (Array.isArray(data) && (schema?.keyword === "list" || schema?.keyword === "leaf-list")) {
+    return data.flatMap((item) => stepNamed({ data: item, schema, parent: node }, segment, rootModule));
+  }
+  const module = segment.module ?? prefix;
+  const local = segment.step.slice(prefix.length + 1);
+  const child = dataChildren(schema).find((c) => c.name === local && definingModule(c, rootModule) === module);
+  if (!child) {
+    return [];
+  }
+  return stepChild(node, memberName(child, rootModule), child);
+}
+
+function stepNode(node: XPathNode, step: string, rootModule: string): XPathNode[] {
   const data = node.data;
   const schema = node.schema;
 
@@ -253,12 +289,17 @@ function stepNode(node: XPathNode, step: string): XPathNode[] {
     const expanded: XPathNode[] = [];
     for (const item of data) {
       const entryNode: XPathNode = { data: item, schema, parent: node };
-      expanded.push(...stepNode(entryNode, step));
+      expanded.push(...stepNode(entryNode, step, rootModule));
     }
     return expanded;
   }
 
   const childSchema = findSchemaChild(schema, step);
+  return stepChild(node, childSchema ? memberName(childSchema, rootModule) : step, childSchema);
+}
+
+function stepChild(node: XPathNode, step: string, childSchema: XPathSchema | null): XPathNode[] {
+  const data = node.data;
 
   let value: unknown;
   if (data && typeof data === "object" && !Array.isArray(data)) {
@@ -322,8 +363,9 @@ export class XPathEvaluator {
         nodes = next;
       } else {
         const next: XPathNode[] = [];
+        const rootModule = (context.root.schema as { name?: string } | null)?.name ?? "";
         for (const entry of nodes) {
-          next.push(...stepNode(entry, segment.step));
+          next.push(...stepNamed(entry, segment, rootModule));
         }
         nodes = next;
       }

@@ -1,7 +1,7 @@
 import * as kw from "../keywords";
-import { YangPatternSpec, YangTypeStmt } from "../../core/ast";
+import { modulePrefixResolver, YangPatternSpec, YangTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
-import { parseXPathPath } from "../../xpath/parser";
+import { bindXPathPrefixes, parseXPathPath, xpathPrefixes } from "../../xpath/parser";
 import type { StatementParsers } from "../statement-parsers";
 
 export class TypeStatementParser {
@@ -150,10 +150,17 @@ export class TypeStatementParser {
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
-  parse_type_path(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+  parse_type_path(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
     tokens.consume(kw.PATH);
     const path = this.parsers.parse_string_argument(tokens);
-    type_stmt.path = parseXPathPath(path);
+    const ast = parseXPathPath(path);
+    const used = xpathPrefixes(ast);
+    if (used.size > 0) {
+      const resolve = modulePrefixResolver(context.module);
+      bindXPathPrefixes(ast, resolve, path);
+      type_stmt.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
+    }
+    type_stmt.path = ast as YangTypeStmt["path"];
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

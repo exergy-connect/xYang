@@ -1311,6 +1311,7 @@ export class StatementParsers {
       range_error_app_tag: type_stmt.range_error_app_tag,
       fraction_digits: type_stmt.fraction_digits,
       path: type_stmt.path,
+      ...(type_stmt.xpath_prefixes ? { xpath_prefixes: type_stmt.xpath_prefixes } : {}),
       require_instance: type_stmt.require_instance,
       identityref_bases: type_stmt.identityref_bases.map((b) =>
         b.prefix ? { prefix: b.prefix, name: b.name } : { name: b.name }

@@ -77,6 +77,23 @@ function pathText(path: unknown): string {
   return `${absolute ? "/" : ""}${segments.join("/")}`;
 }
 
+/** `{ "xpath-prefixes": {prefix: module} }` for a bound expression; the JSON form has no imports. */
+function xpathPrefixesEntry(recorded: unknown): Record<string, unknown> {
+  if (!recorded || typeof recorded !== "object" || Object.keys(recorded).length === 0) {
+    return {};
+  }
+  const sorted = Object.keys(recorded as Record<string, string>)
+    .sort()
+    .map((prefix) => [prefix, (recorded as Record<string, string>)[prefix]]);
+  return { [XYANG_KEYS.xpathPrefixes]: Object.fromEntries(sorted) };
+}
+
+/** RFC 7951 member name: `module:name` for a node another module defines (augment). */
+function propertyKey(stmt: YangStatement, module: YangModule): string {
+  const owner = stmt.defining_module;
+  return owner && owner !== module.name ? `${owner}:${stmt.name}` : (stmt.name ?? "");
+}
+
 function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
   const out: Array<Record<string, unknown>> = [];
   for (const child of stmt.statements) {
@@ -85,7 +102,8 @@ function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
     }
     const entry: Record<string, unknown> = {
       must: child.argument,
-      "error-message": typeof child.error_message === "string" ? child.error_message : ""
+      "error-message": typeof child.error_message === "string" ? child.error_message : "",
+      ...xpathPrefixesEntry(child.xpath_prefixes)
     };
     withDescription(entry, child.description);
     out.push(entry);
@@ -116,7 +134,10 @@ function withStatementMeta(
   const whenShape = asRecord(stmt.when);
   const whenExpression = typeof whenShape.expression === "string" ? whenShape.expression : "";
   if (whenExpression.trim().length > 0) {
-    const whenOut: Record<string, unknown> = { condition: whenExpression };
+    const whenOut: Record<string, unknown> = {
+      condition: whenExpression,
+      ...xpathPrefixesEntry(whenShape.xpath_prefixes as Record<string, string> | undefined)
+    };
     const wd =
       typeof whenShape.description === "string" && whenShape.description.trim().length > 0
         ? whenShape.description.trim()
@@ -272,12 +293,12 @@ function buildSoleChoiceObjectSchema(
     if (!child.name || !isSchemaDataNode(child)) {
       continue;
     }
-    properties[child.name] = statementToSchema(child, module, typedefNames);
+    properties[propertyKey(child, module)] = statementToSchema(child, module, typedefNames);
     if (
       hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       child.mandatory === true
     ) {
-      required.push(child.name);
+      required.push(propertyKey(child, module));
     }
   }
   const choiceShape = buildChoiceOneOf(soleChoice, module, typedefNames);
@@ -343,12 +364,12 @@ function buildMultiChildObjectSchema(
     if (!child.name || !isSchemaDataNode(child)) {
       continue;
     }
-    properties[child.name] = statementToSchema(child, module, typedefNames);
+    properties[propertyKey(child, module)] = statementToSchema(child, module, typedefNames);
     if (
       hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       child.mandatory === true
     ) {
-      required.push(child.name);
+      required.push(propertyKey(child, module));
     }
   }
   const out: Record<string, unknown> = {
@@ -382,8 +403,8 @@ function buildChoiceOneOf(
       if (!child.name || !isSchemaDataNode(child)) {
         continue;
       }
-      properties[child.name] = statementToSchema(child, module, typedefNames);
-      required.push(child.name);
+      properties[propertyKey(child, module)] = statementToSchema(child, module, typedefNames);
+      required.push(propertyKey(child, module));
     }
     if (Object.keys(properties).length === 0) {
       continue;
@@ -506,7 +527,8 @@ function statementToSchema(
       itemsXYang[YANG_SCHEMA_KEYS.xYang] = {
         type: YangTokenType.LEAFREF,
         path: pathText(typeShape.path),
-        "require-instance": typeShape.require_instance !== false
+        "require-instance": typeShape.require_instance !== false,
+        ...xpathPrefixesEntry(typeShape.xpath_prefixes)
       };
       out.items = itemsXYang;
     }
@@ -553,6 +575,7 @@ function statementToSchema(
       xYang.type = YangTokenType.LEAFREF;
       xYang.path = pathText(typeShape.path);
       xYang["require-instance"] = typeShape.require_instance !== false;
+      Object.assign(xYang, xpathPrefixesEntry(typeShape.xpath_prefixes));
     }
     if (typeName === YangTokenType.IDENTITYREF) {
       xYang.type = YangTokenType.IDENTITYREF;
@@ -713,12 +736,12 @@ export function generateJsonSchema(module: YangModule): Record<string, unknown> 
     ) {
       continue;
     }
-    properties[stmt.name] = statementToSchema(stmt, effectiveModule, typedefNames);
+    properties[propertyKey(stmt, module)] = statementToSchema(stmt, effectiveModule, typedefNames);
     if (
       hasTokenType(stmt.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
       stmt.mandatory === true
     ) {
-      required.push(stmt.name);
+      required.push(propertyKey(stmt, module));
     }
   }
 

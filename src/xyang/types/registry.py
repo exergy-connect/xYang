@@ -345,14 +345,15 @@ def _to_leafref(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
     else:
         inner = {JsonSchemaKey.TYPE: "string"}
     inner_clean = {key: value for key, value in inner.items() if key != JsonSchemaKey.X_YANG}
-    return {
-        **inner_clean,
-        JsonSchemaKey.X_YANG: {
-            XYangKey.TYPE: LEAFREF,
-            XYangKey.PATH: path_str,
-            XYangKey.REQUIRE_INSTANCE: require,
-        },
+    from ..json.generator import _with_xpath_prefixes
+
+    xyang: dict[str, Any] = {
+        XYangKey.TYPE: LEAFREF,
+        XYangKey.PATH: path_str,
+        XYangKey.REQUIRE_INSTANCE: require,
     }
+    _with_xpath_prefixes(xyang, path_node)
+    return {**inner_clean, JsonSchemaKey.X_YANG: xyang}
 
 
 def _to_instance_identifier(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
@@ -501,6 +502,12 @@ def _from_leafref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt |
     path_node = None
     if path_val is not None and isinstance(path_val, str) and path_val.strip():
         path_node = XPathParser(path_val.strip()).parse_path()
+        recorded = fragment.xyang.get(XYangKey.XPATH_PREFIXES)
+        if recorded is not None:
+            from ..json.parser import recorded_prefixes
+            from ..xpath.parser import bind_xpath_prefixes
+
+            bind_xpath_prefixes(path_node, recorded_prefixes(recorded).get, path_val)
     return YangTypeStmt(name=LEAFREF, path=path_node, require_instance=bool(require))
 
 

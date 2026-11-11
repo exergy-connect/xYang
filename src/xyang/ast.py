@@ -325,11 +325,17 @@ class YangParsedXPathBase:
             from .xpath import XPathParser
             self.ast = XPathParser(self.expression).parse()
 
-    def bind_prefixes(self, module: Any) -> None:
-        """Bind ``prefix:*`` steps to the modules *module* maps their prefixes to."""
+    def bind_prefixes(self, module: Any, recorded: Optional[Dict[str, str]] = None) -> None:
+        """Bind prefixed steps to the modules *module* maps their prefixes to.
+
+        *recorded* is a ``{prefix: module}`` map kept in the native JSON form; when given it
+        replaces *module*'s prefixes, which that form does not carry for imports.
+        """
         if self.ast is not None:
-            from .xpath.parser import bind_wildcard_prefixes
-            bind_wildcard_prefixes(self.ast, module.resolve_prefix_to_module_name, self.expression)
+            from .xpath.parser import bind_xpath_prefixes
+
+            resolve = recorded.get if recorded is not None else module.resolve_prefix_to_module_name
+            bind_xpath_prefixes(self.ast, resolve, self.expression)
 
 @dataclass
 class YangMustStmt(YangParsedXPathBase):

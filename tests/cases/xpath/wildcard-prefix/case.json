@@ -52,10 +52,7 @@
           "path": "/m:top/other:ext",
           "code": "must"
         }
-      ],
-      "xfail": {
-        "ts": "TypeScript reports the path of a node augmented in by another module without its module prefix (/m:top/ext, not /m:top/other:ext); the must is evaluated correctly"
-      }
+      ]
     },
     {
       "name": "no children of the base module",
@@ -70,10 +67,7 @@
           "path": "/m:top/other:ext",
           "code": "must"
         }
-      ],
-      "xfail": {
-        "ts": "TypeScript reports the path of a node augmented in by another module without its module prefix (/m:top/ext, not /m:top/other:ext); the must is evaluated correctly"
-      }
+      ]
     }
   ]
 }

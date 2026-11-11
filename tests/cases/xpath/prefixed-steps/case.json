@@ -1,0 +1,23 @@
+{
+  "description": "RFC 7950 §6.4.1: a prefixed step names a node by module. The prefix is resolved in the module that wrote the expression (an import alias that differs from the module name and its own prefix, an augment from another module, a grouping from an imported module). ext augments a leaf 'name' next to m's 'name': same local name, different modules. must, when and leafref; absolute, relative and in predicates.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "valid", "data": { "m:sys": { "name": "core", "iface": [{ "name": "e0", "mtu": 1500 }], "ext:name": "edge", "ext:tag": "t", "ext:iref": "e0", "ext:core-flag": "x" }, "m:top": { "host": "h", "port": 80, "ifref": "e0", "mtu-copy": 1500, "core-only": "x" } }, "valid": true },
+    { "name": "same local name in two modules", "data": { "m:sys": { "name": "core", "ext:name": "core", "ext:tag": "t" } }, "valid": false,
+      "errors": [{ "path": "/m:sys/ext:tag", "code": "must", "message": "ext name must differ from m name." }] },
+    { "name": "dangling relative leafref from an augment", "data": { "m:sys": { "iface": [{ "name": "e0" }], "ext:iref": "e9" } }, "valid": false,
+      "errors": [{ "path": "/m:sys/ext:iref", "code": "leafref" }] },
+    { "name": "when in an augment", "data": { "m:sys": { "name": "edge", "ext:core-flag": "x" } }, "valid": false,
+      "errors": [{ "path": "/m:sys/ext:core-flag", "code": "when" }] },
+    { "name": "dangling absolute leafref", "data": { "m:sys": { "iface": [{ "name": "e0" }] }, "m:top": { "ifref": "e9" } }, "valid": false,
+      "errors": [{ "path": "/m:top/ifref", "code": "leafref" }] },
+    { "name": "must with a prefixed predicate", "data": { "m:sys": { "iface": [{ "name": "e0", "mtu": 1500 }, { "name": "e1", "mtu": 9000 }] }, "m:top": { "ifref": "e1", "mtu-copy": 1500 } }, "valid": false,
+      "errors": [{ "path": "/m:top/mtu-copy", "code": "must", "message": "mtu-copy must equal the mtu of ifref." }] },
+    { "name": "when with an absolute prefixed path", "data": { "m:sys": { "name": "edge" }, "m:top": { "core-only": "x" } }, "valid": false,
+      "errors": [{ "path": "/m:top/core-only", "code": "when" }] },
+    { "name": "grouping from an imported module", "data": { "m:top": { "host": "h", "port": 0 } }, "valid": false,
+      "errors": [{ "path": "/m:top/port", "code": "must", "message": "port 0 needs host any." }] },
+    { "name": "native JSON", "encoding": "native", "data": { "sys": { "m:name": "core", "ext:name": "core", "ext:tag": "t" } }, "valid": false,
+      "errors": [{ "path": "/sys/ext:tag", "code": "must" }] }
+  ]
+}
