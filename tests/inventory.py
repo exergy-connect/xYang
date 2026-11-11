@@ -111,8 +111,13 @@ def inventory() -> dict:
     ts = ts_items()
     shared = shared_instances()
 
-    py_shared = {nid.split("[", 1)[1][: -1].split(":", 1)[1] for nid, _, _ in py if nid.startswith(SHARED_PY + "::")}
+    def _case_id(nid: str) -> str:
+        return nid.split("[", 1)[1][:-1].split(":", 1)[1]
+
+    py_shared = {_case_id(nid) for nid, _, _ in py if nid.startswith(SHARED_PY + "::test_case[python:")}
+    py_json = {_case_id(nid) for nid, _, _ in py if nid.startswith(SHARED_PY + "::test_case[python-json:")}
     ts_shared_n = sum(1 for f, _ in ts if f == SHARED_TS)
+    ts_json = sum(1 for f, n in ts if f == SHARED_TS and "(from the native JSON form)" in n)
     py_other = [(nid, x) for nid, x, _ in py if not nid.startswith(SHARED_PY + "::")]
     ts_other = [(f, n) for f, n in ts if f != SHARED_TS]
     ontology_py = sum(1 for _, _, ontology in py if ontology)
@@ -123,10 +128,14 @@ def inventory() -> dict:
     pr_excludes_ontology_ts = ontology_ts_file in pr_test_script and "--exclude" in pr_test_script
     pr_excludes_ontology_py = '-m "not ontology"' in _job_script("tests.yml", "pytest")
 
-    if py_shared != shared or ts_shared_n != len(shared):
+    if py_shared != shared or ts_shared_n - ts_json != len(shared):
         raise SystemExit(
             f"shared-case runners disagree with tests/cases: {len(shared)} instances, "
-            f"python {len(py_shared)}, typescript {ts_shared_n}"
+            f"python {len(py_shared)}, typescript {ts_shared_n - ts_json}"
+        )
+    if len(py_json) != ts_json:
+        raise SystemExit(
+            f"native JSON form re-runs disagree: python {len(py_json)}, typescript {ts_json}"
         )
 
     if not pr_excludes_ontology_py or not pr_excludes_ontology_ts or not _release_runs_ontology():
@@ -142,8 +151,9 @@ def inventory() -> dict:
     pr_ts = len(ts) - ontology_ts
     return {
         "logical": {
-            "total": len(shared) + len(py_other) + len(ts_other),
+            "total": len(shared) + len(py_json) + len(py_other) + len(ts_other),
             "shared_instances": len(shared),
+            "native_json_form": len(py_json),
             "python_only": len(py_other),
             "typescript_only": len(ts_other),
         },
@@ -156,9 +166,12 @@ def inventory() -> dict:
         "ci_executions_per_pr": {
             "python_matrix": f"{py_matrix} x {pr_py}",
             "node_matrix": f"{ts_matrix} x {pr_ts}",
-            "conformance_jobs": f"2 x {len(shared)} (shared cases again, outside the matrices)",
+            "conformance_jobs": (
+                f"python {len(shared) + len(py_json)} + typescript {ts_shared_n} "
+                "(shared cases again, outside the matrices)"
+            ),
             "ontology_not_included": ontology_py + ontology_ts,
-            "total": py_matrix * pr_py + ts_matrix * pr_ts + 2 * len(shared),
+            "total": py_matrix * pr_py + ts_matrix * pr_ts + (len(shared) + len(py_json)) + ts_shared_n,
         },
         "ci_executions_per_release": {
             "event": "release: published",
@@ -184,6 +197,7 @@ def main(argv: list[str] | None = None) -> int:
     ci, rel, ont = inv["ci_executions_per_pr"], inv["ci_executions_per_release"], inv["ontology_release_only"]
     print(f"logical cases        {lg['total']}")
     print(f"  shared instances   {lg['shared_instances']}  (tests/cases, run by both runtimes)")
+    print(f"  native JSON form   {lg['native_json_form']}  (same instance again, from the JSON form, both runtimes)")
     print(f"  python only        {lg['python_only']}")
     print(f"  typescript only    {lg['typescript_only']}")
     print(f"runner items         python {ri['python']}, typescript {ri['typescript']}")

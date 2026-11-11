@@ -85,6 +85,13 @@ the Python file was 69 passed and 0 skipped in 29.1 s. `npm run test:ontology` w
 install does not pass. Those two checks no longer show up as skips in pull-request pytest,
 because the whole file is deselected there.
 
+`main` then gained #160. After merging it, `python tests/inventory.py` reports 1,518 logical
+cases (636 shared instances, plus 8 native-JSON-form re-runs of the same instance in both
+runtimes), 8,648 CI executions per PR, and 93 per published release. One run of
+`pytest -q -m "not ontology" -W error::DeprecationWarning` was 9.28 s: 1071 passed, 1 skipped,
+69 deselected, 2 xfailed. `npm test` was 995 passed, 1 skipped, 6.97 s. The 400-case target is
+still not met.
+
 ## What changed
 
 - **Mirrored tests moved into shared cases.** When a Python test and its TypeScript twin only
