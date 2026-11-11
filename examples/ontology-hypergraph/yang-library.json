@@ -1,0 +1,40 @@
+{
+  "ietf-yang-library:yang-library": {
+    "module-set": [
+      {
+        "name": "lab-2026.1",
+        "module": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:hypergraph"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:bfo"
+          },
+          {
+            "name": "example-lab",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:lab"
+          },
+          {
+            "name": "example-lab-evidence",
+            "revision": "2026-11-10",
+            "namespace": "urn:example:lab-evidence"
+          }
+        ]
+      }
+    ],
+    "schema": [
+      {
+        "name": "lab",
+        "module-set": [
+          "lab-2026.1"
+        ]
+      }
+    ],
+    "content-id": "4d2c933765dd2038a8bd4d86f4fe14a9b06e10b8df00c0ad51efd1bf6cd8292c"
+  }
+}

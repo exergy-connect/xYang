@@ -1,0 +1,31 @@
+name: Ontology example
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "examples/ontology-hypergraph/**"
+      - "tests/test_ontology_hypergraph.py"
+      - "src/**"
+      - ".github/workflows/ontology-example.yml"
+  pull_request:
+    paths:
+      - "examples/ontology-hypergraph/**"
+      - "tests/test_ontology_hypergraph.py"
+      - "src/**"
+      - ".github/workflows/ontology-example.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+jobs:
+  independent-validation:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v6
+        with:
+          python-version: "3.11"
+      - run: pip install -e . pytest -r examples/ontology-hypergraph/requirements-tools.txt
+      - run: pytest tests/test_ontology_hypergraph.py -q

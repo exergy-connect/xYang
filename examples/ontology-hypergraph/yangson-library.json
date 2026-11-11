@@ -1,0 +1,31 @@
+{
+  "ietf-yang-library:modules-state": {
+    "module-set-id": "4d2c933765dd2038a8bd4d86f4fe14a9b06e10b8df00c0ad51efd1bf6cd8292c",
+    "module": [
+      {
+        "name": "example-hypergraph",
+        "revision": "2026-11-10",
+        "namespace": "urn:example:hypergraph",
+        "conformance-type": "implement"
+      },
+      {
+        "name": "example-bfo",
+        "revision": "2026-11-10",
+        "namespace": "urn:example:bfo",
+        "conformance-type": "implement"
+      },
+      {
+        "name": "example-lab",
+        "revision": "2026-11-10",
+        "namespace": "urn:example:lab",
+        "conformance-type": "implement"
+      },
+      {
+        "name": "example-lab-evidence",
+        "revision": "2026-11-10",
+        "namespace": "urn:example:lab-evidence",
+        "conformance-type": "implement"
+      }
+    ]
+  }
+}

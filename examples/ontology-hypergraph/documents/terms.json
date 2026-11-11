@@ -1,0 +1,63 @@
+{
+  "example-lab:graph": {
+    "document": [
+      {
+        "id": "terms.json",
+        "version": "1",
+        "ontology-version": "lab-2026.1",
+        "model": [
+          {
+            "name": "example-hypergraph",
+            "revision": "2026-11-10",
+            "location": "../models/example-hypergraph@2026-11-10.yang",
+            "sha256": "8e71605cb00fc41237339e3c03d8b3f3f60141c6cf8bab2dde4640bd45c2fac9"
+          },
+          {
+            "name": "example-bfo",
+            "revision": "2026-11-10",
+            "location": "../models/example-bfo@2026-11-10.yang",
+            "sha256": "cabc836e6207b1f9ec746a0e6c3e2cd511ca8926c25408eb11afa82493e16185"
+          },
+          {
+            "name": "example-lab",
+            "revision": "2026-11-10",
+            "location": "../models/example-lab@2026-11-10.yang",
+            "sha256": "07bc4e489dd9be5d1a3899aaab1fb1fc635eaeb11e75c48784306ed192c8258c"
+          },
+          {
+            "name": "example-lab-evidence",
+            "revision": "2026-11-10",
+            "location": "../models/example-lab-evidence@2026-11-10.yang",
+            "sha256": "8e6f6268419f3fe37d6aa9a154705a15dcc91f50183996741c8c1ad84ba0d229"
+          }
+        ]
+      }
+    ],
+    "node": [
+      {
+        "id": "#specimen",
+        "label": "specimen",
+        "type": "example-lab:specimen",
+        "term": {
+          "definition": "A material sample examined in a laboratory.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000040"
+        },
+        "origin": "terms.json",
+        "asserted-by": "https://example.org/agents/lab",
+        "evidence": "evidence.txt"
+      },
+      {
+        "id": "#assay",
+        "label": "assay",
+        "type": "example-lab:assay",
+        "term": {
+          "definition": "A process that examines a specimen.",
+          "bfo-class": "http://purl.obolibrary.org/obo/BFO_0000015"
+        },
+        "origin": "terms.json",
+        "asserted-by": "https://example.org/agents/lab",
+        "evidence": "evidence.txt"
+      }
+    ]
+  }
+}

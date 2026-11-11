@@ -1,0 +1,119 @@
+module example-hypergraph {
+  yang-version 1.1;
+  namespace "urn:example:hypergraph";
+  prefix hg;
+  organization "xYang example authors";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Generic hypergraph vocabulary, independent of any upper ontology.
+     SPDX-License-Identifier: MIT";
+  reference "RFC 7950; RFC 7951; RFC 8407.";
+  revision 2026-11-10 {
+    description "Initial example revision.";
+    reference "xYang examples/ontology-hypergraph/README.md";
+  }
+
+  identity element-kind { description "Extensible node or hyperedge type."; }
+  identity relation { base element-kind; description "Hyperedge relation type."; }
+  identity role { description "Extensible incidence role."; }
+
+  grouping annotations {
+    description "Lossless string attributes and external attachments.";
+    list attribute {
+      key "name";
+      description "Application-defined string attributes; no logical entailment.";
+      leaf name { type string; description "Attribute name, preferably an IRI."; }
+      leaf value { type string; mandatory true; description "Lexical value."; }
+    }
+    list attachment {
+      key "url";
+      description "External artifact; not automatically fetched or interpreted.";
+      leaf url { type string; description "URI reference resolved against publication URL."; }
+      leaf media-type { type string; mandatory true; description "Artifact media type."; }
+      leaf purpose { type string; mandatory true; description "Why this artifact is attached."; }
+    }
+  }
+
+  grouping provenance {
+    description "Explicit source and attribution for each graph element.";
+    leaf origin {
+      type leafref { path "../../document/id"; }
+      mandatory true;
+      description "Publishing document, resolved before local validation.";
+    }
+    leaf asserted-by { type string; mandatory true; description "Attributing agent IRI."; }
+    leaf evidence { type string; mandatory true; description "Evidence URI reference."; }
+  }
+
+  grouping hypergraph {
+    description
+      "Instantiated by a host module. Relative leafrefs bind in that host.
+       Hyperedges can participate in hyperedges. Incidence IDs distinguish
+       repeated participants; arity has no upper bound. Cycles are permitted.";
+    list document {
+      key "id";
+      min-elements 1;
+      description "Collected publication inventory; one entry per source.";
+      leaf id { type string; description "Absolute HTTP(S) document URL."; }
+      leaf version { type string; mandatory true; description "Immutable publication version."; }
+      leaf ontology-version { type string; mandatory true; description "Shared ontology suite release."; }
+      list requires {
+        key "id";
+        description "Version-pinned dependencies, fetched before validation.";
+        leaf id {
+          type leafref { path "../../../document/id"; }
+          description "Required publication URL.";
+        }
+        leaf version { type string; mandatory true; description "Required publication version."; }
+      }
+      list model {
+        key "name";
+        min-elements 1;
+        description "Effective implemented modules, pinned by revision and bytes.";
+        leaf name { type string; description "YANG module name."; }
+        leaf revision { type string; mandatory true; description "YANG revision date."; }
+        leaf location { type string; mandatory true; description "Published YANG source URL."; }
+        leaf sha256 {
+          type string { pattern '[0-9a-f]{64}'; }
+          mandatory true;
+          description "SHA-256 digest of published source bytes.";
+        }
+      }
+    }
+    list node {
+      key "id";
+      description "Addressable vertex; no ontology-specific interpretation.";
+      leaf id { type string; description "Absolute document URL plus fragment."; }
+      leaf label { type string; mandatory true; description "Human-readable label."; }
+      leaf type { type identityref { base hg:element-kind; } mandatory true; description "Extensible kind."; }
+      uses provenance;
+      uses annotations;
+    }
+    list hyperedge {
+      key "id";
+      description "Addressable relation occurrence with role-labelled incidences.";
+      leaf id { type string; description "Absolute document URL plus fragment."; }
+      leaf type { type identityref { base hg:relation; } mandatory true; description "Relation kind."; }
+      uses provenance;
+      uses annotations;
+      list incidence {
+        key "id";
+        description "Distinct occurrence of a participant in a role; zero or more.";
+        leaf id { type string; description "Local occurrence identifier, not participant ID."; }
+        leaf role { type identityref { base hg:role; } mandatory true; description "Participant role."; }
+        choice participant {
+          mandatory true;
+          description "Exactly one local leafref target after projection.";
+          leaf node {
+            type leafref { path "../../../node/id"; }
+            description "Vertex participant.";
+          }
+          leaf hyperedge {
+            type leafref { path "../../../hyperedge/id"; }
+            description "Nested relation participant (not a containment copy).";
+          }
+        }
+      }
+    }
+  }
+}

@@ -185,6 +185,10 @@ Use `candidate` instead of `complete` for structural checks only (no `must` / `w
 
 ---
 
+## Example: distributed ontology hypergraph
+
+The [ontology hypergraph example](examples/ontology-hypergraph/README.md) combines generic YANG groupings, a BFO alignment vocabulary, domain constraints, and an independent provider's augment. Its collector resolves HTTP JSON publications into a local tree with leafref validation, independent pyang/Yangson checks, and optional OWL RL evaluation. The [standards traceability matrix](examples/ontology-hypergraph/TRACEABILITY.md) distinguishes executable evidence from outstanding ISO conformity assessment.
+
 ## What xYang does (and does not)
 
 **Does**
