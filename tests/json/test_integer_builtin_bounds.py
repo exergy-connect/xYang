@@ -84,16 +84,20 @@ module m {
     assert td.type.range == "0..max"
 
 
-def test_deprecated_integer_bounds_module_still_warns():
-    """The shim stays, and importing it is the warning. The tests above use the registry."""
+def test_integer_bounds_shim_is_removed():
     import importlib
-    import sys
-    import warnings
 
-    sys.modules.pop("xyang.json.integer_bounds", None)
-    with warnings.catch_warnings(record=True) as caught:
-        warnings.simplefilter("always", DeprecationWarning)
-        mod = importlib.import_module("xyang.json.integer_bounds")
-    messages = [str(item.message) for item in caught if issubclass(item.category, DeprecationWarning)]
-    assert "xyang.json.integer_bounds is deprecated; import from xyang.types.registry" in messages
-    assert mod.YANG_INTEGER_BOUNDS is YANG_INTEGER_BOUNDS
+    import pytest
+
+    from xyang.types.registry import (
+        YANG_INTEGER_BUILTIN_NAMES,
+        json_integer_bounds_for_builtin,
+        yang_integer_from_json_bounds,
+    )
+
+    with pytest.raises(ModuleNotFoundError):
+        importlib.import_module("xyang.json.integer_bounds")
+    assert YANG_INTEGER_BOUNDS["uint16"] == (0, 65535)
+    assert "uint16" in YANG_INTEGER_BUILTIN_NAMES
+    assert json_integer_bounds_for_builtin("uint16", None) == (0, 65535)
+    assert yang_integer_from_json_bounds(0, 65535)[0] == "uint16"

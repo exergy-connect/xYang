@@ -1,6 +1,12 @@
+import { existsSync } from "node:fs";
 import { describe, expect, it } from "vitest";
 import { generateJsonSchema, parseJsonSchema, parseYangString } from "../../src";
-import { YANG_INTEGER_BOUNDS } from "../../src/types/registry";
+import {
+  YANG_INTEGER_BOUNDS,
+  YANG_INTEGER_BUILTIN_NAMES,
+  jsonIntegerBoundsForBuiltin,
+  yangIntegerFromJsonBounds
+} from "../../src/types/registry";
 
 describe("integer built-in JSON bounds round-trip", () => {
   it("uint16 uses minimum/maximum and no builtin-type", () => {
@@ -46,5 +52,13 @@ module m {
     const td = mod2.typedefs["t"] as { type?: { name?: string; range?: string } };
     expect(td?.type?.name).toBe("int32");
     expect(td?.type?.range).toBe("0..max");
+  });
+
+  it("does not keep a json/integer-bounds shim", () => {
+    expect(existsSync(new URL("../../src/json/integer-bounds.ts", import.meta.url))).toBe(false);
+    expect(YANG_INTEGER_BOUNDS.uint16).toEqual([0, 65535]);
+    expect(YANG_INTEGER_BUILTIN_NAMES.has("uint16")).toBe(true);
+    expect(jsonIntegerBoundsForBuiltin("uint16")).toEqual({ minimum: 0, maximum: 65535 });
+    expect(yangIntegerFromJsonBounds(0, 65535)).toEqual({ name: "uint16" });
   });
 });

@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Removed
+
+- **Breaking:** `json/integer-bounds.ts` is removed. There is no compatibility re-export. Import `YANG_INTEGER_BOUNDS`, `YANG_INTEGER_BUILTIN_NAMES`, `jsonIntegerBoundsForBuiltin`, and `yangIntegerFromJsonBounds` from `types/registry`. Integer bounds behavior is unchanged.
+
 ### Added
 
 - **Release benchmark:** `bench/worker.ts` (bundled by `scripts/build-bench-worker.mjs`) is the TypeScript side of the repository benchmark `benchmarks/release_bench.py`, which measures warm parse and validation time, peak RSS (from separate fresh processes that run one operation each), and source lines for both implementations on the same inputs and refreshes the README benchmark section on release. See [`benchmarks/README.md`](../benchmarks/README.md).
@@ -19,7 +23,6 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
-- **Tests:** the integer-bounds round-trip test imports `YANG_INTEGER_BOUNDS` from `types/registry` instead of the deprecated `json/integer-bounds` re-export. The re-export is unchanged.
 - **Boolean arguments:** `mandatory`, `config`, `require-instance`, and `yin-element` accept quoted and unquoted `true` and `false`, matching Python. Any other value, including `TRUE`, `yes`, `1`, and a missing argument, is a `YangSyntaxError` naming the statement and the value.
 - **`range` and `length` bodies:** `range` and `length` accept `description`, `reference`, `error-message`, and `error-app-tag`, plus a prefixed extension, matching Python. An unknown child is a `YangSyntaxError`. The constraint string is unchanged, and `error-message` / `error-app-tag` are reported on a miss.
 - **Types:** `YangTokenType` is a const object, so its type includes punctuation such as `"+"`. `Array.includes` rejected that wider type, and `YangTokenType.INPUT` is not a type. `hasTokenType` does the same membership check and narrows, and input/output parameters use `typeof YangTokenType.INPUT`. `tsc --noEmit` passes. The checks are unchanged.
@@ -56,7 +59,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 ### Added
 
 - **Documentation:** added docs/KEY-LEARNINGS.md.
-- **Built-in type registry:** `ts/src/types/registry.ts` mirrors `src/xyang/types/registry.py`. JSON Schema export, import, and the integer value check call that table. `ts/src/json/type-constants.ts` keeps JSON Schema constants. `integer-bounds.ts` re-exports the integer helpers and is deprecated ([#113](https://github.com/exergy-connect/xYang/issues/113)).
+- **Built-in type registry:** `ts/src/types/registry.ts` mirrors `src/xyang/types/registry.py`. JSON Schema export, import, and the integer value check call that table. `ts/src/json/type-constants.ts` keeps JSON Schema constants ([#113](https://github.com/exergy-connect/xYang/issues/113)).
 - **Native JSON via `--native-json`:** `iterInstance` walks the input as written and yields one node per instance node (`stmt`, decoded `value`, input `pointer`, `children`). RFC 7951 is the default and is strict. Native mode is `{ nativeJson: true }` or `--native-json`: single-key lists keyed by value, JSON numbers for `int64` / `uint64` / `decimal64` (a number past 2^53 is a `type` error), and `empty` as `null`. There is no fallback between modes. New error codes: `ambiguous-name`, `key-mismatch`, `list-encoding`. The CLI no longer unwraps a qualified document root itself. The minified browser bundle uses the same default: strict RFC 7951, so a `uint64` JSON number is a `type` error unless `nativeJson` is set. This subsumes [#50](https://github.com/exergy-connect/xYang/issues/50) ([#95](https://github.com/exergy-connect/xYang/issues/95)).
 - **XPath:** `contains()`, `starts-with()`, `substring-before()`, and `substring-after()` follow XPath 1.0, matching Python. String arguments use the same conversion as `string()`. An empty second argument makes `contains` and `starts-with` true, `substring-before` empty, and `substring-after` the whole source. The wrong number of arguments raises `XPathEvaluationError`, which validation reports as `xpath-error`. An unknown function name is still a compile error (`xpath-unknown-function`) ([#85](https://github.com/exergy-connect/xYang/issues/85)).
 - **One-call validate and machine-readable CLI:** `validate(schema, data, { features, includePath })` returns the `validateDetailed` object (`schema` is a path or a parsed module). `xyang-ts validate` accepts `--format text|json`, `--features` (`{"module": ["feature"]}` or `null`), and `-` for stdin. `--format json` prints `{"valid", "errors": [{path, code, message}]}` on stdout and warnings on stderr. Exit codes are 0 valid, 1 invalid, and 2 for usage or schema/parse errors ([#82](https://github.com/exergy-connect/xYang/issues/82)).
