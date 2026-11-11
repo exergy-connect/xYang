@@ -3,7 +3,7 @@
 Speaks JSON-RPC 2.0 over stdio, one JSON message per line, and handles
 initialize, ping, tools/list and tools/call. No MCP SDK is needed.
 
-Each tools/call is checked with xYang rpc validation (xYang #149):
+Each tools/call is checked with xYang rpc validation (xYang #151):
 
   1. the arguments, as the tool's rpc input, with the session record as
      context, so rules can reach earlier calls;
@@ -64,7 +64,7 @@ INVALID_PARAMS = -32602
 INTERNAL_ERROR = -32603
 
 
-# validate(module, data, rpc=, direction=, context=) as proposed in xYang #149.
+# validate(module, data, rpc=, direction=, context=), added in xYang #151.
 RPC_VALIDATION = "rpc" in inspect.signature(validate).parameters
 
 
@@ -81,8 +81,8 @@ class ProtocolError(Exception):
 class TopologyServer:
     def __init__(self, caller: str = "stdio-client", snapshot: str = "0" * 64) -> None:
         if not RPC_VALIDATION:
-            raise RuntimeError("server.py needs rpc validation in xYang (validate(..., rpc=...)): "
-                               "https://github.com/exergy-connect/xYang/issues/149")
+            raise RuntimeError("server.py needs an xYang with rpc validation (validate(..., rpc=...)): "
+                               "https://github.com/exergy-connect/xYang/pull/151")
         self.module = parse_yang_file(MODULE_PATH, include_path=(str(MODELS),))
         self.validator = YangValidator(self.module)
         self.tools = {t["name"]: t for t in compile_tools(MODULE_PATH, (MODELS,), "standard")["tools"]}
@@ -179,7 +179,7 @@ class TopologyServer:
         return _tool_ok(structured)
 
     def _rpc_errors(self, name: str, direction: str, body: dict[str, Any], *, label: str) -> list[dict[str, str]]:
-        """Validate an rpc input or output with the session record as context (xYang #149)."""
+        """Validate an rpc input or output with the session record as context."""
         verdict = validate(
             self.module,
             {f"{MODULE}:{direction}": body},

@@ -6,10 +6,10 @@
 4. xYang (Python, and TypeScript when ts/dist is built) gives exactly the
    errors in session/expected-errors.json for every session fixture.
 5. Reports how many invalid sessions a plain JSON Schema check accepts.
-6. rpc validation (xYang #149): each case in calls/cases.json, an rpc input
+6. rpc validation (xYang #151): each case in calls/cases.json, an rpc input
    or output checked with the session as context, gives exactly its errors,
    through the CLI's --rpc / --output / --context flags. Skipped, with a
-   message, while xYang lacks rpc validation.
+   message, on an xYang without rpc validation.
 
 Usage: python check.py [--write]   (--write regenerates expected-errors.json)
 Needs: pip install jsonschema
@@ -64,8 +64,10 @@ def validate_ts(path: Path) -> list[dict[str, str]]:
 
 
 def rpc_supported(cli: list[str]) -> bool:
-    proc = subprocess.run([*cli, "validate", "--help"], capture_output=True, text=True, cwd=HERE)
-    return "--rpc" in proc.stdout
+    """True unless the CLI rejects --rpc as an unknown flag (xyang-ts has no validate --help)."""
+    proc = subprocess.run([*cli, "validate", "--rpc", "add-node", str(MODULE), "-"],
+                          input="{}", capture_output=True, text=True, cwd=HERE)
+    return "unrecognized argument" not in proc.stderr
 
 
 def validate_rpc(cli: list[str], case: dict, tmp: Path) -> list[dict[str, str]]:
@@ -152,8 +154,8 @@ def main() -> int:
         clis["TypeScript"] = ["node", str(TS_CLI)]
     for label, cli in clis.items():
         if not rpc_supported(cli):
-            print(f"--  {label}: rpc cases skipped, needs rpc validation "
-                  "(https://github.com/exergy-connect/xYang/issues/149)")
+            print(f"--  {label}: rpc cases skipped, needs an xYang with rpc validation "
+                  "(https://github.com/exergy-connect/xYang/pull/151)")
             continue
         with tempfile.TemporaryDirectory() as tmp:
             for name, case in cases.items():

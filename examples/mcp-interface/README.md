@@ -6,7 +6,7 @@ One YANG source gives three things:
 2. **A gate on each call.** The server checks a call's arguments as the rpc's input, with the session so far as context, before running it. A link may only join nodes that an earlier successful call created.
 3. **A record checked against itself.** The same rules check every call in a stored session against the calls before it.
 
-> **Needs rpc validation in xYang ([#149](https://github.com/exergy-connect/xYang/issues/149)), which is in progress.** Until it lands, the server refuses to start, `test_server.py` is skipped, and `check.py` skips its rpc cases, each with a message pointing here. The compiler and the session checks work today.
+> **Needs an xYang with rpc validation ([#151](https://github.com/exergy-connect/xYang/pull/151)).** With an older xYang, the server refuses to start, `test_server.py` is skipped, and `check.py` skips its rpc cases, each with a message saying so. The compiler and the session checks work with any recent version.
 
 Plain JSON Schema checks each call alone. In this example, 8 of the 12 invalid sessions pass that check, and xYang rejects all 12.
 
@@ -98,7 +98,7 @@ python examples/mcp-interface/compile_mcp.py \
 xyang validate --include-path examples/mcp-interface/models \
   examples/mcp-interface/models/example-topology-tools@2026-11-11.yang \
   examples/mcp-interface/session/invalid/hallucinated-link-target.json
-# with rpc validation (#149): check one call against the session so far
+# check one call against the session so far
 xyang validate --rpc add-link --context examples/mcp-interface/session/valid.json \
   --include-path examples/mcp-interface/models \
   examples/mcp-interface/models/example-topology-tools@2026-11-11.yang call.json
@@ -152,7 +152,6 @@ python -m pytest examples/mcp-interface/test_server.py -q  # 19 tests
 ## Limits
 
 - **The session is the whole world.** A verdict covers the calls in this document. It says nothing about server state the document does not contain. The `view` container (`caller`, `snapshot` digest) records which local view a session was checked in.
-- **rpc validation is assumed.** The server, `test_server.py` and the rpc cases use the API proposed in [#149](https://github.com/exergy-connect/xYang/issues/149): Python `validate(module, data, rpc=, direction=, context=)` and CLI `--rpc`, `--output`, `--context`. Expected errors in `calls/cases.json` follow that proposal, with paths like `/example-topology-tools:input/target`. If the final API differs, these files are what to adjust.
 - **The record check grows.** Step 4 revalidates the whole record on every call, which is fine for a demo but grows with the session.
 - **Unprefixed absolute paths.** The rules write `/session/call`, not `/topo:session/topo:call`. RFC 7950 allows both, but today xYang selects nothing for the prefixed form.
 - **Optional MCP fields.** In MCP revision [2025-11-25](https://modelcontextprotocol.io/specification/2025-11-25/server/tools), a tool has `name`, `title`, `description`, `icons`, `inputSchema`, `outputSchema`, `annotations` and `execution`. The compiler emits `name`, `description`, `inputSchema` and `outputSchema`; the other four are optional and left out. It sets no `$schema`, so both schemas use the spec's default, JSON Schema 2020-12.

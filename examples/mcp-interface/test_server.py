@@ -19,7 +19,7 @@ from server import ERRORS_META_KEY, ROOT, RPC_VALIDATION, TopologyServer  # noqa
 
 pytestmark = pytest.mark.skipif(
     not RPC_VALIDATION,
-    reason="needs rpc validation in xYang: https://github.com/exergy-connect/xYang/issues/149",
+    reason="needs an xYang with rpc validation: https://github.com/exergy-connect/xYang/pull/151",
 )
 
 
