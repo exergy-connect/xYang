@@ -86,7 +86,7 @@ cd ../qjs && ./build.sh linux-x64
 
 `./build.sh all` also cross-compiles linux-arm64, macOS, and Windows. Linux binaries are static musl. macOS binaries link libSystem.
 
-A `--format json` mode and an MCP server are follow-ups. This binary does not add either.
+`validate --format json` works the same as in `xyang-ts`. An MCP server is a follow-up; this binary does not add one.
 
 ---
 
@@ -437,7 +437,7 @@ jobs:
 - uses: exergy-connect/xYang/.github/actions/xyang-ts@main
   id: xyang
   with:
-    version: v0.1.4
+    version: v1.0.0
 
 - run: xyang-ts parse model/example.yang
 - run: xyang-ts convert model/example.yang
@@ -457,7 +457,7 @@ jobs:
       --anydata-module modules/payload.yang
 ```
 
-Pin `version` to a release tag that published the `xyang-ts.mjs` asset.
+Pin `version` to a release tag that published the `xyang-ts.mjs` asset. v1.0.0 is the first release with it; earlier tags have no assets.
 
 ---
 

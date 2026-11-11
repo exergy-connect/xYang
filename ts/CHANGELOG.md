@@ -9,8 +9,13 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- **Agent skills:** the repository skill `skills/xyang-validate/SKILL.md` documents `xyang-ts validate --format json`, its exit codes, `validate` / `validateDetailed`, `{ nativeJson: true }`, `--features`, the `xyang-ts` Action, `@exergy-connect/xyang/browser`, and QuickJS binaries. It notes that parsed modules are typed objects with no `.data`, and that the type registry is not a package export. `skills/xyang-model/SKILL.md` now runs the CLI with `npx -p @exergy-connect/xyang xyang-ts`; `npx xyang-ts` names a package that does not exist.
+
 ### Fixed
 
+- **Docs:** `qjs/README.md` lists `--format`, `--native-json`, and `--features` among the binary's flags and no longer calls `--format json` a follow-up.
 - **QuickJS binaries:** the release workflow that builds the `xyang-ts` QuickJS executables runs on `ubuntu-24.04`. On `ubuntu-latest` (Ubuntu 26.04) `qemu-user-static` cannot be installed, so the v1.0.0 run built no binaries. The build and smoke tests are unchanged.
 
 ## [1.0.0] — 2026-11-11

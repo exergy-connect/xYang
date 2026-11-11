@@ -9,6 +9,8 @@ Author **YANG 1.1 modules** (`.yang`) and/or **JSON Schema with `x-yang`** (conv
 
 Prefer **textual YANG first**, then **`xyang convert`** to produce JSON Schema—fewer mistakes than hand-writing `x-yang` trees.
 
+To check instance data, read errors programmatically, or run xYang in CI, a browser, or a standalone binary, use [`skills/xyang-validate/SKILL.md`](../xyang-validate/SKILL.md).
+
 ## When to use
 
 - User wants a **data model** as YANG or as **JSON Schema + `x-yang`** compatible with xYang.
@@ -30,11 +32,11 @@ xyang convert path/to/module.yang -o path/to/module.yang.json
 xyang validate path/to/module.yang path/to/data.json
 ```
 
-TypeScript CLI: `npx xyang-ts parse|validate|convert <file.yang> [data.json]`. TypeScript `convert` writes to stdout. Python `convert` writes `<file>.yang.json`, or the path given with `-o`.
+TypeScript CLI (the `xyang-ts` binary ships in the `@exergy-connect/xyang` package): `npx -p @exergy-connect/xyang xyang-ts parse|validate|convert <file.yang> [data.json]`. TypeScript `convert` writes to stdout. Python `convert` writes `<file>.yang.json`, or the path given with `-o`. Both take `--include-path DIR` (repeatable) for imports.
 
 Without installing: `PYTHONPATH=src python3 -m xyang …` from the xYang repo root.
 
-Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json.generate_json_schema`, `xyang.json.parse_json_schema` (see repo `README.md`).
+Python API (all importable from `xyang`): `parse_yang_string`, `parse_yang_file`, `validate`, `YangValidator`, `generate_json_schema`, `parse_json_schema`, `YangSyntaxError`. TypeScript exports the camelCase equivalents from `@exergy-connect/xyang` (see repo `README.md`).
 
 ## Authoritative references (this repo)
 
@@ -57,6 +59,18 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 6. **when** — if a `when` is false, omit instance data for that branch; presence when false is invalid.
 7. **must** — XPath must be expressible by xYang’s XPath subset; test with `xyang validate`.
 8. **JSON round-trip** — not every construct round-trips through JSON Schema; prefer **`xyang convert`** from YANG for a canonical `.yang.json`.
+9. **Strict statements** — every statement body accepts only the substatements its parent allows (an unknown keyword is a `YangSyntaxError` naming the parent; a prefixed extension is accepted). `yang-version` must be `1` or `1.1`; boolean arguments (`mandatory`, `config`, `require-instance`, `yin-element`) must be `true` or `false`, quoted or not; `min-elements` / `max-elements` must be an integer (`max-elements` also `unbounded`).
+
+## Instance JSON the model will accept
+
+Write sample instances in **RFC 7951** form, the default for `validate` in both languages:
+
+- `int64`, `uint64`, and `decimal64` values are JSON **strings** (`"9007199254740993"`). 8/16/32-bit integers are JSON **numbers**; a string is a `type` error.
+- `empty` is `[null]`.
+- Lists and leaf-lists are JSON arrays; list entries are objects.
+- An absent list and an empty array `[]` both count as zero entries: `min-elements 1` rejects both, and `[]` is otherwise accepted.
+
+Native dict-style JSON (keyed lists, JSON numbers for 64-bit types, `null` for `empty`) is opt-in only (`--native-json`); see the validate skill.
 
 ## Workflow A: YANG-first (recommended)
 
@@ -71,11 +85,11 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 2. Root object: `$schema`, `$id`, `type: object`, `properties` for each **top-level** data node; each property that is part of the module needs a recognizable **`x-yang`** (`container`, `list`, `leaf`, `leaf-list`, `choice`).
 3. Module metadata lives in **root `x-yang`**: `module`, `yang-version`, `namespace`, `prefix`, etc.
 4. Use **`$defs`** for typedefs and identities as described in the profile doc.
-5. Call **`parse_json_schema`** in Python or rely on tools that emit the same shape; then **`xyang validate`** using the round-tripped module if you export back to YANG, or validate via the API.
+5. Load it with **`parse_json_schema`** (Python) or **`parseJsonSchema`** (TypeScript); both reject a schema without a root `x-yang` object. Validate instances with `YangValidator` on the returned module.
 
 ## Unsupported (do not use in models meant for xYang)
 
-`deviate not-supported` removes the target node. `deviate add`, `replace`, and `delete`, and `action`, are skipped with a warning. Known gaps per implementation: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
+`deviate not-supported` removes the target node. `deviate add`, `replace`, and `delete`, and `action`, are skipped with a warning. The full list of deviations from RFC 7950 / RFC 7951 is the table at the top of `FEATURES.md`. Known gaps per implementation: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
 
 ## After authoring
 
@@ -87,5 +101,5 @@ Python API: `parse_yang_string`, `parse_yang_file`, `YangValidator`, `xyang.json
 - Minimal starter pair: `skills/xyang-model/assets/minimal-module.yang` and **`skills/xyang-model/assets/minimal-module.yang.json`** (same module; JSON is the `xyang convert` output).
 - **Netlab-style topology** (referential integrity): `assets/netlab-topology.yang`, **`assets/netlab-topology.yang.json`**, and sample instance **`assets/netlab-topology-instance.json`**. Try:
   - `xyang validate skills/xyang-model/assets/netlab-topology.yang skills/xyang-model/assets/netlab-topology-instance.json`
-  - Break integrity: set a link’s `source` and `target` to the same node (must on `links`), or set `services/runs-on` to a bad path or a path that does not exist (e.g. wrong `name` in a predicate) (**instance-identifier** with `require-instance`).
+  - Break integrity: set a link’s `source` and `target` to the same node (must on `links`), or set `services/runs-on` to a bad path or a path that does not exist (e.g. wrong `name` in a predicate) (**instance-identifier** with `require-instance`). With `--format json` these report code `must` at `/topology/links/0` and code `instance-identifier` at `/topology/services/0/runs-on`, exit status 1.
 - Tests for JSON parity: `tests/json/` in the xYang repo
