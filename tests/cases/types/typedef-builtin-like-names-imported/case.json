@@ -1,0 +1,29 @@
+{
+  "description": "Prefixed typedefs named date and date-and-time in an imported module keep their pattern, directly and through a local typedef.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "matching values",
+      "data": { "top": { "d": "2026-11-10", "dt": "2026-11-10T01:02:03Z", "local": "2026-11-10T01:02:03Z" } },
+      "valid": true
+    },
+    {
+      "name": "imported date pattern",
+      "data": { "top": { "d": "yesterday" } },
+      "valid": false,
+      "errors": [{ "path": "/top/d", "code": "pattern" }]
+    },
+    {
+      "name": "imported date-and-time pattern",
+      "data": { "top": { "dt": "now" } },
+      "valid": false,
+      "errors": [{ "path": "/top/dt", "code": "pattern" }]
+    },
+    {
+      "name": "local typedef over imported typedef",
+      "data": { "top": { "local": "now" } },
+      "valid": false,
+      "errors": [{ "path": "/top/local", "code": "pattern" }]
+    }
+  ]
+}

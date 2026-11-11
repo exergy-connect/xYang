@@ -1,0 +1,16 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  import types { prefix t; }
+
+  typedef local-stamp {
+    type t:date-and-time;
+  }
+
+  container top {
+    leaf d { type t:date; }
+    leaf dt { type t:date-and-time; }
+    leaf local { type local-stamp; }
+  }
+}
