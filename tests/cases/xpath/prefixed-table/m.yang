@@ -1,0 +1,19 @@
+module a {
+  yang-version 1.1;
+  namespace "urn:a";
+  prefix a;
+
+  container top {
+    list item {
+      key n;
+      leaf n { type string; }
+      leaf r1 { type string; must "/top/item[n = 'x']"; }
+      leaf r2 { type string; must "../../item[n = 'x']"; }
+      leaf r3 { type string; must "/a:top/a:item[a:n = 'x']"; }
+      leaf r4 { type string; must "/a:top/item[n = 'x']"; }
+      leaf r5 { type string; must "/top/a:item[n = 'x']"; }
+      leaf r6 { type string; must "../../a:item[a:n = 'x']"; }
+      leaf r7 { type string; must "count(/a:top/a:item) = 2"; }
+    }
+  }
+}

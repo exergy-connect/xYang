@@ -94,4 +94,4 @@ export const NOTIFICATION = "notification";
 export const INPUT = "input";
 export const OUTPUT = "output";
 
-export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>([ACTION]);
+export const UNSUPPORTED_CONSTRUCT_KEYWORDS = new Set<string>();

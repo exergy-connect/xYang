@@ -60,9 +60,11 @@ export type ValidateOptions = {
   nativeJson?: boolean;
   /** Validate `data` as an instance of this rpc (RFC 7950 §7.14): `{"module:input": {...}}`, or bare parameters with `nativeJson`. */
   rpc?: string;
-  /** Which instance of `rpc`. Default `"input"`. */
+  /** Validate `data` as an instance of this action: its RFC 8040 §3.5.3 data resource identifier (`/m:list=key/action`). */
+  action?: string;
+  /** Which instance of `rpc` or `action`. Default `"input"`. */
   direction?: "input" | "output";
-  /** Server data next to the operation node (RFC 7950 §6.4.1) for `must` and `leafref`. Not validated. */
+  /** Server data (required for an action). Validated first, then reachable from the operation (RFC 7950 §6.4.1). */
   context?: Record<string, unknown>;
 };
 
@@ -107,6 +109,7 @@ export function validate(schema: string | YangModule, data: unknown, options: Va
   return validator.validateDetailed(data, {
     nativeJson: options.nativeJson === true,
     ...(options.rpc !== undefined ? { rpc: options.rpc } : {}),
+    ...(options.action !== undefined ? { action: options.action } : {}),
     ...(options.direction !== undefined ? { direction: options.direction } : {}),
     ...(options.context !== undefined ? { context: options.context } : {})
   });

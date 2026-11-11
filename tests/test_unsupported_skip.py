@@ -25,9 +25,6 @@ module ex {
     input { leaf in-arg { type string; } }
     output { leaf out-arg { type string; } }
   }
-  action "entity" {
-    input { leaf x { type empty; } }
-  }
   notification done { leaf msg { type string; } }
   leaf a { type string; }
 }
@@ -35,10 +32,9 @@ module ex {
     with caplog.at_level(logging.WARNING, logger="xyang.parser.unsupported_skip"):
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
-    # ``rpc`` and nested ``input``/``output`` are parsed. ``action`` is skipped.
+    # ``rpc`` and nested ``input``/``output`` are parsed.
     # ``deviate add`` is skipped with a warning that names the kind and path.
     assert "ignoring unsupported 'deviate add' for /ex:foo" in warn_msgs.lower()
-    assert "action" in warn_msgs.lower()
     assert "rpc" not in warn_msgs.lower()
     assert "input" not in warn_msgs.lower()
     assert "output" not in warn_msgs.lower()
@@ -51,6 +47,19 @@ module ex {
     leaf = mod.find_statement("a")
     assert leaf is not None
     assert getattr(leaf, "name", None) == "a"
+
+
+def test_action_is_parsed_under_a_container_and_rejected_at_module_level() -> None:
+    from xyang.ast import YangActionStmt
+
+    mod = parse_yang_string(
+        'module ex { yang-version 1.1; namespace "urn:ex"; prefix ex;'
+        " container c { action go { input { leaf x { type empty; } } } } }"
+    )
+    (action,) = [s for s in mod.find_statement("c").statements if isinstance(s, YangActionStmt)]
+    assert action.name == "go"
+    with pytest.raises(Exception, match="unknown statement in module body: 'action'"):
+        parse_yang_string('module ex { yang-version 1.1; namespace "urn:ex"; prefix ex; action go { } }')
 
 
 @pytest.mark.parametrize("keyword", ["input", "output"])

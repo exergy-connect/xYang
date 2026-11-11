@@ -1,0 +1,19 @@
+module lib {
+  yang-version 1.1;
+  namespace "urn:lib";
+  prefix l;
+
+  typedef port {
+    type uint16;
+  }
+
+  grouping endpoint {
+    leaf host { type string; }
+    leaf port {
+      type l:port;
+      must ". > 0 or ../host = 'any'" {
+        error-message "port 0 needs host any.";
+      }
+    }
+  }
+}

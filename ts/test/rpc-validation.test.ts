@@ -104,8 +104,8 @@ describe("rpc input and output", () => {
 
   it.each([
     [{ rpc: "nope" }, "no rpc 'nope'"],
-    [{ direction: "output" as const }, "direction applies only together with rpc"],
-    [{ context: {} }, "context applies only together with rpc"],
+    [{ direction: "output" as const }, "direction applies only together with rpc or action"],
+    [{ context: {} }, "context applies only together with rpc or action"],
     [{ rpc: "add-link", direction: "sideways" as never }, "direction must be 'input' or 'output'"],
     [{ rpc: "add-link", context: [] as never }, "context must be a JSON object"],
     [{ rpc: "" }, "rpc must be a non-empty rpc name"]
@@ -190,5 +190,154 @@ describe("rpc CLI", () => {
 
   it("a missing context file exits 2", () => {
     expect(run("--rpc", "add-link", "--context", join(dir, "missing.json"), yang, write("in.json", OTHER_LINK)).status).toBe(2);
+  });
+});
+
+const ACTION_MODULE = `
+module ex {
+  yang-version 1.1;
+  namespace "urn:ex";
+  prefix ex;
+
+  container interfaces {
+    list interface {
+      key name;
+      leaf name { type string; }
+      leaf mtu { type uint16; }
+      action reset {
+        input {
+          leaf delay {
+            type uint16;
+            must ". < ../../ex:mtu" { error-message "delay must be below the interface mtu."; }
+          }
+        }
+        output { leaf ok { type boolean; mandatory true; } }
+      }
+    }
+  }
+}
+`;
+
+const SERVER = { "ex:interfaces": { interface: [{ name: "eth0", mtu: 1500 }, { name: "eth1", mtu: 9000 }] } };
+const ETH0 = "/ex:interfaces/interface=eth0/reset";
+
+describe("action input and output with a validated context", () => {
+  const module = parseYangString(ACTION_MODULE);
+
+  it("must reads the selected parent entry", () => {
+    const data = { "ex:input": { delay: 1600 } };
+    expect(validate(module, data, { action: ETH0, context: SERVER }).errors.map((e) => [e.path, e.code, e.message])).toEqual([
+      ["/ex:input/delay", "must", "delay must be below the interface mtu."]
+    ]);
+    expect(validate(module, data, { action: "/ex:interfaces/interface=eth1/reset", context: SERVER }).valid).toBe(true);
+  });
+
+  it("validates the output", () => {
+    const result = validate(module, { "ex:output": {} }, { action: ETH0, direction: "output", context: SERVER });
+    expect(pairs(result.errors)).toEqual([["/ex:output/ok", "mandatory"]]);
+  });
+
+  it("reports a parent missing from the context on the context", () => {
+    const result = validate(module, { "ex:input": {} }, { action: "/ex:interfaces/interface=eth9/reset", context: SERVER });
+    expect(result.errors.map((e) => [e.document, e.path, e.code])).toEqual([["context", "", "action-parent"]]);
+  });
+
+  it.each([
+    [{ action: ETH0 }, "action needs context"],
+    [{ action: ETH0, rpc: "x", context: {} }, "mutually exclusive"],
+    [{ action: "/ex:interfaces/interface/reset", context: {} }, "needs its 1 key value"],
+    [{ action: "/ex:interfaces/interface=eth0/nope", context: {} }, "has no action 'ex:nope'"],
+    [{ action: "interfaces/interface=eth0/reset", context: {} }, "data resource identifier"]
+  ])("rejects %j", (options, message) => {
+    expect(() => validate(module, { "ex:input": {} }, options)).toThrow(message);
+  });
+
+  it("reports an invalid context before the operation", () => {
+    const bad = { "ex:interfaces": { interface: [{ name: "eth0", mtu: "big" }] } };
+    const result = validate(module, { "ex:input": { delay: 99999 } }, { action: ETH0, context: bad });
+    expect(result.errors.map((e) => [e.document, e.path, e.code])).toEqual([["context", "/ex:interfaces/interface/0/mtu", "type"]]);
+    const text = new YangValidator(module).validate({ "ex:input": {} }, { action: ETH0, context: bad });
+    expect(text.isValid).toBe(false);
+    expect(text.errors[0]).toMatch(/^context /);
+  });
+
+  it("does not mutate the module or the context", () => {
+    const server = structuredClone(SERVER);
+    const iface = module.findStatement("interfaces")!.statements[0]!;
+    const before = [...iface.statements];
+    validate(module, { "ex:input": { delay: 1 } }, { action: ETH0, context: server });
+    expect(server).toEqual(SERVER);
+    expect(iface.statements.every((s, i) => s === before[i])).toBe(true);
+    expect(iface.statements.length).toBe(before.length);
+  });
+});
+
+describe("action CLI", () => {
+  let cli = "";
+  let dir = "";
+  let yang = "";
+  const write = (name: string, value: unknown): string => {
+    const path = join(dir, name);
+    writeFileSync(path, JSON.stringify(value));
+    return path;
+  };
+  const run = (...args: string[]) => spawnSync(process.execPath, [cli, "validate", ...args], { encoding: "utf-8" });
+
+  beforeAll(async () => {
+    dir = mkdtempSync(join(tmpdir(), "xyang-action-"));
+    yang = join(dir, "ex.yang");
+    writeFileSync(yang, ACTION_MODULE);
+    cli = join(dir, "cli.mjs");
+    await build({
+      absWorkingDir: tsRoot,
+      entryPoints: [resolve(tsRoot, "src/cli.ts")],
+      bundle: true,
+      platform: "node",
+      format: "esm",
+      target: "node22",
+      outfile: cli,
+      logLevel: "silent"
+    });
+  });
+
+  it("parses --action", () => {
+    expect(parseValidateArgs(["--action", ETH0, "--context", "c.json", "m.yang"])).toMatchObject({ action: ETH0, contextFile: "c.json" });
+    expect(() => parseValidateArgs(["--action", ETH0, "--rpc", "x", "m.yang"])).toThrow("mutually exclusive");
+  });
+
+  it("validates an action input and output", () => {
+    const ctx = write("server.json", SERVER);
+    const bad = run("--format", "json", "--action", ETH0, "--context", ctx, yang, write("in.json", { "ex:input": { delay: 1600 } }));
+    expect(bad.status).toBe(1);
+    expect(JSON.parse(bad.stdout).errors[0].path).toBe("/ex:input/delay");
+    expect(run("--action", ETH0, "--output", "--context", ctx, yang, write("out.json", { "ex:output": { ok: true } })).status).toBe(0);
+  });
+
+  it("marks context errors with the document", () => {
+    const ctx = write("bad.json", { "ex:interfaces": { interface: [{ name: "eth0", mtu: "big" }] } });
+    const proc = run("--format", "json", "--action", ETH0, "--context", ctx, yang, write("in.json", { "ex:input": {} }));
+    expect(proc.status).toBe(1);
+    expect(JSON.parse(proc.stdout).errors).toMatchObject([{ document: "context", path: "/ex:interfaces/interface/0/mtu", code: "type" }]);
+  });
+
+  it.each([[["--action", ETH0]], [["--action", "/ex:interfaces/interface/reset", "--context", "CTX"]]])(
+    "usage error %j exits 2",
+    (extra) => {
+      const ctx = write("server.json", SERVER);
+      const proc = run(...extra.map((item) => (item === "CTX" ? ctx : item)), yang, write("in.json", { "ex:input": {} }));
+      expect(proc.status).toBe(2);
+      expect(proc.stdout).toBe("");
+    }
+  );
+
+  it("an undeclared XPath prefix exits 2", () => {
+    const bad = join(dir, "m.yang");
+    writeFileSync(
+      bad,
+      'module m { yang-version 1.1; namespace "urn:m"; prefix m; container top { leaf a { type leafref { path "/x:top/x:b"; } } leaf b { type string; } } }'
+    );
+    const proc = run("--format", "json", bad, write("d.json", {}));
+    expect(proc.status).toBe(2);
+    expect(proc.stderr).toContain("unknown prefix 'x'");
   });
 });

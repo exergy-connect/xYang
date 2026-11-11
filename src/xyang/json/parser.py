@@ -28,6 +28,7 @@ from ..ast import (
     YangLeafListStmt,
     YangOutputStmt,
     YangRpcStmt,
+    YangActionStmt,
     YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
@@ -36,6 +37,7 @@ from ..ast import (
     YangWhenStmt,
 )
 from ..types.registry import is_string_number, type_stmt_from_schema
+from ..xpath.parser import bind_xpath_prefixes
 from .schema_keys import (
     JSON_SCHEMA_DEFS_URI_PREFIX,
     JsonSchemaKey,
@@ -130,6 +132,19 @@ def _set_config_from_xyang(stmt: Any, xyang: dict[str, Any]) -> None:
         stmt.config = xyang[XYangKey.CONFIG]
 
 
+def recorded_prefixes(raw: Any) -> dict[str, str]:
+    """Validate an ``x-yang`` ``xpath-prefixes`` map; anything else is a load error."""
+    if not isinstance(raw, dict) or not all(isinstance(k, str) and isinstance(v, str) for k, v in raw.items()):
+        raise ValueError(f'"{XYangKey.XPATH_PREFIXES}" must map prefixes to module names, got {raw!r}')
+    return raw
+
+
+def _bind_recorded(stmt: Any, raw: dict[str, Any]) -> None:
+    if XYangKey.XPATH_PREFIXES in raw:
+        stmt.bind_prefixes(None, recorded_prefixes(raw[XYangKey.XPATH_PREFIXES]))
+        stmt.prefixes_bound = True
+
+
 def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     """Build YangWhenStmt from x-yang ``when``: object with ``condition`` and optional ``description``."""
     raw = xyang.get(XYangKey.WHEN)
@@ -143,7 +158,9 @@ def _when_from_xyang(xyang: dict[str, Any]) -> YangWhenStmt | None:
     desc = raw.get(JsonSchemaKey.DESCRIPTION) or ""
     if not isinstance(desc, str):
         desc = str(desc)
-    return YangWhenStmt(expression=cond, description=desc)
+    when = YangWhenStmt(expression=cond, description=desc)
+    _bind_recorded(when, raw)
+    return when
 
 
 def _bases_from_json(raw: Any) -> list[YangIdentifierRef]:
@@ -282,13 +299,13 @@ def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
     out = []
     for m in xyang.get(XYangKey.MUST) or []:
         if isinstance(m, dict):
-            out.append(
-                YangMustStmt(
-                    expression=m.get(XYangMustEntryKey.MUST, ""),
-                    error_message=m.get(XYangMustEntryKey.ERROR_MESSAGE, ""),
-                    description=m.get(JsonSchemaKey.DESCRIPTION, ""),
-                )
+            must = YangMustStmt(
+                expression=m.get(XYangMustEntryKey.MUST, ""),
+                error_message=m.get(XYangMustEntryKey.ERROR_MESSAGE, ""),
+                description=m.get(JsonSchemaKey.DESCRIPTION, ""),
             )
+            _bind_recorded(must, m)
+            out.append(must)
     return out
 
 
@@ -818,11 +835,13 @@ def _convert_rpc(
     name: str,
     rpc_value: dict[str, Any],
     defs: dict[str, Any],
+    cls: type[YangRpcStmt] = YangRpcStmt,
+    kind: str = XYangTypeValue.RPC,
 ) -> YangRpcStmt | None:
-    """Convert one ``x-yang.rpcs`` entry to ``YangRpcStmt``."""
+    """Convert one ``x-yang.rpcs`` (or ``x-yang.actions``) entry to ``YangRpcStmt`` (``YangActionStmt``)."""
     xyang = _get_xyang(rpc_value)
-    if xyang.get(XYangKey.TYPE) != XYangTypeValue.RPC:
-        return None
+    if xyang.get(XYangKey.TYPE) != kind:
+        raise ValueError(f"{kind} '{name}' must have x-yang type '{kind}', got {xyang.get(XYangKey.TYPE)!r}")
     must_list = _build_must_list(xyang)
     statements: list[YangStatement] = []
     for io_key, io_type in (
@@ -834,7 +853,7 @@ def _convert_rpc(
             io_stmt = _convert_io_block(io_raw, defs, f"/{name}/{io_key}", io_type=io_type)
             if io_stmt is not None:
                 statements.append(io_stmt)
-    rpc = YangRpcStmt(name=name, statements=statements)
+    rpc = cls(name=name, statements=statements)
     rpc.must_statements = must_list
     when_stmt = _when_from_xyang(xyang)
     if when_stmt is not None:
@@ -844,6 +863,47 @@ def _convert_rpc(
 
 
 def _convert_property(
+    name: str,
+    prop_value: dict[str, Any],
+    defs: dict[str, Any],
+    parent_path: str,
+    mandatory_override: bool | None = None,
+) -> Any:
+    """Convert one property. A ``module:name`` key is a node another module defines (augment)."""
+    module_name, sep, local = name.partition(":")
+    if not sep:
+        stmt = _convert_property_local(name, prop_value, defs, parent_path, mandatory_override)
+        return _attach_actions(stmt, prop_value, defs, parent_path)
+    if not module_name or not local:
+        raise ValueError(f"property name {name!r} must be 'name' or 'module:name'")
+    stmt = _convert_property_local(local, prop_value, defs, parent_path, mandatory_override)
+    if stmt is not None:
+        stmt.defining_module = module_name
+    return _attach_actions(stmt, prop_value, defs, parent_path)
+
+
+def _attach_actions(stmt: Any, prop_value: dict[str, Any], defs: dict[str, Any], parent_path: str) -> Any:
+    """Add the ``x-yang.actions`` of a container or list property as ``YangActionStmt`` children."""
+    if not isinstance(stmt, (YangContainerStmt, YangListStmt)):
+        return stmt
+    _schema, xyang = _property_schema_and_xyang(prop_value, defs)
+    actions = xyang.get(XYangKey.ACTIONS)
+    if actions is None:
+        return stmt
+    if not isinstance(actions, dict):
+        raise ValueError(f'x-yang "actions" at {parent_path} must be an object keyed by action name')
+    for action_name, action_value in actions.items():
+        if not isinstance(action_value, dict):
+            raise ValueError(f"action '{action_name}' at {parent_path} must be an object")
+        owner, colon, local = str(action_name).rpartition(":")
+        action = _convert_rpc(local, action_value, defs, YangActionStmt, XYangTypeValue.ACTION)
+        if colon:
+            action.defining_module = owner
+        stmt.statements.append(action)
+    return stmt
+
+
+def _convert_property_local(
     name: str,
     prop_value: dict[str, Any],
     defs: dict[str, Any],
@@ -900,14 +960,27 @@ def _convert_property(
     return None
 
 
+def _bind_type_paths(type_stmt: Any, module: YangModule) -> None:
+    if type_stmt is None:
+        return
+    path = getattr(type_stmt, "path", None)
+    if path is not None and not getattr(path, "bound", False):
+        bind_xpath_prefixes(path, module.resolve_prefix_to_module_name, path.to_string())
+    for member in getattr(type_stmt, "types", None) or []:
+        _bind_type_paths(member, module)
+
+
 def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
-    """Bind ``prefix:*`` steps in every ``must`` and ``when`` to *module*'s prefixes."""
+    """Bind prefixed steps in every ``must``, ``when`` and leafref ``path`` without a recorded
+    ``xpath-prefixes`` map to *module*'s own prefix."""
     for stmt in stmts:
         for must in getattr(stmt, "must_statements", None) or []:
-            must.bind_prefixes(module)
+            if not getattr(must, "prefixes_bound", False):
+                must.bind_prefixes(module)
         when = getattr(stmt, "when", None)
-        if when is not None:
+        if when is not None and not getattr(when, "prefixes_bound", False):
             when.bind_prefixes(module)
+        _bind_type_paths(getattr(stmt, "type", None), module)
         _bind_xpath_prefixes(stmt.statements, module)
         for case in getattr(stmt, "cases", None) or []:
             _bind_xpath_prefixes([case], module)
@@ -995,4 +1068,6 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
                 module.statements.append(rpc_stmt)
 
     _bind_xpath_prefixes(module.statements, module)
+    for typedef in module.typedefs.values():
+        _bind_type_paths(getattr(typedef, "type", None), module)
     return module

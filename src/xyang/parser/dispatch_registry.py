@@ -243,6 +243,7 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
                     kw.MUST,
                     kw.IF_FEATURE,
                     kw.NOTIFICATION,
+                    kw.ACTION,
                 }
             ),
         ),
@@ -261,6 +262,7 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
                     kw.GROUPING,
                     kw.IF_FEATURE,
                     kw.NOTIFICATION,
+                    kw.ACTION,
                 }
             ),
         ),
@@ -272,7 +274,7 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
             METADATA_SUBSTATEMENTS,
             DATA_DEF_SUBSTATEMENTS,
             frozenset(
-                {kw.TYPEDEF, kw.GROUPING, kw.IF_FEATURE, kw.WHEN, kw.MUST, kw.NOTIFICATION}
+                {kw.TYPEDEF, kw.GROUPING, kw.IF_FEATURE, kw.WHEN, kw.MUST, kw.NOTIFICATION, kw.ACTION}
             ),
         ),
     ),
@@ -292,6 +294,10 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
             METADATA_SUBSTATEMENTS,
             frozenset({kw.WHEN, kw.MUST, kw.INPUT, kw.OUTPUT, kw.IF_FEATURE}),
         ),
+    ),
+    (
+        "action",
+        _parent("7.15.1", METADATA_SUBSTATEMENTS, frozenset({kw.INPUT, kw.OUTPUT, kw.IF_FEATURE})),
     ),
     ("input", _IO),
     ("output", DispatchParent("7.14.3", _IO.keywords)),
@@ -318,7 +324,7 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
             "7.17.1",
             DATA_NODE_SUBSTATEMENTS,
             DATA_DEF_SUBSTATEMENTS,
-            frozenset({kw.IF_FEATURE, kw.CASE, kw.WHEN, kw.MUST, kw.NOTIFICATION}),
+            frozenset({kw.IF_FEATURE, kw.CASE, kw.WHEN, kw.MUST, kw.NOTIFICATION, kw.ACTION}),
         ),
     ),
     (

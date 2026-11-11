@@ -76,6 +76,8 @@ class XYangKey:
     CONTACT = "contact"
     #: Module-level RPC definitions (RFC 7950 §7.14), keyed by RPC name.
     RPCS = "rpcs"
+    #: Actions of a container or list (RFC 7950 §7.15), keyed by action name; same shape as ``rpcs``.
+    ACTIONS = "actions"
     #: From ``pattern { error-message "..."; }`` (RFC 7950 §9.4.6), echoed on string JSON Schema.
     PATTERN_ERROR_MESSAGE = "pattern-error-message"
     PATTERN_ERROR_APP_TAG = "pattern-error-app-tag"
@@ -83,6 +85,9 @@ class XYangKey:
     STRING_PATTERNS = "string-patterns"
     #: RFC 7950 §7.21.4 ``units`` (e.g. ``"kbit/s"``).
     UNITS = "units"
+    #: ``{prefix: module}`` for the prefixed steps of a leafref ``path``, ``must`` or ``when``,
+    #: resolved in the module that wrote it (RFC 7950 §6.4.1). The JSON form has no imports.
+    XPATH_PREFIXES = "xpath-prefixes"
 
 
 class XYangTypeValue:
@@ -96,6 +101,7 @@ class XYangTypeValue:
     ANYDATA = "anydata"
     ANYXML = "anyxml"
     RPC = "rpc"
+    ACTION = "action"
     INPUT = "input"
     OUTPUT = "output"
 

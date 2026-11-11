@@ -134,7 +134,6 @@ def test_docs_point_agents_at_help_without_invented_flags() -> None:
         assert "xyang-ts -V" not in text, path
         assert "xyang-ts convert -o" not in text, path
         assert "xyang-ts convert --output" not in text, path
-        assert "--action" not in text, path
     for path in (ROOT / "CHANGELOG.md", ROOT / "ts" / "CHANGELOG.md"):
         text = path.read_text(encoding="utf-8")
         assert "#153" in text

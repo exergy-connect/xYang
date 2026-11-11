@@ -1,7 +1,8 @@
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangModule, YangStatement, type ModuleInit, type ModuleSource } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
-import { parseXPathPath } from "../xpath/parser";
+import { parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
+import { YangSyntaxError } from "../core/errors";
 import { yangDefaultFromJsonSchema } from "./default-values";
 import {
   decimal64FractionDigitsFromSchema,
@@ -82,6 +83,56 @@ function firstNonEmptyDescription(...values: unknown[]): string {
   return "";
 }
 
+/** A recorded `xpath-prefixes` map, validated; anything else is a load error. */
+function recordedPrefixes(raw: unknown): Record<string, string> | undefined {
+  if (raw === undefined) {
+    return undefined;
+  }
+  if (!raw || typeof raw !== "object" || Array.isArray(raw) || !Object.values(raw).every((v) => typeof v === "string")) {
+    throw new Error(`"${XYANG_KEYS.xpathPrefixes}" must map prefixes to module names, got ${JSON.stringify(raw)}`);
+  }
+  return { ...(raw as Record<string, string>) };
+}
+
+/**
+ * A `must`, `when` or leafref `path` without a recorded `xpath-prefixes` map may only use the
+ * module's own prefix (the JSON form has no imports). Record that binding, or fail the load.
+ */
+function ownPrefixBinding(expression: string, isPath: boolean, moduleName: string, ownPrefix: string): Record<string, string> | undefined {
+  const used = xpathPrefixes(isPath ? parseXPathPath(expression) : parseXPath(expression));
+  if (used.size === 0) {
+    return undefined;
+  }
+  const recorded: Record<string, string> = {};
+  for (const prefix of used) {
+    if (prefix !== ownPrefix) {
+      throw new YangSyntaxError(`xpath: unknown prefix '${prefix}' in '${expression}'`);
+    }
+    recorded[prefix] = moduleName;
+  }
+  return recorded;
+}
+
+function bindUnrecordedPrefixes(statements: YangStatement[], moduleName: string, ownPrefix: string): void {
+  for (const stmt of statements) {
+    if (stmt.keyword === "must" && typeof stmt.argument === "string" && !stmt.xpath_prefixes) {
+      const recorded = ownPrefixBinding(stmt.argument, false, moduleName, ownPrefix);
+      if (recorded) stmt.xpath_prefixes = recorded;
+    }
+    const when = stmt.when;
+    if (when && typeof when.expression === "string" && !when.xpath_prefixes) {
+      const recorded = ownPrefixBinding(when.expression, false, moduleName, ownPrefix);
+      if (recorded) when.xpath_prefixes = recorded;
+    }
+    const type = stmt.type;
+    if (type && type.name === YangTokenType.LEAFREF && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
+      const recorded = ownPrefixBinding(type.path, true, moduleName, ownPrefix);
+      if (recorded) type.xpath_prefixes = recorded;
+    }
+    bindUnrecordedPrefixes(stmt.statements, moduleName, ownPrefix);
+  }
+}
+
 function whenFromXyang(xy: Record<string, unknown>): YangStatement["when"] | undefined {
   const w = xy.when;
   if (!w || typeof w !== "object") {
@@ -92,10 +143,12 @@ function whenFromXyang(xy: Record<string, unknown>): YangStatement["when"] | und
   if (!expression.trim()) {
     return undefined;
   }
+  const prefixes = recordedPrefixes(o[XYANG_KEYS.xpathPrefixes]);
   return {
     expression,
     description: typeof o.description === "string" ? o.description : "",
-    evaluate_with_parent_context: Boolean(o.evaluate_with_parent_context)
+    evaluate_with_parent_context: Boolean(o.evaluate_with_parent_context),
+    ...(prefixes ? { xpath_prefixes: prefixes } : {})
   };
 }
 
@@ -117,6 +170,7 @@ function mustStatementsFromXyang(xy: Record<string, unknown>): YangStatement[] {
       argument: expr,
       error_message: typeof e["error-message"] === "string" ? e["error-message"] : "",
       description: typeof e.description === "string" ? e.description : "",
+      ...(e[XYANG_KEYS.xpathPrefixes] !== undefined ? { xpath_prefixes: recordedPrefixes(e[XYANG_KEYS.xpathPrefixes]) } : {}),
       statements: []
     }));
   }
@@ -147,9 +201,11 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
       // Validate path syntax early for parity with YANG parsing behavior.
       parseXPathPath(path);
     }
+    const prefixes = recordedPrefixes(xy[XYANG_KEYS.xpathPrefixes]);
     return {
       name: YangTokenType.LEAFREF,
       path,
+      ...(prefixes ? { xpath_prefixes: prefixes } : {}),
       require_instance: xy["require-instance"] !== false
     };
   }
@@ -721,10 +777,15 @@ function parseIoBlock(
   return parsed;
 }
 
-function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<string, unknown>): YangStatement | null {
+function parseRpc(
+  name: string,
+  rpcValue: Record<string, unknown>,
+  defs: Record<string, unknown>,
+  kind: string = YangTokenType.RPC
+): YangStatement {
   const xy = asRecord(rpcValue[YANG_SCHEMA_KEYS.xYang]);
-  if (xy.type !== YangTokenType.RPC) {
-    return null;
+  if (xy.type !== kind) {
+    throw new Error(`${kind} '${name}' must have x-yang type '${kind}', got ${JSON.stringify(xy.type)}`);
   }
   const statements: YangStatement[] = [...mustStatementsFromXyang(xy)];
   for (const ioKey of [YangTokenType.INPUT, YangTokenType.OUTPUT] as const) {
@@ -734,7 +795,7 @@ function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<
     }
   }
   const out: YangStatement = new YangStatement({
-    keyword: YangTokenType.RPC,
+    keyword: kind,
     name,
     argument: name,
     statements
@@ -743,7 +804,56 @@ function parseRpc(name: string, rpcValue: Record<string, unknown>, defs: Record<
   return out;
 }
 
+/** Add the `x-yang.actions` of a container or list property as `action` children. */
+function attachActions(stmt: YangStatement | null, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement | null {
+  if (!stmt || (stmt.keyword !== YangTokenType.CONTAINER && stmt.keyword !== YangTokenType.LIST)) {
+    return stmt;
+  }
+  const xy = asRecord(resolveSchemaWithOverlay(schema, defs)[YANG_SCHEMA_KEYS.xYang]);
+  const actions = xy[XYANG_KEYS.actions];
+  if (actions === undefined) {
+    return stmt;
+  }
+  if (!actions || typeof actions !== "object" || Array.isArray(actions)) {
+    throw new Error(`x-yang "actions" of '${stmt.name}' must be an object keyed by action name`);
+  }
+  for (const [key, value] of Object.entries(actions as Record<string, unknown>)) {
+    if (!value || typeof value !== "object" || Array.isArray(value)) {
+      throw new Error(`action '${key}' of '${stmt.name}' must be an object`);
+    }
+    const colon = key.lastIndexOf(":");
+    const action = parseRpc(colon < 0 ? key : key.slice(colon + 1), value as Record<string, unknown>, defs, YangTokenType.ACTION);
+    if (colon >= 0) {
+      action.defining_module = key.slice(0, colon);
+    }
+    stmt.statements.push(action);
+  }
+  return stmt;
+}
+
+/** One property. A `module:name` key is a node another module defines (augment). */
 function jsonSchemaPropertyToStatement(
+  name: string,
+  schema: Record<string, unknown>,
+  defs: Record<string, unknown>
+): YangStatement | null {
+  const colon = name.indexOf(":");
+  if (colon < 0) {
+    return attachActions(localPropertyToStatement(name, schema, defs), schema, defs);
+  }
+  const owner = name.slice(0, colon);
+  const local = name.slice(colon + 1);
+  if (!owner || !local) {
+    throw new Error(`property name '${name}' must be 'name' or 'module:name'`);
+  }
+  const stmt = localPropertyToStatement(local, schema, defs);
+  if (stmt) {
+    stmt.defining_module = owner;
+  }
+  return attachActions(stmt, schema, defs);
+}
+
+function localPropertyToStatement(
   name: string,
   schema: Record<string, unknown>,
   defs: Record<string, unknown>
@@ -856,6 +966,8 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     }
   }
 
+  bindUnrecordedPrefixes(statements, moduleName, prefix);
+
   const typedefs: Record<string, unknown> = {};
   const identities: Record<string, { bases: YangIdentifierRef[] }> = {};
   for (const [defName, defSchema] of Object.entries(defs)) {
@@ -875,6 +987,14 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
       type: typeShapeFromJsonLeaf(d, dxy),
       statements: []
     };
+  }
+
+  for (const typedef of Object.values(typedefs) as Array<{ type?: Record<string, unknown> }>) {
+    const type = typedef.type;
+    if (type && type.name === YangTokenType.LEAFREF && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
+      const recorded = ownPrefixBinding(type.path, true, moduleName, prefix);
+      if (recorded) type.xpath_prefixes = recorded;
+    }
   }
 
   const data: ModuleInit = {

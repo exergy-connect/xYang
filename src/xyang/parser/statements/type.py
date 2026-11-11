@@ -15,6 +15,7 @@ from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangPatternSpec, YangTypeStmt
 from ...identifier_ref import identifier_ref
 from ...xpath import PathNode, XPathParser
+from ...xpath.parser import bind_xpath_prefixes
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -53,6 +54,7 @@ class TypeStatementParser:
         else:
             type_name = tokens.consume()
         type_stmt = YangTypeStmt(name=type_name, prefix=type_prefix)
+        type_stmt.scope = context.module
         if tokens.consume_if_type(YangTokenType.LBRACE):
             type_context = context.push_parent(type_stmt)
             while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
@@ -195,6 +197,7 @@ class TypeStatementParser:
         tokens.consume(kw.PATH)
         path_str = self._parsers.parse_string_argument(tokens)
         type_stmt.path = cast(PathNode, XPathParser(path_str).parse_path())
+        bind_xpath_prefixes(type_stmt.path, context.module.resolve_prefix_to_module_name, path_str)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_require_instance(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:

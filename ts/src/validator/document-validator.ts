@@ -1,7 +1,7 @@
 import { YangModule, YangStatement } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { modulePrefixResolver } from "../core/ast";
-import { bindWildcardPrefixes, parseXPath, parseXPathPath, wildcardPrefixes } from "../xpath/parser";
+import { bindXPathPrefixes, parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
 import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
 import { remapPointer, resolveQualifiedTopLevel } from "../encoding";
@@ -12,14 +12,20 @@ import {
   parseAnydataExtensionConfig
 } from "../ext/anydata_validation";
 import { ValidatorExtension } from "./validator-extension";
-import { TypeChecker } from "./type-checker";
+import { lexical } from "./operation";
+import type { OperationTarget } from "./operation";
+import { resolveTypedef, TypeChecker } from "./type-checker";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 import { buildEnabledFeaturesMap, ModuleData, stmtIfFeaturesSatisfied } from "./if-feature-eval";
 
 export type ValidationSeverity = "error" | "warning";
 
-/** Structured validation issue. `path` is a JSON Pointer into the instance. */
+/**
+ * Structured validation issue. `path` is a JSON Pointer into the instance, or into the server data
+ * context of an rpc or action when `document` is `"context"`.
+ */
 export type ValidationIssue = {
+  document?: "context";
   code: string;
   path: string;
   message: string;
@@ -34,6 +40,27 @@ export type DetailedValidationResult = {
 };
 
 type InternalIssue = ValidationIssue & { pathLabel: string };
+
+/** Inputs of one rpc or action validation (see `YangValidator`). */
+export type OperationInput = {
+  target: OperationTarget;
+  operation: YangStatement;
+  parentCopies: YangStatement[];
+  params: Record<string, unknown>;
+  rootData: Record<string, unknown>;
+  wrapper: string | null;
+};
+
+function missingParent(target: OperationTarget, detail: string): InternalIssue {
+  return {
+    document: "context",
+    code: "action-parent",
+    path: "",
+    message: `${target.label} is invoked on an instance that is not in the context: ${detail}`,
+    severity: "error",
+    pathLabel: "context"
+  };
+}
 
 /**
  * Message-to-code table previously stored in tests/cases/error-codes.json.
@@ -102,6 +129,7 @@ function formatIssue(item: InternalIssue): string {
 
 function toPublicIssue(item: InternalIssue): ValidationIssue {
   const pub: ValidationIssue = {
+    ...(item.document ? { document: item.document } : {}),
     code: item.code,
     path: item.path,
     message: item.message,
@@ -216,46 +244,80 @@ export class DocumentValidator {
    * parameter object without the RFC 8040 wrapper, `rootData` the accessible tree's root object
    * (server data plus the operation node) and `operation` the operation node.
    */
-  validateOperationDetailed(
-    rpc: YangStatement,
-    operation: YangStatement,
-    params: Record<string, unknown>,
-    rootData: Record<string, unknown>,
-    wrapper: string | null
-  ): DetailedValidationResult {
-    const errors = this.collectOperation(rpc, operation, params, rootData, wrapper);
+  validateOperationDetailed(input: OperationInput): DetailedValidationResult {
+    const errors = this.collectOperation(input);
     return { valid: errors.length === 0, errors: errors.map(toPublicIssue), warnings: [] };
   }
 
   /** Same as `validateOperationDetailed`, as `[isValid, errors, warnings]` display strings. */
-  validateOperationText(
-    rpc: YangStatement,
-    operation: YangStatement,
-    params: Record<string, unknown>,
-    rootData: Record<string, unknown>,
-    wrapper: string | null
-  ): [boolean, string[], string[]] {
-    const errors = this.collectOperation(rpc, operation, params, rootData, wrapper);
+  validateOperationText(input: OperationInput): [boolean, string[], string[]] {
+    const errors = this.collectOperation(input);
     return [errors.length === 0, errors.map(formatIssue), []];
   }
 
-  private collectOperation(
-    rpc: YangStatement,
-    operation: YangStatement,
-    params: Record<string, unknown>,
-    rootData: Record<string, unknown>,
-    wrapper: string | null
-  ): InternalIssue[] {
+  /**
+   * Validate the parameters of one rpc or action `input` or `output` (RFC 7950 §7.14, §7.15). This
+   * validator's module is the accessible module of RFC 7950 §6.4.1 and `parentCopies` are its copies
+   * of `target.parents` (see `accessibleModule`). `rootData` is the canonical server data, already
+   * validated, which this call may extend (it is the caller's private copy).
+   */
+  private collectOperation(input: OperationInput): InternalIssue[] {
+    const { target, operation, parentCopies, params, rootData, wrapper } = input;
     const ctx = this.rootCtx;
-    const ifFeatures = Array.isArray(rpc.if_features) ? (rpc.if_features as string[]) : [];
-    if (!stmtIfFeaturesSatisfied(ifFeatures, ctx.ifFeatureCtx, ctx.enabledByModule)) {
-      throw new Error(`rpc '${rpc.name}' is not available: its 'if-feature' condition is false`);
+    const active = (stmt: YangStatement): boolean =>
+      stmtIfFeaturesSatisfied(Array.isArray(stmt.if_features) ? (stmt.if_features as string[]) : [], ctx.ifFeatureCtx, ctx.enabledByModule);
+    for (const step of target.parents) {
+      for (const stmt of [...step.wrappers, step.stmt]) {
+        if (!active(stmt)) {
+          throw new Error(`${target.label} is not available: '${stmt.name}' has a false 'if-feature' condition`);
+        }
+      }
+    }
+    if (!active(target.operation)) {
+      throw new Error(`${target.label} is not available: its 'if-feature' condition is false`);
     }
     this.contextStack.push(ctx);
     try {
       const errors: InternalIssue[] = [];
       const rootNode: XPathNode = { data: rootData, schema: ctx.module as unknown as XPathSchema, parent: null };
-      const opNode: XPathNode = { data: params, schema: operation as unknown as XPathSchema, parent: rootNode };
+      let holder: Record<string, unknown> = rootData;
+      let holderNode = rootNode;
+      for (let index = 0; index < target.parents.length; index += 1) {
+        const step = target.parents[index]!;
+        const copied = parentCopies[index]!;
+        const value = holder[this.instanceKeys(step.stmt)[0]!];
+        if (step.stmt.keyword === "list") {
+          const keyNames = (step.stmt.key ?? "").split(/\s+/).filter(Boolean);
+          const keyMembers = keyNames.map((name) => {
+            const leaf = step.stmt.statements.find((child) => child.name === name);
+            return leaf ? this.instanceKeys(leaf)[0]! : name;
+          });
+          const row = (Array.isArray(value) ? value : []).find(
+            (entry): entry is Record<string, unknown> =>
+              Boolean(entry) &&
+              typeof entry === "object" &&
+              keyMembers.every((member, k) => member in (entry as Record<string, unknown>) && lexical((entry as Record<string, unknown>)[member]) === step.keys![k])
+          );
+          if (!row) {
+            return [missingParent(target, `no '${step.stmt.name}' entry with key ${step.keys!.join(", ")}`)];
+          }
+          holder = row;
+        } else {
+          let container = value as Record<string, unknown> | undefined;
+          if (container === undefined) {
+            if (step.stmt.presence) {
+              return [missingParent(target, `presence container '${step.stmt.name}' is absent`)];
+            }
+            // RFC 7950 §7.5.1: a non-presence container exists implicitly.
+            container = {};
+            holder[this.instanceKeys(step.stmt)[0]!] = container;
+          }
+          holder = container;
+        }
+        holderNode = { data: holder, schema: copied as unknown as XPathSchema, parent: holderNode };
+      }
+      holder[this.instanceKeys(operation)[0]!] = params;
+      const opNode: XPathNode = { data: params, schema: operation as unknown as XPathSchema, parent: holderNode };
       if (ctx.constraintChecks) {
         this.checkMust(operation, opNode, rootNode, "", errors);
       }
@@ -486,10 +548,11 @@ export class DocumentValidator {
       if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
         const typeShape = (stmt.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
-        if (typeName === YangTokenType.LEAFREF) {
-          this.checkLeafref(value, typeShape, path, errors, currentNode, rootNode);
-        } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
-          this.checkInstanceIdentifier(value, typeShape, path, errors, currentNode, rootNode);
+        const effective = this.effectiveType(typeShape);
+        if (effective.name === YangTokenType.LEAFREF) {
+          this.checkLeafref(value, effective, path, errors, currentNode, rootNode);
+        } else if (effective.name === YangTokenType.INSTANCE_IDENTIFIER) {
+          this.checkInstanceIdentifier(value, effective, path, errors, currentNode, rootNode);
         } else {
           const typeIssues = this.ctx.typeChecker.validate(value, typeName, typeShape);
           if (this.ctx.typeValidationDebug) {
@@ -527,12 +590,13 @@ export class DocumentValidator {
       if (this.ctx.leafTypeMode === "full" && this.ctx.constraintChecks) {
         const typeShape = (stmt.type as Record<string, unknown> | undefined) ?? {};
         const typeName = (typeShape.name as string | undefined) ?? "string";
+        const effective = this.effectiveType(typeShape);
         for (let i = 0; i < value.length; i += 1) {
           const itemNode: XPathNode = { data: value[i], schema: stmt as unknown as XPathSchema, parent: parentNode };
-          if (typeName === YangTokenType.LEAFREF) {
-            this.checkLeafref(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
-          } else if (typeName === YangTokenType.INSTANCE_IDENTIFIER) {
-            this.checkInstanceIdentifier(value[i], typeShape, `${path}[${i}]`, errors, itemNode, rootNode);
+          if (effective.name === YangTokenType.LEAFREF) {
+            this.checkLeafref(value[i], effective, `${path}[${i}]`, errors, itemNode, rootNode);
+          } else if (effective.name === YangTokenType.INSTANCE_IDENTIFIER) {
+            this.checkInstanceIdentifier(value[i], effective, `${path}[${i}]`, errors, itemNode, rootNode);
           } else {
             const typeIssues = this.ctx.typeChecker.validate(value[i], typeName, typeShape);
             if (this.ctx.typeValidationDebug) {
@@ -786,7 +850,8 @@ export class DocumentValidator {
     if (kw === YangTokenType.CHOICE || kw === YangTokenType.CASE) {
       return path;
     }
-    return path ? `${path}.${child.name}` : (child.name ?? "");
+    const member = this.instanceKeys(child)[0] ?? child.name ?? "";
+    return path ? `${path}.${member}` : member;
   }
 
   private effectiveKeyword(stmt: YangStatement): string {
@@ -890,14 +955,43 @@ export class DocumentValidator {
    * RFC 7950 instance-identifier: string path; when require-instance is true, path must be absolute
    * and resolve to at least one node in the instance (same idea as Python DocumentValidator).
    */
+  /**
+   * The type a leaf's `type` derives from, following typedefs where each `type` was written, so a
+   * leafref or instance-identifier behind a typedef (local or imported) is checked like a direct one.
+   */
+  private effectiveType(typeShape: Record<string, unknown>): Record<string, unknown> {
+    let current = typeShape;
+    for (let depth = 0; depth < 64; depth += 1) {
+      const typedef = resolveTypedef(this.ctx.module, current);
+      if (!typedef?.type) {
+        return current;
+      }
+      current = typedef.type;
+    }
+    return current;
+  }
+
   private leafrefPathAst(typeShape: Record<string, unknown>): XPathAstNode | null {
     const rawPath = typeShape.path;
     if (typeof rawPath === "string" && rawPath.trim().length > 0) {
+      const recorded = typeShape.xpath_prefixes as Record<string, string> | undefined;
+      const text = rawPath.trim();
+      const key = `path\u0000${text}\u0000${recorded ? JSON.stringify(recorded) : this.ctx.module.name ?? ""}`;
+      const cached = this.xpathCache.get(key);
+      if (cached) {
+        return cached;
+      }
+      let ast: XPathAstNode;
       try {
-        return parseXPathPath(rawPath.trim());
+        ast = parseXPathPath(text);
       } catch {
         return null;
       }
+      if (xpathPrefixes(ast).size > 0) {
+        bindXPathPrefixes(ast, recorded ? (prefix: string) => recorded[prefix] : modulePrefixResolver(this.ctx.module), text);
+      }
+      this.xpathCache.set(key, ast);
+      return ast;
     }
     if (rawPath && typeof rawPath === "object" && !Array.isArray(rawPath) && (rawPath as { kind?: string }).kind === "path") {
       return rawPath as XPathAstNode;
@@ -1009,8 +1103,8 @@ export class DocumentValidator {
   }
 
   /**
-   * Parse a `must` / `when` expression once per distinct `prefix:*` binding. A statement with
-   * no recorded binding (native JSON) binds against the root module.
+   * Parse a `must` / `when` expression once per distinct prefix binding. A statement with no
+   * recorded binding binds against the root module's own prefix and imports.
    */
   private compileXPath(expression: string, recorded: Record<string, string> | undefined): XPathAstNode {
     const key = recorded ? `${expression}\u0000${JSON.stringify(recorded)}` : expression;
@@ -1019,9 +1113,9 @@ export class DocumentValidator {
       return cached;
     }
     const ast = parseXPath(expression);
-    if (wildcardPrefixes(ast).size > 0) {
+    if (xpathPrefixes(ast).size > 0) {
       const resolve = recorded ? (prefix: string) => recorded[prefix] : modulePrefixResolver(this.ctx.module);
-      bindWildcardPrefixes(ast, resolve, expression);
+      bindXPathPrefixes(ast, resolve, expression);
     }
     this.xpathCache.set(key, ast);
     return ast;

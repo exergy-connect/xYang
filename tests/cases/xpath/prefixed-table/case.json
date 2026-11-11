@@ -1,0 +1,17 @@
+{
+  "description": "Issue #152 table: prefixed and unprefixed node names in must select the same nodes (RFC 7950 §6.4.1). Each leaf carries one expression from the table.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "every expression is true", "data": { "a:top": { "item": [{ "n": "x" }, { "n": "y", "r1": "q", "r2": "q", "r3": "q", "r4": "q", "r5": "q", "r6": "q", "r7": "q" }] } }, "valid": true },
+    { "name": "every expression is false", "data": { "a:top": { "item": [{ "n": "z" }, { "n": "y", "r1": "q", "r2": "q", "r3": "q", "r4": "q", "r5": "q", "r6": "q" }, { "n": "w", "r7": "q" }] } }, "valid": false,
+      "errors": [
+        { "path": "/a:top/item/1/r1", "code": "must" },
+        { "path": "/a:top/item/1/r2", "code": "must" },
+        { "path": "/a:top/item/1/r3", "code": "must" },
+        { "path": "/a:top/item/1/r4", "code": "must" },
+        { "path": "/a:top/item/1/r5", "code": "must" },
+        { "path": "/a:top/item/1/r6", "code": "must" },
+        { "path": "/a:top/item/2/r7", "code": "must" }
+      ] }
+  ]
+}

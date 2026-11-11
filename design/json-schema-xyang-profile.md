@@ -65,6 +65,10 @@ For **container**, **list**, **leaf**, **leaf-list**, and leaves whose YANG type
 | `presence` | `container` | Presence string when the container is presence container |
 | `choice` | `container` / `list` | When the choice is **hoisted**: `{ "name", "description" }` of the YANG `choice` (round-trip metadata) |
 | `path`, `require-instance` | Leafref leaf | Leafref target path (string) and `require-instance` flag |
+| `xpath-prefixes` | Leafref leaf, each `must` entry, `when` | `{prefix: module}` for the prefixed steps of the expression, resolved in the module that wrote it (RFC 7950 §6.4.1). The form has no imports; without the map only the module's own prefix may appear |
+| `actions` | container / list | Actions (RFC 7950 §7.15) keyed by name, same shape as root `rpcs` with `x-yang.type` `"action"` |
+
+A property name `module:name` is a node another module defines (augment), as in RFC 7951; plain names are this module's. A typedef of another module is inlined, since `$defs` hold only this module's typedefs.
 
 **`must` entries** mirror `must_stmt` + optional `error-message` and `description` substatements from YANG.
 

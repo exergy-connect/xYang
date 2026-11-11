@@ -1,0 +1,11 @@
+{
+  "description": "Issue #152: leafref paths with prefixed steps (RFC 7950 §9.9.2 node-identifier), absolute and relative.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "existing targets", "data": { "b:top": { "item": [{ "n": "x" }], "ref": "x", "rel": "x" } }, "valid": true },
+    { "name": "dangling absolute", "data": { "b:top": { "item": [{ "n": "x" }], "ref": "y" } }, "valid": false,
+      "errors": [{ "path": "/b:top/ref", "code": "leafref" }] },
+    { "name": "dangling relative", "data": { "b:top": { "item": [{ "n": "x" }], "rel": "y" } }, "valid": false,
+      "errors": [{ "path": "/b:top/rel", "code": "leafref" }] }
+  ]
+}

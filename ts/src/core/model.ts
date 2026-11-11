@@ -16,7 +16,7 @@ export type WhenShape = {
   expression?: string;
   description?: string;
   evaluate_with_parent_context?: boolean;
-  /** Module each `prefix:*` step in `expression` is bound to, by prefix. */
+  /** Module each prefixed step in `expression` is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
 };
 
@@ -29,6 +29,10 @@ export type StatementTypeShape = {
   range?: string;
   fraction_digits?: number;
   path?: unknown;
+  /** Module each prefixed step of a leafref `path` is bound to, by prefix. */
+  xpath_prefixes?: Record<string, string>;
+  /** Module that wrote this `type`: its prefix and typedef name resolve there (RFC 7950 §7.13). */
+  scope_module?: string;
   require_instance?: boolean;
   identityref_bases?: unknown;
   enums?: string[];
@@ -60,7 +64,7 @@ export type YangStatementInit = {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
-  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  /** Module each prefixed step in a `must` expression is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
@@ -114,7 +118,7 @@ export class YangStatement {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
-  /** Module each `prefix:*` step in a `must` expression is bound to, by prefix. */
+  /** Module each prefixed step in a `must` expression is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
@@ -231,6 +235,11 @@ export class YangModule {
   groupings: Record<string, YangStatement> = {};
   statements: YangStatement[] = [];
   readonly source: ModuleSource;
+  /**
+   * Modules loaded by the parser that loaded this one, by name. A `type` written in another module
+   * (`scope_module`) resolves there. Not enumerable, so module copies and JSON dumps skip it.
+   */
+  declare readonly module_registry?: Record<string, YangModule>;
 
   constructor(init: ModuleInit, source: ModuleSource) {
     this.source = source;

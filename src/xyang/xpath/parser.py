@@ -29,34 +29,54 @@ _COMPARISON_OPS = {"=", "!=", "<", ">", "<=", ">="}
 _ADDITIVE_OPS = {"+", "-"}
 
 
-def bind_wildcard_prefixes(
+def bind_xpath_prefixes(
     node: Optional[ASTNode],
     resolve: Callable[[str], Optional[str]],
     expression: str = "",
 ) -> None:
-    """Bind each ``prefix:*`` step in *node* to the module *resolve* names for its prefix.
+    """Bind each ``prefix:name`` and ``prefix:*`` step in *node* to the module *resolve* names.
 
-    Raises :class:`YangSyntaxError` for a prefix that is not bound in the module that
-    wrote the expression, as ``augment`` and ``deviation`` paths do.
+    *resolve* maps a lexical prefix to a module name in the module that wrote the
+    expression (RFC 7950 §6.4.1, §7.13: a grouping's prefixes are its defining module's).
+    Raises :class:`YangSyntaxError` for a prefix that is not bound there, as ``augment``
+    and ``deviation`` paths do.
     """
     if isinstance(node, PathNode):
         for seg in node.segments:
-            if seg.step.endswith(":*"):
-                prefix = seg.step[:-2]
+            prefix = seg.prefix
+            if prefix is not None:
                 module = resolve(prefix)
                 if module is None:
-                    raise YangSyntaxError(
-                        f"xpath: unknown prefix {prefix!r} in {seg.step!r} of {expression!r}"
-                    )
+                    raise YangSyntaxError(f"xpath: unknown prefix {prefix!r} in {seg.step!r} of {expression!r}")
                 seg.module = module
             if seg.predicate is not None:
-                bind_wildcard_prefixes(seg.predicate, resolve, expression)
+                bind_xpath_prefixes(seg.predicate, resolve, expression)
+        node.bound = True
+        node.__dict__.pop("_cache_key", None)
     elif isinstance(node, BinaryOpNode):
-        bind_wildcard_prefixes(node.left, resolve, expression)
-        bind_wildcard_prefixes(node.right, resolve, expression)
+        bind_xpath_prefixes(node.left, resolve, expression)
+        bind_xpath_prefixes(node.right, resolve, expression)
     elif isinstance(node, FunctionCallNode):
         for arg in node.args:
-            bind_wildcard_prefixes(arg, resolve, expression)
+            bind_xpath_prefixes(arg, resolve, expression)
+
+
+def xpath_prefix_map(node: Optional[ASTNode], found: Optional[dict[str, str]] = None) -> dict[str, str]:
+    """``{prefix: module}`` for every bound prefixed step in *node* (for the native JSON form)."""
+    found = {} if found is None else found
+    if isinstance(node, PathNode):
+        for seg in node.segments:
+            if seg.prefix is not None and seg.module is not None:
+                found[seg.prefix] = seg.module
+            if seg.predicate is not None:
+                xpath_prefix_map(seg.predicate, found)
+    elif isinstance(node, BinaryOpNode):
+        xpath_prefix_map(node.left, found)
+        xpath_prefix_map(node.right, found)
+    elif isinstance(node, FunctionCallNode):
+        for arg in node.args:
+            xpath_prefix_map(arg, found)
+    return found
 
 
 class XPathParser:

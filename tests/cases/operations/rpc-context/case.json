@@ -49,7 +49,8 @@
       "errors": [{ "path": "/target", "code": "leafref" }] },
     { "name": "context is not an object", "rpc": "add-link", "context": [],
       "data": { "m:input": {} }, "usage_error": "context must be a JSON object" },
-    { "name": "context is not instance data", "rpc": "add-link", "context": { "m:topology": { "node": "r1" } },
-      "data": { "m:input": {} }, "usage_error": "context is not valid instance data" }
+    { "name": "context with an encoding error is reported, not used", "rpc": "add-link", "context": { "m:topology": { "node": "r1" } },
+      "data": { "m:input": {} }, "valid": false,
+      "errors": [{ "document": "context", "path": "/m:topology/node", "code": "type" }] }
   ]
 }

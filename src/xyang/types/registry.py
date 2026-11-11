@@ -345,14 +345,15 @@ def _to_leafref(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
     else:
         inner = {JsonSchemaKey.TYPE: "string"}
     inner_clean = {key: value for key, value in inner.items() if key != JsonSchemaKey.X_YANG}
-    return {
-        **inner_clean,
-        JsonSchemaKey.X_YANG: {
-            XYangKey.TYPE: LEAFREF,
-            XYangKey.PATH: path_str,
-            XYangKey.REQUIRE_INSTANCE: require,
-        },
+    from ..json.generator import _with_xpath_prefixes
+
+    xyang: dict[str, Any] = {
+        XYangKey.TYPE: LEAFREF,
+        XYangKey.PATH: path_str,
+        XYangKey.REQUIRE_INSTANCE: require,
     }
+    _with_xpath_prefixes(xyang, path_node)
+    return {**inner_clean, JsonSchemaKey.X_YANG: xyang}
 
 
 def _to_instance_identifier(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
@@ -501,6 +502,12 @@ def _from_leafref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt |
     path_node = None
     if path_val is not None and isinstance(path_val, str) and path_val.strip():
         path_node = XPathParser(path_val.strip()).parse_path()
+        recorded = fragment.xyang.get(XYangKey.XPATH_PREFIXES)
+        if recorded is not None:
+            from ..json.parser import recorded_prefixes
+            from ..xpath.parser import bind_xpath_prefixes
+
+            bind_xpath_prefixes(path_node, recorded_prefixes(recorded).get, path_val)
     return YangTypeStmt(name=LEAFREF, path=path_node, require_instance=bool(require))
 
 
@@ -936,16 +943,29 @@ def type_to_schema(
 ) -> dict[str, Any]:
     """JSON Schema fragment for a type. Typedef names become ``$ref``."""
     name = type_stmt.name
-    if name in typedef_names:
+    if name in typedef_names and not type_stmt.prefix:
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
     spec = REGISTRY.get(name)
-    if spec is None:
-        return {JsonSchemaKey.TYPE: "string"}
+    if spec is None or type_stmt.prefix:
+        return _imported_typedef_schema(type_stmt, module, leafref_anchor)
     token = _EMIT.set((typedef_names, module, leafref_anchor))
     try:
         return spec.to_schema(type_stmt)
     finally:
         _EMIT.reset(token)
+
+
+def _imported_typedef_schema(type_stmt: YangTypeStmt, module: Any, leafref_anchor: Any) -> dict[str, Any]:
+    """Inline a typedef from another module; the JSON form's ``$defs`` hold only this module's."""
+    from ..module import resolve_typedef
+
+    typedef, target = resolve_typedef(type_stmt, module)
+    label = f"{type_stmt.prefix}:{type_stmt.name}" if type_stmt.prefix else type_stmt.name
+    if typedef is None or typedef.type is None:
+        raise ValueError(f"cannot export type {label!r}: its typedef is not found where the type is written")
+    if type_stmt.range or type_stmt.length or type_stmt.patterns:
+        raise ValueError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
+    return type_to_schema(typedef.type, set(), target, leafref_anchor)
 
 
 def _singleton_enum_string(fragment: SchemaFragment) -> YangTypeStmt | None:

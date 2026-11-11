@@ -114,4 +114,4 @@ NOTIFICATION = "notification"
 INPUT = "input"
 OUTPUT = "output"
 
-UNSUPPORTED_CONSTRUCT_KEYWORDS = frozenset({ACTION})
+UNSUPPORTED_CONSTRUCT_KEYWORDS: frozenset[str] = frozenset()

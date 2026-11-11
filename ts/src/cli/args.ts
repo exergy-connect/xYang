@@ -16,7 +16,9 @@ export type ValidateCliArgs = CommonCliArgs & {
   nativeJson: boolean;
   /** `--rpc NAME`: validate the data as an instance of that rpc. */
   rpc: string | undefined;
-  /** `--output`: with `--rpc`, the output instead of the input. */
+  /** `--action PATH`: validate the data as an instance of the action at that data resource identifier. */
+  action: string | undefined;
+  /** `--output`: with `--rpc` or `--action`, the output instead of the input. */
   output: boolean;
   /** `--context FILE`: server data next to the operation node. */
   contextFile: string | undefined;
@@ -69,7 +71,7 @@ type CliCommand<S> = Omit<CliCommandView, "options"> & {
  * Help text and argv parsing both read this list. `-h` and `--help` are
  * handled before parsing and are not option entries.
  *
- * To add a flag (the action follow-up's `--action`, for example):
+ * To add a flag:
  * 1. Add the field on that command's state (`ValidateCliArgs` for validate).
  * 2. Add one object to that command's `options` (`name`, `help`, `takesValue`, `apply`).
  * Help lists it, and the parser accepts it, with no second flag table.
@@ -179,9 +181,21 @@ const validateCommand: CliCommand<ValidateState> = {
       }
     },
     {
+      name: "--action",
+      metavar: "PATH",
+      takesValue: true,
+      help: "Validate the data as the action at PATH (RFC 7950 §7.15): the RFC 8040 §3.5.3 data resource identifier /module:list=key/action. Mutually exclusive with --rpc. Needs --context containing that instance. Default direction: input.",
+      apply(state, value) {
+        if (value === undefined) {
+          throw new CliUsageError("Missing data resource identifier after --action");
+        }
+        state.action = value;
+      }
+    },
+    {
       name: "--output",
       takesValue: false,
-      help: "With --rpc, validate the rpc output instead of its input. Does not write a file. Requires --rpc. Default: input.",
+      help: "With --rpc or --action, validate the output instead of the input. Does not write a file. Requires --rpc or --action. Default: input.",
       apply(state) {
         state.output = true;
       }
@@ -190,7 +204,7 @@ const validateCommand: CliCommand<ValidateState> = {
       name: "--context",
       metavar: "FILE",
       takesValue: true,
-      help: "With --rpc, JSON server data next to the operation node so must and leafref can use absolute paths (RFC 7950 §6.4.1). Not validated. Requires --rpc. Default: none.",
+      help: 'With --rpc or --action, JSON server data. Validated against the module first (errors carry "document": "context"), then joined to the operation node (RFC 7950 §6.4.1) so must and leafref can reach it. Required with --action. Default: none.',
       apply(state, value) {
         if (value === undefined) {
           throw new CliUsageError("Missing file after --context");
@@ -238,11 +252,12 @@ const validateCommand: CliCommand<ValidateState> = {
     "xyang-ts validate -h",
     "xyang-ts validate --format json module.yang data.json",
     "xyang-ts validate --rpc add-link --output --context state.json module.yang output.json",
-    "xyang-ts validate --native-json --rpc add-link module.yang params.json"
+    "xyang-ts validate --native-json --rpc add-link module.yang params.json",
+    "xyang-ts validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json"
   ],
   notes: [
     "Python xyang validate accepts JSON or YAML (.yaml/.yml, needs PyYAML). This command accepts JSON only.",
-    "--output selects the rpc output. It does not write a file."
+    "--output selects the rpc or action output. It does not write a file."
   ]
 };
 
@@ -341,12 +356,16 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     features: null,
     nativeJson: false,
     rpc: undefined,
+    action: undefined,
     output: false,
     contextFile: undefined
   };
   const positional = collectPositionals(validateCommand, rest, state);
-  if (state.rpc === undefined && (state.output || state.contextFile !== undefined)) {
-    throw new CliUsageError("--output and --context apply only together with --rpc");
+  if (state.rpc !== undefined && state.action !== undefined) {
+    throw new CliUsageError("--rpc and --action are mutually exclusive");
+  }
+  if (state.rpc === undefined && state.action === undefined && (state.output || state.contextFile !== undefined)) {
+    throw new CliUsageError("--output and --context apply only together with --rpc or --action");
   }
   return { ...state, positional };
 }

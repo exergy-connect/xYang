@@ -25,6 +25,8 @@ class ValidationError:
     message     -- human- and AI-readable description of what failed
     expression  -- the failing XPath expression string, if applicable
     severity    -- error or warning (default ERROR)
+    document    -- which document ``pointer`` addresses: ``"data"`` (the instance) or
+                   ``"context"`` (the server data given with an rpc or action)
     """
 
     path: str
@@ -33,6 +35,7 @@ class ValidationError:
     severity: Severity = Severity.ERROR
     code: str = ""
     pointer: str = ""
+    document: str = "data"
 
     def __str__(self) -> str:
         out = f"{self.path}: {self.message}"

@@ -2,6 +2,7 @@ import { formatIdentifierRef, type YangIdentifierRef } from "../core/identifier-
 import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem, type TypeIssue } from "../types";
+import { REGISTRY } from "../types/registry";
 import { resolvePrefixedModule, type ModuleData } from "./if-feature-eval";
 import { identityrefValueValid, resolveIdentityValue } from "../identity-graph";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
@@ -33,6 +34,30 @@ function asTypeRef(name: string, constraint?: Record<string, unknown>): YangIden
   return prefix ? { prefix, name } : { name };
 }
 
+/**
+ * The typedef a derived `type` names, resolved in the module that wrote the `type` (`scope_module`,
+ * RFC 7950 §7.13): its own prefix and imports, or its own typedefs for an unprefixed name. A `type`
+ * without a scope (native JSON form) resolves in `host`. A scope module that was not loaded throws.
+ */
+export function resolveTypedef(
+  host: YangModule,
+  type: { name?: unknown; prefix?: unknown; scope_module?: unknown }
+): TypedefShape | undefined {
+  if (typeof type.name !== "string") return undefined;
+  if (!type.prefix && Object.prototype.hasOwnProperty.call(REGISTRY, type.name)) return undefined;
+  let scope: ModuleData = host as unknown as ModuleData;
+  if (typeof type.scope_module === "string" && type.scope_module && type.scope_module !== host.name) {
+    const loaded = host.module_registry?.[type.scope_module];
+    if (!loaded) {
+      throw new Error(`type '${type.name}' is written in module '${type.scope_module}', which is not loaded`);
+    }
+    scope = loaded as unknown as ModuleData;
+  }
+  const target = typeof type.prefix === "string" && type.prefix ? resolvePrefixedModule(scope, type.prefix) : scope;
+  const typedef = (target?.typedefs as Record<string, TypedefShape> | undefined)?.[type.name];
+  return typedef?.type && typeof typedef.type.name === "string" ? typedef : undefined;
+}
+
 export class TypeChecker {
   private readonly system = new TypeSystem();
   private readonly typeValidationDebug: boolean;
@@ -44,26 +69,10 @@ export class TypeChecker {
     this.typeValidationDebug = options.typeValidationDebug === true;
   }
 
-  /**
-   * Resolve a local or prefixed typedef via the host module and its imports.
-   */
-  private lookupTypedef(ref: YangIdentifierRef): TypedefShape | undefined {
-    if (ref.prefix) {
-      const target = resolvePrefixedModule(this.module, ref.prefix);
-      if (!target) {
-        return undefined;
-      }
-      const imported = (target.typedefs as Record<string, TypedefShape> | undefined)?.[ref.name];
-      if (imported?.type && typeof imported.type.name === "string") {
-        return imported;
-      }
-      return undefined;
-    }
-    const own = this.module.typedefs[ref.name] as TypedefShape | undefined;
-    if (own?.type && typeof own.type.name === "string") {
-      return own;
-    }
-    return undefined;
+  /** Resolve a local or prefixed typedef where the `type` was written (see `resolveTypedef`). */
+  private lookupTypedef(ref: YangIdentifierRef, constraint?: Record<string, unknown>): TypedefShape | undefined {
+    const scope = typeof constraint?.scope_module === "string" ? constraint.scope_module : undefined;
+    return resolveTypedef(this.module, { name: ref.name, prefix: ref.prefix, scope_module: scope });
   }
 
   /**
@@ -72,8 +81,9 @@ export class TypeChecker {
   resolveUnderlyingBuiltinName(typeName: string, constraint?: Record<string, unknown>): string {
     const seen = new Set<string>();
     let ref = asTypeRef(typeName, constraint);
+    let shape = constraint;
     while (seen.size < 64) {
-      const typedef = this.lookupTypedef(ref);
+      const typedef = this.lookupTypedef(ref, shape);
       if (!typedef?.type || typeof typedef.type.name !== "string") {
         return ref.name;
       }
@@ -87,6 +97,7 @@ export class TypeChecker {
         return ref.name;
       }
       ref = next;
+      shape = typedef.type as Record<string, unknown>;
     }
     return ref.name;
   }
@@ -97,13 +108,13 @@ export class TypeChecker {
     let result: TypeIssue[];
 
     const ref = asTypeRef(typeName, constraint);
-    const typedef = this.lookupTypedef(ref);
+    const typedef = this.lookupTypedef(ref, constraint);
     if (typedef?.type && typeof typedef.type.name === "string") {
       const typedefConstraint = new TypeConstraint(typedef.type as Record<string, unknown>);
       if (typedef.type.name === YangTokenType.UNION) {
         via = "typedef-union";
         result = this.validateUnion(value, typedefConstraint);
-      } else if (this.lookupTypedef(asTypeRef(typedef.type.name, typedef.type as Record<string, unknown>))) {
+      } else if (this.lookupTypedef(asTypeRef(typedef.type.name, typedef.type as Record<string, unknown>), typedef.type as Record<string, unknown>)) {
         via = "typedef";
         result = this.validate(value, typedef.type.name, typedef.type as Record<string, unknown>);
       } else {

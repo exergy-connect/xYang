@@ -199,6 +199,7 @@ class StatementParsers:
             kw.CONTAINER: self.parse_container,
             kw.NOTIFICATION: self.parse_notification,
             kw.RPC: self.parse_rpc,
+            kw.ACTION: self.parse_action,
             kw.ANYDATA: self.parse_anydata,
             kw.ANYXML: self.parse_anyxml,
             kw.TYPEDEF: self.parse_typedef,
@@ -550,6 +551,9 @@ class StatementParsers:
 
     def parse_rpc(self, tokens: TokenStream, context: ParserContext):
         return self._rpc_parser.parse_rpc(tokens, context)
+
+    def parse_action(self, tokens: TokenStream, context: ParserContext):
+        return self._rpc_parser.parse_action(tokens, context)
 
     def parse_input(self, tokens: TokenStream, context: ParserContext):
         return self._rpc_parser.parse_input(tokens, context)

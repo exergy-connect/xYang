@@ -40,8 +40,21 @@ class PathSegment:
     def __init__(self, step: str, predicate: Optional[ASTNode] = None):
         self.step = step
         self.predicate = predicate
-        # Module name a ``prefix:*`` step is bound to; set by ``bind_wildcard_prefixes``.
+        # Module a ``prefix:name`` or ``prefix:*`` step is bound to; set by ``bind_xpath_prefixes``
+        # from the prefixes of the module that wrote the expression (RFC 7950 §6.4.1).
         self.module: Optional[str] = None
+
+    @property
+    def prefix(self) -> Optional[str]:
+        """Lexical prefix of a ``prefix:name`` or ``prefix:*`` step, else ``None``."""
+        if self.step in (".", "..") or ":" not in self.step:
+            return None
+        return self.step.partition(":")[0]
+
+    @property
+    def local(self) -> str:
+        """Local name of the step (``name`` for ``prefix:name``)."""
+        return self.step.partition(":")[2] if ":" in self.step else self.step
 
     @property
     def is_wildcard(self) -> bool:
@@ -59,6 +72,8 @@ class PathNode(ASTNode):
         self.segments = segments
         self.is_absolute = is_absolute
         self.is_cacheable = is_cacheable
+        # True once ``bind_xpath_prefixes`` has bound this path's prefixed steps.
+        self.bound = False
 
     def accept(self, ev: "XPathEvaluator", ctx: "Context", node: "Node") -> Any:
         return ev.eval_path(self, ctx, node)

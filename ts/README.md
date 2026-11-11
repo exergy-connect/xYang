@@ -54,7 +54,7 @@ npx xyang-ts validate module.yang data.json
 npx xyang-ts convert module.yang
 ```
 
-`validate --rpc NAME [--output] [--context data.json]` validates the data as that rpc's input (default) or output: `{"module:input": {...}}`, or bare parameters with `--native-json`. `--context` supplies server data that `must` and `leafref` can reach next to the operation node (RFC 7950 §6.4.1); it is not validated. In code: `validate(module, data, { rpc, direction, context })`.
+`validate --rpc NAME | --action PATH [--output] [--context data.json]` validates the data as that rpc's or action's input (default) or output: `{"module:input": {...}}`, or bare parameters with `--native-json`. `PATH` is the RFC 8040 §3.5.3 data resource identifier of the action node (`/ex:interfaces/interface=eth0/reset`). `--context` is server data (required for an action); it is validated first, its errors carry `"document": "context"`, and then `must` and `leafref` reach it from the operation node (RFC 7950 §6.4.1). In code: `validate(module, data, { rpc | action, direction, context })`.
 
 `convert` prints JSON Schema to stdout. Add `--include-path DIR` for imported modules. `--native-json` selects native dict-style instance input; RFC 7951 JSON is the default. See the [project documentation](https://github.com/exergy-connect/xYang#readme) for additional flags and examples.
 
