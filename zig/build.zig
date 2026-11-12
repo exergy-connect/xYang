@@ -1,5 +1,22 @@
 const std = @import("std");
 
+/// `version` in the repository `pyproject.toml`, which is what `xyang -V` prints
+/// after `pip install -e .`.
+fn packageVersion(b: *std.Build) []const u8 {
+    const joined = b.root.join(b.allocator, "../pyproject.toml") catch @panic("OOM");
+    const text = joined.root_dir.handle.readFileAlloc(
+        b.graph.io,
+        joined.sub_path,
+        b.allocator,
+        .limited(1 << 20),
+    ) catch |err| std.process.fatal("reading {s}: {t}", .{ joined.sub_path, err });
+    const needle = "version = \"";
+    const at = std.mem.indexOf(u8, text, needle) orelse std.process.fatal("pyproject.toml has no version", .{});
+    const rest = text[at + needle.len ..];
+    const end = std.mem.indexOfScalar(u8, rest, '"') orelse std.process.fatal("pyproject.toml version is unterminated", .{});
+    return rest[0..end];
+}
+
 pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
@@ -10,13 +27,19 @@ pub fn build(b: *std.Build) void {
         .optimize = optimize,
     });
 
+    const options = b.addOptions();
+    options.addOption([]const u8, "version", packageVersion(b));
+
     const exe = b.addExecutable(.{
         .name = "xyang-zig",
         .root_module = b.createModule(.{
             .root_source_file = b.path("src/main.zig"),
             .target = target,
             .optimize = optimize,
-            .imports = &.{.{ .name = "xyang", .module = lib }},
+            .imports = &.{
+                .{ .name = "xyang", .module = lib },
+                .{ .name = "build_options", .module = options.createModule() },
+            },
         }),
     });
     exe.root_module.strip = optimize != .debug;

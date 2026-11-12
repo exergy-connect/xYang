@@ -1,0 +1,117 @@
+# Build xyang-zig for Linux, macOS, and Windows (x86_64 and aarch64) and attach
+# the binaries to a GitHub Release. Not part of pull-request CI. Runs when a
+# release is published, and on a manual workflow_dispatch (build and smoke test
+# only; nothing is attached unless this run is a published release).
+#
+# One Linux runner cross-compiles every target. Zig 0.17.1 is pinned the same
+# way as zig.yml: ZIG_VERSION equals minimum_zig_version in zig/build.zig.zon,
+# and the tarball is verified against ZIG_SHA256.
+
+name: Release Zig binaries
+
+on:
+  release:
+    types: [published]
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+concurrency:
+  group: zig-release-${{ github.workflow }}-${{ github.event.release.tag_name || github.ref }}
+  cancel-in-progress: false
+
+env:
+  ZIG_VERSION: "0.17.1"
+  ZIG_SHA256: "3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a"
+
+jobs:
+  release:
+    name: Build, smoke-test, and attach
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Zig toolchain
+        id: zig-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+
+      - name: Install Zig ${{ env.ZIG_VERSION }}
+        if: steps.zig-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          curl -sSfL -o "${tarball}" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
+          echo "${ZIG_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p ~/zig
+          tar -xJf "${tarball}" -C ~/zig --strip-components=1
+
+      - name: Check the pinned version
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$HOME/zig" >> "$GITHUB_PATH"
+          pinned="$(sed -n 's/.*minimum_zig_version = "\(.*\)".*/\1/p' zig/build.zig.zon)"
+          actual="$("$HOME/zig/zig" version)"
+          echo "build.zig.zon pins ${pinned}; toolchain is ${actual}"
+          [ "${pinned}" = "${ZIG_VERSION}" ] && [ "${actual}" = "${ZIG_VERSION}" ]
+
+      - name: Cross-compile the six release binaries
+        working-directory: zig
+        shell: bash
+        run: |
+          set -euo pipefail
+          # target, installed file name. Linux is static musl. -Dcpu=baseline
+          # keeps the binary on the architecture's baseline, not the runner's CPU.
+          targets=(
+            "x86_64-linux-musl xyang-zig-linux-x64"
+            "aarch64-linux-musl xyang-zig-linux-arm64"
+            "x86_64-macos xyang-zig-macos-x64"
+            "aarch64-macos xyang-zig-macos-arm64"
+            "x86_64-windows xyang-zig-windows-x64.exe"
+            "aarch64-windows xyang-zig-windows-arm64.exe"
+          )
+          mkdir -p dist
+          for entry in "${targets[@]}"; do
+            target="${entry%% *}"
+            name="${entry#* }"
+            prefix="dist/obj-${name}"
+            zig build -Doptimize=ReleaseSafe -Dtarget="${target}" -Dcpu=baseline --prefix "${prefix}"
+            produced="${prefix}/bin/xyang-zig"
+            if [[ "${name}" == *.exe ]]; then
+              produced="${produced}.exe"
+            fi
+            cp "${produced}" "dist/${name}"
+          done
+          find dist -maxdepth 1 -type f -printf '%f %s\n' | sort
+
+      - name: Smoke-test the linux-x64 binary
+        shell: bash
+        run: |
+          set -euo pipefail
+          bin="zig/dist/xyang-zig-linux-x64"
+          "$bin" --help >/dev/null
+          "$bin" -h >/dev/null
+          "$bin" validate --help >/dev/null
+          "$bin" convert --help >/dev/null
+          "$bin" -V
+          "$bin" parse examples/meta-model.yang
+
+      - name: Upload binaries
+        if: github.event_name == 'workflow_dispatch'
+        uses: actions/upload-artifact@v7
+        with:
+          name: xyang-zig-binaries
+          path: zig/dist/xyang-zig-*
+          if-no-files-found: error
+
+      - name: Attach binaries to the release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: gh release upload "${{ github.event.release.tag_name }}" zig/dist/xyang-zig-* --clobber

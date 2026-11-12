@@ -32,8 +32,10 @@ Checked:
   committed ``.yang.json``, the tree ``parse_json_schema`` rebuilds, the
   ``generate(parse(json))`` text byte for byte, ``generate(parse(json)) == json`` for the
   case goldens, and every case instance validated against the reloaded form.
-- command-line usage errors and ``parse``/``validate``/``convert`` help, with the program
-  name normalized.
+- the full CLI registry (#153, #156): no-argument help, ``--help`` / ``-h``, ``-V`` /
+  ``--version`` (and unambiguous prefixes), and ``parse`` / ``validate`` / ``convert``
+  help, plus usage errors, with the program name normalized. Help is compared to
+  Python 3.13 argparse (``-o, --output PATH``, not 3.12's ``-o PATH, --output PATH``).
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
 
@@ -855,6 +857,35 @@ def main() -> int:
         return code, out.replace("xyang-zig", "xyang"), err.replace("xyang-zig", "xyang")
 
     usage_calls = [
+        [],
+        ["--help"],
+        ["-h"],
+        ["-V"],
+        ["--version"],
+        ["--ver"],
+        ["--v"],
+        ["--h"],
+        ["--help=1"],
+        ["--version=1"],
+        ["-h=1"],
+        ["-V=1"],
+        ["-hV"],
+        ["-Vh"],
+        ["-help"],
+        ["-version"],
+        ["-hV=1"],
+        ["-Vh=1"],
+        ["--=x"],
+        ["-x"],
+        ["-1"],
+        ["--"],
+        ["--", "parse"],
+        ["-h", "parse"],
+        ["-V", "parse"],
+        ["--bogus"],
+        ["--bogus", "parse"],
+        ["--include-path", "x"],
+        ["nonesuch"],
         ["parse"],
         ["parse", "--include-path"],
         ["parse", "a.yang", "b.yang"],

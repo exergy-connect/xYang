@@ -73,8 +73,28 @@ fn displayName(arena: std.mem.Allocator, o: *const Opt) ![]const u8 {
     return std.fmt.allocPrint(arena, "{s}/{s}", .{ short, o.long });
 }
 
-fn looksLikeOption(a: []const u8) bool {
-    return a.len > 1 and a[0] == '-';
+/// argparse's negative-number matcher (`^-\d+$|^-\d*\.\d+$`). Those strings are
+/// positionals when no option looks like a negative number, which none here do.
+pub fn isNegativeNumber(a: []const u8) bool {
+    if (a.len < 2 or a[0] != '-') return false;
+    const s = a[1..];
+    if (std.mem.indexOfScalar(u8, s, '.')) |dot| {
+        if (std.mem.indexOfScalarPos(u8, s, dot + 1, '.') != null) return false;
+        const frac = s[dot + 1 ..];
+        if (frac.len == 0) return false;
+        return allDigits(s[0..dot]) and allDigits(frac);
+    }
+    return allDigits(s);
+}
+
+fn allDigits(s: []const u8) bool {
+    if (s.len == 0) return true;
+    for (s) |c| if (c < '0' or c > '9') return false;
+    return true;
+}
+
+pub fn looksLikeOption(a: []const u8) bool {
+    return a.len > 1 and a[0] == '-' and !isNegativeNumber(a);
 }
 
 /// The option an argument names: exact match first, else the unique prefix.
