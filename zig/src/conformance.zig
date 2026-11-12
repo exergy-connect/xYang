@@ -325,6 +325,7 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     var validator = xyang.YangValidator.init(arena, module);
     const result = validator.validate(data, .{ .native_json = native, .enabled_features_by_module = features }) catch |err| switch (err) {
         error.Unsupported => return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unsupported: {s}", .{ name, validator.unsupported orelse "?" }) },
+        error.Raised => return .{ .regression = try std.fmt.allocPrint(arena, "instance {s}: validation raised: {s}", .{ name, validator.unsupported orelse "?" }) },
         else => return err,
     };
     const mismatch = try compareInstance(arena, inst, result);

@@ -4,11 +4,6 @@
 # instance validation, 4 XPath, 5 operations and extensions, 6 native JSON, 7 CLI parity.
 # `zig build conformance` fails when a listed case passes (remove it) or an unlisted case
 # fails. The port is complete when this list is empty.
-choice/choice-case-when phase-4
-conditions/default-in-xpath phase-4
-conditions/leaf-list-must phase-4
-conditions/must phase-4
-conditions/when phase-4
 encoding/structure phase-5
 modules/json-form-extensions-161 phase-6
 modules/json-form-foreign-augment phase-6
@@ -22,43 +17,3 @@ operations/rpc-conditions phase-5
 operations/rpc-context phase-5
 operations/rpc-if-feature phase-5
 operations/rpc-must phase-5
-references/identityref-must-derived-from phase-4
-references/instance-identifier phase-4
-references/leafref phase-4
-references/leafref-leaf-list phase-4
-references/leafref-prefixed phase-4
-reuse/grouping-must phase-4
-reuse/grouping-refine-must phase-4
-reuse/uses-in-list-refine-must phase-4
-structure/structured-errors phase-5
-xpath/arithmetic phase-4
-xpath/boolean-leaf-compare phase-4
-xpath/contains phase-4
-xpath/deep-relative-current phase-4
-xpath/deref-foreign-key phase-4
-xpath/deref-type-match phase-4
-xpath/div-mod phase-4
-xpath/functions phase-4
-xpath/identity-predicate phase-4
-xpath/leaf-must-relative phase-4
-xpath/must-absolute phase-4
-xpath/must-concat phase-4
-xpath/must-leafref-list phase-4
-xpath/must-or-absolute phase-4
-xpath/must-sibling-current phase-4
-xpath/prefixed-definition-site phase-4
-xpath/prefixed-leafref-unknown-prefix phase-4
-xpath/prefixed-step-unknown-prefix phase-4
-xpath/prefixed-steps phase-4
-xpath/prefixed-table phase-4
-xpath/starts-with phase-4
-xpath/substring-after phase-4
-xpath/substring-before phase-4
-xpath/type-coercion phase-4
-xpath/unknown-function phase-4
-xpath/value-list phase-4
-xpath/wildcard phase-4
-xpath/wildcard-multiply phase-4
-xpath/wildcard-prefix phase-4
-xpath/wildcard-schema-path phase-4
-xpath/wildcard-unknown-prefix phase-4

@@ -7,6 +7,8 @@ const errors = @import("errors.zig");
 const pyfmt = @import("pyfmt.zig");
 const Module = @import("module.zig").Module;
 const refine_expand = @import("refine_expand.zig");
+const xpath_ast = @import("xpath/ast.zig");
+const xpath = @import("xpath/xpath.zig");
 
 const Statement = ast.Statement;
 const Error = errors.Error;
@@ -102,6 +104,12 @@ pub fn mergeWhenIntoRoots(a: std.mem.Allocator, roots: []const *Statement, uses_
             .description = if (old_desc.len > 0) old_desc else std.mem.trim(u8, uw.description, &refine_expand.pyWhitespace),
             .evaluate_with_parent_context = true,
         };
+        if (uw.ast != null and old.ast != null) {
+            // Keep each operand's prefix binding; re-parsing the text would lose it.
+            const both = try a.create(xpath_ast.Expr);
+            both.* = .{ .binary = .{ .left = uw.ast.?, .operator = "and", .right = old.ast.? } };
+            merged.ast = both;
+        }
         node.when = merged;
     }
 }
@@ -132,10 +140,15 @@ fn applyUsesAugmentations(r: *Reporter, body: []const *Statement, uses: *Stateme
     const a = r.arena;
     for (uses.data.uses.augmentations.items) |aug| {
         const path = aug.data.augment.augment_path;
-        if (path.len == 0) return r.fail(.syntax, "uses '{s}' augment: invalid path {f}: Empty path expression", .{ grouping_name, repr(path) });
-        const steps = try refine_expand.descendantPathSteps(a, path) orelse
-            return r.fail(.unsupported, refine_expand.UNSUPPORTED_PATH, .{ "uses augment", repr(path) });
-        const targets = try refine_expand.findNodesByRefinePath(a, body, steps);
+        var xp = try xpath.Parser.init(a, path);
+        const parsed = xp.parsePath(true) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.UnsupportedNumber => return r.fail(.unsupported, "{s}", .{xp.message}),
+            error.XPathSyntax, error.UnknownFunction => return r.fail(.syntax, "uses '{s}' augment: invalid path {f}: {s}", .{ grouping_name, repr(path), xp.message }),
+        };
+        var steps: std.ArrayList([]const u8) = .empty;
+        for (parsed.path.segments) |seg| try steps.append(a, seg.step);
+        const targets = try refine_expand.findNodesByRefinePath(a, body, steps.items);
         if (targets.len == 0) return r.fail(.syntax, "uses '{s}' augment: no target for path {f}", .{ grouping_name, repr(path) });
         if (targets.len != 1) {
             return r.fail(.syntax, "uses '{s}' augment: path {f} matched {d} nodes, expected one", .{ grouping_name, repr(path), targets.len });
