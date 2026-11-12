@@ -1,0 +1,104 @@
+# Build the Zig port and run the shared YANG cases in tests/cases (#165).
+#
+# Toolchain: ZIG_VERSION is pinned and must equal minimum_zig_version in
+# zig/build.zig.zon; the tarball is verified against ZIG_SHA256.
+#
+# Routing: the head-commit trailer `Local-Tests: passed` attests the Python and
+# TypeScript suites listed in AGENTS.md. It does not cover zig/, so this job is never
+# skipped by it; the trailer keeps skipping only the jobs it attests.
+# Pushes to main and feature/zig run only when zig/, tests/cases/, or this workflow
+# changed (the paths filter below). pull_request stays unfiltered so Detect changes
+# can skip the heavy job, the same way tests.yml does for Python, using that same
+# path set. workflow_dispatch always runs.
+
+name: Zig
+
+on:
+  push:
+    branches: [main, feature/zig]
+    paths:
+      - "zig/**"
+      - "tests/cases/**"
+      - ".github/workflows/zig.yml"
+  pull_request:
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: zig-${{ github.workflow }}-${{ github.event.pull_request.number || github.ref }}
+  cancel-in-progress: true
+
+env:
+  ZIG_VERSION: "0.17.1"
+  ZIG_SHA256: "3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a"
+
+jobs:
+  changes:
+    name: Detect changes
+    runs-on: ubuntu-latest
+    outputs:
+      zig: ${{ steps.detect.outputs.zig }}
+    steps:
+      - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - name: Detect Zig-relevant changes
+        id: detect
+        shell: bash
+        run: |
+          if [ "${{ github.event_name }}" != "pull_request" ]; then
+            echo "zig=true" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(zig/|tests/cases/|\.github/workflows/zig\.yml$)'; then
+            echo "zig=true" >> "$GITHUB_OUTPUT"
+          else
+            echo "zig=false" >> "$GITHUB_OUTPUT"
+          fi
+
+  zig:
+    name: Zig
+    runs-on: ubuntu-latest
+    needs: changes
+    if: ${{ needs.changes.outputs.zig == 'true' }}
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Cache Zig toolchain
+        id: zig-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+
+      - name: Install Zig ${{ env.ZIG_VERSION }}
+        if: steps.zig-cache.outputs.cache-hit != 'true'
+        shell: bash
+        run: |
+          set -euo pipefail
+          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          curl -sSfL -o "${tarball}" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
+          echo "${ZIG_SHA256}  ${tarball}" | sha256sum -c -
+          mkdir -p ~/zig
+          tar -xJf "${tarball}" -C ~/zig --strip-components=1
+
+      - name: Check the pinned version
+        shell: bash
+        run: |
+          set -euo pipefail
+          echo "$HOME/zig" >> "$GITHUB_PATH"
+          pinned="$(sed -n 's/.*minimum_zig_version = "\(.*\)".*/\1/p' zig/build.zig.zon)"
+          actual="$("$HOME/zig/zig" version)"
+          echo "build.zig.zon pins ${pinned}; toolchain is ${actual}"
+          [ "${pinned}" = "${ZIG_VERSION}" ] && [ "${actual}" = "${ZIG_VERSION}" ]
+
+      - name: Build
+        working-directory: zig
+        run: zig build
+
+      - name: Conformance cases
+        working-directory: zig
+        run: zig build conformance

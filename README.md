@@ -4,14 +4,14 @@
 
 xYang targets real-world modules and pipelines: agents, CI, and schema tooling that need **RFC 7950-style checks** (`must`, `when`, `if-feature`, built-in types, leafrefs, and the rest) on **one consolidated JSON document** ([RFC 7951](https://www.rfc-editor.org/rfc/rfc7951)). It can also emit a **JSON Schema (2020-12)** view with **`x-yang`** metadata for round-trip where supported.
 
-The same feature set is implemented twice:
+The same feature set is implemented in Python, TypeScript, and Zig:
 
-| | **Python** (`xyang`) | **TypeScript** (`@exergy-connect/xyang`) |
-|---|----------------------|------------------------------|
-| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | [npm](https://www.npmjs.com/package/@exergy-connect/xyang) `@exergy-connect/xyang` |
-| **CLI** | `xyang` | `xyang-ts` |
-| **Runtime** | Python ≥ 3.11, zero required deps | Node ≥ 24 |
-| **Source** | [`src/xyang/`](src/xyang/) | [`ts/src/`](ts/src/) |
+| | **Python** (`xyang`) | **TypeScript** (`@exergy-connect/xyang`) | **Zig** (`xyang-zig`) |
+|---|----------------------|------------------------------|------------------------|
+| **Package** | [PyPI](https://pypi.org/project/xyang) `xyang` | [npm](https://www.npmjs.com/package/@exergy-connect/xyang) `@exergy-connect/xyang` | GitHub Release binary |
+| **CLI** | `xyang` | `xyang-ts` | `xyang-zig` |
+| **Runtime** | Python ≥ 3.11, zero required deps | Node ≥ 24 | none (static binary) |
+| **Source** | [`src/xyang/`](src/xyang/) | [`ts/src/`](ts/src/) | [`zig/src/`](zig/src/) |
 
 Not every YANG statement is modeled; unsupported constructs are skipped with a warning so mixed modules still load. See [**FEATURES.md**](FEATURES.md) for the full matrix, JSON hybrid format, and known gaps.
 
@@ -48,6 +48,38 @@ Optional: **PyYAML** for `.yaml` / `.yml` instance files on `xyang validate`.
 npm install @exergy-connect/xyang
 # from checkout:
 cd ts && npm install && npm run build
+```
+
+**Zig**
+
+`xyang-zig` is one static executable: the same `parse`, `validate`, and `convert` commands as `xyang`, including `--help` / `-h` and `-V` / `--version`. It does not need Python, Node, or a shared library. `-V` prints the xYang version from `pyproject.toml`, the same text as `xyang -V`.
+
+A published GitHub Release attaches one binary per platform. Linux builds are fully static (musl). macOS binaries link libSystem. Windows binaries do not need a MinGW runtime DLL.
+
+| File | Platform |
+| --- | --- |
+| `xyang-zig-linux-x64` | Linux x64, fully static |
+| `xyang-zig-linux-arm64` | Linux arm64, fully static |
+| `xyang-zig-macos-arm64` | macOS Apple silicon |
+| `xyang-zig-macos-x64` | macOS Intel |
+| `xyang-zig-windows-x64.exe` | Windows x64 |
+| `xyang-zig-windows-arm64.exe` | Windows arm64 |
+
+```bash
+chmod +x xyang-zig-linux-x64
+./xyang-zig-linux-x64 --help
+./xyang-zig-linux-x64 parse examples/meta-model.yang
+./xyang-zig-linux-x64 validate examples/meta-model.yang data.json
+./xyang-zig-linux-x64 convert examples/meta-model.yang -o meta-model.yang.json
+```
+
+Flags match `xyang`. `convert` writes `<stem>.yang.json` (or `-o PATH`); it does not print the schema on stdout.
+
+Build it from a checkout with Zig 0.17.1 (the version pinned in `zig/build.zig.zon`):
+
+```bash
+cd zig && zig build -Doptimize=ReleaseSafe
+./zig-out/bin/xyang-zig --help
 ```
 
 ### Standalone binary
@@ -94,7 +126,7 @@ cd ../qjs && ./build.sh linux-x64
 
 ### CLI
 
-Discover the commands and flags this revision implements with `xyang --help`, `xyang-ts --help`, or `<command> --help` / `-h`. Help exits 0, writes to stdout, and does not open a YANG module or a data file. `xyang -V` / `xyang --version` prints the Python package version. `xyang-ts` has no version flag.
+Discover the commands and flags this revision implements with `xyang --help`, `xyang-ts --help`, `xyang-zig --help`, or `<command> --help` / `-h`. Help exits 0, writes to stdout, and does not open a YANG module or a data file. `xyang -V` / `xyang --version` and `xyang-zig -V` / `xyang-zig --version` print the package version. `xyang-ts` has no version flag.
 
 ```bash
 # Python
@@ -106,9 +138,14 @@ xyang convert examples/meta-model.yang -o meta-model.yang.json
 xyang-ts parse examples/meta-model.yang
 xyang-ts validate examples/meta-model.yang data.json
 xyang-ts convert examples/meta-model.yang
+
+# Zig (release binary, or `cd zig && zig build`)
+xyang-zig parse examples/meta-model.yang
+xyang-zig validate examples/meta-model.yang data.json
+xyang-zig convert examples/meta-model.yang -o meta-model.yang.json
 ```
 
-Python `convert` writes `<file>.yang.json` (or `-o PATH`); `xyang-ts convert` prints to stdout.
+Python and Zig `convert` write `<file>.yang.json` (or `-o PATH`); `xyang-ts convert` prints to stdout.
 
 Validate one rpc's or action's input or output with `--rpc NAME` or `--action PATH` (input by default, `--output` for the output) and server data with `--context data.json` (required for an action). The context is validated first; its errors carry `"document": "context"`.
 

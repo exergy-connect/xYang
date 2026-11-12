@@ -135,6 +135,17 @@ line. Not counted: tests (`tests/`, `ts/test/`), fixtures and workloads
 (`ts/node_modules/`), and tooling (`ts/bench/`, `ts/scripts/`, `qjs/`). Code size
 is reported in its own table, separate from performance.
 
+## Executable size
+
+Release and manual benchmark runs also build the Zig CLI with the pinned toolchain,
+`-Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline` (stripped by `build.zig`).
+The results JSON records the file size in bytes and SHA-256; the generated README
+section shows bytes and KiB. This build runs in the release benchmark workflow.
+
+To include a local binary, pass `run --zig-binary PATH` with the other run options.
+The harness measures that file without executing it. Omitting the option keeps
+older results and smoke runs compatible and does not require Zig.
+
 ## Release
 
 [`.github/workflows/benchmark.yml`](../.github/workflows/benchmark.yml):

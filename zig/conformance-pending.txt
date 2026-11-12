@@ -1,0 +1,6 @@
+# Shared cases (tests/cases) that xyang-zig does not pass yet, one per line:
+#   <case path> phase-N
+# N is the phase of #165 that delivers the case: 2 module resolution, 3 types and
+# instance validation, 4 XPath, 5 operations and extensions, 6 native JSON, 7 CLI parity.
+# `zig build conformance` fails when a listed case passes (remove it) or an unlisted case
+# fails. The port is complete when this list is empty.

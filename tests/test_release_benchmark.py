@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import copy
+import hashlib
 import json
 import sys
 from pathlib import Path
@@ -188,3 +189,39 @@ def test_checked_in_results_match_readme() -> None:
     latest = ROOT / "benchmarks" / "results" / "latest.json"
     rb.validate_results(json.loads(latest.read_text(encoding="utf-8")))
     assert rb.update_readme(latest, ROOT / "README.md", check=True, allow_dirty=False) == 0
+
+
+def test_cli_records_zig_binary_size_and_renders_it(tmp_path: Path) -> None:
+    binary = tmp_path / "xyang-zig"
+    content = b"\x7fELF" + bytes(1020)
+    binary.write_bytes(content)
+    results = tmp_path / "results.json"
+    args = ["run", "--smoke", "--languages", "python", "--workloads", "small"]
+    args += ["--zig-binary", str(binary), "--out", str(results)]
+    assert rb.main(args) == 0
+    data = json.loads(results.read_text())
+    assert data["binary_size"]["zig"] == {
+        "file": "xyang-zig",
+        "bytes": 1024,
+        "sha256": hashlib.sha256(content).hexdigest(),
+    }
+    assert "| Zig CLI (`xyang-zig`) | 1,024 | 1.0 |" in rb.render_markdown(data)
+    assert "--zig-binary" in data["reproduce"]
+
+
+@pytest.mark.parametrize("empty", [False, True], ids=["missing", "empty"])
+def test_requested_zig_binary_must_exist_and_be_nonempty(tmp_path: Path, empty: bool) -> None:
+    binary = tmp_path / "xyang-zig"
+    if empty:
+        binary.write_bytes(b"")
+    with pytest.raises(rb.BenchmarkError, match="Zig binary"):
+        rb.run(["python"], ["small"], 1, True, None, zig_binary=binary)
+
+
+@pytest.mark.parametrize("field,value", [("bytes", 0), ("sha256", "bad")])
+def test_schema_rejects_invalid_binary_measurements(smoke_results: dict, field: str, value) -> None:
+    data = copy.deepcopy(smoke_results)
+    data["binary_size"] = {"zig": {"file": "xyang-zig", "bytes": 1024, "sha256": "0" * 64}}
+    data["binary_size"]["zig"][field] = value
+    with pytest.raises(rb.BenchmarkError, match="binary_size.zig"):
+        rb.validate_results(data)

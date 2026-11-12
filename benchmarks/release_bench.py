@@ -1,4 +1,4 @@
-"""Release benchmark harness: time, peak memory, and source lines for Python and TypeScript xYang.
+"""Release benchmark harness: Python/TypeScript time, memory, source lines, and optional Zig binary size.
 
 Usage from the repository root (TypeScript needs ``cd ts && npm ci`` first)::
 
@@ -17,10 +17,12 @@ from __future__ import annotations
 
 import argparse
 import datetime as dt
+import hashlib
 import json
 import os
 import platform
 import re
+import shlex
 import shutil
 import statistics
 import subprocess
@@ -267,7 +269,9 @@ def run(
     smoke: bool,
     release_tag: str | None,
     memory_processes: int = MEMORY_PROCESSES,
+    zig_binary: Path | None = None,
 ) -> dict[str, Any]:
+    binary_size = measure_binary_size(zig_binary) if zig_binary is not None else None
     with tempfile.TemporaryDirectory(prefix="xyang-bench-") as tmp:
         tmpdir = Path(tmp)
         ts_bundle = _build_ts_bundle(tmpdir) if "typescript" in languages else None
@@ -288,7 +292,7 @@ def run(
                         lang, ts_bundle, wl["spec"], phase, warmup, iterations, procs, mem_procs
                     )
             results[lang] = entry
-    return {
+    data = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
         "smoke": smoke,
@@ -298,6 +302,21 @@ def run(
         "code_size": loc.count_all(),
         "reproduce": REPRODUCE,
     }
+    if binary_size is not None:
+        data["binary_size"] = {"zig": binary_size}
+        data["reproduce"] = REPRODUCE.replace("run --out", f"run --zig-binary {shlex.quote(str(zig_binary))} --out", 1)
+    return data
+
+
+def measure_binary_size(path: Path) -> dict[str, Any]:
+    """Record the supplied executable's actual file size; do not run it."""
+    try:
+        content = path.read_bytes()
+    except OSError as exc:
+        raise BenchmarkError(f"cannot read Zig binary {path}: {exc}") from exc
+    if not content:
+        raise BenchmarkError(f"Zig binary is empty: {path}")
+    return {"file": path.name, "bytes": len(content), "sha256": hashlib.sha256(content).hexdigest()}
 
 
 # --------------------------------------------------------------------------- schema
@@ -373,6 +392,16 @@ def validate_results(data: Any) -> None:
     for lang in LANGUAGES:
         info = _require(langs.get(lang), f"code_size.languages.{lang}", dict)
         _require(info.get("code_lines"), f"code_size.languages.{lang}.code_lines", int)
+
+    if "binary_size" in data:
+        binaries = _require(data["binary_size"], "binary_size", dict)
+        zig = _require(binaries.get("zig"), "binary_size.zig", dict)
+        _require(zig.get("file"), "binary_size.zig.file", str)
+        if _require(zig.get("bytes"), "binary_size.zig.bytes", int) <= 0:
+            raise BenchmarkError("binary_size.zig.bytes must be positive")
+        digest = _require(zig.get("sha256"), "binary_size.zig.sha256", str)
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise BenchmarkError("binary_size.zig.sha256 must be a SHA-256 digest")
 
 
 # --------------------------------------------------------------------------- markdown
@@ -481,6 +510,14 @@ def render_markdown(data: dict[str, Any]) -> str:
     for lang in LANGUAGES:
         info = data["code_size"]["languages"][lang]
         lines.append(f"| {label[lang]} | `{info['root']}/{info['pattern']}` | {info['files']} | {info['code_lines']:,} |")
+    if "binary_size" in data:
+        zig = data["binary_size"]["zig"]
+        lines += [
+            "", "Executable size:", "",
+            "| Binary | Bytes | KiB |",
+            "|---|---:|---:|",
+            f"| Zig CLI (`{zig['file']}`) | {zig['bytes']:,} | {zig['bytes'] / 1024:,.1f} |",
+        ]
     lines += ["", f"Reproduce: `{data['reproduce']}`"]
     return "\n".join(lines) + "\n"
 
@@ -526,6 +563,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--memory-processes", type=int, default=MEMORY_PROCESSES, help="one-operation memory processes per phase")
     p_run.add_argument("--smoke", action="store_true", help="1 process, 1 iteration, no warmup (not for README)")
     p_run.add_argument("--release-tag", default=None)
+    p_run.add_argument("--zig-binary", type=Path, help="include this Zig executable's size and SHA-256")
     p_render = sub.add_parser("render", help="print the Markdown section for a results file")
     p_render.add_argument("results", type=Path)
     p_readme = sub.add_parser("update-readme", help="rewrite the marked README section from a results file")
@@ -547,7 +585,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in names:
                 if x not in WORKLOADS:
                     raise BenchmarkError(f"unknown workload {x!r}")
-            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes)
+            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes, args.zig_binary)
             validate_results(data)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
