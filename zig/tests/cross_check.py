@@ -16,10 +16,15 @@ Checked:
 - the resolved schema tree of every case that loads in both (as the case runners load
   it, sibling modules included): ``uses``/``refine``/``augment``/``deviation`` results,
   if-feature, when, must, cardinality, defaults and the module's definitions.
-- ``xyang validate`` on every case instance, in text and JSON output.
+- ``xyang validate`` on every case instance, in text and JSON output, rpc and action
+  instances included.
 - XPath (phase 4) beyond the cases: load errors from the XPath parser and prefix binder,
   and validate runs over the function library, operators, predicates, evaluation errors,
   leafref and instance-identifier.
+- operations and extensions (phase 5) beyond the cases: rpc and action calls through
+  ``--rpc`` / ``--action`` / ``--output`` / ``--context`` (api-path and wrapper errors,
+  list keys, presence, context errors, encodings), RFC 8791 structure instances, and
+  ``sx:augment-structure`` from the same and another module (load errors and the tree).
 - command-line usage errors and ``parse --help``, with the program name normalized.
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
@@ -216,6 +221,22 @@ def tree_failures() -> tuple[int, list[str]]:
     return compared, failures
 
 
+def operation_args(inst: dict, context_path: Path) -> list[str]:
+    """``--rpc`` / ``--action`` / ``--output`` / ``--context`` for an instance, as
+    ``tests/test_cases.py`` passes them to a CLI; the context is written to ``context_path``."""
+    args: list[str] = []
+    if inst.get("rpc") is not None:
+        args += ["--rpc", inst["rpc"]]
+    if inst.get("action") is not None:
+        args += ["--action", inst["action"]]
+    if inst.get("direction", "input") == "output":
+        args.append("--output")
+    if "context" in inst:
+        context_path.write_text(json.dumps(inst["context"]))
+        args += ["--context", str(context_path)]
+    return args
+
+
 def validate_failures() -> tuple[int, int, list[str]]:
     """``xyang validate`` and ``xyang-zig validate`` on every case instance, in both output
     formats: exit code, stdout and stderr must be identical. xyang-zig may refuse an
@@ -230,16 +251,15 @@ def validate_failures() -> tuple[int, int, list[str]]:
             case = case_dir.relative_to(CASES).as_posix()
             spec = json.loads(case_json.read_text())
             for inst in spec.get("instances") or []:
-                if any(key in inst for key in ("rpc", "action", "context", "usage_error")):
-                    continue
                 data_path.write_text(json.dumps(inst["data"]))
+                operation = operation_args(inst, Path(tmp) / "context.json")
                 for fmt in ("text", "json"):
                     args = ["validate", "--format", fmt, "--include-path", str(case_dir)]
                     if "features" in spec:
                         args += ["--features", json.dumps(spec["features"])]
                     if inst.get("encoding") == "native":
                         args.append("--native-json")
-                    args += [str(case_dir / spec["module"]), str(data_path)]
+                    args += [*operation, str(case_dir / spec["module"]), str(data_path)]
                     py, zg = python_cli(*args), zig_cli(*args)
                     if py == zg:
                         same += 1
@@ -389,6 +409,232 @@ def xpath_failures() -> tuple[int, list[str]]:
     return same, failures
 
 
+STRUCTURE_EXT = (CASES / "encoding" / "structure" / "ietf-yang-structure-ext@2020-06-17.yang").read_text()
+
+# RFC 8791 (phase 5): sx:structure instances and sx:augment-structure, in this module and
+# from another one. ``s.yang`` is validated; ``aug.yang`` augments it from outside.
+STRUCTURE_FILES = {
+    "ietf-yang-structure-ext.yang": STRUCTURE_EXT,
+    "s.yang": """module s { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  feature f;
+  identity base; identity one { base base; }
+  typedef small { type uint8 { range "0..10"; } }
+  sx:structure msg {
+    leaf n { type small; default 5; }
+    leaf kind { type identityref { base base; } }
+    leaf gated { if-feature f; type string; }
+    leaf when-n { when "../n > 3"; type string; }
+    list items { key id; leaf id { type string; } leaf ref { type leafref { path "../../n"; } } }
+    container c { leaf x { type string; mandatory true; } }
+    choice ch { leaf a { type string; } leaf b { type string; } }
+  }
+  sx:structure other { leaf z { type int64; } }
+  sx:augment-structure "/s:msg/s:c" { leaf added { type string { length "1..3"; } } }
+  sx:augment-structure "/s:other" { if-feature f; when "z > 1"; leaf w { type string; } }
+}""" % HEADER.format(name="s", prefix="s"),
+    "aug.yang": """module aug { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  import s { prefix s; }
+  sx:augment-structure "/s:msg/s:c" { leaf from-aug { type int8; mandatory true; } }
+}""" % HEADER.format(name="aug", prefix="aug"),
+    "bad-target.yang": """module bad-target { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  import s { prefix s; }
+  sx:augment-structure "/s:nope" { leaf l { type string; } }
+}""" % HEADER.format(name="bt", prefix="bt"),
+    "bad-prefix.yang": """module bad-prefix { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  sx:augment-structure "/q:msg" { leaf l { type string; } }
+}""" % HEADER.format(name="bp", prefix="bp"),
+    "bad-child.yang": """module bad-child { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  import s { prefix s; }
+  sx:augment-structure "/s:msg/s:zzz" { leaf l { type string; } }
+}""" % HEADER.format(name="bc", prefix="bc"),
+    "before.yang": """module before { %s
+  import ietf-yang-structure-ext { prefix sx; }
+  sx:augment-structure "/b:late" { leaf l { type string; } }
+  sx:structure late { leaf k { type string; } }
+}""" % HEADER.format(name="b", prefix="b"),
+}
+
+STRUCTURE_PARSE = ["s.yang", "aug.yang", "bad-target.yang", "bad-prefix.yang", "bad-child.yang", "before.yang"]
+
+STRUCTURE_INSTANCES = [
+    {"s:msg": {"n": 11}},
+    {"msg": {"n": 3}},
+    {"msg": {"kind": "s:one"}},
+    {"msg": {"gated": "x"}},
+    {"msg": {"c": {}}},
+    {"msg": {"n": 2, "when-n": "y"}},
+    {"msg": {"n": 4, "when-n": "y"}},
+    {"msg": {"a": "1", "b": "2"}},
+    {"msg": {"items": [{"id": "a", "ref": "5"}, {"id": "a"}]}},
+    {"msg": {"items": [{"id": "a", "ref": "4"}]}},
+    {"msg": {"c": {"x": "1", "added": "toolong"}}},
+    {"msg": {"c": {"x": "1", "added": "ok"}}},
+    {"other": {"z": 5}},
+    {"s:other": {"z": "1", "w": "x"}},
+    {"other": {"z": "2", "w": "x"}},
+    {"msg": {}, "x": 1},
+    {"s:msg": 1},
+    {"t:msg": {}},
+    {"msg": {"bogus": 1}},
+]
+
+OPERATION_MODULE = """module op { %s
+  identity reason; identity crash { base reason; }
+  container sys {
+    leaf ver { type decimal64 { fraction-digits 2; } default "1.5"; }
+    list slot {
+      key "id ok";
+      leaf id { type decimal64 { fraction-digits 1; } }
+      leaf ok { type boolean; }
+      action eject {
+        input {
+          leaf why { type identityref { base reason; } }
+          leaf count { type int64; must ". < ../../id * 10" { error-message "too many"; } }
+        }
+        output { leaf done { type empty; } }
+      }
+    }
+    choice where { case here { container box { action open; } } }
+    container locked { presence "locked"; action unlock { input { leaf code { type string; mandatory true; } } } }
+  }
+  rpc reboot {
+    input {
+      leaf delay { type int64; }
+      leaf at { type leafref { path "/op:sys/op:slot/op:id"; } }
+      must "not(delay) or ../reboot/delay != '0'" { error-message "no zero delay"; }
+    }
+    output { leaf ok { type empty; } leaf ver { type decimal64 { fraction-digits 2; } must ". >= /sys/ver"; } }
+  }
+  rpc ping;
+}""" % HEADER.format(name="op", prefix="op")
+
+OPERATION_CONTEXT = {"op:sys": {"slot": [{"id": "1.5", "ok": True}, {"id": "2.0", "ok": False}]}}
+
+# (operation options, data, context or None) for ``xyang validate`` on OPERATION_MODULE.
+OPERATION_CALLS = [
+    (["--rpc", "nope"], {"op:input": {}}, None),
+    (["--rpc", "reboot"], {"op:input": {"delay": "5"}}, None),
+    (["--rpc", "reboot"], {"op:input": {"delay": 5}}, None),
+    (["--rpc", "reboot"], {"op:input": {"delay": "0"}}, None),
+    (["--rpc", "reboot"], {"op:input": {"at": "1.5"}}, OPERATION_CONTEXT),
+    (["--rpc", "reboot"], {"op:input": {"at": "9.5"}}, OPERATION_CONTEXT),
+    (["--rpc", "reboot"], [], None),
+    (["--rpc", "reboot"], {}, None),
+    (["--rpc", "reboot"], "text", None),
+    (["--rpc", "reboot"], {"op:input": {}, "x": 1}, None),
+    (["--rpc", "reboot"], {"op:input": "s"}, None),
+    (["--rpc", "reboot", "--native-json"], [], None),
+    (["--rpc", "reboot", "--native-json"], {"delay": 5}, None),
+    (["--rpc", "reboot", "--output"], {"op:output": {"ok": [None]}}, None),
+    (["--rpc", "reboot", "--output"], {"op:output": {"ok": None}}, None),
+    (["--rpc", "reboot", "--output"], {"op:output": {"ver": "1.25"}}, None),
+    (["--rpc", "reboot", "--output"], {"op:output": {"ver": "1.75"}}, None),
+    (["--rpc", "ping"], {"op:input": {}}, None),
+    (["--rpc", "ping", "--output"], {"op:output": {"x": 1}}, None),
+    (["--rpc", "reboot"], {"op:input": {}}, {"op:sys": {"slot": [{"id": "x", "ok": True}]}}),
+    (["--rpc", "reboot"], {"op:input": {}}, {"op:sys": {"slot": [{"id": "1.5", "ok": True}, {"id": "1.5", "ok": True}]}}),
+    (["--action", "/op:sys/slot=1.5,true/eject"], {"op:input": {"why": "op:crash", "count": "14"}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.5,true/eject"], {"op:input": {"count": "15"}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=2.0,false/eject"], {"op:input": {"count": "15"}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.50,true/eject"], {"op:input": {}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.5,True/eject"], {"op:input": {}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.5,true/eject", "--output"], {"op:output": {"done": [None]}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.5,true/eject"], {"op:output": {}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/slot=1.5,true/eject", "--native-json"], {"count": 15}, {"sys": {"slot": [{"id": 1.5, "ok": True}]}}),
+    (["--action", "/op:sys/box/open"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/box/open"], {"op:input": {}}, {"op:sys": {"box": {}}}),
+    (["--action", "/op:sys/locked/unlock"], {"op:input": {}}, {"op:sys": {"locked": {}}}),
+    (["--action", "/op:sys/locked/unlock"], {"op:input": {"code": "1"}}, {}),
+    (["--action", "/op:sys/slot=1.5,true/eject"], {"op:input": {}}, {"op:sys": {"slot": "x"}}),
+    (["--action", "/"], {"op:input": {}}, {}),
+    (["--action", "op:sys/box/open"], {"op:input": {}}, {}),
+    (["--action", "/other:sys/box/open"], {"op:input": {}}, {}),
+    (["--action", "/op:sys"], {"op:input": {}}, {}),
+    (["--action", "/op:nope/x"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/nope/x"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/a b"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/:x"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/slot=1/eject"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/slot/eject"], {"op:input": {}}, {}),
+    (["--action", "/op:sys=1/box/open"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/ver/x"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/slot=1.5,true/op:nope"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/slot=1.5,true/eject=1"], {"op:input": {}}, {}),
+    (["--action", "/op:sys/slot=1.5%2C,true/eject"], {"op:input": {}}, OPERATION_CONTEXT),
+    (["--action", "/op:sys/box/open"], {"op:input": {}}, None),
+    (["--action", ""], {"op:input": {}}, {}),
+    (["--rpc", ""], {"op:input": {}}, None),
+    (["--rpc", "reboot"], {"op:input": {}}, []),
+]
+
+
+def operation_failures() -> tuple[int, list[str]]:
+    """Phase 5 beyond the shared cases: RFC 8791 structures and augment-structure (load
+    errors and instances), and rpc and action calls: api-path errors, wrappers, keys,
+    presence, context errors, encodings. Exit code, stdout and stderr must be identical."""
+    failures: list[str] = []
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp).resolve()
+        for rel, text in STRUCTURE_FILES.items():
+            (base / rel).write_text(text)
+        for rel in STRUCTURE_PARSE:
+            py, zg = python_cli("parse", str(base / rel)), zig_cli("parse", str(base / rel))
+            if py == zg:
+                same += 1
+            else:
+                failures.append(f"structure parse {rel}: parse differs\n  python: {py}\n  zig:    {zg}")
+        data_path = base / "data.json"
+        context_path = base / "context.json"
+        for inst in STRUCTURE_INSTANCES:
+            data_path.write_text(json.dumps(inst))
+            for features in (None, "{}"):
+                for fmt in ("text", "json"):
+                    args = ["validate", "--format", fmt]
+                    if features is not None:
+                        args += ["--features", features]
+                    args += [str(base / "s.yang"), str(data_path)]
+                    py, zg = python_cli(*args), zig_cli(*args)
+                    if py == zg:
+                        same += 1
+                    else:
+                        failures.append(f"structure validate {json.dumps(inst)} ({fmt}): validate differs\n  python: {py}\n  zig:    {zg}")
+        yang = base / "op.yang"
+        yang.write_text(OPERATION_MODULE)
+        for options, data, context in OPERATION_CALLS:
+            data_path.write_text(json.dumps(data))
+            extra = ["--context", str(context_path)] if context is not None else []
+            if context is not None:
+                context_path.write_text(json.dumps(context))
+            for fmt in ("text", "json"):
+                args = ["validate", "--format", fmt, *options, *extra, str(yang), str(data_path)]
+                py, zg = python_cli(*args), zig_cli(*args)
+                if py == zg:
+                    same += 1
+                else:
+                    failures.append(f"operation {options} {json.dumps(data)} context {json.dumps(context)} ({fmt}): validate differs\n  python: {py}\n  zig:    {zg}")
+    with tempfile.TemporaryDirectory() as tmp:
+        # A case directory as the case runners load it: aug.yang is a sibling of s.yang,
+        # so its augment-structure lands in the tree of s.
+        case_dir = Path(tmp).resolve() / "structure-augment"
+        case_dir.mkdir()
+        for rel in ("ietf-yang-structure-ext.yang", "s.yang", "aug.yang"):
+            (case_dir / rel).write_text(STRUCTURE_FILES[rel])
+        (case_dir / "case.json").write_text(json.dumps({"module": "s.yang", "instances": []}))
+        code, out, err = run([str(RUNNER), "--cases", str(case_dir.parent), "--dump-case", "structure-augment"])
+        py_tree = python_case_tree(case_dir, "s.yang")
+        if code == 0 and json.loads(out) == py_tree and "error" not in py_tree:
+            same += 1
+        else:
+            failures.append(f"augment-structure tree differs from Python\n  python: {json.dumps(py_tree)[:2000]}\n  zig:    {(out or err)[:2000]}")
+    return same, failures
+
+
 def main() -> int:
     failures: list[str] = []
     pending = pending_cases()
@@ -456,6 +702,8 @@ def main() -> int:
     failures.extend(validate_diffs)
     xpath_same, xpath_diffs = xpath_failures()
     failures.extend(xpath_diffs)
+    operation_same, operation_diffs = operation_failures()
+    failures.extend(operation_diffs)
 
     from xyang.parser.dispatch_registry import dispatch_registry_parity_snapshot
 
@@ -471,6 +719,7 @@ def main() -> int:
         f"{trees} resolved case trees identical to Python's unless listed; "
         f"{validated} validate runs identical, {validate_deferred} deferred to a pending phase; "
         f"{xpath_same} XPath scenarios identical; "
+        f"{operation_same} operation and structure scenarios identical; "
         f"{len(failures)} failure(s)"
     )
     return 1 if failures else 0
