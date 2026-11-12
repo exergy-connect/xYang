@@ -9,8 +9,9 @@
 //! What a case needs, and which phase provides it:
 //! - `schema_error`: the load (parse and module resolution) fails with a message
 //!   containing `code`. An `unsupported` failure never counts as the expected error.
-//! - `instances`: RFC 7951 validation (phase 3 and later). The module must still parse
-//!   or fail as `unsupported`.
+//! - `instances`: RFC 7951 validation (phase 3). Each instance must give Python's
+//!   `(path, code)` set, messages and `valid`; one needing XPath or operations fails as
+//!   `unsupported` (pending). The module must still parse or fail as `unsupported`.
 //! - `json_form` / `export_error`: the native JSON form (phase 6).
 
 const std = @import("std");
@@ -290,6 +291,88 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
             return .{ .pending = try std.fmt.allocPrint(arena, "unsupported: {s}", .{msg}) };
         },
     }
-    if (json_form) return .{ .pending = "needs instance validation and the native JSON form" };
-    return .{ .pending = "needs instance validation (phase 3+)" };
+    const instances = field(case, "instances") orelse return .{ .regression = "the case has no instances" };
+    for (instances.array.items) |inst_value| {
+        const outcome = try runInstance(arena, case, inst_value.object, load.ok);
+        if (outcome != .pass) return outcome;
+    }
+    if (json_form) return .{ .pending = "needs the native JSON form (phase 6)" };
+    return .pass;
+}
+
+/// One instance, as `test_case` in `tests/test_cases.py` checks it: the set of
+/// `(path, code)` pairs, each expected `message` as a substring, and `valid`. xyang-zig
+/// follows Python, so a `python` xfail (case or instance) is strict: the instance must
+/// then not match.
+fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.json.ObjectMap, module: *xyang.Module) !Outcome {
+    const name = if (inst.get("name")) |n| n.string else "?";
+    for ([_][]const u8{ "rpc", "action", "direction", "context", "usage_error" }) |key| {
+        if (inst.get(key) != null) return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: rpc and action validation (phase 5)", .{name}) };
+    }
+    const xfail = xfailReason(case, inst);
+    const data_text = try std.json.Stringify.valueAlloc(arena, inst.get("data") orelse std.json.Value.null, .{});
+    var msg: []const u8 = "";
+    const data = try xyang.json_value.parse(arena, data_text, &msg);
+    var features: ?*xyang.yang_validator.EnabledFeatures = null;
+    if (field(case, "features")) |f| {
+        const f_text = try std.json.Stringify.valueAlloc(arena, f, .{});
+        features = xyang.yang_validator.featureMap(arena, try xyang.json_value.parse(arena, f_text, &msg), &msg) catch |err| switch (err) {
+            error.InvalidFeatures => return .{ .regression = try std.fmt.allocPrint(arena, "case features: {s}", .{msg}) },
+            else => return err,
+        };
+    }
+    const native = if (inst.get("encoding")) |e| e == .string and std.mem.eql(u8, e.string, "native") else false;
+    var validator = xyang.YangValidator.init(arena, module);
+    const result = validator.validate(data, .{ .native_json = native, .enabled_features_by_module = features }) catch |err| switch (err) {
+        error.Unsupported => return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unsupported: {s}", .{ name, validator.unsupported orelse "?" }) },
+        else => return err,
+    };
+    const mismatch = try compareInstance(arena, inst, result);
+    if (xfail) |why| {
+        if (mismatch == null) return .{ .regression = try std.fmt.allocPrint(arena, "instance {s} passes but Python xfails it ({s})", .{ name, why }) };
+        return .pass;
+    }
+    if (mismatch) |m| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: {s}", .{ name, m }) };
+    return .pass;
+}
+
+fn xfailReason(case: std.json.ObjectMap, inst: std.json.ObjectMap) ?[]const u8 {
+    if (inst.get("xfail")) |x| if (x == .object) if (x.object.get("python")) |r| return r.string;
+    if (case.get("xfail")) |x| if (x == .object) if (x.object.get("python")) |r| return r.string;
+    return null;
+}
+
+/// Null when the result matches the instance, else what differs.
+fn compareInstance(arena: std.mem.Allocator, inst: std.json.ObjectMap, result: xyang.yang_validator.Result) !?[]const u8 {
+    var got: std.StringArrayHashMapUnmanaged(void) = .empty;
+    for (result.errors) |e| try got.put(arena, try where(arena, e.document, e.pointer, e.code), {});
+    var want: std.StringArrayHashMapUnmanaged(void) = .empty;
+    const expected: []const std.json.Value = if (inst.get("errors")) |e| e.array.items else &.{};
+    for (expected) |e| {
+        const doc = if (e.object.get("document")) |d| d.string else "data";
+        try want.put(arena, try where(arena, doc, e.object.get("path").?.string, e.object.get("code").?.string), {});
+    }
+    var same = got.count() == want.count();
+    for (want.keys()) |k| {
+        if (!got.contains(k)) same = false;
+    }
+    if (!same) return try std.fmt.allocPrint(arena, "errors {s} != expected {s}", .{ try std.mem.join(arena, ", ", got.keys()), try std.mem.join(arena, ", ", want.keys()) });
+    for (expected) |e| {
+        const m = e.object.get("message") orelse continue;
+        if (m != .string or m.string.len == 0) continue;
+        const code = e.object.get("code").?.string;
+        const found = for (result.errors) |r| {
+            if (std.mem.eql(u8, r.code, code) and std.mem.indexOf(u8, r.message, m.string) != null) break true;
+        } else false;
+        if (!found) return try std.fmt.allocPrint(arena, "no {s} error message contains {s}", .{ code, m.string });
+    }
+    const valid = if (inst.get("valid")) |v| v == .bool and v.bool else false;
+    if (valid != result.valid()) return try std.fmt.allocPrint(arena, "valid is {}, expected {}", .{ result.valid(), valid });
+    return null;
+}
+
+/// `_where`: `path`, or `document:path` for an issue about another document.
+fn where(arena: std.mem.Allocator, document: []const u8, path: []const u8, code: []const u8) ![]const u8 {
+    if (std.mem.eql(u8, document, "data")) return std.fmt.allocPrint(arena, "({s} {s})", .{ path, code });
+    return std.fmt.allocPrint(arena, "({s}:{s} {s})", .{ document, path, code });
 }
