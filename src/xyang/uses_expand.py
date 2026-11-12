@@ -17,7 +17,7 @@ from .ast import (
     YangUsesStmt,
     YangWhenStmt,
 )
-from .errors import YangCircularUsesError, YangRefineTargetNotFoundError, YangSyntaxError
+from .errors import YangCircularUsesError, YangRefineTargetNotFoundError, YangSemanticError, YangSyntaxError
 from .module import YangModule
 from .refine_expand import apply_refine_to_node, copy_yang_statement, find_nodes_by_refine_path
 from .xpath import XPathParser
@@ -235,11 +235,7 @@ def _expand_one_uses_stmt(
 ) -> list[YangStatement]:
     resolved = _resolve_uses_grouping(stmt, ctx)
     if resolved is None:
-        logger.warning(
-            "Grouping '%s' not found when expanding uses statement",
-            stmt.grouping_qname(),
-        )
-        return []
+        raise YangSemanticError(f"Unknown grouping '{stmt.grouping_qname()}'")
     gname, gmod, grouping = resolved
     if gname in ctx.expanding_chain:
         logger.debug(
