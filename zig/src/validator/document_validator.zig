@@ -23,6 +23,7 @@ const PathBuilder = @import("path_builder.zig").PathBuilder;
 const xpath = @import("../xpath/xpath.zig");
 const xpath_utils = @import("../xpath/utils.zig");
 const schema_nav = @import("../xpath/schema_nav.zig");
+const operation_mod = @import("operation.zig");
 
 const Allocator = std.mem.Allocator;
 const Statement = ast.Statement;
@@ -94,6 +95,9 @@ pub const DocumentValidator = struct {
     root: *const XNode = undefined,
     case_stack: std.ArrayList(*Statement) = .empty,
     case_data_stack: std.ArrayList(*const Object) = .empty,
+    /// False when the root schema is an RFC 8791 structure (Python's root schema is then
+    /// not a `YangModule`): every `if-feature` holds and defaults resolve no typedef.
+    module_root: bool = true,
 
     fn add(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
         try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message });
@@ -134,6 +138,7 @@ pub const DocumentValidator = struct {
     }
 
     fn ifFeaturesActive(self: *DocumentValidator, s: *const Statement) error{OutOfMemory}!bool {
+        if (!self.module_root) return true;
         if (!s.hasIfFeatures() or s.if_features.items.len == 0) return true;
         return if_feature_eval.ifFeaturesSatisfied(self.a, s.if_features.items, self.module, &self.enabled);
     }
@@ -147,6 +152,144 @@ pub const DocumentValidator = struct {
         self.root = try xpath.node.newNode(self.a, data, .{ .module = self.module }, null);
         try self.visitChildren(data, .{ .module = self.module }, &path, true, self.root);
         return self.errors.items;
+    }
+
+    /// `validate` with an RFC 8791 structure as the root schema (`module_root` false).
+    pub fn validateStructure(self: *DocumentValidator, data: Val, structure: *Statement) Error![]ValidationError {
+        self.errors = .empty;
+        self.case_stack = .empty;
+        self.case_data_stack = .empty;
+        var path: PathBuilder = .{ .a = self.a };
+        self.root = try xpath.node.newNode(self.a, data, .{ .stmt = structure }, null);
+        try self.visitChildren(data, .{ .stmt = structure }, &path, true, self.root);
+        return self.errors.items;
+    }
+
+    /// What `validateOperation` checks: `self.module` is the accessible module of RFC 7950
+    /// 6.4.1 and `parent_copies` are its copies of `target.parents`.
+    pub const OperationRun = struct {
+        target: operation_mod.OperationTarget,
+        operation: *Statement,
+        parent_copies: []const *Statement,
+        host: *Module,
+        /// Server data in the same encoding, already validated against the module.
+        context: ?Val,
+        native: bool,
+    };
+
+    /// `validate_operation`: the parameters of one rpc or action `input` or `output`
+    /// (RFC 7950 7.14, 7.15), without the RFC 8040 wrapper. Pointers address `params`.
+    pub fn validateOperation(self: *DocumentValidator, u: *operation_mod.Usage, params: Val, run: OperationRun) (Error || error{Usage})![]ValidationError {
+        const target = run.target;
+        for (target.parents) |step| {
+            for (step.wrappers) |w| if (!try self.ifFeaturesActive(w)) {
+                return u.fail("{s} is not available: '{s}' has a false 'if-feature' condition", .{ target.label, w.name });
+            };
+            if (!try self.ifFeaturesActive(step.stmt)) {
+                return u.fail("{s} is not available: '{s}' has a false 'if-feature' condition", .{ target.label, step.stmt.name });
+            }
+        }
+        if (!try self.ifFeaturesActive(target.operation)) {
+            return u.fail("{s} is not available: its 'if-feature' condition is false", .{target.label});
+        }
+        var out: std.ArrayList(ValidationError) = .empty;
+        if (params != .object) {
+            try out.append(self.a, .{ .path = "/", .pointer = "", .code = "type", .message = "operation parameters must be an object" });
+            return out.items;
+        }
+        var walk_keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = target.module_name };
+        var walk: instance.Walk = .{ .a = self.a, .module = run.host, .native = run.native, .keys = &walk_keys, .checker = self.checker };
+        const nodes = try walk.walkObject(params.object, run.operation, "", false);
+        const projection = try instance.project(self.a, self.keys, nodes.items);
+        const canonical = projection.data;
+        for (try instance.encodingErrors(self.a, nodes.items)) |e| {
+            try out.append(self.a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
+        }
+
+        var root_data = try self.a.create(Object);
+        root_data.* = .empty;
+        if (run.context) |c| if (c == .object) {
+            var context_keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = run.host.name };
+            var context_walk: instance.Walk = .{ .a = self.a, .module = run.host, .native = run.native, .keys = &context_keys, .checker = self.checker };
+            const context_nodes = try context_walk.walkObject(c.object, null, "", true);
+            root_data = (try instance.project(self.a, self.keys, context_nodes.items)).data;
+        };
+
+        const root = try xpath.node.newNode(self.a, .{ .object = root_data }, .{ .module = self.module }, null);
+        var holder = root_data;
+        var holder_node = root;
+        for (target.parents, run.parent_copies) |step, copied| {
+            const member = (try self.keys.key(step.stmt)) orelse step.stmt.name;
+            const value = holder.get(member);
+            if (step.stmt.kind() == .list) {
+                const key_names = try keyNames(self.a, step.stmt);
+                var key_members: std.ArrayList([]const u8) = .empty;
+                for (key_names) |k| {
+                    const leaf = schema_nav.child(.{ .stmt = step.stmt }, k);
+                    try key_members.append(self.a, if (leaf) |l| (try self.keys.key(l)) orelse l.name else k);
+                }
+                const rows: []const Val = if (value) |v| (if (v == .array) v.array else &.{}) else &.{};
+                const row: ?*Object = for (rows) |r| {
+                    if (r != .object) continue;
+                    const matches = for (key_members.items, step.keys.?) |k, want| {
+                        const got = r.object.get(k) orelse break false;
+                        if (!std.mem.eql(u8, try operation_mod.lexical(self.a, got), want)) break false;
+                    } else true;
+                    if (matches) break r.object;
+                } else null;
+                const entry = row orelse {
+                    return self.missingParent(target, try std.fmt.allocPrint(self.a, "no '{s}' entry with key {s}", .{ step.stmt.name, try std.mem.join(self.a, ", ", step.keys.?) }));
+                };
+                holder = entry;
+                holder_node = try xpath.node.newNode(self.a, .{ .object = entry }, .{ .stmt = copied }, holder_node);
+            } else {
+                var obj: *Object = undefined;
+                if (value) |v| {
+                    if (v != .object) {
+                        return self.missingParent(target, try std.fmt.allocPrint(self.a, "presence container '{s}' is absent", .{step.stmt.name}));
+                    }
+                    obj = v.object;
+                } else {
+                    if (presence(step.stmt) != null) {
+                        return self.missingParent(target, try std.fmt.allocPrint(self.a, "presence container '{s}' is absent", .{step.stmt.name}));
+                    }
+                    // RFC 7950 7.5.1: a non-presence container exists implicitly.
+                    obj = try self.a.create(Object);
+                    obj.* = .empty;
+                    try holder.put(self.a, member, .{ .object = obj });
+                }
+                holder = obj;
+                holder_node = try xpath.node.newNode(self.a, .{ .object = obj }, .{ .stmt = copied }, holder_node);
+            }
+        }
+        try holder.put(self.a, (try self.keys.key(run.operation)) orelse run.operation.name, .{ .object = canonical });
+
+        self.errors = .empty;
+        self.case_stack = .empty;
+        self.case_data_stack = .empty;
+        self.root = root;
+        const op_node = try holder_node.step(self.a, .{ .object = canonical }, .{ .stmt = run.operation });
+        try self.checkMust(run.operation, op_node, "/", "");
+        var path: PathBuilder = .{ .a = self.a };
+        try self.visitChildren(.{ .object = canonical }, .{ .stmt = run.operation }, &path, true, op_node);
+        for (self.errors.items) |e| {
+            var err = e;
+            err.pointer = try instance.remapPointer(self.a, e.pointer, &projection.map);
+            try out.append(self.a, err);
+        }
+        return out.items;
+    }
+
+    fn missingParent(self: *DocumentValidator, target: operation_mod.OperationTarget, detail: []const u8) error{OutOfMemory}![]ValidationError {
+        const out = try self.a.alloc(ValidationError, 1);
+        out[0] = .{
+            .path = "/",
+            .pointer = "",
+            .document = "context",
+            .code = "action-parent",
+            .message = try std.fmt.allocPrint(self.a, "{s} is invoked on an instance that is not in the context: {s}", .{ target.label, detail }),
+        };
+        return out;
     }
 
     fn childEnforce(owner: Owner, parent_enforce: bool) bool {
@@ -202,6 +345,7 @@ pub const DocumentValidator = struct {
             }
             return .{ .string = value };
         }
+        if (!self.module_root) return .{ .string = value };
         if (module_mod.resolveTypedef(t, self.module)) |r| {
             if (r.typedef.data.typedef.type) |inner| return self.decodeLexical(inner, value, seen);
         }

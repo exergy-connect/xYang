@@ -4,16 +4,8 @@
 # instance validation, 4 XPath, 5 operations and extensions, 6 native JSON, 7 CLI parity.
 # `zig build conformance` fails when a listed case passes (remove it) or an unlisted case
 # fails. The port is complete when this list is empty.
-encoding/structure phase-5
 modules/json-form-extensions-161 phase-6
 modules/json-form-foreign-augment phase-6
 modules/json-form-identity-alias phase-6
 modules/json-form-imported-identity-augment phase-6
 modules/json-form-rfc8791-extension-161 phase-6
-operations/action phase-5
-operations/action-if-feature phase-5
-operations/context-validation phase-5
-operations/rpc-conditions phase-5
-operations/rpc-context phase-5
-operations/rpc-if-feature phase-5
-operations/rpc-must phase-5

@@ -9,9 +9,10 @@
 //! What a case needs, and which phase provides it:
 //! - `schema_error`: the load (parse and module resolution) fails with a message
 //!   containing `code`. An `unsupported` failure never counts as the expected error.
-//! - `instances`: RFC 7951 validation (phase 3). Each instance must give Python's
-//!   `(path, code)` set, messages and `valid`; one needing XPath or operations fails as
-//!   `unsupported` (pending). The module must still parse or fail as `unsupported`.
+//! - `instances`: RFC 7951 validation (phases 3 to 5). Each instance must give Python's
+//!   `(path, code)` set, messages and `valid`; with `rpc` / `action` / `direction` /
+//!   `context` it is an operation instance, and `usage_error` must be contained in the
+//!   rejected call's message. The module must still parse or fail as `unsupported`.
 //! - `json_form` / `export_error`: the native JSON form (phase 6).
 
 const std = @import("std");
@@ -306,13 +307,10 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
 /// then not match.
 fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.json.ObjectMap, module: *xyang.Module) !Outcome {
     const name = if (inst.get("name")) |n| n.string else "?";
-    for ([_][]const u8{ "rpc", "action", "direction", "context", "usage_error" }) |key| {
-        if (inst.get(key) != null) return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: rpc and action validation (phase 5)", .{name}) };
-    }
     const xfail = xfailReason(case, inst);
-    const data_text = try std.json.Stringify.valueAlloc(arena, inst.get("data") orelse std.json.Value.null, .{});
     var msg: []const u8 = "";
-    const data = try xyang.json_value.parse(arena, data_text, &msg);
+    const data = try jsonVal(arena, inst.get("data") orelse std.json.Value.null);
+    const context: ?xyang.json_value.Val = if (inst.get("context")) |c| try jsonVal(arena, c) else null;
     var features: ?*xyang.yang_validator.EnabledFeatures = null;
     if (field(case, "features")) |f| {
         const f_text = try std.json.Stringify.valueAlloc(arena, f, .{});
@@ -323,11 +321,27 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     }
     const native = if (inst.get("encoding")) |e| e == .string and std.mem.eql(u8, e.string, "native") else false;
     var validator = xyang.YangValidator.init(arena, module);
-    const result = validator.validate(data, .{ .native_json = native, .enabled_features_by_module = features }) catch |err| switch (err) {
+    const options: xyang.yang_validator.Options = .{
+        .native_json = native,
+        .enabled_features_by_module = features,
+        .rpc = if (inst.get("rpc")) |r| r.string else null,
+        .action = if (inst.get("action")) |p| p.string else null,
+        .direction = if (inst.get("direction")) |d| d.string else "input",
+        .context = context,
+    };
+    const usage_error: ?[]const u8 = if (inst.get("usage_error")) |e| e.string else null;
+    const result = validator.validate(data, options) catch |err| switch (err) {
         error.Unsupported => return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unsupported: {s}", .{ name, validator.unsupported orelse "?" }) },
         error.Raised => return .{ .regression = try std.fmt.allocPrint(arena, "instance {s}: validation raised: {s}", .{ name, validator.unsupported orelse "?" }) },
+        error.Usage => {
+            const got = validator.usage orelse "";
+            const want = usage_error orelse return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unexpected usage error: {s}", .{ name, got }) };
+            if (std.mem.indexOf(u8, got, want) == null) return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: usage error {s} does not contain {s}", .{ name, got, want }) };
+            return .pass;
+        },
         else => return err,
     };
+    if (usage_error) |want| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: expected a usage error containing {s}; the call validates", .{ name, want }) };
     const mismatch = try compareInstance(arena, inst, result);
     if (xfail) |why| {
         if (mismatch == null) return .{ .regression = try std.fmt.allocPrint(arena, "instance {s} passes but Python xfails it ({s})", .{ name, why }) };
@@ -335,6 +349,12 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     }
     if (mismatch) |m| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: {s}", .{ name, m }) };
     return .pass;
+}
+
+fn jsonVal(arena: std.mem.Allocator, value: std.json.Value) !xyang.json_value.Val {
+    const text = try std.json.Stringify.valueAlloc(arena, value, .{});
+    var msg: []const u8 = "";
+    return xyang.json_value.parse(arena, text, &msg);
 }
 
 fn xfailReason(case: std.json.ObjectMap, inst: std.json.ObjectMap) ?[]const u8 {
