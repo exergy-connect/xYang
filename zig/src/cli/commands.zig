@@ -153,14 +153,14 @@ pub const COMMANDS = [_]Command{
         \\Default path: <stem>.yang.json beside the input.
         \\
         \\positional arguments:
-        \\  yang_file               Path to .yang file
+        \\  yang_file           Path to .yang file
         \\
         \\options:
-        \\  -h, --help              show this help message and exit
-        \\  --include-path DIR      Directory to search for imported modules (repeatable; searched
-        \\                          after the main file's directory). Default: none
-        \\  -o PATH, --output PATH  Output file (default: <stem>.yang.json beside the input). If
-        \\                          the name does not end in .yang.json, that suffix is added
+        \\  -h, --help          show this help message and exit
+        \\  --include-path DIR  Directory to search for imported modules (repeatable; searched
+        \\                      after the main file's directory). Default: none
+        \\  -o, --output PATH   Output file (default: <stem>.yang.json beside the input). If the
+        \\                      name does not end in .yang.json, that suffix is added
         \\
         \\examples:
         \\  xyang-zig convert --help
