@@ -1,4 +1,4 @@
-# Release benchmark: time, peak memory, and source lines for Python and TypeScript.
+# Release benchmark: Python/TypeScript time, memory, source lines, and Zig binary size.
 #
 # - pull_request (benchmark files only): smoke run (1 iteration) plus a check that
 #   the README section matches benchmarks/results/latest.json. No timing thresholds.
@@ -38,6 +38,10 @@ permissions:
 concurrency:
   group: benchmark-${{ github.event.release.tag_name || github.event.pull_request.number || github.ref }}
   cancel-in-progress: ${{ github.event_name == 'pull_request' }}
+
+env:
+  ZIG_VERSION: "0.17.1"
+  ZIG_SHA256: "3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a"
 
 jobs:
   smoke:
@@ -104,12 +108,38 @@ jobs:
           pip install -e .
           cd ts && npm ci
 
+      - name: Cache Zig toolchain
+        id: zig-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+
+      - name: Install Zig
+        if: steps.zig-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          curl -sSfL -o "${tarball}" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
+          echo "$ZIG_SHA256  $tarball" | sha256sum -c -
+          mkdir -p ~/zig
+          tar -xJf "$tarball" -C ~/zig --strip-components=1
+
+      - name: Build Zig binary for size measurement
+        working-directory: zig
+        run: |
+          set -euo pipefail
+          pinned="$(sed -n 's/.*minimum_zig_version = "\([^"]*\)".*/\1/p' build.zig.zon)"
+          [ "$pinned" = "$ZIG_VERSION" ]
+          [ "$("$HOME/zig/zig" version)" = "$ZIG_VERSION" ]
+          "$HOME/zig/zig" build -Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline --prefix zig-out-benchmark
+
       - name: Run benchmark
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
-          args=(run --out bench-out/results.json)
+          args=(run --out bench-out/results.json --zig-binary zig/zig-out-benchmark/bin/xyang-zig)
           if [ -n "${TAG}" ]; then args+=(--release-tag "${TAG}"); fi
           python benchmarks/release_bench.py "${args[@]}"
           python benchmarks/release_bench.py render bench-out/results.json > bench-out/README-section.md

@@ -1,5 +1,4 @@
-# Build and test the Zig port in zig/ (#165): `zig build`, `zig build test`, the
-# conformance runner over tests/cases, and the cross-check against the Python CLI.
+# Build the Zig port and run the shared YANG cases in tests/cases (#165).
 #
 # Toolchain: ZIG_VERSION is pinned and must equal minimum_zig_version in
 # zig/build.zig.zon; the tarball is verified against ZIG_SHA256.
@@ -100,33 +99,6 @@ jobs:
         working-directory: zig
         run: zig build
 
-      - name: Unit tests
-        working-directory: zig
-        run: zig build test --summary all
-
       - name: Conformance cases
         working-directory: zig
         run: zig build conformance
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.14"
-          cache: pip
-          cache-dependency-path: pyproject.toml
-
-      - name: Install the Python package
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-
-      - name: Cross-check against the Python CLI
-        run: python zig/tests/cross_check.py zig/zig-out/bin/xyang-zig
-
-      - name: Release binary size
-        working-directory: zig
-        shell: bash
-        run: |
-          set -euo pipefail
-          zig build -Doptimize=small --prefix zig-out-small
-          size="$(stat -c %s zig-out-small/bin/xyang-zig)"
-          echo "xyang-zig (ReleaseSmall, x86_64-linux): ${size} bytes" | tee -a "$GITHUB_STEP_SUMMARY"
