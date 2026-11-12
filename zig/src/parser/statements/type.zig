@@ -228,11 +228,13 @@ pub fn parseBitPosition(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// leafref `path`. The XPath is kept as text until the XPath phase parses and binds it.
+/// leafref `path`, parsed as a schema path and bound to this module's prefixes.
 pub fn parsePath(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
     _ = try p.ts.consume(kw.PATH);
-    t.path = try p.parseStringArgument();
+    const path = try p.parseStringArgument();
+    t.path = path;
+    t.path_ast = try p.compileXPathPath(path);
     _ = p.ts.consumeIfType(.semicolon);
 }
 

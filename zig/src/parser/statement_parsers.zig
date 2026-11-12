@@ -18,6 +18,7 @@ const type_parsers = @import("statements/type.zig");
 const module_parsers = @import("statements/module.zig");
 const data_parsers = @import("statements/data.zig");
 const Loader = @import("yang_parser.zig").Loader;
+const xpath = @import("../xpath/xpath.zig");
 
 pub const TokenStream = ts_mod.TokenStream;
 pub const ParentId = registry.ParentId;
@@ -74,6 +75,25 @@ pub const Parser = struct {
 
     pub fn label(p: *Parser, comptime fmt: []const u8, args: anytype) Error![]const u8 {
         return std.fmt.allocPrint(p.arena, fmt, args);
+    }
+
+    /// A `must` / `when` expression parsed and bound to this module's prefixes. Python
+    /// raises the XPath error unwrapped, so the message has no file or line.
+    pub fn compileXPath(p: *Parser, expression: []const u8) Error!?*xpath.Expr {
+        var failure: xpath.Failure = .{};
+        return xpath.compile(p.arena, expression, p.module, &failure) catch |err| switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
+        };
+    }
+
+    /// A leafref `path` parsed as a schema path and bound to this module's prefixes.
+    pub fn compileXPathPath(p: *Parser, path: []const u8) Error!*xpath.Expr {
+        var failure: xpath.Failure = .{};
+        return xpath.compilePath(p.arena, path, p.module, &failure) catch |err| switch (err) {
+            error.OutOfMemory => error.OutOfMemory,
+            error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
+        };
     }
 
     // ------------------------------------------------------------------
