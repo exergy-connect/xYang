@@ -10,6 +10,7 @@ const pyfmt = @import("../../pyfmt.zig");
 const kw = @import("../keywords.zig");
 const sp = @import("../statement_parsers.zig");
 const registry = @import("../dispatch_registry.zig");
+const refine_expand = @import("../../refine_expand.zig");
 
 const Parser = sp.Parser;
 const Parent = sp.Parent;
@@ -252,8 +253,7 @@ pub fn parseUses(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `refine` with a descendant path (`a/b`, `p:a/p:b`). The path stays text until the
-/// XPath phase; uses expansion applies the refine in phase 2.
+/// `refine` with a descendant path (`a/b`, `p:a/p:b`), applied when `uses` is expanded.
 pub fn parseRefine(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REFINE);
     var parts: std.ArrayList([]const u8) = .empty;
@@ -263,6 +263,9 @@ pub fn parseRefine(p: *Parser, parent: Parent) Error!void {
         try parts.append(p.arena, if ((try p.ts.peekType()) == .identifier) try p.consumeQName() else try p.ts.consumeAny());
     }
     const path = try std.mem.join(p.arena, "/", parts.items);
+    if ((try refine_expand.descendantPathSteps(p.arena, path)) == null) {
+        return p.ts.failKind(.unsupported, refine_expand.UNSUPPORTED_PATH, .{ "refine", repr(path) });
+    }
     const refine = try p.newStatement("refine", .{ .refine = .{ .target_path = path } });
     try p.parseOptionalBlock(.{ .stmt = refine }, .refine, try p.label("refine '{s}'", .{path}));
     if (stmtData(parent, .uses)) |s| try s.data.uses.refines.append(p.arena, refine);

@@ -6,6 +6,7 @@ const errors = @import("../../errors.zig");
 const pyfmt = @import("../../pyfmt.zig");
 const kw = @import("../keywords.zig");
 const sp = @import("../statement_parsers.zig");
+const xsd_regex = @import("../../xsd_regex.zig");
 
 const Parser = sp.Parser;
 const Parent = sp.Parent;
@@ -38,7 +39,7 @@ pub fn parseType(p: *Parser, parent: Parent) Error!void {
     } else {
         name = try p.ts.consumeAny();
     }
-    const t = try p.new(ast.TypeStmt, .{ .name = name, .prefix = prefix });
+    const t = try p.new(ast.TypeStmt, .{ .name = name, .prefix = prefix, .scope = p.module });
     if (p.ts.consumeIfType(.lbrace)) {
         const ctx = try p.label("type '{s}'", .{name});
         while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
@@ -106,11 +107,20 @@ pub fn parsePattern(p: *Parser, parent: Parent) Error!void {
     var acc: Holder = .{};
     try p.parseOptionalBlock(.{ .holder = &acc }, .pattern, "pattern");
     _ = p.ts.consumeIfType(.semicolon);
+    var compiled: ?*const xsd_regex.Regex = null;
+    if (pattern.len > 0) {
+        var failure: xsd_regex.Failure = .{};
+        compiled = xsd_regex.translate(p.arena, pattern, &failure) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidPattern => return p.ts.failUnlocated(if (failure.unsupported) .unsupported else .semantic, "{s}", .{failure.message}),
+        };
+    }
     try t.patterns.append(p.arena, .{
         .pattern = pattern,
         .invert_match = acc.invert_match,
         .error_message = acc.error_message,
         .error_app_tag = acc.error_app_tag,
+        .compiled = compiled,
     });
 }
 

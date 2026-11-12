@@ -17,6 +17,7 @@ const ts_mod = @import("token_stream.zig");
 const type_parsers = @import("statements/type.zig");
 const module_parsers = @import("statements/module.zig");
 const data_parsers = @import("statements/data.zig");
+const Loader = @import("yang_parser.zig").Loader;
 
 pub const TokenStream = ts_mod.TokenStream;
 pub const ParentId = registry.ParentId;
@@ -33,6 +34,8 @@ pub const Holder = struct {
     invert_match: bool = false,
     /// `prefix` bound inside an `import` body.
     prefix: ?[]const u8 = null,
+    /// `revision-date` inside an `import` or `include` body.
+    revision_date: ?[]const u8 = null,
 };
 
 /// `ParserContext.current_parent`.
@@ -54,6 +57,10 @@ pub const Parser = struct {
     ts: TokenStream,
     arena: std.mem.Allocator,
     module: *Module,
+    /// Loads `import`ed modules and `include`d submodules (`YangParser`).
+    loader: *Loader,
+    /// Directory of the file being parsed; `import` and `include` search it first.
+    source_dir: ?[]const u8 = null,
 
     pub fn new(p: *Parser, comptime T: type, value: T) Error!*T {
         const ptr = try p.arena.create(T);
@@ -116,15 +123,14 @@ pub const Parser = struct {
         const ext_name = try p.ts.consumeType(.identifier);
         const resolved = p.module.resolvePrefixedModule(prefix) orelse
             return p.ts.fail("Unknown extension prefix {f} in invocation {s}:{s}", .{ repr(prefix), prefix, ext_name });
-        if (!resolved.extensions.contains(ext_name)) {
+        const ext = resolved.extensions.get(ext_name) orelse
             return p.ts.fail("Unknown extension {f} in module {f} for invocation {s}:{s}", .{ repr(ext_name), repr(resolved.name), prefix, ext_name });
-        }
         var arg: ?[]const u8 = null;
         if (p.ts.hasMore() and !p.ts.at(.lbrace) and !p.ts.at(.semicolon) and !p.ts.at(.rbrace)) {
             arg = try p.parseStringArgument();
         }
         const name = try p.label("{s}:{s}", .{ prefix, ext_name });
-        const inv = try p.newStatement(name, .{ .extension_invocation = .{ .prefix = prefix, .argument = arg, .resolved_module = resolved.name } });
+        const inv = try p.newStatement(name, .{ .extension_invocation = .{ .prefix = prefix, .argument = arg, .resolved_module = resolved.name, .resolved_extension = ext } });
         if (p.ts.consumeIfType(.lbrace)) {
             const ctx = try p.label("extension invocation '{s}'", .{name});
             while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
@@ -408,7 +414,7 @@ const Override = struct { ParentId, []const KV };
 
 const OVERRIDES = [_]Override{
     .{ .import, &.{
-        .{ kw.PREFIX, module_parsers.parsePrefixValue },
+        .{ kw.PREFIX, module_parsers.parseImportPrefix },
         .{ kw.DESCRIPTION, parseDiscardedDescription },
         .{ kw.REVISION_DATE, module_parsers.parseRevisionDate },
     } },

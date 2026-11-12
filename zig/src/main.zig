@@ -43,5 +43,5 @@ fn run(ctx: commands.Io, args: []const []const u8) !u8 {
         }
         return commands.usageError(ctx, commands.MAIN_USAGE, commands.PROG, "argument cmd: invalid choice: '{s}' (choose from {s})", .{ first, names.items });
     };
-    return cmd.run(ctx, args[1..]);
+    return commands.dispatch(ctx, cmd, args[1..]);
 }
