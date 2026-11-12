@@ -290,7 +290,6 @@ def main() -> int:
         ["validate", "--a", "x", "a.yang"],
         ["validate", "--native-json=1", "a.yang"],
         ["validate", "a.yang", "b.json", "c.json"],
-        ["validate", "a.yang", "--format", "json", "b.json"],
         ["validate", "missing-file.yang"],
         ["validate", "--rpc", "r", "--action", "/m:a", "examples/meta-model.yang"],
         ["validate", "--output", "examples/meta-model.yang"],

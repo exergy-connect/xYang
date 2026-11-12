@@ -3,8 +3,9 @@
 //!
 //! A command declares its options and positionals once (`commands.zig`); this parser
 //! reads them: long options by exact name or unambiguous prefix, `--opt=value`, `--`,
-//! `-h`/`--help`, choices, repeatable options, and argparse's positional matching (the
-//! first run of positionals fills every positional; later ones are unrecognized).
+//! `-h`/`--help`, choices, repeatable options, and positionals filled in order across
+//! options (Python 3.13 argparse, the version the cross-check runs); extra positionals
+//! are unrecognized.
 
 const std = @import("std");
 
@@ -98,7 +99,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
     var p: Parsed = .{};
     var extras: std.ArrayList([]const u8) = .empty;
     var chunk: std.ArrayList([]const u8) = .empty;
-    var positionals_done = false;
+    var filled: usize = 0;
     var only_positional = false;
 
     const usageError = struct {
@@ -115,19 +116,12 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
         const is_sep = !at_end and !only_positional and std.mem.eql(u8, a, "--");
         if (at_end or is_option or is_sep) {
             if (chunk.items.len > 0) {
-                if (!positionals_done) {
-                    var k: usize = 0;
-                    for (spec.positionals) |pos| {
-                        if (k < chunk.items.len) {
-                            try p.positionals.put(arena, pos.name, chunk.items[k]);
-                            k += 1;
-                        }
-                    }
-                    try extras.appendSlice(arena, chunk.items[k..]);
-                    positionals_done = true;
-                } else {
-                    try extras.appendSlice(arena, chunk.items);
+                var k: usize = 0;
+                while (k < chunk.items.len and filled < spec.positionals.len) : (k += 1) {
+                    try p.positionals.put(arena, spec.positionals[filled].name, chunk.items[k]);
+                    filled += 1;
                 }
+                try extras.appendSlice(arena, chunk.items[k..]);
                 chunk.clearRetainingCapacity();
             }
         }
