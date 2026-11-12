@@ -1,5 +1,5 @@
 //! xYang in Zig: parse YANG modules, resolve them, and validate RFC 7951 instance data
-//! (phases 1 to 4 of #165).
+//! (phases 1 to 5 of #165).
 
 pub const ast = @import("ast.zig");
 pub const errors = @import("errors.zig");
@@ -19,6 +19,7 @@ pub const type_registry = @import("types/registry.zig");
 pub const xpath = @import("xpath/xpath.zig");
 pub const yang_validator = @import("validator/yang_validator.zig");
 pub const YangValidator = yang_validator.YangValidator;
+pub const operation = @import("validator/operation.zig");
 
 pub const Diagnostic = errors.Diagnostic;
 pub const Loader = yang_parser.Loader;
@@ -52,5 +53,6 @@ test {
     _ = @import("validator/path_builder.zig");
     _ = @import("validator/document_validator.zig");
     _ = @import("validator/yang_validator.zig");
+    _ = @import("validator/operation.zig");
     _ = @import("xpath/xpath.zig");
 }

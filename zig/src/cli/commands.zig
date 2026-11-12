@@ -270,7 +270,15 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
             error.InvalidFeatures => return fail(ctx, "{s}", .{message}),
         };
     }
-    if (context) |c| if (!exists(ctx, c)) return fail(ctx, "file not found: {s}", .{c});
+    var context_data: ?jv.Val = null;
+    if (rpc != null or action != null) if (context) |c| {
+        if (!exists(ctx, c)) return fail(ctx, "file not found: {s}", .{c});
+        const c_text = (try readInstanceFile(ctx, c, &message)) orelse return fail(ctx, "{s}", .{message});
+        context_data = jv.parse(ctx.arena, c_text, &message) catch |err| switch (err) {
+            error.OutOfMemory => return err,
+            else => return fail(ctx, "{s}", .{message}),
+        };
+    };
     var diag: xyang.Diagnostic = .{};
     const module = (try loadModule(ctx, parsed, path, &diag)) orelse return fail(ctx, "{f}", .{diag});
     if (parsed.value("--anydata-validation")) |mode| if (!std.mem.eql(u8, mode, "off")) {
@@ -282,11 +290,7 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
     if (data_file != null and !std.mem.eql(u8, data_file.?, "-")) {
         const data_path = data_file.?;
         if (!exists(ctx, data_path)) return fail(ctx, "file not found: {s}", .{data_path});
-        const lower = try std.ascii.allocLowerString(ctx.arena, std.fs.path.extension(data_path));
-        if (std.mem.eql(u8, lower, ".yaml") or std.mem.eql(u8, lower, ".yml")) {
-            return fail(ctx, "xyang-zig cannot read YAML instance data ({s}); pass JSON", .{data_path});
-        }
-        text = std.Io.Dir.cwd().readFileAlloc(ctx.io, data_path, ctx.arena, .unlimited) catch |err| return fail(ctx, "cannot read {s}: {s}", .{ data_path, @errorName(err) });
+        text = (try readInstanceFile(ctx, data_path, &message)) orelse return fail(ctx, "{s}", .{message});
     } else {
         var buf: [4096]u8 = undefined;
         var r = std.Io.File.stdin().reader(ctx.io, &buf);
@@ -296,13 +300,17 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
         error.OutOfMemory => return err,
         else => return fail(ctx, "{s}", .{message}),
     };
-    if (rpc != null or action != null) {
-        return fail(ctx, "xyang-zig cannot validate rpc or action input and output yet (operations are phase 5 of #165)", .{});
-    }
-
     var validator = xyang.YangValidator.init(ctx.arena, module);
-    const result = validator.validate(data, .{ .native_json = parsed.flag("--native-json"), .enabled_features_by_module = features }) catch |err| switch (err) {
+    const result = validator.validate(data, .{
+        .native_json = parsed.flag("--native-json"),
+        .enabled_features_by_module = features,
+        .rpc = rpc,
+        .action = action,
+        .direction = if (parsed.flag("--output")) "output" else "input",
+        .context = context_data,
+    }) catch |err| switch (err) {
         error.Unsupported, error.Raised => return fail(ctx, "{s}", .{validator.unsupported orelse "unsupported construct"}),
+        error.Usage => return fail(ctx, "{s}", .{validator.usage orelse "invalid call"}),
         else => return err,
     };
 
@@ -344,6 +352,20 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
     try ctx.err.writeAll("Validation failed:\n");
     for (result.errors) |e| try ctx.err.print("  {s}\n", .{try yv.formatError(ctx.arena, e)});
     return 1;
+}
+
+/// `_load_instance_data` for a JSON file: its text, or null with `message` set. YAML is
+/// refused loudly.
+fn readInstanceFile(ctx: Io, path: []const u8, message: *[]const u8) !?[]const u8 {
+    const lower = try std.ascii.allocLowerString(ctx.arena, std.fs.path.extension(path));
+    if (std.mem.eql(u8, lower, ".yaml") or std.mem.eql(u8, lower, ".yml")) {
+        message.* = try std.fmt.allocPrint(ctx.arena, "xyang-zig cannot read YAML instance data ({s}); pass JSON", .{path});
+        return null;
+    }
+    return std.Io.Dir.cwd().readFileAlloc(ctx.io, path, ctx.arena, .unlimited) catch |err| {
+        message.* = try std.fmt.allocPrint(ctx.arena, "cannot read {s}: {s}", .{ path, @errorName(err) });
+        return null;
+    };
 }
 
 /// `_print_cli_error`: `Error: message` on stderr, exit 2.

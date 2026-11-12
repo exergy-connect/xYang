@@ -59,6 +59,9 @@ pub const TypeChecker = struct {
     a: Allocator,
     /// `root_schema`: the host module the validator runs against.
     root: *Module,
+    /// False when the validator's root schema is an RFC 8791 structure, not a module:
+    /// Python then cannot check an identityref.
+    module_schema: bool = true,
     /// Set with `error.Unsupported` / `error.Raised`: the message.
     unsupported: ?[]const u8 = null,
     /// XPath context of the value being checked; null is a value outside the instance
@@ -171,6 +174,7 @@ pub const TypeChecker = struct {
 
     fn checkIdentityref(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (try registry.get(registry.IDENTITYREF).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
+        if (!self.module_schema) return self.issue("identityref", "identityref validation requires module schema", .{});
         const s = value.string;
         const bases = t.identityref_bases.items;
         if (bases.len == 0) return self.issue("identityref", "identityref type has no base identities", .{});

@@ -29,6 +29,9 @@ pub const Module = struct {
     import_prefixes: std.StringArrayHashMapUnmanaged(*Module) = .empty,
     extensions: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
     statements: std.ArrayList(*ast.Statement) = .empty,
+    /// RFC 8791 `sx:structure` invocations by name, registered when the extension is
+    /// applied (Python's `extension_runtime["ietf-yang-structure-ext:structure-index"]`).
+    structures: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
     /// Set when `belongs-to` was parsed (this is a submodule).
     is_submodule: bool = false,
 
