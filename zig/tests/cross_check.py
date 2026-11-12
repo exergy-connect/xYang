@@ -212,6 +212,41 @@ def tree_failures() -> tuple[int, list[str]]:
     return compared, failures
 
 
+def validate_failures() -> tuple[int, int, list[str]]:
+    """``xyang validate`` and ``xyang-zig validate`` on every case instance, in both output
+    formats: exit code, stdout and stderr must be identical. xyang-zig may refuse an
+    instance as unsupported (exit 2) only in a case listed as pending."""
+    failures: list[str] = []
+    same = deferred = 0
+    pending = pending_cases()
+    with tempfile.TemporaryDirectory() as tmp:
+        data_path = Path(tmp) / "data.json"
+        for case_json in sorted(CASES.rglob("case.json")):
+            case_dir = case_json.parent
+            case = case_dir.relative_to(CASES).as_posix()
+            spec = json.loads(case_json.read_text())
+            for inst in spec.get("instances") or []:
+                if any(key in inst for key in ("rpc", "action", "context", "usage_error")):
+                    continue
+                data_path.write_text(json.dumps(inst["data"]))
+                for fmt in ("text", "json"):
+                    args = ["validate", "--format", fmt, "--include-path", str(case_dir)]
+                    if "features" in spec:
+                        args += ["--features", json.dumps(spec["features"])]
+                    if inst.get("encoding") == "native":
+                        args.append("--native-json")
+                    args += [str(case_dir / spec["module"]), str(data_path)]
+                    py, zg = python_cli(*args), zig_cli(*args)
+                    if py == zg:
+                        same += 1
+                        continue
+                    if zg[0] == 2 and any(marker in zg[2] for marker in UNSUPPORTED) and case in pending:
+                        deferred += 1
+                        continue
+                    failures.append(f"{case} / {inst['name']} ({fmt}): validate differs\n  python: {py}\n  zig:    {zg}")
+    return same, deferred, failures
+
+
 def main() -> int:
     failures: list[str] = []
     pending = pending_cases()
@@ -249,10 +284,24 @@ def main() -> int:
         ["parse", "missing-file.yang"],
         ["parse", "--help"],
         ["parse", "-h"],
+        ["validate"],
+        ["validate", "--format"],
+        ["validate", "--format", "xml", "a.yang"],
+        ["validate", "--a", "x", "a.yang"],
+        ["validate", "--native-json=1", "a.yang"],
+        ["validate", "a.yang", "b.json", "c.json"],
+        ["validate", "a.yang", "--format", "json", "b.json"],
+        ["validate", "missing-file.yang"],
+        ["validate", "--rpc", "r", "--action", "/m:a", "examples/meta-model.yang"],
+        ["validate", "--output", "examples/meta-model.yang"],
+        ["validate", "--features", "[1]", "examples/meta-model.yang"],
+        ["validate", "examples/meta-model.yang", "missing-data.json"],
+        ["validate", "--help"],
+        ["validate", "-h"],
     ]
     for args in usage_calls:
         py, zg = python_cli(*args), normalized(zig_cli(*args))
-        if args[1:2] in (["a.yang"], ["--bogus"]):
+        if py[0] == 2 and "unrecognized arguments" in py[2]:
             # The top-level usage line lists every Python command; compare the error line.
             py = (py[0], py[1], py[2].splitlines()[-1])
             zg = (zg[0], zg[1], zg[2].splitlines()[-1])
@@ -262,6 +311,8 @@ def main() -> int:
     failures.extend(resolution_failures())
     trees, tree_diffs = tree_failures()
     failures.extend(tree_diffs)
+    validated, validate_deferred, validate_diffs = validate_failures()
+    failures.extend(validate_diffs)
 
     from xyang.parser.dispatch_registry import dispatch_registry_parity_snapshot
 
@@ -275,6 +326,7 @@ def main() -> int:
         f"{len(files)} files: {same} identical, {deferred} deferred to a pending phase, "
         f"{divergent} meeting a case Python xfails; {len(RESOLUTION_CALLS)} resolution scenarios; "
         f"{trees} resolved case trees identical to Python's unless listed; "
+        f"{validated} validate runs identical, {validate_deferred} deferred to a pending phase; "
         f"{len(failures)} failure(s)"
     )
     return 1 if failures else 0
