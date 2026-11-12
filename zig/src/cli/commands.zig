@@ -143,6 +143,37 @@ pub const COMMANDS = [_]Command{
         .positionals = &.{ .{ .name = "yang_file" }, .{ .name = "data_file", .optional = true } },
         .run = runValidate,
     },
+    .{
+        .name = "convert",
+        .summary = "Convert .yang to .yang.json (JSON Schema with x-yang)",
+        .usage = "usage: " ++ PROG ++ " convert [-h] [--include-path DIR] [-o PATH] yang_file\n",
+        .help =
+        \\
+        \\Write JSON Schema (2020-12) with x-yang to a file whose name ends in .yang.json.
+        \\Default path: <stem>.yang.json beside the input.
+        \\
+        \\positional arguments:
+        \\  yang_file           Path to .yang file
+        \\
+        \\options:
+        \\  -h, --help          show this help message and exit
+        \\  --include-path DIR  Directory to search for imported modules (repeatable; searched
+        \\                      after the main file's directory). Default: none
+        \\  -o, --output PATH   Output file (default: <stem>.yang.json beside the input). If the
+        \\                      name does not end in .yang.json, that suffix is added
+        \\
+        \\examples:
+        \\  xyang-zig convert --help
+        \\  xyang-zig convert -h
+        \\  xyang-zig convert module.yang
+        \\  xyang-zig convert module.yang -o module.yang.json
+        \\  xyang-zig convert --include-path ./modules module.yang -o out.yang.json
+        \\
+        ,
+        .options = &.{ INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" } },
+        .positionals = &.{.{ .name = "yang_file" }},
+        .run = runConvert,
+    },
 };
 
 pub fn find(name: []const u8) ?*const Command {
@@ -352,6 +383,98 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
     try ctx.err.writeAll("Validation failed:\n");
     for (result.errors) |e| try ctx.err.print("  {s}\n", .{try yv.formatError(ctx.arena, e)});
     return 1;
+}
+
+/// `xyang convert`: parse without expanding `uses` and write the native JSON form. An
+/// export error exits 2, a module error 1.
+fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerror!u8 {
+    const raw = parsed.positional("yang_file").?;
+    const p = try pyPath(ctx.arena, raw);
+    if (!exists(ctx, raw)) {
+        try ctx.err.print("Error: file not found: {s}\n", .{p});
+        return 1;
+    }
+    const out_path = if (parsed.value("--output")) |o| blk: {
+        const op = try pyPath(ctx.arena, o);
+        const name = std.fs.path.basename(op);
+        if (std.mem.endsWith(u8, name, ".yang.json")) break :blk op;
+        const parent = std.fs.path.dirname(op);
+        const file = try std.fmt.allocPrint(ctx.arena, "{s}.yang.json", .{pathStem(name)});
+        break :blk if (parent) |d| try std.fs.path.join(ctx.arena, &.{ d, file }) else file;
+    } else try withSuffix(ctx.arena, p, ".yang.json");
+
+    var dirs: std.ArrayList([]const u8) = .empty;
+    for (parsed.all("--include-path")) |dir| try dirs.append(ctx.arena, try resolvePath(ctx, dir));
+    var diag: xyang.Diagnostic = .{};
+    var loader = xyang.Loader.init(ctx.arena, ctx.io, &diag, dirs.items);
+    loader.expand_uses = false;
+    const loaded = loader.parseFile(raw);
+    for (loader.warnings()) |w| try ctx.err.print("{s}\n", .{w});
+    const module = loaded catch |err| switch (err) {
+        error.YangLoad => {
+            try ctx.err.print("Error: {f}\n", .{diag});
+            return 1;
+        },
+        else => return err,
+    };
+    const text = xyang.json_generator.schemaToYangJson(ctx.arena, module, &diag) catch |err| switch (err) {
+        error.Export => {
+            try ctx.err.print("Error: {f}\n", .{diag});
+            return 2;
+        },
+        error.YangLoad => {
+            try ctx.err.print("Error: {f}\n", .{diag});
+            return 1;
+        },
+        else => return err,
+    };
+    const cwd = std.Io.Dir.cwd();
+    if (std.fs.path.dirname(out_path)) |d| cwd.createDirPath(ctx.io, d) catch |err| {
+        try ctx.err.print("Error: cannot create {s}: {s}\n", .{ d, @errorName(err) });
+        return 1;
+    };
+    cwd.writeFile(ctx.io, .{ .sub_path = out_path, .data = text }) catch |err| {
+        try ctx.err.print("Error: cannot write {s}: {s}\n", .{ out_path, @errorName(err) });
+        return 1;
+    };
+    try ctx.out.print("Wrote {s}\n", .{out_path});
+    return 0;
+}
+
+/// `str(Path(p))`: repeated and trailing slashes and `.` components removed.
+fn pyPath(arena: std.mem.Allocator, p: []const u8) ![]const u8 {
+    if (p.len == 0) return ".";
+    var out: std.ArrayList(u8) = .empty;
+    const leading: usize = if (std.mem.startsWith(u8, p, "//") and !std.mem.startsWith(u8, p, "///")) 2 else if (p[0] == '/') 1 else 0;
+    try out.appendNTimes(arena, '/', leading);
+    var it = std.mem.tokenizeScalar(u8, p, '/');
+    var first = true;
+    while (it.next()) |part| {
+        if (std.mem.eql(u8, part, ".")) continue;
+        if (!first) try out.append(arena, '/');
+        try out.appendSlice(arena, part);
+        first = false;
+    }
+    if (out.items.len == 0) return ".";
+    return out.items;
+}
+
+/// `PurePath.suffix` start: the last `.` of the name, unless it leads or ends the name.
+fn suffixIndex(name: []const u8) ?usize {
+    const i = std.mem.lastIndexOfScalar(u8, name, '.') orelse return null;
+    if (i == 0 or i == name.len - 1) return null;
+    return i;
+}
+
+fn pathStem(name: []const u8) []const u8 {
+    return if (suffixIndex(name)) |i| name[0..i] else name;
+}
+
+/// `Path.with_suffix(suffix)`.
+fn withSuffix(arena: std.mem.Allocator, p: []const u8, suffix: []const u8) ![]const u8 {
+    const name = std.fs.path.basename(p);
+    const head = p[0 .. p.len - name.len];
+    return std.fmt.allocPrint(arena, "{s}{s}{s}", .{ head, pathStem(name), suffix });
 }
 
 /// `_load_instance_data` for a JSON file: its text, or null with `message` set. YAML is
