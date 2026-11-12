@@ -255,6 +255,7 @@ fn whenToJson(a: Allocator, w: *const ast.WhenStmt) Error!Val {
     try out.put(a, K.when_entry.CONDITION, str(w.expression));
     try withXpathPrefixes(a, out, w.ast);
     if (pyStrip(w.description).len > 0) try out.put(a, K.DESCRIPTION, str(w.description));
+    if (w.evaluate_with_parent_context) try out.put(a, K.when_entry.EVALUATE_WITH_PARENT_CONTEXT, .{ .bool = true });
     return objVal(out);
 }
 
@@ -521,8 +522,6 @@ fn importsForJson(g: *Gen, root: *Module) Error!*Object {
 // ---------------------------------------------------------------------------
 // Extensions
 
-const SEMANTIC_EXTENSIONS = [_][]const u8{ "structure", "augment-structure" };
-
 fn extensionDefJson(a: Allocator, ext: *const Statement) error{OutOfMemory}!Val {
     const d = ext.data.extension;
     const out = try newObject(a);
@@ -533,20 +532,13 @@ fn extensionDefJson(a: Allocator, ext: *const Statement) error{OutOfMemory}!Val 
     return objVal(out);
 }
 
-/// `_reject_semantic_extension`: RFC 8791 hooks are applied at parse and not again when
-/// JSON is loaded, so recording the invocation would not round-trip its effect.
+/// Extensions with callbacks need a reversible form. RFC 8791 has one (#164).
 fn rejectSemanticExtension(g: *Gen, inv: *const Statement) Error!void {
     const d = inv.data.extension_invocation;
     const ext = d.resolved_extension;
-    const rfc8791 = std.mem.eql(u8, d.resolved_module, capabilities.RFC8791_MODULE) and for (SEMANTIC_EXTENSIONS) |n| {
-        if (std.mem.eql(u8, n, ext.name)) break true;
-    } else false;
-    if (!rfc8791 and capabilities.find(ext.data.extension.module_name, ext.name) == null) return;
-    const detail = if (rfc8791)
-        try std.fmt.allocPrint(g.a, "RFC 8791 sx:{s}", .{ext.name})
-    else
-        try std.fmt.allocPrint(g.a, "extension {s}:{s}", .{ d.resolved_module, ext.name });
-    return g.fail("cannot export extension invocation {f}: {s} is applied when the module is parsed and is not re-applied when the native JSON form is loaded", .{ repr(inv.name), detail });
+    if (capabilities.isRfc8791(inv, "structure") or capabilities.isRfc8791(inv, "augment-structure")) return;
+    if (capabilities.find(ext.data.extension.module_name, ext.name) == null) return;
+    return g.fail("cannot export extension invocation {f}: extension {s}:{s} is applied when the module is parsed and is not re-applied when the native JSON form is loaded", .{ repr(inv.name), d.resolved_module, ext.name });
 }
 
 /// The loaded module named `name`: the root or a module it reaches through `import`.
@@ -1277,7 +1269,7 @@ fn rpcToJson(g: *Gen, s: *Statement, names: *const Names, module: *Module, kind:
 
 /// `_statement_to_property`: one schema node, or null for a statement that is not one.
 fn statementToProperty(g: *Gen, s: *Statement, names: *const Names, module: *Module, parent: Schema) Error!?Val {
-    return switch (s.kind()) {
+    const property: ?Val = switch (s.kind()) {
         .container, .notification, .input, .output => try withActions(g, try containerToProperty(g, s, names, module), s, names, module),
         .list => try withActions(g, try listToProperty(g, s, names, module), s, names, module),
         .leaf => try leafToProperty(g, s, names, module, parent),
@@ -1286,6 +1278,10 @@ fn statementToProperty(g: *Gen, s: *Statement, names: *const Names, module: *Mod
         .choice => try choiceToProperty(g, s, names, module, parent),
         else => null,
     };
+    if (property) |prop| if (s.augment_structure) |path| {
+        if (getObject(prop.object, K.X_YANG)) |xy| try xy.put(g.a, K.xy.AUGMENT_STRUCTURE, str(path));
+    };
+    return property;
 }
 
 /// `_typedef_to_def`: a typedef's `$defs` entry (no `$ref` inside).
@@ -1339,6 +1335,119 @@ fn firstPathPrefix(path: []const u8) []const u8 {
     return seg[0..colon];
 }
 
+/// Preserve foreign augment positions even after callbacks removed them from the tree.
+fn orderedExtensionInvocations(g: *Gen, module: *Module, names: *const Names) Error!?Val {
+    var out: std.ArrayList(Val) = .empty;
+    var slot: usize = 0;
+    for (module.statements.items) |node| {
+        if (node.kind() != .extension_invocation) continue;
+        for (module.foreign_structure_augments.items, module.foreign_structure_slots.items) |inv, at| {
+            if (at == slot) try out.append(g.a, try oneExtensionInvocation(g, inv, names, module));
+        }
+        try out.append(g.a, try oneExtensionInvocation(g, node, names, module));
+        slot += 1;
+    }
+    for (module.foreign_structure_augments.items, module.foreign_structure_slots.items) |inv, at| {
+        if (at >= slot) try out.append(g.a, try oneExtensionInvocation(g, inv, names, module));
+    }
+    return if (out.items.len == 0) null else .{ .array = out.items };
+}
+
+fn featuresJson(a: Allocator, module: *Module) Error!*Object {
+    const out = try newObject(a);
+    for (try sortedStrings(a, module.features.keys())) |name| {
+        const body = try newObject(a);
+        if (module.feature_if_features.get(name)) |guards| {
+            if (guards.items.len > 0) try body.put(a, K.xy.IF_FEATURES, try strList(a, guards.items));
+        }
+        try out.put(a, name, objVal(body));
+    }
+    return out;
+}
+
+/// Strip this exporter's additions recursively, since its foreign invocation is
+/// applied separately on reload. Work only on detached copies.
+fn stripAugmentedBy(g: *Gen, node: *Statement, exporter: []const u8) Error!?*Statement {
+    if (node.augment_structure_module) |owner| if (std.mem.eql(u8, owner, exporter)) return null;
+    const copy = try copyStatement(g, node);
+    copy.statements = .empty;
+    for (node.statements.items) |child| {
+        if (try stripAugmentedBy(g, child, exporter)) |kept| try copy.statements.append(g.a, kept);
+    }
+    if (node.kind() == .choice) {
+        copy.data.choice.cases = .empty;
+        for (node.data.choice.cases.items) |case| {
+            if (try stripAugmentedBy(g, case, exporter)) |kept| try copy.data.choice.cases.append(g.a, kept);
+        }
+    }
+    return copy;
+}
+
+fn extensionStub(g: *Gen, module: *Module) Error!*Object {
+    const stub = try newObject(g.a);
+    try stub.put(g.a, K.xy.MODULE, str(module.name));
+    try stub.put(g.a, K.xy.NAMESPACE, str(module.namespace));
+    try stub.put(g.a, K.xy.PREFIX, str(module.prefix));
+    const defs = try newObject(g.a);
+    for (module.extensions.keys(), module.extensions.values()) |name, ext| {
+        try defs.put(g.a, name, try extensionDefJson(g.a, ext));
+    }
+    try stub.put(g.a, K.xy.EXTENSION, objVal(defs));
+    return stub;
+}
+
+fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
+    var invocations: std.ArrayList(*Statement) = .empty;
+    for (root.statements.items) |node| if (capabilities.isRfc8791(node, "augment-structure")) {
+        try invocations.append(g.a, node);
+    };
+    try invocations.appendSlice(g.a, root.foreign_structure_augments.items);
+    var seen: std.AutoArrayHashMapUnmanaged(*Module, void) = .empty;
+    for (invocations.items) |inv| {
+        const owner = capabilities.augmentOwner(root, inv.data.extension_invocation.argument orelse "") orelse continue;
+        if (owner == root or std.mem.eql(u8, owner.name, root.name) or seen.contains(owner)) continue;
+        try seen.put(g.a, owner, {});
+        const key = try importKey(g, root, owner);
+        const stub = getObject(imports, key) orelse blk: {
+            const item = try newObject(g.a);
+            try item.put(g.a, K.xy.MODULE, str(owner.name));
+            try item.put(g.a, K.xy.NAMESPACE, str(owner.namespace));
+            try item.put(g.a, K.xy.PREFIX, str(owner.prefix));
+            try imports.put(g.a, key, objVal(item));
+            break :blk item;
+        };
+        const view = try owner.cowCopy(g.a);
+        view.statements = try refine_expand.copyStatements(&g.reporter, owner.statements.items);
+        try capabilities.applyForExport(&g.reporter, view);
+        var structures = try view.statements.clone(g.a);
+        for (view.structures.values()) |structure| {
+            if (std.mem.indexOfScalar(*Statement, structures.items, structure) == null) try structures.append(g.a, structure);
+        }
+        var bodies: std.ArrayList(Val) = .empty;
+        const none: Names = .empty;
+        for (structures.items) |structure| {
+            if (!capabilities.isRfc8791(structure, "structure")) continue;
+            const shadow = (try stripAugmentedBy(g, structure, root.name)).?;
+            try bodies.append(g.a, try oneExtensionInvocation(g, shadow, &none, root));
+            const defining = view.resolvePrefixedModule(structure.data.extension_invocation.prefix) orelse
+                return g.fail("cannot export imported structure: extension module is not loaded", .{});
+            const nested = getObject(stub, K.xy.IMPORTS) orelse blk: {
+                const item = try newObject(g.a);
+                try stub.put(g.a, K.xy.IMPORTS, objVal(item));
+                break :blk item;
+            };
+            const prefix = structure.data.extension_invocation.prefix;
+            if (!nested.contains(prefix)) try nested.put(g.a, prefix, objVal(try extensionStub(g, defining)));
+        }
+        // Python writes extensions before the nested import map.
+        const nested = stub.fetchOrderedRemove(K.xy.IMPORTS);
+        if (bodies.items.len > 0) try stub.put(g.a, K.xy.EXTENSIONS, .{ .array = bodies.items });
+        if (nested) |entry| try stub.put(g.a, K.xy.IMPORTS, entry.value);
+    }
+    const sorted = try sortedObject(g.a, imports);
+    imports.* = sorted.*;
+}
+
 /// `generate_json_schema`: the module's native JSON form. On `error.Export` or
 /// `error.YangLoad`, `diag` holds the message.
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
@@ -1359,6 +1468,7 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
     schema_module.statements = .empty;
     try schema_module.statements.appendSlice(a, expanded);
     try applyOwnAugments(&g, schema_module);
+    try capabilities.applyForExport(&g.reporter, schema_module);
     expanded = schema_module.statements.items;
 
     const properties = try newObject(a);
@@ -1381,14 +1491,17 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
         if (s.kind() == .rpc and s.name.len > 0) try rpcs.put(a, s.name, try rpcToJson(&g, s, &names, schema_module, K.types.RPC));
     }
     if (rpcs.count() > 0) try root_xy.put(a, K.xy.RPCS, objVal(rpcs));
-    const module_invocations = try extensionInvocationsJson(&g, expanded, &names, schema_module);
+    const module_invocations = try orderedExtensionInvocations(&g, schema_module, &names);
     const imports = try mergeExtensionImports(&g, module, try importsForJson(&g, module));
+    try addImportedStructures(&g, schema_module, imports);
     if (imports.count() > 0) try root_xy.put(a, K.xy.IMPORTS, objVal(imports));
     const ext_defs = try newObject(a);
     for (module.extensions.keys(), module.extensions.values()) |n, ext| {
         if (ext.kind() == .extension) try ext_defs.put(a, n, try extensionDefJson(a, ext));
     }
     if (ext_defs.count() > 0) try root_xy.put(a, K.xy.EXTENSION, objVal(ext_defs));
+    const features = try featuresJson(a, module);
+    if (features.count() > 0) try root_xy.put(a, K.xy.FEATURES, objVal(features));
     if (module_invocations) |inv| try root_xy.put(a, K.xy.EXTENSIONS, inv);
     try assertExtensionsPlaced(&g, schema_module);
     // Typedefs registered while expanding grouping bodies belong to the module (Python
@@ -1514,4 +1627,61 @@ test "statements Python cannot copy fail the conversion" {
     try std.testing.expectEqualStrings("Unsupported statement type for copy: YangNotificationStmt", diag.message);
     try std.testing.expectError(error.YangLoad, convertForTest(a, "module t { prefix t; leaf a { type string; } deviation \"/t:a\" { deviate not-supported; } }", &diag));
     try std.testing.expectEqualStrings("Unsupported statement type for copy: YangDeviationStmt", diag.message);
+}
+
+fn structureFixture(a: Allocator, diag: *errors.Diagnostic, name: []const u8, expand: bool) !*Module {
+    const dir = try std.fmt.allocPrint(a, "../tests/cases/modules/{s}", .{name});
+    var loader = @import("../parser/yang_parser.zig").Loader.init(a, std.testing.io, diag, &.{dir});
+    loader.expand_uses = expand;
+    return loader.parseFile(try std.fs.path.join(a, &.{ dir, "m.yang" }));
+}
+
+test "RFC 8791 own augment export leaves the source tree untouched (#164)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: errors.Diagnostic = .{};
+    const module = try structureFixture(a, &diag, "json-form-augment-structure-164", false);
+    const structure = module.statements.items[0];
+    const augment = module.statements.items[1];
+    const before = try schemaToYangJson(a, module, &diag);
+    try std.testing.expectEqual(@as(usize, 3), structure.statements.items.len);
+    try std.testing.expectEqual(@as(usize, 0), module.structures.count());
+    try std.testing.expect(!augment.rfc8791_applied);
+    try std.testing.expect(!augment.when.?.evaluate_with_parent_context);
+    try std.testing.expectEqualStrings(before, try schemaToYangJson(a, module, &diag));
+}
+
+test "RFC 8791 foreign augment export leaves the imported tree untouched (#164)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: errors.Diagnostic = .{};
+    const module = try structureFixture(a, &diag, "json-form-augment-structure-cross-164", false);
+    const imported = module.import_prefixes.get("b").?;
+    const box = imported.statements.items[0].statements.items[0];
+    const before = try schemaToYangJson(a, module, &diag);
+    try std.testing.expectEqual(@as(usize, 1), box.statements.items.len);
+    try std.testing.expectEqual(@as(usize, 0), imported.structures.count());
+    try std.testing.expectEqualStrings(before, try schemaToYangJson(a, module, &diag));
+}
+
+test "RFC 8791 export after application and reload applies foreign augment once (#164)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: errors.Diagnostic = .{};
+    const module = try structureFixture(a, &diag, "json-form-augment-structure-cross-164", true);
+    const form = try generate(a, module, &diag);
+    const unapplied = try structureFixture(a, &diag, "json-form-augment-structure-cross-164", false);
+    try std.testing.expect(jv.pyEql(form, try generate(a, unapplied, &diag)));
+    var message: []const u8 = "";
+    const loaded = try @import("parser.zig").parseJsonSchema(a, form, &message);
+    const structure = loaded.import_prefixes.get("b").?.structures.get("msg").?;
+    const box = structure.statements.items[0];
+    try std.testing.expectEqual(@as(usize, 2), box.statements.items.len);
+    var reporter: errors.Reporter = .{ .arena = a, .diag = &diag };
+    try capabilities.applyExtensionInvocations(&reporter, loaded);
+    try std.testing.expectEqual(@as(usize, 2), box.statements.items.len);
+    try std.testing.expect(jv.pyEql(form, try generate(a, loaded, &diag)));
 }

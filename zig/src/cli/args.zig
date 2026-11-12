@@ -4,7 +4,7 @@
 //! A command declares its options and positionals once (`commands.zig`); this parser
 //! reads them: long options by exact name or unambiguous prefix, `--opt=value`, `--`,
 //! `-h`/`--help`, choices, repeatable options, and positionals filled in order across
-//! options (Python 3.13 argparse, the version the cross-check runs); extra positionals
+//! options (Python 3.14 argparse, the version the cross-check runs); extra positionals
 //! are unrecognized.
 
 const std = @import("std");
@@ -213,9 +213,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
                         if (std.mem.eql(u8, c, v)) break true;
                     } else false;
                     if (!ok) {
-                        var quoted: std.ArrayList([]const u8) = .empty;
-                        for (choices) |c| try quoted.append(arena, try std.fmt.allocPrint(arena, "'{s}'", .{c}));
-                        return usageError(spec, arena, "argument {s}: invalid choice: '{s}' (choose from {s})", .{ name, v, try std.mem.join(arena, ", ", quoted.items) });
+                        return usageError(spec, arena, "argument {s}: invalid choice: '{s}' (choose from {s})", .{ name, v, try std.mem.join(arena, ", ", choices) });
                     }
                 }
                 const gop = try p.values.getOrPut(arena, o.long);

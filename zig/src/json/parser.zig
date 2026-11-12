@@ -18,6 +18,8 @@ const xast = @import("../xpath/ast.zig");
 const xutils = @import("../xpath/utils.zig");
 const xsd_regex = @import("../xsd_regex.zig");
 const pyfmt = @import("../pyfmt.zig");
+const capabilities = @import("../ext/capabilities.zig");
+const errors = @import("../errors.zig");
 const gen = @import("generator.zig");
 
 const Allocator = std.mem.Allocator;
@@ -223,7 +225,10 @@ fn ifFeatures(p: *Parse, xy: *const Object) Error!ast.StringList {
     return out;
 }
 
-fn setIfFeatures(p: *Parse, s: *Statement, xy: *const Object) Error!void {
+fn setNodeAnnotations(p: *Parse, s: *Statement, xy: *const Object) Error!void {
+    if (xy.get(K.xy.AUGMENT_STRUCTURE)) |path| {
+        if (path == .string) s.augment_structure = path.string;
+    }
     const feats = try ifFeatures(p, xy);
     if (feats.items.len > 0) s.if_features = feats;
 }
@@ -250,6 +255,7 @@ fn whenOf(p: *Parse, xy: *const Object) Error!?*ast.WhenStmt {
     const desc: []const u8 = if (!truthy(d)) "" else if (d.? == .string) d.?.string else try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(d.?)});
     const w = try p.a.create(ast.WhenStmt);
     w.* = .{ .expression = cond.string, .description = desc };
+    w.evaluate_with_parent_context = truthy(raw.object.get(K.when_entry.EVALUATE_WITH_PARENT_CONTEXT));
     w.ast = try p.expression(cond.string, raw.object.get(K.xy.XPATH_PREFIXES));
     return w;
 }
@@ -392,7 +398,7 @@ fn buildIdentity(p: *Parse, name: []const u8, def: *const Object) Error!*Stateme
     const xy = try xyangOf(p, def);
     const s = try newStatement(p, name, .{ .identity = .{ .bases = try basesFromJson(p.a, xy.get(K.xy.BASES)) } });
     s.description = try textField(p, def, K.DESCRIPTION, "");
-    try setIfFeatures(p, s, xy);
+    try setNodeAnnotations(p, s, xy);
     try attachInvocations(p, s, xy);
     return s;
 }
@@ -595,13 +601,13 @@ fn parseHoistedChoiceOneOf(p: *Parse, one_of: []const Val, defs: *const Object, 
         const case = try newStatement(p, case_name, .{ .case = {} });
         case.description = if (d != null and d.? == .string) d.?.string else "";
         case.statements = case_statements;
-        try setIfFeatures(p, case, bxy);
+        try setNodeAnnotations(p, case, bxy);
         try attachInvocations(p, case, bxy);
         try cases.append(a, case);
     }
     const choice = try newStatement(p, choice_name, .{ .choice = .{ .mandatory = mandatory, .cases = cases } });
     choice.description = choice_description;
-    try setIfFeatures(p, choice, meta);
+    try setNodeAnnotations(p, choice, meta);
     try attachInvocations(p, choice, meta);
     try validateCaseUniqueChildNames(p, choice);
     try out.append(a, choice);
@@ -655,7 +661,7 @@ fn convertContainer(p: *Parse, name: []const u8, schema: *const Object, xy: *con
     if (xy.get(K.xy.PRESENCE)) |pr| if (pr != .null) {
         c.data.container.presence = try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(pr)});
     };
-    try setIfFeatures(p, c, xy);
+    try setNodeAnnotations(p, c, xy);
     setConfig(c, xy);
     try attachInvocations(p, c, xy);
     return c;
@@ -701,7 +707,7 @@ fn convertList(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
     l.when = try whenOf(p, xy);
     l.data.list.min_elements = try bound(p, schema, K.MIN_ITEMS);
     l.data.list.max_elements = try bound(p, schema, K.MAX_ITEMS);
-    try setIfFeatures(p, l, xy);
+    try setNodeAnnotations(p, l, xy);
     setConfig(l, xy);
     try attachInvocations(p, l, xy);
     return l;
@@ -770,7 +776,7 @@ fn convertLeaf(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
     leaf.description = try textField(p, schema, K.DESCRIPTION, "");
     leaf.must_statements = musts;
     leaf.when = try whenOf(p, xy);
-    try setIfFeatures(p, leaf, xy);
+    try setNodeAnnotations(p, leaf, xy);
     const units = unitsOf(xy);
     if (units.len > 0) leaf.units = units;
     setConfig(leaf, xy);
@@ -784,7 +790,7 @@ fn convertAny(p: *Parse, name: []const u8, schema: *const Object, xy: *const Obj
     node.description = try textField(p, schema, K.DESCRIPTION, "");
     node.must_statements = musts;
     node.when = try whenOf(p, xy);
-    try setIfFeatures(p, node, xy);
+    try setNodeAnnotations(p, node, xy);
     try attachInvocations(p, node, xy);
     return node;
 }
@@ -806,7 +812,7 @@ fn convertLeafList(p: *Parse, name: []const u8, schema: *const Object, xy: *cons
         ll.data.leaf_list.default_values = vals;
         for (vals) |v| try ll.data.leaf_list.defaults.append(a, try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(v)}));
     };
-    try setIfFeatures(p, ll, xy);
+    try setNodeAnnotations(p, ll, xy);
     const units = unitsOf(xy);
     if (units.len > 0) ll.units = units;
     setConfig(ll, xy);
@@ -838,13 +844,13 @@ fn convertChoice(p: *Parse, name: []const u8, schema: *const Object, xy: *const 
         const case = try newStatement(p, case_name, .{ .case = {} });
         case.description = if (d != null and d.? == .string) d.?.string else "";
         case.statements = case_statements;
-        try setIfFeatures(p, case, cxy);
+        try setNodeAnnotations(p, case, cxy);
         try attachInvocations(p, case, cxy);
         try cases.append(a, case);
     };
     const choice = try newStatement(p, name, .{ .choice = .{ .mandatory = truthy(xy.get(K.xy.MANDATORY)), .cases = cases } });
     choice.description = try textField(p, schema, K.DESCRIPTION, "");
-    try setIfFeatures(p, choice, xy);
+    try setNodeAnnotations(p, choice, xy);
     setConfig(choice, xy);
     try attachInvocations(p, choice, xy);
     try validateCaseUniqueChildNames(p, choice);
@@ -863,7 +869,7 @@ fn convertIoBlock(p: *Parse, schema: *const Object, defs: *const Object, parent_
     s.statements = children;
     s.must_statements = musts;
     s.when = try whenOf(p, xy);
-    try setIfFeatures(p, s, xy);
+    try setNodeAnnotations(p, s, xy);
     try attachInvocations(p, s, xy);
     return s;
 }
@@ -887,7 +893,7 @@ fn convertRpc(p: *Parse, name: []const u8, value: *const Object, defs: *const Ob
     rpc.statements = statements;
     rpc.must_statements = musts;
     rpc.when = try whenOf(p, xy);
-    try setIfFeatures(p, rpc, xy);
+    try setNodeAnnotations(p, rpc, xy);
     try attachInvocations(p, rpc, xy);
     return rpc;
 }
@@ -989,7 +995,7 @@ fn loadExtensionDefs(p: *Parse, module: *Module, raw_xy: *const Object) Error!vo
     }
 }
 
-/// `_invocation_from_json`: one `x-yang.extensions` entry with its body. Not re-applied.
+/// `_invocation_from_json`: rebuild one entry before the module applies callbacks.
 fn invocationFromJson(p: *Parse, raw: Val) Error!*Statement {
     const a = p.a;
     const bad = raw != .object or blk: {
@@ -1015,7 +1021,7 @@ fn invocationFromJson(p: *Parse, raw: Val) Error!*Statement {
     const inv = try newStatement(p, name, .{ .extension_invocation = .{ .prefix = prefix, .argument = argument, .resolved_module = owner.name, .resolved_extension = ext } });
     inv.description = try textOrEmpty(p, o, K.DESCRIPTION);
     inv.reference = try textOrEmpty(p, o, K.xy.REFERENCE);
-    try setIfFeatures(p, inv, o);
+    try setNodeAnnotations(p, inv, o);
     inv.when = try whenOf(p, o);
     inv.must_statements = try mustList(p, o);
     setConfig(inv, o);
@@ -1079,7 +1085,42 @@ fn moduleFromImportStub(p: *Parse, key: []const u8, raw: Val) Error!*Module {
         }
     }
     try loadExtensionDefs(p, stub, o);
+    try loadFeatures(p, stub, o);
+    var nested: Parse = .{ .a = p.a, .module = stub, .in_body = true };
+    appendInvocations(&nested, &stub.statements, o) catch |err| {
+        p.message = nested.message;
+        return err;
+    };
+    try applyInvocations(p, stub);
     return stub;
+}
+
+fn applyInvocations(p: *Parse, module: *Module) Error!void {
+    var diag: errors.Diagnostic = .{};
+    var reporter: errors.Reporter = .{ .arena = p.a, .diag = &diag };
+    capabilities.applyExtensionInvocations(&reporter, module) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.YangLoad => return p.fail("{s}", .{diag.message}),
+    };
+}
+
+fn loadFeatures(p: *Parse, module: *Module, xy: *const Object) Error!void {
+    const raw = xy.get(K.xy.FEATURES) orelse return;
+    if (raw == .null) return;
+    if (raw != .object) return p.fail("\"{s}\" must map feature names to objects, got {f}", .{ K.xy.FEATURES, jv.pyRepr(raw) });
+    for (raw.object.keys(), raw.object.values()) |name, body| {
+        if (body != .object) return p.fail("feature {f} must be an object, got {f}", .{ repr(name), jv.pyRepr(body) });
+        try module.features.put(p.a, name, {});
+        if (body.object.get(K.xy.IF_FEATURES)) |guards| if (truthy(guards)) {
+            if (guards != .array) return p.fail("feature {f} \"{s}\" must be a list of strings", .{ repr(name), K.xy.IF_FEATURES });
+            var names: ast.StringList = .empty;
+            for (guards.array) |guard| {
+                if (guard != .string) return p.fail("feature {f} \"{s}\" must be a list of strings", .{ repr(name), K.xy.IF_FEATURES });
+                try names.append(p.a, guard.string);
+            }
+            try module.feature_if_features.put(p.a, name, names);
+        };
+    }
 }
 
 /// `_load_imports`: `x-yang.imports` as import prefixes.
@@ -1125,6 +1166,7 @@ fn parseInto(p: *Parse, data: Val) Error!void {
     m.description = try textField(p, root, K.DESCRIPTION, "");
     try loadImports(p, m, root_xy);
     try loadExtensionDefs(p, m, root_xy);
+    try loadFeatures(p, m, root_xy);
     p.in_body = true;
     for (defs.keys(), defs.values()) |name, def| {
         if (def != .object) continue;
@@ -1146,6 +1188,7 @@ fn parseInto(p: *Parse, data: Val) Error!void {
         try m.statements.append(a, try convertRpc(p, name, v.object, defs, K.types.RPC));
     }
     try appendInvocations(p, &m.statements, root_xy);
+    try applyInvocations(p, m);
 }
 
 fn reloadForTest(a: Allocator, text_in: []const u8, message: *[]const u8) !*Module {

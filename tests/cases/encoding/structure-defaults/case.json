@@ -1,0 +1,30 @@
+{
+  "description": "RFC 8791 structure defaults resolve imported numeric typedefs in the containing module. Absent defaults decode; explicit JSON strings still fail the type check. Regression for Zig port #165.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "absent numeric typedef default",
+      "valid": true,
+      "data": {
+        "msg": {}
+      }
+    },
+    {
+      "name": "explicit numeric string",
+      "valid": false,
+      "data": {
+        "msg": {
+          "n": "5"
+        }
+      },
+      "errors": [
+        {
+          "path": "/msg/n",
+          "code": "type",
+          "message": "Expected integer, got string"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

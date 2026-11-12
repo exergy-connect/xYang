@@ -198,7 +198,7 @@ pub const CHOICES = blk: {
 
 pub const MAIN_USAGE = "usage: " ++ PROG ++ " [-h] [-V] " ++ CHOICES ++ " ...\n";
 
-/// Python 3.13 argparse help for the top-level parser (`_CliHelpFormatter`: width 88,
+/// Python 3.14 argparse help for the top-level parser (`_CliHelpFormatter`: width 88,
 /// max_help_position 32). An option with a short and a long form is `-V, --version`,
 /// and the help column wraps to that invocation width. The examples are the epilog
 /// from `build_parser`, not one generated line per command.
@@ -351,7 +351,7 @@ pub fn runTop(ctx: Io, args: []const []const u8) !u8 {
         var names: std.ArrayList(u8) = .empty;
         for (COMMANDS, 0..) |c, n| {
             if (n != 0) try names.appendSlice(arena, ", ");
-            try names.print(arena, "'{s}'", .{c.name});
+            try names.appendSlice(arena, c.name);
         }
         return usageError(ctx, MAIN_USAGE, PROG, "argument cmd: invalid choice: '{s}' (choose from {s})", .{ name, names.items });
     };
@@ -367,7 +367,7 @@ pub fn runTop(ctx: Io, args: []const []const u8) !u8 {
     }
 }
 
-test "top-level help is the Python 3.13 registry" {
+test "top-level help is the Python 3.14 registry" {
     try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "[-h] [-V] {parse,validate,convert}") != null);
     try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "-V, --version") != null);
     try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xYang: Parse YANG modules") != null);
@@ -665,4 +665,23 @@ fn resolvePath(ctx: Io, p: []const u8) ![]const u8 {
         const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
         return std.fs.path.resolveAlloc(ctx.arena, &.{ cwd, p });
     };
+}
+
+fn expectUsageError(argv: []const []const u8, expected: []const u8) !void {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var out: std.Io.Writer.Allocating = .init(arena.allocator());
+    var err: std.Io.Writer.Allocating = .init(arena.allocator());
+    const status = try runTop(.{ .io = std.testing.io, .arena = arena.allocator(), .out = &out.writer, .err = &err.writer }, argv);
+    try std.testing.expectEqual(@as(u8, 2), status);
+    try std.testing.expectEqualStrings("", out.written());
+    try std.testing.expectEqualStrings(expected, err.written());
+}
+
+test "unknown command lists choices using Python 3.14 wording" {
+    try expectUsageError(&.{"nonesuch"}, MAIN_USAGE ++ PROG ++ ": error: argument cmd: invalid choice: 'nonesuch' (choose from parse, validate, convert)\n");
+}
+
+test "invalid option choice lists choices before reading the module" {
+    try expectUsageError(&.{ "validate", "--format", "xml", "missing.yang" }, COMMANDS[1].usage ++ PROG ++ " validate: error: argument --format: invalid choice: 'xml' (choose from text, json)\n");
 }

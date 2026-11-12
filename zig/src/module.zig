@@ -32,6 +32,9 @@ pub const Module = struct {
     /// RFC 8791 `sx:structure` invocations by name, registered when the extension is
     /// applied (Python's `extension_runtime["ietf-yang-structure-ext:structure-index"]`).
     structures: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
+    /// Removed foreign augments and their positions among retained root invocations.
+    foreign_structure_augments: std.ArrayList(*ast.Statement) = .empty,
+    foreign_structure_slots: std.ArrayList(usize) = .empty,
     /// Set when `belongs-to` was parsed (this is a submodule).
     is_submodule: bool = false,
 
@@ -58,6 +61,9 @@ pub const Module = struct {
         const out = try arena.create(Module);
         out.* = self.*;
         out.statements = try self.statements.clone(arena);
+        out.structures = try self.structures.clone(arena);
+        out.foreign_structure_augments = try self.foreign_structure_augments.clone(arena);
+        out.foreign_structure_slots = try self.foreign_structure_slots.clone(arena);
         out.import_prefixes = try self.import_prefixes.clone(arena);
         return out;
     }

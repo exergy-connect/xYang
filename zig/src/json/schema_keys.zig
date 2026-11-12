@@ -49,6 +49,8 @@ pub const xy = struct {
     pub const MANDATORY = "mandatory";
     pub const CONFIG = "config";
     pub const CHOICE = "choice";
+    pub const AUGMENT_STRUCTURE = "augment-structure";
+    pub const FEATURES = "features";
     pub const IF_FEATURES = "if-features";
     pub const MODULE = "module";
     pub const YANG_VERSION = "yang-version";
@@ -99,5 +101,6 @@ pub const must_entry = struct {
 
 /// Keys of `x-yang.when`.
 pub const when_entry = struct {
+    pub const EVALUATE_WITH_PARENT_CONTEXT = "evaluate-with-parent-context";
     pub const CONDITION = "condition";
 };

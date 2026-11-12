@@ -24,3 +24,7 @@ pub fn main(init: std.process.Init) !void {
 fn run(ctx: commands.Io, args: []const []const u8) !u8 {
     return commands.runTop(ctx, args);
 }
+
+test {
+    _ = @import("cli/commands.zig");
+}

@@ -35,7 +35,7 @@ Checked:
 - the full CLI registry (#153, #156): no-argument help, ``--help`` / ``-h``, ``-V`` /
   ``--version`` (and unambiguous prefixes), and ``parse`` / ``validate`` / ``convert``
   help, plus usage errors, with the program name normalized. Help is compared to
-  Python 3.13 argparse (``-o, --output PATH``, not 3.12's ``-o PATH, --output PATH``).
+  Python 3.14 argparse (``-o, --output PATH``, not 3.12's ``-o PATH, --output PATH``).
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
 

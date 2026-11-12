@@ -96,7 +96,8 @@ pub const DocumentValidator = struct {
     case_stack: std.ArrayList(*Statement) = .empty,
     case_data_stack: std.ArrayList(*const Object) = .empty,
     /// False when the root schema is an RFC 8791 structure (Python's root schema is then
-    /// not a `YangModule`): every `if-feature` holds and defaults resolve no typedef.
+    /// not a `YangModule`): every `if-feature` holds. Defaults still resolve against
+    /// the containing module, like Python's `_typedef_module`.
     module_root: bool = true,
 
     fn add(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
@@ -345,7 +346,6 @@ pub const DocumentValidator = struct {
             }
             return .{ .string = value };
         }
-        if (!self.module_root) return .{ .string = value };
         if (module_mod.resolveTypedef(t, self.module)) |r| {
             if (r.typedef.data.typedef.type) |inner| return self.decodeLexical(inner, value, seen);
         }
