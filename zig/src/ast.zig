@@ -10,6 +10,8 @@
 //! strings until the XPath phase adds a parser.
 
 const std = @import("std");
+const Module = @import("module.zig").Module;
+const xsd_regex = @import("xsd_regex.zig");
 
 pub const StringList = std.ArrayList([]const u8);
 
@@ -30,6 +32,8 @@ pub const PatternSpec = struct {
     invert_match: bool = false,
     error_message: ?[]const u8 = null,
     error_app_tag: ?[]const u8 = null,
+    /// The translated XSD regex; null only for an empty pattern, which never applies.
+    compiled: ?*const xsd_regex.Regex = null,
 };
 
 pub const TypeStmt = struct {
@@ -55,6 +59,9 @@ pub const TypeStmt = struct {
     path: ?[]const u8 = null,
     require_instance: bool = true,
     identityref_bases: std.ArrayList(IdentifierRef) = .empty,
+    /// Module that wrote this `type` (RFC 7950 7.13, 9.9.2): its prefix and typedef name
+    /// resolve there, also when a grouping or augment places the node in another module.
+    scope: ?*Module = null,
 };
 
 pub const MustStmt = struct {
@@ -68,6 +75,9 @@ pub const WhenStmt = struct {
     expression: []const u8,
     description: []const u8 = "",
     reference: []const u8 = "",
+    /// RFC 7950 7.21.5: a `when` merged from `uses` or `augment` is evaluated with the
+    /// parent of that statement as the context node.
+    evaluate_with_parent_context: bool = false,
 };
 
 pub const Kind = enum {
@@ -105,7 +115,12 @@ pub const Container = struct {
 pub const Bound = ?i64;
 
 pub const Data = union(Kind) {
-    typedef: struct { type: ?*TypeStmt = null, default: ?[]const u8 = null },
+    typedef: struct {
+        type: ?*TypeStmt = null,
+        default: ?[]const u8 = null,
+        /// Submodule the typedef was merged from by `include`.
+        included_from: ?[]const u8 = null,
+    },
     identity: struct { bases: std.ArrayList(IdentifierRef) = .empty },
     container: Container,
     notification: Container,
@@ -128,12 +143,19 @@ pub const Data = union(Kind) {
     },
     anydata: struct { mandatory: bool = false },
     anyxml: struct { mandatory: bool = false },
-    extension: struct { argument_name: []const u8 = "", argument_yin_element: ?bool = null },
+    extension: struct {
+        argument_name: []const u8 = "",
+        argument_yin_element: ?bool = null,
+        /// Name of the (sub)module whose body declares the extension; with the extension
+        /// name it selects the apply callback in `ext/capabilities.zig`.
+        module_name: []const u8 = "",
+    },
     extension_invocation: struct {
         prefix: []const u8,
         argument: ?[]const u8 = null,
         /// Name of the module that defines the invoked extension.
         resolved_module: []const u8,
+        resolved_extension: *Statement,
     },
     grouping: struct { typedef_names: StringList = .empty },
     uses: struct {
@@ -173,6 +195,9 @@ pub const Statement = struct {
     when: ?*WhenStmt = null,
     if_features: StringList = .empty,
     config: ?bool = null,
+    /// RFC 7951: module that defined this node when it differs from the enclosing parent
+    /// (merged from a foreign `augment`); null means the parent's module.
+    defining_module: ?[]const u8 = null,
     data: Data,
 
     pub fn kind(self: *const Statement) Kind {

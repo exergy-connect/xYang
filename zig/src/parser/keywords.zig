@@ -75,6 +75,11 @@ pub const BELONGS_TO = "belongs-to";
 pub const DEVIATION = "deviation";
 pub const DEVIATE = "deviate";
 pub const NOT_SUPPORTED = "not-supported";
+pub const ADD = "add";
+pub const DELETE = "delete";
+pub const REPLACE = "replace";
+/// `deviate` kinds Python parses, warns about and does not apply.
+pub const UNSUPPORTED_DEVIATE_KINDS = [_][]const u8{ ADD, DELETE, REPLACE };
 
 pub const RPC = "rpc";
 pub const ACTION = "action";
