@@ -62,9 +62,5 @@ docs/xyang.umd.min.js
 # CI CLI bundle — single-file output from ts/scripts/build-ci-artifacts.mjs
 artifacts/xyang-ts.mjs
 
-# QuickJS-ng CLI build (qjs/build.sh)
-qjs/.cache/
-qjs/dist/
-
 # Benchmark CPU profiles (ts/scripts/run-bench.mjs --cpu-prof)
 ts/bench/profiles/

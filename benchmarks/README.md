@@ -132,7 +132,7 @@ Python docstrings (treated like JSDoc) do not. A multi-line string counts every
 line. Not counted: tests (`tests/`, `ts/test/`), fixtures and workloads
 (`tests/cases/`, `examples/`, `benchmarks/`), generated output (`ts/dist/`,
 `artifacts/`, `docs/*.js`, `src/xyang.egg-info/`), dependencies
-(`ts/node_modules/`), and tooling (`ts/bench/`, `ts/scripts/`, `qjs/`). Code size
+(`ts/node_modules/`), and tooling (`ts/bench/`, `ts/scripts/`). Code size
 is reported in its own table, separate from performance.
 
 ## Executable size

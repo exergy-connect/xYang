@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Removed
+
+- **QuickJS standalone binaries:** removed the QuickJS build scripts, shims, vendored license, and release workflow in favor of the native Zig `xyang-zig` binaries. Updated runtime and release documentation. Migrate standalone asset/executable names to `xyang-zig-<platform>`; `convert` now writes a `.yang.json` file (or `-o PATH`) instead of printing JSON Schema to stdout. The npm CLI and browser bundles remain available.
+
 ### Added
 
 - **Native JSON: RFC 8791 structures** ([#164](https://github.com/exergy-connect/xYang/issues/164), [#161](https://github.com/exergy-connect/xYang/issues/161)): the #162 refusal was removed. `xyang-ts convert` writes the same form as Python for `sx:structure` and `sx:augment-structure` and no longer throws `YangExportError` for them. A structure is an extension invocation whose body uses the normal node encoding. A same-module `sx:augment-structure` is merged, with `augment-structure` and any merged `if-feature` and `when` on each added node, and is not applied again on reload. A cross-module `sx:augment-structure` is the invocation, with the imported structure on that import's `x-yang.imports` stub; reload applies it once. Applying the callbacks again does not add the nodes twice. Any other extension with an apply callback and no JSON form still fails. Shared cases `modules/json-form-*-164`.

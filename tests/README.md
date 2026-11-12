@@ -27,7 +27,7 @@ Pull requests and pushes do not run these tests. The pytest matrix uses `-m "not
 and `npm test` excludes `test/ontology_audit_example.test.ts`.
 
 A published release runs them. The event is `release: published`, the same event as Publish to
-PyPI, Publish to npm, Release TypeScript artifacts, QuickJS release, and Benchmark
+PyPI, Publish to npm, Release TypeScript artifacts, Release Zig binaries, and Benchmark
 ([`.github/workflows/ontology-example.yml`](../.github/workflows/ontology-example.yml)). The
 Python job installs `examples/ontology-hypergraph/requirements-tools.txt` and fails if any test
 is skipped, so the pyang and OWL RL checks run. The TypeScript job runs `npm run test:ontology`.

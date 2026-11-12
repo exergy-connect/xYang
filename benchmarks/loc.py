@@ -39,7 +39,7 @@ EXCLUDED_ELSEWHERE = [
     "tests/cases/, examples/, benchmarks/ (fixtures and workloads)",
     "ts/dist/, artifacts/, docs/*.js (generated bundles)",
     "ts/node_modules/ (dependencies)",
-    "ts/bench/, ts/scripts/, qjs/ (tooling)",
+    "ts/bench/, ts/scripts/ (tooling)",
 ]
 
 _SKIP_TOKENS = {

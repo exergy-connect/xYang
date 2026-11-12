@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **QuickJS standalone binaries:** removed the QuickJS build scripts, shims, vendored license, and release workflow in favor of the native Zig `xyang-zig` binaries. Updated runtime and release documentation. Migrate standalone asset/executable names to `xyang-zig-<platform>`; `convert` now writes a `.yang.json` file (or `-o PATH`) instead of printing JSON Schema to stdout. The npm CLI and browser bundles remain available.
+
 ### Added
 
 - **Release benchmark Zig binary size:** release and manual benchmark runs build the stripped Linux x64 Zig CLI and include its size in bytes and KiB in the JSON results and generated README report. The JSON also records the binary SHA-256.

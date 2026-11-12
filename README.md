@@ -84,41 +84,18 @@ cd zig && zig build -Doptimize=ReleaseSafe
 
 ### Standalone binary
 
-The TypeScript CLI is also built as a single executable with [QuickJS-ng](https://github.com/quickjs-ng/quickjs) 0.18.0. It is the same `parse` / `validate` / `convert` commands, with no Node.js or Python install. The linux-x64 build is about 1 MB and starts in a few milliseconds, so an agent or a small CI image can shell out to it directly.
+Use the Zig `xyang-zig-<platform>` executable for agents, appliances, and minimal
+CI images that need xYang without a Python or Node.js installation. Download it
+from the [GitHub Releases](https://github.com/exergy-connect/xYang/releases)
+assets; the platform list and build instructions are in the **Zig** section above.
+Check the selected release's assets before scripting a download: older releases
+may not include Zig binaries.
 
-This does not replace the Python package or the npm package. Those stay the supported library APIs.
-
-A published GitHub Release attaches:
-
-| File | Platform |
-| --- | --- |
-| `xyang-ts-linux-x64` | Linux x64, fully static |
-| `xyang-ts-linux-arm64` | Linux arm64, fully static |
-| `xyang-ts-macos-arm64` | macOS Apple silicon |
-| `xyang-ts-macos-x64` | macOS Intel |
-| `xyang-ts-windows-x64.exe` | Windows x64 |
-
-```bash
-chmod +x xyang-ts-linux-x64
-./xyang-ts-linux-x64 parse examples/meta-model.yang
-./xyang-ts-linux-x64 validate examples/openconfig/openconfig-interfaces-subset.yang \
-  examples/openconfig/sample_interfaces.json
-./xyang-ts-linux-x64 convert examples/meta-model.yang
-```
-
-Flags match `xyang-ts`. Piped output is flushed before exit, including JSON Schema documents larger than Node's 64 KiB pipe buffer.
-
-Build it from a checkout (Zig 0.14.1 and the TypeScript dependencies; details in [`qjs/README.md`](qjs/README.md)):
-
-```bash
-cd ts && npm ci && npm run build
-cd ../qjs && ./build.sh linux-x64
-./smoke.sh dist/xyang-ts-linux-x64
-```
-
-`./build.sh all` also cross-compiles linux-arm64, macOS, and Windows. Linux binaries are static musl. macOS binaries link libSystem.
-
-`validate --format json` works the same as in `xyang-ts`. An MCP server is a follow-up; this binary does not add one.
+The binary uses `xyang` flags: `validate --format json` returns machine-readable
+diagnostics, and `convert` writes `<stem>.yang.json` or the path supplied with
+`-o`. When migrating from the former standalone `xyang-ts` executable, update the
+asset and executable names and consume the output file from `convert` instead of
+capturing its stdout. The Python and npm packages remain available as library APIs.
 
 ---
 
@@ -394,7 +371,7 @@ Reproduce: `python benchmarks/release_bench.py run --out benchmarks/results/late
 xYang/
 ├── src/xyang/          # Python library + xyang CLI
 ├── ts/                 # TypeScript package (@exergy-connect/xyang) + xyang-ts CLI
-├── qjs/                # QuickJS-ng static executable of the TypeScript CLI
+├── zig/                # Native Zig library + standalone xyang-zig CLI
 ├── examples/           # meta-model.yang, ietf-yang-push/, samples
 ├── tests/              # Python tests
 ├── benchmarks/         # Release benchmark harness and workloads
@@ -431,11 +408,11 @@ cd ts && npm install && npm test
 |----------|------|---------|
 | **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, `npm run build:ci`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS. The `build:ci` step is a check only: it does not commit or upload |
 | **Release TypeScript artifacts** | [`.github/workflows/release-artifacts.yml`](.github/workflows/release-artifacts.yml) | On a published release, runs `npm run build:ci` and attaches `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js`. On `workflow_dispatch`, uploads those files as workflow artifacts only |
-| **Release QuickJS binaries** | [`.github/workflows/qjs-release.yml`](.github/workflows/qjs-release.yml) | On a published release, builds all five `xyang-ts` executables, smoke-tests the Linux binaries against the Node CLI, and attaches the files. Also runnable by hand (`workflow_dispatch`) without attaching anything |
+| **Release Zig binaries** | [`.github/workflows/zig-release.yml`](.github/workflows/zig-release.yml) | On a published release, builds six `xyang-zig` executables for Linux, macOS, and Windows (x64 and arm64), smoke-tests Linux x64, and attaches the binaries. A manual run uploads workflow artifacts only |
 | **Benchmark** | [`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) | On a published release, measures time, peak memory, and source lines, attaches `benchmark-<tag>.json` to the release, and opens a pull request that refreshes the README benchmark section. On `workflow_dispatch`, measures and uploads a workflow artifact (`open_pr` also proposes the README update). On pull requests touching benchmark files, a smoke run only |
 | **Ontology example** | [`.github/workflows/ontology-example.yml`](.github/workflows/ontology-example.yml) | On a published release, runs `pytest -m ontology` with the optional pyang and OWL RL tools installed, and `npm run test:ontology`. A skipped Python test fails the job. `workflow_dispatch` runs the same checks and publishes nothing. Pull requests do not run these tests |
 
-The TypeScript test workflow runs on pushes to `main` and on pull requests that touch `ts/**` (and related paths). It builds the release bundles and does not commit or upload them. The QuickJS binaries and the TypeScript bundles are attached only when a release is published. The stdout flush is covered by the TypeScript test suite.
+The TypeScript test workflow runs on pushes to `main` and on pull requests that touch `ts/**` (and related paths). It builds the release bundles and does not commit or upload them. The Zig binaries and the TypeScript bundles are attached only when a release is published. The stdout flush is covered by the TypeScript test suite.
 
 ### Release artifacts
 

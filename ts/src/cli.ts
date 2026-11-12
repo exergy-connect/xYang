@@ -213,17 +213,9 @@ function main(argv: string[]): number {
  * 64 KiB). `process.exit` right after that drops the tail, so piped
  * `convert` output is truncated. `stream.end` runs its callback once that
  * buffer has been written.
- *
- * The QuickJS process shim writes with synchronous stdio and does not
- * implement stream `.end()`. `process.exit` there flushes and sets the
- * static binary's status.
  */
 function finish(code: number): void {
-  const streams = [process.stdout, process.stderr].filter((stream) => typeof stream.end === "function");
-  if (streams.length === 0) {
-    process.exit(code);
-    return;
-  }
+  const streams = [process.stdout, process.stderr];
 
   let pending = streams.length;
   let exited = false;

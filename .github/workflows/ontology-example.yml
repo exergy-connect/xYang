@@ -4,7 +4,7 @@
 #
 # Runs when a GitHub Release is published — the same `release: published`
 # event as Publish to PyPI, Publish to npm, Release TypeScript artifacts,
-# QuickJS release, and Benchmark — and on a manual workflow_dispatch, which
+# Release Zig binaries, and Benchmark — and on a manual workflow_dispatch, which
 # runs the same checks and publishes nothing.
 #
 # A failure fails this workflow on the release. The other release workflows
