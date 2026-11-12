@@ -11,6 +11,7 @@
 
 const std = @import("std");
 const Module = @import("module.zig").Module;
+const xsd_regex = @import("xsd_regex.zig");
 
 pub const StringList = std.ArrayList([]const u8);
 
@@ -31,6 +32,8 @@ pub const PatternSpec = struct {
     invert_match: bool = false,
     error_message: ?[]const u8 = null,
     error_app_tag: ?[]const u8 = null,
+    /// The translated XSD regex; null only for an empty pattern, which never applies.
+    compiled: ?*const xsd_regex.Regex = null,
 };
 
 pub const TypeStmt = struct {
