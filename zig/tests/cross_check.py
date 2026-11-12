@@ -16,6 +16,10 @@ Checked:
 - the resolved schema tree of every case that loads in both (as the case runners load
   it, sibling modules included): ``uses``/``refine``/``augment``/``deviation`` results,
   if-feature, when, must, cardinality, defaults and the module's definitions.
+- ``xyang validate`` on every case instance, in text and JSON output.
+- XPath (phase 4) beyond the cases: load errors from the XPath parser and prefix binder,
+  and validate runs over the function library, operators, predicates, evaluation errors,
+  leafref and instance-identifier.
 - command-line usage errors and ``parse --help``, with the program name normalized.
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
@@ -247,6 +251,144 @@ def validate_failures() -> tuple[int, int, list[str]]:
     return same, deferred, failures
 
 
+XPATH_HEADER = 'module x { yang-version 1.1; namespace "urn:x"; prefix x; %s }'
+
+# XPath that must fail when the module loads, with Python's message (parse command).
+XPATH_LOAD_ERRORS = [
+    'leaf a { type string; must "a = "; }',
+    'leaf a { type string; must "(a"; }',
+    'leaf a { type string; must "a ]"; }',
+    'leaf a { type string; must "1.2.3"; }',
+    "leaf a { type string; must \"a == 'b'\"; }",
+    'leaf a { type string; must "not ."; }',
+    "leaf a { type string; must \"(1, ../a)\"; }",
+    'leaf a { type string; must "Foo:Bar(1)"; }',
+    'leaf a { type string; when "q:a"; }',
+    'leaf a { type leafref { path "/a[. = 1]/*"; } }',
+    'leaf a { type leafref { path "../b c"; } }',
+    'leaf a { type leafref { path ""; } }',
+    'grouping g { leaf a { type string; must "q:y"; } }',
+]
+
+# `refine` and `uses`-`augment` targets are XPath schema paths: these load or fail alike.
+XPATH_REFINE_PATHS = [
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { refine "c[b = 1]/b" { mandatory true; } } }',
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { refine "c/./b" { mandatory true; } } }',
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { refine "c/*" { mandatory true; } } }',
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { augment "c[b = 1]" { leaf z { type string; } } } }',
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { augment "c/*" { leaf z { type string; } } } }',
+    'grouping g { container c { leaf b { type string; } } } container t { uses g { augment "c[nope()]" { leaf z { type string; } } } }',
+]
+
+# One module whose leaves exercise the function library, operators and predicates; each
+# instance sets one of them, so a difference names the expression.
+XPATH_MODULE = XPATH_HEADER % """
+  identity base; identity mid { base base; } identity leaf { base mid; }
+  container top {
+    leaf s { type string; }
+    leaf n { type int32; }
+    leaf d { type decimal64 { fraction-digits 2; } }
+    leaf flag { type boolean; default false; }
+    leaf kind { type identityref { base base; } }
+    leaf-list tags { type string; must "string-length(.) < 4" { error-message "tag too long"; } }
+    list item { key id; leaf id { type string; } leaf v { type int32; }
+      must "count(../item[v = current()/v]) = 1"; }
+    leaf arity { type string; must "contains(.)"; }
+    leaf empty-must { type string; must ""; }
+    leaf ws { type string; must "translate(., 'abc', 'AB') = 'AB'"; }
+    leaf num { type string; must "number(.) > 1.5 and boolean(.) and not(. = 'x')"; }
+    leaf pos { type string; must "../item[2]/id = 'b'"; }
+    leaf nanpos { type string; must "../item[0 div 0]"; }
+    leaf zero { type int32; must "1 div . > 0 or -1 div . < 0 or . mod 0 != . mod 0"; }
+    leaf cmp { type string; must ". < 'm' and . >= 'b' and '10' > 9"; }
+    leaf list-eq { type string; must ". = ('a', 'b', 3)"; }
+    leaf concat { type string; must "concat(../s, '-', ../n, '-', ../d, '-', ../flag) = ."; }
+    leaf derived { type string; must "derived-from(../kind, 'x:base') and derived-from-or-self(../kind, 'x:mid')"; }
+    leaf dflt { type string; must "../flag = false()"; }
+    leaf present-when { type string; when "../n > 5"; }
+    leaf ref { type leafref { path "../item/id"; } }
+    leaf-list refs { type leafref { path "/top/item/id"; } }
+    leaf iid { type instance-identifier; }
+  }
+"""
+
+XPATH_INSTANCES = [
+    {"tags": ["ab", "abcd"]},
+    {"item": [{"id": "a", "v": 1}, {"id": "b", "v": 1}]},
+    {"arity": "z"},
+    {"empty-must": "z"},
+    {"ws": "abc"},
+    {"ws": "cab"},
+    {"num": "2"},
+    {"num": "1"},
+    {"pos": "p", "item": [{"id": "a"}, {"id": "b"}]},
+    {"pos": "p", "item": [{"id": "b"}, {"id": "a"}]},
+    {"nanpos": "p", "item": [{"id": "a"}]},
+    {"zero": 0},
+    {"cmp": "c"},
+    {"cmp": "z"},
+    {"list-eq": "b"},
+    {"list-eq": "3"},
+    {"list-eq": "c"},
+    {"s": "q", "n": 7, "d": "1.5", "flag": True, "concat": "q-7-1.5-True"},
+    {"s": "q", "n": 7, "concat": "q-7--False"},
+    {"kind": "x:leaf", "derived": "y"},
+    {"kind": "x:base", "derived": "y"},
+    {"dflt": "y"},
+    {"dflt": "y", "flag": True},
+    {"n": 3, "present-when": "y"},
+    {"n": 9, "present-when": "y"},
+    {"ref": "a", "item": [{"id": "a"}]},
+    {"ref": "b", "item": [{"id": "a"}]},
+    {"refs": ["a", "c"], "item": [{"id": "a"}]},
+    {"iid": "/x:top/x:s", "s": "v"},
+    {"iid": "/x:top/x:n"},
+    {"iid": "top/s"},
+    {"iid": "1 + 2"},
+    {"iid": "/top["},
+    {"iid": "/top[nope(1)]"},
+]
+
+
+def xpath_failures() -> tuple[int, list[str]]:
+    """Phase 4 (XPath) beyond the shared cases: load errors from the XPath parser and
+    binder, and validate runs over the function library, operators, predicates,
+    evaluation errors and references. Exit code, stdout and stderr must be identical."""
+    failures: list[str] = []
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp).resolve()
+        yang = base / "x.yang"
+        for body in XPATH_LOAD_ERRORS:
+            yang.write_text(XPATH_HEADER % body)
+            py, zg = python_cli("parse", str(yang)), zig_cli("parse", str(yang))
+            if py[0] == 0:
+                failures.append(f"xpath load error {body!r}: Python loads the module")
+            elif py == zg:
+                same += 1
+            else:
+                failures.append(f"xpath load error {body!r}: parse differs\n  python: {py}\n  zig:    {zg}")
+        for body in XPATH_REFINE_PATHS:
+            yang.write_text(XPATH_HEADER % body)
+            py, zg = python_cli("parse", str(yang)), zig_cli("parse", str(yang))
+            if py == zg:
+                same += 1
+            else:
+                failures.append(f"refine/augment path {body!r}: parse differs\n  python: {py}\n  zig:    {zg}")
+        yang.write_text(XPATH_MODULE)
+        data_path = base / "data.json"
+        for inst in XPATH_INSTANCES:
+            data_path.write_text(json.dumps({"top": inst}))
+            for fmt in ("text", "json"):
+                args = ["validate", "--format", fmt, str(yang), str(data_path)]
+                py, zg = python_cli(*args), zig_cli(*args)
+                if py == zg:
+                    same += 1
+                else:
+                    failures.append(f"xpath validate {json.dumps(inst)} ({fmt}): validate differs\n  python: {py}\n  zig:    {zg}")
+    return same, failures
+
+
 def main() -> int:
     failures: list[str] = []
     pending = pending_cases()
@@ -312,6 +454,8 @@ def main() -> int:
     failures.extend(tree_diffs)
     validated, validate_deferred, validate_diffs = validate_failures()
     failures.extend(validate_diffs)
+    xpath_same, xpath_diffs = xpath_failures()
+    failures.extend(xpath_diffs)
 
     from xyang.parser.dispatch_registry import dispatch_registry_parity_snapshot
 
@@ -326,6 +470,7 @@ def main() -> int:
         f"{divergent} meeting a case Python xfails; {len(RESOLUTION_CALLS)} resolution scenarios; "
         f"{trees} resolved case trees identical to Python's unless listed; "
         f"{validated} validate runs identical, {validate_deferred} deferred to a pending phase; "
+        f"{xpath_same} XPath scenarios identical; "
         f"{len(failures)} failure(s)"
     )
     return 1 if failures else 0

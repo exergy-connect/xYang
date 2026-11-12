@@ -103,38 +103,6 @@ fn findFromNode(a: Allocator, s: *Statement, segments: []const []const u8, idx: 
     for (try statementChildren(a, s)) |ch| try findFromNode(a, ch, segments, idx, out);
 }
 
-/// The steps of a `refine` or `uses`-`augment` descendant path, or null when the path is
-/// more than `[prefix:]name` steps separated by `/` (an optional leading `/` included).
-/// Python parses these as an XPath location path; until the XPath phase the other forms
-/// are refused with `UNSUPPORTED_PATH` instead of guessed at.
-pub fn descendantPathSteps(a: Allocator, path: []const u8) Error!?[]const []const u8 {
-    var body = path;
-    if (std.mem.startsWith(u8, body, "/")) body = body[1..];
-    var out: std.ArrayList([]const u8) = .empty;
-    var it = std.mem.splitScalar(u8, body, '/');
-    while (it.next()) |step| {
-        if (!isQName(step)) return null;
-        try out.append(a, step);
-    }
-    return out.items;
-}
-
-pub const UNSUPPORTED_PATH = "xyang-zig cannot read {s} path {f} yet: only 'name' and 'prefix:name' steps are supported until XPath (phase 4 of #165)";
-
-fn isIdentifier(s: []const u8) bool {
-    if (s.len == 0) return false;
-    if (!(std.ascii.isAlphabetic(s[0]) or s[0] == '_')) return false;
-    for (s[1..]) |c| {
-        if (!(std.ascii.isAlphanumeric(c) or c == '_' or c == '-' or c == '.')) return false;
-    }
-    return true;
-}
-
-fn isQName(s: []const u8) bool {
-    if (std.mem.indexOfScalar(u8, s, ':')) |i| return isIdentifier(s[0..i]) and isIdentifier(s[i + 1 ..]);
-    return isIdentifier(s);
-}
-
 /// `apply_refine_to_node`: apply one `refine` to a resolved schema node.
 pub fn applyRefineToNode(a: Allocator, s: *Statement, refine: *const Statement) Error!void {
     const rf = refine.data.refine;
@@ -190,15 +158,4 @@ test "copies are independent where later passes write" {
     const found = try findNodesByRefinePath(a, &.{copy}, &.{ "top", "x" });
     try std.testing.expectEqual(@as(usize, 1), found.len);
     try std.testing.expect(found[0] == copy.statements.items[0]);
-}
-
-test "descendant paths beyond qualified names are refused" {
-    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
-    defer arena.deinit();
-    const a = arena.allocator();
-    const steps = (try descendantPathSteps(a, "m:a/b")).?;
-    try std.testing.expectEqual(@as(usize, 2), steps.len);
-    try std.testing.expectEqual(@as(?[]const []const u8, null), try descendantPathSteps(a, "a[x=1]"));
-    try std.testing.expectEqual(@as(?[]const []const u8, null), try descendantPathSteps(a, "a//b"));
-    try std.testing.expectEqual(@as(?[]const []const u8, null), try descendantPathSteps(a, "*"));
 }

@@ -2,8 +2,9 @@
 //! `src/xyang/validator/type_checker.py`). Returns `(code, message)` issues; empty means
 //! valid. Built-ins dispatch through `types/registry.zig`.
 //!
-//! `leafref` and `instance-identifier` with `require-instance true` need the XPath engine
-//! (phase 4 of #165): they fail with `error.Unsupported` instead of passing silently.
+//! `leafref` and `instance-identifier` with `require-instance true` resolve through the
+//! XPath evaluator from `ctx`: the leaf or leaf-list item being checked is `current()`
+//! (RFC 7950 9.9.2).
 
 const std = @import("std");
 const ast = @import("../ast.zig");
@@ -12,6 +13,8 @@ const pyfmt = @import("../pyfmt.zig");
 const module_mod = @import("../module.zig");
 const registry = @import("../types/registry.zig");
 const identity_graph = @import("../identity_graph.zig");
+const xpath = @import("../xpath/xpath.zig");
+const pychars = @import("../xpath/pychars.zig");
 
 const Allocator = std.mem.Allocator;
 const Module = module_mod.Module;
@@ -20,7 +23,10 @@ const Val = jv.Val;
 const repr = pyfmt.repr;
 pub const Issue = registry.Issue;
 
-pub const Error = error{ OutOfMemory, Unsupported };
+/// `Unsupported`: a construct this port cannot check yet. `Raised`: Python raises a
+/// `ValueError` out of validation (the CLI prints it as `Error: ...`). Both set the
+/// checker's `unsupported` message.
+pub const Error = error{ OutOfMemory, Unsupported, Raised };
 
 /// Integer or float operand of a range comparison (Python `int` / `float`).
 pub const Num = union(enum) {
@@ -53,12 +59,33 @@ pub const TypeChecker = struct {
     a: Allocator,
     /// `root_schema`: the host module the validator runs against.
     root: *Module,
-    /// Set with `error.Unsupported`: what this port cannot check yet.
+    /// Set with `error.Unsupported` / `error.Raised`: the message.
     unsupported: ?[]const u8 = null,
+    /// XPath context of the value being checked; null is a value outside the instance
+    /// tree (`Node(None, module)`, as `encoding.instance._accepts` checks one).
+    ctx: ?xpath.Context = null,
 
-    fn fail(self: *TypeChecker, comptime fmt: []const u8, args: anytype) Error {
+    fn fail(self: *TypeChecker, err: Error, comptime fmt: []const u8, args: anytype) Error {
         self.unsupported = try std.fmt.allocPrint(self.a, fmt, args);
-        return error.Unsupported;
+        return err;
+    }
+
+    /// `check` with `ctx` as the XPath context.
+    pub fn checkIn(self: *TypeChecker, value: Val, t: *const TypeStmt, ctx: xpath.Context) Error![]const Issue {
+        const saved = self.ctx;
+        self.ctx = ctx;
+        defer self.ctx = saved;
+        return self.check(value, t);
+    }
+
+    fn context(self: *TypeChecker) Error!xpath.Context {
+        if (self.ctx) |c| return c;
+        const root = try xpath.node.newNode(self.a, .null, .{ .module = self.root }, null);
+        return .{ .current = root, .root = root };
+    }
+
+    fn evaluator(self: *TypeChecker) xpath.Evaluator {
+        return .{ .a = self.a };
     }
 
     fn one(self: *TypeChecker, i: ?Issue) Error![]const Issue {
@@ -96,7 +123,7 @@ pub const TypeChecker = struct {
     fn checkBuiltin(self: *TypeChecker, spec: *const registry.Builtin, value: Val, t: *const TypeStmt) Error![]const Issue {
         return switch (spec.family) {
             .@"union" => self.checkUnion(value, t),
-            .leafref => self.checkLeafref(t),
+            .leafref => self.checkLeafref(value, t),
             .identityref => self.checkIdentityref(value, t),
             .@"instance-identifier" => self.checkInstanceIdentifier(value, t),
             .string => self.checkString(value, t),
@@ -172,10 +199,33 @@ pub const TypeChecker = struct {
     fn checkInstanceIdentifier(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (try registry.get(registry.INSTANCE_IDENTIFIER).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
         if (!t.require_instance) return &.{};
-        if (std.mem.trim(u8, value.string, &std.ascii.whitespace).len == 0) {
+        const s = pychars.strip(value.string);
+        if (s.len == 0) {
             return self.issue("instance-identifier", "instance-identifier path must not be empty when require-instance is true", .{});
         }
-        return self.fail("xyang-zig cannot check the instance-identifier {f} yet: require-instance needs the XPath engine (phase 4 of #165)", .{repr(value.string)});
+        var p = try xpath.Parser.init(self.a, s);
+        const parsed = p.parse() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.XPathSyntax => return self.issue("instance-identifier", "instance-identifier: invalid path expression ({s})", .{p.message}),
+            error.UnknownFunction => return self.fail(error.Raised, "{s}", .{p.message}),
+            error.UnsupportedNumber => return self.fail(error.Unsupported, "{s}", .{p.message}),
+        };
+        if (parsed.* != .path) {
+            return self.issue("instance-identifier", "instance-identifier: value must be a path expression (e.g. /top/leaf)", .{});
+        }
+        if (!parsed.path.is_absolute) {
+            return self.issue("instance-identifier", "instance-identifier: only absolute paths are supported (path must start with '/')", .{});
+        }
+        const ctx = try self.context();
+        var ev = self.evaluator();
+        const nodes = ev.evalPath(&parsed.path, ctx, ctx.root) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.XPathEval => return self.fail(error.Raised, "{s}", .{ev.message}),
+        };
+        if (nodes.len == 0) {
+            return self.issue("instance-identifier", "instance-identifier: no instance at path {f} (require-instance is true)", .{repr(value.string)});
+        }
+        return &.{};
     }
 
     fn checkUnion(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
@@ -187,10 +237,23 @@ pub const TypeChecker = struct {
         return self.issue("union", "Value {f} does not match any union member type ({s})", .{ jv.pyRepr(value), try std.mem.join(self.a, ", ", names.items) });
     }
 
-    fn checkLeafref(self: *TypeChecker, t: *const TypeStmt) Error![]const Issue {
-        const path = t.path orelse return &.{};
+    /// require-instance: the value is the data of a node the `path` selects. A relative
+    /// path starts at the leaf or leaf-list item (`ctx.current`).
+    fn checkLeafref(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (!t.require_instance) return &.{};
-        return self.fail("xyang-zig cannot check the leafref path {f} yet: require-instance needs the XPath engine (phase 4 of #165)", .{repr(path)});
+        const expr = t.path_ast orelse return &.{};
+        const path = &expr.path;
+        const path_str = try path.toString(self.a);
+        const ctx = try self.context();
+        const start = if (path.is_absolute) ctx.root else ctx.current orelse
+            return self.issue("leafref", "Leafref relative path {f} requires context node", .{repr(path_str)});
+        var ev = self.evaluator();
+        const targets = ev.evalPath(path, ctx, start) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.XPathEval => return self.fail(error.Raised, "{s}", .{ev.message}),
+        };
+        for (targets) |n| if (jv.pyEql(value, n.data)) return &.{};
+        return self.issue("leafref", "Leafref value {f} not found via path {f} (require-instance is true)", .{ jv.pyRepr(value), repr(path_str) });
     }
 
     fn checkString(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {

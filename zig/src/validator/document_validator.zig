@@ -5,8 +5,10 @@
 //! checks (mandatory, min/max-elements, presence), must, type, then descend. `choice`
 //! and `case` are not data nodes; their errors point at the parent data node.
 //!
-//! `when` and `must` need the XPath engine (phase 4 of #165): reaching one fails with
-//! `error.Unsupported` at the point Python would evaluate it, never silently passing.
+//! The walk carries the XPath `Node` of each data node (`Node.step`), so `when`, `must`
+//! and leafref evaluate in the same context as Python: a node's own `when` and `must` at
+//! that node, a `when` merged from `uses` or `augment` and a `choice` / `case` `when` at
+//! the parent, a list's `must` per entry, a leaf-list's `must` per item.
 
 const std = @import("std");
 const ast = @import("../ast.zig");
@@ -18,6 +20,9 @@ const rfc7951 = @import("../encoding/rfc7951.zig");
 const instance = @import("../encoding/instance.zig");
 const type_checker = @import("type_checker.zig");
 const PathBuilder = @import("path_builder.zig").PathBuilder;
+const xpath = @import("../xpath/xpath.zig");
+const xpath_utils = @import("../xpath/utils.zig");
+const schema_nav = @import("../xpath/schema_nav.zig");
 
 const Allocator = std.mem.Allocator;
 const Statement = ast.Statement;
@@ -25,6 +30,7 @@ const TypeStmt = ast.TypeStmt;
 const Module = module_mod.Module;
 const Val = jv.Val;
 const Object = jv.Object;
+const XNode = xpath.Node;
 
 pub const Error = type_checker.Error;
 
@@ -84,16 +90,47 @@ pub const DocumentValidator = struct {
     checker: *type_checker.TypeChecker,
     keys: *rfc7951.MemberKeys,
     errors: std.ArrayList(ValidationError) = .empty,
+    /// The XPath root: the canonical data under the module.
+    root: *const XNode = undefined,
     case_stack: std.ArrayList(*Statement) = .empty,
     case_data_stack: std.ArrayList(*const Object) = .empty,
 
-    fn unsupported(self: *DocumentValidator, comptime fmt: []const u8, args: anytype) Error {
-        self.checker.unsupported = try std.fmt.allocPrint(self.a, fmt, args);
-        return error.Unsupported;
-    }
-
     fn add(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
         try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message });
+    }
+
+    fn addExpr(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8, expression: []const u8) error{OutOfMemory}!void {
+        try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message, .expression = expression });
+    }
+
+    fn context(self: *const DocumentValidator, node: *const XNode) xpath.Context {
+        return .{ .current = node, .root = self.root };
+    }
+
+    /// `_eval_expr`: the expression as a YANG boolean at `node`, or null when it has no
+    /// AST or its evaluation raises.
+    fn evalExpr(self: *DocumentValidator, e: ?*xpath.Expr, node: *const XNode) error{OutOfMemory}!?bool {
+        const expr = e orelse return null;
+        var ev: xpath.Evaluator = .{ .a = self.a };
+        const v = ev.eval(expr, self.context(node), node) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.XPathEval => return null,
+        };
+        return xpath_utils.yangBool(v);
+    }
+
+    /// `_check_must`: each `must` of `s` at `node`.
+    fn checkMust(self: *DocumentValidator, s: *const Statement, node: *const XNode, path: []const u8, pointer: []const u8) error{OutOfMemory}!void {
+        for (s.must_statements.items) |must| {
+            const result = try self.evalExpr(must.ast, node) orelse {
+                try self.addExpr(path, pointer, "xpath-error", try std.fmt.allocPrint(self.a, "Error evaluating must expression on '{s}'", .{s.name}), must.expression);
+                continue;
+            };
+            if (!result) {
+                const message = if (must.error_message.len > 0) must.error_message else try std.fmt.allocPrint(self.a, "must constraint not satisfied on '{s}'", .{s.name});
+                try self.addExpr(path, pointer, "must", message, must.expression);
+            }
+        }
     }
 
     fn ifFeaturesActive(self: *DocumentValidator, s: *const Statement) error{OutOfMemory}!bool {
@@ -107,7 +144,8 @@ pub const DocumentValidator = struct {
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         var path: PathBuilder = .{ .a = self.a };
-        try self.visitChildren(data, .{ .module = self.module }, &path, true);
+        self.root = try xpath.node.newNode(self.a, data, .{ .module = self.module }, null);
+        try self.visitChildren(data, .{ .module = self.module }, &path, true, self.root);
         return self.errors.items;
     }
 
@@ -127,50 +165,11 @@ pub const DocumentValidator = struct {
     fn effectiveValue(self: *DocumentValidator, data: *const Object, s: *const Statement) Error!?Val {
         const found = try self.keys.lookup(data, s);
         if (found.json_key != null) return found.value;
-        const leaf = switch (s.data) {
-            .leaf => |d| d,
-            else => return null,
-        };
-        const d = leaf.default orelse return null;
-        const t = leaf.type orelse return Val{ .string = d };
-        const coerced = coerceDefault(d, t.name);
-        if (coerced != .string) return coerced;
-        return try self.decodeLexical(t, d, &.{});
-    }
-
-    /// `coerce_default_value` for a built-in leaf type name.
-    fn coerceDefault(d: []const u8, type_name: []const u8) Val {
-        if (std.mem.eql(u8, type_name, registry.BOOLEAN)) {
-            if (std.mem.eql(u8, d, "true")) return .{ .bool = true };
-            if (std.mem.eql(u8, d, "false")) return .{ .bool = false };
-        }
-        if (registry.get(type_name)) |b| if (b.bounds != null) {
-            if (pyInt(d)) |i| return .{ .int = i };
-        };
-        if (registry.isDecimalName(type_name)) {
-            const t = std.mem.trim(u8, d, &std.ascii.whitespace);
-            if (std.fmt.parseFloat(f64, t)) |f| return .{ .float = f } else |_| {}
-        }
-        return .{ .string = d };
-    }
-
-    /// Python `int(text)`: surrounding whitespace, a sign and `_` between digits.
-    fn pyInt(text: []const u8) ?i128 {
-        const t = std.mem.trim(u8, text, &std.ascii.whitespace);
-        var body = t;
-        if (body.len > 0 and (body[0] == '+' or body[0] == '-')) body = body[1..];
-        if (body.len == 0 or body[0] == '_' or body[body.len - 1] == '_') return null;
-        var prev_us = false;
-        for (body) |c| {
-            if (c == '_') {
-                if (prev_us) return null;
-                prev_us = true;
-                continue;
-            }
-            prev_us = false;
-            if (!std.ascii.isDigit(c)) return null;
-        }
-        return std.fmt.parseInt(i128, t, 10) catch null;
+        // Schema defaults are YANG lexical text; integer typedefs and unions decode here.
+        const d = schema_nav.default(s) orelse return null;
+        if (d != .string) return d;
+        const t = s.data.leaf.type orelse return d;
+        return try self.decodeLexical(t, d.string, &.{});
     }
 
     const Marker = struct { prefix: ?[]const u8, name: []const u8 };
@@ -209,8 +208,11 @@ pub const DocumentValidator = struct {
         return .{ .string = value };
     }
 
+    /// `_default_accepted`: the type accepts the decoded default, checked as a value of
+    /// its own (`Node(value, type)` as the XPath root).
     fn accepted(self: *DocumentValidator, v: Val, t: *const TypeStmt) Error!bool {
-        return (try self.checker.check(v, t)).len == 0;
+        const node = try xpath.node.newNode(self.a, v, .none, null);
+        return (try self.checker.checkIn(v, t, .{ .current = node, .root = node })).len == 0;
     }
 
     // -- choice and mandatory helpers -----------------------------------------------------
@@ -272,7 +274,7 @@ pub const DocumentValidator = struct {
 
     const NameSet = std.StringHashMapUnmanaged(void);
 
-    fn visitChildren(self: *DocumentValidator, data: Val, owner: Owner, path: *PathBuilder, enforce: bool) Error!void {
+    fn visitChildren(self: *DocumentValidator, data: Val, owner: Owner, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
         if (data != .object) return;
         const obj = data.object;
         const child_enforce = childEnforce(owner, enforce);
@@ -284,7 +286,7 @@ pub const DocumentValidator = struct {
             } else if (try self.keys.key(s)) |k| {
                 try visited.put(self.a, k, {});
             }
-            try self.visitStmt(s, obj, path, child_enforce);
+            try self.visitStmt(s, obj, path, child_enforce, parent);
         }
         for (obj.keys()) |key| {
             if (visited.contains(key)) continue;
@@ -292,8 +294,8 @@ pub const DocumentValidator = struct {
         }
     }
 
-    fn visitStmt(self: *DocumentValidator, s: *Statement, data: *const Object, path: *PathBuilder, enforce: bool) Error!void {
-        if (s.kind() == .choice) return self.visitChoice(s, data, path, enforce);
+    fn visitStmt(self: *DocumentValidator, s: *Statement, data: *const Object, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
+        if (s.kind() == .choice) return self.visitChoice(s, data, path, enforce, parent);
         if (s.kind() == .case) {
             try self.case_stack.append(self.a, s);
             try self.case_data_stack.append(self.a, data);
@@ -301,7 +303,7 @@ pub const DocumentValidator = struct {
                 _ = self.case_data_stack.pop();
                 _ = self.case_stack.pop();
             }
-            return self.visitChildren(.{ .object = @constCast(data) }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce));
+            return self.visitChildren(.{ .object = @constCast(data) }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), parent);
         }
 
         const name = s.name;
@@ -319,9 +321,17 @@ pub const DocumentValidator = struct {
         }
 
         const val = try self.effectiveValue(data, s);
+        const curr = try parent.step(self.a, val orelse .null, .{ .stmt = s });
 
         if (s.hasWhen()) if (s.when) |w| {
-            return self.unsupported("xyang-zig cannot evaluate the 'when' condition {f} on '{s}' yet: XPath is phase 4 of #165", .{ @import("../pyfmt.zig").repr(w.expression), name });
+            // RFC 7950 7.21.5: a `when` merged from `uses` or `augment` uses the parent.
+            const ok = try self.evalExpr(w.ast, if (w.evaluate_with_parent_context) parent else curr) orelse true;
+            if (!ok) {
+                if (present) {
+                    try self.addExpr(child_path, child_pointer, "when", try std.fmt.allocPrint(self.a, "Node '{s}' is present but its 'when' condition evaluates to false \u{2014} this node must not exist", .{name}), w.expression);
+                }
+                return;
+            }
         };
 
         if (present) {
@@ -354,27 +364,35 @@ pub const DocumentValidator = struct {
                 defer path.pop();
                 const empty = try self.a.create(Object);
                 empty.* = .empty;
-                try self.visitChildren(.{ .object = empty }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce));
+                const empty_node = try parent.step(self.a, .{ .object = empty }, .{ .stmt = s });
+                try self.visitChildren(.{ .object = empty }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), empty_node);
             }
             return;
         }
 
-        if (s.hasMust() and s.kind() != .list and s.must_statements.items.len > 0) {
-            const items_nonempty = if (s.kind() == .leaf_list) (if (val) |v| v == .array and v.array.len > 0 else false) else true;
-            if (items_nonempty) {
-                return self.unsupported("xyang-zig cannot evaluate the 'must' expression {f} on '{s}' yet: XPath is phase 4 of #165", .{ @import("../pyfmt.zig").repr(s.must_statements.items[0].expression), name });
+        if (s.hasMust() and s.kind() != .list) {
+            if (s.kind() == .leaf_list) {
+                // Per element; a non-array value was already rejected above.
+                const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
+                for (items, 0..) |item, i| {
+                    const item_node = try parent.step(self.a, item, .{ .stmt = s });
+                    try self.checkMust(s, item_node, try std.fmt.allocPrint(self.a, "{s}[{d}]", .{ child_path, i }), try std.fmt.allocPrint(self.a, "{s}/{d}", .{ child_pointer, i }));
+                }
+            } else {
+                try self.checkMust(s, curr, child_path, child_pointer);
             }
         }
 
         if (s.kind() == .leaf) if (leafType(s)) |t| if (val) |v| if (v != .null) {
-            for (try self.checker.check(v, t)) |i| try self.add(child_path, child_pointer, i.code, i.message);
+            for (try self.checker.checkIn(v, t, self.context(curr))) |i| try self.add(child_path, child_pointer, i.code, i.message);
         };
         if (s.kind() == .leaf_list) if (leafType(s)) |t| {
             const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
             for (items, 0..) |item, i| {
                 const item_path = try std.fmt.allocPrint(self.a, "{s}[{d}]", .{ child_path, i });
                 const item_pointer = try std.fmt.allocPrint(self.a, "{s}/{d}", .{ child_pointer, i });
-                for (try self.checker.check(item, t)) |iss| try self.add(item_path, item_pointer, iss.code, iss.message);
+                const item_node = try parent.step(self.a, item, .{ .stmt = s });
+                for (try self.checker.checkIn(item, t, self.context(item_node))) |iss| try self.add(item_path, item_pointer, iss.code, iss.message);
             }
         };
 
@@ -382,7 +400,7 @@ pub const DocumentValidator = struct {
         if (isContainerKind(s) and v == .object) {
             try path.push(name, null, null, json_name);
             defer path.pop();
-            try self.visitChildren(v, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce));
+            try self.visitChildren(v, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), curr);
         } else if (s.kind() == .list and v == .array) {
             const key_names = try keyNames(self.a, s);
             try self.checkListKeyUniqueness(v.array, key_names, name, child_path, child_pointer);
@@ -391,10 +409,9 @@ pub const DocumentValidator = struct {
                 if (entry != .object) continue;
                 try path.push(name, try self.entryKey(entry.object, key_names), i, json_name);
                 defer path.pop();
-                if (s.must_statements.items.len > 0) {
-                    return self.unsupported("xyang-zig cannot evaluate the 'must' expression {f} on '{s}' yet: XPath is phase 4 of #165", .{ @import("../pyfmt.zig").repr(s.must_statements.items[0].expression), name });
-                }
-                try self.visitChildren(entry, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce));
+                const entry_node = try xpath.node.newNode(self.a, entry, .{ .stmt = s }, parent);
+                try self.checkMust(s, entry_node, try path.current(), try path.pointer());
+                try self.visitChildren(entry, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), entry_node);
             }
         }
     }
@@ -436,7 +453,7 @@ pub const DocumentValidator = struct {
         }
     }
 
-    fn visitChoice(self: *DocumentValidator, choice: *Statement, data: *const Object, path: *PathBuilder, enforce: bool) Error!void {
+    fn visitChoice(self: *DocumentValidator, choice: *Statement, data: *const Object, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
         const cname = choice.name;
         if (!try self.ifFeaturesActive(choice)) {
             for (choice.data.choice.cases.items) |c| if (try self.caseHasAnyData(c, data)) {
@@ -446,7 +463,13 @@ pub const DocumentValidator = struct {
             return;
         }
         if (choice.when) |w| {
-            return self.unsupported("xyang-zig cannot evaluate the 'when' condition {f} on choice '{s}' yet: XPath is phase 4 of #165", .{ @import("../pyfmt.zig").repr(w.expression), cname });
+            if (!(try self.evalExpr(w.ast, parent) orelse true)) {
+                for (choice.data.choice.cases.items) |c| if (try self.caseHasAnyData(c, data)) {
+                    try self.addExpr(try path.current(), try path.pointer(), "when", try std.fmt.allocPrint(self.a, "Choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{cname}), w.expression);
+                    break;
+                };
+                return;
+            }
         }
         var active: std.ArrayList(*Statement) = .empty;
         for (choice.data.choice.cases.items) |case| {
@@ -459,7 +482,10 @@ pub const DocumentValidator = struct {
             }
             if (!try self.caseHasAnyData(case, data)) continue;
             if (case.when) |w| {
-                return self.unsupported("xyang-zig cannot evaluate the 'when' condition {f} on case '{s}' yet: XPath is phase 4 of #165", .{ @import("../pyfmt.zig").repr(w.expression), case.name });
+                if (!(try self.evalExpr(w.ast, parent) orelse true)) {
+                    try self.addExpr(try path.current(), try path.pointer(), "when", try std.fmt.allocPrint(self.a, "Case '{s}' of choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{ case.name, cname }), w.expression);
+                    return;
+                }
             }
             try active.append(self.a, case);
         }
@@ -483,7 +509,7 @@ pub const DocumentValidator = struct {
             _ = self.case_stack.pop();
         }
         const inner = childEnforce(.{ .stmt = case }, enforce);
-        for (case.statements.items) |s| try self.visitStmt(s, data, path, inner);
+        for (case.statements.items) |s| try self.visitStmt(s, data, path, inner, parent);
     }
 
     /// `_check_structural`: false when the node is absent and nothing further applies.

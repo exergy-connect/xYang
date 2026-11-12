@@ -6,12 +6,13 @@
 //! payload for the class-specific fields. `hasMust`, `hasWhen` and friends answer the
 //! `isinstance` / `hasattr` questions the Python parser asks.
 //!
-//! XPath expressions (`must`, `when`, leafref `path`, `refine` targets) are kept as source
-//! strings until the XPath phase adds a parser.
+//! `must`, `when` and leafref `path` keep their source text next to the XPath AST parsed
+//! and prefix-bound when the module loads (`xpath/`). `refine` targets stay text.
 
 const std = @import("std");
 const Module = @import("module.zig").Module;
 const xsd_regex = @import("xsd_regex.zig");
+const xpath_ast = @import("xpath/ast.zig");
 
 pub const StringList = std.ArrayList([]const u8);
 
@@ -57,6 +58,8 @@ pub const TypeStmt = struct {
     types: std.ArrayList(*TypeStmt) = .empty,
     /// leafref `path` source text.
     path: ?[]const u8 = null,
+    /// `path` parsed as a schema path and bound to the prefixes of the module that wrote it.
+    path_ast: ?*xpath_ast.Expr = null,
     require_instance: bool = true,
     identityref_bases: std.ArrayList(IdentifierRef) = .empty,
     /// Module that wrote this `type` (RFC 7950 7.13, 9.9.2): its prefix and typedef name
@@ -66,6 +69,8 @@ pub const TypeStmt = struct {
 
 pub const MustStmt = struct {
     expression: []const u8,
+    /// Parsed and prefix-bound XPath; null for an empty expression.
+    ast: ?*xpath_ast.Expr = null,
     description: []const u8 = "",
     reference: []const u8 = "",
     error_message: []const u8 = "",
@@ -73,6 +78,8 @@ pub const MustStmt = struct {
 
 pub const WhenStmt = struct {
     expression: []const u8,
+    /// Parsed and prefix-bound XPath; null for an empty expression.
+    ast: ?*xpath_ast.Expr = null,
     description: []const u8 = "",
     reference: []const u8 = "",
     /// RFC 7950 7.21.5: a `when` merged from `uses` or `augment` is evaluated with the

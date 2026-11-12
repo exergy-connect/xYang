@@ -11,6 +11,7 @@ const kw = @import("../keywords.zig");
 const sp = @import("../statement_parsers.zig");
 const registry = @import("../dispatch_registry.zig");
 const refine_expand = @import("../../refine_expand.zig");
+const xpath = @import("../../xpath/xpath.zig");
 
 const Parser = sp.Parser;
 const Parent = sp.Parent;
@@ -253,7 +254,8 @@ pub fn parseUses(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `refine` with a descendant path (`a/b`, `p:a/p:b`), applied when `uses` is expanded.
+/// `refine` with a descendant path (`a/b`, `p:a/p:b`), parsed as an XPath schema path and
+/// applied when `uses` is expanded.
 pub fn parseRefine(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REFINE);
     var parts: std.ArrayList([]const u8) = .empty;
@@ -262,10 +264,16 @@ pub fn parseRefine(p: *Parser, parent: Parent) Error!void {
         _ = try p.ts.consumeType(.slash);
         try parts.append(p.arena, if ((try p.ts.peekType()) == .identifier) try p.consumeQName() else try p.ts.consumeAny());
     }
-    const path = try std.mem.join(p.arena, "/", parts.items);
-    if ((try refine_expand.descendantPathSteps(p.arena, path)) == null) {
-        return p.ts.failKind(.unsupported, refine_expand.UNSUPPORTED_PATH, .{ "refine", repr(path) });
-    }
+    const path_arg = try std.mem.join(p.arena, "/", parts.items);
+    // Python keeps the parsed path; matching and messages use its `to_string()`.
+    var xp = try xpath.Parser.init(p.arena, path_arg);
+    const parsed = xp.parsePath(true) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.XPathSyntax => return p.ts.fail("{s}", .{xp.message}),
+        error.UnknownFunction => return p.ts.failUnlocated(.syntax, "{s}", .{xp.message}),
+        error.UnsupportedNumber => return p.ts.failUnlocated(.unsupported, "{s}", .{xp.message}),
+    };
+    const path = try parsed.path.toString(p.arena);
     const refine = try p.newStatement("refine", .{ .refine = .{ .target_path = path } });
     try p.parseOptionalBlock(.{ .stmt = refine }, .refine, try p.label("refine '{s}'", .{path}));
     if (stmtData(parent, .uses)) |s| try s.data.uses.refines.append(p.arena, refine);
@@ -285,10 +293,11 @@ pub fn parseRefineDefault(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `must`. The XPath is kept as text until the XPath phase parses and binds it.
+/// `must`: the XPath is parsed and bound to this module's prefixes before the body.
 pub fn parseMust(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.MUST);
-    const must = try p.new(ast.MustStmt, .{ .expression = try p.parseStringConcatenation() });
+    const expression = try p.parseStringConcatenation();
+    const must = try p.new(ast.MustStmt, .{ .expression = expression, .ast = try p.compileXPath(expression) });
     try p.parseOptionalBlock(.{ .must = must }, .must, "must");
     switch (parent) {
         .stmt => |s| if (s.hasMust()) try s.must_statements.append(p.arena, must),
@@ -306,10 +315,11 @@ pub fn parseMustErrorMessage(p: *Parser, parent: Parent) Error!void {
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `when`. The XPath is kept as text until the XPath phase parses and binds it.
+/// `when`: the XPath is parsed and bound to this module's prefixes before the body.
 pub fn parseWhen(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.WHEN);
-    const when = try p.new(ast.WhenStmt, .{ .expression = try p.parseStringConcatenation() });
+    const expression = try p.parseStringConcatenation();
+    const when = try p.new(ast.WhenStmt, .{ .expression = expression, .ast = try p.compileXPath(expression) });
     try p.parseOptionalBlock(.{ .when = when }, .when, "when");
     switch (parent) {
         .stmt => |s| if (s.hasWhen()) {
