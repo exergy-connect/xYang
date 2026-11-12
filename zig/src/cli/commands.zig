@@ -6,8 +6,12 @@
 const std = @import("std");
 const xyang = @import("xyang");
 const args_mod = @import("args.zig");
+const build_options = @import("build_options");
 
 pub const PROG = "xyang-zig";
+
+/// Same text `xyang -V` prints (`pyproject.toml` `version`, read in `build.zig`).
+pub const VERSION = build_options.version;
 
 pub const Io = struct {
     io: std.Io,
@@ -192,20 +196,187 @@ pub const CHOICES = blk: {
     break :blk s ++ "}";
 };
 
-pub const MAIN_USAGE = "usage: " ++ PROG ++ " [-h] " ++ CHOICES ++ " ...\n";
+pub const MAIN_USAGE = "usage: " ++ PROG ++ " [-h] [-V] " ++ CHOICES ++ " ...\n";
 
+/// Python 3.13 argparse help for the top-level parser (`_CliHelpFormatter`: width 88,
+/// max_help_position 32). An option with a short and a long form is `-V, --version`,
+/// and the help column wraps to that invocation width. The examples are the epilog
+/// from `build_parser`, not one generated line per command.
 pub const MAIN_HELP = blk: {
     var width: usize = CHOICES.len;
     for (COMMANDS) |c| width = @max(width, c.name.len + 2);
     var s: []const u8 = MAIN_USAGE ++
-        "\nxYang (Zig): Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema\n" ++
+        "\nxYang: Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema\n" ++
         "\npositional arguments:\n  " ++ pad(CHOICES, width) ++ "  Commands\n";
     for (COMMANDS) |c| s = s ++ "    " ++ pad(c.name, width - 2) ++ "  " ++ c.summary ++ "\n";
     s = s ++ "\noptions:\n  " ++ pad("-h, --help", width) ++ "  show this help message and exit\n" ++
-        "\nexamples:\n  " ++ PROG ++ " --help\n  " ++ PROG ++ " -h\n";
-    for (COMMANDS) |c| s = s ++ "  " ++ PROG ++ " " ++ c.name ++ " module.yang\n";
+        "  " ++ pad("-V, --version", width) ++ "  show program's version number and exit\n" ++
+        "\nexamples:\n" ++
+        "  " ++ PROG ++ " --help\n" ++
+        "  " ++ PROG ++ " -h\n" ++
+        "  " ++ PROG ++ " -V\n" ++
+        "  " ++ PROG ++ " parse module.yang\n" ++
+        "  " ++ PROG ++ " validate --format json module.yang data.json\n" ++
+        "  " ++ PROG ++ " validate --rpc add-link --output --context state.json module.yang output.json\n" ++
+        "  " ++ PROG ++ " convert module.yang -o module.yang.json\n";
     break :blk s;
 };
+
+const LongOpt = struct {
+    name: []const u8,
+    display: []const u8,
+    help: bool,
+};
+
+/// Top-level optional actions, in the order argparse registered them.
+const LONGS = [_]LongOpt{
+    .{ .name = "--help", .display = "-h/--help", .help = true },
+    .{ .name = "--version", .display = "-V/--version", .help = false },
+};
+
+const TopKind = union(enum) { help, version, unknown, err: []const u8 };
+
+fn ignoredExplicit(arena: std.mem.Allocator, display: []const u8, value: []const u8) !TopKind {
+    return .{ .err = try std.fmt.allocPrint(arena, "argument {s}: ignored explicit argument '{s}'", .{ display, value }) };
+}
+
+/// Long-option prefix match, including `--opt=value` on a flag (`nargs == 0`).
+fn classifyLong(arena: std.mem.Allocator, arg: []const u8) !TopKind {
+    const eq = std.mem.indexOfScalar(u8, arg, '=');
+    const prefix = if (eq) |e| arg[0..e] else arg;
+    var matched: [LONGS.len]usize = undefined;
+    var n: usize = 0;
+    for (LONGS, 0..) |o, idx| {
+        if (std.mem.startsWith(u8, o.name, prefix)) {
+            matched[n] = idx;
+            n += 1;
+        }
+    }
+    if (n == 0) return .unknown;
+    if (n > 1) {
+        var parts: [LONGS.len][]const u8 = undefined;
+        for (matched[0..n], 0..) |idx, k| parts[k] = LONGS[idx].name;
+        return .{ .err = try std.fmt.allocPrint(arena, "ambiguous option: {s} could match {s}", .{ arg, try std.mem.join(arena, ", ", parts[0..n]) }) };
+    }
+    const o = LONGS[matched[0]];
+    if (eq) |e| return ignoredExplicit(arena, o.display, arg[e + 1 ..]);
+    return if (o.help) .help else .version;
+}
+
+/// Single-dash cluster. `-h` and `-V` take no value, so the first one exits, unless a
+/// later `=` in the same argv element is an ignored explicit argument (argparse raises
+/// that while collecting the cluster, before running the first action).
+fn classifyShort(arena: std.mem.Allocator, arg: []const u8) !TopKind {
+    if (std.mem.indexOfScalar(u8, arg, '=')) |eq| {
+        const left = arg[0..eq];
+        if (std.mem.eql(u8, left, "-h") or std.mem.eql(u8, left, "-V")) {
+            const display = if (left[1] == 'h') "-h/--help" else "-V/--version";
+            return ignoredExplicit(arena, display, arg[eq + 1 ..]);
+        }
+    }
+    var index: usize = 1;
+    var first: ?u8 = null;
+    while (index < arg.len) {
+        const ch = arg[index];
+        if (ch != 'h' and ch != 'V') {
+            if (first == null) return .unknown;
+            break;
+        }
+        if (first == null) first = ch;
+        index += 1;
+        if (index < arg.len and arg[index] == '=') {
+            const display = if (ch == 'h') "-h/--help" else "-V/--version";
+            return ignoredExplicit(arena, display, arg[index + 1 ..]);
+        }
+    }
+    return if (first.? == 'h') .help else .version;
+}
+
+fn classifyTop(arena: std.mem.Allocator, arg: []const u8) !TopKind {
+    if (std.mem.startsWith(u8, arg, "--")) return classifyLong(arena, arg);
+    return classifyShort(arena, arg);
+}
+
+/// Top-level argv, with the same exits as `xyang`: help and version on stdout exit 0
+/// (and do no file I/O), a missing command prints help, and usage errors exit 2.
+/// Unknown options before the command are extras of this parser. They are reported
+/// only when the subcommand's own parse succeeds; a subcommand usage error wins, as
+/// it does in argparse (the subparser runs inside the parent parse).
+pub fn runTop(ctx: Io, args: []const []const u8) !u8 {
+    const arena = ctx.arena;
+    var extras: std.ArrayList([]const u8) = .empty;
+    var i: usize = 0;
+    var only_positional = false;
+    while (i < args.len) {
+        const a = args[i];
+        if (!only_positional and std.mem.eql(u8, a, "--")) {
+            if (i + 1 >= args.len) {
+                try extras.append(arena, a);
+                i += 1;
+                break;
+            }
+            only_positional = true;
+            i += 1;
+            continue;
+        }
+        if (!only_positional and args_mod.looksLikeOption(a)) {
+            switch (try classifyTop(arena, a)) {
+                .help => {
+                    try ctx.out.writeAll(MAIN_HELP);
+                    return 0;
+                },
+                .version => {
+                    try ctx.out.print("{s} {s}\n", .{ PROG, VERSION });
+                    return 0;
+                },
+                .unknown => {
+                    try extras.append(arena, a);
+                    i += 1;
+                    continue;
+                },
+                .err => |msg| return usageError(ctx, MAIN_USAGE, PROG, "{s}", .{msg}),
+            }
+        }
+        break;
+    }
+    if (i >= args.len) {
+        if (extras.items.len > 0) {
+            return usageError(ctx, MAIN_USAGE, PROG, "unrecognized arguments: {s}", .{try std.mem.join(arena, " ", extras.items)});
+        }
+        try ctx.out.writeAll(MAIN_HELP);
+        return 0;
+    }
+    const name = args[i];
+    const cmd = find(name) orelse {
+        var names: std.ArrayList(u8) = .empty;
+        for (COMMANDS, 0..) |c, n| {
+            if (n != 0) try names.appendSlice(arena, ", ");
+            try names.print(arena, "'{s}'", .{c.name});
+        }
+        return usageError(ctx, MAIN_USAGE, PROG, "argument cmd: invalid choice: '{s}' (choose from {s})", .{ name, names.items });
+    };
+    switch (try args_mod.parse(arena, try cmd.spec(arena), args[i + 1 ..], MAIN_USAGE, PROG, ctx.out)) {
+        .help => return 0,
+        .usage_error => |e| return usageError(ctx, e.usage, e.prog, "{s}", .{e.message}),
+        .parsed => |p| {
+            if (extras.items.len > 0) {
+                return usageError(ctx, MAIN_USAGE, PROG, "unrecognized arguments: {s}", .{try std.mem.join(arena, " ", extras.items)});
+            }
+            return cmd.run(ctx, cmd, &p);
+        },
+    }
+}
+
+test "top-level help is the Python 3.13 registry" {
+    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "[-h] [-V] {parse,validate,convert}") != null);
+    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "-V, --version") != null);
+    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xYang: Parse YANG modules") != null);
+    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xyang-zig -V\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xyang-zig convert module.yang -o module.yang.json\n") != null);
+    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].usage, "[-o PATH]") != null);
+    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].help, "-o, --output PATH") != null);
+    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].help, "-o PATH, --output PATH") == null);
+}
 
 fn pad(comptime s: []const u8, comptime width: usize) []const u8 {
     var out: []const u8 = s;
@@ -220,15 +391,6 @@ pub fn usageError(ctx: Io, usage: []const u8, prog: []const u8, comptime fmt: []
     try ctx.err.writeAll(usage);
     try ctx.err.print("{s}: error: " ++ fmt ++ "\n", .{prog} ++ args);
     return 2;
-}
-
-/// Parse the command's arguments, then run it.
-pub fn dispatch(ctx: Io, cmd: *const Command, args: []const []const u8) !u8 {
-    switch (try args_mod.parse(ctx.arena, try cmd.spec(ctx.arena), args, MAIN_USAGE, PROG, ctx.out)) {
-        .help => return 0,
-        .usage_error => |e| return usageError(ctx, e.usage, e.prog, "{s}", .{e.message}),
-        .parsed => |p| return cmd.run(ctx, cmd, &p),
-    }
 }
 
 fn exists(ctx: Io, path: []const u8) bool {
