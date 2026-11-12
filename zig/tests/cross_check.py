@@ -1,4 +1,4 @@
-"""Run ``xyang parse`` and ``xyang-zig parse`` side by side and require the same result.
+"""Run ``xyang`` and ``xyang-zig`` side by side and require the same result.
 
 Usage: ``python zig/tests/cross_check.py [path/to/xyang-zig]`` from the repository root,
 with the Python package installed (``pip install -e .``). Exits non-zero on any mismatch.
@@ -25,7 +25,15 @@ Checked:
   ``--rpc`` / ``--action`` / ``--output`` / ``--context`` (api-path and wrapper errors,
   list keys, presence, context errors, encodings), RFC 8791 structure instances, and
   ``sx:augment-structure`` from the same and another module (load errors and the tree).
-- command-line usage errors and ``parse --help``, with the program name normalized.
+- the native JSON form (phase 6): ``convert`` on every ``.yang`` file under ``tests/cases``
+  and ``examples/meta-model.yang`` (exit code, stdout, stderr and the written file byte
+  for byte; a ``TypeError`` Python raises from ``copy_yang_statement`` compares as its
+  message) and where ``convert`` writes; then, for every converted form and every
+  committed ``.yang.json``, the tree ``parse_json_schema`` rebuilds, the
+  ``generate(parse(json))`` text byte for byte, ``generate(parse(json)) == json`` for the
+  case goldens, and every case instance validated against the reloaded form.
+- command-line usage errors and ``parse``/``validate``/``convert`` help, with the program
+  name normalized.
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
 
@@ -187,15 +195,7 @@ def python_case_tree(case_dir: Path, module_file: str) -> dict:
             parser.parse_file(sibling)
     except Exception as exc:  # noqa: BLE001 - any load failure is compared as an error
         return {"error": str(exc)}
-    return {
-        "name": mod.name,
-        "typedefs": sorted(mod.typedefs),
-        "identities": sorted(mod.identities),
-        "groupings": sorted(mod.groupings),
-        "features": sorted(mod.features),
-        "imports": {p: m.name for p, m in mod.import_prefixes.items()},
-        "statements": [_dump_node(s) for s in mod.statements],
-    }
+    return _module_tree(mod)
 
 
 def tree_failures() -> tuple[int, list[str]]:
@@ -635,6 +635,196 @@ def operation_failures() -> tuple[int, list[str]]:
     return same, failures
 
 
+def normalized_python(result: tuple[int, str, str]) -> tuple[int, str, str]:
+    """A ``TypeError`` Python raises from ``copy_yang_statement`` (a statement class it has
+    no copier for) as the ``Error: message`` line xyang-zig prints; warnings before it stay."""
+    code, out, err = result
+    marker = "Traceback (most recent call last):"
+    if marker not in err:
+        return result
+    head, _, tail = err.partition(marker)
+    last = tail.strip().splitlines()[-1]
+    kind, _, message = last.partition(": ")
+    if kind != "TypeError" or not message.startswith("Unsupported statement type for copy: "):
+        return result
+    return 1, out, f"{head}Error: {message}\n"
+
+
+def convert_pair(args: list[str], out_path: Path) -> tuple[tuple[int, str, str, bytes | None], tuple[int, str, str, bytes | None]]:
+    """``xyang convert`` then ``xyang-zig convert`` writing the same ``out_path``; each result
+    is ``(exit code, stdout, stderr, bytes written or None)``."""
+    results = []
+    for cli in (python_cli, zig_cli):
+        if out_path.exists():
+            out_path.unlink()
+        code, out, err = cli("convert", *args)
+        if cli is python_cli:
+            code, out, err = normalized_python((code, out, err))
+        results.append((code, out, err, out_path.read_bytes() if out_path.exists() else None))
+    return results[0], results[1]
+
+
+def convert_failures(form_dir: Path) -> tuple[int, int, dict[Path, Path], list[str]]:
+    """``xyang convert`` and ``xyang-zig convert`` on every case module and the meta-model,
+    with the module's directory on the include path: exit code, stdout, stderr and the
+    written ``.yang.json`` must be byte-identical. Each written form is kept in
+    ``form_dir`` (module path -> form path) for the reload checks."""
+    failures: list[str] = []
+    same = divergent = 0
+    forms: dict[Path, Path] = {}
+    files = sorted(CASES.rglob("*.yang")) + [ROOT / "examples" / "meta-model.yang"]
+    for index, path in enumerate(files):
+        out_path = form_dir / f"{index:04d}-{path.stem}.yang.json"
+        py, zg = convert_pair(["--include-path", str(path.parent), str(path), "-o", str(out_path)], out_path)
+        rel = path.relative_to(ROOT).as_posix()
+        if py == zg:
+            same += 1
+            if py[3] is not None:
+                out_path.write_bytes(py[3])
+                forms[path] = out_path
+            continue
+        case = path.parent.relative_to(CASES).as_posix() if CASES in path.parents else None
+        if case is not None and python_xfail_met(case, path, zg[:3]):
+            divergent += 1
+            continue
+        failures.append(f"{rel}: convert differs\n  python: {py[:3]}\n  zig:    {zg[:3]}")
+    return same, divergent, forms, failures
+
+
+CONVERT_MODULE = """module paths { %s
+  container top { leaf a { type string; } }
+}""" % HEADER.format(name="paths", prefix="p")
+
+
+def convert_path_failures() -> tuple[int, list[str]]:
+    """Where ``convert`` writes: ``<stem>.yang.json`` beside the input, ``-o`` with the
+    suffix added, in a directory it creates, and ``-oPATH``."""
+    failures: list[str] = []
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp).resolve()
+        yang = base / "src" / "paths.yang"
+        yang.parent.mkdir()
+        yang.write_text(CONVERT_MODULE)
+        calls = [
+            ([str(yang)], base / "src" / "paths.yang.json"),
+            ([str(yang), "-o", str(base / "out")], base / "out.yang.json"),
+            ([str(yang), "-o", str(base / "deep" / "er" / "x.json")], base / "deep" / "er" / "x.yang.json"),
+            ([str(yang), f"-o{base / 'attached.yang.json'}"], base / "attached.yang.json"),
+            ([str(yang), "--output", str(base / "long.yang.json")], base / "long.yang.json"),
+            ([str(base / "missing.yang")], base / "missing.yang.json"),
+        ]
+        for args, out_path in calls:
+            py, zg = convert_pair(args, out_path)
+            if py == zg:
+                same += 1
+            else:
+                failures.append(f"xyang convert {' '.join(args)}: differs\n  python: {py[:3]}\n  zig:    {zg[:3]}")
+    return same, failures
+
+
+def _module_tree(mod) -> dict:
+    return {
+        "name": mod.name,
+        "typedefs": sorted(mod.typedefs),
+        "identities": sorted(mod.identities),
+        "groupings": sorted(mod.groupings),
+        "features": sorted(mod.features),
+        "imports": {p: m.name for p, m in mod.import_prefixes.items()},
+        "statements": [_dump_node(s) for s in mod.statements],
+    }
+
+
+def python_reload(form: Path):
+    from xyang.json import parse_json_schema
+
+    return parse_json_schema(form)
+
+
+def native_json_files() -> list[Path]:
+    """The committed native JSON forms: the case goldens and the examples."""
+    found = sorted(ROOT.glob("tests/cases/**/expected.yang.json")) + sorted(ROOT.glob("tests/json/data/**/*.yang.json"))
+    found += sorted(ROOT.glob("examples/**/*.yang.json")) + sorted(ROOT.glob("skills/**/*.yang.json"))
+    return found
+
+
+def reload_failures(forms: list[Path]) -> tuple[int, int, list[str]]:
+    """``parse_json_schema`` (reload) and ``generate(parse(json))`` on every native JSON
+    form: the rebuilt tree must equal Python's, the regenerated text must be
+    byte-identical to Python's, and it must equal the form as JSON (Python's ``==``) for
+    every committed golden. Returns (scenarios identical, round trips equal, failures)."""
+    from xyang.json import schema_to_yang_json
+
+    failures: list[str] = []
+    same = round_trips = 0
+    goldens = set(native_json_files())
+    for form in forms:
+        rel = form.relative_to(ROOT).as_posix() if ROOT in form.parents else form.name
+        code, out, err = run([str(RUNNER), "--reload-tree", str(form)])
+        try:
+            py_tree = _module_tree(python_reload(form))
+        except Exception as exc:  # noqa: BLE001 - a load failure is compared as an error
+            py_tree = {"error": str(exc)}
+        zig_tree = json.loads(out) if code == 0 and out.strip() else {"runner": err}
+        if py_tree == zig_tree:
+            same += 1
+        else:
+            failures.append(f"{rel}: reloaded tree differs from Python\n  python: {json.dumps(py_tree)[:2000]}\n  zig:    {json.dumps(zig_tree)[:2000]}")
+        try:
+            py_regen = (0, schema_to_yang_json(python_reload(form)))
+        except Exception as exc:  # noqa: BLE001 - a failure is compared as its message
+            py_regen = (2, f"Error: {exc}\n")
+        code, out, err = run([str(RUNNER), "--regenerate", str(form)])
+        if (code, out) == py_regen:
+            same += 1
+        else:
+            failures.append(f"{rel}: generate(parse(json)) differs from Python\n  python: {py_regen[1][:2000]}\n  zig:    {(out or err)[:2000]}")
+            continue
+        if code == 0 and json.loads(out) == json.loads(form.read_text()):
+            round_trips += 1
+        elif form in goldens and "tests/cases" in rel:
+            failures.append(f"{rel}: generate(parse(json)) != json")
+    return same, round_trips, failures
+
+
+def reloaded_validate_failures(forms: dict[Path, Path]) -> tuple[int, list[str]]:
+    """Every data instance of a case whose module converts, validated against the module
+    reloaded from its native JSON form: ``valid`` and each ``(path, code, message)`` must
+    equal Python's ``validate_detailed`` on ``parse_json_schema`` of the same form.
+    Operation instances, native encoding and feature sets are covered by the YANG runs."""
+    from xyang import YangValidator
+
+    failures: list[str] = []
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        data_path = Path(tmp) / "data.json"
+        for case_json in sorted(CASES.rglob("case.json")):
+            spec = json.loads(case_json.read_text())
+            form = forms.get(case_json.parent / spec["module"])
+            if form is None or "features" in spec:
+                continue
+            case = case_json.parent.relative_to(CASES).as_posix()
+            for inst in spec.get("instances") or []:
+                if any(k in inst for k in ("rpc", "action", "context", "encoding")) or "data" not in inst:
+                    continue
+                data_path.write_text(json.dumps(inst["data"]))
+                try:
+                    result = YangValidator(python_reload(form)).validate_detailed(inst["data"])
+                    expected = {
+                        "valid": result["valid"],
+                        "errors": [{"path": e["path"], "code": e["code"], "message": e["message"]} for e in result["errors"]],
+                    }
+                except Exception as exc:  # noqa: BLE001 - compared as an error
+                    expected = {"error": str(exc)}
+                code, out, err = run([str(RUNNER), "--validate-reloaded", str(form), str(data_path)])
+                got = json.loads(out) if code == 0 and out.strip() else {"runner": err}
+                if got == expected:
+                    same += 1
+                else:
+                    failures.append(f"{case} / {inst['name']}: validate against the reloaded form differs\n  python: {expected}\n  zig:    {got}")
+    return same, failures
+
+
 def main() -> int:
     failures: list[str] = []
     pending = pending_cases()
@@ -685,6 +875,14 @@ def main() -> int:
         ["validate", "examples/meta-model.yang", "missing-data.json"],
         ["validate", "--help"],
         ["validate", "-h"],
+        ["convert"],
+        ["convert", "-o"],
+        ["convert", "--output"],
+        ["convert", "a.yang", "b.yang"],
+        ["convert", "--bogus", "x.yang"],
+        ["convert", "missing-file.yang"],
+        ["convert", "--help"],
+        ["convert", "-h"],
     ]
     for args in usage_calls:
         py, zg = python_cli(*args), normalized(zig_cli(*args))
@@ -704,6 +902,15 @@ def main() -> int:
     failures.extend(xpath_diffs)
     operation_same, operation_diffs = operation_failures()
     failures.extend(operation_diffs)
+    with tempfile.TemporaryDirectory() as tmp:
+        converted, convert_divergent, forms, convert_diffs = convert_failures(Path(tmp))
+        failures.extend(convert_diffs)
+        path_same, path_diffs = convert_path_failures()
+        failures.extend(path_diffs)
+        reload_same, round_trips, reload_diffs = reload_failures([*forms.values(), *native_json_files()])
+        failures.extend(reload_diffs)
+        reloaded_same, reloaded_diffs = reloaded_validate_failures(forms)
+        failures.extend(reloaded_diffs)
 
     from xyang.parser.dispatch_registry import dispatch_registry_parity_snapshot
 
@@ -720,6 +927,10 @@ def main() -> int:
         f"{validated} validate runs identical, {validate_deferred} deferred to a pending phase; "
         f"{xpath_same} XPath scenarios identical; "
         f"{operation_same} operation and structure scenarios identical; "
+        f"{converted} conversions byte-identical, {convert_divergent} meeting a case Python xfails, "
+        f"{path_same} output path scenarios identical; "
+        f"{reload_same} reload and regenerate scenarios identical, {round_trips} forms with "
+        f"generate(parse(json)) == json; {reloaded_same} validate runs against reloaded forms identical; "
         f"{len(failures)} failure(s)"
     )
     return 1 if failures else 0

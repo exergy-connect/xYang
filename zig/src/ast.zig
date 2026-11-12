@@ -13,6 +13,7 @@ const std = @import("std");
 const Module = @import("module.zig").Module;
 const xsd_regex = @import("xsd_regex.zig");
 const xpath_ast = @import("xpath/ast.zig");
+const jv = @import("json_value.zig");
 
 pub const StringList = std.ArrayList([]const u8);
 
@@ -112,6 +113,34 @@ pub const Kind = enum {
     case,
 };
 
+/// `type(stmt).__name__` of the Python class for a kind, for messages that name it.
+pub fn pythonClassName(k: Kind) []const u8 {
+    return switch (k) {
+        .typedef => "YangTypedefStmt",
+        .identity => "YangIdentityStmt",
+        .container => "YangContainerStmt",
+        .notification => "YangNotificationStmt",
+        .input => "YangInputStmt",
+        .output => "YangOutputStmt",
+        .rpc => "YangRpcStmt",
+        .action => "YangActionStmt",
+        .list => "YangListStmt",
+        .leaf => "YangLeafStmt",
+        .leaf_list => "YangLeafListStmt",
+        .anydata => "YangAnydataStmt",
+        .anyxml => "YangAnyxmlStmt",
+        .extension => "YangExtensionStmt",
+        .extension_invocation => "YangExtensionInvocationStmt",
+        .grouping => "YangGroupingStmt",
+        .uses => "YangUsesStmt",
+        .augment => "YangAugmentStmt",
+        .deviation => "YangDeviationStmt",
+        .refine => "YangRefineStmt",
+        .choice => "YangChoiceStmt",
+        .case => "YangCaseStmt",
+    };
+}
+
 pub const Container = struct {
     presence: ?[]const u8 = null,
     /// Groupings declared in this container; visible here and in descendants only.
@@ -125,6 +154,9 @@ pub const Data = union(Kind) {
     typedef: struct {
         type: ?*TypeStmt = null,
         default: ?[]const u8 = null,
+        /// The default as the native JSON form wrote it (any JSON value), when the module
+        /// was loaded from that form; `default` is its Python `str`.
+        default_value: ?jv.Val = null,
         /// Submodule the typedef was merged from by `include`.
         included_from: ?[]const u8 = null,
     },
@@ -147,6 +179,9 @@ pub const Data = union(Kind) {
         min_elements: Bound = null,
         max_elements: Bound = null,
         defaults: StringList = .empty,
+        /// The defaults as the native JSON form wrote them (any JSON values), when the
+        /// module was loaded from that form; `defaults` holds their Python `str`.
+        default_values: ?[]const jv.Val = null,
     },
     anydata: struct { mandatory: bool = false },
     anyxml: struct { mandatory: bool = false },
