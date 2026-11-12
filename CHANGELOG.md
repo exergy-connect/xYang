@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Removed
+
+- **QuickJS standalone binaries:** removed the QuickJS build scripts, shims, vendored license, and release workflow in favor of the native Zig `xyang-zig` binaries. Updated runtime and release documentation. Migrate standalone asset/executable names to `xyang-zig-<platform>`; `convert` now writes a `.yang.json` file (or `-o PATH`) instead of printing JSON Schema to stdout. The npm CLI and browser bundles remain available.
+
 ### Added
 
 - **Experimental Zig WebAssembly library:** `cd zig && zig build wasm -Doptimize=ReleaseSmall` builds a freestanding `xyang.wasm` with native JSON model loading, retained-model RFC 7951 document and RPC/action validation (`rpc`, `action`, `direction`, and exact JSON-text `context`), explicit buffer ownership, and reset. A dependency-free JavaScript wrapper supports browser and Node hosts; CI checks the ABI and reuses native JSON and operation conformance cases. See `zig/wasm/README.md` for the API and initial scope.

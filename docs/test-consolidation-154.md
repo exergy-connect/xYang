@@ -77,7 +77,7 @@ passing Python tests, the Huawei skip, and the two xfails.
 | `pytest -q -m "not ontology" -W error::DeprecationWarning` | (not used; full `pytest -q` was 33.9 / 34.5 s) | 9.75 / 9.40 s: 1051 passed, 1 skipped, 69 deselected, 2 xfailed |
 | `npm test` | 999 passed, 1 skipped, about 7.5 s | 975 passed, 1 skipped, 7.33 s |
 
-A published release (`release: published`, the event used by the PyPI, npm, artifact, QuickJS,
+A published release (`release: published`, the event used by the PyPI, npm, artifact, Zig,
 and benchmark workflows) runs the 93 ontology tests once: 69 Python and 24 TypeScript.
 `workflow_dispatch` runs the same jobs and publishes nothing. With the optional tools installed,
 the Python file was 69 passed and 0 skipped in 29.1 s. `npm run test:ontology` was 24 passed in

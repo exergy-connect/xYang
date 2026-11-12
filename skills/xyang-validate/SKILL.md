@@ -1,6 +1,6 @@
 ---
 name: xyang-validate
-description: Validate JSON instance data against YANG with xYang and consume the results in code, scripts, or CI. Use when checking instances, reading machine-readable errors (--format json, validate_detailed / validateDetailed), choosing RFC 7951 vs native JSON or 64-bit encodings, enabling features, or running xYang from the PyPI/npm packages, the xyang-ts GitHub Action, the browser bundle, or a QuickJS binary.
+description: Validate JSON instance data against YANG with xYang and consume the results in code, scripts, or CI. Use when checking instances, reading machine-readable errors (--format json, validate_detailed / validateDetailed), choosing RFC 7951 vs native JSON or 64-bit encodings, enabling features, or running xYang from the PyPI/npm packages, the xyang-ts GitHub Action, the browser bundle, or a Zig binary.
 ---
 
 # xyang-validate
@@ -12,7 +12,7 @@ Check JSON instances against a YANG module and act on the result. To write or ch
 - A script, agent, or CI job must decide valid / invalid and read each error's location and code.
 - Instance data has 64-bit numbers, `empty` leaves, or keyed lists and you must pick an encoding.
 - The module uses `if-feature`, `import`, or `anydata`.
-- You need xYang without a Python or Node install (GitHub Action, QuickJS binary) or in a browser.
+- You need xYang without a Python or Node install (GitHub Action, Zig binary) or in a browser.
 
 ## Pick a runtime
 
@@ -22,9 +22,9 @@ Check JSON instances against a YANG module and act on the result. To write or ch
 | Node library or CLI | `npm i @exergy-connect/xyang` → `xyang-ts`, or one-off `npx -p @exergy-connect/xyang xyang-ts …` |
 | Another repo's GitHub workflow | `exergy-connect/xYang/.github/actions/xyang-ts` (downloads the release's `xyang-ts.mjs`; needs no install) |
 | Browser | `@exergy-connect/xyang/browser` (ESM) or the `xyang.umd.min.js` release asset (global `xYang`). Parse from strings only: there is no filesystem, so `import` must be resolvable without files |
-| No runtime at all | QuickJS `xyang-ts-<platform>` binaries, same flags as `xyang-ts`. They exist only on releases whose QuickJS workflow succeeded: check `gh release view <tag> -R exergy-connect/xYang --json assets` first |
+| No Python or Node runtime | Zig `xyang-zig-<platform>` binaries, same flags as `xyang`. Check `gh release view <tag> -R exergy-connect/xYang --json assets` first: older releases may lack these assets |
 
-The Python and TypeScript CLIs take the same `validate` flags and give the same JSON output and exit codes.
+The Python, TypeScript, and Zig CLIs take the same `validate` flags and give the same JSON output and exit codes. For Zig, replace `xyang` with the downloaded executable path. Zig `convert` writes a `.yang.json` file (or `-o PATH`) like Python; TypeScript `convert` prints JSON Schema to stdout.
 
 ## Recipe: validate from a shell and branch on the result
 
