@@ -1,6 +1,6 @@
 //! Extension apply callbacks and their application after a load (mirrors
 //! `src/xyang/ext/capabilities.py` and the built-in registrations in
-//! `src/xyang/ext/rfc8791/__init__.py`).
+//! `src/xyang/ext/rfc8791/`).
 //!
 //! One registry: an extension identity (defining module, extension name) maps to the
 //! callback that replaces or removes each invocation. Invocations of other extensions
@@ -10,6 +10,9 @@ const std = @import("std");
 const ast = @import("../ast.zig");
 const errors = @import("../errors.zig");
 const Module = @import("../module.zig").Module;
+const augment_expand = @import("../augment_expand.zig");
+const refine_expand = @import("../refine_expand.zig");
+const uses_expand = @import("../uses_expand.zig");
 
 const Statement = ast.Statement;
 const Error = errors.Error;
@@ -27,9 +30,8 @@ pub const Capability = struct {
 pub const RFC8791_MODULE = "ietf-yang-structure-ext";
 
 pub const CAPABILITIES = [_]Capability{
-    // RFC 8791 `sx:structure` is represented by the invocation node itself.
-    .{ .module_name = RFC8791_MODULE, .extension_name = "structure", .apply = keepInvocation },
-    .{ .module_name = RFC8791_MODULE, .extension_name = "augment-structure", .apply = augmentStructureUnsupported },
+    .{ .module_name = RFC8791_MODULE, .extension_name = "structure", .apply = applyStructure },
+    .{ .module_name = RFC8791_MODULE, .extension_name = "augment-structure", .apply = applyAugmentStructure },
 };
 
 pub fn find(module_name: []const u8, extension_name: []const u8) ?*const Capability {
@@ -39,12 +41,29 @@ pub fn find(module_name: []const u8, extension_name: []const u8) ?*const Capabil
     return null;
 }
 
-fn keepInvocation(_: *Reporter, invocation: *Statement, _: *Module) Error!?*Statement {
+/// RFC 8791 `sx:structure` is represented by the invocation node itself; it is
+/// registered by name for `augment-structure` targets and structure instances.
+fn applyStructure(r: *Reporter, invocation: *Statement, context_module: *Module) Error!?*Statement {
+    const name = std.mem.trim(u8, invocation.data.extension_invocation.argument orelse "", &std.ascii.whitespace);
+    if (name.len > 0) try context_module.structures.put(r.arena, name, invocation);
     return invocation;
 }
 
-fn augmentStructureUnsupported(r: *Reporter, invocation: *Statement, _: *Module) Error!?*Statement {
-    return r.fail(.unsupported, "xyang-zig cannot apply '{s}' yet (RFC 8791 augment-structure is phase 5 of #165)", .{invocation.name});
+fn lookupRegisteredStructure(module: *Module, name: []const u8) ?*Statement {
+    return module.structures.get(name);
+}
+
+/// `apply_augment_structure_invocation`: copy the invocation's children into the target
+/// node inside a registered structure; the invocation itself is removed.
+fn applyAugmentStructure(r: *Reporter, invocation: *Statement, context_module: *Module) Error!?*Statement {
+    const path = invocation.data.extension_invocation.argument orelse "";
+    if (path.len == 0) return r.fail(.syntax, "augment-structure requires an absolute path argument", .{});
+    const target = try augment_expand.resolveAbsoluteSchemaPath(r, context_module, path, "augment-structure", lookupRegisteredStructure);
+    const copies = try refine_expand.copyStatements(r, invocation.statements.items);
+    try uses_expand.mergeIfFeaturesIntoRoots(r.arena, copies.items, invocation.if_features.items);
+    try uses_expand.mergeWhenIntoRoots(r.arena, copies.items, invocation.when);
+    try target.statements.appendSlice(r.arena, copies.items);
+    return null;
 }
 
 /// `apply_extension_invocations`: walk the schema tree and apply each registered callback.

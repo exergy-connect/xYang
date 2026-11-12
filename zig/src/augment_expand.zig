@@ -72,15 +72,22 @@ fn findNamedSchemaChild(parent: *Statement, name: []const u8) ?*Statement {
 
 const Walked = struct { parent: Owner, target: *Statement };
 
+/// The lookup of the first path segment in its module (`find_toplevel`).
+pub const FindToplevel = *const fn (module: *Module, name: []const u8) ?*Statement;
+
 /// `_walk_absolute_schema_path`: `/prefix:name/...` to `(parent, target)`. Every prefix
 /// must be bound in `ctx_module`; children are matched by name, through choices and cases.
 fn walkAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef) Error!Walked {
+    return walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, findToplevelSchemaChild);
+}
+
+fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef, find_toplevel: FindToplevel) Error!Walked {
     const first = segments[0];
     const pref0 = first.prefix orelse "";
     if (pref0.len == 0) return r.fail(.syntax, "{s}: invalid first segment in path {f} (expected 'prefix:identifier')", .{ kind, repr(path) });
     const mod0 = ctx_module.resolvePrefixedModule(pref0) orelse
         return r.fail(.syntax, "{s}: unknown prefix {f} in path {f} (module {f})", .{ kind, repr(pref0), repr(path), repr(ctx_module.name) });
-    var cur = findToplevelSchemaChild(mod0, first.name) orelse
+    var cur = find_toplevel(mod0, first.name) orelse
         return r.fail(.syntax, "{s}: no top-level schema node {f} in module {f} (path {f})", .{ kind, repr(first.name), repr(mod0.name), repr(path) });
     var parent: Owner = .{ .module = mod0 };
     for (segments[1..]) |seg| {
@@ -93,6 +100,13 @@ fn walkAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, k
         cur = nxt;
     }
     return .{ .parent = parent, .target = cur };
+}
+
+/// `resolve_absolute_schema_path`: an absolute schema path whose first segment is found
+/// with `find_toplevel` (RFC 8791 `augment-structure` looks up registered structures).
+pub fn resolveAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, find_toplevel: FindToplevel) Error!*Statement {
+    const segments = try absoluteSegments(r, path, &.{});
+    return (try walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, find_toplevel)).target;
 }
 
 /// `resolve_augment_target`: the schema node that receives the augment's children.
