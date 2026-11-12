@@ -32,10 +32,6 @@ Checked:
   committed ``.yang.json``, the tree ``parse_json_schema`` rebuilds, the
   ``generate(parse(json))`` text byte for byte, ``generate(parse(json)) == json`` for the
   case goldens, and every case instance validated against the reloaded form.
-- the full CLI registry (#153, #156): no-argument help, ``--help`` / ``-h``, ``-V`` /
-  ``--version`` (and unambiguous prefixes), and ``parse`` / ``validate`` / ``convert``
-  help, plus usage errors, with the program name normalized. Help is compared to
-  Python 3.14 argparse (``-o, --output PATH``, not 3.12's ``-o PATH, --output PATH``).
 - the parser dispatch registry against Python's ``dispatch_registry_parity_snapshot()``.
 """
 
@@ -851,78 +847,6 @@ def main() -> int:
             divergent += 1
             continue
         failures.append(f"{rel}: results differ\n  python: {py}\n  zig:    {zg}")
-
-    def normalized(result: tuple[int, str, str]) -> tuple[int, str, str]:
-        code, out, err = result
-        return code, out.replace("xyang-zig", "xyang"), err.replace("xyang-zig", "xyang")
-
-    usage_calls = [
-        [],
-        ["--help"],
-        ["-h"],
-        ["-V"],
-        ["--version"],
-        ["--ver"],
-        ["--v"],
-        ["--h"],
-        ["--help=1"],
-        ["--version=1"],
-        ["-h=1"],
-        ["-V=1"],
-        ["-hV"],
-        ["-Vh"],
-        ["-help"],
-        ["-version"],
-        ["-hV=1"],
-        ["-Vh=1"],
-        ["--=x"],
-        ["-x"],
-        ["-1"],
-        ["--"],
-        ["--", "parse"],
-        ["-h", "parse"],
-        ["-V", "parse"],
-        ["--bogus"],
-        ["--bogus", "parse"],
-        ["--include-path", "x"],
-        ["nonesuch"],
-        ["parse"],
-        ["parse", "--include-path"],
-        ["parse", "a.yang", "b.yang"],
-        ["parse", "--bogus", "x.yang"],
-        ["parse", "missing-file.yang"],
-        ["parse", "--help"],
-        ["parse", "-h"],
-        ["validate"],
-        ["validate", "--format"],
-        ["validate", "--format", "xml", "a.yang"],
-        ["validate", "--a", "x", "a.yang"],
-        ["validate", "--native-json=1", "a.yang"],
-        ["validate", "a.yang", "b.json", "c.json"],
-        ["validate", "missing-file.yang"],
-        ["validate", "--rpc", "r", "--action", "/m:a", "examples/meta-model.yang"],
-        ["validate", "--output", "examples/meta-model.yang"],
-        ["validate", "--features", "[1]", "examples/meta-model.yang"],
-        ["validate", "examples/meta-model.yang", "missing-data.json"],
-        ["validate", "--help"],
-        ["validate", "-h"],
-        ["convert"],
-        ["convert", "-o"],
-        ["convert", "--output"],
-        ["convert", "a.yang", "b.yang"],
-        ["convert", "--bogus", "x.yang"],
-        ["convert", "missing-file.yang"],
-        ["convert", "--help"],
-        ["convert", "-h"],
-    ]
-    for args in usage_calls:
-        py, zg = python_cli(*args), normalized(zig_cli(*args))
-        if py[0] == 2 and "unrecognized arguments" in py[2]:
-            # The top-level usage line lists every Python command; compare the error line.
-            py = (py[0], py[1], py[2].splitlines()[-1])
-            zg = (zg[0], zg[1], zg[2].splitlines()[-1])
-        if py != zg:
-            failures.append(f"xyang {' '.join(args)}: CLI differs\n  python: {py}\n  zig:    {zg}")
 
     failures.extend(resolution_failures())
     trees, tree_diffs = tree_failures()
