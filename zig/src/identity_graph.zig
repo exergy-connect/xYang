@@ -78,6 +78,33 @@ pub fn ancestorClosure(a: std.mem.Allocator, start: Pair) error{OutOfMemory}![]c
     return out.items;
 }
 
+/// `descendant_closure`: identities of `module` that derive from `base_local` over
+/// same-module unprefixed `base` edges (used by the native JSON form).
+pub fn descendantClosure(a: std.mem.Allocator, module: *const Module, base_local: []const u8) error{OutOfMemory}!std.StringArrayHashMapUnmanaged(void) {
+    var children: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
+    for (module.identities.keys(), module.identities.values()) |name, stmt| {
+        for (stmt.data.identity.bases.items) |b| {
+            if (b.prefix) |p| if (p.len > 0) continue;
+            const gop = try children.getOrPut(a, b.name);
+            if (!gop.found_existing) gop.value_ptr.* = .empty;
+            try gop.value_ptr.append(a, name);
+        }
+    }
+    var out: std.StringArrayHashMapUnmanaged(void) = .empty;
+    try out.put(a, base_local, {});
+    var stack: std.ArrayList([]const u8) = .empty;
+    try stack.append(a, base_local);
+    while (stack.pop()) |cur| {
+        const kids = children.get(cur) orelse continue;
+        for (kids.items) |ch| {
+            if (out.contains(ch)) continue;
+            try out.put(a, ch, {});
+            try stack.append(a, ch);
+        }
+    }
+    return out;
+}
+
 fn contains(pairs: []const Pair, p: Pair) bool {
     for (pairs) |x| if (x.eql(p)) return true;
     return false;

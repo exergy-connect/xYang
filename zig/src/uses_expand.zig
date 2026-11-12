@@ -228,6 +228,12 @@ pub fn expandAllUsesInModule(r: *Reporter, module: *Module) Error!void {
     for (module.groupings.values()) |g| g.statements = try expandUsesInStatements(r, g.statements.items, root);
 }
 
+/// `expand_uses_in_statements(statements, ctx=ExpandUsesContext(module=module))`.
+pub fn expandUsesInStatementsOf(r: *Reporter, module: *Module, statements: []const *Statement) Error!StatementList {
+    var refines: StatementList = .empty;
+    return expandUsesInStatements(r, statements, .{ .module = module, .refines = &refines });
+}
+
 /// `expand_uses_in_statements`. Nested typedefs register on `ctx.typedef_target` when set.
 fn expandUsesInStatements(r: *Reporter, statements: []const *Statement, ctx: Ctx) Error!StatementList {
     const a = r.arena;

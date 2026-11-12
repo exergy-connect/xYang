@@ -404,6 +404,84 @@ fn writeJsonToken(a: Allocator, w: *std.Io.Writer, v: Val) (std.Io.Writer.Error 
     }
 }
 
+/// `json.dumps(value, indent=indent, ensure_ascii=False)`: members in insertion order,
+/// `,` between items, `": "` after keys, `{}` / `[]` when empty.
+pub fn dumpIndented(w: *std.Io.Writer, v: Val, indent: usize) std.Io.Writer.Error!void {
+    try dumpAt(w, v, indent, 0);
+}
+
+fn newline(w: *std.Io.Writer, indent: usize, level: usize) std.Io.Writer.Error!void {
+    try w.writeByte('\n');
+    try w.splatByteAll(' ', indent * level);
+}
+
+fn dumpAt(w: *std.Io.Writer, v: Val, indent: usize, level: usize) std.Io.Writer.Error!void {
+    switch (v) {
+        .null => try w.writeAll("null"),
+        .bool => |b| try w.writeAll(if (b) "true" else "false"),
+        .int => |i| try w.print("{d}", .{i}),
+        .float => |f| if (std.math.isNan(f)) try w.writeAll("NaN") else if (std.math.isInf(f)) try w.writeAll(if (f < 0) "-Infinity" else "Infinity") else try floatRepr(f).format(w),
+        .decimal => |d| try d.format(w),
+        .string => |s| try writePyJsonString(w, s),
+        .array => |items| {
+            if (items.len == 0) return w.writeAll("[]");
+            try w.writeByte('[');
+            for (items, 0..) |item, i| {
+                if (i > 0) try w.writeByte(',');
+                try newline(w, indent, level + 1);
+                try dumpAt(w, item, indent, level + 1);
+            }
+            try newline(w, indent, level);
+            try w.writeByte(']');
+        },
+        .object => |obj| {
+            if (obj.count() == 0) return w.writeAll("{}");
+            try w.writeByte('{');
+            for (obj.keys(), obj.values(), 0..) |k, item, i| {
+                if (i > 0) try w.writeByte(',');
+                try newline(w, indent, level + 1);
+                try writePyJsonString(w, k);
+                try w.writeAll(": ");
+                try dumpAt(w, item, indent, level + 1);
+            }
+            try newline(w, indent, level);
+            try w.writeByte('}');
+        },
+    }
+}
+
+/// `py_encode_basestring`: `"`, `\`, and control characters escaped; the rest as is.
+fn writePyJsonString(w: *std.Io.Writer, s: []const u8) std.Io.Writer.Error!void {
+    try w.writeByte('"');
+    for (s) |c| {
+        switch (c) {
+            '"' => try w.writeAll("\\\""),
+            '\\' => try w.writeAll("\\\\"),
+            '\n' => try w.writeAll("\\n"),
+            '\r' => try w.writeAll("\\r"),
+            '\t' => try w.writeAll("\\t"),
+            0x08 => try w.writeAll("\\b"),
+            0x0c => try w.writeAll("\\f"),
+            else => if (c < 0x20) try w.print("\\u{x:0>4}", .{c}) else try w.writeByte(c),
+        }
+    }
+    try w.writeByte('"');
+}
+
+test "indented dump matches json.dumps(indent=2, ensure_ascii=False)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var msg: []const u8 = "";
+    const v = try parse(a, "{\"a\": [1, 2.5, \"\\u00e9\\u0001\\n\"], \"b\": {}, \"c\": [], \"d\": {\"e\": null, \"f\": true}}", &msg);
+    var out: std.Io.Writer.Allocating = .init(a);
+    try dumpIndented(&out.writer, v, 2);
+    try std.testing.expectEqualStrings(
+        "{\n  \"a\": [\n    1,\n    2.5,\n    \"\xc3\xa9\\u0001\\n\"\n  ],\n  \"b\": {},\n  \"c\": [],\n  \"d\": {\n    \"e\": null,\n    \"f\": true\n  }\n}",
+        out.written(),
+    );
+}
+
 test "python text of values" {
     var buf: [128]u8 = undefined;
     const cases = [_]struct { f64, []const u8 }{

@@ -13,7 +13,11 @@
 //!   `(path, code)` set, messages and `valid`; with `rpc` / `action` / `direction` /
 //!   `context` it is an operation instance, and `usage_error` must be contained in the
 //!   rejected call's message. The module must still parse or fail as `unsupported`.
-//! - `json_form` / `export_error`: the native JSON form (phase 6).
+//! - `json_form` / `export_error`: the native JSON form (phase 6). The case module is
+//!   converted without `uses` expansion (`_json_form`). `export_error` must be contained in
+//!   the export failure; with `json_form` the form must equal `expected.yang.json`, and
+//!   every instance must give the same result against the module reloaded from the
+//!   serialised form.
 
 const std = @import("std");
 const xyang = @import("xyang");
@@ -49,6 +53,12 @@ pub fn main(init: std.process.Init) !u8 {
             return 0;
         } else if (std.mem.eql(u8, a, "--dump-case") and i + 1 < argv.len) {
             return dumpCase(arena, io, cases_dir, argv[i + 1], out);
+        } else if (std.mem.eql(u8, a, "--reload-tree") and i + 1 < argv.len) {
+            return reloadTree(arena, io, argv[i + 1], out);
+        } else if (std.mem.eql(u8, a, "--regenerate") and i + 1 < argv.len) {
+            return regenerate(arena, io, argv[i + 1], out);
+        } else if (std.mem.eql(u8, a, "--validate-reloaded") and i + 2 < argv.len) {
+            return validateReloaded(arena, io, argv[i + 1], argv[i + 2], out);
         } else if (std.mem.eql(u8, a, "--cases") and i + 1 < argv.len) {
             i += 1;
             cases_dir = argv[i];
@@ -58,7 +68,7 @@ pub fn main(init: std.process.Init) !u8 {
         } else if (std.mem.eql(u8, a, "-v") or std.mem.eql(u8, a, "--verbose")) {
             verbose = true;
         } else {
-            try out.print("usage: xyang-zig-conformance [--cases DIR] [--pending FILE] [-v] [--registry-snapshot] [--dump-case CASE]\nunknown argument: {s}\n", .{a});
+            try out.print("usage: xyang-zig-conformance [--cases DIR] [--pending FILE] [-v] [--registry-snapshot] [--dump-case CASE] [--reload-tree FORM] [--regenerate FORM] [--validate-reloaded FORM DATA]\nunknown argument: {s}\n", .{a});
             return 2;
         }
     }
@@ -261,10 +271,22 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
     const case = root.object;
     const module_name = field(case, "module").?.string;
 
-    if (truthy(field(case, "export_error"))) return .{ .pending = "needs the native JSON export (phase 6)" };
+    if (field(case, "export_error")) |want| if (truthy(want)) {
+        return switch (try jsonForm(arena, io, case_dir, module_name)) {
+            .ok => .{ .pending = try std.fmt.allocPrint(arena, "expected an export error containing {s}; the module converts", .{want.string}) },
+            .failed => |msg| if (std.mem.indexOf(u8, msg, want.string) != null) .pass else .{ .pending = try std.fmt.allocPrint(arena, "export error {s} does not contain {s}", .{ msg, want.string }) },
+        };
+    };
 
     const load = try loadCaseModules(arena, io, case_dir, module_name);
     const json_form = truthy(field(case, "json_form"));
+    var reloaded: ?*xyang.Module = null;
+    if (json_form) {
+        switch (try checkJsonForm(arena, io, case_dir, module_name)) {
+            .ok => |m| reloaded = m,
+            .failed => |why| return .{ .pending = why },
+        }
+    }
 
     if (truthy(field(case, "schema_error"))) {
         const diag = switch (load) {
@@ -278,7 +300,6 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
                 return .{ .pending = try std.fmt.allocPrint(arena, "load error {s} does not contain {s}", .{ msg, code.string }) };
             }
         }
-        if (json_form) return .{ .pending = "needs the native JSON form (phase 6)" };
         return .pass;
     }
 
@@ -296,9 +317,159 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
     for (instances.array.items) |inst_value| {
         const outcome = try runInstance(arena, case, inst_value.object, load.ok);
         if (outcome != .pass) return outcome;
+        if (reloaded) |m| if (inst_value.object.get("name") != null and inst_value.object.get("data") != null) {
+            const from_json = try runInstance(arena, case, inst_value.object, m);
+            switch (from_json) {
+                .pass => {},
+                .pending => |why| return .{ .pending = try std.fmt.allocPrint(arena, "native JSON form: {s}", .{why}) },
+                .regression => |why| return .{ .regression = try std.fmt.allocPrint(arena, "native JSON form: {s}", .{why}) },
+            }
+        };
     }
-    if (json_form) return .{ .pending = "needs the native JSON form (phase 6)" };
     return .pass;
+}
+
+const Form = union(enum) { ok: []const u8, failed: []const u8 };
+
+/// `_json_form`: the case module parsed without `uses` expansion (the case directory on
+/// the include path) and serialised as its native JSON form, or the failure text.
+fn jsonForm(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_name: []const u8) !Form {
+    var diag: xyang.Diagnostic = .{};
+    const include_path = try arena.dupe([]const u8, &.{case_dir});
+    var loader = xyang.Loader.init(arena, io, &diag, include_path);
+    loader.expand_uses = false;
+    const module = loader.parseFile(try std.fs.path.join(arena, &.{ case_dir, module_name })) catch |err| switch (err) {
+        error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "{f}", .{diag}) },
+        else => return err,
+    };
+    const text = xyang.json_generator.schemaToYangJson(arena, module, &diag) catch |err| switch (err) {
+        error.Export, error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "{f}", .{diag}) },
+        else => return err,
+    };
+    return .{ .ok = text };
+}
+
+const Reloaded = union(enum) { ok: *xyang.Module, failed: []const u8 };
+
+/// The golden check of a `json_form` case: the form equals `expected.yang.json` (as JSON
+/// and byte for byte), `generate(parse(json)) == json` as Python compares the dicts, and
+/// the reloaded module is returned for the instances.
+fn checkJsonForm(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_name: []const u8) !Reloaded {
+    const text = switch (try jsonForm(arena, io, case_dir, module_name)) {
+        .ok => |t| t,
+        .failed => |msg| return .{ .failed = try std.fmt.allocPrint(arena, "native JSON form fails: {s}", .{msg}) },
+    };
+    var msg: []const u8 = "";
+    const golden_path = try std.fs.path.join(arena, &.{ case_dir, "expected.yang.json" });
+    const golden_text = std.Io.Dir.cwd().readFileAlloc(io, golden_path, arena, .unlimited) catch |err| {
+        return .{ .failed = try std.fmt.allocPrint(arena, "cannot read {s}: {s}", .{ golden_path, @errorName(err) }) };
+    };
+    const golden = try xyang.json_value.parse(arena, golden_text, &msg);
+    const form = try xyang.json_value.parse(arena, text, &msg);
+    if (!jsonEqual(form, golden)) return .{ .failed = "the native JSON form differs from expected.yang.json" };
+    if (!std.mem.eql(u8, text, golden_text)) return .{ .failed = "the native JSON form is not byte-identical to expected.yang.json" };
+    const module = xyang.json_parser.parseJsonSchema(arena, form, &msg) catch |err| switch (err) {
+        error.JsonForm => return .{ .failed = try std.fmt.allocPrint(arena, "parse_json_schema fails: {s}", .{msg}) },
+        else => return err,
+    };
+    var diag: xyang.Diagnostic = .{};
+    const again = xyang.json_generator.schemaToYangJson(arena, module, &diag) catch |err| switch (err) {
+        error.Export, error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "generate(parse(json)) fails: {f}", .{diag}) },
+        else => return err,
+    };
+    if (!jsonEqual(try xyang.json_value.parse(arena, again, &msg), form)) return .{ .failed = "generate(parse(json)) != json" };
+    return .{ .ok = module };
+}
+
+/// Python `==` on parsed JSON: objects compare without member order, `1 == 1.0`.
+fn jsonEqual(x: xyang.json_value.Val, y: xyang.json_value.Val) bool {
+    return xyang.json_value.pyEql(x, y);
+}
+
+fn readForm(arena: std.mem.Allocator, io: std.Io, path: []const u8, msg: *[]const u8) !?*xyang.Module {
+    const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .unlimited);
+    const value = xyang.json_value.parse(arena, text, msg) catch |err| switch (err) {
+        error.OutOfMemory => return err,
+        else => return null,
+    };
+    return xyang.json_parser.parseJsonSchema(arena, value, msg) catch |err| switch (err) {
+        error.JsonForm => null,
+        else => err,
+    };
+}
+
+fn writeError(out: *std.Io.Writer, message: []const u8) !u8 {
+    var s: std.json.Stringify = .{ .writer = out };
+    try s.beginObject();
+    try s.objectField("error");
+    try s.write(message);
+    try s.endObject();
+    try out.writeAll("\n");
+    return 0;
+}
+
+/// Print the module `parse_json_schema` rebuilds from a native JSON file, as `--dump-case`
+/// prints a case module, or `{"error": message}`.
+fn reloadTree(arena: std.mem.Allocator, io: std.Io, path: []const u8, out: *std.Io.Writer) !u8 {
+    var msg: []const u8 = "";
+    const module = try readForm(arena, io, path, &msg) orelse return writeError(out, msg);
+    try xyang.schema_dump.writeModule(out, arena, module);
+    try out.writeAll("\n");
+    return 0;
+}
+
+/// Print `schema_to_yang_json(parse_json_schema(path))`, or `Error: message` (exit 2).
+fn regenerate(arena: std.mem.Allocator, io: std.Io, path: []const u8, out: *std.Io.Writer) !u8 {
+    var msg: []const u8 = "";
+    const module = try readForm(arena, io, path, &msg) orelse {
+        try out.print("Error: {s}\n", .{msg});
+        return 2;
+    };
+    var diag: xyang.Diagnostic = .{};
+    const text = xyang.json_generator.schemaToYangJson(arena, module, &diag) catch |err| switch (err) {
+        error.Export, error.YangLoad => {
+            try out.print("Error: {f}\n", .{diag});
+            return 2;
+        },
+        else => return err,
+    };
+    try out.writeAll(text);
+    return 0;
+}
+
+/// Validate RFC 7951 data against the module reloaded from a native JSON file and print
+/// `{"valid", "errors": [{path, code, message}]}`, or `{"error": message}`.
+fn validateReloaded(arena: std.mem.Allocator, io: std.Io, form_path: []const u8, data_path: []const u8, out: *std.Io.Writer) !u8 {
+    var msg: []const u8 = "";
+    const module = try readForm(arena, io, form_path, &msg) orelse return writeError(out, msg);
+    const data_text = try std.Io.Dir.cwd().readFileAlloc(io, data_path, arena, .unlimited);
+    const data = try xyang.json_value.parse(arena, data_text, &msg);
+    var validator = xyang.YangValidator.init(arena, module);
+    const result = validator.validate(data, .{}) catch |err| switch (err) {
+        error.Unsupported, error.Raised => return writeError(out, validator.unsupported orelse "unsupported construct"),
+        error.Usage => return writeError(out, validator.usage orelse "invalid call"),
+        else => return err,
+    };
+    var s: std.json.Stringify = .{ .writer = out };
+    try s.beginObject();
+    try s.objectField("valid");
+    try s.write(result.valid());
+    try s.objectField("errors");
+    try s.beginArray();
+    for (result.errors) |e| {
+        try s.beginObject();
+        try s.objectField("path");
+        try s.write(e.pointer);
+        try s.objectField("code");
+        try s.write(e.code);
+        try s.objectField("message");
+        try s.write(e.message);
+        try s.endObject();
+    }
+    try s.endArray();
+    try s.endObject();
+    try out.writeAll("\n");
+    return 0;
 }
 
 /// One instance, as `test_case` in `tests/test_cases.py` checks it: the set of

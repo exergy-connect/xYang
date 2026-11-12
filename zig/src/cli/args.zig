@@ -11,6 +11,8 @@ const std = @import("std");
 
 pub const Opt = struct {
     long: []const u8,
+    /// `-x` alias; argparse names the option `-x/--long` in messages.
+    short: ?[]const u8 = null,
     /// Null for a flag (`store_true`).
     metavar: ?[]const u8 = null,
     choices: ?[]const []const u8 = null,
@@ -65,6 +67,12 @@ pub const Outcome = union(enum) {
     usage_error: struct { usage: []const u8, prog: []const u8, message: []const u8 },
 };
 
+/// argparse's name for the option in messages.
+fn displayName(arena: std.mem.Allocator, o: *const Opt) ![]const u8 {
+    const short = o.short orelse return o.long;
+    return std.fmt.allocPrint(arena, "{s}/{s}", .{ short, o.long });
+}
+
 fn looksLikeOption(a: []const u8) bool {
     return a.len > 1 and a[0] == '-';
 }
@@ -72,7 +80,10 @@ fn looksLikeOption(a: []const u8) bool {
 /// The option an argument names: exact match first, else the unique prefix.
 fn match(spec: Spec, arena: std.mem.Allocator, arg: []const u8, flag_part: []const u8) !union(enum) { opt: *const Opt, help, none, ambiguous: []const u8 } {
     if (std.mem.eql(u8, flag_part, "--help")) return .help;
-    for (spec.options) |*o| if (std.mem.eql(u8, o.long, flag_part)) return .{ .opt = o };
+    for (spec.options) |*o| {
+        if (std.mem.eql(u8, o.long, flag_part)) return .{ .opt = o };
+        if (o.short) |short| if (std.mem.eql(u8, short, flag_part)) return .{ .opt = o };
+    }
     if (flag_part.len <= 2 or !std.mem.startsWith(u8, flag_part, "--")) return .none;
     var names: std.ArrayList([]const u8) = .empty;
     var found: ?*const Opt = null;
@@ -139,8 +150,18 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
             try out.writeAll(spec.help);
             return .help;
         }
-        const eq = std.mem.indexOfScalar(u8, a, '=');
-        const flag_part = if (eq) |e| a[0..e] else a;
+        var eq = std.mem.indexOfScalar(u8, a, '=');
+        var flag_part = if (eq) |e| a[0..e] else a;
+        var attached: ?[]const u8 = null;
+        if (a.len > 2 and a[1] != '-') {
+            for (spec.options) |o| if (o.short) |short| if (o.metavar != null and std.mem.eql(u8, short, a[0..2]) and !std.mem.eql(u8, a, short)) {
+                if (!(eq != null and std.mem.eql(u8, a[0..eq.?], short))) {
+                    flag_part = short;
+                    attached = a[2..];
+                    eq = null;
+                }
+            };
+        }
         switch (try match(spec, arena, a, flag_part)) {
             .help => {
                 try out.writeAll(spec.usage);
@@ -150,19 +171,22 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
             .ambiguous => |msg| return .{ .usage_error = .{ .usage = spec.usage, .prog = spec.prog, .message = msg } },
             .none => try extras.append(arena, a),
             .opt => |o| {
+                const name = try displayName(arena, o);
                 if (o.metavar == null) {
-                    if (eq) |e| return usageError(spec, arena, "argument {s}: ignored explicit argument '{s}'", .{ o.long, a[e + 1 ..] });
+                    if (eq) |e| return usageError(spec, arena, "argument {s}: ignored explicit argument '{s}'", .{ name, a[e + 1 ..] });
                     try p.flags.put(arena, o.long, {});
                     continue;
                 }
                 var v: []const u8 = undefined;
-                if (eq) |e| {
+                if (attached) |rest| {
+                    v = rest;
+                } else if (eq) |e| {
                     v = a[e + 1 ..];
                 } else if (i + 1 < args.len and !looksLikeOption(args[i + 1])) {
                     i += 1;
                     v = args[i];
                 } else {
-                    return usageError(spec, arena, "argument {s}: expected one argument", .{o.long});
+                    return usageError(spec, arena, "argument {s}: expected one argument", .{name});
                 }
                 if (o.choices) |choices| {
                     const ok = for (choices) |c| {
@@ -171,7 +195,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
                     if (!ok) {
                         var quoted: std.ArrayList([]const u8) = .empty;
                         for (choices) |c| try quoted.append(arena, try std.fmt.allocPrint(arena, "'{s}'", .{c}));
-                        return usageError(spec, arena, "argument {s}: invalid choice: '{s}' (choose from {s})", .{ o.long, v, try std.mem.join(arena, ", ", quoted.items) });
+                        return usageError(spec, arena, "argument {s}: invalid choice: '{s}' (choose from {s})", .{ name, v, try std.mem.join(arena, ", ", quoted.items) });
                     }
                 }
                 const gop = try p.values.getOrPut(arena, o.long);
