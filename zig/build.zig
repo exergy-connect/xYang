@@ -21,6 +21,23 @@ pub fn build(b: *std.Build) void {
     const target = b.standardTargetOptions(.{});
     const optimize = b.standardOptimizeOption(.{});
 
+    // Explicit opt-in target: native CLI builds remain unchanged.
+    const wasm_target = b.resolveTargetQuery(.{ .cpu_arch = .wasm32, .os_tag = .freestanding });
+    const wasm = b.addExecutable(.{
+        .name = "xyang",
+        .root_module = b.createModule(.{
+            .root_source_file = b.path("src/wasm.zig"),
+            .target = wasm_target,
+            .optimize = optimize,
+        }),
+    });
+    wasm.entry = .disabled;
+    wasm.rdynamic = true;
+    wasm.stack_size = 2 * 1024 * 1024;
+    wasm.max_memory = 256 * 1024 * 1024;
+    const install_wasm = b.addInstallArtifact(wasm, .{});
+    b.step("wasm", "Build the freestanding Wasm validation library").dependOn(&install_wasm.step);
+
     const lib = b.addModule("xyang", .{
         .root_source_file = b.path("src/root.zig"),
         .target = target,

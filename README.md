@@ -82,6 +82,10 @@ cd zig && zig build -Doptimize=ReleaseSafe
 ./zig-out/bin/xyang-zig --help
 ```
 
+An experimental [WebAssembly build](zig/wasm/README.md) embeds the same Zig
+validation core in browsers and Wasm hosts, loading canonical `.yang.json` models
+without WASI or filesystem access: `cd zig && zig build wasm -Doptimize=ReleaseSmall`.
+
 ### Standalone binary
 
 The TypeScript CLI is also built as a single executable with [QuickJS-ng](https://github.com/quickjs-ng/quickjs) 0.18.0. It is the same `parse` / `validate` / `convert` commands, with no Node.js or Python install. The linux-x64 build is about 1 MB and starts in a few milliseconds, so an agent or a small CI image can shell out to it directly.

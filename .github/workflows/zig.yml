@@ -102,3 +102,13 @@ jobs:
       - name: Conformance cases
         working-directory: zig
         run: zig build conformance
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: "24"
+
+      - name: Build freestanding Wasm and test the host API
+        working-directory: zig
+        run: |
+          zig build wasm -Doptimize=ReleaseSmall
+          node --test tests/wasm.test.mjs
