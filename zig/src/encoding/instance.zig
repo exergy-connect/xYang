@@ -155,8 +155,13 @@ pub const Walk = struct {
         return current;
     }
 
+    /// `_accepts`: checked outside the instance tree; a raised error is a rejection.
     fn accepts(self: *Walk, value: Val, t: *const TypeStmt) Error!bool {
-        return (try self.checker.check(value, t)).len == 0;
+        const issues = self.checker.check(value, t) catch |err| switch (err) {
+            error.Raised => return false,
+            else => return err,
+        };
+        return issues.len == 0;
     }
 
     /// `decode`: the decoded value, or null when this JSON type is not the encoding of

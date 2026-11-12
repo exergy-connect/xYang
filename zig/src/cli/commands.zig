@@ -302,7 +302,7 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
 
     var validator = xyang.YangValidator.init(ctx.arena, module);
     const result = validator.validate(data, .{ .native_json = parsed.flag("--native-json"), .enabled_features_by_module = features }) catch |err| switch (err) {
-        error.Unsupported => return fail(ctx, "{s}", .{validator.unsupported orelse "unsupported construct"}),
+        error.Unsupported, error.Raised => return fail(ctx, "{s}", .{validator.unsupported orelse "unsupported construct"}),
         else => return err,
     };
 
