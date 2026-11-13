@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.1] — 2026-11-13
+
 ### Removed
 
 - **QuickJS standalone binaries:** removed the QuickJS build scripts, shims, vendored license, and release workflow in favor of the native Zig `xyang-zig` binaries. Updated runtime and release documentation. Migrate standalone asset/executable names to `xyang-zig-<platform>`; `convert` now writes a `.yang.json` file (or `-o PATH`) instead of printing JSON Schema to stdout. The npm CLI and browser bundles remain available.
@@ -423,7 +425,11 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v0.1.9...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.1...HEAD
+[1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
+[1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0
+[0.1.11]: https://github.com/exergy-connect/xYang/compare/v0.1.10...v0.1.11
+[0.1.10]: https://github.com/exergy-connect/xYang/compare/v0.1.9...v0.1.10
 [0.1.9]: https://github.com/exergy-connect/xYang/compare/v0.1.8...v0.1.9
 [0.1.8]: https://github.com/exergy-connect/xYang/compare/v0.1.7...v0.1.8
 [0.1.7]: https://github.com/exergy-connect/xYang/compare/v0.1.6...v0.1.7
