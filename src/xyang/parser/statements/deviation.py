@@ -122,12 +122,5 @@ class DeviationStatementParser:
         elif keyword == kw.DEFAULT:
             deviate.defaults.append(p.parse_default_value_tokens(tokens))
         elif keyword == kw.UNIQUE:
-            arg = p.parse_string_argument(tokens)
-            paths = [
-                "/".join(seg.split(":", 1)[-1] for seg in path.split("/") if seg)
-                for path in arg.split()
-            ]
-            if not paths:
-                raise tokens.make_error("unique requires at least one descendant path")
-            deviate.unique.append(paths)
+            deviate.unique.append(p.parse_unique_paths(tokens))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
