@@ -1,0 +1,17 @@
+{
+  "description": "RFC 7950 §7.20.3.2: deviate replace changes the leaf's type. After replace, l is an int8 (#196).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "string is no longer accepted", "data": { "l": "abc" }, "valid": false,
+      "errors": [{ "path": "/l", "code": "type" }],
+      "xfail": {
+        "python": "deviate replace is skipped (#196)",
+        "ts": "deviate replace is skipped (#196)"
+      } },
+    { "name": "int8 value", "data": { "l": 1 }, "valid": true,
+      "xfail": {
+        "python": "deviate replace is skipped (#196)",
+        "ts": "deviate replace is skipped (#196)"
+      } }
+  ]
+}

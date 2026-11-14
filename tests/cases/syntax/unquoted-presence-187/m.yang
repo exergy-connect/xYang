@@ -1,0 +1,10 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container c {
+    presence root;
+    leaf a { type string; mandatory true; }
+  }
+}
