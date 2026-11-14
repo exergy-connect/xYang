@@ -5,7 +5,8 @@ XPath parser for xpath. Produces AST nodes with accept(ev, ctx, node).
 from __future__ import annotations
 
 import logging
-from typing import Any, Callable, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Callable
 
 from ..errors import XPathSyntaxError, YangSyntaxError
 
@@ -93,7 +94,7 @@ class XPathParser:
     def __init__(self, expression: str):
         self.expression = expression
         tokenizer = XPathTokenizer(expression)
-        self.tokens: List[Token] = tokenizer.tokenize()
+        self.tokens: list[Token] = tokenizer.tokenize()
         self.position = 0
 
     def parse(self) -> ASTNode:
@@ -169,10 +170,10 @@ class XPathParser:
         t = self._current()
         return t.type == TokenType.IDENTIFIER and t.value.lower() == keyword.lower()
 
-    def _parse_expression(self) -> Tuple[ASTNode, bool]:
+    def _parse_expression(self) -> tuple[ASTNode, bool]:
         return self._parse_logical_or()
 
-    def _parse_logical_or(self) -> Tuple[ASTNode, bool]:
+    def _parse_logical_or(self) -> tuple[ASTNode, bool]:
         left, cacheable = self._parse_logical_and()
         while self._is_keyword("or"):
             self._consume()
@@ -181,7 +182,7 @@ class XPathParser:
             cacheable = cacheable and rc
         return left, cacheable
 
-    def _parse_logical_and(self) -> Tuple[ASTNode, bool]:
+    def _parse_logical_and(self) -> tuple[ASTNode, bool]:
         left, cacheable = self._parse_comparison()
         while self._is_keyword("and"):
             self._consume()
@@ -190,7 +191,7 @@ class XPathParser:
             cacheable = cacheable and rc
         return left, cacheable
 
-    def _parse_comparison(self) -> Tuple[ASTNode, bool]:
+    def _parse_comparison(self) -> tuple[ASTNode, bool]:
         left, cacheable = self._parse_additive()
         t = self._current()
         if t.type == TokenType.OPERATOR and t.value in _COMPARISON_OPS:
@@ -199,7 +200,7 @@ class XPathParser:
             return BinaryOpNode(left, op, right), cacheable and rc
         return left, cacheable
 
-    def _parse_additive(self) -> Tuple[ASTNode, bool]:
+    def _parse_additive(self) -> tuple[ASTNode, bool]:
         left, cacheable = self._parse_multiplicative()
         while True:
             t = self._current()
@@ -212,7 +213,7 @@ class XPathParser:
                 break
         return left, cacheable
 
-    def _parse_multiplicative(self) -> Tuple[ASTNode, bool]:
+    def _parse_multiplicative(self) -> tuple[ASTNode, bool]:
         left, cacheable = self._parse_unary()
         while True:
             t = self._current()
@@ -236,7 +237,7 @@ class XPathParser:
                 break
         return left, cacheable
 
-    def _parse_unary(self) -> Tuple[ASTNode, bool]:
+    def _parse_unary(self) -> tuple[ASTNode, bool]:
         t = self._current()
         if t.type == TokenType.OPERATOR and t.value == "-":
             self._consume()
@@ -253,7 +254,7 @@ class XPathParser:
             return FunctionCallNode("not", [operand]), False
         return self._parse_primary()
 
-    def _parse_primary(self) -> Tuple[ASTNode, bool]:
+    def _parse_primary(self) -> tuple[ASTNode, bool]:
         t = self._current()
         if t.type == TokenType.STRING:
             value = self._consume().value
@@ -310,7 +311,7 @@ class XPathParser:
                 mark = self.position
                 first, _ = self._parse_primary()
                 if isinstance(first, LiteralNode) and self._current().type == TokenType.COMMA:
-                    values: List[Any] = [first.value]
+                    values: list[Any] = [first.value]
                     while self._current().type == TokenType.COMMA:
                         self._consume(TokenType.COMMA)
                         next_node, _ = self._parse_primary()
@@ -337,10 +338,10 @@ class XPathParser:
             expression=self.expression,
         )
 
-    def _parse_function_call(self) -> Tuple[ASTNode, bool]:
+    def _parse_function_call(self) -> tuple[ASTNode, bool]:
         name = self._consume().value
         self._consume(TokenType.PAREN_OPEN)
-        args: List[ASTNode] = []
+        args: list[ASTNode] = []
         if self._current().type != TokenType.PAREN_CLOSE:
             node, _ = self._parse_expression()
             args.append(node)
@@ -358,8 +359,8 @@ class XPathParser:
         is_absolute: bool,
         first_step: Optional[str] = None,
         allow_predicate: bool = True,
-    ) -> Tuple[PathNode, bool]:
-        segments: List[PathSegment] = []
+    ) -> tuple[PathNode, bool]:
+        segments: list[PathSegment] = []
         cacheable = is_absolute
 
         def _add_step_and_optional_predicate(step: str) -> bool:

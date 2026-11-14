@@ -6,7 +6,7 @@ Uses isinstance checks against the actual AST types — no keyword strings.
 Groupings are pre-expanded during parsing; uses/grouping resolution is never needed here.
 """
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from .ast import PathNode
 from ..ast import (
@@ -66,16 +66,16 @@ class SchemaNav:
         return None
 
     @staticmethod
-    def data_children(schema: Any) -> List[Any]:
+    def data_children(schema: Any) -> list[Any]:
         """Data-node children of *schema*, in schema order, descending through choice and case."""
         if schema is None:
             return []
-        out: List[Any] = []
+        out: list[Any] = []
         SchemaNav._collect_data_children(getattr(schema, "statements", []), out)
         return out
 
     @staticmethod
-    def _collect_data_children(stmts: list, out: List[Any]) -> None:
+    def _collect_data_children(stmts: list, out: list[Any]) -> None:
         for stmt in stmts:
             if isinstance(stmt, YangChoiceStmt):
                 for case in stmt.cases:

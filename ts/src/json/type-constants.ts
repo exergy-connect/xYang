@@ -6,7 +6,7 @@ export const JSON_TYPE_NUMBER = "number";
 export const JSON_TYPE_BOOLEAN = "boolean";
 export const JSON_TYPE_OBJECT = "object";
 export const JSON_TYPE_ARRAY = "array";
-export const JSON_TYPE_NULL = "null";
+const JSON_TYPE_NULL = "null";
 
 export const JSON_TYPE_FREE_FORM = [
   JSON_TYPE_STRING,

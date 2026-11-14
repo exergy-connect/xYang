@@ -6,7 +6,7 @@ All nodes support: accept(ev, ctx, node) -> value.
 
 from __future__ import annotations
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 # Forward reference for evaluator (avoid circular import)
 from typing import TYPE_CHECKING
@@ -65,7 +65,7 @@ class PathSegment:
 class PathNode(ASTNode):
     def __init__(
         self,
-        segments: List[PathSegment],
+        segments: list[PathSegment],
         is_absolute: bool = False,
         is_cacheable: bool = True,
     ):
@@ -95,7 +95,7 @@ class BinaryOpNode(ASTNode):
 
 
 class FunctionCallNode(ASTNode):
-    def __init__(self, name: str, args: List[ASTNode]):
+    def __init__(self, name: str, args: list[ASTNode]):
         self.name = name
         self.args = args
 
@@ -103,11 +103,3 @@ class FunctionCallNode(ASTNode):
         return ev.eval_function(self, ctx, node)
 
 
-def ast_is_const_false(node: Optional[ASTNode]) -> bool:
-    """True if *node* is an XPath AST that always evaluates to false.
-
-    Used for schema pruning (e.g. ``must`` under ``uses`` expansion).
-    :class:`~xyang.xpath.parser.XPathParser` turns ``false`` / ``false()`` into
-    :class:`LiteralNode` with ``value is False`` (not :class:`FunctionCallNode`).
-    """
-    return isinstance(node, LiteralNode) and node.value is False

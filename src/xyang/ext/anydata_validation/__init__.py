@@ -9,7 +9,7 @@ does not parse ``ietf-yang-library`` instance data.
 from __future__ import annotations
 
 from enum import Enum
-from typing import Any, Dict, Tuple
+from typing import Any
 
 from ...ast import YangLeafStmt
 from ...module import YangModule
@@ -27,8 +27,8 @@ class AnydataValidationMode(str, Enum):
 
 
 def parse_anydata_extension_kwargs(
-    kwargs: Dict[str, Any],
-) -> Tuple[Dict[str, YangModule], AnydataValidationMode]:
+    kwargs: dict[str, Any],
+) -> tuple[dict[str, YangModule], AnydataValidationMode]:
     """Validate ``enable_extension(ANYDATA_VALIDATION, ...)`` keyword arguments."""
     rest = dict(kwargs)
     try:
@@ -82,14 +82,14 @@ def _rewrite_error_path(
 
 def run_anydata_subtree_validation(
     outer: DocumentValidator,
-    value: Dict[str, Any],
+    value: dict[str, Any],
     anydata_path: str,
 ) -> None:
     """Validate ``value`` (JSON object under ``anydata``) and append to ``outer._errors``."""
     cfg = outer._anydata_validation
     if cfg is None:
         return
-    modules: Dict[str, YangModule] = cfg["modules"]
+    modules: dict[str, YangModule] = cfg["modules"]
     mode = cfg["mode"]
     constraint = mode == AnydataValidationMode.COMPLETE
     segments = [s for s in anydata_path.strip("/").split("/") if s]

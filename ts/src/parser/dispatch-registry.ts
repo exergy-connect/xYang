@@ -13,20 +13,20 @@
 
 import * as kw from "./keywords";
 
-export const METADATA_SUBSTATEMENTS: ReadonlySet<string> = new Set([
+const METADATA_SUBSTATEMENTS: ReadonlySet<string> = new Set([
   kw.DESCRIPTION,
   kw.REFERENCE,
   kw.UNITS,
   kw.STATUS
 ]);
 
-export const DATA_NODE_SUBSTATEMENTS: ReadonlySet<string> = new Set([
+const DATA_NODE_SUBSTATEMENTS: ReadonlySet<string> = new Set([
   ...METADATA_SUBSTATEMENTS,
   kw.CONFIG,
   kw.TYPEDEF
 ]);
 
-export const DATA_DEF_SUBSTATEMENTS: ReadonlySet<string> = new Set([
+const DATA_DEF_SUBSTATEMENTS: ReadonlySet<string> = new Set([
   kw.LEAF,
   kw.LEAF_LIST,
   kw.CONTAINER,

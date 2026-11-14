@@ -7,7 +7,7 @@ using YangTokenType enum for token kinds.
 
 import re
 import sys
-from typing import Optional, List
+from typing import Optional
 
 from .parser_context import TokenStream, YangToken, YangTokenType
 from .yang_strings import unescape_yang_quoted_string
@@ -40,7 +40,7 @@ class YangTokenizer:
         Returns:
             TokenStream with typed tokens and position information
         """
-        token_list: List[YangToken] = []
+        token_list: list[YangToken] = []
         append = token_list.append
         punctuation = self._PUNCTUATION
         whitespace_run = _WHITESPACE_RUN.match

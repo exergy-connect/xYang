@@ -2,13 +2,13 @@
 XPath expression tokenizer for xpath.
 """
 
-from typing import List, Optional, Set
+from typing import Optional
 
 from .tokens import Token, TokenType
 
-QUOTE_CHARS: Set[str] = {'"', "'"}
-OPERATOR_CHARS: Set[str] = {'=', '<', '>', '!', '+', '-', '*', '/'}
-OPERATOR_NAMES: Set[str] = {'and', 'or', 'div', 'mod'}
+QUOTE_CHARS: set[str] = {'"', "'"}
+OPERATOR_CHARS: set[str] = {'=', '<', '>', '!', '+', '-', '*', '/'}
+OPERATOR_NAMES: set[str] = {'and', 'or', 'div', 'mod'}
 
 
 def normalize_yang_escaped_quotes(expression: str) -> str:
@@ -46,14 +46,12 @@ class XPathTokenizer:
         '=', '<', '>', '+', '-', '*', '/',
     ]
 
-    KEYWORDS = ['or', 'and', 'not', 'true', 'false', 'current']
-
     def __init__(self, expression: str):
         self.expression = normalize_yang_escaped_quotes(expression)
         self.position = 0
-        self.tokens: List[Token] = []
+        self.tokens: list[Token] = []
 
-    def tokenize(self) -> List[Token]:
+    def tokenize(self) -> list[Token]:
         """Tokenize the expression."""
         self.position = 0
         self.tokens = []

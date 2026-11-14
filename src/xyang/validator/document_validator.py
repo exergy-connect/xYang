@@ -27,7 +27,8 @@ import json
 import logging
 import re
 from decimal import Decimal, InvalidOperation
-from typing import AbstractSet, Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Set
 
 from ..types.registry import DECIMAL64, INTEGER_TYPE_NAMES
 
@@ -68,7 +69,7 @@ from .type_checker import TypeChecker
 from .validation_error import ValidationError, Severity
 
 # (Context, Node) for the current parent in the data/schema walk
-ParentCtx = Tuple[Context, Node]
+ParentCtx = tuple[Context, Node]
 
 logger = logging.getLogger("xyang.validator")
 
@@ -107,7 +108,7 @@ class DocumentValidator:
         self,
         root_schema: YangStatementList,
         *,
-        enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = None,
+        enabled_features_by_module: Optional[dict[str, Set[str]]] = None,
         constraint_checks: bool = True,
     ) -> None:
         self._root_schema = root_schema
@@ -121,10 +122,10 @@ class DocumentValidator:
         else:
             self._if_feature_module = None
             self._enabled_features = {}
-        self._anydata_validation: Optional[Dict[str, Any]] = None
+        self._anydata_validation: Optional[dict[str, Any]] = None
         self._leafref_severity = Severity.ERROR
         self._root_data: Any = None
-        self._errors: List[ValidationError] = []
+        self._errors: list[ValidationError] = []
         self._case_stack: list[YangCaseStmt] = []
         self._case_level_data_stack: list[dict[str, Any]] = []
 
@@ -139,7 +140,7 @@ class DocumentValidator:
         native_json: bool = False,
         module: Optional[YangModule] = None,
         from_iterator: bool = False,
-    ) -> List[ValidationError]:
+    ) -> list[ValidationError]:
         """Validate data against the root schema.
 
         Walks the data tree in lockstep with the schema, evaluating when,
@@ -181,7 +182,7 @@ class DocumentValidator:
         self._case_stack = []
         self._case_level_data_stack = []
         self._evaluator.clear_cache_stats()
-        path_cache: Dict[Any, Any] | None = {} if cache else None
+        path_cache: dict[Any, Any] | None = {} if cache else None
         node = Node(data, self._root_schema, None)
         ctx = Context(current=node, root=node, path_cache=path_cache)
         path_builder = path if path is not None else PathBuilder()
@@ -205,12 +206,12 @@ class DocumentValidator:
         *,
         target: Any,
         operation: YangContainerStmt,
-        parent_copies: List[YangStatement],
+        parent_copies: list[YangStatement],
         host: YangModule,
-        context: Optional[Dict[str, Any]] = None,
+        context: Optional[dict[str, Any]] = None,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
-    ) -> List[ValidationError]:
+    ) -> list[ValidationError]:
         """Validate the parameters of one rpc or action ``input`` or ``output`` (RFC 7950 §7.14, §7.15).
 
         This validator's root schema is the accessible module of RFC 7950 §6.4.1 and
@@ -244,12 +245,12 @@ class DocumentValidator:
             ValidationError(path=ptr or "/", message=message, code=code, pointer=ptr)
             for ptr, code, message in encoding_errors(nodes)
         ]
-        root_data: Dict[str, Any] = {}
+        root_data: dict[str, Any] = {}
         if context is not None:
             root_data, _ = project_instance(list(iter_instance(context, host, native_json=native_json)), parent)
 
         root = Node(root_data, self._root_schema, None)
-        holder: Dict[str, Any] = root_data
+        holder: dict[str, Any] = root_data
         holder_node = root
         for step, copied in zip(target.parents, parent_copies):
             member = next(iter(member_keys_cached(step.stmt, parent)))
@@ -349,7 +350,7 @@ class DocumentValidator:
             return self._root_schema.name
         return ""
 
-    def _effective_value(self, data: Dict[str, Any], stmt: YangStatement) -> Any:
+    def _effective_value(self, data: dict[str, Any], stmt: YangStatement) -> Any:
         """
         Return the effective value for a node:
         - instance JSON value if present (local or ``module:`` qualified)
@@ -509,7 +510,6 @@ class DocumentValidator:
     def _mandatory_choice_violation(
         self,
         choice: YangChoiceStmt,
-        data: dict[str, Any],
         enforce_mandatory_choice: bool,
     ) -> bool:
         """True if mandatory ``choice`` with no active case should be reported (§7.9.4)."""
@@ -524,7 +524,6 @@ class DocumentValidator:
     def _leaf_mandatory_must_exist(
         self,
         leaf: YangLeafStmt | YangAnydataStmt | YangAnyxmlStmt,
-        data: dict[str, Any],
         enforce_mandatory_choice: bool,
     ) -> bool:
         """RFC 7950 §7.6.5: when a mandatory leaf's absence is invalid."""
@@ -574,7 +573,7 @@ class DocumentValidator:
     def _visit_stmt(
         self,
         stmt: YangStatement,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         parent_ctx: ParentCtx,
         path: PathBuilder,
         enforce_mandatory_choice: bool,
@@ -809,7 +808,7 @@ class DocumentValidator:
                 self._visit_children(entry, stmt, (entry_ctx, entry_node), path, entry_enforce)
                 path.pop()
 
-    def _choice_has_branch_data(self, choice: YangChoiceStmt, data: Dict[str, Any]) -> bool:
+    def _choice_has_branch_data(self, choice: YangChoiceStmt, data: dict[str, Any]) -> bool:
         """True if any schema child under any case has matching data in ``data``."""
         return any(self._case_has_any_stmt_data(c, data) for c in choice.cases)
 
@@ -845,7 +844,7 @@ class DocumentValidator:
     def _visit_choice(
         self,
         choice: YangChoiceStmt,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         parent_ctx: ParentCtx,
         path: PathBuilder,
         enforce_mandatory_choice: bool,
@@ -933,7 +932,7 @@ class DocumentValidator:
         active_case = active_cases[0] if active_cases else None
 
         if active_case is None:
-            if self._mandatory_choice_violation(choice, data, enforce_mandatory_choice):
+            if self._mandatory_choice_violation(choice, enforce_mandatory_choice):
                 self._add(
                     path=path.current(),
                     pointer=path.pointer(),
@@ -965,7 +964,7 @@ class DocumentValidator:
         self,
         stmt: YangStatement,
         name: str,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         path: str,
         pointer: str,
         enforce_mandatory_choice: bool,
@@ -980,7 +979,7 @@ class DocumentValidator:
             if type_name == "empty" and present:
                 return True
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
+                if self._leaf_mandatory_must_exist(stmt, enforce_mandatory_choice):
                     self._add(
                         path=path,
                         pointer=pointer,
@@ -991,7 +990,7 @@ class DocumentValidator:
 
         if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
+                if self._leaf_mandatory_must_exist(stmt, enforce_mandatory_choice):
                     kind = "anydata" if isinstance(stmt, YangAnydataStmt) else "anyxml"
                     self._add(
                         path=path,
@@ -1083,7 +1082,7 @@ class DocumentValidator:
     def _check_list_key_uniqueness(
         self,
         val: list,
-        key_names: List[str],
+        key_names: list[str],
         list_name: str,
         path_str: str,
         pointer: str,
@@ -1091,7 +1090,7 @@ class DocumentValidator:
         """Report duplicate key in list. Returns True if duplicate found."""
         if not key_names:
             return False
-        seen_keys: Dict[tuple, int] = {}
+        seen_keys: dict[tuple, int] = {}
         for i, entry in enumerate(val):
             if not isinstance(entry, dict):
                 continue
@@ -1118,7 +1117,7 @@ class DocumentValidator:
         Entries missing any leaf of the set are ignored.
         """
         for paths in stmt.unique:
-            seen: Dict[str, int] = {}
+            seen: dict[str, int] = {}
             for i, entry in enumerate(val):
                 values = [_descendant_value(entry, p) for p in paths]
                 if any(v is _MISSING for v in values):
@@ -1138,15 +1137,10 @@ class DocumentValidator:
                     break
                 seen[token] = i
 
-    def _entry_key_from_names(self, entry: Any, key_names: List[str]) -> Optional[str]:
+    def _entry_key_from_names(self, entry: Any, key_names: list[str]) -> Optional[str]:
         """Path key string for a list entry from key leaf names."""
         if not isinstance(entry, dict) or not key_names:
             return None
         parts = [f"{k}='{entry.get(k)}'" for k in key_names]
         return ", ".join(parts) if parts else None
 
-    def _entry_key(self, entry: Any, list_stmt: YangListStmt) -> Optional[str]:
-        if not isinstance(entry, dict) or not list_stmt.key:
-            return None
-        key_names = [k.strip() for k in list_stmt.key.split()]
-        return self._entry_key_from_names(entry, key_names)

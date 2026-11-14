@@ -33,7 +33,6 @@ from ..ast import (
     YangListStmt,
     YangMustStmt,
     YangOutputStmt,
-    YangRefineStmt,
     YangRpcStmt,
     YangActionStmt,
     YangStatement,

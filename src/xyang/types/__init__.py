@@ -3,7 +3,8 @@ YANG type system implementation.
 """
 
 import re
-from typing import Any, Optional, Dict, List, Callable
+from typing import Any, Optional
+from collections.abc import Callable
 from dataclasses import dataclass
 
 
@@ -14,7 +15,7 @@ class TypeConstraint:
     length: Optional[str] = None
     range: Optional[str] = None
     fraction_digits: Optional[int] = None
-    enums: List[str] = None
+    enums: list[str] = None
 
     def __post_init__(self):
         if self.enums is None:
@@ -25,9 +26,8 @@ class TypeSystem:
     """YANG type system for validation."""
 
     def __init__(self):
-        self.typedefs: Dict[str, 'TypeDefinition'] = {}
-        self._pattern_cache: Dict[str, re.Pattern] = {}  # Cache compiled regex patterns
-        self._validators: Dict[str, Callable] = {}
+        self.typedefs: dict[str, 'TypeDefinition'] = {}
+        self._validators: dict[str, Callable] = {}
         self._init_builtin_types()
         # Register built-in validators after all methods are defined
         # This is done lazily on first use to avoid forward reference issues
@@ -195,7 +195,7 @@ class TypeSystem:
     def _validate_decimal64(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
         """Validate decimal64 value."""
         try:
-            float_val = float(value)
+            float(value)
             if constraints and constraints.fraction_digits:
                 # Check fraction digits
                 str_val = str(value)

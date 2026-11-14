@@ -88,7 +88,7 @@ export function reachableModuleData(root: ModuleData): ModuleData[] {
   return out;
 }
 
-export function featureIsSupported(
+function featureIsSupported(
   ctxModule: ModuleData,
   enabledByModule: Readonly<Record<string, ReadonlySet<string>>>,
   ref: string | YangIdentifierRef,

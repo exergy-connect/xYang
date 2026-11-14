@@ -78,7 +78,7 @@ function time(fn: () => void, repeat: number): number {
 function parseAll(): void {
   for (const rel of PARSE_FILES) {
     const path = resolve(repoRoot, rel);
-    new YangParser({ include_path: [dirname(path)] }).parseFile(path);
+    new YangParser({ includePath: [dirname(path)] }).parseFile(path);
   }
 }
 

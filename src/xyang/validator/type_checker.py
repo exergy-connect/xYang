@@ -10,7 +10,7 @@ import base64
 import binascii
 import logging
 from types import SimpleNamespace
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..ast import YangTypeStmt
 from ..errors import XPathSyntaxError
@@ -73,7 +73,7 @@ def _instance_identifier_path_errors(
     value_repr: str,
     ctx: Context,
     evaluator: Any,
-) -> List[TypeIssue]:
+) -> list[TypeIssue]:
     """Path shape and require-instance target check for a parsed instance-identifier.
 
     Kept as a module function so ``isinstance(expr, PathNode)`` and uses of
@@ -149,7 +149,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """
         leafref_current: node to use as current() for leafref path resolution: the leaf
         or leaf-list item being checked (RFC 7950 9.9.2). If None, ctx.current is used.
@@ -162,19 +162,11 @@ class TypeChecker:
             scope = type_stmt.scope or root_schema
             if scope.resolve_prefixed_module(type_stmt.prefix) is None:
                 return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
-            typedef, _module = resolve_typedef(type_stmt, root_schema)
-            if typedef is not None and typedef.type is not None:
-                return self._check_typedef_reference(
-                    value,
-                    type_stmt,
-                    typedef.type,
-                    path,
-                    root_data,
-                    root_schema,
-                    ctx,
-                    evaluator,
-                    leafref_current,
-                )
+            issues = self._check_resolved_typedef(
+                value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current
+            )
+            if issues is not None:
+                return issues
             return [_issue("type", f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}")]
 
         spec = REGISTRY.get(name)
@@ -198,20 +190,39 @@ class TypeChecker:
             return self._check_decimal(value, type_stmt)
         # Resolve typedef and check against the underlying type
         if type_stmt.scope is not None or getattr(root_schema, "get_typedef", None) is not None:
-            typedef, _module = resolve_typedef(type_stmt, root_schema)
-            if typedef is not None and typedef.type is not None:
-                return self._check_typedef_reference(
-                    value,
-                    type_stmt,
-                    typedef.type,
-                    path,
-                    root_data,
-                    root_schema,
-                    ctx,
-                    evaluator,
-                    leafref_current,
-                )
+            issues = self._check_resolved_typedef(
+                value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current
+            )
+            if issues is not None:
+                return issues
         return []
+
+    def _check_resolved_typedef(
+        self,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        path: str,
+        root_data: Any,
+        root_schema: Any,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node],
+    ) -> Optional[list[TypeIssue]]:
+        """Check against the typedef ``type_stmt`` names, or None when it does not resolve."""
+        typedef, _module = resolve_typedef(type_stmt, root_schema)
+        if typedef is None or typedef.type is None:
+            return None
+        return self._check_typedef_reference(
+            value,
+            type_stmt,
+            typedef.type,
+            path,
+            root_data,
+            root_schema,
+            ctx,
+            evaluator,
+            leafref_current,
+        )
 
     def _check_builtin(
         self,
@@ -224,7 +235,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node],
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Dispatch a built-in through the type registry."""
         family = spec.family
         if family == UNION:
@@ -281,7 +292,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node],
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Validate the typedef chain, then restrictions on the referring ``type``.
 
         Each level checks its own ``range`` / ``length`` / ``pattern`` after the
@@ -326,7 +337,7 @@ class TypeChecker:
         value: Any,
         type_stmt: YangTypeStmt,
         root_schema: Any,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Apply ``type_stmt`` restrictions using the chain's built-in checker."""
         builtin = self._builtin_name(type_stmt, root_schema)
         if builtin in _INTEGER_TYPE_NAMES:
@@ -339,7 +350,7 @@ class TypeChecker:
             return self._check_string(value, type_stmt)
         return []
 
-    def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> List[TypeIssue]:
+    def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> list[TypeIssue]:
         gate = REGISTRY[IDENTITYREF].check_value(value, type_stmt)
         if gate is not None:
             return [gate]
@@ -369,7 +380,7 @@ class TypeChecker:
         type_stmt: YangTypeStmt,
         ctx: Context,
         evaluator: Any,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """RFC 7950 instance-identifier: string path; optional require-instance existence check."""
         gate = REGISTRY[INSTANCE_IDENTIFIER].check_value(value, type_stmt)
         if gate is not None:
@@ -401,7 +412,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         for member in getattr(type_stmt, "types", ()):
             if not self.check(
                 value,
@@ -425,7 +436,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         if not getattr(type_stmt, "require_instance", True) or not getattr(type_stmt, "path", None):
             return []
         path_ast = getattr(type_stmt, "path", None)
@@ -466,11 +477,11 @@ class TypeChecker:
             ]
         return []
 
-    def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         gate = REGISTRY[STRING].check_value(value, type_stmt)
         if gate is not None:
             return [gate]
-        errors: List[TypeIssue] = []
+        errors: list[TypeIssue] = []
         s = value
         if getattr(type_stmt, "length", None):
             issue = self._length_issue(
@@ -482,21 +493,7 @@ class TypeChecker:
             )
             if issue is not None:
                 errors.append(issue)
-        patterns = list(getattr(type_stmt, "patterns", None) or [])
-        if patterns:
-            for p in patterns:
-                patt = getattr(p, "pattern", None)
-                if not isinstance(patt, str) or not patt:
-                    continue
-                matched = _compiled_pattern(p).match(s) is not None
-                invert = bool(getattr(p, "invert_match", False))
-                if (not invert and not matched) or (invert and matched):
-                    default_msg = (
-                        f"Value {s!r} does not match pattern {patt!r}"
-                        if not invert
-                        else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
-                    )
-                    errors.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
+        errors.extend(self._pattern_issues(s, type_stmt, "Value"))
         enums = getattr(type_stmt, "enums", None)
         if enums:
             if s not in [str(e) for e in enums]:
@@ -508,7 +505,7 @@ class TypeChecker:
                 )
         return errors
 
-    def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         # bool is a subclass of int; int(True) is 1 and must not pass as an integer.
         # A non-integral float (1.5) must not be truncated by int().
         # RFC 7951 encodes int8..int32 and uint8..uint32 as JSON numbers (#63).
@@ -525,15 +522,9 @@ class TypeChecker:
             n = value
         else:
             n = int(value)
-        if getattr(type_stmt, "range", None):
-            issue = self._numeric_range_issue(
-                n,
-                getattr(type_stmt, "range", None),
-                error_message=getattr(type_stmt, "range_error_message", None),
-                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
-            )
-            if issue is not None:
-                return [issue]
+        issue = self._type_range_issue(n, type_stmt)
+        if issue is not None:
+            return [issue]
         bounds = spec.bounds if spec is not None and spec.bounds is not None else None
         if bounds:
             lo, hi = bounds
@@ -543,7 +534,7 @@ class TypeChecker:
                 return [_issue("range", f"Value {n} exceeds maximum {hi}")]
         return []
 
-    def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         # bool is a subclass of int; float(True) is 1.0 and must not pass as a number.
         # RFC decimal64 strings are decoded to Decimal before this check.
         from ..types.registry import DECIMAL64 as _DECIMAL64
@@ -552,15 +543,9 @@ class TypeChecker:
         if gate is not None:
             return [gate]
         n = float(value)
-        if getattr(type_stmt, "range", None):
-            issue = self._numeric_range_issue(
-                n,
-                getattr(type_stmt, "range", None),
-                error_message=getattr(type_stmt, "range_error_message", None),
-                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
-            )
-            if issue is not None:
-                return [issue]
+        issue = self._type_range_issue(n, type_stmt)
+        if issue is not None:
+            return [issue]
         fd = getattr(type_stmt, "fraction_digits", None)
         if fd is not None and fd >= 0:
             s = str(value).strip()
@@ -575,24 +560,24 @@ class TypeChecker:
                     ]
         return []
 
-    def _one(self, issue: Optional[TypeIssue]) -> List[TypeIssue]:
+    def _one(self, issue: Optional[TypeIssue]) -> list[TypeIssue]:
         return [] if issue is None else [issue]
 
-    def _check_boolean(self, value: Any) -> List[TypeIssue]:
+    def _check_boolean(self, value: Any) -> list[TypeIssue]:
         return self._one(REGISTRY[BOOLEAN].check_value(value, make_type_stmt(name=BOOLEAN)))
 
-    def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         return self._one(REGISTRY[ENUMERATION].check_value(value, type_stmt))
 
-    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
         return self._one(REGISTRY[BITS].check_value(value, type_stmt))
 
-    def _check_empty(self, value: Any) -> List[TypeIssue]:
+    def _check_empty(self, value: Any) -> list[TypeIssue]:
         # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
         return self._one(REGISTRY[EMPTY].check_value(value, make_type_stmt(name=EMPTY)))
 
-    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
         gate = REGISTRY[BINARY].check_value(value, type_stmt)
         if gate is not None:
@@ -615,8 +600,12 @@ class TypeChecker:
             )
             if issue is not None:
                 return [issue]
-        patterns = list(getattr(type_stmt, "patterns", None) or [])
-        for p in patterns:
+        return self._pattern_issues(s, type_stmt, "binary value")[:1]
+
+    def _pattern_issues(self, s: str, type_stmt: YangTypeStmt, label: str) -> list[TypeIssue]:
+        """One issue per ``pattern`` that ``s`` violates, honoring ``invert-match``."""
+        issues: list[TypeIssue] = []
+        for p in getattr(type_stmt, "patterns", None) or []:
             patt = getattr(p, "pattern", None)
             if not isinstance(patt, str) or not patt:
                 continue
@@ -624,12 +613,12 @@ class TypeChecker:
             invert = bool(getattr(p, "invert_match", False))
             if (not invert and not matched) or (invert and matched):
                 default_msg = (
-                    f"binary value {s!r} does not match pattern {patt!r}"
+                    f"{label} {s!r} does not match pattern {patt!r}"
                     if not invert
-                    else f"binary value {s!r} matches forbidden pattern {patt!r} (invert-match)"
+                    else f"{label} {s!r} matches forbidden pattern {patt!r} (invert-match)"
                 )
-                return [_issue("pattern", _pattern_entry_violation_message(p, default=default_msg))]
-        return []
+                issues.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
+        return issues
 
     def _parse_ranges(self, text: str) -> list[tuple[Optional[float], Optional[float]]]:
         """Split a YANG range or length on ``|``, then each part on ``..``.
@@ -679,6 +668,21 @@ class TypeChecker:
                 return ("max", hi)
         return ("max", n)
 
+    def _type_range_issue(self, n: float, type_stmt: YangTypeStmt) -> Optional[TypeIssue]:
+        """The ``range`` restriction on ``type_stmt`` applied to ``n``, if any."""
+        text = getattr(type_stmt, "range", None)
+        if not text:
+            return None
+        return self._numeric_range_issue(
+            n,
+            text,
+            error_message=getattr(type_stmt, "range_error_message", None),
+            error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
+        )
+
+    def _range_bound_miss(self, n: float, text: str) -> Optional[tuple[str, float]]:
+        return self._range_miss(n, self._parse_ranges(text))
+
     def _numeric_range_issue(
         self,
         n: float,
@@ -687,7 +691,7 @@ class TypeChecker:
         error_message: Optional[str] = None,
         error_app_tag: Optional[str] = None,
     ) -> Optional[TypeIssue]:
-        miss = self._range_miss(n, self._parse_ranges(text))
+        miss = self._range_bound_miss(n, text)
         if miss is None:
             return None
         kind, bound = miss
@@ -709,7 +713,7 @@ class TypeChecker:
         error_message: Optional[str] = None,
         error_app_tag: Optional[str] = None,
     ) -> Optional[TypeIssue]:
-        miss = self._range_miss(n, self._parse_ranges(text))
+        miss = self._range_bound_miss(n, text)
         if miss is None:
             return None
         kind, bound = miss

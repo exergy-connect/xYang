@@ -7,14 +7,13 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
-from typing import List, Tuple, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
 from ..errors import YangSyntaxError
 
 if TYPE_CHECKING:
     from ..module import YangModule
     from ..ast import (
-        YangStatement,
         YangStatementList,
         YangTypeStmt,
         YangMustStmt,
@@ -57,7 +56,7 @@ class YangTokenType(Enum):
     # unquoted argument (RFC 7950 §6.1.3); a parse error anywhere else.
     OTHER = "OTHER"
 
-def diagnostic_source_lines(content: str) -> List[str]:
+def diagnostic_source_lines(content: str) -> list[str]:
     """Split source on newlines for error snippets (verbatim text, comments included)."""
     if not content:
         return []
@@ -86,7 +85,7 @@ class TokenStream:
 
     def __init__(
         self,
-        token_list: List[YangToken],
+        token_list: list[YangToken],
         source: str,
         filename: Optional[str] = None,
     ):
@@ -94,7 +93,7 @@ class TokenStream:
         self.tokens = [t.value for t in token_list]
         self.positions = [(t.line_num, t.char_pos) for t in token_list]
         self._source = source
-        self._diagnostic_lines: Optional[List[str]] = None
+        self._diagnostic_lines: Optional[list[str]] = None
         self.filename = filename
         self.index = 0
 
@@ -120,13 +119,6 @@ class TokenStream:
 
         self.index += 1
         return token_val
-
-    def consume_if(self, expected: str) -> bool:
-        """Consume token if it matches expected, return True if consumed."""
-        if self.peek() == expected:
-            self.consume()
-            return True
-        return False
 
     def peek_type(self) -> YangTokenType:
         """Peek at current token type without consuming. Raises at end of input."""
@@ -170,30 +162,11 @@ class TokenStream:
         self.consume_type(expected)
         return True
 
-    def consume_oneof(
-        self, allowed_types: List[Union[YangTokenType, str]]
-    ) -> Tuple[str, Union[YangTokenType, str]]:
-        """Consume current token if it matches one of allowed kinds; return (value, matched)."""
-        if self.index >= len(self._token_list):
-            raise self.make_error("Unexpected end of input")
-        tok = self._token_list[self.index]
-        for allowed in allowed_types:
-            if isinstance(allowed, str):
-                if tok.type == YangTokenType.IDENTIFIER and tok.value == allowed:
-                    self.index += 1
-                    return (tok.value, allowed)
-            elif tok.type == allowed:
-                self.index += 1
-                return (tok.value, allowed)
-        names = ", ".join(t if isinstance(t, str) else t.name for t in allowed_types)
-        got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
-        raise self.make_error(f"Expected one of ({names}), got {got!r}")
-
     def has_more(self) -> bool:
         """Check if there are more tokens."""
         return self.index < len(self.tokens)
 
-    def position(self) -> Tuple[int, int]:
+    def position(self) -> tuple[int, int]:
         """Get current position (line_num, char_pos)."""
         if self.index < len(self.positions):
             return self.positions[self.index]
@@ -201,7 +174,7 @@ class TokenStream:
             return self.positions[-1]
         return (1, 0)
 
-    def _diagnostic_lines_once(self) -> List[str]:
+    def _diagnostic_lines_once(self) -> list[str]:
         """Build per-line source text for errors (lazy, at most once per stream)."""
         if self._diagnostic_lines is None:
             self._diagnostic_lines = diagnostic_source_lines(self._source)

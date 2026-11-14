@@ -2,7 +2,7 @@
 Utilities for xpath: YANG boolean coercion, node-set helpers, comparisons.
 """
 
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..types.registry import BOOLEAN, DECIMAL_TYPE_NAMES, YANG_INTEGER_NAMES
 from .node import Node
@@ -57,7 +57,7 @@ def yang_bool(val: Any) -> bool:
     return val is not None
 
 
-def node_set_values(val: Any) -> List[Any]:
+def node_set_values(val: Any) -> list[Any]:
     """Extract scalar data values from a node-set (list of Node), single Node, or scalar."""
     if isinstance(val, list):
         return [n.data if isinstance(n, Node) else n for n in val]
@@ -79,7 +79,7 @@ def is_nodeset(val: Any) -> bool:
 
 def node_chain(n: Optional[Node], max_steps: int = 20) -> str:
     """Format node chain from node up to root for debug (node.data repr per step)."""
-    parts: List[str] = []
+    parts: list[str] = []
     cur: Optional[Node] = n
     while cur is not None and len(parts) < max_steps:
         data = cur.data
@@ -106,7 +106,7 @@ def coerce_pair(l: Any, r: Any):
         return str(l).strip(), str(r).strip()
 
 
-def _comparison_values(right: Any) -> List[Any]:
+def _comparison_values(right: Any) -> list[Any]:
     """Right-hand side values: node-set, XPath 2.0 value list (tuple), or single scalar."""
     if isinstance(right, (list, tuple)) and (not right or not isinstance(right[0], Node)):
         return list(right)

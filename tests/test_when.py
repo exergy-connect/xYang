@@ -2,7 +2,7 @@
 Tests for when expression support.
 """
 
-from typing import Any, List
+from typing import Any
 
 import pytest
 from xyang import parse_yang_string, YangValidator
@@ -20,7 +20,7 @@ from xyang.xpath import (
 def _make_node_context(
     data: Any,
     module: Any,
-    context_path: List[Any],
+    context_path: list[Any],
 ) -> tuple[Context, Node]:
     """Build (Context, Node) for xyang evaluator from data, module, and path."""
     root = Node(data, module, None)

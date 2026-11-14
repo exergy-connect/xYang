@@ -10,7 +10,8 @@ from __future__ import annotations
 
 import logging
 import math
-from typing import Any, Callable, List, Optional
+from typing import Any, Optional
+from collections.abc import Callable
 
 from .ast import (
     ASTNode,
@@ -156,7 +157,7 @@ class XPathEvaluator:
     # Path
     # ------------------------------------------------------------------
 
-    def eval_path(self, path: PathNode, ctx: Context, node: Node) -> List[Node]:
+    def eval_path(self, path: PathNode, ctx: Context, node: Node) -> list[Node]:
         """
         Resolve a path expression. Returns node-set.
         Only absolute, cacheable paths use ctx.path_cache (global cache).
@@ -191,9 +192,9 @@ class XPathEvaluator:
 
     def _eval_path_inner(
         self, path: PathNode, ctx: Context, node: Node
-    ) -> List[Node]:
+    ) -> list[Node]:
         """Evaluate path without cache. Returns nodes."""
-        nodes: List[Node] = [ctx.root if path.is_absolute else node]
+        nodes: list[Node] = [ctx.root if path.is_absolute else node]
 
         for seg in path.segments:
             if seg.step == ".":
@@ -223,7 +224,7 @@ class XPathEvaluator:
 
     def _step_wildcard(
         self, node: Node, ctx: Context, module: Optional[str]
-    ) -> List[Node]:
+    ) -> list[Node]:
         """``*`` / ``prefix:*``: every data-node child present in the instance (or by default).
 
         With *module* set, only children that module defines (RFC 7951 namespace of the
@@ -245,7 +246,7 @@ class XPathEvaluator:
 
         root_schema = ctx.root.schema
         root_module = root_schema.name if isinstance(root_schema, YangModule) else ""
-        result: List[Node] = []
+        result: list[Node] = []
         for child in SchemaNav.data_children(node.schema):
             if module is not None and defining_module_name(child, root_module) != module:
                 continue
@@ -263,7 +264,7 @@ class XPathEvaluator:
                 result.append(node.step(val, child))
         return result
 
-    def _step_named(self, node: Node, ctx: Context, seg: Any) -> List[Node]:
+    def _step_named(self, node: Node, ctx: Context, seg: Any) -> list[Node]:
         """Step to the child named by *seg*.
 
         An unprefixed step matches the local name. A ``prefix:name`` step matches only a
@@ -287,7 +288,7 @@ class XPathEvaluator:
             return []
         return self._step_child(node, next(iter(member_keys_cached(schema_child, root_module))), schema_child)
 
-    def _step(self, node: Node, key: str, root_module: Optional[str] = None) -> List[Node]:
+    def _step(self, node: Node, key: str, root_module: Optional[str] = None) -> list[Node]:
         """
         Step from node into child named key.
         List expansion is determined by schema type (YangListStmt / YangLeafListStmt).
@@ -313,7 +314,7 @@ class XPathEvaluator:
                 key = next(iter(keys))
         return self._step_child(node, key, schema_child)
 
-    def _step_child(self, node: Node, key: str, schema_child: Any) -> List[Node]:
+    def _step_child(self, node: Node, key: str, schema_child: Any) -> list[Node]:
         data = node.data
         if isinstance(data, dict):
             if key in data:
@@ -339,10 +340,10 @@ class XPathEvaluator:
 
     def _apply_predicate(
         self,
-        nodes: List[Node],
+        nodes: list[Node],
         predicate: ASTNode,
         ctx: Context,
-    ) -> List[Node]:
+    ) -> list[Node]:
         """Filter nodes by predicate. Returns results."""
         if not nodes:
             return []
@@ -352,7 +353,7 @@ class XPathEvaluator:
                 len(nodes),
                 getattr(predicate, "to_string", lambda: repr(predicate))(),
             )
-        results: List[Node] = []
+        results: list[Node] = []
         for i, n in enumerate(nodes):
             val = self._eval_inner(predicate, ctx, n)
             keep = False
@@ -403,10 +404,10 @@ class XPathEvaluator:
 
     def _eval_composition_inner(
         self, ast: BinaryOpNode, ctx: Context, node: Node
-    ) -> List[Node]:
+    ) -> list[Node]:
         """Path composition: left/right. Returns nodes."""
         left = self._eval_inner(ast.left, ctx, node)
-        left_nodes: List[Node] = (
+        left_nodes: list[Node] = (
             list(left)
             if is_nodeset(left)
             else [left]
@@ -414,7 +415,7 @@ class XPathEvaluator:
             else []
         )
 
-        results: List[Node] = []
+        results: list[Node] = []
         for n in left_nodes:
             r = self._eval_inner(ast.right, ctx, n)
             if is_nodeset(r):

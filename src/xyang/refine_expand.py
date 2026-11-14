@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import Callable, cast
+from typing import cast
+from collections.abc import Callable
 
 from .errors import YangRefineTargetNotFoundError
 from .xpath.ast import PathNode
@@ -98,30 +99,6 @@ def _find_from_node(
     for ch in statement_children(stmt):
         matches.extend(_find_from_node(ch, segments, idx))
     return matches
-
-
-def apply_refines_list_cardinality(
-    statements: list[YangStatement], refines: list[YangRefineStmt]
-) -> None:
-    """Apply only ``min-elements`` / ``max-elements`` from refines to matching lists.
-
-    Callers must ensure refine target paths are already visible (nested ``uses``
-    expanded first); see ``uses_expand`` preprocessing.
-    """
-    for r in refines:
-        if r.min_elements is None and r.max_elements is None:
-            continue
-        nodes = find_nodes_by_refine_path(statements, r.target_path)
-        if not nodes:
-            raise YangRefineTargetNotFoundError(
-                r.target_path.to_string()
-            )
-        for node in nodes:
-            if isinstance(node, (YangListStmt, YangLeafListStmt)):
-                if r.min_elements is not None:
-                    node.min_elements = r.min_elements
-                if r.max_elements is not None:
-                    node.max_elements = r.max_elements
 
 
 def apply_refines_by_path(

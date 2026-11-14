@@ -4,18 +4,17 @@ Identity derivation graph (RFC 7950) for YANG modules, including ``import`` pref
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, List, Optional, Set, Tuple, Union
+from typing import TYPE_CHECKING, Optional, Union
 
 from .identifier_ref import (
     YangIdentifierRef,
-    format_identifier_ref,
     parse_identifier_ref_atom,
 )
 
 if TYPE_CHECKING:
     from .module import YangModule
 
-IdentityPair = Tuple["YangModule", str]
+IdentityPair = tuple["YangModule", str]
 BaseRef = Union[str, YangIdentifierRef]
 
 
@@ -67,12 +66,6 @@ def resolve_identity_value(module: "YangModule", value: str) -> Optional[Identit
     return (target, name)
 
 
-def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
-    """Local name of the identity if ``qname`` resolves in *importer* scope; else None."""
-    pair = resolve_identity_qname_pair(importer, qname)
-    return pair[1] if pair else None
-
-
 def resolve_identity_base_ref(
     from_mod: "YangModule", base: BaseRef, file: str | None = None
 ) -> Optional[IdentityPair]:
@@ -96,20 +89,20 @@ def _pair_key(pair: IdentityPair) -> tuple[int, str]:
     return (id(m), n)
 
 
-def _pair_in_pairs(p: IdentityPair, pairs: List[IdentityPair]) -> bool:
+def _pair_in_pairs(p: IdentityPair, pairs: list[IdentityPair]) -> bool:
     kp = _pair_key(p)
     return any(_pair_key(x) == kp for x in pairs)
 
 
 def identity_ancestor_closure(
     start_mod: "YangModule", start_name: str
-) -> List[IdentityPair]:
+) -> list[IdentityPair]:
     """
     Reflexive transitive closure of identity bases starting at (start_mod, start_name):
     all (M, L) reachable by following ``base`` edges.
     """
     out: list[IdentityPair] = []
-    seen: Set[tuple[int, str]] = set()
+    seen: set[tuple[int, str]] = set()
     stack: list[IdentityPair] = [(start_mod, start_name)]
     while stack:
         pair = stack.pop()
@@ -129,9 +122,9 @@ def identity_ancestor_closure(
     return out
 
 
-def strict_ancestors(module: "YangModule", local_name: str) -> Set[str]:
+def strict_ancestors(module: "YangModule", local_name: str) -> set[str]:
     """Set of strict ancestors of ``local_name`` (same module, unprefixed base names only)."""
-    seen: Set[str] = set()
+    seen: set[str] = set()
     stack = [local_name]
     while stack:
         cur = stack.pop()
@@ -148,13 +141,13 @@ def strict_ancestors(module: "YangModule", local_name: str) -> Set[str]:
     return seen
 
 
-def descendant_closure(module: "YangModule", base_local: str) -> Set[str]:
+def descendant_closure(module: "YangModule", base_local: str) -> set[str]:
     """
     Identities in *module* that derive from ``base_local`` (same-module ``bases`` edges only).
 
     Used by JSON Schema generation; cross-module ``base`` refs are treated as opaque edge labels.
     """
-    children: dict[str, Set[str]] = {}
+    children: dict[str, set[str]] = {}
     for name, stmt in module.identities.items():
         for b in stmt.bases:
             ref = _as_base_ref(b)
@@ -162,7 +155,7 @@ def descendant_closure(module: "YangModule", base_local: str) -> Set[str]:
                 continue
             children.setdefault(ref.name, set()).add(name)
 
-    out: Set[str] = {base_local}
+    out: set[str] = {base_local}
     stack = [base_local]
     while stack:
         cur = stack.pop()
@@ -203,14 +196,6 @@ def is_derived_from_strict(
         return False
     anc = strict_ancestors(module, value_local)
     return target_local in anc
-
-
-def is_derived_from_or_self(
-    module: "YangModule", value_local: str, target_local: str
-) -> bool:
-    if value_local == target_local:
-        return True
-    return is_derived_from_strict(module, value_local, target_local)
 
 
 def identityref_value_valid(

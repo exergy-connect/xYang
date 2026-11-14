@@ -6,7 +6,7 @@ from __future__ import annotations
 
 from .. import keywords as kw
 
-from typing import TYPE_CHECKING, Optional
+from typing import TYPE_CHECKING
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
 from ...ast import YangBitStmt, YangTypeStmt, YangBitsTypeStmt, YangDerivedTypeStmt

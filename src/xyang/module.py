@@ -4,7 +4,7 @@ YANG module representation.
 
 from __future__ import annotations
 
-from typing import Any, Dict, List, Optional, Set, TYPE_CHECKING
+from typing import Any, Optional, TYPE_CHECKING
 from dataclasses import dataclass, field
 
 from .ast import YangStatementList
@@ -25,35 +25,35 @@ class YangModule(YangStatementList):
     contact: str = ""
     description: str = ""
     reference: str = ""
-    revisions: List[Dict[str, str]] = field(default_factory=list)
+    revisions: list[dict[str, str]] = field(default_factory=list)
     # Set when this tree was parsed from a submodule (belongs-to argument).
     belongs_to_module: str = ""
-    typedefs: Dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
-    identities: Dict[str, 'YangIdentityStmt'] = field(default_factory=dict)
-    groupings: Dict[str, 'YangStatement'] = field(default_factory=dict)
+    typedefs: dict[str, 'YangTypedefStmt'] = field(default_factory=dict)
+    identities: dict[str, 'YangIdentityStmt'] = field(default_factory=dict)
+    groupings: dict[str, 'YangStatement'] = field(default_factory=dict)
     # Declared ``feature`` names in this module (RFC 7950 §7.18.1).
-    features: Set[str] = field(default_factory=set)
+    features: set[str] = field(default_factory=set)
     # Per-feature ``if-feature`` substatements (RFC 7950 §7.20.1.1); AND of expressions.
-    feature_if_features: Dict[str, List[str]] = field(default_factory=dict)
+    feature_if_features: dict[str, list[str]] = field(default_factory=dict)
     # import prefix (local) -> parsed module (RFC 7950 ``import``).
     # This map is the module file's own imports. A submodule's imports stay on
     # that file (``included_files``) and are not merged here.
-    import_prefixes: Dict[str, "YangModule"] = field(default_factory=dict)
+    import_prefixes: dict[str, "YangModule"] = field(default_factory=dict)
     # Submodule name -> the included file, which keeps its own ``import_prefixes``.
-    included_files: Dict[str, "YangModule"] = field(default_factory=dict)
+    included_files: dict[str, "YangModule"] = field(default_factory=dict)
     # The module this included submodule was merged into. Its definitions are
     # visible across that module (RFC 7950 §5.1).
     included_parent: Optional["YangModule"] = None
     # Submodule that contributed an included feature, or its if-feature list.
     # The same submodule reached twice is one definition.
-    feature_included_from: Dict[str, str] = field(default_factory=dict)
-    feature_if_included_from: Dict[str, str] = field(default_factory=dict)
+    feature_included_from: dict[str, str] = field(default_factory=dict)
+    feature_if_included_from: dict[str, str] = field(default_factory=dict)
     # Submodule names whose statements are already on this module.
-    included_submodules: Set[str] = field(default_factory=set)
+    included_submodules: set[str] = field(default_factory=set)
     # extension name -> extension definition from this module.
-    extensions: Dict[str, "YangExtensionStmt"] = field(default_factory=dict)
+    extensions: dict[str, "YangExtensionStmt"] = field(default_factory=dict)
     # Generic runtime storage for extension callbacks.
-    extension_runtime: Dict[str, Any] = field(default_factory=dict)
+    extension_runtime: dict[str, Any] = field(default_factory=dict)
 
     def own_prefix_stripped(self) -> str:
         return (self.prefix or "").strip("'\"")
@@ -111,10 +111,6 @@ class YangModule(YangStatementList):
     def get_grouping(self, name: str) -> Optional['YangStatement']:
         """Get a grouping by name."""
         return self.groupings.get(name)
-
-    def get_identity(self, name: str) -> Optional['YangIdentityStmt']:
-        """Get an identity by name."""
-        return self.identities.get(name)
 
     def get_extension(self, name: str) -> Optional["YangExtensionStmt"]:
         """Get an extension definition by local name."""

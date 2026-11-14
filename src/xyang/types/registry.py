@@ -12,7 +12,8 @@ from ..ast import make_type_stmt
 import contextvars
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Optional
+from collections.abc import Callable, Mapping
 
 from ..ast import YangBitStmt, YangPatternSpec, YangTypeStmt
 from ..errors import YangExportError
@@ -925,10 +926,6 @@ def yang_integer_from_json_bounds(
 
     base = _narrowest_integer_builtin(lo, hi)
     return base, range_str
-
-
-def integer_bounds_for(name: str) -> tuple[int, int] | None:
-    return YANG_INTEGER_BOUNDS.get(name)
 
 
 def is_string_number(name: str) -> bool:

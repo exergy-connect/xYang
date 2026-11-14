@@ -24,27 +24,27 @@ export type TypeConstraintInput = {
   types?: Array<Record<string, unknown>>;
 };
 
-export class TypeConstraint {
-  patterns?: Array<{
-    pattern: string;
-    invert_match?: boolean;
-    error_message?: string;
-    error_app_tag?: string;
-  }>;
-  length?: string;
-  range?: string;
-  length_error_message?: string;
-  length_error_app_tag?: string;
-  range_error_message?: string;
-  range_error_app_tag?: string;
-  fraction_digits?: number;
-  enums?: string[];
-  bits?: Array<{ name: string; position: number }>;
-  types?: Array<Record<string, unknown>>;
+// Declaration merging gives the class every TypeConstraintInput field.
+export interface TypeConstraint extends TypeConstraintInput {}
 
+export class TypeConstraint {
   constructor(input: TypeConstraintInput = {}) {
     Object.assign(this, input);
   }
+}
+
+/** decimal64 `range` and `fraction-digits` checks; `text` is the lexical form of `n`. */
+function decimalIssues(n: number, text: string, c: TypeConstraint): TypeIssue[] {
+  if (c.range && !matchesRange(n, c.range)) {
+    return [["range", restrictionMessage(`Number ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
+  }
+  if (typeof c.fraction_digits === "number") {
+    const decimals = text.split(".")[1]?.length ?? 0;
+    if (decimals > c.fraction_digits) {
+      return [["fraction-digits", `Too many fraction digits (${decimals} > ${c.fraction_digits})`]];
+    }
+  }
+  return [];
 }
 
 function restrictionMessage(defaultMsg: string, message?: string, tag?: string): string {
@@ -103,7 +103,7 @@ function matchesRange(value: number, raw: string): boolean {
 }
 
 /** @internal JSON number that is an integer. Strings are not integers (RFC 7951 §6.1). */
-export function integerLike(value: unknown): number | null {
+function integerLike(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)) {
     return value;
   }
@@ -344,31 +344,13 @@ export class TypeSystem {
         if (!Number.isFinite(n)) {
           return [["type", "Expected number"]];
         }
-        if (c.range && !matchesRange(n, c.range)) {
-          return [["range", restrictionMessage(`Number ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
-        }
-        if (typeof c.fraction_digits === "number" && text.includes(".")) {
-          const decimals = text.split(".")[1]?.length ?? 0;
-          if (decimals > c.fraction_digits) {
-            return [["fraction-digits", `Too many fraction digits (${decimals} > ${c.fraction_digits})`]];
-          }
-        }
-        return [];
+        return decimalIssues(n, text, c);
       }
       const n = decimalLike(value);
       if (n === null) {
         return [["type", "Expected number"]];
       }
-      if (c.range && !matchesRange(n, c.range)) {
-        return [["range", restrictionMessage(`Number ${n} does not match ${c.range}`, c.range_error_message, c.range_error_app_tag)]];
-      }
-      if (typeof c.fraction_digits === "number") {
-        const decimals = `${n}`.split(".")[1]?.length ?? 0;
-        if (decimals > c.fraction_digits) {
-          return [["fraction-digits", `Too many fraction digits (${decimals} > ${c.fraction_digits})`]];
-        }
-      }
-      return [];
+      return decimalIssues(n, `${n}`, c);
     }
 
     if (normalizedType === YangTokenType.INT64 || normalizedType === "integer") {

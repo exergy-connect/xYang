@@ -6,7 +6,7 @@ import { parseYangFile, type YangModule } from "../../src";
 const DEFAULT_VERSION = "26.03.29.1";
 
 export const repoRoot = resolve(__dirname, "..", "..", "..");
-export const metaModelYangPath = resolve(repoRoot, "examples/meta-model.yang");
+const metaModelYangPath = resolve(repoRoot, "examples/meta-model.yang");
 
 export function loadMetaModel(): YangModule {
   return parseYangFile(metaModelYangPath);

@@ -7,14 +7,14 @@ ctx and node follow the same contract as evaluator methods.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional
+from collections.abc import Callable
+from typing import TYPE_CHECKING, Any
 
 from ..errors import UnsupportedXPathError, XPathEvaluationError
 from .ast import FunctionCallNode
 from .node import Context, Node
 
 if TYPE_CHECKING:
-    from ..module import YangModule
     from .evaluator import XPathEvaluator
 from .utils import first_value, is_nodeset, yang_bool
 
@@ -80,26 +80,25 @@ def f_starts_with(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, nod
     return source.startswith(needle)
 
 
-def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
-    """Substring preceding the first needle. Empty when needle is empty or absent."""
+def _split_on_needle(
+    ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node
+) -> tuple[str, str, int]:
     _require_arity(ast, 2)
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
-    index = source.find(needle)
-    if index < 0:
-        return ""
-    return source[:index]
+    return source, needle, source.find(needle)
+
+
+def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """Substring preceding the first needle. Empty when needle is empty or absent."""
+    source, _needle, index = _split_on_needle(ev, ast, ctx, node)
+    return source[:index] if index >= 0 else ""
 
 
 def f_substring_after(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """Substring following the first needle. Empty needle returns the whole source."""
-    _require_arity(ast, 2)
-    source = _as_xpath_string(ev, ast.args[0], ctx, node)
-    needle = _as_xpath_string(ev, ast.args[1], ctx, node)
-    index = source.find(needle)
-    if index < 0:
-        return ""
-    return source[index + len(needle) :]
+    source, needle, index = _split_on_needle(ev, ast, ctx, node)
+    return source[index + len(needle) :] if index >= 0 else ""
 
 
 def f_number(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
@@ -172,7 +171,7 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
 
     from .schema_nav import SchemaNav
 
-    results: List[Node] = []
+    results: list[Node] = []
     for src in source_nodes:
         leafref_path = SchemaNav.leafref_path(src.schema)
         if leafref_path is None:
@@ -184,21 +183,23 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
     return results
 
 
-def f_derived_from(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
-    """derived-from(identityref, identity) — value is strict descendant of target (RFC 7950)."""
+def _derived_from(
+    ev: "XPathEvaluator",
+    ast: FunctionCallNode,
+    ctx: Context,
+    node: Node,
+    predicate: Callable[[Any, str, str], bool],
+) -> bool:
     if len(ast.args) != 2:
         return False
-    from ..identity_graph import is_derived_from_strict_qnames
     from ..module import YangModule
 
     root_schema = ctx.root.schema if ctx.root is not None else None
     if not isinstance(root_schema, YangModule):
         return False
-    mod = root_schema
     # XPath function arguments use the evaluation cursor; only current()
     # uses the fixed expression origin (RFC 7950 section 10.1.1).
-    start = node
-    v1 = ev.eval(ast.args[0], ctx, start)
+    v1 = ev.eval(ast.args[0], ctx, node)
     if is_nodeset(v1):
         if not v1:
             return False
@@ -209,41 +210,24 @@ def f_derived_from(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, no
         v1 = first_value(v1)
     if not isinstance(v1, str):
         return False
-    v2 = first_value(ev.eval(ast.args[1], ctx, start))
+    v2 = first_value(ev.eval(ast.args[1], ctx, node))
     if not isinstance(v2, str):
         return False
-    return is_derived_from_strict_qnames(mod, v1, v2)
+    return predicate(root_schema, v1, v2)
+
+
+def f_derived_from(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """derived-from(identityref, identity) — value is strict descendant of target (RFC 7950)."""
+    from ..identity_graph import is_derived_from_strict_qnames
+
+    return _derived_from(ev, ast, ctx, node, is_derived_from_strict_qnames)
 
 
 def f_derived_from_or_self(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """derived-from-or-self(identityref, identity) — equal or strict descendant."""
-    if len(ast.args) != 2:
-        return False
     from ..identity_graph import is_derived_from_or_self_qnames
-    from ..module import YangModule
 
-    root_schema = ctx.root.schema if ctx.root is not None else None
-    if not isinstance(root_schema, YangModule):
-        return False
-    mod = root_schema
-    # XPath function arguments use the evaluation cursor; only current()
-    # uses the fixed expression origin (RFC 7950 section 10.1.1).
-    start = node
-    v1 = ev.eval(ast.args[0], ctx, start)
-    if is_nodeset(v1):
-        if not v1:
-            return False
-        v1 = v1[0].data
-    elif isinstance(v1, Node):
-        v1 = v1.data
-    else:
-        v1 = first_value(v1)
-    if not isinstance(v1, str):
-        return False
-    v2 = first_value(ev.eval(ast.args[1], ctx, start))
-    if not isinstance(v2, str):
-        return False
-    return is_derived_from_or_self_qnames(mod, v1, v2)
+    return _derived_from(ev, ast, ctx, node, is_derived_from_or_self_qnames)
 
 
 FUNCTIONS = {

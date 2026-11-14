@@ -6,7 +6,6 @@ import {
   YangLeafListStmt,
   YangListStmt,
   YangMustStmt,
-  YangNotificationStmt,
   YangRefineStmt,
   YangTypedefStmt,
   YangTypeStmt,
@@ -153,7 +152,7 @@ export class StatementParsers {
   readonly must_parser = new MustStatementParser(this);
   private readonly refine_parser = new RefineStatementParser(this);
   readonly revision_parser = new RevisionStatementParser(this);
-  private readonly submodule_parser = new SubmoduleStatementParser(this, this.module_parser);
+  private readonly submodule_parser = new SubmoduleStatementParser(this);
   readonly type_parser = new TypeStatementParser(this);
   readonly typedef_parser = new TypedefStatementParser(this);
   readonly uses_parser = new UsesStatementParser(this);
