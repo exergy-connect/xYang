@@ -23,7 +23,7 @@ class FeatureStatementParser:
 
     def parse_feature_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume(kw.FEATURE)
-        name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        name = self._parsers.parse_identifier_argument(tokens, "feature")
         context.module.features.add(name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             holder = SimpleNamespace(if_features=[], description="", reference="")

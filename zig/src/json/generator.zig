@@ -271,6 +271,7 @@ fn mustToJson(a: Allocator, m: *const ast.MustStmt) Error!Val {
     const out = try newObject(a);
     try out.put(a, K.must_entry.MUST, str(m.expression));
     try out.put(a, K.must_entry.ERROR_MESSAGE, str(m.error_message));
+    if (m.error_app_tag.len > 0) try out.put(a, K.must_entry.ERROR_APP_TAG, str(m.error_app_tag));
     try withXpathPrefixes(a, out, m.ast);
     try withDescription(a, out, m.description);
     return objVal(out);

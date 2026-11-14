@@ -7,7 +7,7 @@ export class FeatureStatementParser {
 
   parse_feature_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.FEATURE);
-    const name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name = this.parsers.parse_identifier_argument(tokens, "feature");
     ((context.module as any).features ??= new Set<string>()).add(name);
     const featParent = { if_features: [] as string[] };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

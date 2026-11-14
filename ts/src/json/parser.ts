@@ -413,6 +413,9 @@ function mustStatementsFromXyang(xy: Record<string, unknown>): YangStatement[] {
       name: expr,
       argument: expr,
       error_message: typeof e["error-message"] === "string" ? e["error-message"] : "",
+      ...(typeof e["error-app-tag"] === "string" && e["error-app-tag"].length > 0
+        ? { error_app_tag: e["error-app-tag"] }
+        : {}),
       description: typeof e.description === "string" ? e.description : "",
       ...(e[XYANG_KEYS.xpathPrefixes] !== undefined ? { xpath_prefixes: recordedPrefixes(e[XYANG_KEYS.xpathPrefixes]) } : {}),
       statements: []

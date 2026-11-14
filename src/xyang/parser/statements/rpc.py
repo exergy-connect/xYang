@@ -69,7 +69,7 @@ class RpcStatementParser:
         self, tokens: TokenStream, context: ParserContext, keyword: str, cls: type[YangRpcStmt]
     ) -> YangRpcStmt:
         tokens.consume(keyword)
-        name = tokens.consume()
+        name = self._parsers.parse_identifier_argument(tokens, keyword)
         stmt = cls(name=name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(stmt)

@@ -1060,11 +1060,14 @@ class DocumentValidator:
             elif not result:
                 if logger.isEnabledFor(logging.DEBUG):
                     logger.debug("must FAIL (constraint not satisfied) path=%s", path)
+                message = must.error_message or f"must constraint not satisfied on '{stmt.name}'"
+                if must.error_app_tag:
+                    message = f"{message} (error-app-tag: {must.error_app_tag})"
                 self._add(
                     path=path,
                     pointer=pointer,
                     code="must",
-                    message=must.error_message or (f"must constraint not satisfied on '{stmt.name}'"),
+                    message=message,
                     expression=must.expression,
                 )
 

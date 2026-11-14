@@ -8,12 +8,7 @@ export class RefineStatementParser {
 
   parse_refine(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.REFINE);
-    const parts = [tokens.consume()];
-    while (tokens.has_more() && tokens.peek_type() === YangTokenType.SLASH) {
-      tokens.consume_type(YangTokenType.SLASH);
-      parts.push(tokens.consume());
-    }
-    const target_path = parts.join("/");
+    const target_path = this.parsers.parse_string_argument(tokens);
     const stmt = new YangRefineStmt({ name: "refine", target_path });
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

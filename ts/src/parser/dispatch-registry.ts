@@ -267,7 +267,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
   ],
   ["anydata", parent("7.10.1", DATA_NODE_SUBSTATEMENTS, new Set([kw.WHEN, kw.MUST, kw.IF_FEATURE, kw.MANDATORY]))],
   ["anyxml", parent("7.11.1", DATA_NODE_SUBSTATEMENTS, new Set([kw.WHEN, kw.MUST, kw.IF_FEATURE, kw.MANDATORY]))],
-  ["must", parent("7.5.4", new Set([kw.ERROR_MESSAGE, kw.DESCRIPTION, kw.REFERENCE]))],
+  ["must", parent("7.5.4", new Set([kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE]))],
   ["when", parent("7.21.5", new Set([kw.DESCRIPTION, kw.REFERENCE]))],
   ["feature", parent("7.20.1", new Set([kw.DESCRIPTION, kw.IF_FEATURE, kw.REFERENCE]))],
   ["if-feature", parent("7.20.2", new Set([kw.DESCRIPTION, kw.REFERENCE]))],

@@ -88,10 +88,3 @@ def is_unsupported_construct_start(tokens: TokenStream) -> bool:
     return tok is not None and tok.value in UNSUPPORTED_CONSTRUCT_TYPES
 
 
-def skip_status_substatement(tokens: TokenStream, *, context: str) -> None:
-    """Consume ``status current|deprecated|obsolete;`` (RFC 7950 §7.21.2); not stored on the AST."""
-    tokens.consume(kw.STATUS)
-    if tokens.peek_type() == YangTokenType.IDENTIFIER:
-        tokens.consume_type(YangTokenType.IDENTIFIER)
-    tokens.consume_if_type(YangTokenType.SEMICOLON)
-

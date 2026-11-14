@@ -30,15 +30,9 @@ fn holderOf(p: *Parser, parent: Parent) Error!*Holder {
 
 pub fn parseType(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.TYPE);
-    var name: []const u8 = undefined;
-    var prefix: ?[]const u8 = null;
-    if ((try p.ts.peekType()) == .identifier) {
-        const ref = try p.consumeIdentifierRef();
-        name = ref.name;
-        prefix = ref.prefix;
-    } else {
-        name = try p.ts.consumeAny();
-    }
+    const ref = try p.consumeIdentifierRef();
+    const name = ref.name;
+    const prefix = ref.prefix;
     const t = try p.new(ast.TypeStmt, ast.TypeStmt.init(name, prefix));
     t.scope = p.module;
     t.context = p.context;
@@ -135,8 +129,8 @@ pub fn parsePattern(p: *Parser, parent: Parent) Error!void {
 pub fn parsePatternModifier(p: *Parser, parent: Parent) Error!void {
     const h = try holderOf(p, parent);
     _ = try p.ts.consume(kw.MODIFIER);
-    const modifier = try p.ts.consumeAny();
-    h.invert_match = std.mem.eql(u8, modifier, "invert-match");
+    _ = try p.parseKeywordArgument(kw.MODIFIER, &.{"invert-match"});
+    h.invert_match = true;
     _ = p.ts.consumeIfType(.semicolon);
 }
 
@@ -188,7 +182,7 @@ pub fn parseFractionDigits(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
     if (t.kind() != .decimal) return p.ts.fail("fraction-digits is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.FRACTION_DIGITS);
-    (try t.ensure(.decimal, p.arena)).fraction_digits = try p.parseInt(try p.ts.consumeType(.integer));
+    (try t.ensure(.decimal, p.arena)).fraction_digits = try p.parseIntegerArgument(kw.FRACTION_DIGITS);
     _ = p.ts.consumeIfType(.semicolon);
 }
 
@@ -208,22 +202,19 @@ pub fn parseEnum(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseEnumValue(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.VALUE);
-    const raw = try p.parseStringArgument();
-    if (!sp.isSignedDecimal(raw)) return p.ts.fail("value argument must be an integer, got {f}", .{repr(raw)});
+    _ = try p.parseIntegerArgument(kw.VALUE);
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseEnumStatus(p: *Parser, _: Parent) Error!void {
-    _ = try p.ts.consume(kw.STATUS);
-    _ = try p.ts.consumeType(.identifier);
-    _ = p.ts.consumeIfType(.semicolon);
+    _ = try p.parseStatusArgument();
 }
 
 pub fn parseBit(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
     if (!(t.kind() == .bits or t.kind() == .derived)) return p.ts.fail("bit is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.BIT);
-    var bit: ast.BitStmt = .{ .name = try p.ts.consumeAny() };
+    var bit: ast.BitStmt = .{ .name = try p.parseIdentifierArgument(kw.BIT) };
     try p.parseOptionalBlock(.{ .bit = &bit }, .bit, "bit");
     try (try t.ensureBits(p.arena)).append(p.arena, bit);
     _ = p.ts.consumeIfType(.semicolon);
@@ -238,7 +229,7 @@ pub fn parseBitPosition(p: *Parser, parent: Parent) Error!void {
     if (bit) |b| {
         if (b.position != null) return p.ts.fail("Duplicate position in bit statement", .{});
     }
-    const pos = try p.parseInt(try p.ts.consumeType(.integer));
+    const pos = try p.parseIntegerArgument(kw.POSITION);
     if (bit) |b| b.position = pos;
     _ = p.ts.consumeIfType(.semicolon);
 }

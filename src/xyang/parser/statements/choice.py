@@ -84,7 +84,7 @@ class ChoiceStatementParser:
     def parse_choice(self, tokens: TokenStream, context: ParserContext) -> YangChoiceStmt:
         """Parse choice statement."""
         tokens.consume(kw.CHOICE)
-        choice_name = tokens.consume()  # identifier or keyword
+        choice_name = self._parsers.parse_identifier_argument(tokens, "choice")
         choice_stmt = YangChoiceStmt(name=choice_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(choice_stmt)
@@ -99,7 +99,7 @@ class ChoiceStatementParser:
     def parse_case(self, tokens: TokenStream, context: ParserContext) -> YangCaseStmt:
         """Parse case statement."""
         tokens.consume(kw.CASE)
-        case_name = tokens.consume()  # identifier or keyword
+        case_name = self._parsers.parse_identifier_argument(tokens, "case")
         case_stmt = YangCaseStmt(name=case_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(case_stmt)
@@ -124,7 +124,7 @@ class ChoiceStatementParser:
     def parse_choice_default(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``default`` in a choice (RFC 7950 §7.9.3)."""
         tokens.consume(kw.DEFAULT)
-        name = self._parsers.parse_string_argument(tokens)
+        name = self._parsers.parse_identifier_argument(tokens, "default")
         if isinstance(context.current_parent, YangChoiceStmt):
             context.current_parent.default = name
         tokens.consume_if_type(YangTokenType.SEMICOLON)

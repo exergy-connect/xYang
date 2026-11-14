@@ -517,10 +517,12 @@ export class YangParsedXPathBase {
 
 export class YangMustStmt extends YangParsedXPathBase {
   error_message: string;
+  error_app_tag: string;
 
-  constructor(init: { expression: string; description?: string; error_message?: string }) {
+  constructor(init: { expression: string; description?: string; error_message?: string; error_app_tag?: string }) {
     super(init);
     this.error_message = init.error_message ?? "";
+    this.error_app_tag = init.error_app_tag ?? "";
   }
 }
 

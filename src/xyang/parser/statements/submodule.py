@@ -27,7 +27,7 @@ class SubmoduleStatementParser:
     def parse_submodule(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse submodule statement (YANG 1.1)."""
         tokens.consume(kw.SUBMODULE)
-        submodule_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        submodule_name = self._parsers.parse_identifier_argument(tokens, "submodule")
         tokens.consume_type(YangTokenType.LBRACE)
         context.module.name = submodule_name
         while tokens.has_more() and tokens.peek_type() != YangTokenType.RBRACE:
@@ -46,7 +46,7 @@ class SubmoduleStatementParser:
 
     def _parse_belongs_to(self, tokens: TokenStream, context: ParserContext) -> None:
         tokens.consume(kw.BELONGS_TO)
-        parent_module = tokens.consume_type(YangTokenType.IDENTIFIER)
+        parent_module = self._parsers.parse_identifier_argument(tokens, "belongs-to")
         context.module.belongs_to_module = parent_module
         tokens.consume_type(YangTokenType.LBRACE)
         self._parsers.parse_body(tokens, context, "belongs-to", error_context="belongs-to")

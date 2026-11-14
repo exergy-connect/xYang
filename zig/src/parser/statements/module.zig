@@ -17,7 +17,7 @@ const repr = pyfmt.repr;
 
 pub fn parseModule(p: *Parser) Error!void {
     _ = try p.ts.consume(kw.MODULE);
-    p.module.name = try p.ts.consumeType(.identifier);
+    p.module.name = try p.parseIdentifierArgument(kw.MODULE);
     _ = try p.ts.consumeType(.lbrace);
     while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
         try p.dispatchSubstatement(.module, .module, "module body");
@@ -27,7 +27,7 @@ pub fn parseModule(p: *Parser) Error!void {
 
 pub fn parseSubmodule(p: *Parser) Error!void {
     _ = try p.ts.consume(kw.SUBMODULE);
-    p.module.name = try p.ts.consumeType(.identifier);
+    p.module.name = try p.parseIdentifierArgument(kw.SUBMODULE);
     _ = try p.ts.consumeType(.lbrace);
     while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
         if (p.ts.atValue(kw.BELONGS_TO)) {
@@ -41,7 +41,7 @@ pub fn parseSubmodule(p: *Parser) Error!void {
 
 fn parseBelongsTo(p: *Parser) Error!void {
     _ = try p.ts.consume(kw.BELONGS_TO);
-    p.module.belongs_to_module = try p.ts.consumeType(.identifier);
+    p.module.belongs_to_module = try p.parseIdentifierArgument(kw.BELONGS_TO);
     p.module.is_submodule = true;
     _ = try p.ts.consumeType(.lbrace);
     try p.parseBody(.discard, .belongs_to, "belongs-to");
@@ -53,7 +53,7 @@ fn parseBelongsTo(p: *Parser) Error!void {
 /// a body binds nothing, like Python.
 pub fn parseImport(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.IMPORT);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.IMPORT);
     if (p.ts.consumeIfType(.semicolon)) return;
     if (!p.ts.consumeIfType(.lbrace)) return p.ts.fail("Expected '{{' or ';' after import module name", .{});
     var acc: Holder = .{};
@@ -68,7 +68,7 @@ pub fn parseImport(p: *Parser, _: Parent) Error!void {
 /// `include`: load the submodule and merge its definitions (`merge_included_submodule`).
 pub fn parseInclude(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.INCLUDE);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.INCLUDE);
     var acc: Holder = .{};
     if (p.ts.consumeIfType(.lbrace)) {
         try p.parseBody(.{ .holder = &acc }, .include, "include");
@@ -99,25 +99,7 @@ pub fn parseImportPrefix(p: *Parser, parent: Parent) Error!void {
 /// `revision-date` inside `import` or `include` (`parse_revision_date_statement`).
 pub fn parseRevisionDate(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REVISION_DATE);
-    const tt0 = try p.ts.peekType();
-    var date: []const u8 = undefined;
-    if (tt0 == .string) {
-        date = try p.ts.consumeType(.string);
-    } else {
-        var chunks: std.ArrayList(u8) = .empty;
-        var n: usize = 0;
-        while (p.ts.hasMore() and !p.ts.at(.semicolon)) {
-            switch (try p.ts.peekType()) {
-                .identifier, .dotted_number, .integer => {
-                    try chunks.appendSlice(p.arena, try p.ts.consumeAny());
-                    n += 1;
-                },
-                else => break,
-            }
-        }
-        if (n == 0) return p.ts.fail("Expected revision-date value, got {s}", .{tt0.pyName()});
-        date = chunks.items;
-    }
+    const date = try p.parseStringArgument();
     switch (parent) {
         .holder => |h| h.revision_date = date,
         else => {},
@@ -149,33 +131,19 @@ pub fn parseModulePrefix(p: *Parser, _: Parent) Error!void {
 
 pub fn parseOrganization(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.ORGANIZATION);
-    p.module.organization = try p.ts.consumeType(.string);
+    p.module.organization = try p.parseStringArgument();
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseContact(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.CONTACT);
-    p.module.contact = try p.ts.consumeType(.string);
+    p.module.contact = try p.parseStringArgument();
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseRevision(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.REVISION);
-    const tt0 = try p.ts.peekType();
-    var date: []const u8 = undefined;
-    if (tt0 == .string) {
-        date = try p.ts.consumeType(.string);
-    } else {
-        var chunks: std.ArrayList(u8) = .empty;
-        while (p.ts.hasMore() and !p.ts.at(.lbrace) and !p.ts.at(.semicolon)) {
-            switch (try p.ts.peekType()) {
-                .identifier, .dotted_number, .integer => try chunks.appendSlice(p.arena, try p.ts.consumeAny()),
-                else => break,
-            }
-        }
-        if (chunks.items.len == 0) return p.ts.fail("Expected revision date, got {s}", .{tt0.pyName()});
-        date = chunks.items;
-    }
+    const date = try p.parseStringArgument();
     var body: Holder = .{};
     try p.parseOptionalBlock(.{ .holder = &body }, .revision, "revision");
     try p.module.revisions.append(p.arena, .{ .date = date, .description = body.description, .reference = body.reference });
@@ -184,7 +152,7 @@ pub fn parseRevision(p: *Parser, _: Parent) Error!void {
 
 pub fn parseFeature(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.FEATURE);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.FEATURE);
     try p.module.features.put(p.arena, name, {});
     if (p.ts.consumeIfType(.lbrace)) {
         var holder: Holder = .{};
@@ -219,7 +187,7 @@ pub fn parseIfFeature(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseIdentity(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.IDENTITY);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.IDENTITY);
     const stmt = try p.newStatement(name, .{ .identity = .{} });
     try p.parseOptionalBlock(.{ .stmt = stmt }, .identity, try p.label("identity '{s}'", .{name}));
     try p.module.identities.put(p.arena, name, stmt);
@@ -241,7 +209,7 @@ pub fn parseIdentityBase(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseExtension(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.EXTENSION);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.EXTENSION);
     const ext = try p.newStatement(name, .{ .extension = .{ .module_name = p.module.name } });
     try p.parseOptionalBlock(.{ .stmt = ext }, .extension, try p.label("extension '{s}'", .{name}));
     _ = p.ts.consumeIfType(.semicolon);
@@ -251,11 +219,7 @@ pub fn parseExtension(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseExtensionArgument(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.ARGUMENT);
-    const tt = try p.ts.peekType();
-    const arg = switch (tt) {
-        .string, .identifier => try p.ts.consumeAny(),
-        else => return p.ts.fail("Expected extension argument identifier/string, got {s}", .{tt.pyName()}),
-    };
+    const arg = try p.parseIdentifierArgument(kw.ARGUMENT);
     if (extensionOf(parent)) |d| d.argument_name = arg;
     try p.parseOptionalBlock(parent, .argument, "extension argument");
     _ = p.ts.consumeIfType(.semicolon);
@@ -319,8 +283,7 @@ pub fn parseAugment(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseDeviation(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.DEVIATION);
-    if ((try p.ts.peekType()) != .string) return p.ts.fail("deviation argument must be a quoted absolute schema path", .{});
-    const path = try p.parseStringConcatenation();
+    const path = try p.parseStringArgument();
     const dev = try p.newStatement("deviation", .{ .deviation = .{ .target_path = path } });
     try parseAbsoluteSchemaPath(p, path, &dev.data.deviation.target_path_segments);
     try p.parseOptionalBlock(.{ .stmt = dev }, .deviation, "deviation");
@@ -340,8 +303,7 @@ pub fn parseDeviate(p: *Parser, parent: Parent) Error!void {
         else => return p.ts.fail("internal: deviate outside deviation", .{}),
     };
     _ = try p.ts.consume(kw.DEVIATE);
-    if ((try p.ts.peekType()) != .identifier) return p.ts.fail("Expected deviate argument, got {f}", .{repr(p.ts.peek().?)});
-    const kind = try p.ts.consumeType(.identifier);
+    const kind = try p.parseStringArgument();
     if (std.mem.eql(u8, kind, kw.NOT_SUPPORTED)) {
         dev.not_supported = true;
         _ = p.ts.consumeIfType(.semicolon);

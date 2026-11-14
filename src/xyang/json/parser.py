@@ -325,6 +325,9 @@ def _build_must_list(xyang: dict[str, Any]) -> list[YangMustStmt]:
             must = YangMustStmt(
                 expression=m.get(XYangMustEntryKey.MUST, ""),
                 error_message=m.get(XYangMustEntryKey.ERROR_MESSAGE, ""),
+                error_app_tag=m.get(XYangMustEntryKey.ERROR_APP_TAG, "")
+                if isinstance(m.get(XYangMustEntryKey.ERROR_APP_TAG), str)
+                else "",
                 description=m.get(JsonSchemaKey.DESCRIPTION, ""),
             )
             _bind_recorded(must, m)

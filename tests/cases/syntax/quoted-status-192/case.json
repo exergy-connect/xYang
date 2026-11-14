@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §14: status-arg and other enumerated arguments may be quoted. status \"deprecated\" and config \"false\" (#192).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "deprecated leaf", "data": { "l": "ok" }, "valid": true }
+  ]
+}

@@ -8,7 +8,7 @@ export class LeafStatementParser {
 
   parse_leaf(tokens: TokenStream, context: ParserContext): YangLeafStmt {
     tokens.consume(kw.LEAF);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "leaf");
     const stmt = new YangLeafStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

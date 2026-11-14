@@ -8,7 +8,7 @@ export class AnydataStatementParser {
 
   parse_anydata(tokens: TokenStream, context: ParserContext): YangAnydataStmt {
     tokens.consume(kw.ANYDATA);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "anydata");
     const stmt = new YangAnydataStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

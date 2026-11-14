@@ -1,0 +1,14 @@
+module base {
+  yang-version 1.1;
+  namespace "urn:base";
+  prefix b;
+
+  import t { prefix inet; }
+  import host { prefix h; }
+
+  augment "/h:top/h:link" {
+    case te {
+      leaf addr { type inet:ipv6-address; }
+    }
+  }
+}

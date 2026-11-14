@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §6.4.1 / §7.13: type inet:ipv6-address resolves against the imports of the module that writes it. Mirrors huawei-bfd-static-mpls-te-deviations-NE8000M8M14.yang: the deviation module does not import the types module; the imported module augments a choice and uses the prefixed typedef (#189).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "deviation module loads", "data": { "ok": "x" }, "valid": true }
+  ]
+}

@@ -10,7 +10,7 @@ export class BitsStatementParser {
     if (!(type_stmt instanceof YangBitsTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("bit requires a bits or derived type");
     const bits = type_stmt.bits ??= [];
     tokens.consume(kw.BIT);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "bit");
     const bit = new YangBitStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(bit);
@@ -30,7 +30,7 @@ export class BitsStatementParser {
     if (parent instanceof YangBitStmt && parent.position !== undefined) {
       tokens.syntaxError("Duplicate position in bit statement");
     }
-    const position = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
+    const position = this.parsers.parse_integer_argument(tokens, "position");
     if (parent instanceof YangBitStmt) {
       parent.position = position;
     }

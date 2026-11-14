@@ -24,7 +24,7 @@ class ListStatementParser:
     def parse_list(self, tokens: TokenStream, context: ParserContext) -> YangListStmt:
         """Parse list statement."""
         tokens.consume(kw.LIST)
-        list_name = tokens.consume()  # identifier or keyword
+        list_name = self._parsers.parse_identifier_argument(tokens, "list")
         list_stmt = YangListStmt(name=list_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(list_stmt)

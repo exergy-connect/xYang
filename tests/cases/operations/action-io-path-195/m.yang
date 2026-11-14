@@ -1,0 +1,22 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container c {
+    action a;
+  }
+
+  augment "/m:c/m:a/m:input" {
+    leaf y { type string; }
+    leaf extra { type string; }
+  }
+
+  augment "/m:c/m:a/m:output" {
+    leaf w { type string; }
+  }
+
+  deviation "/m:c/m:a/m:input/m:y" {
+    deviate not-supported;
+  }
+}

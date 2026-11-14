@@ -442,6 +442,8 @@ def _must_to_json(must: YangMustStmt) -> dict[str, Any]:
         XYangMustEntryKey.MUST: must.expression,
         XYangMustEntryKey.ERROR_MESSAGE: must.error_message or "",
     }
+    if must.error_app_tag:
+        out[XYangMustEntryKey.ERROR_APP_TAG] = must.error_app_tag
     _with_xpath_prefixes(out, must.ast)
     _with_description(out, must.description)
     return out

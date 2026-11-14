@@ -372,7 +372,10 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
     ),
     (
         "must",
-        _parent("7.5.4", frozenset({kw.ERROR_MESSAGE, kw.DESCRIPTION, kw.REFERENCE})),
+        _parent(
+            "7.5.4",
+            frozenset({kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE}),
+        ),
     ),
     ("when", _parent("7.21.5", frozenset({kw.DESCRIPTION, kw.REFERENCE}))),
     (

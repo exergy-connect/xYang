@@ -1,0 +1,14 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  import host { prefix h; }
+  import base { prefix b; }
+
+  deviation "/h:top/h:gone" {
+    deviate not-supported;
+  }
+
+  leaf ok { type string; }
+}

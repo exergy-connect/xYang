@@ -1,0 +1,6 @@
+submodule u {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  leaf af { type m:af-type; }
+}

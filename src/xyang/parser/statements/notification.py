@@ -26,7 +26,7 @@ class NotificationStatementParser:
     ) -> YangNotificationStmt:
         """Parse notification statement."""
         tokens.consume(kw.NOTIFICATION)
-        notification_name = tokens.consume()
+        notification_name = self._parsers.parse_identifier_argument(tokens, "notification")
         notification_stmt = YangNotificationStmt(name=notification_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(notification_stmt)

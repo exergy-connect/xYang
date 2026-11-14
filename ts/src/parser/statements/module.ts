@@ -9,7 +9,7 @@ export class ModuleStatementParser {
 
   parse_module(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.MODULE);
-    (context.module as any).name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    (context.module as any).name = this.parsers.parse_identifier_argument(tokens, "module");
     tokens.consume_type(YangTokenType.LBRACE);
     const scoped = context.with_dispatch("module", "module body");
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
@@ -36,28 +36,25 @@ export class ModuleStatementParser {
 
   parse_prefix(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.PREFIX);
-    const tt = this.parsers.dispatch_key(tokens);
-    (context.module as any).prefix = tt === YangTokenType.STRING
-      ? tokens.consume_type(YangTokenType.STRING)
-      : tokens.consume_type(YangTokenType.IDENTIFIER);
+    (context.module as any).prefix = this.parsers.parse_identifier_argument(tokens, "prefix");
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_organization(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.ORGANIZATION);
-    (context.module as any).organization = tokens.consume_type(YangTokenType.STRING);
+    (context.module as any).organization = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_contact(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.CONTACT);
-    (context.module as any).contact = tokens.consume_type(YangTokenType.STRING);
+    (context.module as any).contact = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_import_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.IMPORT);
-    const moduleName = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const moduleName = this.parsers.parse_identifier_argument(tokens, "import");
     let localPrefix: string | undefined;
     let revisionDate: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
@@ -89,10 +86,7 @@ export class ModuleStatementParser {
 
   parse_include_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.INCLUDE);
-    const name =
-      tokens.peek_type() === YangTokenType.STRING
-        ? tokens.consume_type(YangTokenType.STRING)
-        : tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name = this.parsers.parse_identifier_argument(tokens, "include");
     let revisionDate: string | undefined;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       this.parsers.includeRevisionDate = undefined;
@@ -115,11 +109,7 @@ export class ModuleStatementParser {
 
   parse_prefix_value_stmt(tokens: TokenStream): void {
     tokens.consume(kw.PREFIX);
-    if (tokens.peek_type() === YangTokenType.STRING) {
-      tokens.consume_type(YangTokenType.STRING);
-    } else {
-      tokens.consume_type(YangTokenType.IDENTIFIER);
-    }
+    this.parsers.parse_identifier_argument(tokens, "prefix");
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 

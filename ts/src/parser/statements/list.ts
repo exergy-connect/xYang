@@ -8,7 +8,7 @@ export class ListStatementParser {
 
   parse_list(tokens: TokenStream, context: ParserContext): YangListStmt {
     tokens.consume(kw.LIST);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "list");
     const stmt = new YangListStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

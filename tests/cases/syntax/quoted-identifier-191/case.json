@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §6.1.3: identifier-arg and identifier-ref-arg may be quoted. base \"b\" and belongs-to \"m\" are the same argument as the unquoted form (#191).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "identity and submodule leaf", "data": { "kind": "m:d", "from-sub": "ok" }, "valid": true }
+  ]
+}
