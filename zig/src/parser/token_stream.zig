@@ -66,14 +66,6 @@ pub const TokenStream = struct {
         return v;
     }
 
-    pub fn consumeIf(self: *TokenStream, expected: []const u8) bool {
-        if (self.atValue(expected)) {
-            self.index += 1;
-            return true;
-        }
-        return false;
-    }
-
     /// `consume_type(YangTokenType.X)`.
     pub fn consumeType(self: *TokenStream, expected: TokenType) errors.Error![]const u8 {
         if (!self.hasMore()) return self.fail("Unexpected end of input", .{});
@@ -91,25 +83,6 @@ pub const TokenStream = struct {
             return true;
         }
         return false;
-    }
-
-    /// `consume_oneof([...])` over token types.
-    pub fn consumeOneOf(self: *TokenStream, allowed: []const TokenType) errors.Error![]const u8 {
-        if (!self.hasMore()) return self.fail("Unexpected end of input", .{});
-        const tok = self.tokens[self.index];
-        for (allowed) |a| {
-            if (tok.type == a) {
-                self.index += 1;
-                return tok.value;
-            }
-        }
-        var names: std.Io.Writer.Allocating = .init(self.arena);
-        for (allowed, 0..) |a, i| {
-            if (i != 0) names.writer.writeAll(", ") catch return error.OutOfMemory;
-            names.writer.writeAll(a.pyName()) catch return error.OutOfMemory;
-        }
-        const got = if (tok.type == .identifier) tok.value else tok.type.pyName();
-        return self.fail("Expected one of ({s}), got {f}", .{ names.written(), repr(got) });
     }
 
     /// Line of the current token (or the last one at the end), like `position()`.

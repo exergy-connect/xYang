@@ -117,10 +117,6 @@ pub const Val = union(enum) {
     string: []const u8,
     array: []Val,
     object: *Object,
-
-    pub fn isNull(v: Val) bool {
-        return v == .null;
-    }
 };
 
 pub const LoadError = error{ OutOfMemory, InvalidJson, IntegerTooLarge };

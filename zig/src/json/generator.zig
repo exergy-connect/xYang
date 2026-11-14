@@ -599,13 +599,6 @@ fn recordImportedExtension(g: *Gen, inv: *const Statement) Error!void {
     try g.extensions_used.append(g.a, .{ .owner = owner, .name = d.resolved_extension.name });
 }
 
-fn isContainerLike(k: ast.Kind) bool {
-    return switch (k) {
-        .container, .notification, .input, .output => true,
-        else => false,
-    };
-}
-
 /// `_one_extension_invocation`: `{name, argument?, ...}` plus a nested body, in source order.
 fn oneExtensionInvocation(g: *Gen, inv: *Statement, names: *const Names, module: *Module) Error!Val {
     const a = g.a;

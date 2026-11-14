@@ -145,10 +145,6 @@ pub fn yangBool(v: Value) bool {
     };
 }
 
-pub fn isNodeset(v: Value) bool {
-    return v == .nodes;
-}
-
 /// `node_set_values`: data of a node-set or `Node`, or the scalar itself (none for `None`).
 /// A tuple is one value, compared as its Python `str`.
 pub fn nodeSetValues(a: Allocator, v: Value) error{OutOfMemory}![]const Val {

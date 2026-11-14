@@ -220,12 +220,6 @@ pub const Parser = struct {
         return .{ .name = raw };
     }
 
-    pub fn consumeQName(p: *Parser) Error![]const u8 {
-        const ref = try p.consumeIdentifierRef();
-        if (ref.prefix) |pre| return p.label("{s}:{s}", .{ pre, ref.name });
-        return ref.name;
-    }
-
     /// Quoted string with `+` concatenation, or one unquoted argument.
     pub fn parseStringConcatenation(p: *Parser) Error![]const u8 {
         if (!p.ts.at(.string)) return p.parseStringArgument();
