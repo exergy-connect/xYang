@@ -235,38 +235,49 @@ class YangParser:
     def _merge_submodule_definitions(
         self, parent: YangModule, sub: YangModule, tokens: TokenStream
     ) -> None:
+        """Merge *sub* into *parent*.
+
+        One submodule reached through two include paths is one definition
+        (same submodule name on the statement). Two distinct definitions of
+        the same name still fail.
+        """
         for n, td in sub.typedefs.items():
             origin = getattr(td, "included_from", None) or sub.name
             setattr(td, "included_from", origin)
             existing = parent.typedefs.get(n)
             if existing is not None:
-                # The same typedef reached again through this include is one definition.
                 if existing is td or getattr(existing, "included_from", None) == origin:
                     continue
                 raise tokens.make_error(f"Duplicate typedef {n!r} from include of {sub.name!r}")
             from ..typedef_scope import register_typedef
 
             register_typedef(parent.typedefs, td)
-        for n, ident in sub.identities.items():
-            if n in parent.identities:
-                raise tokens.make_error(f"Duplicate identity {n!r} from include of {sub.name!r}")
-            parent.identities[n] = ident
-        for n, grp in sub.groupings.items():
-            if n in parent.groupings:
-                raise tokens.make_error(f"Duplicate grouping {n!r} from include of {sub.name!r}")
-            parent.groupings[n] = grp
-        for fname in sub.features:
+        self._merge_included_map(
+            parent.identities, sub.identities, sub.name, tokens, "identity"
+        )
+        self._merge_included_map(
+            parent.groupings, sub.groupings, sub.name, tokens, "grouping"
+        )
+        for fname in list(sub.features):
+            origin = sub.feature_included_from.get(fname) or sub.name
             if fname in parent.features:
+                if parent.feature_included_from.get(fname) == origin:
+                    continue
                 raise tokens.make_error(
                     f"Duplicate feature {fname!r} from include of {sub.name!r}"
                 )
             parent.features.add(fname)
+            parent.feature_included_from[fname] = origin
         for fname, ifs in sub.feature_if_features.items():
+            origin = sub.feature_if_included_from.get(fname) or sub.name
             if fname in parent.feature_if_features:
+                if parent.feature_if_included_from.get(fname) == origin:
+                    continue
                 raise tokens.make_error(
                     f"Duplicate feature if-feature for {fname!r} from include of {sub.name!r}"
                 )
             parent.feature_if_features[fname] = list(ifs)
+            parent.feature_if_included_from[fname] = origin
         own = parent.own_prefix_stripped()
         for pref, im in sub.import_prefixes.items():
             if pref == own:
@@ -279,14 +290,46 @@ class YangParser:
                 )
             if existing is None:
                 parent.import_prefixes[pref] = im
-        parent.statements.extend(sub.statements)
+        kept = []
+        for stmt in sub.statements:
+            origin = getattr(stmt, "included_from", None) or sub.name
+            setattr(stmt, "included_from", origin)
+            if origin in parent.included_submodules:
+                continue
+            parent.included_submodules.add(origin)
+            kept.append(stmt)
+        parent.included_submodules.add(sub.name)
+        parent.statements.extend(kept)
+        sub.included_parent = parent
         sub.statements.clear()
         sub.typedefs = parent.typedefs
         sub.identities.clear()
         sub.groupings.clear()
         sub.features.clear()
         sub.feature_if_features.clear()
+        sub.feature_included_from.clear()
+        sub.feature_if_included_from.clear()
         sub.import_prefixes = parent.import_prefixes
+
+    @staticmethod
+    def _merge_included_map(
+        parent_map: dict,
+        sub_map: dict,
+        sub_name: str,
+        tokens: TokenStream,
+        kind: str,
+    ) -> None:
+        for name, stmt in sub_map.items():
+            origin = getattr(stmt, "included_from", None) or sub_name
+            setattr(stmt, "included_from", origin)
+            existing = parent_map.get(name)
+            if existing is not None:
+                if existing is stmt or getattr(existing, "included_from", None) == origin:
+                    continue
+                raise tokens.make_error(
+                    f"Duplicate {kind} {name!r} from include of {sub_name!r}"
+                )
+            parent_map[name] = stmt
 
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file (resolves ``include`` relative to this file's directory).

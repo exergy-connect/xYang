@@ -37,6 +37,15 @@ class YangModule(YangStatementList):
     feature_if_features: Dict[str, List[str]] = field(default_factory=dict)
     # import prefix (local) -> parsed module (RFC 7950 ``import``).
     import_prefixes: Dict[str, "YangModule"] = field(default_factory=dict)
+    # The module this included submodule was merged into. Its definitions are
+    # visible across that module (RFC 7950 §5.1).
+    included_parent: Optional["YangModule"] = None
+    # Submodule that contributed an included feature, or its if-feature list.
+    # The same submodule reached twice is one definition.
+    feature_included_from: Dict[str, str] = field(default_factory=dict)
+    feature_if_included_from: Dict[str, str] = field(default_factory=dict)
+    # Submodule names whose statements are already on this module.
+    included_submodules: Set[str] = field(default_factory=set)
     # extension name -> extension definition from this module.
     extensions: Dict[str, "YangExtensionStmt"] = field(default_factory=dict)
     # Generic runtime storage for extension callbacks.
@@ -44,6 +53,13 @@ class YangModule(YangStatementList):
 
     def own_prefix_stripped(self) -> str:
         return (self.prefix or "").strip("'\"")
+
+    def defining_module(self) -> "YangModule":
+        """The module this tree belongs to. An included submodule resolves to its parent."""
+        scope: YangModule = self
+        while scope.included_parent is not None:
+            scope = scope.included_parent
+        return scope
 
     def resolve_prefixed_module(self, prefix: str) -> Optional["YangModule"]:
         """Module for ``prefix`` in this module's scope (own prefix or ``import``)."""
@@ -86,6 +102,7 @@ def resolve_typedef(type_stmt: Any, fallback: Any) -> tuple[Optional["YangTypede
     scope = getattr(type_stmt, "scope", None) or fallback
     if not isinstance(scope, YangModule):
         return None, None
+    scope = scope.defining_module()
     prefix = getattr(type_stmt, "prefix", None)
     target = scope.resolve_prefixed_module(prefix) if prefix else scope
     if target is None:

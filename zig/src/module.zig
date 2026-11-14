@@ -38,10 +38,22 @@ pub const Module = struct {
     /// Set when `belongs-to` was parsed (this is a submodule).
     is_submodule: bool = false,
     included_parent: ?*Module = null,
+    /// Submodule that contributed an included feature or its if-feature list.
+    feature_included_from: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
+    feature_if_included_from: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
+    /// Submodule names whose statements are already on this module.
+    included_submodules: std.StringArrayHashMapUnmanaged(void) = .empty,
 
     /// `own_prefix_stripped()`.
     pub fn ownPrefix(self: *const Module) []const u8 {
         return std.mem.trim(u8, self.prefix, "'\"");
+    }
+
+    /// The module this tree belongs to. An included submodule resolves to its parent.
+    pub fn definingModule(self: *Module) *Module {
+        var scope = self;
+        while (scope.included_parent) |parent| scope = parent;
+        return scope;
     }
 
     /// `resolve_prefixed_module(prefix)`: this module for its own prefix, else the import.
@@ -76,7 +88,7 @@ pub const ResolvedTypedef = struct { typedef: *ast.Statement, module: *Module };
 
 pub fn resolveTypedef(type_stmt: *const ast.TypeStmt, fallback: ?*Module) ?ResolvedTypedef {
     var scope = type_stmt.scope orelse fallback orelse return null;
-    while (scope.included_parent) |parent| scope = parent;
+    scope = scope.definingModule();
     const target = if (type_stmt.prefix) |pre| scope.resolvePrefixedModule(pre) orelse return null else scope;
     const scopes = @import("typedef_scope.zig");
     const context = type_stmt.context orelse "";

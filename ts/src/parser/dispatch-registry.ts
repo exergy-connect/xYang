@@ -59,71 +59,41 @@ const ioBody = parent(
   new Set([kw.TYPEDEF, kw.WHEN, kw.MUST, kw.IF_FEATURE])
 );
 
+/**
+ * RFC 7950 body-stmts, plus linkage, meta and revision. A submodule body (7.2)
+ * accepts this same set; a module body (7.1) adds namespace and prefix.
+ */
+const BODY_STATEMENTS: ReadonlySet<string> = new Set([
+  kw.LEAF,
+  kw.LIST,
+  kw.LEAF_LIST,
+  kw.CONTAINER,
+  kw.NOTIFICATION,
+  kw.RPC,
+  kw.ANYDATA,
+  kw.ANYXML,
+  kw.TYPEDEF,
+  kw.GROUPING,
+  kw.USES,
+  kw.IMPORT,
+  kw.INCLUDE,
+  kw.REVISION,
+  kw.DESCRIPTION,
+  kw.REFERENCE,
+  kw.FEATURE,
+  kw.IDENTITY,
+  kw.EXTENSION,
+  kw.AUGMENT,
+  kw.DEVIATION,
+  kw.YANG_VERSION,
+  kw.ORGANIZATION,
+  kw.CONTACT
+]);
+
 /** Insertion order is the parity snapshot order. Keep it aligned with Python. */
 const PARENTS: Array<[string, DispatchParent]> = [
-  [
-    "module",
-    parent(
-      "7.1.1",
-      new Set([
-        kw.LEAF,
-        kw.LIST,
-        kw.LEAF_LIST,
-        kw.CONTAINER,
-        kw.NOTIFICATION,
-        kw.RPC,
-        kw.ANYDATA,
-        kw.ANYXML,
-        kw.TYPEDEF,
-        kw.GROUPING,
-        kw.IMPORT,
-        kw.INCLUDE,
-        kw.REVISION,
-        kw.DESCRIPTION,
-        kw.REFERENCE,
-        kw.FEATURE,
-        kw.IDENTITY,
-        kw.EXTENSION,
-        kw.AUGMENT,
-        kw.DEVIATION,
-        kw.YANG_VERSION,
-        kw.NAMESPACE,
-        kw.PREFIX,
-        kw.ORGANIZATION,
-        kw.CONTACT
-      ])
-    )
-  ],
-  [
-    "submodule",
-    parent(
-      "7.2.1",
-      new Set([
-        kw.YANG_VERSION,
-        kw.ORGANIZATION,
-        kw.CONTACT,
-        kw.DESCRIPTION,
-        kw.REFERENCE,
-        kw.IMPORT,
-        kw.INCLUDE,
-        kw.REVISION,
-        kw.FEATURE,
-        kw.EXTENSION,
-        kw.TYPEDEF,
-        kw.IDENTITY,
-        kw.GROUPING,
-        kw.AUGMENT,
-        kw.DEVIATION,
-        kw.CONTAINER,
-        kw.LIST,
-        kw.LEAF,
-        kw.LEAF_LIST,
-        kw.ANYDATA,
-        kw.ANYXML,
-        kw.NOTIFICATION
-      ])
-    )
-  ],
+  ["module", parent("7.1.1", BODY_STATEMENTS, new Set([kw.NAMESPACE, kw.PREFIX]))],
+  ["submodule", parent("7.2.1", BODY_STATEMENTS)],
   ["belongs-to", parent("7.2.2", new Set([kw.PREFIX]))],
   ["import", parent("7.1.5", new Set([kw.PREFIX, kw.REFERENCE, kw.REVISION_DATE, kw.DESCRIPTION]))],
   ["include", parent("7.1.6", new Set([kw.PREFIX, kw.REFERENCE, kw.REVISION_DATE, kw.DESCRIPTION]))],

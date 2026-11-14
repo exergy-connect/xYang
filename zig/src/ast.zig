@@ -442,6 +442,9 @@ pub const Statement = struct {
     /// RFC 7951: module that defined this node when it differs from the enclosing parent
     /// (merged from a foreign `augment`); null means the parent's module.
     defining_module: ?[]const u8 = null,
+    /// Submodule this statement was merged from. The same submodule reached
+    /// through two includes is one definition.
+    included_from: ?[]const u8 = null,
     /// RFC 8791 provenance survives native JSON export and copy operations.
     augment_structure: ?[]const u8 = null,
     augment_structure_module: ?[]const u8 = null,

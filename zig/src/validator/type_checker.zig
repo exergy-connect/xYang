@@ -105,7 +105,7 @@ pub const TypeChecker = struct {
     pub fn check(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         const name = t.name;
         if (t.prefix) |prefix| {
-            const scope = t.scope orelse self.root;
+            const scope = (t.scope orelse self.root).definingModule();
             if (scope.resolvePrefixedModule(prefix) == null) {
                 return self.issue("type", "unknown type prefix {f} in type {f}", .{ repr(prefix), repr(name) });
             }

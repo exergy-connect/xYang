@@ -160,6 +160,8 @@ class TypeChecker:
             if type_stmt.scope is None and not isinstance(root_schema, YangModule):
                 return []
             scope = type_stmt.scope or root_schema
+            if isinstance(scope, YangModule):
+                scope = scope.defining_module()
             if scope.resolve_prefixed_module(type_stmt.prefix) is None:
                 return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
             typedef, _module = resolve_typedef(type_stmt, root_schema)

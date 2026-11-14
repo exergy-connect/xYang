@@ -1,9 +1,6 @@
 {
   "description": "RFC 7950 §5.1 / §7.13: a top-level typedef in an included submodule is visible to a sibling submodule through the parent module prefix, as in type bgp:af-type (#190).",
   "module": "m.yang",
-  "xfail": {
-    "python": "typedef from an included submodule used as m:af-type (#190)"
-  },
   "instances": [
     { "name": "enum value", "data": { "af": "ipv4" }, "valid": true },
     { "name": "not an enum", "data": { "af": "nope" }, "valid": false,
