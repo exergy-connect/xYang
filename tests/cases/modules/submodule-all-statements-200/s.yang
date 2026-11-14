@@ -1,0 +1,14 @@
+submodule s {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  container one {
+    leaf a { type string; }
+  }
+
+  container two {
+    leaf b { type string; }
+  }
+
+  rpc three;
+}

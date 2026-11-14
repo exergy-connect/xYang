@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §7.1: an included submodule contributes every top-level statement, not only the first. The second container validates, and a deviation of that container and of a later rpc loads (#200, #214).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "second container", "data": { "two": { "b": "x" } }, "valid": true }
+  ]
+}

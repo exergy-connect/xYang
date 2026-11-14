@@ -1,0 +1,10 @@
+submodule s2 {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  import a { prefix x; }
+
+  grouping g2 {
+    uses x:ga;
+  }
+}

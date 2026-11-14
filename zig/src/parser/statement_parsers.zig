@@ -172,6 +172,10 @@ pub const Parser = struct {
     // ------------------------------------------------------------------
 
     pub fn addToParentOrModule(p: *Parser, parent: Parent, stmt: *ast.Statement) Error!void {
+        // Nested statements in a submodule resolve prefixes in that file, not the parent.
+        if (p.module.belongs_to_module.len > 0 and stmt.included_from == null) {
+            stmt.included_from = p.module.name;
+        }
         switch (parent) {
             .stmt => |s| try s.statements.append(p.arena, stmt),
             else => try p.module.statements.append(p.arena, stmt),

@@ -116,6 +116,9 @@ class StatementParsers:
         self, context: ParserContext, stmt: "YangStatement"
     ) -> None:
         """Add statement to the current parent (if it can contain statements) or to the module."""
+        # Nested statements in a submodule resolve prefixes in that file, not the parent.
+        if context.module.belongs_to_module and not stmt.included_from:
+            stmt.included_from = context.module.name
         parent = context.current_parent
         if isinstance(parent, YangStatementList):
             parent.statements.append(stmt)

@@ -282,11 +282,14 @@ class YangParser:
         parent.included_files[sub.name] = sub
         for name, nested in sub.included_files.items():
             parent.included_files.setdefault(name, nested)
+        # Snapshot first: this include keeps every statement of one submodule.
+        # A later include of an origin already present (a diamond) still skips.
+        already = set(parent.included_submodules)
         kept = []
         for stmt in sub.statements:
-            origin = getattr(stmt, "included_from", None) or sub.name
-            setattr(stmt, "included_from", origin)
-            if origin in parent.included_submodules:
+            origin = stmt.included_from or sub.name
+            stmt.included_from = origin
+            if origin in already:
                 continue
             parent.included_submodules.add(origin)
             kept.append(stmt)
