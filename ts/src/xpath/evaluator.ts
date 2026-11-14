@@ -78,6 +78,53 @@ function requireArity(name: string, args: XPathAstNode[], expected: number): voi
   }
 }
 
+/** XPath 1.0 number conversion, the same as `number()` for one argument. */
+function asXPathNumber(value: unknown): number {
+  const first = firstValue(value);
+  const numberValue = Number(first);
+  return Number.isNaN(numberValue) ? Number.NaN : numberValue;
+}
+
+/** XPath 1.0 `round`: half toward +∞. NaN and infinities are unchanged. */
+function xpathRound(value: number): number {
+  if (!Number.isFinite(value)) {
+    return value;
+  }
+  if (value === 0) {
+    return value;
+  }
+  if (value >= -0.5 && value < 0) {
+    return -0;
+  }
+  return Math.floor(value + 0.5);
+}
+
+/** 0-based index of a 1-based position boundary, clamped to `[0, length]`. */
+function substringOffset(boundary: number, length: number): number {
+  if (!(boundary > 1)) {
+    return 0;
+  }
+  const index = boundary - 1;
+  if (!(index < length)) {
+    return length;
+  }
+  return Math.trunc(index);
+}
+
+/** Characters whose 1-based position `p` satisfies `start <= p < end` (IEEE). */
+function substringOf(source: string, start: number, end: number): string {
+  if (Number.isNaN(start) || Number.isNaN(end) || start === Number.POSITIVE_INFINITY || end === Number.NEGATIVE_INFINITY) {
+    return "";
+  }
+  const length = source.length;
+  const lo = substringOffset(start, length);
+  const hi = end === Number.POSITIVE_INFINITY ? length : substringOffset(end, length);
+  if (lo >= hi) {
+    return "";
+  }
+  return source.slice(lo, hi);
+}
+
 function coercePair(left: unknown, right: unknown): [unknown, unknown] {
   if (typeof left === "boolean" || typeof right === "boolean") {
     return [toYangBool(left), toYangBool(right)];
@@ -525,6 +572,16 @@ export class XPathEvaluator {
     if (fn === "starts-with") {
       const [source, needle] = this.stringPair(fn, args, context, node);
       return source.startsWith(needle);
+    }
+    if (fn === "substring") {
+      if (args.length !== 2 && args.length !== 3) {
+        throw new XPathEvaluationError(`${fn}() expects 2 or 3 arguments, got ${args.length}`);
+      }
+      const source = asXPathString(this.eval(args[0], context, node));
+      const start = xpathRound(asXPathNumber(this.eval(args[1], context, node)));
+      const end =
+        args.length === 3 ? start + xpathRound(asXPathNumber(this.eval(args[2], context, node))) : Number.POSITIVE_INFINITY;
+      return substringOf(source, start, end);
     }
     if (fn === "substring-before") {
       const [source, needle] = this.stringPair(fn, args, context, node);

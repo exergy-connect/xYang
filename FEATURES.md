@@ -340,6 +340,7 @@ xYang implements a comprehensive XPath evaluator that handles all the XPath expr
 - ✅ `string-length(.)` - Get length of current node value
 - ✅ `contains(., 'ab')` - True when the first string contains the second (XPath 1.0). An empty second argument is true
 - ✅ `starts-with(., 'z')` - True when the first string starts with the second. An empty second argument is true
+- ✅ `substring(., 1, 4)` - XPath 1.0 substring ([#215](https://github.com/exergy-connect/xYang/issues/215)): 1-based start and optional length, numeric arguments rounded as `round` (half toward +∞). `substring('12345', 1.5, 2.6)` is `234`; `substring('12345', 0, 3)` is `12`. Two or three arguments; any other count is an evaluation error
 - ✅ `substring-before(., '-')` - Substring preceding the first occurrence of the second argument; empty when that argument is empty or does not occur
 - ✅ `substring-after(., '-')` - Substring following the first occurrence of the second argument; the whole source when that argument is empty; empty when it does not occur
 - ✅ `translate(., '_', '')` - Translate/remove characters
