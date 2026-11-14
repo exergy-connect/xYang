@@ -5,13 +5,13 @@ Performance benchmarks for xYang library.
 import time
 import statistics
 from pathlib import Path
-from typing import List, Dict, Any
+from typing import Any
 
 from xyang import parse_yang_file, parse_yang_string, YangValidator
 from xyang.xpath import Context, Node, XPathEvaluator, XPathParser
 
 
-def _xpath_context(data: Dict[str, Any], context_path: List[str]):
+def _xpath_context(data: dict[str, Any], context_path: list[str]):
     """Build root Node, context node at path, and Context for XPath evaluation."""
     root = Node(data, None, None)
     node = root
@@ -26,7 +26,7 @@ class Benchmark:
     """Benchmark runner."""
 
     def __init__(self):
-        self.results: Dict[str, List[float]] = {}
+        self.results: dict[str, list[float]] = {}
 
     def time_function(self, func, *args, **kwargs):
         """Time a function execution."""

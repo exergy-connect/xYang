@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Dict, Optional, Protocol, TYPE_CHECKING
+from typing import Optional, Protocol, TYPE_CHECKING
 
 from ..ast import (
     YangChoiceStmt,
@@ -35,7 +35,7 @@ class ExtensionApplyCallback(Protocol):
         """Return replacement stmt, or ``None`` to remove invocation."""
 
 
-_APPLY_CALLBACKS: Dict[ExtensionIdentity, ExtensionApplyCallback] = {}
+_APPLY_CALLBACKS: dict[ExtensionIdentity, ExtensionApplyCallback] = {}
 
 
 def register_extension_apply_callback(

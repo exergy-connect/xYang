@@ -6,7 +6,8 @@ Multiple ``if-feature`` substatements on one node are combined with logical AND.
 
 from __future__ import annotations
 
-from typing import AbstractSet, Dict, List, Mapping, Optional, Set
+from typing import Optional
+from collections.abc import Mapping, Set
 
 from ..module import YangModule
 from ..identifier_ref import YangIdentifierRef, parse_identifier_ref_atom
@@ -16,10 +17,10 @@ class IfFeatureEvalError(Exception):
     """Malformed ``if-feature`` expression."""
 
 
-def reachable_modules(root: YangModule) -> List[YangModule]:
+def reachable_modules(root: YangModule) -> list[YangModule]:
     """``root`` and all modules reachable via ``import`` (transitive)."""
-    out: List[YangModule] = []
-    seen: Set[int] = set()
+    out: list[YangModule] = []
+    seen: set[int] = set()
 
     def walk(m: YangModule) -> None:
         if id(m) in seen:
@@ -38,8 +39,8 @@ def reachable_modules(root: YangModule) -> List[YangModule]:
 
 def build_enabled_features_map(
     root: YangModule,
-    override: Optional[Mapping[str, AbstractSet[str]]],
-) -> Dict[str, AbstractSet[str]]:
+    override: Optional[Mapping[str, Set[str]]],
+) -> dict[str, Set[str]]:
     """
     For each reachable module, the set of feature names that are *enabled*.
 
@@ -48,7 +49,7 @@ def build_enabled_features_map(
     * Module not listed in ``override``: all declared features enabled.
     """
     modules = reachable_modules(root)
-    result: Dict[str, AbstractSet[str]] = {}
+    result: dict[str, Set[str]] = {}
     for m in modules:
         if override is None or m.name not in override:
             result[m.name] = frozenset(m.features)
@@ -59,7 +60,7 @@ def build_enabled_features_map(
 
 def feature_is_supported(
     ctx_module: YangModule,
-    enabled_by_module: Mapping[str, AbstractSet[str]],
+    enabled_by_module: Mapping[str, Set[str]],
     ref: str | YangIdentifierRef,
     file: str | None = None,
 ) -> bool:
@@ -84,8 +85,8 @@ def feature_is_supported(
     return fname in enabled
 
 
-def _tokenize(expr: str) -> List[str]:
-    tokens: List[str] = []
+def _tokenize(expr: str) -> list[str]:
+    tokens: list[str] = []
     i = 0
     n = len(expr)
     while i < n:
@@ -110,9 +111,9 @@ class _IfFeatureParser:
 
     def __init__(
         self,
-        tokens: List[str],
+        tokens: list[str],
         ctx_module: YangModule,
-        enabled_by_module: Mapping[str, AbstractSet[str]],
+        enabled_by_module: Mapping[str, Set[str]],
         file: str | None = None,
     ) -> None:
         self._toks = tokens
@@ -173,7 +174,7 @@ class _IfFeatureParser:
 def evaluate_if_feature_expression(
     expr: str,
     ctx_module: YangModule,
-    enabled_by_module: Mapping[str, AbstractSet[str]],
+    enabled_by_module: Mapping[str, Set[str]],
     file: str | None = None,
 ) -> bool:
     """
@@ -195,9 +196,9 @@ def evaluate_if_feature_expression(
 
 
 def stmt_if_features_satisfied(
-    if_features: List[str],
+    if_features: list[str],
     ctx_module: YangModule,
-    enabled_by_module: Mapping[str, AbstractSet[str]],
+    enabled_by_module: Mapping[str, Set[str]],
     file: str | None = None,
 ) -> bool:
     """True iff every ``if-feature`` substatement on the node passes (AND)."""
@@ -210,11 +211,11 @@ def stmt_if_features_satisfied(
 
 
 def _prune_per_feature_if_features(
-    modules: List[YangModule],
-    enabled: Dict[str, AbstractSet[str]],
-) -> Dict[str, AbstractSet[str]]:
+    modules: list[YangModule],
+    enabled: dict[str, Set[str]],
+) -> dict[str, Set[str]]:
     """RFC 7950 §7.20.1: drop feature names whose own ``if-feature`` substatements fail."""
-    mutable: Dict[str, Set[str]] = {m.name: set(enabled.get(m.name, ())) for m in modules}
+    mutable: dict[str, set[str]] = {m.name: set(enabled.get(m.name, ())) for m in modules}
     changed = True
     while changed:
         changed = False

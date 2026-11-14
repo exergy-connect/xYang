@@ -10,7 +10,7 @@ import base64
 import binascii
 import logging
 from types import SimpleNamespace
-from typing import Any, List, Optional
+from typing import Any, Optional
 
 from ..ast import YangTypeStmt
 from ..errors import XPathSyntaxError
@@ -73,7 +73,7 @@ def _instance_identifier_path_errors(
     value_repr: str,
     ctx: Context,
     evaluator: Any,
-) -> List[TypeIssue]:
+) -> list[TypeIssue]:
     """Path shape and require-instance target check for a parsed instance-identifier.
 
     Kept as a module function so ``isinstance(expr, PathNode)`` and uses of
@@ -149,7 +149,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """
         leafref_current: node to use as current() for leafref path resolution: the leaf
         or leaf-list item being checked (RFC 7950 9.9.2). If None, ctx.current is used.
@@ -224,7 +224,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node],
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Dispatch a built-in through the type registry."""
         family = spec.family
         if family == UNION:
@@ -281,7 +281,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node],
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Validate the typedef chain, then restrictions on the referring ``type``.
 
         Each level checks its own ``range`` / ``length`` / ``pattern`` after the
@@ -326,7 +326,7 @@ class TypeChecker:
         value: Any,
         type_stmt: YangTypeStmt,
         root_schema: Any,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """Apply ``type_stmt`` restrictions using the chain's built-in checker."""
         builtin = self._builtin_name(type_stmt, root_schema)
         if builtin in _INTEGER_TYPE_NAMES:
@@ -339,7 +339,7 @@ class TypeChecker:
             return self._check_string(value, type_stmt)
         return []
 
-    def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> List[TypeIssue]:
+    def _check_identityref(self, value: Any, type_stmt: YangTypeStmt, root_schema: Any) -> list[TypeIssue]:
         gate = REGISTRY[IDENTITYREF].check_value(value, type_stmt)
         if gate is not None:
             return [gate]
@@ -369,7 +369,7 @@ class TypeChecker:
         type_stmt: YangTypeStmt,
         ctx: Context,
         evaluator: Any,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         """RFC 7950 instance-identifier: string path; optional require-instance existence check."""
         gate = REGISTRY[INSTANCE_IDENTIFIER].check_value(value, type_stmt)
         if gate is not None:
@@ -401,7 +401,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         for member in getattr(type_stmt, "types", ()):
             if not self.check(
                 value,
@@ -425,7 +425,7 @@ class TypeChecker:
         ctx: Context,
         evaluator: Any,
         leafref_current: Optional[Node] = None,
-    ) -> List[TypeIssue]:
+    ) -> list[TypeIssue]:
         if not getattr(type_stmt, "require_instance", True) or not getattr(type_stmt, "path", None):
             return []
         path_ast = getattr(type_stmt, "path", None)
@@ -466,11 +466,11 @@ class TypeChecker:
             ]
         return []
 
-    def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_string(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         gate = REGISTRY[STRING].check_value(value, type_stmt)
         if gate is not None:
             return [gate]
-        errors: List[TypeIssue] = []
+        errors: list[TypeIssue] = []
         s = value
         if getattr(type_stmt, "length", None):
             issue = self._length_issue(
@@ -508,7 +508,7 @@ class TypeChecker:
                 )
         return errors
 
-    def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_integer(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         # bool is a subclass of int; int(True) is 1 and must not pass as an integer.
         # A non-integral float (1.5) must not be truncated by int().
         # RFC 7951 encodes int8..int32 and uint8..uint32 as JSON numbers (#63).
@@ -543,7 +543,7 @@ class TypeChecker:
                 return [_issue("range", f"Value {n} exceeds maximum {hi}")]
         return []
 
-    def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_decimal(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         # bool is a subclass of int; float(True) is 1.0 and must not pass as a number.
         # RFC decimal64 strings are decoded to Decimal before this check.
         from ..types.registry import DECIMAL64 as _DECIMAL64
@@ -575,24 +575,24 @@ class TypeChecker:
                     ]
         return []
 
-    def _one(self, issue: Optional[TypeIssue]) -> List[TypeIssue]:
+    def _one(self, issue: Optional[TypeIssue]) -> list[TypeIssue]:
         return [] if issue is None else [issue]
 
-    def _check_boolean(self, value: Any) -> List[TypeIssue]:
+    def _check_boolean(self, value: Any) -> list[TypeIssue]:
         return self._one(REGISTRY[BOOLEAN].check_value(value, make_type_stmt(name=BOOLEAN)))
 
-    def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         return self._one(REGISTRY[ENUMERATION].check_value(value, type_stmt))
 
-    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
         return self._one(REGISTRY[BITS].check_value(value, type_stmt))
 
-    def _check_empty(self, value: Any) -> List[TypeIssue]:
+    def _check_empty(self, value: Any) -> list[TypeIssue]:
         # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
         return self._one(REGISTRY[EMPTY].check_value(value, make_type_stmt(name=EMPTY)))
 
-    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
+    def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
         gate = REGISTRY[BINARY].check_value(value, type_stmt)
         if gate is not None:

@@ -2,7 +2,7 @@
 Path builder for YANG document validation.
 """
 
-from typing import List, Optional
+from typing import Optional
 
 
 def _json_pointer_token(token: str) -> str:
@@ -19,10 +19,10 @@ class PathBuilder:
     (``/entities/0``), which is what ``validate_detailed`` reports.
     """
 
-    def __init__(self, initial_segments: Optional[List[str]] = None) -> None:
-        self._segments: List[str] = list(initial_segments) if initial_segments else []
-        self._pointer_tokens: List[str] = [_json_pointer_token(s) for s in self._segments]
-        self._pointer_widths: List[int] = [1] * len(self._segments)
+    def __init__(self, initial_segments: Optional[list[str]] = None) -> None:
+        self._segments: list[str] = list(initial_segments) if initial_segments else []
+        self._pointer_tokens: list[str] = [_json_pointer_token(s) for s in self._segments]
+        self._pointer_widths: list[int] = [1] * len(self._segments)
 
     def push(
         self,
