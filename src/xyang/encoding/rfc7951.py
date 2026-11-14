@@ -7,7 +7,8 @@ is the YANG module name and ``node`` is a top-level data node in that module.
 
 from __future__ import annotations
 
-from typing import Any, Dict, Mapping, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Mapping
 
 from ..ast import YangStatement
 from ..module import YangModule
@@ -16,8 +17,8 @@ _STRUCTURE_INDEX_KEY = "ietf-yang-structure-ext:structure-index"
 
 
 def resolve_structure_instance(
-    data: Dict[str, Any], module: YangModule
-) -> Optional[Tuple[YangStatement, Dict[str, Any], str]]:
+    data: dict[str, Any], module: YangModule
+) -> Optional[tuple[YangStatement, dict[str, Any], str]]:
     """
     If *data* is a single object for a registered RFC 8791 structure in *module*,
     return ``(structure_schema, inner_object, json_key)``.
@@ -107,7 +108,7 @@ def instance_member_lookup(
 
 def resolve_qualified_top_level(
     member_key: str, modules: Mapping[str, YangModule]
-) -> Tuple[Optional[YangStatement], Optional[YangModule]]:
+) -> tuple[Optional[YangStatement], Optional[YangModule]]:
     """
     Resolve an RFC 7951 ``module-name:identifier`` member at the root of a JSON object
     (e.g. under ``anydata``) to a top-level schema statement and its defining module.

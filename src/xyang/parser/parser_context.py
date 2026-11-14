@@ -7,7 +7,7 @@ Token types follow the minimal YANG grammar (meta-model-grammar.ebnf).
 from enum import Enum
 from pathlib import Path
 from types import SimpleNamespace
-from typing import List, Tuple, Optional, TYPE_CHECKING, Union
+from typing import Optional, TYPE_CHECKING, Union
 from dataclasses import dataclass
 from ..errors import YangSyntaxError
 
@@ -56,7 +56,7 @@ class YangTokenType(Enum):
     # unquoted argument (RFC 7950 §6.1.3); a parse error anywhere else.
     OTHER = "OTHER"
 
-def diagnostic_source_lines(content: str) -> List[str]:
+def diagnostic_source_lines(content: str) -> list[str]:
     """Split source on newlines for error snippets (verbatim text, comments included)."""
     if not content:
         return []
@@ -85,7 +85,7 @@ class TokenStream:
 
     def __init__(
         self,
-        token_list: List[YangToken],
+        token_list: list[YangToken],
         source: str,
         filename: Optional[str] = None,
     ):
@@ -93,7 +93,7 @@ class TokenStream:
         self.tokens = [t.value for t in token_list]
         self.positions = [(t.line_num, t.char_pos) for t in token_list]
         self._source = source
-        self._diagnostic_lines: Optional[List[str]] = None
+        self._diagnostic_lines: Optional[list[str]] = None
         self.filename = filename
         self.index = 0
 
@@ -166,7 +166,7 @@ class TokenStream:
         """Check if there are more tokens."""
         return self.index < len(self.tokens)
 
-    def position(self) -> Tuple[int, int]:
+    def position(self) -> tuple[int, int]:
         """Get current position (line_num, char_pos)."""
         if self.index < len(self.positions):
             return self.positions[self.index]
@@ -174,7 +174,7 @@ class TokenStream:
             return self.positions[-1]
         return (1, 0)
 
-    def _diagnostic_lines_once(self) -> List[str]:
+    def _diagnostic_lines_once(self) -> list[str]:
         """Build per-line source text for errors (lazy, at most once per stream)."""
         if self._diagnostic_lines is None:
             self._diagnostic_lines = diagnostic_source_lines(self._source)

@@ -8,7 +8,7 @@ from __future__ import annotations
 
 import logging
 from pathlib import Path
-from typing import Optional, Tuple
+from typing import Optional
 
 from ..augment_expand import apply_augmentations, apply_deviations
 from ..errors import YangSyntaxError
@@ -30,7 +30,7 @@ class YangParser:
         self,
         *,
         expand_uses: bool = True,
-        include_path: Tuple[Path, ...] = (),
+        include_path: tuple[Path, ...] = (),
     ):
         """
         Args:
@@ -398,7 +398,7 @@ class YangParser:
 def parse_yang_file(
     file_path: str | Path,
     *,
-    include_path: Tuple[str, ...] = (),
+    include_path: tuple[str, ...] = (),
 ) -> YangModule:
     """Parse a YANG file and return a YangModule."""
     extras = tuple(Path(p) for p in include_path)
@@ -411,7 +411,7 @@ def parse_yang_string(
     *,
     filename: Optional[str] = None,
     source_path: str | Path | None = None,
-    include_path: Tuple[str, ...] = (),
+    include_path: tuple[str, ...] = (),
 ) -> YangModule:
     """Parse YANG content from a string and return a YangModule.
 

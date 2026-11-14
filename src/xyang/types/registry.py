@@ -12,7 +12,8 @@ from ..ast import make_type_stmt
 import contextvars
 from dataclasses import dataclass
 from types import MappingProxyType
-from typing import Any, Callable, Mapping, Optional
+from typing import Any, Optional
+from collections.abc import Callable, Mapping
 
 from ..ast import YangBitStmt, YangPatternSpec, YangTypeStmt
 from ..errors import YangExportError

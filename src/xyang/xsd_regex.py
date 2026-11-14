@@ -17,11 +17,10 @@ import re
 import sys
 import unicodedata
 from functools import lru_cache
-from typing import Dict, List, Tuple
 
 from .errors import YangSemanticError
 
-Ranges = List[Tuple[int, int]]
+Ranges = list[tuple[int, int]]
 
 MAX_CP = sys.maxunicode
 
@@ -88,9 +87,9 @@ def _complement(ranges: Ranges) -> Ranges:
 
 
 @lru_cache(maxsize=1)
-def _category_table() -> Dict[str, Ranges]:
+def _category_table() -> dict[str, Ranges]:
     """Code point ranges per two-letter general category, built once."""
-    table: Dict[str, Ranges] = {}
+    table: dict[str, Ranges] = {}
     start = 0
     current = unicodedata.category(chr(0))
     for cp in range(1, MAX_CP + 1):
@@ -103,7 +102,7 @@ def _category_table() -> Dict[str, Ranges]:
 
 
 @lru_cache(maxsize=None)
-def _category_ranges(name: str) -> Tuple[Tuple[int, int], ...]:
+def _category_ranges(name: str) -> tuple[tuple[int, int], ...]:
     table = _category_table()
     subs = GENERAL_CATEGORIES.get(name, (name,))
     ranges: Ranges = []
@@ -132,7 +131,7 @@ class _Translator:
         i = self.pos + offset
         return self.src[i] if i < len(self.src) else ""
 
-    def escape_ranges(self) -> Tuple[Ranges, bool]:
+    def escape_ranges(self) -> tuple[Ranges, bool]:
         """Parse an escape at ``pos`` (after ``\\``) into ranges; second item is "negated"."""
         ch = self.peek()
         if not ch:
@@ -221,7 +220,7 @@ class _Translator:
         return f"[{_render(ranges)}]" if ranges else "(?!)"
 
     def translate(self) -> str:
-        out: List[str] = []
+        out: list[str] = []
         while self.pos < len(self.src):
             ch = self.peek()
             if ch == "\\":

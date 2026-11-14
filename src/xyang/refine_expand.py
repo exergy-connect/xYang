@@ -4,7 +4,8 @@ from __future__ import annotations
 
 import logging
 from dataclasses import replace
-from typing import Callable, cast
+from typing import cast
+from collections.abc import Callable
 
 from .errors import YangRefineTargetNotFoundError
 from .xpath.ast import PathNode

@@ -8,7 +8,8 @@ import json
 import sys
 import textwrap
 from pathlib import Path
-from typing import Any, Dict, Iterable
+from typing import Any
+from collections.abc import Iterable
 
 from xyang.errors import YangExportError, YangSemanticError, YangSyntaxError
 
@@ -69,7 +70,7 @@ def _load_anydata_module_map(
     host_module: Any,
     include_path: tuple[str, ...],
     extra_module_paths: list[Path],
-) -> Dict[str, Any]:
+) -> dict[str, Any]:
     """Build ``module-name -> YangModule`` for anydata subtree validation."""
     from xyang.augment_expand import (
         apply_augmentations_across_module_map,
@@ -78,7 +79,7 @@ def _load_anydata_module_map(
     from xyang.module import YangModule
     from xyang.parser import YangParser
 
-    modules: Dict[str, YangModule] = {}
+    modules: dict[str, YangModule] = {}
     register_module_closure(modules, host_module)
 
     if extra_module_paths:

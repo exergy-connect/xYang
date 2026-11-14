@@ -8,7 +8,7 @@ ctx and node follow the same contract as evaluator methods.
 from __future__ import annotations
 
 from collections.abc import Callable
-from typing import TYPE_CHECKING, Any, List
+from typing import TYPE_CHECKING, Any
 
 from ..errors import UnsupportedXPathError, XPathEvaluationError
 from .ast import FunctionCallNode
@@ -171,7 +171,7 @@ def f_deref(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Nod
 
     from .schema_nav import SchemaNav
 
-    results: List[Node] = []
+    results: list[Node] = []
     for src in source_nodes:
         leafref_path = SchemaNav.leafref_path(src.schema)
         if leafref_path is None:

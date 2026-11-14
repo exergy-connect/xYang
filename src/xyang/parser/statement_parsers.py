@@ -10,7 +10,8 @@ from . import keywords as kw
 from .dispatch_registry import DISPATCH_REGISTRY
 
 from types import SimpleNamespace
-from typing import Any, Callable, Optional, TYPE_CHECKING, cast
+from typing import Any, Optional, TYPE_CHECKING, cast
+from collections.abc import Callable
 from .parser_context import TokenStream, ParserContext, YangTokenType
 from .statements.anydata import AnydataStatementParser
 from .statements.anyxml import AnyxmlStatementParser

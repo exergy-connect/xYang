@@ -9,7 +9,8 @@ from __future__ import annotations
 
 import copy
 import re
-from typing import Callable, Dict, List, Optional
+from typing import Optional
+from collections.abc import Callable
 
 from .ast import (
     YangAugmentStmt,
@@ -40,7 +41,7 @@ from .uses_expand import (
 )
 
 
-def _path_segments_from_augment(aug: YangAugmentStmt, path: str) -> List[YangIdentifierRef]:
+def _path_segments_from_augment(aug: YangAugmentStmt, path: str) -> list[YangIdentifierRef]:
     stored = aug.augment_path_segments
     if stored:
         return stored
@@ -114,7 +115,7 @@ def _walk_absolute_schema_path(
     path: str,
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
-    segments: List[YangIdentifierRef] | None = None,
+    segments: list[YangIdentifierRef] | None = None,
     file: str | None = None,
 ) -> tuple[YangStatementList, YangStatement]:
     """Resolve ``/prefix:name/...`` to ``(parent, target)``.
@@ -178,7 +179,7 @@ def resolve_absolute_schema_path(
     path: str,
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
-    segments: List[YangIdentifierRef] | None = None,
+    segments: list[YangIdentifierRef] | None = None,
     file: str | None = None,
 ) -> YangStatement:
     """Resolve absolute ``/prefix:name/...`` path into a target schema node.
@@ -276,7 +277,7 @@ def _drop_child_at(parent: YangStatementList, slot: tuple[str, int]) -> None:
 
 
 def _copied_path_to_target(
-    module: YangModule, segments: List[YangIdentifierRef]
+    module: YangModule, segments: list[YangIdentifierRef]
 ) -> tuple[YangStatementList, tuple[str, int]]:
     """Copy the ancestors of the node *segments* name in a module copy.
 
@@ -303,7 +304,7 @@ def _copied_path_to_target(
 def _private_target_module(
     root: YangModule,
     owner: YangModule,
-    copies: Dict[int, YangModule],
+    copies: dict[int, YangModule],
 ) -> YangModule:
     """Return a module this build may edit. Cached imports are copied once."""
     if owner is root:
@@ -329,7 +330,7 @@ def _private_target_module(
 def _deviation_target(
     root: YangModule,
     dev: YangDeviationStmt,
-    copies: Dict[int, YangModule],
+    copies: dict[int, YangModule],
 ) -> tuple[YangStatementList, tuple[str, int], bool]:
     """Resolve *dev*'s target to ``(parent, slot, foreign)`` in a tree this build may edit.
 
@@ -532,7 +533,7 @@ def _apply_deviate(node: YangStatement, deviate: YangDeviateStmt) -> None:
 def _apply_deviation(
     root: YangModule,
     dev: YangDeviationStmt,
-    copies: Dict[int, YangModule],
+    copies: dict[int, YangModule],
 ) -> None:
     parent, slot, foreign = _deviation_target(root, dev, copies)
     node = _child_at(parent, slot)
@@ -562,7 +563,7 @@ def apply_deviations(root: YangModule) -> None:
     object in the parser cache is left unchanged.
     """
     pending = [s for s in root.statements if isinstance(s, YangDeviationStmt)]
-    copies: Dict[int, YangModule] = {}
+    copies: dict[int, YangModule] = {}
     for dev in pending:
         _apply_deviation(root, dev, copies)
     if pending:
@@ -603,14 +604,14 @@ def _merge_augment_into_target(
             tlist.statements.append(c)
 
 
-def register_module_closure(modules: Dict[str, YangModule], mod: YangModule) -> None:
+def register_module_closure(modules: dict[str, YangModule], mod: YangModule) -> None:
     """Register *mod* and every module reachable via ``import`` (RFC 7950 import closure)."""
     modules[mod.name] = mod
     for imported in mod.import_prefixes.values():
         register_module_closure(modules, imported)
 
 
-def apply_augmentations_across_module_map(modules: Dict[str, YangModule]) -> None:
+def apply_augmentations_across_module_map(modules: dict[str, YangModule]) -> None:
     """
     Apply every top-level ``augment`` still present in any module in *modules*.
 

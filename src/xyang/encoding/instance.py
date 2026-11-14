@@ -9,7 +9,8 @@ from __future__ import annotations
 import re
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
-from typing import Any, Iterator, Optional
+from typing import Any, Optional
+from collections.abc import Iterator
 
 from ..ast import (
     YangAnydataStmt,
