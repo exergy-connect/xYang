@@ -147,9 +147,13 @@ for (const dir of await nativeForms(new URL("../../tests/cases/", import.meta.ur
   const validator = await createValidator(bytes);
   validator.loadModel(await readFile(new URL("expected.yang.json", dir), "utf8"));
   for (const item of spec.instances) {
-    assert.equal(item.rpc ?? item.action ?? item.context, undefined);
     test(`${dir.pathname.split("/").at(-2)}: ${item.name}`, () => {
-      const result = validator.validate(JSON.stringify(item.data));
+      const options = {};
+      for (const key of ["rpc", "action", "direction"]) {
+        if (key in item) options[key] = item[key];
+      }
+      if ("context" in item) options.context = JSON.stringify(item.context);
+      const result = validator.validate(JSON.stringify(item.data), options);
       assertResult(result, item);
     });
   }

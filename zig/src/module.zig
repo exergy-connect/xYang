@@ -37,6 +37,7 @@ pub const Module = struct {
     foreign_structure_slots: std.ArrayList(usize) = .empty,
     /// Set when `belongs-to` was parsed (this is a submodule).
     is_submodule: bool = false,
+    included_parent: ?*Module = null,
 
     /// `own_prefix_stripped()`.
     pub fn ownPrefix(self: *const Module) []const u8 {
@@ -74,10 +75,22 @@ pub const Module = struct {
 pub const ResolvedTypedef = struct { typedef: *ast.Statement, module: *Module };
 
 pub fn resolveTypedef(type_stmt: *const ast.TypeStmt, fallback: ?*Module) ?ResolvedTypedef {
-    const scope = type_stmt.scope orelse fallback orelse return null;
+    var scope = type_stmt.scope orelse fallback orelse return null;
+    while (scope.included_parent) |parent| scope = parent;
     const target = if (type_stmt.prefix) |pre| scope.resolvePrefixedModule(pre) orelse return null else scope;
-    const td = target.typedefs.get(type_stmt.name) orelse return null;
-    return .{ .typedef = td, .module = target };
+    const scopes = @import("typedef_scope.zig");
+    const context = type_stmt.context orelse "";
+    if (target.typedefs.get(type_stmt.name)) |td| {
+        if (if (type_stmt.prefix != null) td.data.typedef.scope == null else scopes.inScope(td.data.typedef.scope, context))
+            return .{ .typedef = td, .module = target };
+        return null;
+    }
+    for (target.typedefs.values()) |td| {
+        if (!std.mem.eql(u8, td.name, type_stmt.name)) continue;
+        if (if (type_stmt.prefix != null) td.data.typedef.scope == null else scopes.inScope(td.data.typedef.scope, context))
+            return .{ .typedef = td, .module = target };
+    }
+    return null;
 }
 
 test "prefixes resolve to the module and to imports" {

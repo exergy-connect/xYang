@@ -23,13 +23,8 @@ const Ctx = struct {
     expanding_chain: []const []const u8 = &.{},
     refines: *StatementList,
     refine_path_prefix: []const u8 = "",
-    typedef_target: ?*Module = null,
     /// Groupings in lexical scope (a container and its descendants), shadowing the module.
     local_groupings: ?*const Groupings = null,
-
-    fn regModule(c: Ctx) *Module {
-        return c.typedef_target orelse c.module;
-    }
 
     fn child(c: Ctx, prefix: []const u8, local: ?*const Groupings) Ctx {
         return .{
@@ -37,7 +32,6 @@ const Ctx = struct {
             .expanding_chain = c.expanding_chain,
             .refines = c.refines,
             .refine_path_prefix = prefix,
-            .typedef_target = c.regModule(),
             .local_groupings = local,
         };
     }
@@ -48,25 +42,7 @@ fn extendRefinePath(a: std.mem.Allocator, prefix: []const u8, segment: []const u
     return std.fmt.allocPrint(a, "{s}/{s}", .{ prefix, segment });
 }
 
-/// Expose a grouping typedef on the module where `uses` is expanded (RFC 7950 scoping).
-fn registerTypedefForUses(r: *Reporter, target: *Module, source: *Module, td: *Statement) Error!void {
-    if (target.typedefs.contains(td.name)) return;
-    const resolved = source.typedefs.get(td.name) orelse td;
-    if (target == source) return target.typedefs.put(r.arena, td.name, resolved);
-    try target.typedefs.put(r.arena, td.name, try refine_expand.copyStatement(r, resolved));
-}
-
-fn registerGroupingTypedefs(r: *Reporter, target: *Module, source: *Module, grouping: *Statement) Error!void {
-    for (grouping.data.grouping.typedef_names.items) |name| {
-        if (source.typedefs.get(name)) |td| try registerTypedefForUses(r, target, source, td);
-    }
-    for (grouping.statements.items) |s| {
-        if (s.kind() == .typedef) try registerTypedefForUses(r, target, source, s);
-    }
-}
-
-fn groupingBodyWithoutTypedefs(r: *Reporter, target: *Module, source: *Module, grouping: *Statement) Error!StatementList {
-    try registerGroupingTypedefs(r, target, source, grouping);
+fn groupingBodyWithoutTypedefs(r: *Reporter, grouping: *Statement) Error!StatementList {
     var out: StatementList = .empty;
     for (grouping.statements.items) |s| {
         if (s.kind() != .typedef) try out.append(r.arena, try refine_expand.copyStatement(r, s));
@@ -200,7 +176,7 @@ fn expandOneUses(r: *Reporter, s: *Statement, ctx: Ctx) Error!StatementList {
         return r.fail(.semantic, "Circular uses chain: groupings are expanded at compile-time and this cycle would not terminate ({s} -> {s}). Restructure groupings to break the cycle.", .{ cycle, resolved.qname });
     }
     const chain = try std.mem.concat(a, []const u8, &.{ ctx.expanding_chain, &.{resolved.qname} });
-    const body = try groupingBodyWithoutTypedefs(r, ctx.module, resolved.module, resolved.grouping);
+    const body = try groupingBodyWithoutTypedefs(r, resolved.grouping);
     try mergeIfFeaturesIntoRoots(a, body.items, s.if_features.items);
     try mergeWhenIntoRoots(a, body.items, s.when);
     var pending = try s.data.uses.refines.clone(a);
@@ -209,7 +185,6 @@ fn expandOneUses(r: *Reporter, s: *Statement, ctx: Ctx) Error!StatementList {
         .expanding_chain = chain,
         .refines = &pending,
         .refine_path_prefix = if (ctx.refines.items.len > 0) ctx.refine_path_prefix else "",
-        .typedef_target = ctx.module,
         .local_groupings = ctx.local_groupings,
     };
     const out = try expandUsesInStatements(r, body.items, inner);
@@ -234,7 +209,7 @@ pub fn expandUsesInStatementsOf(r: *Reporter, module: *Module, statements: []con
     return expandUsesInStatements(r, statements, .{ .module = module, .refines = &refines });
 }
 
-/// `expand_uses_in_statements`. Nested typedefs register on `ctx.typedef_target` when set.
+/// `expand_uses_in_statements`. Typedefs retain their declaration module and context.
 fn expandUsesInStatements(r: *Reporter, statements: []const *Statement, ctx: Ctx) Error!StatementList {
     const a = r.arena;
     var expanded: StatementList = .empty;
@@ -247,13 +222,7 @@ fn expandUsesInStatements(r: *Reporter, statements: []const *Statement, ctx: Ctx
                 const again = try expandUsesInStatements(r, body.items, ctx.child(stmt_path, ctx.local_groupings));
                 try expanded.appendSlice(a, again.items);
             },
-            .typedef => {
-                if (ctx.typedef_target != null) {
-                    try registerTypedefForUses(r, ctx.regModule(), ctx.module, s);
-                } else {
-                    try expanded.append(a, s);
-                }
-            },
+            .typedef => try expanded.append(a, s),
             .choice => |*c| {
                 for (c.cases.items) |case| {
                     const case_prefix = try extendRefinePath(a, stmt_path, case.name);

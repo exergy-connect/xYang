@@ -1,0 +1,6 @@
+module m {
+  yang-version 1.1; namespace "urn:m"; prefix m;
+  import provider { prefix p; }
+  typedef code { type boolean; }
+  container top { uses p:g; leaf own { type code; } }
+}

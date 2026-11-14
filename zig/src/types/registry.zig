@@ -125,12 +125,12 @@ fn emptyCheck(a: Allocator, _: *const Builtin, value: Val, _: *const ast.TypeStm
 }
 
 fn enumerationCheck(a: Allocator, _: *const Builtin, value: Val, t: *const ast.TypeStmt) error{OutOfMemory}!?Issue {
-    if (t.enums.items.len == 0) {
+    if (t.enums().len == 0) {
         return issue(a, "enum", "enumeration type has no enum definitions in schema; cannot validate instance data", .{});
     }
     const text = try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(value)});
-    for (t.enums.items) |e| if (std.mem.eql(u8, e, text)) return null;
-    const allowed = try std.mem.join(a, ", ", t.enums.items);
+    for (t.enums()) |e| if (std.mem.eql(u8, e, text)) return null;
+    const allowed = try std.mem.join(a, ", ", t.enums());
     return issue(a, "enum", "Value {f} is not one of the allowed enum values: {s}", .{ jv.pyRepr(value), allowed });
 }
 
@@ -139,18 +139,18 @@ fn bitsCheck(a: Allocator, _: *const Builtin, value: Val, t: *const ast.TypeStmt
         .string => |s| s,
         else => return issue(a, "bits", "bits value must be a string (space-sep bit names), got {s}", .{jv.typeName(value)}),
     };
-    if (t.bits.items.len == 0) return issue(a, "bits", "bits type has no bit definitions", .{});
+    if (t.bits().len == 0) return issue(a, "bits", "bits type has no bit definitions", .{});
     var seen: std.StringHashMapUnmanaged(void) = .empty;
     var it = pyWhitespaceSplit(s);
     while (it.next()) |token| {
         if (seen.contains(token)) return issue(a, "bits", "Duplicate bit {f} in bits value", .{pyfmt.repr(token)});
         try seen.put(a, token, {});
-        const known = for (t.bits.items) |b| {
+        const known = for (t.bits()) |b| {
             if (std.mem.eql(u8, b.name, token)) break true;
         } else false;
         if (!known) {
             var names: std.ArrayList([]const u8) = .empty;
-            for (t.bits.items) |b| {
+            for (t.bits()) |b| {
                 const dup = for (names.items) |n| {
                     if (std.mem.eql(u8, n, b.name)) break true;
                 } else false;
@@ -242,7 +242,7 @@ fn anchored(a: Allocator, p: []const u8) error{OutOfMemory}![]const u8 {
 fn toString(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     const out = try typeOnly(a, "string");
-    const specs = t.patterns.items;
+    const specs = t.patterns();
     if (specs.len == 1 and !specs[0].invert_match) {
         if (specs[0].pattern.len > 0) try out.put(a, K.PATTERN, gen.str(try anchored(a, specs[0].pattern)));
     } else if (specs.len > 0) {
@@ -262,7 +262,7 @@ fn toString(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*O
         }
         if (all_of.items.len > 0) try out.put(a, K.ALL_OF, .{ .array = all_of.items });
     }
-    if (t.length) |length| if (length.len > 0) {
+    if (t.lengthRestriction().expression) |length| if (length.len > 0) {
         var parts = std.mem.splitSequence(u8, length, "..");
         const first = gen.pyStrip(parts.first());
         const second = if (parts.next()) |p| gen.pyStrip(p) else null;
@@ -294,7 +294,7 @@ fn toString(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*O
 fn toEnumeration(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     const out = try typeOnly(a, "string");
-    if (t.enums.items.len > 0) try out.put(a, K.ENUM, try gen.strList(a, t.enums.items));
+    if (t.enums().len > 0) try out.put(a, K.ENUM, try gen.strList(a, t.enums()));
     return out;
 }
 
@@ -331,8 +331,8 @@ fn bitLess(_: void, x: ast.BitStmt, y: ast.BitStmt) bool {
 
 fn toBits(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
-    if (t.bits.items.len == 0) return typeOnly(a, "string");
-    const ordered = try a.dupe(ast.BitStmt, t.bits.items);
+    if (t.bits().len == 0) return typeOnly(a, "string");
+    const ordered = try a.dupe(ast.BitStmt, t.bits());
     std.mem.sort(ast.BitStmt, ordered, {}, bitLess);
     const bits_obj = try obj(a);
     const names = try a.alloc([]const u8, ordered.len);
@@ -367,12 +367,12 @@ fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
         try out.put(a, K.PATTERN, gen.str(b.pattern.?));
         const xy = try obj(a);
         try xy.put(a, K.xy.TYPE, gen.str(b.name));
-        if (t.range) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+        if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
         try out.put(a, K.X_YANG, gen.objVal(xy));
         return out;
     }
     const out = try typeOnly(a, "integer");
-    const bounds = jsonIntegerBounds(b.name, t.range);
+    const bounds = jsonIntegerBounds(b.name, t.rangeRestriction().expression);
     if (bounds[0]) |lo| try out.put(a, K.MINIMUM, .{ .int = lo });
     if (bounds[1]) |hi| try out.put(a, K.MAXIMUM, .{ .int = hi });
     return out;
@@ -384,8 +384,8 @@ fn toDecimal(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
     try out.put(a, K.PATTERN, gen.str(b.pattern.?));
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(DECIMAL64));
-    if (t.fraction_digits) |fd| try xy.put(a, K.xy.FRACTION_DIGITS, .{ .int = fd });
-    if (t.range) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+    if (t.fractionDigits()) |fd| try xy.put(a, K.xy.FRACTION_DIGITS, .{ .int = fd });
+    if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }
@@ -398,9 +398,9 @@ fn toEmpty(e: gen.Emit, _: *const Builtin, _: *const ast.TypeStmt) gen.Error!*Ob
 
 fn toUnion(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
-    if (t.types.items.len == 0) return typeOnly(a, "string");
-    const members = try a.alloc(Val, t.types.items.len);
-    for (t.types.items, 0..) |m, i| members[i] = gen.objVal(try gen.typeToSchema(e.g, m, e.typedef_names, e.module, e.anchor));
+    if (t.members().len == 0) return typeOnly(a, "string");
+    const members = try a.alloc(Val, t.members().len);
+    for (t.members(), 0..) |m, i| members[i] = gen.objVal(try gen.typeToSchema(e.g, m, e.typedef_names, e.module, e.anchor));
     const out = try obj(a);
     try out.put(a, K.ONE_OF, .{ .array = members });
     return out;
@@ -409,7 +409,7 @@ fn toUnion(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Ob
 fn toIdentityref(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     const scope = t.scope orelse e.module;
-    const bases = t.identityref_bases.items;
+    const bases = t.identityBases();
     if (bases.len == 0) return typeOnly(a, "string");
     const exported = try a.alloc([2][]const u8, bases.len);
     for (bases, 0..) |base, i| exported[i] = try gen.identityBaseForJson(e.g, base, scope, e.module);
@@ -447,8 +447,8 @@ fn toLeafref(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(LEAFREF));
     try xy.put(a, K.xy.PATH, gen.str(path));
-    try xy.put(a, K.xy.REQUIRE_INSTANCE, .{ .bool = t.require_instance });
-    try gen.withXpathPrefixes(a, xy, t.path_ast);
+    try xy.put(a, K.xy.REQUIRE_INSTANCE, .{ .bool = t.requireInstance() });
+    try gen.withXpathPrefixes(a, xy, t.pathAst());
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }
@@ -458,7 +458,7 @@ fn toInstanceIdentifier(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) 
     const out = try typeOnly(a, "string");
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(K.types.INSTANCE_IDENTIFIER));
-    try xy.put(a, K.xy.REQUIRE_INSTANCE, .{ .bool = t.require_instance });
+    try xy.put(a, K.xy.REQUIRE_INSTANCE, .{ .bool = t.requireInstance() });
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }
@@ -466,10 +466,13 @@ fn toInstanceIdentifier(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) 
 /// `type_to_schema`: a typedef name becomes `$ref`; a built-in is encoded by its entry;
 /// anything else is a typedef of another module, inlined.
 pub fn typeToSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object {
+    if (try gen.scopedTypeSchema(e, t)) |schema| return schema;
     const prefixed = if (t.prefix) |p| p.len > 0 else false;
-    if (!prefixed and e.typedef_names.contains(t.name)) {
+    const resolved = module_mod.resolveTypedef(t, e.module);
+    const local = e.module.typedefs.get(t.name);
+    if (!prefixed and e.typedef_names.contains(t.name) and resolved != null and local != null and resolved.?.typedef == local.?) {
         const o = try obj(e.g.a);
-        try o.put(e.g.a, K.REF, gen.str(try std.fmt.allocPrint(e.g.a, "{s}{s}", .{ K.DEFS_URI_PREFIX, t.name })));
+        try o.put(e.g.a, K.REF, gen.str(try @import("../typedef_scope.zig").defsUri(e.g.a, t.name)));
         return o;
     }
     const spec = get(t.name);
@@ -484,7 +487,7 @@ fn importedTypedefSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object 
     const resolved = module_mod.resolveTypedef(t, e.module);
     const td_type: ?*ast.TypeStmt = if (resolved) |r| r.typedef.data.typedef.type else null;
     if (resolved == null or td_type == null) return e.g.fail("cannot export type {f}: its typedef is not found where the type is written", .{pyfmt.repr(label)});
-    const restricted = (if (t.range) |r| r.len > 0 else false) or (if (t.length) |l| l.len > 0 else false) or t.patterns.items.len > 0;
+    const restricted = (if (t.rangeRestriction().expression) |r| r.len > 0 else false) or (if (t.lengthRestriction().expression) |l| l.len > 0 else false) or t.patterns().len > 0;
     if (restricted) return e.g.fail("cannot export restrictions on the imported typedef {f} in the native JSON form", .{pyfmt.repr(label)});
     const none: gen.Names = .empty;
     return typeToSchema(.{ .g = e.g, .typedef_names = &none, .module = resolved.?.module, .anchor = e.anchor }, td_type.?);
@@ -527,7 +530,7 @@ fn isStr(v: ?Val, s: []const u8) bool {
 
 fn newType(p: *jparse.Parse, name: []const u8) error{OutOfMemory}!*ast.TypeStmt {
     const t = try p.a.create(ast.TypeStmt);
-    t.* = .{ .name = name };
+    t.* = ast.TypeStmt.init(name, null);
     return t;
 }
 
@@ -579,7 +582,7 @@ fn integerFromBounds(a: Allocator, min: ?Val, max: ?Val) error{OutOfMemory}!stru
 fn integerFromFragment(p: *jparse.Parse, f: Fragment) jparse.Error!*ast.TypeStmt {
     const r = try integerFromBounds(p.a, f.schema.get(K.MINIMUM), f.schema.get(K.MAXIMUM));
     const t = try newType(p, r.name);
-    if (r.range) |range| t.range = range;
+    if (r.range) |range| (try t.ensureRange(p.a)).expression = range;
     return t;
 }
 
@@ -594,7 +597,7 @@ fn fromQuotedInteger(p: *jparse.Parse, b: *const Builtin, f: Fragment) jparse.Er
     if (!isStr(f.xyang.get(K.xy.TYPE), b.name)) return null;
     const t = try newType(p, b.name);
     if (f.xyang.get(K.xy.RANGE)) |r| if (r == .string and r.string.len > 0) {
-        t.range = r.string;
+        (try t.ensureRange(p.a)).expression = r.string;
     };
     return t;
 }
@@ -604,10 +607,10 @@ fn fromDecimal(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*
     if (isStr(kind, "string") and isStr(f.xyang.get(K.xy.TYPE), DECIMAL64)) {
         const t = try newType(p, DECIMAL64);
         if (f.xyang.get(K.xy.RANGE)) |r| if (r == .string and r.string.len > 0) {
-            t.range = r.string;
+            (try t.ensureRange(p.a)).expression = r.string;
         };
         if (f.xyang.get(K.xy.FRACTION_DIGITS)) |fd| if (fd == .int) {
-            t.fraction_digits = std.math.cast(i64, fd.int) orelse return p.fail("fraction-digits {d} is out of range", .{fd.int});
+            (try t.ensure(.decimal, p.a)).fraction_digits = std.math.cast(i64, fd.int) orelse return p.fail("fraction-digits {d} is out of range", .{fd.int});
         };
         return t;
     }
@@ -619,16 +622,16 @@ fn fromDecimal(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*
         else => null,
     } else null;
     if (legacy != null and legacy.? > 0) {
-        t.fraction_digits = std.math.cast(i64, legacy.?) orelse return p.fail("x-fraction-digits {d} is out of range", .{legacy.?});
+        (try t.ensure(.decimal, p.a)).fraction_digits = std.math.cast(i64, legacy.?) orelse return p.fail("x-fraction-digits {d} is out of range", .{legacy.?});
     } else if (try jparse.fractionDigitsFromMultipleOf(p.a, f.schema.get(K.MULTIPLE_OF))) |fd| {
-        t.fraction_digits = fd;
+        (try t.ensure(.decimal, p.a)).fraction_digits = fd;
     }
     const min = f.schema.get(K.MINIMUM);
     const max = f.schema.get(K.MAXIMUM);
     if ((min != null and min.? != .null) or (max != null and max.? != .null)) {
-        const lo = if (min == null or min.? == .null) "min" else try jparse.formatDecimal64Bound(p.a, min.?, t.fraction_digits);
-        const hi = if (max == null or max.? == .null) "max" else try jparse.formatDecimal64Bound(p.a, max.?, t.fraction_digits);
-        t.range = try std.fmt.allocPrint(p.a, "{s}..{s}", .{ lo, hi });
+        const lo = if (min == null or min.? == .null) "min" else try jparse.formatDecimal64Bound(p.a, min.?, t.fractionDigits());
+        const hi = if (max == null or max.? == .null) "max" else try jparse.formatDecimal64Bound(p.a, max.?, t.fractionDigits());
+        (try t.ensureRange(p.a)).expression = try std.fmt.allocPrint(p.a, "{s}..{s}", .{ lo, hi });
     }
     return t;
 }
@@ -658,7 +661,7 @@ fn fromEnumeration(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Erro
     const items: []const Val = if (raw == .array) raw.array else &.{};
     if (items.len <= 1) return null;
     const t = try newType(p, ENUMERATION);
-    t.enums = try enumStrings(p, items);
+    (try t.ensureEnums(p.a)).* = try enumStrings(p, items);
     return t;
 }
 
@@ -702,18 +705,18 @@ fn fromBits(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast
     }
     if (bits.items.len == 0) return null;
     const t = try newType(p, BITS);
-    t.bits = bits;
+    (try t.ensureBits(p.a)).* = bits;
     return t;
 }
 
 fn fromLeafref(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     if (!isStr(f.xyang.get(K.xy.TYPE), LEAFREF)) return null;
     const t = try newType(p, LEAFREF);
-    t.require_instance = if (f.xyang.get(K.xy.REQUIRE_INSTANCE)) |r| xutils.valBool(r) else true;
+    (try t.ensure(.leafref, p.a)).require_instance = if (f.xyang.get(K.xy.REQUIRE_INSTANCE)) |r| xutils.valBool(r) else true;
     if (f.xyang.get(K.xy.PATH)) |pv| if (pv == .string and gen.pyStrip(pv.string).len > 0) {
         const text = gen.pyStrip(pv.string);
-        t.path = text;
-        t.path_ast = try p.leafrefPath(text, f.xyang.get(K.xy.XPATH_PREFIXES));
+        (try t.ensure(.leafref, p.a)).path = text;
+        (try t.ensure(.leafref, p.a)).path_ast = try p.leafrefPath(text, f.xyang.get(K.xy.XPATH_PREFIXES));
     };
     return t;
 }
@@ -721,9 +724,9 @@ fn fromLeafref(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*
 fn fromIdentityref(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     if (!isStr(f.xyang.get(K.xy.TYPE), K.types.IDENTITYREF)) return null;
     const t = try newType(p, IDENTITYREF);
-    t.identityref_bases = try jparse.basesFromJson(p.a, f.xyang.get(K.xy.BASES));
-    if (t.identityref_bases.items.len == 0) {
-        if (f.xyang.get(K.xy.BASE)) |b| if (b == .string) if (jparse.coerceIdentifierRef(b)) |ref| try t.identityref_bases.append(p.a, ref);
+    (try t.ensureIdentityBases(p.a)).* = try jparse.basesFromJson(p.a, f.xyang.get(K.xy.BASES));
+    if (t.identityBases().len == 0) {
+        if (f.xyang.get(K.xy.BASE)) |b| if (b == .string) if (jparse.coerceIdentifierRef(b)) |ref| try (try t.ensureIdentityBases(p.a)).append(p.a, ref);
     }
     return t;
 }
@@ -731,7 +734,7 @@ fn fromIdentityref(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Erro
 fn fromInstanceIdentifier(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     if (!isStr(f.xyang.get(K.xy.TYPE), K.types.INSTANCE_IDENTIFIER)) return null;
     const t = try newType(p, INSTANCE_IDENTIFIER);
-    t.require_instance = if (f.xyang.get(K.xy.REQUIRE_INSTANCE)) |r| xutils.valBool(r) else true;
+    (try t.ensure(.instance_identifier, p.a)).require_instance = if (f.xyang.get(K.xy.REQUIRE_INSTANCE)) |r| xutils.valBool(r) else true;
     return t;
 }
 
@@ -745,7 +748,7 @@ fn fromUnion(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*as
     };
     if (members.items.len == 0) return null;
     const t = try newType(p, UNION);
-    t.types = members;
+    (try t.ensureMembers(p.a)).* = members;
     return t;
 }
 
@@ -764,16 +767,16 @@ fn fromString(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*a
     const has_min = min_len != null and min_len.? != .null;
     const has_max = max_len != null and max_len.? != .null;
     if (has_min and has_max) {
-        t.length = try std.fmt.allocPrint(p.a, "{f}..{f}", .{ jv.pyStr(min_len.?), jv.pyStr(max_len.?) });
+        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "{f}..{f}", .{ jv.pyStr(min_len.?), jv.pyStr(max_len.?) });
     } else if (has_max) {
-        t.length = try std.fmt.allocPrint(p.a, "0..{f}", .{jv.pyStr(max_len.?)});
+        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "0..{f}", .{jv.pyStr(max_len.?)});
     } else if (has_min) {
-        t.length = try std.fmt.allocPrint(p.a, "{f}..", .{jv.pyStr(min_len.?)});
+        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "{f}..", .{jv.pyStr(min_len.?)});
     }
     const merged = try jparse.mergeSchemaXyang(p.a, f.schema, f.xyang);
     const meta = jparse.patternMetadata(merged);
     try jparse.applyStringPatternEntries(p, t, merged);
-    if (t.patterns.items.len == 0) if (raw_pat) |pat| try t.patterns.append(p.a, try p.patternSpec(pat, false, meta[0], meta[1]));
+    if (t.patterns().len == 0) if (raw_pat) |pat| try (try t.ensurePatterns(p.a)).append(p.a, try p.patternSpec(pat, false, meta[0], meta[1]));
     return t;
 }
 
@@ -787,7 +790,7 @@ fn singletonEnumString(p: *jparse.Parse, f: Fragment) jparse.Error!?*ast.TypeStm
     const merged = try jparse.mergeSchemaXyang(p.a, f.schema, f.xyang);
     const meta = jparse.patternMetadata(merged);
     try jparse.applyStringPatternEntries(p, t, merged);
-    if (t.patterns.items.len == 0) try t.patterns.append(p.a, try p.patternSpec(pattern, false, meta[0], meta[1]));
+    if (t.patterns().len == 0) try (try t.ensurePatterns(p.a)).append(p.a, try p.patternSpec(pattern, false, meta[0], meta[1]));
     return t;
 }
 
@@ -798,7 +801,7 @@ pub fn typeStmtFromSchema(p: *jparse.Parse, defs: *const Object, schema: *const 
         if (try get(n).?.fromSchema(p, f)) |t| return t;
     }
     if (schema.get(K.REF)) |ref| if (ref == .string and ref.string.len > 0) {
-        if (jparse.refToTypedefName(ref.string)) |name| if (name.len > 0) return try newType(p, name);
+        if (try jparse.refToTypedefName(p, ref.string)) |name| if (name.len > 0) return try newType(p, name);
     };
     if (try get(ENUMERATION).?.fromSchema(p, f)) |t| return t;
     if (try singletonEnumString(p, f)) |t| return t;
@@ -821,6 +824,20 @@ pub fn typeStmtFromSchema(p: *jparse.Parse, defs: *const Object, schema: *const 
 pub fn isStringNumber(name: []const u8) bool {
     const b = get(name) orelse return false;
     return b.json_encoding == .@"string-number";
+}
+
+/// AST family selection shares the built-in registry with validation and JSON conversion.
+pub fn typeKind(name: []const u8, prefix: ?[]const u8) ast.TypeKind {
+    if (prefix != null) return .derived;
+    if (std.mem.eql(u8, name, "integer")) return .numeric;
+    if (std.mem.eql(u8, name, "number")) return .decimal;
+    const builtin = get(name) orelse return .derived;
+    return switch (builtin.family) {
+        .integer => .numeric,
+        .boolean, .empty => .plain,
+        .@"instance-identifier" => .instance_identifier,
+        inline else => |family| @field(ast.TypeKind, @tagName(family)),
+    };
 }
 
 pub fn get(name: []const u8) ?*const Builtin {
@@ -864,7 +881,7 @@ pub fn isBuiltinOrLegacyName(name: []const u8) bool {
 
 /// `integer_json_error`: the JSON type gate shared by every integer type.
 pub fn integerGate(a: Allocator, value: Val) error{OutOfMemory}!?Issue {
-    const t: ast.TypeStmt = .{ .name = INT32 };
+    const t = ast.TypeStmt.init(INT32, null);
     return integerJsonError(a, get(INT32).?, value, &t);
 }
 

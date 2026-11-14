@@ -1,0 +1,52 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": ""
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "value": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/%40provider%3A~1%40grouping%3Ag~1private",
+              "x-yang": {
+                "type-context": "/@grouping:g"
+              }
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "x-yang": {
+            "type": "leaf"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "@provider:/@grouping:g/private": {
+      "type": "integer",
+      "minimum": 0,
+      "maximum": 255,
+      "x-yang": {
+        "scope": "/@grouping:g",
+        "name": "private"
+      }
+    }
+  }
+}

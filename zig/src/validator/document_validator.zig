@@ -340,7 +340,7 @@ pub const DocumentValidator = struct {
             return if (try self.accepted(n, t)) n else .{ .string = value };
         }
         if (t.prefix == null and std.mem.eql(u8, t.name, registry.UNION)) {
-            for (t.types.items) |member| {
+            for (t.members()) |member| {
                 const decoded = try self.decodeLexical(member, value, seen);
                 if (try self.accepted(decoded, member)) return decoded;
             }

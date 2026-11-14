@@ -1,0 +1,69 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): siblings",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "forward and descendant references with sibling reuse",
+      "data": {
+        "a": {
+          "value": "aa",
+          "child": {
+            "value": "aaa"
+          }
+        },
+        "b": {
+          "value": 3
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "first sibling restriction",
+      "data": {
+        "a": {
+          "value": "b"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/a/value",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "descendant restriction",
+      "data": {
+        "a": {
+          "child": {
+            "value": "b"
+          }
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/a/child/value",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "second sibling restriction",
+      "data": {
+        "b": {
+          "value": 6
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/b/value",
+          "code": "range"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

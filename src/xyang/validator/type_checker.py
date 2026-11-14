@@ -4,6 +4,8 @@ Type checker for YANG document validation.
 
 from __future__ import annotations
 
+from ..ast import make_type_stmt
+
 import base64
 import binascii
 import logging
@@ -122,9 +124,9 @@ def _pattern_entry_violation_message(entry: Any, *, default: str) -> str:
 
 def _type_has_restrictions(type_stmt: YangTypeStmt) -> bool:
     """True when this ``type`` statement adds range, length, or pattern restrictions."""
-    if type_stmt.range or type_stmt.length:
+    if getattr(type_stmt, "range", None) or getattr(type_stmt, "length", None):
         return True
-    return bool(type_stmt.patterns)
+    return bool(getattr(type_stmt, "patterns", None))
 
 
 _INTEGER_TYPE_NAMES = INTEGER_TYPE_NAMES
@@ -301,15 +303,14 @@ class TypeChecker:
 
     def _builtin_name(self, type_stmt: YangTypeStmt, root_schema: Any) -> str:
         """Follow ``type_stmt`` through typedefs to the underlying built-in name."""
-        seen: set[tuple[Optional[str], str]] = set()
+        seen: set[int] = set()
         current: Optional[YangTypeStmt] = type_stmt
         schema: Any = root_schema
         for _ in range(64):
             if current is None:
                 return ""
             name = current.name
-            prefix = current.prefix
-            key = (prefix, name)
+            key = id(current)
             if key in seen:
                 return name
             seen.add(key)
@@ -401,7 +402,7 @@ class TypeChecker:
         evaluator: Any,
         leafref_current: Optional[Node] = None,
     ) -> List[TypeIssue]:
-        for member in type_stmt.types:
+        for member in getattr(type_stmt, "types", ()):
             if not self.check(
                 value,
                 member,
@@ -413,7 +414,7 @@ class TypeChecker:
                 leafref_current=leafref_current,
             ):
                 return []
-        names = ", ".join(t.name for t in type_stmt.types)
+        names = ", ".join(t.name for t in getattr(type_stmt, "types", ()))
         return [_issue("union", f"Value {value!r} does not match any union member type ({names})")]
 
     def _check_leafref(
@@ -425,9 +426,9 @@ class TypeChecker:
         evaluator: Any,
         leafref_current: Optional[Node] = None,
     ) -> List[TypeIssue]:
-        if not type_stmt.require_instance or not type_stmt.path:
+        if not getattr(type_stmt, "require_instance", True) or not getattr(type_stmt, "path", None):
             return []
-        path_ast = type_stmt.path
+        path_ast = getattr(type_stmt, "path", None)
         path_str = path_ast.to_string()
         logger.debug(
             "_check_leafref require-instance node_path=%s value=%r leafref_path=%s",
@@ -471,13 +472,13 @@ class TypeChecker:
             return [gate]
         errors: List[TypeIssue] = []
         s = value
-        if type_stmt.length:
+        if getattr(type_stmt, "length", None):
             issue = self._length_issue(
                 len(s),
-                type_stmt.length,
+                getattr(type_stmt, "length", None),
                 binary=False,
-                error_message=type_stmt.length_error_message,
-                error_app_tag=type_stmt.length_error_app_tag,
+                error_message=getattr(type_stmt, "length_error_message", None),
+                error_app_tag=getattr(type_stmt, "length_error_app_tag", None),
             )
             if issue is not None:
                 errors.append(issue)
@@ -496,12 +497,12 @@ class TypeChecker:
                         else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                     )
                     errors.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
-        if type_stmt.enums:
-            if s not in [str(e) for e in type_stmt.enums]:
+        if getattr(type_stmt, "enums", None):
+            if s not in [str(e) for e in getattr(type_stmt, "enums", None)]:
                 errors.append(
                     _issue(
                         "enum",
-                        f"Value {s!r} is not one of: " f"{', '.join(str(e) for e in type_stmt.enums)}",
+                        f"Value {s!r} is not one of: " f"{', '.join(str(e) for e in getattr(type_stmt, "enums", None))}",
                     )
                 )
         return errors
@@ -523,12 +524,12 @@ class TypeChecker:
             n = value
         else:
             n = int(value)
-        if type_stmt.range:
+        if getattr(type_stmt, "range", None):
             issue = self._numeric_range_issue(
                 n,
-                type_stmt.range,
-                error_message=type_stmt.range_error_message,
-                error_app_tag=type_stmt.range_error_app_tag,
+                getattr(type_stmt, "range", None),
+                error_message=getattr(type_stmt, "range_error_message", None),
+                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
             )
             if issue is not None:
                 return [issue]
@@ -550,12 +551,12 @@ class TypeChecker:
         if gate is not None:
             return [gate]
         n = float(value)
-        if type_stmt.range:
+        if getattr(type_stmt, "range", None):
             issue = self._numeric_range_issue(
                 n,
-                type_stmt.range,
-                error_message=type_stmt.range_error_message,
-                error_app_tag=type_stmt.range_error_app_tag,
+                getattr(type_stmt, "range", None),
+                error_message=getattr(type_stmt, "range_error_message", None),
+                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
             )
             if issue is not None:
                 return [issue]
@@ -577,7 +578,7 @@ class TypeChecker:
         return [] if issue is None else [issue]
 
     def _check_boolean(self, value: Any) -> List[TypeIssue]:
-        return self._one(REGISTRY[BOOLEAN].check_value(value, YangTypeStmt(name=BOOLEAN)))
+        return self._one(REGISTRY[BOOLEAN].check_value(value, make_type_stmt(name=BOOLEAN)))
 
     def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         return self._one(REGISTRY[ENUMERATION].check_value(value, type_stmt))
@@ -588,7 +589,7 @@ class TypeChecker:
 
     def _check_empty(self, value: Any) -> List[TypeIssue]:
         # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.
-        return self._one(REGISTRY[EMPTY].check_value(value, YangTypeStmt(name=EMPTY)))
+        return self._one(REGISTRY[EMPTY].check_value(value, make_type_stmt(name=EMPTY)))
 
     def _check_binary(self, value: Any, type_stmt: YangTypeStmt) -> List[TypeIssue]:
         """RFC 7950 binary: base64 in JSON; ``length`` applies to decoded octet count."""
@@ -603,13 +604,13 @@ class TypeChecker:
                 decoded = base64.b64decode(s, validate=True)
         except binascii.Error:
             return [_issue("type", "binary value is not valid base64")]
-        if type_stmt.length:
+        if getattr(type_stmt, "length", None):
             issue = self._length_issue(
                 len(decoded),
-                type_stmt.length,
+                getattr(type_stmt, "length", None),
                 binary=True,
-                error_message=type_stmt.length_error_message,
-                error_app_tag=type_stmt.length_error_app_tag,
+                error_message=getattr(type_stmt, "length_error_message", None),
+                error_app_tag=getattr(type_stmt, "length_error_app_tag", None),
             )
             if issue is not None:
                 return [issue]

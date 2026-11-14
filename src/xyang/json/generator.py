@@ -13,7 +13,7 @@ import re
 from copy import copy
 from dataclasses import dataclass, field
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from ..ast import (
     YangAnydataStmt,
@@ -208,6 +208,7 @@ def _identity_stub(module: YangModule, names: dict[str, set[str]]) -> dict[str, 
                     f"cannot export identity {name!r} of module {module.name!r}: base {base!r} does not resolve there"
                 )
             if pair[0].name != module.name:
+                assert ref.prefix is not None
                 imports[ref.prefix] = _identity_stub(pair[0], names)
     stub: dict[str, Any] = {
         XYangKey.MODULE: module.name,
@@ -230,9 +231,10 @@ def _imports_for_json(root: YangModule, used: list[IdentityPair]) -> dict[str, A
     used_keys = {(module.name, name) for module, name in used}
     for name, identity in root.identities.items():
         for base in identity.bases:
+            ref = coerce_identifier_ref(base)
             if resolve_identity_base_ref(root, base) is None:
                 raise YangExportError(
-                    f"cannot export identity {name!r}: base {format_identifier_ref(coerce_identifier_ref(base))!r} "
+                    f"cannot export identity {name!r}: base {(format_identifier_ref(ref) if ref is not None else str(base))!r} "
                     f"does not resolve in module {root.name!r}"
                 )
     names: dict[str, set[str]] = {}
@@ -688,7 +690,7 @@ def _merge_extension_imports(
             names.append(name)
     for owner, names in by_owner.values():
         key = _import_key(root, owner)
-        stub = imports.get(key)
+        stub: dict[str, Any] | None = imports.get(key)
         if stub is None:
             stub = {
                 XYangKey.MODULE: owner.name,
@@ -1168,7 +1170,9 @@ def _leaf_stmt_to_property(
 ) -> dict[str, Any]:
     type_stmt = stmt.type
     when_stmt = getattr(stmt, "when", None)
-    if type_stmt and type_stmt.name in typedef_names:
+    from ..module import resolve_typedef
+
+    if type_stmt and type_stmt.name in typedef_names and module.typedefs[type_stmt.name].scope is None and resolve_typedef(type_stmt, module)[0] is module.typedefs[type_stmt.name]:
         out: dict[str, Any] = {
             JsonSchemaKey.REF: json_schema_defs_uri(type_stmt.name),
         }
@@ -1304,7 +1308,7 @@ def _choice_stmt_to_property(
     if ff:
         xy_choice[XYangKey.IF_FEATURES] = ff
     _stamp_extensions(xy_choice, stmt.statements, typedef_names, module)
-    out = {JsonSchemaKey.TYPE: "object"}
+    out: dict[str, Any] = {JsonSchemaKey.TYPE: "object"}
     _with_description(out, body.get(JsonSchemaKey.DESCRIPTION, ""))
     out[JsonSchemaKey.X_YANG] = xy_choice
     if body.get(JsonSchemaKey.PROPERTIES):
@@ -1473,6 +1477,8 @@ def _typedef_to_def(typedef: YangTypedefStmt, module: YangModule) -> dict[str, A
             xy = {}
             schema[JsonSchemaKey.X_YANG] = xy
         xy[XYangKey.EXTENSIONS] = invocations
+    if typedef.scope is not None:
+        schema.setdefault("x-yang", {}).update({"scope": typedef.scope, "name": typedef.name})
     return schema
 
 
@@ -1573,7 +1579,7 @@ def _strip_augmented_by(stmt: YangStatement, exporter_name: str) -> YangStatemen
     ]
     if isinstance(cloned, YangChoiceStmt):
         cloned.cases = [
-            kept
+            cast(YangCaseStmt, kept)
             for case in cloned.cases
             if (kept := _strip_augmented_by(case, exporter_name)) is not None
         ]
@@ -1620,7 +1626,7 @@ def _add_imported_structures(root: YangModule, imports: dict[str, Any], typedef_
         if owner is None or owner is root or owner.name == root.name:
             continue
         key = _import_key(root, owner)
-        stub = imports.get(key)
+        stub: dict[str, Any] | None = imports.get(key)
         if not isinstance(stub, dict):
             stub = {
                 XYangKey.MODULE: owner.name,
@@ -1682,12 +1688,16 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     meta), properties (one entry per module-level data node), and $defs (typedefs).
     Raises :class:`YangExportError` for a construct the form cannot carry.
     """
+    from ..typedef_scope import EXPORT_TYPEDEFS, scoped_export_catalog
+
+    scope_token = EXPORT_TYPEDEFS.set(scoped_export_catalog(module))
     export = _IdentityExport(root=module)
     token = _EXPORT.set(export)
     ext_token = _EXT_USED.set(_ExtensionUse(root=module))
     try:
         return _generate_json_schema(module, export)
     finally:
+        EXPORT_TYPEDEFS.reset(scope_token)
         _EXPORT.reset(token)
         _EXT_USED.reset(ext_token)
 
@@ -1726,6 +1736,12 @@ def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[s
     for name, typedef in schema_module.typedefs.items():
         if isinstance(typedef, YangTypedefStmt):
             defs[name] = _typedef_to_def(typedef, schema_module)
+    from ..typedef_scope import EXPORT_TYPEDEFS
+
+    scoped_definitions = EXPORT_TYPEDEFS.get()
+    assert scoped_definitions is not None
+    for name, (typedef, owner) in scoped_definitions.items():
+        defs[name] = _typedef_to_def(typedef, owner)
     for name, identity in schema_module.identities.items():
         if isinstance(identity, YangIdentityStmt):
             defs[name] = _identity_to_def(name, identity, schema_module)

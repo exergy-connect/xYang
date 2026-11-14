@@ -444,47 +444,10 @@ function applyRefinesFromUses(usesStmt: YangStatement, expanded: YangStatement[]
   }
 }
 
-/** Register a typedef statement onto the importing module (RFC 7950 scoping). */
-function registerOneTypedef(hostTypedefs: Record<string, unknown>, child: YangStatement): void {
-  const name =
-    (typeof child.argument === "string" && child.argument) ||
-    (typeof child.name === "string" && child.name) ||
-    "";
-  if (!name || name in hostTypedefs) {
-    return;
-  }
-  const typeStmt = child.statements?.find((c) => c.keyword === "type");
-  hostTypedefs[name] = {
-    name,
-    description: typeof child.description === "string" ? child.description : "",
-    reference: typeof child.reference === "string" ? child.reference : "",
-    default: child.default,
-    type: child.type ?? typeStmt?.type,
-    statements: child.statements ?? []
-  };
-}
-
-/** Register typedefs from an expanded grouping onto the importing module; omit them from the body. */
-function registerGroupingTypedefs(
-  hostTypedefs: Record<string, unknown>,
-  body: YangStatement[]
-): YangStatement[] {
-  const dataNodes: YangStatement[] = [];
-  for (const child of body) {
-    if (child.keyword === "typedef") {
-      registerOneTypedef(hostTypedefs, child);
-      continue;
-    }
-    dataNodes.push(child);
-  }
-  return dataNodes;
-}
-
 function expandGroupingBody(
   ref: YangIdentifierRef,
   scope: GroupingScope,
-  stack: string[],
-  hostTypedefs: Record<string, unknown>
+  stack: string[]
 ): YangStatement[] {
   const resolved = resolveGrouping(ref, scope);
   if (stack.includes(resolved.key)) {
@@ -499,7 +462,7 @@ function expandGroupingBody(
       if (!childRef) {
         continue;
       }
-      const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack, hostTypedefs);
+      const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack);
       applyAugmentsFromUses(child, body);
       applyRefinesFromUses(child, body);
       for (const stmt of body) {
@@ -507,15 +470,12 @@ function expandGroupingBody(
         mergeWhenFromParentUses(child, stmt);
         flattened.push(deepCloneStatement(stmt));
       }
-    } else if (child.keyword === "typedef") {
-      // Handled via registerGroupingTypedefs on the collected body.
-      flattened.push(deepCloneStatement(child));
     } else {
       flattened.push(deepCloneStatement(child));
     }
   }
-  const withoutTypedefs = registerGroupingTypedefs(hostTypedefs, flattened);
-  return withoutTypedefs.map((stmt) => expandUsesUnderStatement(stmt, resolved.nestedScope, nextStack, hostTypedefs));
+  const withoutTypedefs = flattened.filter((stmt) => stmt.keyword !== "typedef");
+  return withoutTypedefs.map((stmt) => expandUsesUnderStatement(stmt, resolved.nestedScope, nextStack));
 }
 
 function scopeWithLocalGroupings(stmt: YangStatement, scope: GroupingScope): GroupingScope {
@@ -529,12 +489,11 @@ function scopeWithLocalGroupings(stmt: YangStatement, scope: GroupingScope): Gro
 function expandUsesUnderStatement(
   stmt: YangStatement,
   scope: GroupingScope,
-  stack: string[],
-  hostTypedefs: Record<string, unknown>
+  stack: string[]
 ): YangStatement {
   const next = scopeWithLocalGroupings(stmt, scope);
   if (stmt.statements?.length) {
-    stmt.statements = expandStatementList(stmt.statements, next, stack, hostTypedefs);
+    stmt.statements = expandStatementList(stmt.statements, next, stack);
   }
   return stmt;
 }
@@ -542,8 +501,7 @@ function expandUsesUnderStatement(
 function expandStatementList(
   statements: YangStatement[],
   scope: GroupingScope,
-  stack: string[],
-  hostTypedefs: Record<string, unknown>
+  stack: string[]
 ): YangStatement[] {
   const out: YangStatement[] = [];
   for (const stmt of statements) {
@@ -552,16 +510,16 @@ function expandStatementList(
       if (!ref) {
         continue;
       }
-      const expanded = expandGroupingBody(ref, scope, stack, hostTypedefs);
+      const expanded = expandGroupingBody(ref, scope, stack);
       applyAugmentsFromUses(stmt, expanded);
       applyRefinesFromUses(stmt, expanded);
       for (const e of expanded) {
         mergeIfFeaturesFromParentUses(stmt, e);
         mergeWhenFromParentUses(stmt, e);
-        out.push(expandUsesUnderStatement(e, scope, stack, hostTypedefs));
+        out.push(expandUsesUnderStatement(e, scope, stack));
       }
     } else {
-      out.push(expandUsesUnderStatement(cloneStatementShell(stmt), scope, stack, hostTypedefs));
+      out.push(expandUsesUnderStatement(cloneStatementShell(stmt), scope, stack));
     }
   }
   return out;
@@ -603,17 +561,13 @@ export function expandUses(module: YangModule): YangModule {
     prefix: modulePrefix(module)
   };
 
-  const hostTypedefs =
-    cloned.typedefs && typeof cloned.typedefs === "object" ? cloned.typedefs : {};
-  cloned.typedefs = hostTypedefs;
-
   const top = cloned.statements ?? [];
-  cloned.statements = expandStatementList(top as YangStatement[], expandScope, [], hostTypedefs);
+  cloned.statements = expandStatementList(top as YangStatement[], expandScope, []);
 
   // Expand nested uses inside grouping bodies (Python expand_all_uses_in_module).
   for (const g of Object.values(expandScope.groupings)) {
     if (!g.statements?.length) continue;
-    g.statements = expandStatementList(g.statements, expandScope, [], hostTypedefs);
+    g.statements = expandStatementList(g.statements, expandScope, []);
   }
 
   return new YangModule(cloned, module.source);

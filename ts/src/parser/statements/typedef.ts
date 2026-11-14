@@ -1,3 +1,4 @@
+import { registerTypedef, type ScopedTypedef } from "../../typedef-scope";
 import * as kw from "../keywords";
 import { YangTypedefStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
@@ -9,16 +10,21 @@ export class TypedefStatementParser {
   parse_typedef(tokens: TokenStream, context: ParserContext): YangTypedefStmt {
     tokens.consume(kw.TYPEDEF);
     const name = tokens.consume_type(YangTokenType.IDENTIFIER);
-    const stmt = new YangTypedefStmt({ name });
+    const stmt = new YangTypedefStmt({ name, scope: context.typedef_context || undefined });
     const unsupportedCtx = `typedef '${name}'`;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
       this.parsers.parseBody(tokens, child, "typedef", unsupportedCtx);
       tokens.consume_type(YangTokenType.RBRACE);
     }
-    (context.module as any).typedefs[name] = stmt;
-    // Keep nested typedefs on the parent (grouping/container/…) so ``uses``
-    // expansion can re-register them on the importing module (RFC 7950 §7.13).
+    const typedefs = (context.module as { typedefs: Record<string, ScopedTypedef> }).typedefs;
+    const key = (stmt.scope ? stmt.scope + "/" : "") + name;
+    if (this.parsers.includingSubmoduleName && key in typedefs) {
+      // Include guards distinguish a repeated include from a different declaration.
+      typedefs[key] = stmt as unknown as ScopedTypedef;
+    } else {
+      registerTypedef(typedefs, stmt as unknown as ScopedTypedef);
+    }
     this.parsers.add_to_parent_or_module(context, stmt);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     return stmt;

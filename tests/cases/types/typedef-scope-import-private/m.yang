@@ -1,0 +1,4 @@
+module m {
+  yang-version 1.1; namespace "urn:m"; prefix m;
+import provider { prefix p; } leaf leak { type p:private; }
+}

@@ -1,0 +1,1 @@
+module m { namespace "urn:m"; prefix m; container a { typedef code { type string; } leaf value { type code { length "1..3"; } } } }

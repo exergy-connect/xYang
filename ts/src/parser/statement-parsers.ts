@@ -10,11 +10,22 @@ import {
   YangRefineStmt,
   YangTypedefStmt,
   YangTypeStmt,
+  YangUnionTypeStmt,
+  YangDerivedTypeStmt,
+  YangStringTypeStmt,
+  YangNumericTypeStmt,
+  YangBinaryTypeStmt,
+  YangDecimalTypeStmt,
+  YangEnumerationTypeStmt,
+  YangBitsTypeStmt,
+  YangLeafrefTypeStmt,
+  YangIdentityrefTypeStmt,
+  YangInstanceIdentifierTypeStmt,
   YangUsesStmt
 } from "../core/ast";
 import { formatIdentifierRef } from "../core/identifier-ref";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
-import { YangModule, YangStatement } from "../core/model";
+import { YangModule, YangStatement, normalizeTypeShape } from "../core/model";
 import { DISPATCH_REGISTRY } from "./dispatch-registry";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
 import {
@@ -73,6 +84,9 @@ function serializedKeywordFromAstStatement(stmt: { keyword?: unknown }): string 
 type TypeShape = {
   name: string;
   prefix?: string;
+  scope_module?: string;
+  context?: string;
+  xpath_prefixes?: Record<string, string>;
   patterns?: Array<{
     pattern: string;
     invert_match?: boolean;
@@ -464,7 +478,7 @@ export class StatementParsers {
 
     const out: YangStatement = new YangStatement({ keyword, name: argument, argument, statements });
     if (keyword === "type") {
-      out.type = this.extract_type_shape(out);
+      out.type = normalizeTypeShape(this.extract_type_shape(out));
     }
     return out;
   }
@@ -919,6 +933,7 @@ export class StatementParsers {
       type: {
         [kw.TYPE]: (t, c, typeStmt: YangTypeStmt) => {
           const nested = typ.parse_type(t, c);
+          if (!(typeStmt instanceof YangUnionTypeStmt)) throw new YangSemanticError("nested type requires union");
           typeStmt.types.push(nested);
         },
         [kw.PATTERN]: (t, c, typeStmt: YangTypeStmt) => {
@@ -1107,8 +1122,11 @@ export class StatementParsers {
       statements: children
 });
 
+    if (keyword === "typedef" && (stmt as { scope?: string }).scope) {
+      (out as unknown as { scope: string }).scope = (stmt as unknown as { scope: string }).scope;
+    }
     if (stmt.type) {
-      out.type = this.fromTypeShape(stmt.type);
+      out.type = normalizeTypeShape(this.fromTypeShape(stmt.type));
     }
     if (stmt.mandatory !== undefined) {
       out.mandatory = stmt.mandatory;
@@ -1302,34 +1320,43 @@ export class StatementParsers {
   }
 
   private fromTypeShape(type_stmt: YangTypeStmt): TypeShape {
-    const shape: TypeShape = {
-      name: type_stmt.name,
-      patterns: type_stmt.patterns.map((p) => ({
-        pattern: p.pattern,
-        invert_match: p.invert_match,
-        error_message: p.error_message,
-        error_app_tag: p.error_app_tag
-      })),
-      length: type_stmt.length,
-      range: type_stmt.range,
-      length_error_message: type_stmt.length_error_message,
-      length_error_app_tag: type_stmt.length_error_app_tag,
-      range_error_message: type_stmt.range_error_message,
-      range_error_app_tag: type_stmt.range_error_app_tag,
-      fraction_digits: type_stmt.fraction_digits,
-      path: type_stmt.path,
-      ...(type_stmt.xpath_prefixes ? { xpath_prefixes: type_stmt.xpath_prefixes } : {}),
-      ...(type_stmt.scope_module ? { scope_module: type_stmt.scope_module } : {}),
-      require_instance: type_stmt.require_instance,
-      identityref_bases: type_stmt.identityref_bases.map((b) =>
-        b.prefix ? { prefix: b.prefix, name: b.name } : { name: b.name }
-      ),
-      enums: [...type_stmt.enums],
-      bits: type_stmt.bits.map((b) => ({ name: b.name, position: b.position ?? 0 })),
-      types: type_stmt.types.map((t) => this.fromTypeShape(t))
-    };
-    if (type_stmt.prefix) {
-      shape.prefix = type_stmt.prefix;
+    const shape: TypeShape = { name: type_stmt.name };
+    if (type_stmt.prefix !== undefined) shape.prefix = type_stmt.prefix;
+    if (type_stmt.scope_module !== undefined) shape.scope_module = type_stmt.scope_module;
+    if (type_stmt.context !== undefined) shape.context = type_stmt.context;
+    if (type_stmt instanceof YangStringTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
+      if (type_stmt.patterns?.length) shape.patterns = type_stmt.patterns.map((p) => ({
+        pattern: p.pattern, invert_match: p.invert_match,
+        ...(p.error_message !== undefined ? { error_message: p.error_message } : {}),
+        ...(p.error_app_tag !== undefined ? { error_app_tag: p.error_app_tag } : {})
+      }));
+    }
+    for (const kind of ["range", "length"] as const) {
+      const restriction = kind === "range"
+        ? (type_stmt instanceof YangNumericTypeStmt || type_stmt instanceof YangDerivedTypeStmt ? type_stmt.range_restriction : undefined)
+        : (type_stmt instanceof YangBinaryTypeStmt || type_stmt instanceof YangDerivedTypeStmt ? type_stmt.length_restriction : undefined);
+      if (restriction) {
+        shape[kind] = restriction.expression;
+        for (const key of ["error_message", "error_app_tag", "description", "reference"] as const) {
+          if (restriction[key] !== undefined) (shape as Record<string, unknown>)[`${kind}_${key}`] = restriction[key];
+        }
+      }
+    }
+    if (type_stmt instanceof YangDecimalTypeStmt && type_stmt.fraction_digits !== undefined) shape.fraction_digits = type_stmt.fraction_digits;
+    if (type_stmt instanceof YangEnumerationTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
+      if (type_stmt.enums) shape.enums = [...type_stmt.enums];
+    }
+    if (type_stmt instanceof YangBitsTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
+      if (type_stmt.bits) shape.bits = type_stmt.bits.map((b) => ({ name: b.name, position: b.position ?? 0 }));
+    }
+    if (type_stmt instanceof YangUnionTypeStmt) shape.types = type_stmt.types.map((member) => this.fromTypeShape(member));
+    if (type_stmt instanceof YangIdentityrefTypeStmt) shape.identityref_bases = type_stmt.identityref_bases.map((base) => ({ ...base }));
+    if (type_stmt instanceof YangInstanceIdentifierTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
+      if (type_stmt.require_instance !== undefined) shape.require_instance = type_stmt.require_instance;
+    }
+    if (type_stmt instanceof YangLeafrefTypeStmt) {
+      if (type_stmt.path !== undefined) shape.path = type_stmt.path;
+      if (type_stmt.xpath_prefixes) shape.xpath_prefixes = type_stmt.xpath_prefixes;
     }
     return shape;
   }

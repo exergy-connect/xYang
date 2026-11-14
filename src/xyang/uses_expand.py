@@ -34,7 +34,6 @@ class ExpandUsesContext:
     expanding_chain: tuple[str, ...] = ()
     refines: list | None = None
     refine_path_prefix: str = ""
-    typedef_target: YangModule | None = None
     # Groupings in lexical scope (container and its descendants), shadowing the module.
     local_groupings: dict[str, YangStatement] | None = None
 
@@ -42,53 +41,15 @@ class ExpandUsesContext:
         if self.refines is None:
             self.refines = []
 
-    @property
-    def reg_module(self) -> YangModule:
-        return self.typedef_target if self.typedef_target is not None else self.module
-
 
 def _extend_refine_path(prefix: str, segment: str) -> str:
     return f"{prefix}/{segment}" if prefix else segment
 
 
-def _register_typedef_for_uses(
-    target: YangModule,
-    source: YangModule,
-    td: YangTypedefStmt,
-) -> None:
-    """Expose a grouping typedef on the module where ``uses`` is expanded (RFC 7950 scoping)."""
-    name = td.name
-    if name in target.typedefs:
-        return
-    if target is source:
-        target.typedefs[name] = source.typedefs.get(name, td)
-        return
-    resolved = source.typedefs.get(name, td)
-    target.typedefs[name] = cast(YangTypedefStmt, copy_yang_statement(resolved))
-
-
-def _register_grouping_typedefs(
-    target: YangModule,
-    source: YangModule,
-    grouping: YangGroupingStmt,
-) -> None:
-    """Register typedefs from a grouping onto the module that instantiates ``uses``."""
-    for td_name in grouping.typedef_names:
-        td = source.typedefs.get(td_name)
-        if td is not None:
-            _register_typedef_for_uses(target, source, td)
-    for s in grouping.statements:
-        if isinstance(s, YangTypedefStmt):
-            _register_typedef_for_uses(target, source, s)
-
-
 def _grouping_body_without_typedefs(
-    target: YangModule,
-    source: YangModule,
     grouping: YangGroupingStmt,
 ) -> list[YangStatement]:
-    """Copy grouping data nodes; register typedefs on *target* first."""
-    _register_grouping_typedefs(target, source, grouping)
+    """Copy grouping data nodes with their original lexical type contexts."""
     return [
         copy_yang_statement(s)
         for s in grouping.statements
@@ -246,7 +207,7 @@ def _expand_one_uses_stmt(
         raise YangCircularUsesError(ctx.expanding_chain, gname)
     inner_chain = ctx.expanding_chain + (gname,)
     if isinstance(grouping, YangGroupingStmt):
-        body = _grouping_body_without_typedefs(ctx.module, gmod, grouping)
+        body = _grouping_body_without_typedefs(grouping)
     else:
         body = [copy_yang_statement(s) for s in grouping.statements]
     _merge_uses_if_features_into_grouping_roots(body, stmt.if_features)
@@ -258,7 +219,6 @@ def _expand_one_uses_stmt(
         expanding_chain=inner_chain,
         refines=pending_refines,
         refine_path_prefix=inner_prefix,
-        typedef_target=ctx.module,
         local_groupings=ctx.local_groupings,
     )
     out = expand_uses_in_statements(body, inner_ctx)
@@ -285,10 +245,7 @@ def expand_uses_in_statements(
     statements: list[YangStatement],
     ctx: ExpandUsesContext,
 ) -> list[YangStatement]:
-    """Expand ``uses`` in *statements*.
-
-    Nested typedefs register on ``ctx.typedef_target`` when set.
-    """
+    """Expand ``uses`` in *statements*, preserving lexical typedef contexts."""
     expanded: list[YangStatement] = []
     refines = ctx.refines
     assert refines is not None
@@ -308,15 +265,11 @@ def expand_uses_in_statements(
                 expanding_chain=ctx.expanding_chain,
                 refines=refines,
                 refine_path_prefix=stmt_path,
-                typedef_target=ctx.reg_module,
                 local_groupings=ctx.local_groupings,
             )
             expanded.extend(expand_uses_in_statements(body, child_ctx))
         elif isinstance(stmt, YangTypedefStmt):
-            if ctx.typedef_target is not None:
-                _register_typedef_for_uses(ctx.reg_module, ctx.module, stmt)
-            else:
-                expanded.append(stmt)
+            expanded.append(stmt)
             continue
         elif isinstance(stmt, YangChoiceStmt):
             for case in stmt.cases:
@@ -327,7 +280,6 @@ def expand_uses_in_statements(
                     expanding_chain=ctx.expanding_chain,
                     refines=refines,
                     refine_path_prefix=case_prefix,
-                    typedef_target=ctx.reg_module,
                     local_groupings=ctx.local_groupings,
                 )
                 case.statements = expand_uses_in_statements(case.statements, case_ctx)
@@ -341,7 +293,6 @@ def expand_uses_in_statements(
                 expanding_chain=ctx.expanding_chain,
                 refines=refines,
                 refine_path_prefix=stmt_path,
-                typedef_target=ctx.reg_module,
                 local_groupings=local,
             )
             stmt.statements = expand_uses_in_statements(stmt.statements, child_ctx)

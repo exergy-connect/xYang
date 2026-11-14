@@ -1,3 +1,4 @@
+import { typeStatementKind, type TypeStatementKind } from "../types/registry";
 /**
  * Runtime model. `YangModule` and `YangStatement` are the only representation.
  * Fields are read on the objects (`statement.if_features`, `module.import_prefixes`,
@@ -20,25 +21,67 @@ export type WhenShape = {
   xpath_prefixes?: Record<string, string>;
 };
 
-/** Type substatement shape carried on data nodes (`type.name`, `type.range`, …). */
-export type StatementTypeShape = {
-  name?: string;
+/** Sparse input accepted by constructors; runtime output is discriminated by family. */
+export type StatementTypeInput = Record<string, unknown> & { name?: string };
+type TypeIdentity = {
+  name: string;
   prefix?: string;
-  patterns?: unknown;
-  length?: string;
-  range?: string;
-  fraction_digits?: number;
-  path?: unknown;
-  /** Module each prefixed step of a leafref `path` is bound to, by prefix. */
-  xpath_prefixes?: Record<string, string>;
-  /** Module that wrote this `type`: its prefix and typedef name resolve there (RFC 7950 §7.13). */
   scope_module?: string;
-  require_instance?: boolean;
-  identityref_bases?: unknown;
-  enums?: string[];
-  bits?: unknown;
-  types?: unknown;
+  context?: string;
+  units?: string;
 };
+type RangeRestrictionShape = {
+  range?: string; range_error_message?: string; range_error_app_tag?: string;
+  range_description?: string; range_reference?: string;
+};
+type LengthRestrictionShape = {
+  length?: string; length_error_message?: string; length_error_app_tag?: string;
+  length_description?: string; length_reference?: string;
+};
+export type PatternShape = { pattern: string; invert_match?: boolean; error_message?: string; error_app_tag?: string };
+type PatternRestrictions = { patterns?: PatternShape[]; pattern?: string };
+export type StatementTypeShape = TypeIdentity & (
+  | { kind: "plain" }
+  | ({ kind: "numeric" } & RangeRestrictionShape)
+  | ({ kind: "decimal"; fraction_digits?: number } & RangeRestrictionShape)
+  | ({ kind: "string" } & LengthRestrictionShape & PatternRestrictions)
+  | ({ kind: "binary" } & LengthRestrictionShape)
+  | { kind: "enumeration"; enums?: string[] }
+  | { kind: "bits"; bits?: unknown }
+  | { kind: "union"; types?: StatementTypeShape[] }
+  | { kind: "leafref"; path?: unknown; xpath_prefixes?: Record<string, string>; require_instance?: boolean }
+  | { kind: "instance-identifier"; require_instance?: boolean }
+  | { kind: "identityref"; identityref_bases?: unknown }
+  | ({ kind: "derived"; enums?: string[]; bits?: unknown; require_instance?: boolean } & RangeRestrictionShape & LengthRestrictionShape & PatternRestrictions)
+);
+
+const RANGE_FIELDS = ["range", "range_error_message", "range_error_app_tag", "range_description", "range_reference"];
+const LENGTH_FIELDS = ["length", "length_error_message", "length_error_app_tag", "length_description", "length_reference"];
+const TYPE_FIELDS: Record<TypeStatementKind, readonly string[]> = {
+  plain: [], numeric: RANGE_FIELDS, decimal: [...RANGE_FIELDS, "fraction_digits"],
+  string: [...LENGTH_FIELDS, "patterns", "pattern"], binary: LENGTH_FIELDS,
+  enumeration: ["enums"], bits: ["bits"], union: ["types"],
+  leafref: ["path", "xpath_prefixes", "require_instance"],
+  "instance-identifier": ["require_instance"], identityref: ["identityref_bases"],
+  derived: [...RANGE_FIELDS, ...LENGTH_FIELDS, "patterns", "pattern", "enums", "bits", "require_instance"]
+};
+const COMMON_TYPE_FIELDS = new Set(["name", "prefix", "scope_module", "context", "units"]);
+
+export function normalizeTypeShape(input: StatementTypeInput): StatementTypeShape {
+  const name = input.name ?? "";
+  const kind = typeStatementKind(name, typeof input.prefix === "string" ? input.prefix : undefined);
+  const output: Record<string, unknown> = { kind, name };
+  const fields = TYPE_FIELDS[kind];
+  for (const [key, value] of Object.entries(input)) {
+    if (key === "kind" || value === undefined) continue;
+    if (!COMMON_TYPE_FIELDS.has(key) && !fields.includes(key)) {
+      throw new TypeError(`Attribute '${key}' does not belong to type '${name}' (${kind})`);
+    }
+    output[key] = key === "types" && Array.isArray(value)
+      ? value.map((member) => normalizeTypeShape(member as StatementTypeInput)) : value;
+  }
+  return output as StatementTypeShape;
+}
 
 export type IdentityBases = {
   bases: Array<{ prefix?: string; name: string }>;
@@ -48,16 +91,13 @@ export type IdentityBases = {
   statements?: YangStatement[];
 };
 
-export type YangStatementInit = {
+interface YangStatementFields {
   keyword?: string;
   name?: string;
   argument?: string;
   description?: string;
   reference?: string;
   units?: string;
-  local_groupings?: Record<string, YangStatement | YangStatementInit>;
-  statements?: Array<YangStatement | YangStatementInit>;
-  type?: StatementTypeShape;
   mandatory?: boolean;
   default?: unknown;
   defaults?: unknown[];
@@ -74,8 +114,6 @@ export type YangStatementInit = {
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;
   grouping_prefix?: string;
-  refines?: Array<YangStatement | YangStatementInit>;
-  augmentations?: Array<YangStatement | YangStatementInit>;
   path?: string;
   augment_path?: string;
   augment_path_segments?: YangIdentifierRef[];
@@ -94,6 +132,15 @@ export type YangStatementInit = {
   refined_defaults?: unknown[];
   refined_config?: boolean;
   allOf?: unknown;
+}
+
+/** Constructor input permits plain child objects and unnormalized types. */
+export type YangStatementInit = YangStatementFields & {
+  local_groupings?: Record<string, YangStatement | YangStatementInit>;
+  statements?: Array<YangStatement | YangStatementInit>;
+  type?: StatementTypeInput;
+  refines?: Array<YangStatement | YangStatementInit>;
+  augmentations?: Array<YangStatement | YangStatementInit>;
 };
 
 const STATEMENT_LIST_KEYS = new Set(["statements", "refines", "augmentations", "local_groupings"]);
@@ -102,62 +149,26 @@ function isStatementInit(value: unknown): value is YangStatementInit {
   return Boolean(value) && typeof value === "object" && !Array.isArray(value);
 }
 
+// Declaration merging shares the common fields without emitting unused properties.
+export interface YangStatement extends YangStatementFields {}
+
 export class YangStatement {
-  keyword?: string;
-  name?: string;
-  argument?: string;
-  description?: string;
-  reference?: string;
-  units?: string;
-  local_groupings?: Record<string, YangStatement>;
+  declare local_groupings?: Record<string, YangStatement>;
   statements: YangStatement[] = [];
-  type?: StatementTypeShape;
-  mandatory?: boolean;
-  default?: unknown;
-  defaults?: unknown[];
-  key?: string;
-  unique?: string[][];
-  min_elements?: number;
-  max_elements?: number;
-  config?: boolean;
-  if_features?: string[];
-  when?: WhenShape;
-  presence?: string;
-  error_message?: string;
-  /** Module each prefixed step in a `must` expression is bound to, by prefix. */
-  xpath_prefixes?: Record<string, string>;
-  grouping_name?: string;
-  grouping_prefix?: string;
-  refines?: YangStatement[];
-  augmentations?: YangStatement[];
-  path?: string;
-  augment_path?: string;
-  augment_path_segments?: YangIdentifierRef[];
-  argument_name?: string;
-  argument_yin_element?: boolean;
-  prefix?: string;
-  resolved_module_name?: string;
-  resolved_extension_name?: string;
-  deviation_path?: string;
-  deviation_path_segments?: YangIdentifierRef[];
-  not_supported?: boolean;
-  defining_module?: string;
-  data_node_kind?: string;
-  refine_target_path?: string;
-  refined_mandatory?: boolean;
-  refined_defaults?: unknown[];
-  refined_config?: boolean;
-  allOf?: unknown;
+  declare type?: StatementTypeShape;
+  declare refines?: YangStatement[];
+  declare augmentations?: YangStatement[];
 
   constructor(init: YangStatementInit = {}) {
     const raw = init as Record<string, unknown>;
     for (const key of Object.keys(raw)) {
-      if (key === "__class__" || STATEMENT_LIST_KEYS.has(key)) {
+      if (key === "__class__" || key === "type" || STATEMENT_LIST_KEYS.has(key)) {
         continue;
       }
       (this as Record<string, unknown>)[key] = raw[key];
     }
     this.statements = statementList(init.statements);
+    if (init.type) this.type = normalizeTypeShape(init.type);
     if (Array.isArray(init.refines)) {
       this.refines = statementList(init.refines);
     }

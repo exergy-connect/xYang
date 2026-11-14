@@ -1,0 +1,1 @@
+module q { namespace "urn:q"; prefix q; grouping g { typedef code { type string { pattern "q+"; } } leaf value { type code; } } }

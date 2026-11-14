@@ -238,9 +238,13 @@ class ParserContext:
     current_parent: _ParserParent
     # Directory of the file being parsed (for resolving include of submodules).
     source_dir: Optional[Path] = None
+    typedef_context: str = ""
 
     def push_parent(self, parent: _ParserParent) -> "ParserContext":
         """Create new context with updated parent."""
+        from ..typedef_scope import scope_path
+
         return ParserContext(
-            module=self.module, current_parent=parent, source_dir=self.source_dir
+            module=self.module, current_parent=parent, source_dir=self.source_dir,
+            typedef_context=scope_path(self.typedef_context, parent),
         )

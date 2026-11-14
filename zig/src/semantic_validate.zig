@@ -13,6 +13,29 @@ const repr = pyfmt.repr;
 
 pub fn validateSemantics(r: *errors.Reporter, module: *Module) Error!void {
     try validateListKeys(r, module.statements.items);
+    for (module.typedefs.values()) |td| try checkType(r, module, td.data.typedef.type, &.{});
+    try checkStatements(r, module, module.statements.items);
+}
+
+fn checkType(r: *errors.Reporter, module: *Module, maybe_type: ?*const ast.TypeStmt, stack: []const *Statement) Error!void {
+    const t = maybe_type orelse return;
+    if (t.kind() == .derived) {
+        const resolved = @import("module.zig").resolveTypedef(t, module) orelse
+            return r.fail(.semantic, "Unknown typedef '{s}' in lexical scope", .{t.name});
+        for (stack) |previous| if (previous == resolved.typedef)
+            return r.fail(.semantic, "Circular typedef '{s}'", .{resolved.typedef.name});
+        const next = try std.mem.concat(r.arena, *Statement, &.{ stack, &.{resolved.typedef} });
+        try checkType(r, resolved.module, resolved.typedef.data.typedef.type, next);
+    }
+    for (t.members()) |member| try checkType(r, module, member, stack);
+}
+
+fn checkStatements(r: *errors.Reporter, module: *Module, statements: []const *Statement) Error!void {
+    for (statements) |s| {
+        if (s.typeSlot()) |slot| try checkType(r, module, slot.*, &.{});
+        if (s.data == .choice) for (s.data.choice.cases.items) |case| try checkStatements(r, module, case.statements.items);
+        try checkStatements(r, module, s.statements.items);
+    }
 }
 
 /// RFC 7950 7.8.2: every key names a child leaf, and a key leaf has no `when` or `if-feature`.

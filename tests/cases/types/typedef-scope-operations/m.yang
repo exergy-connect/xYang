@@ -1,0 +1,7 @@
+module m {
+ yang-version 1.1; namespace "urn:m"; prefix m;
+rpc run {
+ input { typedef code { type uint8 { range '1..5'; } } leaf value { type code; } }
+ output { typedef code { type string { pattern 'a+'; } } leaf value { type code; } }
+}
+}

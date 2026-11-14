@@ -1,0 +1,81 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": ""
+  },
+  "type": "object",
+  "properties": {
+    "a": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/%40p%3A~1%40grouping%3Ag~1code",
+          "x-yang": {
+            "type": "leaf",
+            "units": "status",
+            "type-context": "/@grouping:g"
+          }
+        }
+      },
+      "additionalProperties": false
+    },
+    "b": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/%40q%3A~1%40grouping%3Ag~1code",
+          "x-yang": {
+            "type": "leaf",
+            "type-context": "/@grouping:g"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "@p:/@grouping:g/code": {
+      "type": "string",
+      "pattern": "^p+$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "p+",
+            "invert-match": false
+          }
+        ],
+        "units": "status",
+        "scope": "/@grouping:g",
+        "name": "code"
+      },
+      "default": "p"
+    },
+    "@q:/@grouping:g/code": {
+      "type": "string",
+      "pattern": "^q+$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "q+",
+            "invert-match": false
+          }
+        ],
+        "scope": "/@grouping:g",
+        "name": "code"
+      }
+    }
+  }
+}

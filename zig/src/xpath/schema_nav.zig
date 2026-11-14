@@ -110,5 +110,5 @@ pub fn leafrefPath(schema: Schema) ?*xast.Expr {
     if (schema != .stmt or schema.stmt.kind() != .leaf) return null;
     const t = schema.stmt.data.leaf.type orelse return null;
     if (!std.mem.eql(u8, t.name, "leafref")) return null;
-    return t.path_ast;
+    return t.pathAst();
 }

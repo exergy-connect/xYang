@@ -1,0 +1,4 @@
+module m {
+  yang-version 1.1; namespace "urn:m"; prefix m;
+container a { typedef code { type string; } typedef code { type uint8; } }
+}

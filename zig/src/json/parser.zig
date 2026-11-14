@@ -40,6 +40,7 @@ pub const Parse = struct {
     /// `_PARSING` is set: invocations resolve against the module.
     in_body: bool = false,
     message: []const u8 = "",
+    context: []const u8 = "",
 
     pub fn fail(p: *Parse, comptime fmt: []const u8, args: anytype) Error {
         p.message = try std.fmt.allocPrint(p.a, fmt, args);
@@ -208,7 +209,7 @@ pub fn applyStringPatternEntries(p: *Parse, t: *ast.TypeStmt, merged: *const Obj
             if (et != null and et.? == .string) et.?.string else null,
         ));
     }
-    if (out.items.len > 0) t.patterns = out;
+    if (out.items.len > 0) (try t.ensurePatterns(p.a)).* = out;
 }
 
 /// `_if_features_from_xyang`: a string or a list of strings.
@@ -289,9 +290,32 @@ pub fn basesFromJson(a: Allocator, raw: ?Val) error{OutOfMemory}!std.ArrayList(a
 }
 
 /// `_ref_to_typedef_name`: `#/$defs/name` to `name`.
-pub fn refToTypedefName(ref: []const u8) ?[]const u8 {
-    if (ref.len == 0 or !std.mem.startsWith(u8, ref, K.DEFS_URI_PREFIX)) return null;
-    return ref[K.DEFS_URI_PREFIX.len..];
+pub fn refToTypedefName(p: *Parse, ref: []const u8) Error!?[]const u8 {
+    if (!std.mem.startsWith(u8, ref, K.DEFS_URI_PREFIX)) return null;
+    const raw = ref[K.DEFS_URI_PREFIX.len..];
+    var decoded: std.ArrayList(u8) = .empty;
+    var i: usize = 0;
+    while (i < raw.len) : (i += 1) {
+        if (raw[i] == '%') {
+            if (i + 2 >= raw.len) return p.fail("Invalid typedef reference '{s}'", .{ref});
+            const c = std.fmt.parseInt(u8, raw[i + 1 .. i + 3], 16) catch return p.fail("Invalid typedef reference '{s}'", .{ref});
+            try decoded.append(p.a, c);
+            i += 2;
+        } else try decoded.append(p.a, raw[i]);
+    }
+    var name: std.ArrayList(u8) = .empty;
+    i = 0;
+    while (i < decoded.items.len) : (i += 1) {
+        const c = decoded.items[i];
+        if (c == '~') {
+            if (i + 1 >= decoded.items.len) return p.fail("Invalid typedef reference '{s}'", .{ref});
+            const next = decoded.items[i + 1];
+            if (next != '0' and next != '1') return p.fail("Invalid typedef reference '{s}'", .{ref});
+            try name.append(p.a, if (next == '0') '~' else '/');
+            i += 1;
+        } else try name.append(p.a, c);
+    }
+    return try name.toOwnedSlice(p.a);
 }
 
 /// `_format_decimal64_bound`: a decimal64 range bound in YANG lexical form.
@@ -326,7 +350,7 @@ pub fn fractionDigitsFromMultipleOf(a: Allocator, raw: ?Val) error{OutOfMemory}!
 fn resolveSchema(p: *Parse, schema: *const Object, defs: *const Object) Error!*const Object {
     if (schema.count() == 0) return schema;
     if (schema.get(K.REF)) |ref| if (schema.count() <= 2 and ref == .string) {
-        if (refToTypedefName(ref.string)) |name| if (name.len > 0) if (getObj(defs, name)) |d| return resolveSchema(p, d, defs);
+        if (try refToTypedefName(p, ref.string)) |name| if (name.len > 0) if (getObj(defs, name)) |d| return resolveSchema(p, d, defs);
     };
     if (schema.get(K.ALL_OF)) |all| {
         const merged = try newObject(p.a);
@@ -351,6 +375,13 @@ fn resolveSchema(p: *Parse, schema: *const Object, defs: *const Object) Error!*c
 /// `_type_from_schema`: the registry's type plus `units`.
 pub fn typeFromSchema(p: *Parse, defs: *const Object, schema: *const Object, xyang: *const Object) Error!?*ast.TypeStmt {
     const t = try registry.typeStmtFromSchema(p, defs, schema, xyang) orelse return null;
+    t.context = p.context;
+    const merged = try mergeSchemaXyang(p.a, schema, xyang);
+    if (merged.get(K.xy.TYPE_CONTEXT)) |value| {
+        if (value != .string or (value.string.len > 0 and !@import("../typedef_scope.zig").valid(value.string)))
+            return p.fail("typedef scope must be a non-empty absolute context path", .{});
+        t.context = value.string;
+    }
     const units = unitsOf(try mergeSchemaXyang(p.a, schema, xyang));
     if (units.len > 0) t.units = units;
     return t;
@@ -358,7 +389,7 @@ pub fn typeFromSchema(p: *Parse, defs: *const Object, schema: *const Object, xya
 
 fn stringType(p: *Parse) error{OutOfMemory}!*ast.TypeStmt {
     const t = try p.a.create(ast.TypeStmt);
-    t.* = .{ .name = registry.STRING };
+    t.* = ast.TypeStmt.init(registry.STRING, null);
     return t;
 }
 
@@ -380,7 +411,16 @@ fn newStatement(p: *Parse, name: []const u8, data: ast.Data) error{OutOfMemory}!
 /// `_build_typedef`: a `$defs` entry that is not an identity.
 fn buildTypedef(p: *Parse, name: []const u8, def: *const Object) Error!*Statement {
     const xy = try xyangOf(p, def);
-    const s = try newStatement(p, name, .{ .typedef = .{} });
+    const actual_name = try textField(p, xy, K.NAME, name);
+    const s = try newStatement(p, actual_name, .{ .typedef = .{} });
+    if (xy.get(K.xy.SCOPE)) |value| {
+        if (value != .string or !@import("../typedef_scope.zig").valid(value.string))
+            return p.fail("typedef scope must be a non-empty absolute context path", .{});
+        s.data.typedef.scope = value.string;
+    }
+    const saved = p.context;
+    defer p.context = saved;
+    p.context = s.data.typedef.scope orelse "";
     s.description = try textField(p, def, K.DESCRIPTION, "");
     s.data.typedef.type = try typeFromSchema(p, p.defs, def, xy) orelse try stringType(p);
     if (def.get(K.DEFAULT)) |d| if (d != .null) {
@@ -429,7 +469,7 @@ const SchemaAndXyang = struct { schema: *const Object, xyang: *const Object };
 fn propertySchemaAndXyang(p: *Parse, prop: *const Object, defs: *const Object) Error!SchemaAndXyang {
     const a = p.a;
     if (prop.get(K.REF)) |ref| if (prop.contains(K.X_YANG)) {
-        const ref_name = if (ref == .string) refToTypedefName(ref.string) else null;
+        const ref_name = if (ref == .string) try refToTypedefName(p, ref.string) else null;
         const base: *const Object = if (ref_name) |n| (if (defs.get(n)) |b| (if (b == .object) b.object else return p.fail("$defs entry {f} must be an object", .{repr(n)})) else &empty_object) else &empty_object;
         const schema = try newObject(a);
         for (base.keys(), base.values()) |k, v| try schema.put(a, k, v);
@@ -449,7 +489,7 @@ fn propertySchemaAndXyang(p: *Parse, prop: *const Object, defs: *const Object) E
         if (all == .array) for (all.array) |part| {
             if (part != .object) continue;
             if (part.object.get(K.REF)) |ref| {
-                const name = if (ref == .string) refToTypedefName(ref.string) else null;
+                const name = if (ref == .string) try refToTypedefName(p, ref.string) else null;
                 if (name) |n| if (n.len > 0) if (defs.get(n)) |d| {
                     if (d != .object) return p.fail("$defs entry {f} must be an object", .{repr(n)});
                     for (d.object.keys(), d.object.values()) |k, v| try merged.put(a, k, v);
@@ -644,6 +684,9 @@ fn convertChildren(p: *Parse, props: *const Object, required: []const []const u8
 }
 
 fn convertContainer(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, defs: *const Object, parent_path: []const u8, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
+    const saved_context = p.context;
+    defer p.context = saved_context;
+    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const props = try propertiesOf(p, schema);
     const one_of = schema.get(K.ONE_OF);
     var children: std.ArrayList(*Statement) = .empty;
@@ -681,6 +724,9 @@ fn bound(p: *Parse, schema: *const Object, key: []const u8) Error!?i64 {
 }
 
 fn convertList(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, defs: *const Object, parent_path: []const u8, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
+    const saved_context = p.context;
+    defer p.context = saved_context;
+    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const a = p.a;
     const key = xy.get(K.xy.KEY);
     const items = try resolveSchema(p, try objectOr(p, schema, K.ITEMS), defs);
@@ -746,12 +792,12 @@ fn mandatoryOf(name: []const u8, schema: *const Object, xy: *const Object, overr
 fn convertLeaf(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, prop: *const Object, defs: *const Object, override: ?bool, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
     const a = p.a;
     var type_schema = schema;
-    if (prop.get(K.REF)) |ref| if (ref == .string) if (refToTypedefName(ref.string)) |rn| if (rn.len > 0) if (getObj(defs, rn) != null) {
+    if (prop.get(K.REF)) |ref| if (ref == .string) if (try refToTypedefName(p, ref.string)) |rn| if (rn.len > 0) if (getObj(defs, rn) != null) {
         type_schema = prop;
     };
     const t = try typeFromSchema(p, defs, type_schema, xy) orelse try stringType(p);
     var default: ?[]const u8 = null;
-    if (schema.get(K.DEFAULT)) |d| if (d != .null) {
+    if (prop.get(K.DEFAULT)) |d| if (d != .null) {
         const st = schema.get(K.TYPE);
         const st_name = if (st != null and st.? == .string) st.?.string else "";
         if (std.mem.eql(u8, st_name, "boolean")) {
@@ -773,7 +819,7 @@ fn convertLeaf(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
         }
     };
     const leaf = try newStatement(p, name, .{ .leaf = .{ .type = t, .mandatory = mandatoryOf(name, schema, xy, override), .default = default } });
-    leaf.description = try textField(p, schema, K.DESCRIPTION, "");
+    leaf.description = try textField(p, prop, K.DESCRIPTION, "");
     leaf.must_statements = musts;
     leaf.when = try whenOf(p, xy);
     try setNodeAnnotations(p, leaf, xy);
@@ -859,6 +905,9 @@ fn convertChoice(p: *Parse, name: []const u8, schema: *const Object, xy: *const 
 
 /// `_convert_io_block`: rpc / action `input` or `output`.
 fn convertIoBlock(p: *Parse, schema: *const Object, defs: *const Object, parent_path: []const u8, io_type: []const u8) Error!?*Statement {
+    const saved_context = p.context;
+    defer p.context = saved_context;
+    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, io_type) });
     const xy = try xyangOf(p, schema);
     if (!xyTypeIs(xy, io_type)) return null;
     const musts = try mustList(p, xy);
@@ -876,6 +925,9 @@ fn convertIoBlock(p: *Parse, schema: *const Object, defs: *const Object, parent_
 
 /// `_convert_rpc`: one `x-yang.rpcs` or `x-yang.actions` entry.
 fn convertRpc(p: *Parse, name: []const u8, value: *const Object, defs: *const Object, kind: []const u8) Error!*Statement {
+    const saved_context = p.context;
+    defer p.context = saved_context;
+    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const a = p.a;
     const xy = try xyangOf(p, value);
     if (!xyTypeIs(xy, kind)) {
@@ -923,6 +975,9 @@ fn attachActions(p: *Parse, s: ?*Statement, prop: *const Object, defs: *const Ob
     const actions = sx.xyang.get(K.xy.ACTIONS) orelse return stmt;
     if (actions == .null) return stmt;
     if (actions != .object) return p.fail("x-yang \"actions\" at {s} must be an object keyed by action name", .{parent_path});
+    const saved_context = p.context;
+    defer p.context = saved_context;
+    p.context = try @import("../typedef_scope.zig").path(p.a, saved_context, stmt);
     for (actions.object.keys(), actions.object.values()) |action_name, v| {
         if (v != .object) return p.fail("action {f} at {s} must be an object", .{ repr(action_name), parent_path });
         const colon = std.mem.lastIndexOfScalar(u8, action_name, ':');
@@ -1189,6 +1244,12 @@ fn parseInto(p: *Parse, data: Val) Error!void {
     }
     try appendInvocations(p, &m.statements, root_xy);
     try applyInvocations(p, m);
+    var diagnostic: errors.Diagnostic = .{};
+    var reporter: errors.Reporter = .{ .arena = a, .diag = &diagnostic };
+    @import("../semantic_validate.zig").validateSemantics(&reporter, m) catch |err| switch (err) {
+        error.OutOfMemory => return error.OutOfMemory,
+        error.YangLoad => return p.fail("{s}", .{diagnostic.message}),
+    };
 }
 
 fn reloadForTest(a: Allocator, text_in: []const u8, message: *[]const u8) !*Module {
@@ -1221,8 +1282,8 @@ test "the form reloads and regenerates" {
     try std.testing.expectEqualStrings("t", back.name);
     const top = back.statements.items[0];
     try std.testing.expectEqualStrings("pct", top.statements.items[0].data.leaf.type.?.name);
-    try std.testing.expect(top.statements.items[1].data.leaf.type.?.patterns.items[0].compiled != null);
-    try std.testing.expectEqualStrings("1..4", top.statements.items[1].data.leaf.type.?.length.?);
+    try std.testing.expect(top.statements.items[1].data.leaf.type.?.patterns()[0].compiled != null);
+    try std.testing.expectEqualStrings("1..4", top.statements.items[1].data.leaf.type.?.lengthRestriction().expression.?);
     try std.testing.expectEqualStrings("rpc", @tagName(back.statements.items[1].kind()));
     try std.testing.expectEqualStrings(text1, try gen.schemaToYangJson(a, back, &diag));
 }
@@ -1240,4 +1301,34 @@ test "load errors carry Python's text" {
     try std.testing.expectEqualStrings("extension invocation 'q:e': unknown prefix 'q'", message);
     try std.testing.expectError(error.JsonForm, reloadForTest(a, "{\"x-yang\": {\"imports\": {\"b\": {\"module\": 1}}}}", &message));
     try std.testing.expectEqualStrings("\"imports\" entry 'b' must be an object with \"module\" and \"prefix\"", message);
+}
+
+test "native global typedefs retain an explicit scope independent of their storage key" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var message: []const u8 = "";
+    const module = try reloadForTest(arena.allocator(),
+        \\{"x-yang":{"module":"m","prefix":"m"},
+        \\ "$defs":{"code":{"type":"string","x-yang":{"scope":"/a"}}},
+        \\ "properties":{"a":{"type":"object","x-yang":{"type":"container"},
+        \\   "properties":{"value":{"$ref":"#/$defs/code","x-yang":{"type":"leaf"}}}}}}
+    , &message);
+    const td = module.typedefs.get("code").?;
+    try std.testing.expectEqualStrings("/a", td.data.typedef.scope.?);
+    const reference = module.statements.items[0].statements.items[0].data.leaf.type.?;
+    try std.testing.expectEqualStrings("/a", reference.context.?);
+    try std.testing.expect(@import("../module.zig").resolveTypedef(reference, module).?.typedef == td);
+}
+
+test "native scoped references reject a sibling sharing only a name prefix" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var message: []const u8 = "";
+    try std.testing.expectError(error.JsonForm, reloadForTest(arena.allocator(),
+        \\{"x-yang":{"module":"m","prefix":"m"},
+        \\ "$defs":{"code":{"type":"string","x-yang":{"scope":"/a"}}},
+        \\ "properties":{"ab":{"type":"object","x-yang":{"type":"container"},
+        \\   "properties":{"value":{"$ref":"#/$defs/code","x-yang":{"type":"leaf"}}}}}}
+    , &message));
+    try std.testing.expectEqualStrings("Unknown typedef 'code' in lexical scope", message);
 }

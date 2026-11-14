@@ -8,6 +8,8 @@ YangLeafStmt, YangLeafListStmt, YangTypedefStmt, YangTypeStmt, YangMustStmt.
 
 from __future__ import annotations
 
+from ..ast import make_type_stmt
+
 import contextvars
 import json
 from decimal import Decimal, InvalidOperation
@@ -15,6 +17,7 @@ from pathlib import Path
 from typing import Any
 
 from ..module import YangModule
+from ..typedef_scope import validate_scope
 from ..identifier_ref import YangIdentifierRef, coerce_identifier_ref
 from ..ext import ensure_builtin_extensions_loaded
 from ..ext.capabilities import ExtensionIdentity, apply_extension_invocations, get_extension_apply_callback
@@ -188,7 +191,9 @@ def _ref_to_typedef_name(ref: str) -> str | None:
     """Return typedef name from $ref like '#/$defs/entity-name' or None."""
     if not ref or not ref.startswith(JSON_SCHEMA_DEFS_URI_PREFIX):
         return None
-    return ref.removeprefix(JSON_SCHEMA_DEFS_URI_PREFIX)
+    from urllib.parse import unquote
+
+    return unquote(ref.removeprefix(JSON_SCHEMA_DEFS_URI_PREFIX)).replace("~1", "/").replace("~0", "~")
 
 
 def _format_decimal64_bound(value: Any, fraction_digits: int | None) -> str:
@@ -248,6 +253,9 @@ def _type_from_schema(defs: dict[str, Any], schema: dict[str, Any], xyang: dict[
     stmt = type_stmt_from_schema(defs, schema, xyang)
     if stmt is not None:
         merged_xy = _merge_schema_xyang(schema, xyang)
+        if "type-context" in merged_xy:
+            value = merged_xy["type-context"]
+            stmt.context = value if value == "" else validate_scope(value)
         units = _units_from_xyang(merged_xy)
         if units:
             stmt.units = units
@@ -278,14 +286,17 @@ def _build_typedef(def_name: str, def_schema: dict[str, Any], defs: dict[str, An
     desc = def_schema.get(JsonSchemaKey.DESCRIPTION, "")
     type_stmt = _type_from_schema(defs, def_schema, xyang)
     if type_stmt is None:
-        type_stmt = YangTypeStmt(name="string")
+        type_stmt = make_type_stmt(name="string")
     default = def_schema.get(JsonSchemaKey.DEFAULT)
     stmt = YangTypedefStmt(
-        name=def_name,
+        name=xyang.get("name", def_name),
+        scope=validate_scope(xyang["scope"]) if "scope" in xyang else None,
         description=desc,
         type=type_stmt,
         default=default,
     )
+    if stmt.type.context is None:
+        stmt.type.context = stmt.scope or ""
     units = _units_from_xyang(xyang)
     if units:
         stmt.units = units
@@ -634,7 +645,7 @@ def _convert_leaf(
     must_list: list[YangMustStmt],
 ) -> YangLeafStmt:
     """Convert a leaf property to YangLeafStmt."""
-    description = schema.get(JsonSchemaKey.DESCRIPTION, "")
+    description = prop_value.get(JsonSchemaKey.DESCRIPTION, "") if JsonSchemaKey.REF in prop_value else schema.get(JsonSchemaKey.DESCRIPTION, "")
     type_schema = schema
     if JsonSchemaKey.REF in prop_value:
         ref_name = _ref_to_typedef_name(prop_value[JsonSchemaKey.REF])
@@ -644,14 +655,14 @@ def _convert_leaf(
                 type_schema = prop_value
     type_stmt = _type_from_schema(defs, type_schema, xyang)
     if type_stmt is None:
-        type_stmt = YangTypeStmt(name="string")
+        type_stmt = make_type_stmt(name="string")
     if mandatory_override is not None:
         mandatory = mandatory_override
     elif xyang.get(XYangKey.MANDATORY) is True:
         mandatory = True
     else:
         mandatory = name in (schema.get(JsonSchemaKey.REQUIRED) or [])
-    default = schema.get(JsonSchemaKey.DEFAULT)
+    default = prop_value.get(JsonSchemaKey.DEFAULT) if JsonSchemaKey.REF in prop_value else schema.get(JsonSchemaKey.DEFAULT)
     if default is not None:
         schema_type = schema.get(JsonSchemaKey.TYPE)
         if schema_type == "boolean":
@@ -726,7 +737,7 @@ def _convert_leaf_list(
     )
     type_stmt = _type_from_schema(defs, items_schema, items_xyang or xyang)
     if type_stmt is None:
-        type_stmt = YangTypeStmt(name="string")
+        type_stmt = make_type_stmt(name="string")
     when_stmt = _when_from_xyang(xyang)
     ll = YangLeafListStmt(
         statements=[],
@@ -983,17 +994,19 @@ def _convert_property_local(
     return None
 
 
-def _bind_type_paths(type_stmt: Any, module: YangModule) -> None:
+def _bind_type_paths(type_stmt: Any, module: YangModule, context: str = "") -> None:
     if type_stmt is None:
         return
+    if type_stmt.context is None:
+        type_stmt.context = context
     path = getattr(type_stmt, "path", None)
     if path is not None and not getattr(path, "bound", False):
         bind_xpath_prefixes(path, module.resolve_prefix_to_module_name, path.to_string())
     for member in getattr(type_stmt, "types", None) or []:
-        _bind_type_paths(member, module)
+        _bind_type_paths(member, module, type_stmt.context)
 
 
-def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
+def _bind_xpath_prefixes(stmts: list[Any], module: YangModule, context: str = "") -> None:
     """Bind prefixed steps in every ``must``, ``when`` and leafref ``path`` without a recorded
     ``xpath-prefixes`` map to *module*'s own prefix."""
     for stmt in stmts:
@@ -1003,10 +1016,12 @@ def _bind_xpath_prefixes(stmts: list[Any], module: YangModule) -> None:
         when = getattr(stmt, "when", None)
         if when is not None and not getattr(when, "prefixes_bound", False):
             when.bind_prefixes(module)
-        _bind_type_paths(getattr(stmt, "type", None), module)
-        _bind_xpath_prefixes(stmt.statements, module)
+        from ..typedef_scope import scope_path
+
+        _bind_type_paths(getattr(stmt, "type", None), module, context)
+        _bind_xpath_prefixes(stmt.statements, module, scope_path(context, stmt))
         for case in getattr(stmt, "cases", None) or []:
-            _bind_xpath_prefixes([case], module)
+            _bind_xpath_prefixes([case], module, context)
 
 
 class _JsonParse:
@@ -1304,4 +1319,7 @@ def _parse_json_schema_body(
 
     _bind_xpath_prefixes(module.statements, module)
     for typedef in module.typedefs.values():
-        _bind_type_paths(getattr(typedef, "type", None), module)
+        _bind_type_paths(getattr(typedef, "type", None), module, typedef.scope or "")
+    from ..semantic_validate import validate_semantics
+
+    validate_semantics(module)

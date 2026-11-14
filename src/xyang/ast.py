@@ -104,6 +104,8 @@ class YangTypedefStmt(YangStatement):
     """Typedef statement."""
     type: Optional['YangTypeStmt'] = None
     default: Optional[Any] = None
+    # Optional lexical subcontext restriction; None means module-wide.
+    scope: Optional[str] = None
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -155,41 +157,135 @@ class YangPatternSpec:
         self.compiled = translate(self.pattern) if self.pattern else None
 
 
-@dataclass
+@dataclass(slots=True)
 class YangTypeStmt:
-    """Type statement.
-
-    For ``pattern`` under string and binary types (RFC 7950 §9.4.6 / §9.8.1),
-    ``patterns`` holds every ``pattern`` substatement (including
-    ``modifier invert-match`` in YANG 1.1) with optional per-pattern
-    ``error-message`` / ``error-app-tag``.
-    """
+    """Common identity and declaration context of a type statement."""
 
     name: str
     prefix: Optional[str] = None
     units: str = ""
-    patterns: List[YangPatternSpec] = field(default_factory=list)
-    length: Optional[str] = None
-    range: Optional[str] = None
-    # RFC 7950 §9.4.4 / §9.2.4 body. The constraint strings above are unchanged.
-    length_error_message: Optional[str] = None
-    length_error_app_tag: Optional[str] = None
-    length_description: str = ""
-    length_reference: str = ""
-    range_error_message: Optional[str] = None
-    range_error_app_tag: Optional[str] = None
-    range_description: str = ""
-    range_reference: str = ""
-    fraction_digits: Optional[int] = None
-    enums: List[str] = field(default_factory=list)
-    bits: List[YangBitStmt] = field(default_factory=list)  # For bits type
-    types: List['YangTypeStmt'] = field(default_factory=list)  # For union types
-    path: Optional["PathNode"] = None  # For leafref: parsed XPath path, set during parsing
-    require_instance: bool = True  # For leafref
-    identityref_bases: List[YangIdentifierRef] = field(default_factory=list)
-    # Module that wrote this ``type`` (RFC 7950 §7.13, §9.9.2): its prefix and typedef name
-    # resolve there, also when a grouping or augment places the node in another module.
     scope: Any = field(default=None, compare=False, repr=False)
+    context: Optional[str] = None
+
+
+@dataclass(slots=True)
+class YangRestriction:
+    expression: str
+    error_message: Optional[str] = None
+    error_app_tag: Optional[str] = None
+    description: str = ""
+    reference: str = ""
+
+
+def _restriction_attribute(slot: str, attribute: str, default: Any = None) -> property:
+    def get(stmt):
+        restriction = getattr(stmt, slot)
+        return getattr(restriction, attribute) if restriction is not None else default
+
+    def set_value(stmt, value):
+        restriction = getattr(stmt, slot)
+        if restriction is None:
+            if value == default:
+                return
+            restriction = YangRestriction("")
+            setattr(stmt, slot, restriction)
+        setattr(restriction, attribute, value)
+
+    return property(get, set_value)
+
+
+class _RangeAttributes:
+    __slots__ = ()
+    range = _restriction_attribute("range_restriction", "expression")
+    range_error_message = _restriction_attribute("range_restriction", "error_message")
+    range_error_app_tag = _restriction_attribute("range_restriction", "error_app_tag")
+    range_description = _restriction_attribute("range_restriction", "description", "")
+    range_reference = _restriction_attribute("range_restriction", "reference", "")
+
+
+class _LengthAttributes:
+    __slots__ = ()
+    length = _restriction_attribute("length_restriction", "expression")
+    length_error_message = _restriction_attribute("length_restriction", "error_message")
+    length_error_app_tag = _restriction_attribute("length_restriction", "error_app_tag")
+    length_description = _restriction_attribute("length_restriction", "description", "")
+    length_reference = _restriction_attribute("length_restriction", "reference", "")
+
+
+@dataclass(slots=True)
+class YangNumericTypeStmt(YangTypeStmt, _RangeAttributes):
+    range_restriction: Optional[YangRestriction] = None
+
+
+@dataclass(slots=True)
+class YangDecimalTypeStmt(YangNumericTypeStmt):
+    fraction_digits: Optional[int] = None
+
+
+@dataclass(slots=True)
+class YangBinaryTypeStmt(YangTypeStmt, _LengthAttributes):
+    length_restriction: Optional[YangRestriction] = None
+
+
+@dataclass(slots=True)
+class YangStringTypeStmt(YangBinaryTypeStmt):
+    patterns: Optional[List[YangPatternSpec]] = None
+
+
+@dataclass(slots=True)
+class YangEnumerationTypeStmt(YangTypeStmt):
+    enums: List[str] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class YangBitsTypeStmt(YangTypeStmt):
+    bits: List[YangBitStmt] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class YangUnionTypeStmt(YangTypeStmt):
+    types: List[YangTypeStmt] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class YangInstanceIdentifierTypeStmt(YangTypeStmt):
+    require_instance: bool = True
+
+
+@dataclass(slots=True)
+class YangLeafrefTypeStmt(YangInstanceIdentifierTypeStmt):
+    path: Optional["PathNode"] = None
+
+
+@dataclass(slots=True)
+class YangIdentityrefTypeStmt(YangTypeStmt):
+    identityref_bases: List[YangIdentifierRef] = field(default_factory=list)
+
+
+@dataclass(slots=True)
+class YangDerivedTypeStmt(YangTypeStmt, _RangeAttributes, _LengthAttributes):
+    """An unresolved typedef reference, with only explicitly supplied restrictions."""
+
+    range_restriction: Optional[YangRestriction] = None
+    length_restriction: Optional[YangRestriction] = None
+    patterns: Optional[List[YangPatternSpec]] = None
+    # Enumeration and bits may be narrowed on derived references.
+    enums: Optional[List[str]] = None
+    bits: Optional[List[YangBitStmt]] = None
+    require_instance: Optional[bool] = None
+
+
+def make_type_stmt(name: str, prefix: Optional[str] = None, **attributes: Any) -> YangTypeStmt:
+    """Construct the type family selected by the built-in registry, or a typedef reference."""
+    from .types.registry import type_statement_class
+
+    cls = type_statement_class(name, prefix)
+    initial = {key: value for key, value in attributes.items() if key in cls.__dataclass_fields__}
+    stmt = cls(name=name, prefix=prefix, **initial)
+    for key, value in attributes.items():
+        if key not in initial:
+            setattr(stmt, key, value)
+    return stmt
 
 
 @dataclass

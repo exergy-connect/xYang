@@ -9,6 +9,15 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- **Typedef scope:** nested typedefs are visible only in their declaration context and descendants. Lookup checks scope during existing resolution, including imported groupings and includes. Native JSON preserves scope restrictions in global `$defs` with optional `x-yang.scope`, `x-yang.name`, and reference context metadata, and rejects scoped reference restrictions that cannot be exported without loss.
+
+### Changed
+
+- **Type AST storage:** specialized `YangTypeStmt` subclasses hold only attributes relevant to their type family. Range and length metadata uses restriction objects, and optional fields and pattern lists are allocated when needed. Use `createTypeStmt` to construct the appropriate specialized type. Normalized statement types form a sparse discriminated union.
+- **Statement field definitions:** `YangStatementInit` and `YangStatement` share common fields while retaining separate input and normalized runtime types. Unused optional statement properties no longer occupy runtime objects.
+
 ## [1.0.1] — 2026-11-13
 
 ### Removed

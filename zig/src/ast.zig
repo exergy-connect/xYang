@@ -38,34 +38,234 @@ pub const PatternSpec = struct {
     compiled: ?*const xsd_regex.Regex = null,
 };
 
+/// Restriction metadata is allocated only when a range or length is present.
+pub const TypeRestriction = struct {
+    expression: ?[]const u8 = null,
+    error_message: ?[]const u8 = null,
+    error_app_tag: ?[]const u8 = null,
+    description: []const u8 = "",
+    reference: []const u8 = "",
+};
+
+pub const NumericType = struct { range: ?*TypeRestriction = null };
+pub const DecimalType = struct { range: ?*TypeRestriction = null, fraction_digits: ?i64 = null };
+pub const BinaryType = struct { length: ?*TypeRestriction = null };
+pub const StringType = struct { length: ?*TypeRestriction = null, patterns: std.ArrayList(PatternSpec) = .empty };
+pub const EnumerationType = struct { enums: StringList = .empty };
+pub const BitsType = struct { bits: std.ArrayList(BitStmt) = .empty };
+pub const UnionType = struct { types: std.ArrayList(*TypeStmt) = .empty };
+pub const LeafrefType = struct {
+    path: ?[]const u8 = null,
+    path_ast: ?*xpath_ast.Expr = null,
+    require_instance: bool = true,
+};
+pub const IdentityrefType = struct { identityref_bases: std.ArrayList(IdentifierRef) = .empty };
+pub const InstanceIdentifierType = struct { require_instance: bool = true };
+/// A typedef reference may carry restrictions before its base type is resolved.
+pub const DerivedType = struct {
+    range: ?*TypeRestriction = null,
+    length: ?*TypeRestriction = null,
+    patterns: std.ArrayList(PatternSpec) = .empty,
+    enums: StringList = .empty,
+    bits: std.ArrayList(BitStmt) = .empty,
+    require_instance: bool = true,
+};
+
+/// Pointer payloads keep even the largest family out of the common header.
+/// Null means the family has no explicit attributes and needs no allocation.
+pub const TypeData = union(enum) {
+    plain: void,
+    numeric: ?*NumericType,
+    decimal: ?*DecimalType,
+    binary: ?*BinaryType,
+    string: ?*StringType,
+    enumeration: ?*EnumerationType,
+    bits: ?*BitsType,
+    @"union": ?*UnionType,
+    leafref: ?*LeafrefType,
+    identityref: ?*IdentityrefType,
+    instance_identifier: ?*InstanceIdentifierType,
+    derived: ?*DerivedType,
+};
+pub const TypeKind = std.meta.Tag(TypeData);
+
 pub const TypeStmt = struct {
     name: []const u8,
     prefix: ?[]const u8 = null,
     units: []const u8 = "",
-    patterns: std.ArrayList(PatternSpec) = .empty,
-    length: ?[]const u8 = null,
-    range: ?[]const u8 = null,
-    length_error_message: ?[]const u8 = null,
-    length_error_app_tag: ?[]const u8 = null,
-    length_description: []const u8 = "",
-    length_reference: []const u8 = "",
-    range_error_message: ?[]const u8 = null,
-    range_error_app_tag: ?[]const u8 = null,
-    range_description: []const u8 = "",
-    range_reference: []const u8 = "",
-    fraction_digits: ?i64 = null,
-    enums: StringList = .empty,
-    bits: std.ArrayList(BitStmt) = .empty,
-    types: std.ArrayList(*TypeStmt) = .empty,
-    /// leafref `path` source text.
-    path: ?[]const u8 = null,
-    /// `path` parsed as a schema path and bound to the prefixes of the module that wrote it.
-    path_ast: ?*xpath_ast.Expr = null,
-    require_instance: bool = true,
-    identityref_bases: std.ArrayList(IdentifierRef) = .empty,
-    /// Module that wrote this `type` (RFC 7950 7.13, 9.9.2): its prefix and typedef name
-    /// resolve there, also when a grouping or augment places the node in another module.
+    /// Module that wrote this type, retained when groupings or augments move it.
     scope: ?*Module = null,
+    /// Lexical declaration context, preserved through uses expansion and native JSON.
+    context: ?[]const u8 = null,
+    data: TypeData,
+
+    pub fn init(name: []const u8, prefix: ?[]const u8) TypeStmt {
+        const family = @import("types/registry.zig").typeKind(name, prefix);
+        const data: TypeData = switch (family) {
+            .plain => .{ .plain = {} },
+            inline else => |tag| @unionInit(TypeData, @tagName(tag), null),
+        };
+        return .{ .name = name, .prefix = prefix, .data = data };
+    }
+
+    pub fn kind(self: *const TypeStmt) TypeKind {
+        return std.meta.activeTag(self.data);
+    }
+
+    fn Payload(comptime family: TypeKind) type {
+        return @typeInfo(@typeInfo(@FieldType(TypeData, @tagName(family))).optional.child).pointer.child;
+    }
+
+    pub fn get(self: *const TypeStmt, comptime family: TypeKind) ?*const Payload(family) {
+        if (self.kind() != family) return null;
+        return @field(self.data, @tagName(family));
+    }
+
+    /// Callers must first establish the family (parser input is checked explicitly).
+    /// Payloads and their lists live in the same arena as the owning module.
+    pub fn ensure(self: *TypeStmt, comptime family: TypeKind, a: std.mem.Allocator) error{OutOfMemory}!*Payload(family) {
+        std.debug.assert(self.kind() == family);
+        const slot = &@field(self.data, @tagName(family));
+        if (slot.* == null) {
+            const value = try a.create(Payload(family));
+            value.* = .{};
+            slot.* = value;
+        }
+        return slot.*.?;
+    }
+
+    pub fn supportsRange(self: *const TypeStmt) bool {
+        return switch (self.kind()) {
+            .numeric, .decimal, .derived => true,
+            else => false,
+        };
+    }
+    pub fn supportsLength(self: *const TypeStmt) bool {
+        return switch (self.kind()) {
+            .string, .binary, .derived => true,
+            else => false,
+        };
+    }
+
+    pub fn rangeRestriction(self: *const TypeStmt) *const TypeRestriction {
+        const value: ?*const TypeRestriction = switch (self.data) {
+            inline .numeric, .decimal, .derived => |p| if (p) |v| v.range else null,
+            else => null,
+        };
+        return value orelse &.{};
+    }
+    pub fn lengthRestriction(self: *const TypeStmt) *const TypeRestriction {
+        const value: ?*const TypeRestriction = switch (self.data) {
+            inline .string, .binary, .derived => |p| if (p) |v| v.length else null,
+            else => null,
+        };
+        return value orelse &.{};
+    }
+    pub fn ensureRange(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*TypeRestriction {
+        const slot = switch (self.data) {
+            inline .numeric, .decimal, .derived => |_, tag| &((try self.ensure(tag, a)).range),
+            else => unreachable,
+        };
+        if (slot.* == null) {
+            const r = try a.create(TypeRestriction);
+            r.* = .{};
+            slot.* = r;
+        }
+        return slot.*.?;
+    }
+    pub fn ensureLength(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*TypeRestriction {
+        const slot = switch (self.data) {
+            inline .string, .binary, .derived => |_, tag| &((try self.ensure(tag, a)).length),
+            else => unreachable,
+        };
+        if (slot.* == null) {
+            const r = try a.create(TypeRestriction);
+            r.* = .{};
+            slot.* = r;
+        }
+        return slot.*.?;
+    }
+
+    pub fn patterns(self: *const TypeStmt) []const PatternSpec {
+        return switch (self.data) {
+            inline .string, .derived => |p| if (p) |v| v.patterns.items else &.{},
+            else => &.{},
+        };
+    }
+    pub fn ensurePatterns(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*std.ArrayList(PatternSpec) {
+        return switch (self.data) {
+            inline .string, .derived => |_, tag| &((try self.ensure(tag, a)).patterns),
+            else => unreachable,
+        };
+    }
+
+    pub fn enums(self: *const TypeStmt) []const []const u8 {
+        return switch (self.data) {
+            inline .enumeration, .derived => |p| if (p) |v| v.enums.items else &.{},
+            else => &.{},
+        };
+    }
+    pub fn ensureEnums(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*StringList {
+        return switch (self.data) {
+            inline .enumeration, .derived => |_, tag| &((try self.ensure(tag, a)).enums),
+            else => unreachable,
+        };
+    }
+
+    pub fn bits(self: *const TypeStmt) []const BitStmt {
+        return switch (self.data) {
+            inline .bits, .derived => |p| if (p) |v| v.bits.items else &.{},
+            else => &.{},
+        };
+    }
+    pub fn ensureBits(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*std.ArrayList(BitStmt) {
+        return switch (self.data) {
+            inline .bits, .derived => |_, tag| &((try self.ensure(tag, a)).bits),
+            else => unreachable,
+        };
+    }
+
+    pub fn members(self: *const TypeStmt) []const *TypeStmt {
+        return switch (self.data) {
+            inline .@"union" => |p| if (p) |v| v.types.items else &.{},
+            else => &.{},
+        };
+    }
+    pub fn ensureMembers(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*std.ArrayList(*TypeStmt) {
+        return switch (self.data) {
+            inline .@"union" => |_, tag| &((try self.ensure(tag, a)).types),
+            else => unreachable,
+        };
+    }
+
+    pub fn identityBases(self: *const TypeStmt) []const IdentifierRef {
+        return switch (self.data) {
+            inline .identityref => |p| if (p) |v| v.identityref_bases.items else &.{},
+            else => &.{},
+        };
+    }
+    pub fn ensureIdentityBases(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*std.ArrayList(IdentifierRef) {
+        return switch (self.data) {
+            inline .identityref => |_, tag| &((try self.ensure(tag, a)).identityref_bases),
+            else => unreachable,
+        };
+    }
+
+    pub fn fractionDigits(self: *const TypeStmt) ?i64 {
+        return if (self.get(.decimal)) |p| p.fraction_digits else null;
+    }
+    pub fn leafrefPath(self: *const TypeStmt) ?[]const u8 {
+        return if (self.get(.leafref)) |p| p.path else null;
+    }
+    pub fn pathAst(self: *const TypeStmt) ?*xpath_ast.Expr {
+        return if (self.get(.leafref)) |p| p.path_ast else null;
+    }
+    pub fn requireInstance(self: *const TypeStmt) bool {
+        return switch (self.data) {
+            inline .leafref, .instance_identifier, .derived => |p| if (p) |v| v.require_instance else true,
+            else => true,
+        };
+    }
 };
 
 pub const MustStmt = struct {
@@ -152,6 +352,7 @@ pub const Bound = ?i64;
 
 pub const Data = union(Kind) {
     typedef: struct {
+        scope: ?[]const u8 = null,
         type: ?*TypeStmt = null,
         default: ?[]const u8 = null,
         /// The default as the native JSON form wrote it (any JSON value), when the module
@@ -199,7 +400,7 @@ pub const Data = union(Kind) {
         resolved_module: []const u8,
         resolved_extension: *Statement,
     },
-    grouping: struct { typedef_names: StringList = .empty },
+    grouping: struct {},
     uses: struct {
         grouping_name: []const u8 = "",
         grouping_prefix: ?[]const u8 = null,
@@ -309,3 +510,43 @@ pub const Statement = struct {
         };
     }
 };
+
+test "type headers reserve only pointer payload storage" {
+    try std.testing.expect(@sizeOf(TypeData) <= 2 * @sizeOf(usize));
+    // Four string slices, a module pointer, and a tagged payload pointer.
+    try std.testing.expect(@sizeOf(TypeStmt) <= 11 * @sizeOf(usize));
+}
+
+test "reading an unconstrained string leaves its payload unallocated" {
+    const t = TypeStmt.init("string", null);
+    try std.testing.expectEqual(TypeKind.string, t.kind());
+    try std.testing.expectEqual(@as(usize, 0), t.patterns().len);
+    try std.testing.expect(t.lengthRestriction().expression == null);
+    try std.testing.expect(t.get(.string) == null);
+}
+
+test "type payload allocation failure leaves the header usable" {
+    var t = TypeStmt.init("string", null);
+    try std.testing.expectError(error.OutOfMemory, t.ensurePatterns(std.testing.failing_allocator));
+    try std.testing.expect(t.get(.string) == null);
+    try std.testing.expectEqual(@as(usize, 0), t.patterns().len);
+}
+
+test "prefixed built-in names remain typedef references" {
+    const t = TypeStmt.init("string", "other");
+    try std.testing.expectEqual(TypeKind.derived, t.kind());
+    try std.testing.expect(t.get(.derived) == null);
+}
+
+test "separate string types own separate mutable pattern lists" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var first = TypeStmt.init("string", null);
+    var second = TypeStmt.init("string", null);
+    try (try first.ensurePatterns(arena.allocator())).append(arena.allocator(), .{ .pattern = "a" });
+    try (try second.ensurePatterns(arena.allocator())).append(arena.allocator(), .{ .pattern = "b" });
+    try std.testing.expectEqualStrings("a", first.patterns()[0].pattern);
+    try std.testing.expectEqualStrings("b", second.patterns()[0].pattern);
+    try std.testing.expect(first.get(.string).?.length == null);
+    try std.testing.expect(first.get(.decimal) == null);
+}

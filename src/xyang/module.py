@@ -78,8 +78,9 @@ class YangModule(YangStatementList):
 def resolve_typedef(type_stmt: Any, fallback: Any) -> tuple[Optional["YangTypedefStmt"], Optional["YangModule"]]:
     """``(typedef, module)`` a derived ``type`` names, resolved where the ``type`` was written.
 
-    The writing module (``type_stmt.scope``, set by the parser) owns the prefix and the
-    unprefixed name (RFC 7950 §7.13). A ``type`` without a scope (built from the native JSON
+    The writing module (``type_stmt.scope``, set by the parser) resolves prefixes and
+    top-level typedef names (RFC 7950 §7.13). Unprefixed references also check the typedef
+    scope against the reference context (§5.5). A ``type`` without a scope (built from the native JSON
     form) resolves in *fallback*. ``(None, None)`` when the prefix or the typedef is unknown.
     """
     scope = getattr(type_stmt, "scope", None) or fallback
@@ -89,5 +90,12 @@ def resolve_typedef(type_stmt: Any, fallback: Any) -> tuple[Optional["YangTypede
     target = scope.resolve_prefixed_module(prefix) if prefix else scope
     if target is None:
         return None, None
-    typedef = target.get_typedef(type_stmt.name)
-    return (typedef, target) if typedef is not None else (None, None)
+    from .typedef_scope import in_scope
+
+    context = getattr(type_stmt, "context", None) or ""
+    direct = target.typedefs.get(type_stmt.name)
+    candidates = [direct] if direct is not None else [td for td in target.typedefs.values() if td.name == type_stmt.name]
+    for td in candidates:
+        if (td.scope is None if prefix else in_scope(td.scope, context)):
+            return td, target
+    return None, None

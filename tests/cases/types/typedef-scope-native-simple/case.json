@@ -1,0 +1,31 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): native JSON scope",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "private typedef",
+      "data": {
+        "a": {
+          "value": "a"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "wrong private type",
+      "data": {
+        "a": {
+          "value": 1
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/a/value",
+          "code": "type"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

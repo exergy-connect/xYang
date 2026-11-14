@@ -1,0 +1,46 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): list",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "list body private type",
+      "data": {
+        "top": {
+          "row": [
+            {
+              "id": "x",
+              "values": [
+                1,
+                5
+              ]
+            }
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "leaf-list restriction",
+      "data": {
+        "top": {
+          "row": [
+            {
+              "id": "x",
+              "values": [
+                6
+              ]
+            }
+          ]
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/row/0/values/0",
+          "code": "range"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

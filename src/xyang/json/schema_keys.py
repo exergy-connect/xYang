@@ -47,7 +47,10 @@ JSON_SCHEMA_DEFS_URI_PREFIX = f"#/{JsonSchemaKey.DEFS}/"
 
 def json_schema_defs_uri(typedef_name: str) -> str:
     """JSON Pointer-style URI for a local ``$defs`` entry (e.g. ``#/$defs/foo``)."""
-    return f"{JSON_SCHEMA_DEFS_URI_PREFIX}{typedef_name}"
+    from urllib.parse import quote
+
+    key = typedef_name.replace("~", "~0").replace("/", "~1")
+    return f"{JSON_SCHEMA_DEFS_URI_PREFIX}{quote(key, safe='~')}"
 
 
 class XYangKey:

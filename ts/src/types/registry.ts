@@ -110,6 +110,19 @@ define({ name: INSTANCE_IDENTIFIER, jsonEncoding: "string", bounds: null, bounds
 
 export const REGISTRY: Readonly<Record<string, Builtin>> = Object.fromEntries(table);
 
+export type TypeStatementKind = "plain" | "numeric" | "decimal" | "binary" | "string" | "enumeration" | "bits" | "union" | "leafref" | "identityref" | "instance-identifier" | "derived";
+const TYPE_KINDS: Readonly<Record<string, TypeStatementKind>> = {
+  [STRING]: "string", [BINARY]: "binary", [DECIMAL64]: "decimal", [ENUMERATION]: "enumeration",
+  [BITS]: "bits", [UNION]: "union", [LEAFREF]: "leafref", [IDENTITYREF]: "identityref",
+  [INSTANCE_IDENTIFIER]: "instance-identifier", [BOOLEAN]: "plain", [EMPTY]: "plain",
+  integer: "numeric", number: "decimal"
+};
+export function typeStatementKind(name: string, prefix?: string): TypeStatementKind {
+  if (prefix) return "derived";
+  if (Object.prototype.hasOwnProperty.call(REGISTRY, name) && REGISTRY[name].bounds) return "numeric";
+  return TYPE_KINDS[name] ?? "derived";
+}
+
 export const YANG_INTEGER_BOUNDS: Readonly<Record<string, readonly [number, number]>> = Object.fromEntries(
   [...table.values()].filter((spec) => spec.bounds).map((spec) => [spec.name, spec.bounds!])
 );

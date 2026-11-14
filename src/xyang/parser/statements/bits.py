@@ -9,7 +9,7 @@ from .. import keywords as kw
 from typing import TYPE_CHECKING, Optional
 
 from ..parser_context import ParserContext, TokenStream, YangTokenType
-from ...ast import YangBitStmt, YangTypeStmt
+from ...ast import YangBitStmt, YangTypeStmt, YangBitsTypeStmt, YangDerivedTypeStmt
 
 if TYPE_CHECKING:
     from ..statement_parsers import StatementParsers
@@ -23,6 +23,10 @@ class BitsStatementParser:
 
     def parse_type_bit(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
         """Parse ``bit`` substatement under ``type bits { ... }`` (RFC 7950 §9.3.4)."""
+        if not isinstance(type_stmt, (YangBitsTypeStmt, YangDerivedTypeStmt)):
+            raise tokens.make_error("bit requires a bits or derived type")
+        if type_stmt.bits is None:
+            type_stmt.bits = []
         tokens.consume(kw.BIT)
         bit_name = tokens.consume()
         bit_stmt = YangBitStmt(name=bit_name, position=None)
@@ -44,7 +48,7 @@ class BitsStatementParser:
             parent.position = pos
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def finalize_bits_type(self, type_stmt: YangTypeStmt, tokens: TokenStream) -> None:
+    def finalize_bits_type(self, type_stmt: YangBitsTypeStmt, tokens: TokenStream) -> None:
         """Assign implicit bit positions; validate unique names and positions (RFC 7950 §9.3.4).
 
         Positions are resolved in **declaration order**: an implicit bit uses the largest
