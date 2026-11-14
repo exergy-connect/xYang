@@ -78,8 +78,10 @@ pub const NOT_SUPPORTED = "not-supported";
 pub const ADD = "add";
 pub const DELETE = "delete";
 pub const REPLACE = "replace";
-/// `deviate` kinds Python parses, warns about and does not apply.
-pub const UNSUPPORTED_DEVIATE_KINDS = [_][]const u8{ ADD, DELETE, REPLACE };
+/// Substatements each `deviate` argument allows (RFC 7950 7.20.3.2 grammar).
+pub const DEVIATE_ADD_SUBSTATEMENTS = [_][]const u8{ UNITS, MUST, UNIQUE, DEFAULT, CONFIG, MANDATORY, MIN_ELEMENTS, MAX_ELEMENTS };
+pub const DEVIATE_DELETE_SUBSTATEMENTS = [_][]const u8{ UNITS, MUST, UNIQUE, DEFAULT };
+pub const DEVIATE_REPLACE_SUBSTATEMENTS = [_][]const u8{ TYPE, UNITS, DEFAULT, CONFIG, MANDATORY, MIN_ELEMENTS, MAX_ELEMENTS };
 
 pub const RPC = "rpc";
 pub const ACTION = "action";

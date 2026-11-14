@@ -510,7 +510,7 @@ test "import and include without a file location fail like Python" {
     try expectError("module m {\n  prefix m;\n  include s;\n}", "m.yang: 4: include requires a filesystem location for the submodule: use parse_file(), or parse_string(..., source_path=Path('module.yang'))");
 }
 
-test "deviate add is a warning, not applied" {
+test "deviate add sets the property without a warning (#196)" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     var diag: Diagnostic = .{};
@@ -522,9 +522,8 @@ test "deviate add is a warning, not applied" {
         \\}
     , "m.yang", null, true);
     try std.testing.expectEqual(@as(usize, 1), m.statements.items.len);
-    try std.testing.expect(m.statements.items[0].data.leaf.default == null);
-    try std.testing.expectEqual(@as(usize, 1), loader.warnings().len);
-    try std.testing.expectEqualStrings("Ignoring unsupported 'deviate add' for /m:a", loader.warnings()[0]);
+    try std.testing.expectEqualStrings("x", m.statements.items[0].data.leaf.default.?);
+    try std.testing.expectEqual(@as(usize, 0), loader.warnings().len);
 }
 
 test "imports are shared; foreign augment edits the import, foreign deviation a copy" {

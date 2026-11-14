@@ -102,7 +102,7 @@ Native dict-style JSON (keyed lists, JSON numbers for 64-bit types, `null` for `
 
 ## Unsupported (do not use in models meant for xYang)
 
-`deviate not-supported` removes the target node. `deviate add`, `replace`, and `delete`, and `action`, are skipped with a warning. The full list of deviations from RFC 7950 / RFC 7951 is the table at the top of `FEATURES.md`. Known gaps per implementation: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
+`deviation` is applied: `not-supported` removes the target node, and `add`, `replace`, and `delete` change its properties; an invalid deviate fails the load. The full list of deviations from RFC 7950 / RFC 7951 is the table at the top of `FEATURES.md`. Known gaps per implementation: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.
 
 ## After authoring
 

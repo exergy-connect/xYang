@@ -238,7 +238,7 @@ The [ontology hypergraph example](examples/ontology-hypergraph/README.md) models
 **Does not (today)**
 
 - NETCONF/RESTCONF servers, XML instance encoding, or incremental edit validation.
-- Full RFC 7950 surface (`notification` instance validation and `deviate add|replace|delete` are limited or skipped—see **FEATURES.md**).
+- Full RFC 7950 surface (`notification` instance validation is limited—see **FEATURES.md**).
 - A generic XPath 1.0 engine; expressions are evaluated in **schema context** for `must` / `when` (subset documented in **FEATURES.md**).
 
 Supported subset and RFC deviations: [FEATURES.md](FEATURES.md#deviations-from-rfc-7950--rfc-7951).

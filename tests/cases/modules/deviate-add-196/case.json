@@ -2,11 +2,7 @@
   "description": "RFC 7950 §7.20.3.2: deviate add applies the property. default \"x\" is visible to a must on a sibling when l is omitted (#196).",
   "module": "m.yang",
   "instances": [
-    { "name": "default satisfies must", "data": { "check": "ok" }, "valid": true,
-      "xfail": {
-        "python": "deviate add is skipped (#196)",
-        "ts": "deviate add is skipped (#196)"
-      } },
+    { "name": "default satisfies must", "data": { "check": "ok" }, "valid": true },
     { "name": "explicit other value", "data": { "l": "y", "check": "ok" }, "valid": false,
       "errors": [{ "path": "/check", "code": "must", "message": "need x" }] }
   ]

@@ -1,4 +1,4 @@
-"""``deviate not-supported`` removes the target, including across an import.
+"""``deviate`` across an import edits a copy owned by the deviating module.
 
 Same-module not-supported validation and missing-target schema errors live in
 ``tests/cases/modules/``.
@@ -101,3 +101,40 @@ module dev {
     ok, errors, _warnings = YangValidator(alone).validate({"top": {"a": "x"}})
     assert ok, errors
     assert alone is not deviated
+
+
+def test_cross_module_deviate_replace_keeps_cached_target(tmp_path: Path) -> None:
+    """``deviate replace`` edits a copy of the imported leaf; the parser cache keeps the original (#196)."""
+    _write(
+        tmp_path,
+        "base.yang",
+        """
+module base {
+  yang-version 1.1;
+  namespace "urn:b";
+  prefix b;
+  container top { leaf a { type string; } }
+}
+""",
+    )
+    _write(
+        tmp_path,
+        "dev.yang",
+        """
+module dev {
+  yang-version 1.1;
+  namespace "urn:dev";
+  prefix d;
+  import base { prefix b; }
+  deviation "/b:top/b:a" { deviate replace { type uint8; } }
+}
+""",
+    )
+    parser = YangParser()
+    dev = parser.parse_file(tmp_path / "dev.yang")
+    deviated = dev.import_prefixes["b"]
+    replaced, _errors, _warnings = YangValidator(deviated).validate({"top": {"a": "x"}})
+    assert not replaced
+    alone = parser.parse_file(tmp_path / "base.yang")
+    ok, errors, _warnings = YangValidator(alone).validate({"top": {"a": "x"}})
+    assert ok, errors

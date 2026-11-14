@@ -513,12 +513,35 @@ class YangAugmentStmt(YangStatementWithWhen):
 
 
 @dataclass
+class YangDeviateStmt:
+    """One ``deviate add|replace|delete`` (RFC 7950 §7.20.3.2) and the properties it names.
+
+    ``None`` / empty means the property is not named. ``max_elements_set`` tells
+    ``max-elements unbounded`` (stored as ``None``) apart from an absent statement.
+    """
+
+    kind: str = ""
+    config: Optional[bool] = None
+    defaults: List[str] = field(default_factory=list)
+    mandatory: Optional[bool] = None
+    min_elements: Optional[int] = None
+    max_elements: Optional[int] = None
+    max_elements_set: bool = False
+    must_statements: List['YangMustStmt'] = field(default_factory=list)
+    type: Optional['YangTypeStmt'] = None
+    units: Optional[str] = None
+    unique: List[List[str]] = field(default_factory=list)
+
+
+@dataclass
 class YangDeviationStmt(YangStatement):
-    """``deviation`` (RFC 7950). ``deviate not-supported`` removes the target after augments."""
+    """``deviation`` (RFC 7950 §7.20.3). Applied after augments: ``not-supported`` removes the
+    target, ``add``/``replace``/``delete`` change its properties (``deviates``, in order)."""
 
     target_path: str = ""
     target_path_segments: List[YangIdentifierRef] = field(default_factory=list)
     not_supported: bool = False
+    deviates: List[YangDeviateStmt] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None

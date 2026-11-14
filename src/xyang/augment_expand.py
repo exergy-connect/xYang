@@ -8,15 +8,27 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 from __future__ import annotations
 
 import copy
+import re
 from typing import Callable, Dict, List, Optional
 
 from .ast import (
     YangAugmentStmt,
     YangCaseStmt,
     YangChoiceStmt,
+    YangAnydataStmt,
+    YangAnyxmlStmt,
+    YangDeviateStmt,
     YangDeviationStmt,
+    YangInputStmt,
+    YangLeafListStmt,
+    YangLeafStmt,
+    YangListStmt,
+    YangOutputStmt,
+    YangRpcStmt,
     YangStatement,
     YangStatementList,
+    YangStatementWithMust,
+    YangStatementWithWhen,
 )
 from .module import YangModule
 from .errors import YangSemanticError, YangSyntaxError
@@ -38,6 +50,24 @@ def _path_segments_from_augment(aug: YangAugmentStmt, path: str) -> List[YangIde
         raise YangSyntaxError(str(exc)) from exc
 
 
+def _materialize_operation_io(parent: YangStatement, name: str) -> Optional[YangStatement]:
+    """RFC 7950 §7.14.2 / §7.14.3: every rpc and action has ``input`` and ``output`` schema
+    nodes, written or not. Add the empty node a schema node identifier names."""
+    if not isinstance(parent, YangRpcStmt) or name not in ("input", "output"):
+        return None
+    if name == "input":
+        node: YangStatement = YangInputStmt(name="input")
+        index = next(
+            (i for i, s in enumerate(parent.statements) if isinstance(s, YangOutputStmt)),
+            len(parent.statements),
+        )
+        parent.statements.insert(index, node)
+    else:
+        node = YangOutputStmt(name="output")
+        parent.statements.append(node)
+    return node
+
+
 def _find_named_schema_child(parent: YangStatement, name: str) -> Optional[YangStatement]:
     if isinstance(parent, YangChoiceStmt):
         for case in parent.cases:
@@ -50,7 +80,7 @@ def _find_named_schema_child(parent: YangStatement, name: str) -> Optional[YangS
     for s in sl.statements:
         if getattr(s, "name", None) == name and s.get_schema_node() is not None:
             return s
-    return None
+    return _materialize_operation_io(parent, name)
 
 
 def _find_toplevel_schema_child(module: YangModule, name: str) -> Optional[YangStatement]:
@@ -210,6 +240,9 @@ def _schema_child_slot(parent: YangStatementList, name: str) -> tuple[str, int] 
     for index, stmt in enumerate(parent.statements):
         if getattr(stmt, "name", None) == name and stmt.get_schema_node() is not None:
             return ("statements", index)
+    node = _materialize_operation_io(parent, name)  # type: ignore[arg-type]
+    if node is not None:
+        return ("statements", parent.statements.index(node))
     return None
 
 
@@ -228,34 +261,29 @@ def _drop_child_at(parent: YangStatementList, slot: tuple[str, int]) -> None:
     del getattr(parent, attr)[index]
 
 
-def _detach_copied_path(module: YangModule, segments: List[YangIdentifierRef]) -> None:
-    """Remove the node named by *segments* from a module copy, copying ancestors only."""
+def _copied_path_to_target(
+    module: YangModule, segments: List[YangIdentifierRef]
+) -> tuple[YangStatementList, tuple[str, int]]:
+    """Copy the ancestors of the node *segments* name in a module copy.
+
+    Returns the copied parent and the slot of the target in it. The target is not copied.
+    """
+    def missing(name: str, under: str) -> YangSemanticError:
+        path = "/" + "/".join(f"{s.prefix}:{s.name}" for s in segments)
+        return YangSemanticError(f"deviation: no child {name!r} under {under!r} (path {path!r})")
+
+    parent: YangStatementList = module
     slot = _schema_child_slot(module, segments[0].name)
     if slot is None:
-        raise YangSemanticError(
-            f"deviation: no schema node for path "
-            f"'/{'/'.join(f'{s.prefix}:{s.name}' for s in segments)}'"
-        )
-    if len(segments) == 1:
-        _drop_child_at(module, slot)
-        return
-    current = _cow_statement(_child_at(module, slot))
-    _put_child(module, slot, current)
-    for seg in segments[1:-1]:
+        raise missing(segments[0].name, module.name)
+    for seg in segments[1:]:
+        current = _cow_statement(_child_at(parent, slot))
+        _put_child(parent, slot, current)
+        parent = current
         slot = _schema_child_slot(current, seg.name)
         if slot is None:
-            raise YangSemanticError(
-                f"deviation: no child {seg.name!r} under {getattr(current, 'name', '?')!r}"
-            )
-        nxt = _cow_statement(_child_at(current, slot))
-        _put_child(current, slot, nxt)
-        current = nxt
-    slot = _schema_child_slot(current, segments[-1].name)
-    if slot is None:
-        raise YangSemanticError(
-            f"deviation: no child {segments[-1].name!r} under {getattr(current, 'name', '?')!r}"
-        )
-    _drop_child_at(current, slot)
+            raise missing(seg.name, getattr(current, "name", "?"))
+    return parent, slot
 
 
 def _private_target_module(
@@ -280,11 +308,14 @@ def _private_target_module(
     return cloned
 
 
-def _apply_not_supported(
+def _deviation_target(
     root: YangModule,
     dev: YangDeviationStmt,
     copies: Dict[int, YangModule],
-) -> None:
+) -> tuple[YangStatementList, tuple[str, int], bool]:
+    """Resolve *dev*'s target to ``(parent, slot, foreign)`` in a tree this build may edit.
+
+    When *foreign*, the target itself is still shared with the parser cache."""
     path = dev.target_path
     segments = dev.target_path_segments or None
     try:
@@ -304,26 +335,215 @@ def _apply_not_supported(
             f"deviation: unknown prefix {resolved[0].prefix!r} in path {path!r}"
         )
     if owner is root:
-        _remove_schema_child(parent, node)
-        return
+        if isinstance(parent, YangChoiceStmt) and node in parent.cases:
+            return parent, ("cases", parent.cases.index(node)), False
+        return parent, ("statements", parent.statements.index(node)), False
     private = _private_target_module(root, owner, copies)
-    _detach_copied_path(private, resolved)
+    return (*_copied_path_to_target(private, resolved), True)
+
+
+class _DeviateError(YangSemanticError):
+    pass
+
+
+def _node_kind(node: YangStatement) -> str:
+    """YANG keyword of *node* (``YangLeafListStmt`` -> ``leaf-list``)."""
+    name = type(node).__name__.removeprefix("Yang").removesuffix("Stmt")
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
+
+
+def _single(
+    node: YangStatement,
+    deviate: YangDeviateStmt,
+    prop: str,
+    value: object,
+    *,
+    present: bool,
+    always_present: bool = False,
+) -> object:
+    """Return the new value of a single-valued property, or raise on an invalid deviate."""
+    if deviate.kind == "add" and present:
+        raise _DeviateError(
+            f"cannot 'deviate add' {prop}: target {_node_kind(node)} {node.name!r} already has it "
+            "(use 'deviate replace')"
+        )
+    if deviate.kind == "replace" and not present and not always_present:
+        raise _DeviateError(
+            f"cannot 'deviate replace' {prop}: target {_node_kind(node)} {node.name!r} has no {prop} "
+            "(use 'deviate add')"
+        )
+    return value
+
+
+def _require(node: YangStatement, prop: str, ok: bool) -> None:
+    if not ok:
+        raise _DeviateError(
+            f"{prop} does not apply to target {_node_kind(node)} {node.name!r}"
+        )
+
+
+def _apply_deviate_defaults(node: YangStatement, deviate: YangDeviateStmt) -> None:
+    values = deviate.defaults
+    if isinstance(node, YangLeafListStmt):
+        current = list(node.defaults)
+        if deviate.kind == "add":
+            node.defaults = current + list(values)
+        elif deviate.kind == "replace":
+            if not current:
+                raise _DeviateError(
+                    f"cannot 'deviate replace' default: target leaf-list {node.name!r} has no default"
+                )
+            node.defaults = list(values)
+        else:
+            for value in values:
+                if value not in current:
+                    raise _DeviateError(
+                        f"cannot 'deviate delete' default {value!r}: target leaf-list "
+                        f"{node.name!r} has no such default"
+                    )
+                current.remove(value)
+            node.defaults = current
+        return
+    _require(node, "default", isinstance(node, (YangLeafStmt, YangChoiceStmt)))
+    if len(values) != 1:
+        raise _DeviateError(
+            f"target {_node_kind(node)} {node.name!r} takes one default, got {len(values)}"
+        )
+    present = node.default is not None  # type: ignore[union-attr]
+    if deviate.kind == "delete":
+        if not present or str(node.default) != values[0]:  # type: ignore[union-attr]
+            raise _DeviateError(
+                f"cannot 'deviate delete' default {values[0]!r}: target {_node_kind(node)} "
+                f"{node.name!r} has default {node.default!r}"  # type: ignore[union-attr]
+            )
+        node.default = None  # type: ignore[union-attr]
+        return
+    node.default = _single(node, deviate, "default", values[0], present=present)  # type: ignore[union-attr]
+
+
+def _apply_deviate_musts(node: YangStatement, deviate: YangDeviateStmt) -> None:
+    _require(node, "must", isinstance(node, YangStatementWithMust))
+    current = list(node.must_statements)  # type: ignore[attr-defined]
+    if deviate.kind == "add":
+        node.must_statements = current + list(deviate.must_statements)  # type: ignore[attr-defined]
+        return
+    for must in deviate.must_statements:
+        match = next((m for m in current if m.expression == must.expression), None)
+        if match is None:
+            raise _DeviateError(
+                f"cannot 'deviate delete' must {must.expression!r}: target "
+                f"{_node_kind(node)} {node.name!r} has no such must"
+            )
+        current.remove(match)
+    node.must_statements = current  # type: ignore[attr-defined]
+
+
+def _apply_deviate_unique(node: YangStatement, deviate: YangDeviateStmt) -> None:
+    _require(node, "unique", isinstance(node, YangListStmt))
+    current = [list(u) for u in node.unique]  # type: ignore[attr-defined]
+    if deviate.kind == "add":
+        node.unique = current + [list(u) for u in deviate.unique]  # type: ignore[attr-defined]
+        return
+    for paths in deviate.unique:
+        if paths not in current:
+            raise _DeviateError(
+                f"cannot 'deviate delete' unique {' '.join(paths)!r}: target list "
+                f"{node.name!r} has no such unique"
+            )
+        current.remove(paths)
+    node.unique = current  # type: ignore[attr-defined]
+
+
+def _apply_deviate(node: YangStatement, deviate: YangDeviateStmt) -> None:
+    """Apply one ``deviate add|replace|delete`` to *node* (RFC 7950 §7.20.3.2)."""
+    if deviate.config is not None:
+        _require(node, "config", isinstance(node, YangStatementWithWhen) and not isinstance(node, YangRpcStmt))
+        node.config = _single(  # type: ignore[attr-defined]
+            node, deviate, "config", deviate.config,
+            present=node.config is not None, always_present=True,  # type: ignore[attr-defined]
+        )
+    if deviate.mandatory is not None:
+        _require(
+            node,
+            "mandatory",
+            isinstance(node, (YangLeafStmt, YangChoiceStmt, YangAnydataStmt, YangAnyxmlStmt)),
+        )
+        node.mandatory = _single(  # type: ignore[attr-defined]
+            node, deviate, "mandatory", deviate.mandatory,
+            present=bool(node.mandatory), always_present=True,  # type: ignore[attr-defined]
+        )
+    if deviate.min_elements is not None:
+        _require(node, "min-elements", isinstance(node, (YangListStmt, YangLeafListStmt)))
+        node.min_elements = _single(  # type: ignore[attr-defined]
+            node, deviate, "min-elements", deviate.min_elements,
+            present=node.min_elements is not None, always_present=True,  # type: ignore[attr-defined]
+        )
+    if deviate.max_elements_set:
+        _require(node, "max-elements", isinstance(node, (YangListStmt, YangLeafListStmt)))
+        node.max_elements = _single(  # type: ignore[attr-defined]
+            node, deviate, "max-elements", deviate.max_elements,
+            present=node.max_elements is not None, always_present=True,  # type: ignore[attr-defined]
+        )
+    if deviate.type is not None:
+        _require(node, "type", isinstance(node, (YangLeafStmt, YangLeafListStmt)))
+        node.type = deviate.type  # type: ignore[attr-defined]
+    if deviate.units is not None:
+        _require(node, "units", isinstance(node, (YangLeafStmt, YangLeafListStmt)))
+        if deviate.kind == "delete":
+            if node.units != deviate.units:
+                raise _DeviateError(
+                    f"cannot 'deviate delete' units {deviate.units!r}: target "
+                    f"{_node_kind(node)} {node.name!r} has units {node.units!r}"
+                )
+            node.units = ""
+        else:
+            node.units = _single(  # type: ignore[assignment]
+                node, deviate, "units", deviate.units, present=bool(node.units)
+            )
+    if deviate.defaults:
+        _apply_deviate_defaults(node, deviate)
+    if deviate.must_statements:
+        _apply_deviate_musts(node, deviate)
+    if deviate.unique:
+        _apply_deviate_unique(node, deviate)
+
+
+def _apply_deviation(
+    root: YangModule,
+    dev: YangDeviationStmt,
+    copies: Dict[int, YangModule],
+) -> None:
+    parent, slot, foreign = _deviation_target(root, dev, copies)
+    node = _child_at(parent, slot)
+    if dev.not_supported:
+        if foreign:
+            _drop_child_at(parent, slot)
+        else:
+            _remove_schema_child(parent, node)
+        return
+    if foreign:
+        node = _cow_statement(node)
+        _put_child(parent, slot, node)
+    for deviate in dev.deviates:
+        try:
+            _apply_deviate(node, deviate)
+        except _DeviateError as exc:
+            raise YangSemanticError(f"deviation {dev.target_path!r}: {exc}") from None
 
 
 def apply_deviations(root: YangModule) -> None:
-    """Remove each ``deviate not-supported`` target, then drop the ``deviation`` statements.
+    """Apply each ``deviation`` in order, then drop the ``deviation`` statements.
 
     Uses the same absolute-path resolution as ``augment`` (import prefixes included).
-    A path that does not name a schema node is a :class:`YangSemanticError`.
-    A target in another module is removed on a copy owned by *root*; the module
+    A path that does not name a schema node, or a ``deviate`` the target cannot take
+    (RFC 7950 §7.20.3.2), is a :class:`YangSemanticError`.
+    A target in another module is changed on a copy owned by *root*; the module
     object in the parser cache is left unchanged.
-    ``deviate add|replace|delete`` are not applied; the parser already warned.
     """
     pending = [s for s in root.statements if isinstance(s, YangDeviationStmt)]
     copies: Dict[int, YangModule] = {}
     for dev in pending:
-        if dev.not_supported:
-            _apply_not_supported(root, dev, copies)
+        _apply_deviation(root, dev, copies)
     if pending:
         root.statements = [
             s for s in root.statements if not isinstance(s, YangDeviationStmt)

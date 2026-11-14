@@ -413,6 +413,8 @@ pub const Data = union(Kind) {
         target_path: []const u8 = "",
         target_path_segments: std.ArrayList(IdentifierRef) = .empty,
         not_supported: bool = false,
+        /// `deviate add|replace|delete`, applied in order.
+        deviates: std.ArrayList(*Deviate) = .empty,
     },
     refine: struct {
         target_path: []const u8 = "",
@@ -425,6 +427,25 @@ pub const Data = union(Kind) {
     },
     choice: struct { mandatory: bool = false, default: ?[]const u8 = null, cases: std.ArrayList(*Statement) = .empty },
     case: void,
+};
+
+pub const DeviateKind = enum { add, replace, delete };
+
+/// One `deviate add|replace|delete` (RFC 7950 7.20.3.2) and the properties it names.
+/// Null / empty means the property is not named.
+pub const Deviate = struct {
+    kind: DeviateKind,
+    config: ?bool = null,
+    defaults: StringList = .empty,
+    mandatory: ?bool = null,
+    min_elements: ?i64 = null,
+    /// `max-elements` named; `max_elements` null then means `unbounded`.
+    max_elements_set: bool = false,
+    max_elements: Bound = null,
+    must_statements: std.ArrayList(*MustStmt) = .empty,
+    type: ?*TypeStmt = null,
+    units: ?[]const u8 = null,
+    unique: std.ArrayList([]const []const u8) = .empty,
 };
 
 pub const Statement = struct {

@@ -3,15 +3,7 @@
   "module": "m.yang",
   "instances": [
     { "name": "string is no longer accepted", "data": { "l": "abc" }, "valid": false,
-      "errors": [{ "path": "/l", "code": "type" }],
-      "xfail": {
-        "python": "deviate replace is skipped (#196)",
-        "ts": "deviate replace is skipped (#196)"
-      } },
-    { "name": "int8 value", "data": { "l": 1 }, "valid": true,
-      "xfail": {
-        "python": "deviate replace is skipped (#196)",
-        "ts": "deviate replace is skipped (#196)"
-      } }
+      "errors": [{ "path": "/l", "code": "type" }] },
+    { "name": "int8 value", "data": { "l": 1 }, "valid": true }
   ]
 }

@@ -775,7 +775,7 @@ fn uncopyable(s: *const Statement) ?ast.Kind {
         else => {},
     }
     return switch (s.kind()) {
-        .notification, .deviation, .grouping, .identity, .refine => s.kind(),
+        .notification, .grouping, .identity, .refine => s.kind(),
         else => null,
     };
 }
@@ -1372,6 +1372,23 @@ fn applyOwnAugments(g: *Gen, schema_module: *Module) Error!void {
     try augment_expand.applyAugmentations(&g.reporter, schema_module);
 }
 
+/// `_apply_own_deviations`: apply the module's `deviation` statements to its own tree. A
+/// deviation of another module's tree has no place in this module's JSON: an error.
+fn applyOwnDeviations(g: *Gen, schema_module: *Module) Error!void {
+    for (schema_module.statements.items) |s| {
+        if (s.kind() != .deviation) continue;
+        const d = s.data.deviation;
+        const first_prefix: []const u8 = if (d.target_path_segments.items.len > 0)
+            d.target_path_segments.items[0].prefix orelse ""
+        else
+            firstPathPrefix(d.target_path);
+        if (schema_module.resolvePrefixedModule(first_prefix) != schema_module) {
+            return g.fail("cannot export deviation {f}: its target belongs to another module, which the native JSON form of module {f} does not carry", .{ repr(d.target_path), repr(schema_module.name) });
+        }
+    }
+    try augment_expand.applyDeviations(&g.reporter, schema_module);
+}
+
 fn firstPathPrefix(path: []const u8) []const u8 {
     const raw = std.mem.trimStart(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "/");
     const end = std.mem.indexOfScalar(u8, raw, '/') orelse raw.len;
@@ -1515,6 +1532,7 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
     schema_module.statements = .empty;
     try schema_module.statements.appendSlice(a, expanded);
     try applyOwnAugments(&g, schema_module);
+    try applyOwnDeviations(&g, schema_module);
     try capabilities.applyForExport(&g.reporter, schema_module);
     expanded = schema_module.statements.items;
 
@@ -1675,8 +1693,16 @@ test "statements Python cannot copy fail the conversion" {
     var diag: errors.Diagnostic = .{};
     try std.testing.expectError(error.YangLoad, convertForTest(a, "module t { prefix t; notification n { leaf a { type string; } } }", &diag));
     try std.testing.expectEqualStrings("Unsupported statement type for copy: YangNotificationStmt", diag.message);
-    try std.testing.expectError(error.YangLoad, convertForTest(a, "module t { prefix t; leaf a { type string; } deviation \"/t:a\" { deviate not-supported; } }", &diag));
-    try std.testing.expectEqualStrings("Unsupported statement type for copy: YangDeviationStmt", diag.message);
+}
+
+test "convert applies the module's own deviations; a foreign target fails (#195, #196)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: errors.Diagnostic = .{};
+    const text = try convertForTest(a, "module t { prefix t; leaf a { type string; } leaf b { type string; } deviation \"/t:a\" { deviate replace { type int8; } } deviation \"/t:b\" { deviate not-supported; } }", &diag);
+    try std.testing.expect(std.mem.indexOf(u8, text, "\"maximum\": 127") != null);
+    try std.testing.expect(std.mem.indexOf(u8, text, "\"b\"") == null);
 }
 
 fn structureFixture(a: Allocator, diag: *errors.Diagnostic, name: []const u8, expand: bool) !*Module {

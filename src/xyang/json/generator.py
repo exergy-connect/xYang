@@ -22,6 +22,7 @@ from ..ast import (
     YangChoiceStmt,
     YangContainerStmt,
     YangAugmentStmt,
+    YangDeviationStmt,
     YangExtensionStmt,
     YangExtensionInvocationStmt,
     YangGroupingStmt,
@@ -41,7 +42,7 @@ from ..ast import (
     YangUsesStmt,
     YangWhenStmt,
 )
-from ..augment_expand import apply_augmentations
+from ..augment_expand import apply_augmentations, apply_deviations
 from ..errors import YangExportError
 from ..ext.capabilities import apply_extension_invocations
 from ..ext.rfc8791.structure_expand import FOREIGN_AUGMENTS, FOREIGN_SLOTS, _STRUCTURE_INDEX_KEY
@@ -1682,6 +1683,24 @@ def _apply_own_augments(schema_module: YangModule) -> None:
     apply_augmentations(schema_module)
 
 
+def _apply_own_deviations(schema_module: YangModule) -> None:
+    """Apply the module's ``deviation`` statements to its own (augmented) tree.
+
+    Like an augment, a deviation of another module's tree has no place in this module's JSON,
+    so it is an error, not dropped.
+    """
+    for stmt in schema_module.statements:
+        if not isinstance(stmt, YangDeviationStmt):
+            continue
+        first = (stmt.target_path_segments or parse_absolute_schema_path(stmt.target_path))[0]
+        if schema_module.resolve_prefixed_module(first.prefix or "") is not schema_module:
+            raise YangExportError(
+                f"cannot export deviation {stmt.target_path!r}: its target belongs to another module, "
+                f"which the native JSON form of module {schema_module.name!r} does not carry"
+            )
+    apply_deviations(schema_module)
+
+
 def generate_json_schema(module: YangModule) -> dict[str, Any]:
     """
     Build a JSON Schema dict from a YangModule AST.
@@ -1720,6 +1739,7 @@ def _generate_json_schema(module: YangModule, export: _IdentityExport) -> dict[s
     schema_module.extension_runtime = _detached_runtime(module)
     schema_module.statements = _expand_uses_for_json(module.statements, module)
     _apply_own_augments(schema_module)
+    _apply_own_deviations(schema_module)
     # Merge a same-module ``sx:augment-structure`` into the structure. A cross-module one
     # stays as an invocation. Already-applied modules no-op (the nodes are already there).
     apply_extension_invocations(schema_module, export_view=True)

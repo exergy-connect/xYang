@@ -97,15 +97,23 @@ AUGMENT = "augment"
 SUBMODULE = "submodule"
 BELONGS_TO = "belongs-to"
 
-# Deviation (``not-supported`` is applied; other deviate arguments are skipped)
+# Deviation (RFC 7950 §7.20.3)
 DEVIATION = "deviation"
 DEVIATE = "deviate"
 NOT_SUPPORTED = "not-supported"
 ADD = "add"
 DELETE = "delete"
 REPLACE = "replace"
-# ``deviate`` arguments that stay unsupported. ``not-supported`` is applied.
-UNSUPPORTED_DEVIATE_KINDS = frozenset({ADD, DELETE, REPLACE})
+# Substatements each ``deviate`` argument allows (RFC 7950 §7.20.3.2 grammar).
+DEVIATE_SUBSTATEMENTS: dict[str, frozenset[str]] = {
+    ADD: frozenset(
+        {UNITS, MUST, UNIQUE, DEFAULT, CONFIG, MANDATORY, MIN_ELEMENTS, MAX_ELEMENTS}
+    ),
+    DELETE: frozenset({UNITS, MUST, UNIQUE, DEFAULT}),
+    REPLACE: frozenset(
+        {TYPE, UNITS, DEFAULT, CONFIG, MANDATORY, MIN_ELEMENTS, MAX_ELEMENTS}
+    ),
+}
 
 # Unsupported statements
 RPC = "rpc"

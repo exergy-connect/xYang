@@ -36,8 +36,8 @@ pub fn copyStatement(r: *errors.Reporter, s: *const Statement) Error!*Statement 
             out.must_statements = try s.must_statements.clone(a);
             out.if_features = try s.if_features.clone(a);
         },
-        .extension, .typedef => {},
-        .identity, .grouping, .deviation, .refine => return r.fail(.semantic, "Unsupported statement type for copy: {s}", .{@tagName(s.kind())}),
+        .extension, .typedef, .deviation => {},
+        .identity, .grouping, .refine => return r.fail(.semantic, "Unsupported statement type for copy: {s}", .{@tagName(s.kind())}),
     }
     return out;
 }

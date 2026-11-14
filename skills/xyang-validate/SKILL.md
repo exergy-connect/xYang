@@ -158,6 +158,6 @@ Integer bounds and other built-in type facts live in the type registry: Python `
 
 ## Limits to keep in mind
 
-- `deviate add|replace|delete` are skipped with a warning; see the RFC deviations table in `FEATURES.md`.
+- `deviation` is applied when the module loads; an invalid `deviate` fails the load (see `FEATURES.md`).
 - `must` / `when` use xYang's XPath 1.0 subset (`FEATURES.md`).
 - Per-language known differences: `rg -n '"(python|ts)": "' tests/cases --glob case.json`.

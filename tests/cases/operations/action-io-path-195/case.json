@@ -1,10 +1,6 @@
 {
   "description": "RFC 7950 §7.14.2 / §7.15 / §7.17: input and output are schema nodes of an action even when the action does not write them. An augment and a deviation may target .../action/input and .../action/output (#195).",
   "module": "m.yang",
-  "xfail": {
-    "python": "augment path into an action input (#195)",
-    "ts": "augment path into an action input (#195)"
-  },
   "instances": [
     { "name": "augmented input", "action": "/m:c/a", "context": { "m:c": {} }, "data": { "m:input": { "extra": "ok" } }, "valid": true },
     { "name": "deviated input leaf", "action": "/m:c/a", "context": { "m:c": {} }, "data": { "m:input": { "y": "no" } }, "valid": false,
