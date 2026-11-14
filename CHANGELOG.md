@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **WebAssembly release assets:** new releases include the freestanding `xyang.wasm` validation library and its JavaScript wrapper, `xyang.mjs`. The Zig release workflow builds with `ReleaseSmall` and runs the Wasm host API tests before attaching the assets; manual runs upload workflow artifacts only.
 
+### Changed
+
+- **`deviate replace` of a defaulted property** ([#196](https://github.com/exergy-connect/xYang/issues/196)): documented as a deliberate choice of practice over the strict RFC 7950 §7.20.3.2 reading. Replace requires the property to exist in the target; a strict implementation rejects `deviate replace { config false; }` on a node that inherits `config`. `config`, `mandatory`, `min-elements` and `max-elements` count as present when the target omits them, because each has an RFC default. Huawei NE8000 8.22.0 deviation modules (Huawei/yang 1a06948, `network-router/8.22.0/ne8000-m4m8m14`) use that form on nodes that do not write `config`. `default`, `units` and `type` stay strict. Shared cases `modules/deviate-replace-defaulted-196` and `modules/deviate-replace-missing-default-196`.
+
 ### Fixed
 
 - **Schema node paths through `input` / `output` (Python, TypeScript, and Zig)** ([#195](https://github.com/exergy-connect/xYang/issues/195)): an `augment` or `deviation` path may name the `input` or `output` of an rpc or action, written or not (RFC 7950 §7.14.2 / §7.14.3). The resolver shared by augment and deviation adds the empty node the path names. `xyang-zig convert` copies `deviation` statements, so the Wasm host test converts every operation case with no exceptions. Shared case `operations/action-io-path-195`.

@@ -1,0 +1,8 @@
+{
+  "description": "Practice over RFC 7950 §7.20.3.2: deviate replace of config on a leaf that omits config succeeds, because config defaults to true. The native JSON form records config false (#196).",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    { "name": "string value", "data": { "l": "abc" }, "valid": true }
+  ]
+}

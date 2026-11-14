@@ -11,3 +11,9 @@ One table per concern per language replaces logic spread over many files. Python
 The next application is parser keyword dispatch (which substatements each statement accepts), the same pattern as the type registry.
 
 When a fix needs a broad search, treat that as a structural defect and open an issue to restructure, instead of only patching.
+
+## Practice over strict RFC reading
+
+Accept a lenient reading only when (a) widely shipped vendor modules depend on it, (b) the lenient meaning is unambiguous and lossless (the RFC default makes the 'existing' value well defined), and (c) it is listed in the FEATURES.md Deviations table with the evidence. Otherwise follow the RFC and fail loudly.
+
+`deviate replace` of `config`, `mandatory`, `min-elements` and `max-elements` is that case: each has an RFC default, and Huawei NE8000 8.22.0 modules replace an omitted `config`. `default`, `units` and `type` have no RFC default, so a missing property stays a loud error.
