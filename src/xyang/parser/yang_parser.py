@@ -244,7 +244,9 @@ class YangParser:
                 if existing is td or getattr(existing, "included_from", None) == origin:
                     continue
                 raise tokens.make_error(f"Duplicate typedef {n!r} from include of {sub.name!r}")
-            parent.typedefs[n] = td
+            from ..typedef_scope import register_typedef
+
+            register_typedef(parent.typedefs, td)
         for n, ident in sub.identities.items():
             if n in parent.identities:
                 raise tokens.make_error(f"Duplicate identity {n!r} from include of {sub.name!r}")
@@ -279,12 +281,12 @@ class YangParser:
                 parent.import_prefixes[pref] = im
         parent.statements.extend(sub.statements)
         sub.statements.clear()
-        sub.typedefs.clear()
+        sub.typedefs = parent.typedefs
         sub.identities.clear()
         sub.groupings.clear()
         sub.features.clear()
         sub.feature_if_features.clear()
-        sub.import_prefixes.clear()
+        sub.import_prefixes = parent.import_prefixes
 
     def parse_file(self, file_path: Path) -> YangModule:
         """Parse a YANG file (resolves ``include`` relative to this file's directory).

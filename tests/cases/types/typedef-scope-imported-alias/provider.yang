@@ -1,0 +1,1 @@
+module provider { namespace "urn:p"; prefix p; typedef code { type int64 { range "1..9223372036854775807"; } } }

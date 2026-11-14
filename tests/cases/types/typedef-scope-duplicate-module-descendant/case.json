@@ -1,0 +1,6 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): duplicate-module-descendant",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Duplicate typedef"
+}

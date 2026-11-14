@@ -97,16 +97,10 @@ pub fn parseTypedef(p: *Parser, parent: Parent) Error!void {
     const name = try p.ts.consumeType(.identifier);
     const stmt = try p.newStatement(name, .{ .typedef = .{} });
     try p.parseOptionalBlock(.{ .stmt = stmt }, .typedef, try p.label("typedef '{s}'", .{name}));
-    if (p.module.typedefs.contains(name)) {
-        return p.ts.fail("Duplicate typedef {f} in module {f}", .{ repr(name), repr(p.module.name) });
-    }
-    try p.module.typedefs.put(p.arena, name, stmt);
+    stmt.data.typedef.scope = if (p.context.len > 0) p.context else null;
+    try @import("../../typedef_scope.zig").register(&p.loader.reporter, p.module, stmt);
     switch (parent) {
         .stmt => |s| {
-            switch (s.data) {
-                .grouping => |*g| try g.typedef_names.append(p.arena, name),
-                else => {},
-            }
             try s.statements.append(p.arena, stmt);
         },
         else => {},

@@ -7,6 +7,8 @@ strict RFC 7951 value check call this table.
 
 from __future__ import annotations
 
+from ..ast import make_type_stmt
+
 import contextvars
 from dataclasses import dataclass
 from types import MappingProxyType
@@ -164,8 +166,8 @@ def _to_string(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
                     all_of.append({JsonSchemaKey.PATTERN: anchored})
             if all_of:
                 out[JsonSchemaKey.ALL_OF] = all_of
-    if type_stmt.length:
-        parts = type_stmt.length.split("..")
+    if getattr(type_stmt, "length", None):
+        parts = getattr(type_stmt, "length", None).split("..")
         min_len = None
         max_len = None
         if len(parts) >= 1 and parts[0].strip():
@@ -215,18 +217,18 @@ def _to_string(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
 
 
 def _to_enumeration(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    if type_stmt.enums:
-        return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(type_stmt.enums)}
+    if getattr(type_stmt, "enums", None):
+        return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(getattr(type_stmt, "enums", None))}
     return {JsonSchemaKey.TYPE: "string"}
 
 
 def _to_bits(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    if not type_stmt.bits:
+    if not getattr(type_stmt, "bits", None):
         return {JsonSchemaKey.TYPE: "string"}
     from ..json.generator import _bits_space_separated_pattern, _with_description
 
     ordered = sorted(
-        type_stmt.bits,
+        getattr(type_stmt, "bits", None),
         key=lambda b: (
             b.position if b.position is not None else 0,
             b.name,
@@ -266,12 +268,12 @@ def _to_integer(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
             JsonSchemaKey.PATTERN: builtin.pattern,
         }
         xyang: dict[str, Any] = {XYangKey.TYPE: builtin.name}
-        if type_stmt.range:
-            xyang["range"] = type_stmt.range
+        if getattr(type_stmt, "range", None):
+            xyang["range"] = getattr(type_stmt, "range", None)
         out[JsonSchemaKey.X_YANG] = xyang
         return out
     out = {JsonSchemaKey.TYPE: "integer"}
-    min_v, max_v = json_integer_bounds_for_builtin(builtin.name, type_stmt.range or None)
+    min_v, max_v = json_integer_bounds_for_builtin(builtin.name, getattr(type_stmt, "range", None) or None)
     if min_v is not None:
         out[JsonSchemaKey.MINIMUM] = min_v
     if max_v is not None:
@@ -285,10 +287,10 @@ def _to_decimal(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
         JsonSchemaKey.PATTERN: builtin.pattern,
     }
     xyang: dict[str, Any] = {XYangKey.TYPE: DECIMAL64}
-    if type_stmt.fraction_digits is not None:
-        xyang["fraction-digits"] = int(type_stmt.fraction_digits)
-    if type_stmt.range:
-        xyang["range"] = type_stmt.range
+    if getattr(type_stmt, "fraction_digits", None) is not None:
+        xyang["fraction-digits"] = int(getattr(type_stmt, "fraction_digits", None))
+    if getattr(type_stmt, "range", None):
+        xyang["range"] = getattr(type_stmt, "range", None)
     out[JsonSchemaKey.X_YANG] = xyang
     return out
 
@@ -298,14 +300,14 @@ def _to_empty(_builtin: Builtin, _type_stmt: YangTypeStmt) -> dict[str, Any]:
 
 
 def _to_union(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    if not type_stmt.types:
+    if not getattr(type_stmt, "types", ()):
         return {JsonSchemaKey.TYPE: "string"}
     from ..json.generator import _type_to_schema
 
     typedef_names, module, anchor = _EMIT.get()
     return {
         JsonSchemaKey.ONE_OF: [
-            _type_to_schema(member, typedef_names, module=module, leafref_anchor=anchor) for member in type_stmt.types
+            _type_to_schema(member, typedef_names, module=module, leafref_anchor=anchor) for member in getattr(type_stmt, "types", ())
         ],
     }
 
@@ -315,7 +317,7 @@ def _to_identityref(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any
 
     _typedef_names, module, _anchor = _EMIT.get()
     scope = type_stmt.scope or module
-    exported = [identity_base_for_json(base, scope, module) for base in type_stmt.identityref_bases or []]
+    exported = [identity_base_for_json(base, scope, module) for base in getattr(type_stmt, "identityref_bases", ()) or []]
     if not exported:
         return {JsonSchemaKey.TYPE: "string"}
     xyang = {
@@ -338,9 +340,9 @@ def _to_leafref(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
     from ..xpath.ast import PathNode
 
     typedef_names, module, anchor = _EMIT.get()
-    path_str = _leafref_path_string(type_stmt.path)
+    path_str = _leafref_path_string(getattr(type_stmt, "path", None))
     require = getattr(type_stmt, "require_instance", True)
-    path_node = type_stmt.path if isinstance(type_stmt.path, PathNode) else None
+    path_node = getattr(type_stmt, "path", None) if isinstance(getattr(type_stmt, "path", None), PathNode) else None
     target_leaf = _resolve_leafref_target_leaf(module, path_node, anchor)
     target_type = target_leaf.type if target_leaf and target_leaf.type else None
     if target_type is not None and module is not None:
@@ -383,7 +385,7 @@ def _from_number_integer(builtin: Builtin, fragment: SchemaFragment) -> YangType
     )
     if name != builtin.name:
         return None
-    type_stmt = YangTypeStmt(name=name)
+    type_stmt = make_type_stmt(name=name)
     if range_str:
         type_stmt.range = range_str
     return type_stmt
@@ -394,7 +396,7 @@ def _from_quoted_integer(builtin: Builtin, fragment: SchemaFragment) -> YangType
         return None
     if fragment.xyang.get(XYangKey.TYPE) != builtin.name:
         return None
-    type_stmt = YangTypeStmt(name=builtin.name)
+    type_stmt = make_type_stmt(name=builtin.name)
     rng = fragment.xyang.get("range")
     if isinstance(rng, str) and rng:
         type_stmt.range = rng
@@ -406,7 +408,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
     xyang = fragment.xyang
     kind = schema.get(JsonSchemaKey.TYPE)
     if kind == "string" and xyang.get(XYangKey.TYPE) == DECIMAL64:
-        type_stmt = YangTypeStmt(name=DECIMAL64)
+        type_stmt = make_type_stmt(name=DECIMAL64)
         rng = xyang.get("range")
         if isinstance(rng, str) and rng:
             type_stmt.range = rng
@@ -418,7 +420,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
         return None
     from ..json.parser import _format_decimal64_bound, _fraction_digits_from_multiple_of
 
-    type_stmt = YangTypeStmt(name=DECIMAL64)
+    type_stmt = make_type_stmt(name=DECIMAL64)
     legacy_fd = schema.get(JsonSchemaKey.X_FRACTION_DIGITS)
     if isinstance(legacy_fd, int) and legacy_fd > 0:
         type_stmt.fraction_digits = legacy_fd
@@ -429,7 +431,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
     min_val = schema.get(JsonSchemaKey.MINIMUM)
     max_val = schema.get(JsonSchemaKey.MAXIMUM)
     if min_val is not None or max_val is not None:
-        digits = type_stmt.fraction_digits
+        digits = getattr(type_stmt, "fraction_digits", None)
         lo = "min" if min_val is None else _format_decimal64_bound(min_val, digits)
         hi = "max" if max_val is None else _format_decimal64_bound(max_val, digits)
         type_stmt.range = f"{lo}..{hi}"
@@ -438,14 +440,14 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
 
 def _from_boolean(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
     if fragment.schema.get(JsonSchemaKey.TYPE) == "boolean":
-        return YangTypeStmt(name=BOOLEAN)
+        return make_type_stmt(name=BOOLEAN)
     return None
 
 
 def _from_empty(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
     schema = fragment.schema
     if schema.get(JsonSchemaKey.TYPE) == "object" and schema.get(JsonSchemaKey.MAX_PROPERTIES) == 0:
-        return YangTypeStmt(name=EMPTY)
+        return make_type_stmt(name=EMPTY)
     return None
 
 
@@ -455,7 +457,7 @@ def _from_enumeration(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeSt
         return None
     enums = list(schema[JsonSchemaKey.ENUM]) if isinstance(schema[JsonSchemaKey.ENUM], list) else []
     if len(enums) > 1:
-        type_stmt = YangTypeStmt(name=ENUMERATION)
+        type_stmt = make_type_stmt(name=ENUMERATION)
         type_stmt.enums = enums
         return type_stmt
     return None
@@ -491,7 +493,7 @@ def _from_bits(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | No
             elif isinstance(item, str) and item:
                 bits.append(YangBitStmt(name=item, position=index))
     if bits:
-        return YangTypeStmt(name=BITS, bits=bits)
+        return make_type_stmt(name=BITS, bits=bits)
     return None
 
 
@@ -511,7 +513,7 @@ def _from_leafref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt |
             from ..xpath.parser import bind_xpath_prefixes
 
             bind_xpath_prefixes(path_node, recorded_prefixes(recorded).get, path_val)
-    return YangTypeStmt(name=LEAFREF, path=path_node, require_instance=bool(require))
+    return make_type_stmt(name=LEAFREF, path=path_node, require_instance=bool(require))
 
 
 def _from_identityref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
@@ -526,14 +528,14 @@ def _from_identityref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeSt
             ref = coerce_identifier_ref(base)
             if ref is not None:
                 bases = [ref]
-    return YangTypeStmt(name=IDENTITYREF, identityref_bases=bases)
+    return make_type_stmt(name=IDENTITYREF, identityref_bases=bases)
 
 
 def _from_instance_identifier(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
     if fragment.xyang.get(XYangKey.TYPE) != XYangTypeValue.INSTANCE_IDENTIFIER:
         return None
     require = fragment.xyang.get(XYangKey.REQUIRE_INSTANCE, True)
-    return YangTypeStmt(name=INSTANCE_IDENTIFIER, require_instance=bool(require))
+    return make_type_stmt(name=INSTANCE_IDENTIFIER, require_instance=bool(require))
 
 
 def _from_union(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
@@ -550,7 +552,7 @@ def _from_union(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | N
             if parsed:
                 members.append(parsed)
     if members:
-        return YangTypeStmt(name=UNION, types=members)
+        return make_type_stmt(name=UNION, types=members)
     return None
 
 
@@ -564,7 +566,7 @@ def _from_string(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
         return None
     from ..json.parser import _apply_string_pattern_entries, _merge_schema_xyang, _pattern_metadata_from_xyang
 
-    type_stmt = YangTypeStmt(name=STRING)
+    type_stmt = make_type_stmt(name=STRING)
     raw_pat: str | None = None
     if JsonSchemaKey.PATTERN in schema:
         pattern = schema[JsonSchemaKey.PATTERN]
@@ -583,7 +585,7 @@ def _from_string(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
     merged = _merge_schema_xyang(dict(schema), dict(xyang))
     message, tag = _pattern_metadata_from_xyang(merged)
     _apply_string_pattern_entries(type_stmt, merged)
-    if not type_stmt.patterns and raw_pat is not None:
+    if not getattr(type_stmt, "patterns", None) and raw_pat is not None:
         type_stmt.patterns = [
             YangPatternSpec(
                 pattern=raw_pat,
@@ -646,12 +648,12 @@ def _empty_check(_builtin: Builtin, value: Any, _type_stmt: YangTypeStmt) -> Typ
 
 
 def _enumeration_check(_builtin: Builtin, value: Any, type_stmt: YangTypeStmt) -> TypeIssue | None:
-    if not type_stmt.enums:
+    if not getattr(type_stmt, "enums", None):
         return (
             "enum",
             "enumeration type has no enum definitions in schema; cannot validate instance data",
         )
-    allowed = [str(item) for item in type_stmt.enums]
+    allowed = [str(item) for item in getattr(type_stmt, "enums", None)]
     if str(value) not in allowed:
         return (
             "enum",
@@ -663,7 +665,7 @@ def _enumeration_check(_builtin: Builtin, value: Any, type_stmt: YangTypeStmt) -
 def _bits_check(_builtin: Builtin, value: Any, type_stmt: YangTypeStmt) -> TypeIssue | None:
     if not isinstance(value, str):
         return ("bits", f"bits value must be a string (space-sep bit names), got {type(value).__name__}")
-    bits = type_stmt.bits or []
+    bits = getattr(type_stmt, "bits", None) or []
     allowed = {bit.name for bit in bits}
     if not allowed:
         return ("bits", "bits type has no bit definitions")
@@ -935,7 +937,29 @@ def is_string_number(name: str) -> bool:
 
 
 def integer_json_error(value: Any) -> TypeIssue | None:
-    return _integer_json_error(REGISTRY[INT32], value, YangTypeStmt(name=INT32))
+    return _integer_json_error(REGISTRY[INT32], value, make_type_stmt(name=INT32))
+
+
+def type_statement_class(name: str, prefix: str | None = None) -> type[YangTypeStmt]:
+    from ..ast import (
+        YangBinaryTypeStmt, YangBitsTypeStmt, YangDecimalTypeStmt, YangDerivedTypeStmt,
+        YangEnumerationTypeStmt, YangIdentityrefTypeStmt, YangInstanceIdentifierTypeStmt,
+        YangLeafrefTypeStmt, YangNumericTypeStmt, YangStringTypeStmt, YangUnionTypeStmt,
+    )
+
+    if prefix:
+        return YangDerivedTypeStmt
+    spec = REGISTRY.get(name)
+    if spec is not None and spec.bounds is not None:
+        return YangNumericTypeStmt
+    return {
+        STRING: YangStringTypeStmt, BINARY: YangBinaryTypeStmt,
+        DECIMAL64: YangDecimalTypeStmt, ENUMERATION: YangEnumerationTypeStmt,
+        BITS: YangBitsTypeStmt, UNION: YangUnionTypeStmt, LEAFREF: YangLeafrefTypeStmt,
+        IDENTITYREF: YangIdentityrefTypeStmt, INSTANCE_IDENTIFIER: YangInstanceIdentifierTypeStmt,
+        BOOLEAN: YangTypeStmt, EMPTY: YangTypeStmt,
+        "integer": YangNumericTypeStmt, "number": YangDecimalTypeStmt,
+    }.get(name, YangDerivedTypeStmt)
 
 
 def type_to_schema(
@@ -945,6 +969,11 @@ def type_to_schema(
     leafref_anchor: Any = None,
 ) -> dict[str, Any]:
     """JSON Schema fragment for a type. Typedef names become ``$ref``."""
+    from ..typedef_scope import scoped_type_schema
+
+    scoped = scoped_type_schema(type_stmt, module)
+    if scoped is not None:
+        return scoped
     name = type_stmt.name
     if name in typedef_names and not type_stmt.prefix:
         return {JsonSchemaKey.REF: json_schema_defs_uri(name)}
@@ -966,7 +995,7 @@ def _imported_typedef_schema(type_stmt: YangTypeStmt, module: Any, leafref_ancho
     label = f"{type_stmt.prefix}:{type_stmt.name}" if type_stmt.prefix else type_stmt.name
     if typedef is None or typedef.type is None:
         raise YangExportError(f"cannot export type {label!r}: its typedef is not found where the type is written")
-    if type_stmt.range or type_stmt.length or type_stmt.patterns:
+    if getattr(type_stmt, "range", None) or getattr(type_stmt, "length", None) or getattr(type_stmt, "patterns", None):
         raise YangExportError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
     return type_to_schema(typedef.type, set(), target, leafref_anchor)
 
@@ -980,12 +1009,12 @@ def _singleton_enum_string(fragment: SchemaFragment) -> YangTypeStmt | None:
     if len(enums) == 1 and kind == "string" and isinstance(enums[0], str):
         from ..json.parser import _apply_string_pattern_entries, _merge_schema_xyang, _pattern_metadata_from_xyang
 
-        type_stmt = YangTypeStmt(name=STRING)
+        type_stmt = make_type_stmt(name=STRING)
         pattern = "\\*" if enums[0] == "*" else enums[0]
         merged = _merge_schema_xyang(dict(schema), dict(fragment.xyang))
         message, tag = _pattern_metadata_from_xyang(merged)
         _apply_string_pattern_entries(type_stmt, merged)
-        if not type_stmt.patterns:
+        if not getattr(type_stmt, "patterns", None):
             type_stmt.patterns = [
                 YangPatternSpec(
                     pattern=pattern,
@@ -1003,7 +1032,7 @@ def _integer_stmt_from_bounds(fragment: SchemaFragment) -> YangTypeStmt:
         fragment.schema.get(JsonSchemaKey.MINIMUM),
         fragment.schema.get(JsonSchemaKey.MAXIMUM),
     )
-    type_stmt = YangTypeStmt(name=name)
+    type_stmt = make_type_stmt(name=name)
     if range_str:
         type_stmt.range = range_str
     return type_stmt
@@ -1026,7 +1055,7 @@ def type_stmt_from_schema(
 
         typedef_name = _ref_to_typedef_name(ref) if isinstance(ref, str) else None
         if typedef_name:
-            return YangTypeStmt(name=typedef_name)
+            return make_type_stmt(name=typedef_name, context=xyang.get("type-context"))
     parsed = REGISTRY[ENUMERATION].from_schema(fragment)
     if parsed is not None:
         return parsed

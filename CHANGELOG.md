@@ -7,6 +7,16 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- **Typedef scope (Python, TypeScript, and Zig):** nested typedefs are restricted to their declaration context and descendants instead of leaking across the module. Lookup checks scope during existing resolution, including imported groupings and includes. Native JSON preserves these restrictions in global `$defs` through optional `x-yang.scope`, `x-yang.name`, and reference context metadata; exports fail loudly when scoped reference restrictions cannot be represented without loss.
+
+### Changed
+
+- **Type AST storage:** Python and TypeScript use specialized `YangTypeStmt` subclasses so plain types no longer carry unrelated lists and attributes. Python uses slotted dataclasses; range and length metadata is stored in restriction objects. Code constructing constrained types should use `make_type_stmt` (Python) or `createTypeStmt` (TypeScript) and the appropriate specialized attributes.
+- **TypeScript statement definitions:** `YangStatementInit` and `YangStatement` share common field declarations while retaining separate input and normalized runtime types. Unused optional statement properties no longer occupy runtime objects.
+- **Zig type AST storage:** `TypeStmt` uses a common header and tagged pointers to specialized payloads. Payloads and range/length restrictions are allocated only when needed; parser, validation, XPath, instance encoding, and native JSON consumers use the new representation. Unconstrained types shrink from 424 to 88 bytes on 64-bit builds. The header includes the lexical declaration context used for scope checks.
+
 ## [1.0.1] — 2026-11-13
 
 ### Removed

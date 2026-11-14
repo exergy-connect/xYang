@@ -176,7 +176,7 @@ pub const TypeChecker = struct {
         if (try registry.get(registry.IDENTITYREF).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
         if (!self.module_schema) return self.issue("identityref", "identityref validation requires module schema", .{});
         const s = value.string;
-        const bases = t.identityref_bases.items;
+        const bases = t.identityBases();
         if (bases.len == 0) return self.issue("identityref", "identityref type has no base identities", .{});
         if (identity_graph.resolveValue(self.root, s) == null) {
             return self.issue("identityref", "identityref value {f} does not resolve to a known identity", .{repr(s)});
@@ -202,7 +202,7 @@ pub const TypeChecker = struct {
 
     fn checkInstanceIdentifier(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (try registry.get(registry.INSTANCE_IDENTIFIER).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
-        if (!t.require_instance) return &.{};
+        if (!t.requireInstance()) return &.{};
         const s = pychars.strip(value.string);
         if (s.len == 0) {
             return self.issue("instance-identifier", "instance-identifier path must not be empty when require-instance is true", .{});
@@ -233,19 +233,19 @@ pub const TypeChecker = struct {
     }
 
     fn checkUnion(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
-        for (t.types.items) |member| {
+        for (t.members()) |member| {
             if ((try self.check(value, member)).len == 0) return &.{};
         }
         var names: std.ArrayList([]const u8) = .empty;
-        for (t.types.items) |m| try names.append(self.a, m.name);
+        for (t.members()) |m| try names.append(self.a, m.name);
         return self.issue("union", "Value {f} does not match any union member type ({s})", .{ jv.pyRepr(value), try std.mem.join(self.a, ", ", names.items) });
     }
 
     /// require-instance: the value is the data of a node the `path` selects. A relative
     /// path starts at the leaf or leaf-list item (`ctx.current`).
     fn checkLeafref(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
-        if (!t.require_instance) return &.{};
-        const expr = t.path_ast orelse return &.{};
+        if (!t.requireInstance()) return &.{};
+        const expr = t.pathAst() orelse return &.{};
         const path = &expr.path;
         const path_str = try path.toString(self.a);
         const ctx = try self.context();
@@ -264,11 +264,11 @@ pub const TypeChecker = struct {
         if (try registry.get(registry.STRING).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
         const s = value.string;
         var errors: std.ArrayList(Issue) = .empty;
-        if (t.length) |length| {
+        if (t.lengthRestriction().expression) |length| {
             const n: i128 = @intCast(std.unicode.utf8CountCodepoints(s) catch s.len);
-            if (try self.lengthIssue(n, length, false, t.length_error_message, t.length_error_app_tag)) |i| try errors.append(self.a, i);
+            if (try self.lengthIssue(n, length, false, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| try errors.append(self.a, i);
         }
-        for (t.patterns.items) |*p| {
+        for (t.patterns()) |*p| {
             if (p.pattern.len == 0) continue;
             const matched = try p.compiled.?.matches(self.a, s);
             if (matched == p.invert_match) {
@@ -279,12 +279,12 @@ pub const TypeChecker = struct {
                 try errors.append(self.a, .{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) });
             }
         }
-        if (t.enums.items.len > 0) {
-            const known = for (t.enums.items) |e| {
+        if (t.enums().len > 0) {
+            const known = for (t.enums()) |e| {
                 if (std.mem.eql(u8, e, s)) break true;
             } else false;
             if (!known) {
-                try errors.append(self.a, .{ .code = "enum", .message = try std.fmt.allocPrint(self.a, "Value {f} is not one of: {s}", .{ repr(s), try std.mem.join(self.a, ", ", t.enums.items) }) });
+                try errors.append(self.a, .{ .code = "enum", .message = try std.fmt.allocPrint(self.a, "Value {f} is not one of: {s}", .{ repr(s), try std.mem.join(self.a, ", ", t.enums()) }) });
             }
         }
         return errors.items;
@@ -303,8 +303,8 @@ pub const TypeChecker = struct {
             .decimal => |d| truncDecimal(d),
             else => unreachable,
         };
-        if (t.range) |range| {
-            if (try self.rangeIssue(.{ .int = n }, range, t.range_error_message, t.range_error_app_tag)) |i| return self.one(i);
+        if (t.rangeRestriction().expression) |range| {
+            if (try self.rangeIssue(.{ .int = n }, range, t.rangeRestriction().error_message, t.rangeRestriction().error_app_tag)) |i| return self.one(i);
         }
         if (spec) |sp| if (sp.bounds) |b| {
             if (n < b[0]) return self.issue("range", "Value {d} is less than minimum {d}", .{ n, b[0] });
@@ -321,10 +321,10 @@ pub const TypeChecker = struct {
             .decimal => |d| d.toFloat(),
             else => unreachable,
         };
-        if (t.range) |range| {
-            if (try self.rangeIssue(.{ .float = n }, range, t.range_error_message, t.range_error_app_tag)) |i| return self.one(i);
+        if (t.rangeRestriction().expression) |range| {
+            if (try self.rangeIssue(.{ .float = n }, range, t.rangeRestriction().error_message, t.rangeRestriction().error_app_tag)) |i| return self.one(i);
         }
-        if (t.fraction_digits) |fd| if (fd >= 0) {
+        if (t.fractionDigits()) |fd| if (fd >= 0) {
             const text = try std.fmt.allocPrint(self.a, "{f}", .{jv.pyStr(value)});
             const s = std.mem.trim(u8, text, &std.ascii.whitespace);
             if (std.mem.indexOfScalar(u8, s, '.')) |dot| {
@@ -340,10 +340,10 @@ pub const TypeChecker = struct {
         if (try registry.get(registry.BINARY).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
         const s = std.mem.trim(u8, value.string, &pyWhitespace);
         const decoded_len = base64DecodedLen(s) orelse return self.issue("type", "binary value is not valid base64", .{});
-        if (t.length) |length| {
-            if (try self.lengthIssue(@intCast(decoded_len), length, true, t.length_error_message, t.length_error_app_tag)) |i| return self.one(i);
+        if (t.lengthRestriction().expression) |length| {
+            if (try self.lengthIssue(@intCast(decoded_len), length, true, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| return self.one(i);
         }
-        for (t.patterns.items) |*p| {
+        for (t.patterns()) |*p| {
             if (p.pattern.len == 0) continue;
             const matched = try p.compiled.?.matches(self.a, s);
             if (matched == p.invert_match) {
@@ -437,7 +437,7 @@ fn optEql(x: ?[]const u8, y: ?[]const u8) bool {
 
 /// `_type_has_restrictions`.
 fn hasRestrictions(t: *const TypeStmt) bool {
-    return t.range != null or t.length != null or t.patterns.items.len > 0;
+    return t.rangeRestriction().expression != null or t.lengthRestriction().expression != null or t.patterns().len > 0;
 }
 
 /// `_pattern_entry_violation_message`.

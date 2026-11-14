@@ -1,5 +1,7 @@
+import { scopePath, validateScope } from "../typedef-scope";
+import { validateSemantics } from "../validator/semantic-validation";
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
-import { YangModule, YangStatement, type IdentityBases, type ModuleInit, type ModuleSource } from "../core/model";
+import { YangModule, YangStatement, normalizeTypeShape, type IdentityBases, type ModuleInit, type ModuleSource } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { YangSyntaxError } from "../core/errors";
@@ -275,7 +277,7 @@ function setConfigFromXyang(stmt: YangStatement, xyang: Record<string, unknown>)
 function resolveSchema(schema: Record<string, unknown>, defs: Record<string, unknown>): Record<string, unknown> {
   const ref = schema.$ref;
   if (typeof ref === "string" && ref.startsWith("#/$defs/")) {
-    const name = ref.slice("#/$defs/".length);
+    const name = decodeURIComponent(ref.slice("#/$defs/".length)).replace(/~1/g, "/").replace(/~0/g, "~");
     const d = defs[name];
     if (d && typeof d === "object") {
       return resolveSchema(d as Record<string, unknown>, defs);
@@ -299,7 +301,7 @@ function refToTypedefName(ref: unknown): string | undefined {
   if (typeof ref !== "string" || !ref.startsWith("#/$defs/")) {
     return undefined;
   }
-  const name = ref.slice("#/$defs/".length);
+  const name = decodeURIComponent(ref.slice("#/$defs/".length)).replace(/~1/g, "/").replace(/~0/g, "~");
   return name.trim().length > 0 ? name : undefined;
 }
 
@@ -347,7 +349,13 @@ function ownPrefixBinding(expression: string, isPath: boolean, moduleName: strin
   return recorded;
 }
 
-function bindUnrecordedPrefixes(statements: YangStatement[], moduleName: string, ownPrefix: string): void {
+function setTypeContext(shape: Record<string, unknown> | undefined, inherited: string): void {
+  if (!shape) return;
+  shape.context ??= inherited;
+  for (const member of (shape.types ?? []) as Record<string, unknown>[]) setTypeContext(member, String(shape.context));
+}
+
+function bindUnrecordedPrefixes(statements: YangStatement[], moduleName: string, ownPrefix: string, context = ""): void {
   for (const stmt of statements) {
     if (stmt.keyword === "must" && typeof stmt.argument === "string" && !stmt.xpath_prefixes) {
       const recorded = ownPrefixBinding(stmt.argument, false, moduleName, ownPrefix);
@@ -359,11 +367,12 @@ function bindUnrecordedPrefixes(statements: YangStatement[], moduleName: string,
       if (recorded) when.xpath_prefixes = recorded;
     }
     const type = stmt.type;
-    if (type && type.name === YangTokenType.LEAFREF && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
+    setTypeContext(type, context);
+    if (type?.kind === "leafref" && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
       const recorded = ownPrefixBinding(type.path, true, moduleName, ownPrefix);
       if (recorded) type.xpath_prefixes = recorded;
     }
-    bindUnrecordedPrefixes(stmt.statements, moduleName, ownPrefix);
+    bindUnrecordedPrefixes(stmt.statements, moduleName, ownPrefix, scopePath(context, stmt));
   }
 }
 
@@ -424,6 +433,10 @@ function applyStatementMetaFromXyang(stmt: YangStatement, xy: Record<string, unk
 }
 
 function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
+  return normalizeTypeShape(rawTypeShapeFromJsonLeaf(schema, xy));
+}
+
+function rawTypeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
   if (schema.type === JSON_TYPE_STRING) {
     const quoted = quotedNumericTypeShape(xy);
     if (quoted) {
@@ -455,7 +468,7 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
   }
   const typedefRef = refToTypedefName(schema.$ref);
   if (typedefRef) {
-    return { name: typedefRef };
+    return { name: typedefRef, ...(xy["type-context"] !== undefined ? { context: xy["type-context"] === "" ? "" : validateScope(xy["type-context"]) } : {}) };
   }
   if (schema.type === JSON_TYPE_OBJECT && schema.maxProperties === 0) {
     return { name: YangTokenType.EMPTY };
@@ -603,11 +616,11 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
   if (xy.mandatory === true) {
     out.mandatory = true;
   }
-  out.description = descriptionOrEmpty(resolved.description);
-  if (resolved.default !== undefined) {
+  out.description = descriptionOrEmpty(schema.description);
+  if (schema.default !== undefined) {
     const schemaType = typeof resolved.type === "string" ? resolved.type : undefined;
     const xyType = typeof xy.type === "string" ? xy.type : undefined;
-    out.default = yangDefaultFromJsonSchema(resolved.default, schemaType, xyType);
+    out.default = yangDefaultFromJsonSchema(schema.default, schemaType, xyType);
   }
   if (when) {
     out.when = when;
@@ -618,6 +631,7 @@ function parseLeaf(name: string, schema: Record<string, unknown>, defs: Record<s
       out.if_features = feats;
     }
   }
+  if (typeof xy.units === "string") out.units = xy.units;
   setConfigFromXyang(out, xy);
   attachInvocations(out, xy);
   return out;
@@ -972,7 +986,7 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
 
 function parseLeafList(name: string, schema: Record<string, unknown>, defs: Record<string, unknown>): YangStatement {
   const xy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
-  const items = resolveSchema(asRecord(schema.items), defs);
+  const items = resolveSchemaWithOverlay(asRecord(schema.items), defs);
   const itemXy = asRecord(items[YANG_SCHEMA_KEYS.xYang]);
   const mergedXy = { ...xy, ...itemXy };
   const typeShape = typeShapeFromJsonLeaf(items, mergedXy);
@@ -1001,6 +1015,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
       out.defaults = [schema.default];
     }
   }
+  if (typeof xy.units === "string") out.units = xy.units;
   setConfigFromXyang(out, xy);
   attachInvocations(out, xy);
   return out;
@@ -1131,17 +1146,17 @@ function localPropertyToStatement(
     return parseChoice(name, resolved, defs);
   }
   if (xyType === YangTokenType.LEAF) {
-    return parseLeaf(name, resolved, defs);
+    return parseLeaf(name, schema, defs);
   }
   if (
     xyType === YangTokenType.LEAFREF ||
     xyType === YangTokenType.IDENTITYREF ||
     xyType === YangTokenType.INSTANCE_IDENTIFIER
   ) {
-    return parseLeaf(name, resolved, defs);
+    return parseLeaf(name, schema, defs);
   }
   if (resolved.type === JSON_TYPE_STRING && isStringNumberBuiltin(xyType)) {
-    return parseLeaf(name, resolved, defs);
+    return parseLeaf(name, schema, defs);
   }
   if (xyType === YangTokenType.ANYDATA) {
     return parseAnydataOrAnyxml(name, resolved, YangTokenType.ANYDATA);
@@ -1260,16 +1275,19 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     const holder = new YangStatement({ statements: [] });
     attachInvocations(holder, dxy);
     typedefs[defName] = {
-      name: defName,
+      name: typeof dxy.name === "string" ? dxy.name : defName,
+      scope: validateScope(dxy.scope),
+      ...(dxy.scope !== undefined ? { units: typeof dxy.units === "string" ? dxy.units : undefined, default: d.default } : {}),
       description: descriptionOrEmpty(d.description),
       type: typeShapeFromJsonLeaf(d, dxy),
       statements: holder.statements
     };
   }
 
-  for (const typedef of Object.values(typedefs) as Array<{ type?: Record<string, unknown> }>) {
+  for (const typedef of Object.values(typedefs) as Array<{ scope?: string; type?: Record<string, unknown> }>) {
     const type = typedef.type;
-    if (type && type.name === YangTokenType.LEAFREF && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
+    setTypeContext(type, typedef.scope ?? "");
+    if (type?.kind === "leafref" && typeof type.path === "string" && type.path && !type.xpath_prefixes) {
       const recorded = ownPrefixBinding(type.path, true, moduleName, prefix);
       if (recorded) type.xpath_prefixes = recorded;
     }
@@ -1300,6 +1318,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
   const loaded = new YangModule(data, modSource);
   // Index sx:structure and apply a cross-module sx:augment-structure once.
   applyBuiltinExtensionInvocations(loaded);
+  validateSemantics(loaded);
   return loaded;
   } finally {
     parsingModule = previousModule;

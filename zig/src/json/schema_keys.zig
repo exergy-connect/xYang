@@ -35,6 +35,8 @@ pub const DEFS_URI_PREFIX = "#/" ++ DEFS ++ "/";
 
 /// Keys inside the `x-yang` object (and the root module metadata).
 pub const xy = struct {
+    pub const SCOPE = "scope";
+    pub const TYPE_CONTEXT = "type-context";
     pub const TYPE = "type";
     pub const BASE = "base";
     pub const BASES = "bases";

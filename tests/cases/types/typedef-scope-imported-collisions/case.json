@@ -1,0 +1,49 @@
+{
+  "description": "Imported private typedefs with the same lexical names and scopes retain distinct global native keys.",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    {
+      "name": "two modules with identical private names",
+      "data": {
+        "a": {
+          "value": "pp"
+        },
+        "b": {
+          "value": "qq"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "first provider restriction",
+      "data": {
+        "a": {
+          "value": "qq"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/a/value",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "second provider restriction",
+      "data": {
+        "b": {
+          "value": "pp"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/b/value",
+          "code": "pattern"
+        }
+      ]
+    }
+  ]
+}

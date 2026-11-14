@@ -1,0 +1,79 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "rpcs": {
+      "run": {
+        "x-yang": {
+          "type": "rpc"
+        },
+        "input": {
+          "type": "object",
+          "x-yang": {
+            "type": "input"
+          },
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "$ref": "#/$defs/~1run~1input~1code",
+              "x-yang": {
+                "type": "leaf",
+                "type-context": "/run/input"
+              }
+            }
+          }
+        },
+        "output": {
+          "type": "object",
+          "x-yang": {
+            "type": "output"
+          },
+          "additionalProperties": false,
+          "properties": {
+            "value": {
+              "$ref": "#/$defs/~1run~1output~1code",
+              "x-yang": {
+                "type": "leaf",
+                "type-context": "/run/output"
+              }
+            }
+          }
+        }
+      }
+    }
+  },
+  "type": "object",
+  "properties": {},
+  "additionalProperties": false,
+  "$defs": {
+    "/run/input/code": {
+      "type": "integer",
+      "minimum": 1,
+      "maximum": 5,
+      "x-yang": {
+        "scope": "/run/input",
+        "name": "code"
+      }
+    },
+    "/run/output/code": {
+      "type": "string",
+      "pattern": "^a+$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "a+",
+            "invert-match": false
+          }
+        ],
+        "scope": "/run/output",
+        "name": "code"
+      }
+    }
+  }
+}

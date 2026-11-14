@@ -1,3 +1,5 @@
+import { resolveTypedef } from "./type-checker";
+import { REGISTRY } from "../types/registry";
 import { YangSemanticError } from "../core/errors";
 import { YangStatement, YangModule } from "../core/model";
 
@@ -47,4 +49,16 @@ function validateListKeyConstraints(module: YangModule): void {
 
 export function validateSemantics(module: YangModule): void {
   validateListKeyConstraints(module);
+  const checkType = (type: Record<string, unknown> | undefined, stack = new Set<object>()): void => {
+    if (!type) return;
+    if (type.prefix || !Object.prototype.hasOwnProperty.call(REGISTRY, String(type.name))) {
+      const td = resolveTypedef(module, type);
+      if (!td) throw new YangSemanticError(`Unknown typedef '${type.name}' in lexical scope`);
+      if (stack.has(td)) throw new YangSemanticError(`Circular typedef '${type.name}'`);
+      checkType(td.type, new Set([...stack, td]));
+    }
+    for (const member of (type.types ?? []) as Record<string, unknown>[]) checkType(member, stack);
+  };
+  for (const td of Object.values(module.typedefs) as Array<{ type?: Record<string, unknown> }>) checkType(td.type);
+  for (const stmt of iterStatements(module.statements)) checkType(stmt.type);
 }

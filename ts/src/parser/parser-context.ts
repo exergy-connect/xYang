@@ -1,3 +1,4 @@
+import { scopePath } from "../typedef-scope";
 import { YangSyntaxError } from "../core/errors";
 import {
   BINARY,
@@ -404,6 +405,7 @@ export class ParserContext {
   module: unknown;
   current_parent: ParserContextParent;
   source_dir?: string;
+  typedef_context = "";
   /** Parent name from the keyword dispatch registry, when this context is a statement body. */
   dispatch_parent?: string;
   /** Text used in ``Invalid or unknown statement in …``. */
@@ -416,11 +418,13 @@ export class ParserContext {
   }
 
   push_parent(parent: ParserContextParent): ParserContext {
-    return new ParserContext({
+    const next = new ParserContext({
       module: this.module,
       current_parent: parent,
       source_dir: this.source_dir
     });
+    next.typedef_context = parent === this.current_parent ? this.typedef_context : scopePath(this.typedef_context, parent);
+    return next;
   }
 
   /** Copy of this context whose ``parseStatement`` calls use *parent*'s allow-list. */

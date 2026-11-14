@@ -1,0 +1,1 @@
+module p { namespace "urn:p"; prefix p; grouping g { typedef code { units "status"; default "p"; type string { pattern "p+"; } } leaf value { type code; } } }

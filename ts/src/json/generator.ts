@@ -1,3 +1,4 @@
+import { type ScopedTypedef } from "../typedef-scope";
 import {
   coerceIdentifierRef,
   formatIdentifierRef,
@@ -479,6 +480,7 @@ function withStatementMeta(
   if (ifFeatures.length > 0) {
     out["if-features"] = ifFeatures;
   }
+  if (typeof stmt.units === "string" && stmt.units) out.units = stmt.units;
   const whenShape = asRecord(stmt.when);
   const whenExpression = typeof whenShape.expression === "string" ? whenShape.expression : "";
   if (whenExpression.trim().length > 0) {
@@ -560,6 +562,7 @@ function resolveAbsoluteLeafTypePath(module: YangModule, path: unknown): Record<
  * `$defs` hold only this module's typedefs. Restrictions on such a `type` cannot be kept, so they fail.
  */
 function foreignTypedefResolved(typeShape: Record<string, unknown>, module: YangModule): Record<string, unknown> {
+  if (resolveTypedef(module, typeShape)?.scope !== undefined) return typeShape;
   let current = typeShape;
   for (let depth = 0; depth < 64; depth += 1) {
     const typeName = typeof current.name === "string" ? current.name : "";
@@ -582,19 +585,56 @@ function foreignTypedefResolved(typeShape: Record<string, unknown>, module: Yang
   return current;
 }
 
+type ScopedExportEntry = { td: ScopedTypedef; owner: YangModule; key: string };
+let scopedExportDefs: Record<string, ScopedExportEntry> = {};
+const defsRef = (name: string): string => `#/$defs/${encodeURIComponent(name.replace(/~/g, "~0").replace(/\//g, "~1"))}`;
+function scopedCatalog(module: YangModule): Record<string, ScopedExportEntry> {
+  const out: Record<string, ScopedExportEntry> = {};
+  const seen = new Set<YangModule>();
+  const collect = (current: YangModule): void => {
+    if (seen.has(current)) return;
+    seen.add(current);
+    for (const [key, value] of Object.entries(current.typedefs)) {
+      const td = value as ScopedTypedef;
+      if (td.scope !== undefined) {
+        const exported = current === module ? key : `@${current.name}:${key}`;
+        if (exported in out) throw new YangExportError(`Conflicting scoped typedef key '${exported}'`);
+        out[exported] = { td, owner: current, key };
+      }
+    }
+    for (const imported of Object.values(current.import_prefixes)) collect(imported);
+  };
+  collect(module);
+  return out;
+}
+function scopedTypeSchema(type: Record<string, unknown>, module: YangModule): Record<string, unknown> | undefined {
+  const td = resolveTypedef(module, type);
+  if (td?.scope === undefined) return undefined;
+  if (type.range || type.length || (Array.isArray(type.patterns) && type.patterns.length)) throw new YangExportError(`cannot export restrictions on scoped typedef '${td.name}' in the native JSON form`);
+  const writer = typeof type.scope_module === "string" ? type.scope_module : module.name;
+  const source = writer === module.name ? module : module.module_registry?.[String(writer)];
+  const storageKey = Object.entries(source?.typedefs ?? {}).find(([, value]) => value === td)?.[0];
+  const found = Object.entries(scopedExportDefs).find(([, entry]) => entry.owner.name === writer && entry.key === storageKey);
+  if (!found) throw new YangExportError(`Scoped typedef '${td.name}' is absent from the export catalog`);
+  return { $ref: defsRef(found[0]), [YANG_SCHEMA_KEYS.xYang]: { "type-context": type.context ?? "" } };
+}
+
 function typedefRefOrInline(
   typeShape: Record<string, unknown>,
   typedefNames: Set<string>,
   module: YangModule
 ): Record<string, unknown> {
+  const scoped = scopedTypeSchema(typeShape, module);
+  if (scoped) return scoped;
   const typeName = typeof typeShape.name === "string" ? typeShape.name : "";
   const prefix = typeof typeShape.prefix === "string" && typeShape.prefix ? typeShape.prefix : undefined;
   const scope = typeof typeShape.scope_module === "string" ? typeShape.scope_module : undefined;
   const local = !prefix && (scope === undefined || scope === module.name);
   if (local && typedefNames.has(typeName)) {
-    return { $ref: `#/$defs/${typeName}` };
+    return { $ref: defsRef(typeName) };
   }
   if (!prefix && Object.prototype.hasOwnProperty.call(REGISTRY, typeName)) {
+    if (typeName === "union") return { oneOf: ((typeShape.types ?? []) as Record<string, unknown>[]).map((member) => typedefRefOrInline(member, typedefNames, module)) };
     return leafTypeToSchema(typeShape);
   }
   // A typedef from another module is inlined; the JSON form's `$defs` hold only this module's.
@@ -1000,6 +1040,7 @@ function statementToSchemaBody(
     }
 
     const xYang = withStatementMeta(stmt, {
+      ...asRecord(leafSchema[YANG_SCHEMA_KEYS.xYang]),
       type: keyword
     }, module, typedefNames);
     if (stmt.mandatory === true) {
@@ -1060,9 +1101,9 @@ function statementToSchemaBody(
   };
 }
 
-function typedefToSchema(module: YangModule): Record<string, unknown> {
+function typedefToSchema(module: YangModule, entries = module.typedefs): Record<string, unknown> {
   const out: Record<string, unknown> = {};
-  const typedefs = module.typedefs as Record<string, { type?: unknown; description?: string }>;
+  const typedefs = entries as Record<string, { type?: unknown; description?: string }>;
   const names = new Set(Object.keys(typedefs));
   for (const [name, entry] of Object.entries(typedefs)) {
     const typeShape = asRecord(entry.type);
@@ -1091,7 +1132,21 @@ function typedefToSchema(module: YangModule): Record<string, unknown> {
       xy[XYANG_KEYS.extensions] = invocations;
       def[YANG_SCHEMA_KEYS.xYang] = xy;
     }
+    const scoped = entry as ScopedTypedef;
+    if (scoped.scope !== undefined) {
+      def[YANG_SCHEMA_KEYS.xYang] = { ...asRecord(def[YANG_SCHEMA_KEYS.xYang]), scope: scoped.scope, name: scoped.name, ...(scoped.units ? { units: scoped.units } : {}) };
+      const defaultValue = (entry as { default?: unknown }).default;
+      if (defaultValue !== undefined) def.default = jsonSchemaDefaultValue(defaultValue, { yangTypeName: String(typeShape.name), jsonSchemaType: typeof def.type === "string" ? def.type : null });
+    }
     out[name] = def;
+  }
+  return out;
+}
+
+function scopedTypedefsToSchema(): Record<string, unknown> {
+  const out: Record<string, unknown> = {};
+  for (const [key, { td, owner }] of Object.entries(scopedExportDefs)) {
+    Object.assign(out, typedefToSchema(owner, { [key]: td }));
   }
   return out;
 }
@@ -1344,12 +1399,16 @@ function featuresJson(module: YangModule): Record<string, unknown> {
 
 /** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
 export function generateJsonSchema(module: YangModule): Record<string, unknown> {
+
   const previous = extensionUses;
+  const previousScoped = scopedExportDefs;
+  scopedExportDefs = scopedCatalog(module);
   extensionUses = [];
   try {
     return withIdentityExport(module, (used) => generateSchema(module, used));
   } finally {
     extensionUses = previous;
+    scopedExportDefs = previousScoped;
   }
 }
 
@@ -1357,6 +1416,7 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
   // Preserve parse-time AST shape (reversible YANG <-> yang.json) while still
   // emitting a flattened schema view.
   const effectiveModule = expandUses(module);
+
   if (effectiveModule !== module && module.module_registry && !effectiveModule.module_registry) {
     Object.defineProperty(effectiveModule, "module_registry", { value: module.module_registry, enumerable: false });
   }
@@ -1412,6 +1472,7 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
 
   const defs = {
     ...typedefToSchema(effectiveModule),
+    ...scopedTypedefsToSchema(),
     ...identityToSchema(effectiveModule, typedefNames)
   };
   const moduleInvocations = orderedExtensionInvocations(effectiveModule, typedefNames);

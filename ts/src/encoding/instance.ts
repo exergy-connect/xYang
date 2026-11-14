@@ -12,7 +12,7 @@ import {
   REGISTRY,
   STRINGISH_NAMES
 } from "../types/registry";
-import { TypeChecker } from "../validator/type-checker";
+import { resolveTypedef, TypeChecker } from "../validator/type-checker";
 
 const INT64 = QUOTED_INTEGER_NAMES;
 const DECIMAL = DECIMAL_TYPE_NAMES;
@@ -128,22 +128,20 @@ function leafType(stmt: YangStatement): TypeShape | undefined {
 function unwrap(module: YangModule, type: TypeShape | undefined): TypeShape | undefined {
   if (!type) return type;
   const cache = walkCache;
-  if (!cache) return unwrapType(module, type, new Set<string>());
+  if (!cache) return unwrapType(module, type, new Set<TypeShape>());
   if (cache.unwrapped.has(type)) return cache.unwrapped.get(type);
-  const eff = unwrapType(module, type, new Set<string>());
+  const eff = unwrapType(module, type, new Set<TypeShape>());
   cache.unwrapped.set(type, eff);
   return eff;
 }
 
-function unwrapType(module: YangModule, type: TypeShape | undefined, seen: Set<string>): TypeShape | undefined {
+function unwrapType(module: YangModule, type: TypeShape | undefined, seen: Set<TypeShape>): TypeShape | undefined {
   if (!type || typeof type.name !== "string") return type;
-  if (typeof type.prefix === "string" && type.prefix) return type;
   const name = type.name;
-  if (BUILTINS.has(name) || seen.has(name)) return type;
-  const typedefs = module.typedefs as Record<string, { type?: TypeShape }>;
-  const typedef = typedefs[name];
+  if ((!type.prefix && BUILTINS.has(name)) || seen.has(type)) return type;
+  const typedef = resolveTypedef(module, type);
   if (typedef?.type && typeof typedef.type.name === "string") {
-    seen.add(name);
+    seen.add(type);
     return unwrapType(module, typedef.type, seen);
   }
   return type;

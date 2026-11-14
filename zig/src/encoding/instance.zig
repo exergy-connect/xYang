@@ -170,7 +170,7 @@ pub const Walk = struct {
         const eff = self.unwrap(t);
         const name = eff.name;
         if (std.mem.eql(u8, name, registry.UNION)) {
-            for (eff.types.items) |member| {
+            for (eff.members()) |member| {
                 const decoded = (try self.decode(value, member)) orelse continue;
                 if (try self.accepts(decoded, member)) return decoded;
             }

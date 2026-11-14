@@ -121,7 +121,7 @@ describe("imported grouping uses expansion", () => {
     expect(v.validate({ root: { x: "a", y: 1 } }).isValid).toBe(true);
   });
 
-  it("registers typedefs from an imported grouping onto the consumer", () => {
+  it("keeps typedefs from an imported grouping private", () => {
     const dir = mkdtempSync(join(tmpdir(), "xyang-imported-grouping-typedef-"));
     writeFileSync(
       join(dir, "provider.yang"),
@@ -131,6 +131,7 @@ describe("imported grouping uses expansion", () => {
   prefix p;
   grouping g {
     typedef code {
+      units "status";
       type enumeration {
         enum a;
         enum b;
@@ -156,7 +157,8 @@ describe("imported grouping uses expansion", () => {
     const mod = new YangParser({ includePath: [dir], expandUses: true }).parseFile(
       join(dir, "consumer.yang")
     );
-    expect((mod.typedefs as Record<string, unknown>).code).toBeDefined();
+    expect((mod.typedefs as Record<string, unknown>).code).toBeUndefined();
+    expect(mod.findStatement("data")?.findStatement("value")?.units).toBe("status");
     const v = new YangValidator(mod);
     expect(v.validate({ data: { value: "a" } }).isValid).toBe(true);
     expect(v.validate({ data: { value: "nope" } }).isValid).toBe(false);

@@ -1,0 +1,9 @@
+module provider {
+ yang-version 1.1; namespace "urn:provider"; prefix p;
+ grouping g {
+   typedef code { type string { pattern 'a+'; } }
+   typedef wide { type int64; }
+   leaf value { type code; }
+   leaf wide { type union { type wide; type boolean; } }
+ }
+}

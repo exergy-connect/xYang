@@ -1,3 +1,4 @@
+import { typeStatementKind } from "../types/registry";
 import { YangSemanticError } from "./errors";
 import type { YangIdentifierRef } from "./identifier-ref";
 import { bindXPathPrefixes, parseXPath, xpathPrefixes } from "../xpath/parser";
@@ -123,12 +124,14 @@ export class YangStatementWithWhen extends YangStatement {
 }
 
 export class YangTypedefStmt extends YangStatement {
+  scope?: string;
   type?: YangTypeStmt;
   default?: string;
 
   constructor(init: Partial<YangTypedefStmt> = {}) {
     super(init);
     this.keyword = "typedef";
+    this.scope = init.scope;
     this.type = init.type;
     this.default = init.default;
   }
@@ -182,63 +185,91 @@ export class YangPatternSpec {
   }
 }
 
+/** Common declaration identity; specialized attributes live only on their family. */
 export class YangTypeStmt {
-  /** Local type / typedef name (never ``prefix:name``). */
   name: string;
-  /** Import prefix when the type names a typedef from another module. */
-  prefix?: string;
-  patterns: YangPatternSpec[];
-  length?: string;
-  range?: string;
-  /** RFC 7950 §9.4.4 / §9.2.4 body. ``length`` and ``range`` strings are unchanged. */
-  length_error_message?: string;
-  length_error_app_tag?: string;
-  length_description: string;
-  length_reference: string;
-  range_error_message?: string;
-  range_error_app_tag?: string;
-  range_description: string;
-  range_reference: string;
-  fraction_digits?: number;
-  enums: string[];
-  bits: YangBitStmt[];
-  types: YangTypeStmt[];
-  path?: PathNode;
-  /** Module each prefixed step of `path` is bound to, by prefix (RFC 7950 §9.9.2). */
-  xpath_prefixes?: Record<string, string>;
-  /** Module that wrote this `type`: its prefix and typedef name resolve there (RFC 7950 §7.13). */
-  scope_module?: string;
-  require_instance: boolean;
-  identityref_bases: YangIdentifierRef[];
-  /** ``units`` under ``type`` (accepted; not an RFC 7950 type substatement). */
-  units: string;
+  declare prefix?: string;
+  declare scope_module?: string;
+  declare context?: string;
+  declare units?: string;
 
   constructor(init: Partial<YangTypeStmt> = {}) {
     this.name = init.name ?? "";
-    this.prefix = init.prefix;
-    this.patterns = init.patterns ?? [];
-    this.length = init.length;
-    this.range = init.range;
-    this.length_error_message = init.length_error_message;
-    this.length_error_app_tag = init.length_error_app_tag;
-    this.length_description = init.length_description ?? "";
-    this.length_reference = init.length_reference ?? "";
-    this.range_error_message = init.range_error_message;
-    this.range_error_app_tag = init.range_error_app_tag;
-    this.range_description = init.range_description ?? "";
-    this.range_reference = init.range_reference ?? "";
-    this.fraction_digits = init.fraction_digits;
-    this.enums = init.enums ?? [];
-    this.bits = init.bits ?? [];
-    this.types = init.types ?? [];
-    this.path = init.path;
-    if (init.xpath_prefixes) this.xpath_prefixes = init.xpath_prefixes;
-    if (init.scope_module) this.scope_module = init.scope_module;
-    this.require_instance = init.require_instance ?? true;
-    this.identityref_bases = init.identityref_bases ?? [];
-    this.units = init.units ?? "";
+    if (init.prefix !== undefined) this.prefix = init.prefix;
+    if (init.scope_module !== undefined) this.scope_module = init.scope_module;
+    if (init.context !== undefined) this.context = init.context;
+    if (init.units !== undefined) this.units = init.units;
   }
 }
+
+export class YangRestriction {
+  expression: string;
+  declare error_message?: string;
+  declare error_app_tag?: string;
+  declare description?: string;
+  declare reference?: string;
+
+  constructor(expression: string, metadata: Omit<Partial<YangRestriction>, "expression"> = {}) {
+    this.expression = expression;
+    for (const key of ["error_message", "error_app_tag", "description", "reference"] as const) {
+      if (metadata[key] !== undefined && metadata[key] !== "") this[key] = metadata[key];
+    }
+  }
+}
+
+export class YangNumericTypeStmt extends YangTypeStmt {
+  declare range_restriction?: YangRestriction;
+}
+export class YangDecimalTypeStmt extends YangNumericTypeStmt {
+  declare fraction_digits?: number;
+}
+export class YangBinaryTypeStmt extends YangTypeStmt {
+  declare length_restriction?: YangRestriction;
+}
+export class YangStringTypeStmt extends YangBinaryTypeStmt {
+  declare patterns?: YangPatternSpec[];
+}
+export class YangEnumerationTypeStmt extends YangTypeStmt {
+  enums: string[] = [];
+}
+export class YangBitsTypeStmt extends YangTypeStmt {
+  bits: YangBitStmt[] = [];
+}
+export class YangUnionTypeStmt extends YangTypeStmt {
+  types: YangTypeStmt[] = [];
+}
+export class YangInstanceIdentifierTypeStmt extends YangTypeStmt {
+  require_instance = true;
+}
+export class YangLeafrefTypeStmt extends YangInstanceIdentifierTypeStmt {
+  declare path?: PathNode;
+  declare xpath_prefixes?: Record<string, string>;
+}
+export class YangIdentityrefTypeStmt extends YangTypeStmt {
+  identityref_bases: YangIdentifierRef[] = [];
+}
+export class YangDerivedTypeStmt extends YangTypeStmt {
+  declare range_restriction?: YangRestriction;
+  declare length_restriction?: YangRestriction;
+  declare patterns?: YangPatternSpec[];
+  declare enums?: string[];
+  declare bits?: YangBitStmt[];
+  declare require_instance?: boolean;
+}
+
+const TYPE_STATEMENT_CLASSES = {
+  plain: YangTypeStmt, numeric: YangNumericTypeStmt, decimal: YangDecimalTypeStmt,
+  binary: YangBinaryTypeStmt, string: YangStringTypeStmt, enumeration: YangEnumerationTypeStmt,
+  bits: YangBitsTypeStmt, union: YangUnionTypeStmt, leafref: YangLeafrefTypeStmt,
+  identityref: YangIdentityrefTypeStmt, "instance-identifier": YangInstanceIdentifierTypeStmt,
+  derived: YangDerivedTypeStmt
+};
+
+export function createTypeStmt(init: Partial<YangTypeStmt> & { name: string }): YangTypeStmt {
+  const Constructor = TYPE_STATEMENT_CLASSES[typeStatementKind(init.name, init.prefix)];
+  return new Constructor(init);
+}
+
 
 export class YangContainerStmt extends YangStatementWithWhen {
   must_statements: YangMustStmt[];

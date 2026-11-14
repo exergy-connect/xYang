@@ -6,7 +6,7 @@ from collections.abc import Iterable
 
 from .ast import YangChoiceStmt, YangLeafStmt, YangListStmt, YangStatement
 from .errors import YangSemanticError
-from .module import YangModule
+from .module import YangModule, resolve_typedef
 
 
 def _iter_effective_statements(statements: Iterable[YangStatement]) -> Iterable[YangStatement]:
@@ -51,3 +51,22 @@ def _validate_list_key_constraints(module: YangModule) -> None:
 def validate_semantics(module: YangModule) -> None:
     """Run semantic checks that require the effective post-expansion schema tree."""
     _validate_list_key_constraints(module)
+    from .types.registry import REGISTRY
+
+    def check_type(type_stmt, stack=frozenset()):
+        if type_stmt is None:
+            return
+        if type_stmt.prefix or type_stmt.name not in REGISTRY:
+            td, _ = resolve_typedef(type_stmt, module)
+            if td is None:
+                raise YangSemanticError(f"Unknown typedef {type_stmt.name!r} in lexical scope")
+            if id(td) in stack:
+                raise YangSemanticError(f"Circular typedef {td.name!r}")
+            check_type(td.type, stack | {id(td)})
+        for member in getattr(type_stmt, "types", ()):
+            check_type(member, stack)
+
+    for td in module.typedefs.values():
+        check_type(td.type)
+    for stmt in _iter_effective_statements(module.statements):
+        check_type(getattr(stmt, "type", None))

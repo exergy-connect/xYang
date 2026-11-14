@@ -1,0 +1,61 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): operations",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "input private type",
+      "rpc": "run",
+      "data": {
+        "m:input": {
+          "value": 3
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "input restriction",
+      "rpc": "run",
+      "data": {
+        "m:input": {
+          "value": 6
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:input/value",
+          "code": "range"
+        }
+      ]
+    },
+    {
+      "name": "output private type",
+      "rpc": "run",
+      "direction": "output",
+      "data": {
+        "m:output": {
+          "value": "aa"
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "output restriction",
+      "rpc": "run",
+      "direction": "output",
+      "data": {
+        "m:output": {
+          "value": "b"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:output/value",
+          "code": "pattern"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

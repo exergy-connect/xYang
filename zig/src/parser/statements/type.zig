@@ -39,7 +39,9 @@ pub fn parseType(p: *Parser, parent: Parent) Error!void {
     } else {
         name = try p.ts.consumeAny();
     }
-    const t = try p.new(ast.TypeStmt, .{ .name = name, .prefix = prefix, .scope = p.module });
+    const t = try p.new(ast.TypeStmt, ast.TypeStmt.init(name, prefix));
+    t.scope = p.module;
+    t.context = p.context;
     if (p.ts.consumeIfType(.lbrace)) {
         const ctx = try p.label("type '{s}'", .{name});
         while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
@@ -47,21 +49,25 @@ pub fn parseType(p: *Parser, parent: Parent) Error!void {
         }
         _ = try p.ts.consumeType(.rbrace);
     }
-    if (std.mem.eql(u8, t.name, kw.ENUMERATION) and t.enums.items.len == 0) {
+    if (t.kind() == .enumeration and t.enums().len == 0) {
         return p.ts.fail("enumeration type requires at least one \"enum\" statement (RFC 7950)", .{});
     }
-    if (std.mem.eql(u8, t.name, kw.BITS)) {
-        if (t.bits.items.len == 0) return p.ts.fail("bits type requires at least one \"bit\" statement (RFC 7950)", .{});
+    if (t.kind() == .bits) {
+        if (t.bits().len == 0) return p.ts.fail("bits type requires at least one \"bit\" statement (RFC 7950)", .{});
         try finalizeBits(p, t);
     }
-    if (std.mem.eql(u8, t.name, kw.IDENTITYREF) and t.identityref_bases.items.len == 0) {
+    if (t.kind() == .identityref and t.identityBases().len == 0) {
         return p.ts.fail("identityref type requires at least one \"base\" statement (RFC 7950)", .{});
     }
     switch (parent) {
-        .type => |outer| try outer.types.append(p.arena, t),
+        .type => |outer| {
+            if (outer.kind() != .@"union") return p.ts.fail("Nested type requires a union", .{});
+            try (try outer.ensureMembers(p.arena)).append(p.arena, t);
+        },
         .stmt => |s| if (s.typeSlot()) |slot| {
             if (slot.*) |existing| {
-                try existing.types.append(p.arena, t);
+                if (existing.kind() != .@"union") return p.ts.fail("Multiple type statements require a union", .{});
+                try (try existing.ensureMembers(p.arena)).append(p.arena, t);
             } else {
                 slot.* = t;
             }
@@ -76,7 +82,7 @@ fn finalizeBits(p: *Parser, t: *ast.TypeStmt) Error!void {
     var names: std.StringHashMapUnmanaged(void) = .empty;
     var used: std.AutoHashMapUnmanaged(i64, void) = .empty;
     var max_used: ?i64 = null;
-    for (t.bits.items) |*b| {
+    for ((try t.ensureBits(p.arena)).items) |*b| {
         if (names.contains(b.name)) return p.ts.fail("Duplicate bit name {f} in bits type", .{repr(b.name)});
         try names.put(p.arena, b.name, {});
         if (b.position) |pos| {
@@ -95,13 +101,15 @@ fn finalizeBits(p: *Parser, t: *ast.TypeStmt) Error!void {
 
 pub fn parseTypeBase(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (t.kind() != .identityref) return p.ts.fail("base is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.BASE);
-    try t.identityref_bases.append(p.arena, try p.consumeIdentifierRef());
+    try (try t.ensureIdentityBases(p.arena)).append(p.arena, try p.consumeIdentifierRef());
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parsePattern(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!(t.kind() == .string or t.kind() == .derived)) return p.ts.fail("pattern is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.PATTERN);
     const pattern = try p.parseStringConcatenation();
     var acc: Holder = .{};
@@ -115,7 +123,7 @@ pub fn parsePattern(p: *Parser, parent: Parent) Error!void {
             error.InvalidPattern => return p.ts.failUnlocated(if (failure.unsupported) .unsupported else .semantic, "{s}", .{failure.message}),
         };
     }
-    try t.patterns.append(p.arena, .{
+    try (try t.ensurePatterns(p.arena)).append(p.arena, .{
         .pattern = pattern,
         .invert_match = acc.invert_match,
         .error_message = acc.error_message,
@@ -148,43 +156,49 @@ pub fn parseHolderErrorAppTag(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseLength(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!t.supportsLength()) return p.ts.fail("length is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.LENGTH);
-    t.length = try p.parseStringArgument();
+    const restriction = try t.ensureLength(p.arena);
+    restriction.expression = try p.parseStringArgument();
     var meta: Holder = .{};
     try p.parseOptionalBlock(.{ .holder = &meta }, .length, "length");
-    t.length_error_message = meta.error_message;
-    t.length_error_app_tag = meta.error_app_tag;
-    t.length_description = meta.description;
-    t.length_reference = meta.reference;
+    restriction.error_message = meta.error_message;
+    restriction.error_app_tag = meta.error_app_tag;
+    restriction.description = meta.description;
+    restriction.reference = meta.reference;
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseRange(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!t.supportsRange()) return p.ts.fail("range is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.RANGE);
-    t.range = try p.parseStringArgument();
+    const restriction = try t.ensureRange(p.arena);
+    restriction.expression = try p.parseStringArgument();
     var meta: Holder = .{};
     try p.parseOptionalBlock(.{ .holder = &meta }, .range, "range");
-    t.range_error_message = meta.error_message;
-    t.range_error_app_tag = meta.error_app_tag;
-    t.range_description = meta.description;
-    t.range_reference = meta.reference;
+    restriction.error_message = meta.error_message;
+    restriction.error_app_tag = meta.error_app_tag;
+    restriction.description = meta.description;
+    restriction.reference = meta.reference;
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseFractionDigits(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (t.kind() != .decimal) return p.ts.fail("fraction-digits is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.FRACTION_DIGITS);
-    t.fraction_digits = try p.parseInt(try p.ts.consumeType(.integer));
+    (try t.ensure(.decimal, p.arena)).fraction_digits = try p.parseInt(try p.ts.consumeType(.integer));
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseEnum(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!(t.kind() == .enumeration or t.kind() == .derived)) return p.ts.fail("enum is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.ENUM);
     // One argument: `100GE` lexes as INTEGER + IDENTIFIER (RFC 7950 9.6.4).
     const name = try p.parseStringArgument();
-    try t.enums.append(p.arena, name);
+    try (try t.ensureEnums(p.arena)).append(p.arena, name);
     if (p.ts.consumeIfType(.lbrace)) {
         try p.parseBody(.discard, .@"enum", try p.label("enum '{s}'", .{name}));
         _ = try p.ts.consumeType(.rbrace);
@@ -207,10 +221,11 @@ pub fn parseEnumStatus(p: *Parser, _: Parent) Error!void {
 
 pub fn parseBit(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!(t.kind() == .bits or t.kind() == .derived)) return p.ts.fail("bit is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.BIT);
     var bit: ast.BitStmt = .{ .name = try p.ts.consumeAny() };
     try p.parseOptionalBlock(.{ .bit = &bit }, .bit, "bit");
-    try t.bits.append(p.arena, bit);
+    try (try t.ensureBits(p.arena)).append(p.arena, bit);
     _ = p.ts.consumeIfType(.semicolon);
 }
 
@@ -231,16 +246,22 @@ pub fn parseBitPosition(p: *Parser, parent: Parent) Error!void {
 /// leafref `path`, parsed as a schema path and bound to this module's prefixes.
 pub fn parsePath(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (t.kind() != .leafref) return p.ts.fail("path is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.PATH);
     const path = try p.parseStringArgument();
-    t.path = path;
-    t.path_ast = try p.compileXPathPath(path);
+    (try t.ensure(.leafref, p.arena)).path = path;
+    (try t.ensure(.leafref, p.arena)).path_ast = try p.compileXPathPath(path);
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseRequireInstance(p: *Parser, parent: Parent) Error!void {
     const t = try typeOf(p, parent);
+    if (!(t.kind() == .leafref or t.kind() == .instance_identifier or t.kind() == .derived)) return p.ts.fail("require-instance is not allowed for type {f}", .{repr(t.name)});
     _ = try p.ts.consume(kw.REQUIRE_INSTANCE);
-    t.require_instance = try p.parseBooleanArgument(kw.REQUIRE_INSTANCE);
+    const required = try p.parseBooleanArgument(kw.REQUIRE_INSTANCE);
+    switch (t.data) {
+        inline .leafref, .instance_identifier, .derived => |_, tag| (try t.ensure(tag, p.arena)).require_instance = required,
+        else => unreachable,
+    }
     _ = p.ts.consumeIfType(.semicolon);
 }

@@ -37,7 +37,7 @@ class TypedefStatementParser:
         """Parse typedef statement."""
         tokens.consume(kw.TYPEDEF)
         typedef_name = tokens.consume_type(YangTokenType.IDENTIFIER)
-        typedef_stmt = YangTypedefStmt(name=typedef_name)
+        typedef_stmt = YangTypedefStmt(name=typedef_name, scope=context.typedef_context or None)
         unsupported_ctx = f"typedef '{typedef_name}'"
 
         if tokens.consume_if_type(YangTokenType.LBRACE):
@@ -47,12 +47,10 @@ class TypedefStatementParser:
             )
             tokens.consume_type(YangTokenType.RBRACE)
 
-        if typedef_name in context.module.typedefs:
-            raise tokens.make_error(
-                f"Duplicate typedef {typedef_name!r} in module {context.module.name!r}"
-            )
-        context.module.typedefs[typedef_name] = typedef_stmt
         parent = context.current_parent
+        from ...typedef_scope import register_typedef
+
+        register_typedef(context.module.typedefs, typedef_stmt)
         if isinstance(parent, YangGroupingStmt):
             parent.typedef_names.append(typedef_name)
         if isinstance(parent, YangStatementList) and parent is not context.module:
@@ -71,13 +69,9 @@ def propagate_typedef_units(module: object) -> None:
         if key in seen:
             return ""
         seen.add(key)
-        target = mod
-        if type_stmt.prefix and hasattr(mod, "resolve_prefixed_module"):
-            target = mod.resolve_prefixed_module(type_stmt.prefix)  # type: ignore[attr-defined]
-            if target is None:
-                return ""
-        typedefs = getattr(target, "typedefs", None)
-        td = typedefs.get(type_stmt.name) if isinstance(typedefs, dict) else None
+        from ...module import resolve_typedef
+
+        td, target = resolve_typedef(type_stmt, mod)
         if td is None:
             return ""
         own = getattr(td, "units", "") or ""

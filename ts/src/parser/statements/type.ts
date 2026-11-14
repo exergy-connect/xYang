@@ -1,5 +1,5 @@
 import * as kw from "../keywords";
-import { modulePrefixResolver, YangPatternSpec, YangTypeStmt } from "../../core/ast";
+import { modulePrefixResolver, YangPatternSpec, YangTypeStmt, createTypeStmt, YangRestriction, YangStringTypeStmt, YangDerivedTypeStmt, YangBinaryTypeStmt, YangNumericTypeStmt, YangDecimalTypeStmt, YangEnumerationTypeStmt, YangIdentityrefTypeStmt, YangLeafrefTypeStmt, YangInstanceIdentifierTypeStmt } from "../../core/ast";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import { bindXPathPrefixes, parseXPathPath, xpathPrefixes } from "../../xpath/parser";
 import type { StatementParsers } from "../statement-parsers";
@@ -23,7 +23,7 @@ export class TypeStatementParser {
     } else {
       name = tokens.consume().trim();
     }
-    const type_stmt = new YangTypeStmt({ name, prefix });
+    const type_stmt = createTypeStmt({ name, prefix, context: context.typedef_context });
     const writer = context.module as { name?: string; belongs_to_module?: string };
     const scope = writer.belongs_to_module || writer.name;
     if (scope) type_stmt.scope_module = scope;
@@ -32,7 +32,7 @@ export class TypeStatementParser {
       const child = context.push_parent(type_stmt);
       this.parsers.parseBody(tokens, child, "type", `type '${name}'`, type_stmt);
       tokens.consume_type(YangTokenType.RBRACE);
-      if (type_stmt.name === kw.ENUMERATION && type_stmt.enums.length === 0) {
+      if (type_stmt instanceof YangEnumerationTypeStmt && type_stmt.enums.length === 0) {
         tokens.syntaxError("enumeration type must contain at least one enum statement");
       }
     }
@@ -47,12 +47,14 @@ export class TypeStatementParser {
   }
 
   parse_type_base(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangIdentityrefTypeStmt)) tokens.syntaxError("base requires an identityref type");
     tokens.consume(kw.BASE);
     type_stmt.identityref_bases.push(this.parsers.consume_identifier_ref(tokens));
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_pattern(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangStringTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("pattern requires a string or derived type");
     tokens.consume(kw.PATTERN);
     const pattern = this.parsers.parse_string_concatenation(tokens);
     let invertMatch = false;
@@ -70,7 +72,7 @@ export class TypeStatementParser {
     } finally {
       this.patternBody = undefined;
     }
-    type_stmt.patterns.push(
+    (type_stmt.patterns ??= []).push(
       new YangPatternSpec({
         pattern,
         invert_match: invertMatch,
@@ -82,24 +84,26 @@ export class TypeStatementParser {
   }
 
   parse_type_length(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangBinaryTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("length requires a string, binary or derived type");
     tokens.consume(kw.LENGTH);
-    type_stmt.length = this.parsers.parse_string_argument(tokens);
+    const expression = this.parsers.parse_string_argument(tokens);
     const meta = this.parseRestrictionBody(tokens, context, "length");
-    type_stmt.length_error_message = meta.errorMessage;
-    type_stmt.length_error_app_tag = meta.errorAppTag;
-    type_stmt.length_description = meta.description;
-    type_stmt.length_reference = meta.reference;
+    type_stmt.length_restriction = new YangRestriction(expression, {
+      error_message: meta.errorMessage, error_app_tag: meta.errorAppTag,
+      description: meta.description, reference: meta.reference
+    });
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_range(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangNumericTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("range requires a numeric or derived type");
     tokens.consume(kw.RANGE);
-    type_stmt.range = this.parsers.parse_string_argument(tokens);
+    const expression = this.parsers.parse_string_argument(tokens);
     const meta = this.parseRestrictionBody(tokens, context, "range");
-    type_stmt.range_error_message = meta.errorMessage;
-    type_stmt.range_error_app_tag = meta.errorAppTag;
-    type_stmt.range_description = meta.description;
-    type_stmt.range_reference = meta.reference;
+    type_stmt.range_restriction = new YangRestriction(expression, {
+      error_message: meta.errorMessage, error_app_tag: meta.errorAppTag,
+      description: meta.description, reference: meta.reference
+    });
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
@@ -136,16 +140,18 @@ export class TypeStatementParser {
   }
 
   parse_type_fraction_digits(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangDecimalTypeStmt)) tokens.syntaxError("fraction-digits requires decimal64");
     tokens.consume(kw.FRACTION_DIGITS);
     type_stmt.fraction_digits = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_enum(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangEnumerationTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("enum requires an enumeration or derived type");
     tokens.consume(kw.ENUM);
     // One argument: ``100GE`` lexes as INTEGER + IDENTIFIER (RFC 7950 §9.6.4).
     const enumName = this.parsers.parse_string_argument(tokens);
-    type_stmt.enums.push(enumName);
+    (type_stmt.enums ??= []).push(enumName);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       this.parsers.parseBody(tokens, context, "enum", `enum '${enumName}'`);
       tokens.consume_type(YangTokenType.RBRACE);
@@ -154,6 +160,7 @@ export class TypeStatementParser {
   }
 
   parse_type_path(tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangLeafrefTypeStmt)) tokens.syntaxError("path requires leafref");
     tokens.consume(kw.PATH);
     const path = this.parsers.parse_string_argument(tokens);
     const ast = parseXPathPath(path);
@@ -163,11 +170,12 @@ export class TypeStatementParser {
       bindXPathPrefixes(ast, resolve, path);
       type_stmt.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
     }
-    type_stmt.path = ast as YangTypeStmt["path"];
+    type_stmt.path = ast as YangLeafrefTypeStmt["path"];
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_type_require_instance(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
+    if (!(type_stmt instanceof YangInstanceIdentifierTypeStmt || type_stmt instanceof YangDerivedTypeStmt)) tokens.syntaxError("require-instance requires a reference type");
     tokens.consume(kw.REQUIRE_INSTANCE);
     type_stmt.require_instance = this.parsers.parse_boolean_argument(tokens, "require-instance");
     tokens.consume_if_type(YangTokenType.SEMICOLON);

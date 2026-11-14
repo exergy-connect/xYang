@@ -62,6 +62,7 @@ pub const Parser = struct {
     loader: *Loader,
     /// Directory of the file being parsed; `import` and `include` search it first.
     source_dir: ?[]const u8 = null,
+    context: []const u8 = "",
 
     pub fn new(p: *Parser, comptime T: type, value: T) Error!*T {
         const ptr = try p.arena.create(T);
@@ -120,6 +121,9 @@ pub const Parser = struct {
 
     /// Every substatement until the closing `}` (not consumed).
     pub fn parseBody(p: *Parser, parent: Parent, id: ParentId, error_context: []const u8) Error!void {
+        const saved = p.context;
+        defer p.context = saved;
+        if (parent == .stmt) p.context = try @import("../typedef_scope.zig").path(p.arena, saved, parent.stmt);
         while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
             try p.dispatchSubstatement(parent, id, error_context);
         }

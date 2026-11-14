@@ -1,0 +1,5 @@
+{
+  "description": "Refuse native export rather than silently dropping restrictions on a scoped typedef reference.",
+  "module": "m.yang",
+  "export_error": "cannot export restrictions on scoped typedef"
+}

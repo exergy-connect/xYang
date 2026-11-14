@@ -39,6 +39,7 @@ pub const Error = error{ OutOfMemory, Export, YangLoad };
 /// `typedef_names`: the typedef names a `type` may reference as `$ref`.
 pub const Names = std.StringHashMapUnmanaged(void);
 
+const ScopedTypedef = struct { typedef: *Statement, module: *Module };
 const ExtUse = struct { owner: *Module, name: []const u8 };
 
 /// One export: the module, the identities and extensions it resolved outside itself
@@ -49,12 +50,43 @@ pub const Gen = struct {
     reporter: errors.Reporter,
     identities_used: std.ArrayList(identity_graph.Pair) = .empty,
     extensions_used: std.ArrayList(ExtUse) = .empty,
+    scoped_typedefs: std.StringArrayHashMapUnmanaged(ScopedTypedef) = .empty,
 
     pub fn fail(g: *Gen, comptime fmt: []const u8, args: anytype) Error {
         g.reporter.diag.* = .{ .kind = .semantic, .message = try std.fmt.allocPrint(g.a, fmt, args) };
         return error.Export;
     }
 };
+
+fn collectScopedTypedefs(g: *Gen, module: *Module, visited: *std.AutoHashMapUnmanaged(*Module, void)) Error!void {
+    if (visited.contains(module)) return;
+    try visited.put(g.a, module, {});
+    for (module.typedefs.keys(), module.typedefs.values()) |key, td| {
+        if (td.data.typedef.scope == null) continue;
+        const exported = if (module == g.root) key else try std.fmt.allocPrint(g.a, "@{s}:{s}", .{ module.name, key });
+        if (g.scoped_typedefs.contains(exported)) return g.fail("Conflicting scoped typedef key '{s}'", .{exported});
+        try g.scoped_typedefs.put(g.a, exported, .{ .typedef = td, .module = module });
+    }
+    for (module.import_prefixes.values()) |imported| try collectScopedTypedefs(g, imported, visited);
+}
+
+/// Scoped references retain their lexical context even after grouping expansion.
+pub fn scopedTypeSchema(e: Emit, t: *const ast.TypeStmt) Error!?*Object {
+    const resolved = @import("../module.zig").resolveTypedef(t, e.module) orelse return null;
+    if (resolved.typedef.data.typedef.scope == null) return null;
+    if (t.rangeRestriction().expression != null or t.lengthRestriction().expression != null or t.patterns().len > 0)
+        return e.g.fail("cannot export restrictions on scoped typedef '{s}' in the native JSON form", .{resolved.typedef.name});
+    for (e.g.scoped_typedefs.keys(), e.g.scoped_typedefs.values()) |key, entry| {
+        if (entry.typedef != resolved.typedef) continue;
+        const out = try newObject(e.g.a);
+        try out.put(e.g.a, K.REF, str(try @import("../typedef_scope.zig").defsUri(e.g.a, key)));
+        const xy = try newObject(e.g.a);
+        try xy.put(e.g.a, K.xy.TYPE_CONTEXT, str(t.context orelse ""));
+        try out.put(e.g.a, K.X_YANG, objVal(xy));
+        return out;
+    }
+    return e.g.fail("Scoped typedef '{s}' is absent from the export catalog", .{resolved.typedef.name});
+}
 
 /// What `type_to_schema` emits with (Python's `_EMIT` context): the typedef names that
 /// become `$ref`, the module the type is read in, and the leafref anchor.
@@ -261,8 +293,8 @@ fn whenToJson(a: Allocator, w: *const ast.WhenStmt) Error!Val {
 
 /// `_leafref_path_string`.
 pub fn leafrefPathString(a: Allocator, t: *const ast.TypeStmt) error{OutOfMemory}![]const u8 {
-    if (t.path_ast) |e| if (e.* == .path) return e.path.toString(a);
-    return t.path orelse "";
+    if (t.pathAst()) |e| if (e.* == .path) return e.path.toString(a);
+    return t.leafrefPath() orelse "";
 }
 
 // ---------------------------------------------------------------------------
@@ -311,7 +343,7 @@ fn leafrefContextParent(module: *Module, parent: Schema) Schema {
 
 /// `_resolve_leafref_target_leaf`: the leaf a predicate-free leafref path names.
 pub fn resolveLeafrefTargetLeaf(module: *Module, t: *const ast.TypeStmt, anchor: Schema) ?*Statement {
-    const e = t.path_ast orelse return null;
+    const e = t.pathAst() orelse return null;
     if (e.* != .path) return null;
     const path = e.path;
     if (path.segments.len == 0) return null;
@@ -1100,7 +1132,8 @@ fn listToProperty(g: *Gen, s: *Statement, names: *const Names, module: *Module) 
 fn leafYangTypeName(t: ?*const ast.TypeStmt, names: *const Names, module: *Module) ?[]const u8 {
     const ts = t orelse return null;
     if (names.contains(ts.name)) {
-        const td = module.typedefs.get(ts.name) orelse return null;
+        const resolved = @import("../module.zig").resolveTypedef(ts, module) orelse return null;
+        const td = resolved.typedef;
         if (td.kind() != .typedef) return null;
         const inner = td.data.typedef.type orelse return null;
         return inner.name;
@@ -1121,9 +1154,11 @@ fn leafToProperty(g: *Gen, s: *Statement, names: *const Names, module: *Module, 
         .config = s.config,
     };
     var out: *Object = undefined;
-    if (t != null and names.contains(t.?.name)) {
+    const local_td = if (t) |ts| module.typedefs.get(ts.name) else null;
+    const resolved = if (t) |ts| @import("../module.zig").resolveTypedef(ts, module) else null;
+    if (t != null and local_td != null and local_td.?.data.typedef.scope == null and resolved != null and resolved.?.typedef == local_td.?) {
         out = try newObject(a);
-        try out.put(a, K.REF, str(try std.fmt.allocPrint(a, "{s}{s}", .{ K.DEFS_URI_PREFIX, t.?.name })));
+        try out.put(a, K.REF, str(try @import("../typedef_scope.zig").defsUri(a, t.?.name)));
         try withDescription(a, out, s.description);
         const xy = try buildXyang(a, "leaf", opts);
         try out.put(a, K.X_YANG, objVal(xy));
@@ -1298,6 +1333,15 @@ fn typedefToDef(g: *Gen, td: *Statement, module: *Module) Error!Val {
         const yang_type = if (d.type) |t| t.name else null;
         try schema.put(a, K.DEFAULT, jsonSchemaDefaultValue(dv, yang_type, schemaTypeName(schema)));
     }
+    if (d.scope) |scope| {
+        const xy = getObject(schema, K.X_YANG) orelse blk: {
+            const value = try newObject(a);
+            try schema.put(a, K.X_YANG, objVal(value));
+            break :blk value;
+        };
+        try xy.put(a, K.xy.SCOPE, str(scope));
+        try xy.put(a, K.NAME, str(td.name));
+    }
     const names = try typedefNameSet(a, module);
     if (try extensionInvocationsJson(g, td.statements.items, &names, module)) |inv| {
         const xy = getObject(schema, K.X_YANG) orelse blk: {
@@ -1452,6 +1496,8 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
 /// `error.YangLoad`, `diag` holds the message.
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
     var g: Gen = .{ .a = a, .root = module, .reporter = .{ .arena = a, .diag = diag } };
+    var visited: std.AutoHashMapUnmanaged(*Module, void) = .empty;
+    try collectScopedTypedefs(&g, module, &visited);
     const names = try typedefNameSet(a, module);
     const root_xy = try newObject(a);
     try root_xy.put(a, K.xy.MODULE, str(if (module.name.len > 0) module.name else "unknown"));
@@ -1481,6 +1527,9 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
     const defs = try newObject(a);
     for (schema_module.typedefs.keys(), schema_module.typedefs.values()) |n, td| {
         if (td.kind() == .typedef) try defs.put(a, n, try typedefToDef(&g, td, schema_module));
+    }
+    for (g.scoped_typedefs.keys(), g.scoped_typedefs.values()) |key, entry| {
+        try defs.put(a, key, try typedefToDef(&g, entry.typedef, entry.module));
     }
     for (schema_module.identities.keys(), schema_module.identities.values()) |n, id| {
         if (id.kind() == .identity) try defs.put(a, n, try identityToDef(&g, n, id, schema_module, null));

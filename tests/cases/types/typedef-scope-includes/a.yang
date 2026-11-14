@@ -1,0 +1,1 @@
+submodule a { yang-version 1.1; belongs-to m { prefix m; } container a { typedef code { type string { pattern "a+"; } } leaf value { type code; } } }

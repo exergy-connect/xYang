@@ -14,6 +14,7 @@ module m {
   prefix m;
   container outer {
     typedef status-bits {
+      units "flags";
       type bits {
         bit on;
         bit off;
@@ -46,12 +47,15 @@ module m2 {
 
 
 def test_parse_typedef_inside_container() -> None:
-    """Container-scoped typedef is registered and referenced by a leaf."""
+    """Container-scoped typedef stays private and is referenced by a leaf."""
     mod = parse_yang_string(CONTAINER_TYPEDEF)
-    assert "status-bits" in mod.typedefs
+    assert "status-bits" not in mod.typedefs
     outer = mod.find_statement("outer")
     assert outer is not None
-    assert outer.find_statement("flags") is not None
+    flags = outer.find_statement("flags")
+    declaration = outer.find_statement("status-bits")
+    assert flags.type.context == declaration.scope == "/outer"
+    assert flags.units == "flags"
 
 
 def test_validate_leaf_using_container_scoped_typedef() -> None:
@@ -66,16 +70,17 @@ def test_validate_leaf_using_container_scoped_typedef() -> None:
 
 
 def test_parse_typedef_inside_grouping() -> None:
-    """Grouping typedef is registered and visible after ``uses`` expansion."""
+    """Grouping typedef stays private after ``uses`` expansion."""
     mod = parse_yang_string(GROUPING_TYPEDEF)
-    assert "code" in mod.typedefs
+    assert "code" not in mod.typedefs
     c = mod.find_statement("c")
     assert c is not None
-    assert c.find_statement("value") is not None
+    value = c.find_statement("value")
+    assert value.type.context == "/@grouping:g"
 
 
-def test_uses_registers_grouping_typedef_on_importing_module(tmp_path: Path) -> None:
-    """``uses`` of an imported grouping copies typedefs onto the importing module."""
+def test_uses_keeps_grouping_typedef_private(tmp_path: Path) -> None:
+    """``uses`` of an imported grouping retains its private type contexts."""
     inc = tmp_path / "inc"
     inc.mkdir()
     (inc / "provider.yang").write_text(
@@ -109,7 +114,7 @@ def test_uses_registers_grouping_typedef_on_importing_module(tmp_path: Path) -> 
         encoding="utf-8",
     )
     mod = YangParser(include_path=(inc,)).parse_file(main)
-    assert "code" in mod.typedefs
+    assert "code" not in mod.typedefs
     v = YangValidator(mod)
     ok, errors, _ = v.validate({"data": {"value": "a"}})
     assert ok, errors

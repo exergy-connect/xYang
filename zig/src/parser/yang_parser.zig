@@ -260,7 +260,7 @@ pub const Loader = struct {
                 if (existing == td or same_origin) continue;
                 return p.ts.fail("Duplicate typedef {f} from include of {f}", .{ repr(n), repr(sub.name) });
             }
-            try parent.typedefs.put(a, n, td);
+            try @import("../typedef_scope.zig").register(&self.reporter, parent, td);
         }
         for (sub.identities.keys(), sub.identities.values()) |n, ident| {
             if (parent.identities.contains(n)) return p.ts.fail("Duplicate identity {f} from include of {f}", .{ repr(n), repr(sub.name) });
@@ -292,6 +292,7 @@ pub const Loader = struct {
             try parent.import_prefixes.put(a, pref, im);
         }
         try parent.statements.appendSlice(a, sub.statements.items);
+        sub.included_parent = parent;
         sub.statements = .empty;
         sub.typedefs = .empty;
         sub.identities = .empty;
@@ -327,8 +328,9 @@ fn propagateTypedefUnits(arena: std.mem.Allocator, module: *Module) Error!void {
             const key = try std.fmt.allocPrint(w.arena, "{x}\x00{s}\x00{s}", .{ @intFromPtr(mod), t.prefix orelse "", t.name });
             if (seen.contains(key)) return "";
             try seen.put(w.arena, key, {});
-            const target = if (t.prefix) |pre| mod.resolvePrefixedModule(pre) orelse return "" else mod;
-            const td = target.typedefs.get(t.name) orelse return "";
+            const resolved = @import("../module.zig").resolveTypedef(t, mod) orelse return "";
+            const target = resolved.module;
+            const td = resolved.typedef;
             if (td.units.len > 0) return td.units;
             return w.lookup(td.data.typedef.type, target, seen);
         }
@@ -544,8 +546,8 @@ test "imports are shared; foreign augment edits the import, foreign deviation a 
     const top = m.statements.items[0];
     try std.testing.expectEqualStrings("a", top.statements.items[0].name);
     try std.testing.expectEqualStrings("chars", top.statements.items[0].units);
-    // Only typedefs declared in the grouping are registered where it is used.
-    try std.testing.expect(m.typedefs.contains("inner-t"));
+    // Imported grouping types retain their declaration module instead of leaking here.
+    try std.testing.expect(!m.typedefs.contains("inner-t"));
     try std.testing.expect(!m.typedefs.contains("name-t"));
     try std.testing.expectEqualStrings("f", top.statements.items[2].if_features.items[0]);
     try std.testing.expect(m.features.contains("f"));
@@ -557,4 +559,48 @@ test "universal newlines" {
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     try std.testing.expectEqualStrings("a\nb\nc\n", try universalNewlines(arena.allocator(), "a\r\nb\rc\n"));
+}
+
+test "length restriction retains all source metadata in its specialized payload" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var diag: Diagnostic = .{};
+    const m = try parseString(arena.allocator(),
+        \\module m { namespace "urn:m"; prefix m;
+        \\  leaf value { type string { length "1..4" {
+        \\    error-message "bad length"; error-app-tag "length-tag";
+        \\    description "length description"; reference "length reference";
+        \\  } } }
+        \\}
+    , "m.yang", &diag);
+    const t = m.statements.items[0].data.leaf.type.?;
+    try std.testing.expectEqual(ast.TypeKind.string, t.kind());
+    const restriction = t.lengthRestriction();
+    try std.testing.expectEqualStrings("1..4", restriction.expression.?);
+    try std.testing.expectEqualStrings("bad length", restriction.error_message.?);
+    try std.testing.expectEqualStrings("length-tag", restriction.error_app_tag.?);
+    try std.testing.expectEqualStrings("length description", restriction.description);
+    try std.testing.expectEqualStrings("length reference", restriction.reference);
+}
+
+test "range restriction retains all source metadata in its specialized payload" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var diag: Diagnostic = .{};
+    const m = try parseString(arena.allocator(),
+        \\module m { namespace "urn:m"; prefix m;
+        \\  leaf value { type uint8 { range "1..4" {
+        \\    error-message "bad range"; error-app-tag "range-tag";
+        \\    description "range description"; reference "range reference";
+        \\  } } }
+        \\}
+    , "m.yang", &diag);
+    const t = m.statements.items[0].data.leaf.type.?;
+    try std.testing.expectEqual(ast.TypeKind.numeric, t.kind());
+    const restriction = t.rangeRestriction();
+    try std.testing.expectEqualStrings("1..4", restriction.expression.?);
+    try std.testing.expectEqualStrings("bad range", restriction.error_message.?);
+    try std.testing.expectEqualStrings("range-tag", restriction.error_app_tag.?);
+    try std.testing.expectEqualStrings("range description", restriction.description);
+    try std.testing.expectEqualStrings("range reference", restriction.reference);
 }

@@ -1,0 +1,48 @@
+{
+  "description": "Lexical typedef scope (RFC 7950 \u00a7\u00a75.4\u20135.5, 6.2.1): imported-grouping",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "definition scope survives import and union decoding",
+      "data": {
+        "top": {
+          "value": "aa",
+          "wide": "9223372036854775807",
+          "own": true
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "provider restriction",
+      "data": {
+        "top": {
+          "value": "b"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/value",
+          "code": "pattern"
+        }
+      ]
+    },
+    {
+      "name": "consumer restriction",
+      "data": {
+        "top": {
+          "own": "aa"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/top/own",
+          "code": "type"
+        }
+      ]
+    }
+  ],
+  "json_form": true
+}

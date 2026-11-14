@@ -1,0 +1,12 @@
+module m {
+  yang-version 1.1; namespace "urn:m"; prefix m;
+  grouping a {
+    typedef code { type string { pattern 'a+'; } }
+    leaf first { type code; }
+  }
+  grouping b {
+    typedef code { type uint8 { range '1..5'; } }
+    leaf second { type code; }
+  }
+  container top { uses a; uses b; }
+}

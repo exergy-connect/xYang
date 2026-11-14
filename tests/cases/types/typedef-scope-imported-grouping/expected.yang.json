@@ -1,0 +1,82 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": ""
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "value": {
+          "$ref": "#/$defs/%40provider%3A~1%40grouping%3Ag~1code",
+          "x-yang": {
+            "type": "leaf",
+            "type-context": "/@grouping:g"
+          }
+        },
+        "wide": {
+          "oneOf": [
+            {
+              "$ref": "#/$defs/%40provider%3A~1%40grouping%3Ag~1wide",
+              "x-yang": {
+                "type-context": "/@grouping:g"
+              }
+            },
+            {
+              "type": "boolean"
+            }
+          ],
+          "x-yang": {
+            "type": "leaf"
+          }
+        },
+        "own": {
+          "$ref": "#/$defs/code",
+          "x-yang": {
+            "type": "leaf"
+          }
+        }
+      },
+      "additionalProperties": false
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "code": {
+      "type": "boolean"
+    },
+    "@provider:/@grouping:g/code": {
+      "type": "string",
+      "pattern": "^a+$",
+      "x-yang": {
+        "string-patterns": [
+          {
+            "pattern": "a+",
+            "invert-match": false
+          }
+        ],
+        "scope": "/@grouping:g",
+        "name": "code"
+      }
+    },
+    "@provider:/@grouping:g/wide": {
+      "type": "string",
+      "pattern": "^-?[0-9]+$",
+      "x-yang": {
+        "type": "int64",
+        "scope": "/@grouping:g",
+        "name": "wide"
+      }
+    }
+  }
+}

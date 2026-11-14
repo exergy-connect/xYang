@@ -1,3 +1,4 @@
+import { resolveTypedef } from "../validator/type-checker";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
@@ -46,7 +47,7 @@ function serializeIdentities(
   return out;
 }
 
-function buildModuleData(root: YangStatement, moduleState: Record<string, unknown>): ModuleInit {
+function buildModuleData(root: YangStatement, moduleState: Record<string, unknown>, serialize: (stmt: unknown) => YangStatement): ModuleInit {
   if (root.keyword !== "module") {
     throw new YangSemanticError("Only 'module' roots are currently supported by TS parser");
   }
@@ -54,19 +55,9 @@ function buildModuleData(root: YangStatement, moduleState: Record<string, unknow
   const statements = root.statements ?? [];
   const typedefs: Record<string, unknown> = {};
 
-  for (const stmt of statements) {
-    if (stmt.keyword === "typedef" && stmt.argument) {
-      const typeStmt = stmt.statements?.find((child) => child.keyword === "type");
-      typedefs[stmt.argument] = {
-        name: stmt.argument,
-        description: typeof stmt.description === "string" ? stmt.description : "",
-        reference: typeof stmt.reference === "string" ? stmt.reference : "",
-        units: typeof stmt.units === "string" ? stmt.units : "",
-        default: stmt.default,
-        type: stmt.type ?? typeStmt?.type,
-        statements: stmt.statements ?? []
-      };
-    }
+  for (const [key, raw] of Object.entries((moduleState.typedefs ?? {}) as Record<string, unknown>)) {
+    const stmt = serialize(raw);
+    typedefs[key] = { ...stmt, name: stmt.name, scope: (stmt as unknown as { scope?: string }).scope };
   }
 
   const features = moduleState.features;
@@ -300,9 +291,7 @@ export class YangParser {
     };
     const context = new ParserContext({ module: moduleState, current_parent: {} });
     const root = this.parsers.parseModule(stream, context);
-    const data = buildModuleData(root, moduleState);
-    mergeNestedTypedefs(data, moduleState, (stmt) => this.parsers.serializeAstStatement(stmt));
-    propagateTypedefUnits(data);
+    const data = buildModuleData(root, moduleState, (stmt) => this.parsers.serializeAstStatement(stmt));
     const rawGroupings = (moduleState.groupings as Record<string, unknown>) ?? {};
     const serializedGroupings: Record<string, YangStatement> = {};
     for (const [key, val] of Object.entries(rawGroupings)) {
@@ -333,10 +322,13 @@ export class YangParser {
     }
     // Python order, gated on expandUses: uses, then augment, then extensions.
     let mod = new YangModule(data, source);
+    Object.defineProperty(mod, "module_registry", { value: this.modulesByName, enumerable: false });
+    propagateTypedefUnits(data, mod);
     if (this.expandUses) {
       mod = expandUses(mod);
       mod = applyAugments(mod);
       mod = applyDeviations(mod);
+      if (!mod.module_registry) Object.defineProperty(mod, "module_registry", { value: this.modulesByName, enumerable: false });
       applyBuiltinExtensionInvocations(mod);
       validateSemantics(mod);
     }
@@ -420,41 +412,7 @@ function restoreModuleHeader(module: Record<string, unknown>, saved: HeaderSnap)
   }
 }
 
-/** Keep typedefs parsed under container/list/grouping; buildModuleData only sees top-level ones. */
-function mergeNestedTypedefs(
-  data: ModuleInit,
-  moduleState: Record<string, unknown>,
-  serialize: (stmt: unknown) => YangStatement
-): void {
-  const typedefs =
-    data.typedefs && typeof data.typedefs === "object"
-      ? (data.typedefs as Record<string, unknown>)
-      : {};
-  data.typedefs = typedefs;
-  const parsed = moduleState.typedefs;
-  if (!parsed || typeof parsed !== "object") {
-    return;
-  }
-  for (const [name, td] of Object.entries(parsed as Record<string, unknown>)) {
-    if (typedefs[name]) {
-      continue;
-    }
-    const serialized = serialize(td);
-    typedefs[name] = {
-      name,
-      description: typeof serialized.description === "string" ? serialized.description : "",
-      reference: typeof serialized.reference === "string" ? serialized.reference : "",
-      units: typeof serialized.units === "string" ? serialized.units : "",
-      default: serialized.default,
-      type: serialized.type,
-      statements: serialized.statements ?? []
-    };
-  }
-}
-
-function propagateTypedefUnits(data: ModuleInit): void {
-  const typedefs = (data.typedefs ?? {}) as Record<string, { units?: string; type?: { name?: string; prefix?: string } }>;
-
+function propagateTypedefUnits(data: ModuleInit, module: YangModule): void {
   const unitsOf = (type: { name?: string; prefix?: string } | undefined, seen: Set<string>): string => {
     if (!type || typeof type.name !== "string" || !type.name) {
       return "";
@@ -464,7 +422,7 @@ function propagateTypedefUnits(data: ModuleInit): void {
       return "";
     }
     seen.add(key);
-    const td = typedefs[type.name];
+    const td = resolveTypedef(module, type) as { units?: string; type?: { name?: string; prefix?: string } } | undefined;
     if (!td) {
       return "";
     }
