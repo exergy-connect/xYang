@@ -69,7 +69,7 @@ pub const TypeChecker = struct {
     ctx: ?xpath.Context = null,
 
     fn fail(self: *TypeChecker, err: Error, comptime fmt: []const u8, args: anytype) Error {
-        self.unsupported = try std.fmt.allocPrint(self.a, fmt, args);
+        self.unsupported = try self.a.print(fmt, args);
         return err;
     }
 
@@ -99,7 +99,7 @@ pub const TypeChecker = struct {
     }
 
     fn issue(self: *TypeChecker, code: []const u8, comptime fmt: []const u8, args: anytype) Error![]const Issue {
-        return self.one(.{ .code = code, .message = try std.fmt.allocPrint(self.a, fmt, args) });
+        return self.one(.{ .code = code, .message = try self.a.print(fmt, args) });
     }
 
     pub fn check(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
@@ -191,7 +191,7 @@ pub const TypeChecker = struct {
             w.writeByte('[') catch return error.OutOfMemory;
             for (bases, 0..) |b, i| {
                 if (i > 0) w.writeAll(", ") catch return error.OutOfMemory;
-                const text = if (b.prefix) |p| try std.fmt.allocPrint(self.a, "{s}:{s}", .{ p, b.name }) else b.name;
+                const text = if (b.prefix) |p| try self.a.print("{s}:{s}", .{ p, b.name }) else b.name;
                 repr(text).format(w) catch return error.OutOfMemory;
             }
             w.writeByte(']') catch return error.OutOfMemory;
@@ -273,9 +273,9 @@ pub const TypeChecker = struct {
             const matched = try p.compiled.?.matches(self.a, s);
             if (matched == p.invert_match) {
                 const default = if (!p.invert_match)
-                    try std.fmt.allocPrint(self.a, "Value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
+                    try self.a.print("Value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
                 else
-                    try std.fmt.allocPrint(self.a, "Value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
+                    try self.a.print("Value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
                 try errors.append(self.a, .{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) });
             }
         }
@@ -284,7 +284,7 @@ pub const TypeChecker = struct {
                 if (std.mem.eql(u8, e, s)) break true;
             } else false;
             if (!known) {
-                try errors.append(self.a, .{ .code = "enum", .message = try std.fmt.allocPrint(self.a, "Value {f} is not one of: {s}", .{ repr(s), try std.mem.join(self.a, ", ", t.enums()) }) });
+                try errors.append(self.a, .{ .code = "enum", .message = try self.a.print("Value {f} is not one of: {s}", .{ repr(s), try std.mem.join(self.a, ", ", t.enums()) }) });
             }
         }
         return errors.items;
@@ -325,9 +325,9 @@ pub const TypeChecker = struct {
             if (try self.rangeIssue(.{ .float = n }, range, t.rangeRestriction().error_message, t.rangeRestriction().error_app_tag)) |i| return self.one(i);
         }
         if (t.fractionDigits()) |fd| if (fd >= 0) {
-            const text = try std.fmt.allocPrint(self.a, "{f}", .{jv.pyStr(value)});
+            const text = try self.a.print("{f}", .{jv.pyStr(value)});
             const s = std.mem.trim(u8, text, &std.ascii.whitespace);
-            if (std.mem.indexOfScalar(u8, s, '.')) |dot| {
+            if (std.mem.findScalar(u8, s, '.')) |dot| {
                 if (s.len - dot - 1 > fd) {
                     return self.issue("fraction-digits", "Value has more than {d} fraction digits (decimal64 fraction-digits)", .{fd});
                 }
@@ -348,9 +348,9 @@ pub const TypeChecker = struct {
             const matched = try p.compiled.?.matches(self.a, s);
             if (matched == p.invert_match) {
                 const default = if (!p.invert_match)
-                    try std.fmt.allocPrint(self.a, "binary value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
+                    try self.a.print("binary value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
                 else
-                    try std.fmt.allocPrint(self.a, "binary value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
+                    try self.a.print("binary value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
                 return self.one(.{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) });
             }
         }
@@ -364,7 +364,7 @@ pub const TypeChecker = struct {
         while (parts.next()) |raw| {
             const part = std.mem.trim(u8, raw, &pyWhitespace);
             if (part.len == 0) continue;
-            if (std.mem.indexOf(u8, part, "..")) |dots| {
+            if (std.mem.find(u8, part, "..")) |dots| {
                 const lo_s = std.mem.trim(u8, part[0..dots], &pyWhitespace);
                 const hi_s = std.mem.trim(u8, part[dots + 2 ..], &pyWhitespace);
                 try bands.append(self.a, .{
@@ -403,9 +403,9 @@ pub const TypeChecker = struct {
     fn rangeIssue(self: *TypeChecker, n: Num, text: []const u8, em: ?[]const u8, tag: ?[]const u8) Error!?Issue {
         const miss = rangeMiss(n, try self.parseRanges(text)) orelse return null;
         const default = if (miss.min)
-            try std.fmt.allocPrint(self.a, "Value {f} is less than minimum {f}", .{ n, miss.bound })
+            try self.a.print("Value {f} is less than minimum {f}", .{ n, miss.bound })
         else
-            try std.fmt.allocPrint(self.a, "Value {f} exceeds maximum {f}", .{ n, miss.bound });
+            try self.a.print("Value {f} exceeds maximum {f}", .{ n, miss.bound });
         return .{ .code = "range", .message = try violationMessage(self.a, default, em, tag) };
     }
 
@@ -417,13 +417,13 @@ pub const TypeChecker = struct {
                 .float => |f| std.math.lossyCast(i128, f),
             };
             break :blk if (miss.min)
-                try std.fmt.allocPrint(self.a, "binary decoded length {d} octets is less than minimum {d}", .{ n, shown })
+                try self.a.print("binary decoded length {d} octets is less than minimum {d}", .{ n, shown })
             else
-                try std.fmt.allocPrint(self.a, "binary decoded length {d} octets exceeds maximum {d}", .{ n, shown });
+                try self.a.print("binary decoded length {d} octets exceeds maximum {d}", .{ n, shown });
         } else if (miss.min)
-            try std.fmt.allocPrint(self.a, "String length {d} is less than minimum {f}", .{ n, miss.bound })
+            try self.a.print("String length {d} is less than minimum {f}", .{ n, miss.bound })
         else
-            try std.fmt.allocPrint(self.a, "String length {d} exceeds maximum {f}", .{ n, miss.bound });
+            try self.a.print("String length {d} exceeds maximum {f}", .{ n, miss.bound });
         return .{ .code = "length", .message = try violationMessage(self.a, default, em, tag) };
     }
 };
@@ -443,7 +443,7 @@ fn hasRestrictions(t: *const TypeStmt) bool {
 /// `_pattern_entry_violation_message`.
 fn violationMessage(a: Allocator, default: []const u8, em: ?[]const u8, tag: ?[]const u8) error{OutOfMemory}![]const u8 {
     const msg = if (em) |m| (if (m.len > 0) m else default) else default;
-    if (tag) |t| if (t.len > 0) return std.fmt.allocPrint(a, "{s} (error-app-tag: {s})", .{ msg, t });
+    if (tag) |t| if (t.len > 0) return a.print("{s} (error-app-tag: {s})", .{ msg, t });
     return msg;
 }
 

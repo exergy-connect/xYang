@@ -75,7 +75,7 @@ pub const Parser = struct {
     }
 
     pub fn label(p: *Parser, comptime fmt: []const u8, args: anytype) Error![]const u8 {
-        return std.fmt.allocPrint(p.arena, fmt, args);
+        return p.arena.print(fmt, args);
     }
 
     /// A `must` / `when` expression parsed and bound to this module's prefixes. Python
@@ -208,10 +208,10 @@ pub const Parser = struct {
     /// `name` or `prefix:name`, quoted or unquoted (RFC 7950 identifier-ref-arg-str).
     pub fn consumeIdentifierRef(p: *Parser) Error!ast.IdentifierRef {
         const raw = try p.parseStringArgument();
-        if (std.mem.indexOfScalar(u8, raw, ':')) |colon| {
+        if (std.mem.findScalar(u8, raw, ':')) |colon| {
             const prefix = raw[0..colon];
             const name = raw[colon + 1 ..];
-            if (prefix.len > 0 and name.len > 0 and std.mem.indexOfScalar(u8, name, ':') == null and isIdentifier(prefix) and isIdentifier(name)) {
+            if (prefix.len > 0 and name.len > 0 and std.mem.findScalar(u8, name, ':') == null and isIdentifier(prefix) and isIdentifier(name)) {
                 return .{ .prefix = prefix, .name = name };
             }
             return p.ts.fail("Expected an identifier or prefix:identifier, got {f}", .{repr(raw)});

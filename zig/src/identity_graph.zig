@@ -20,7 +20,7 @@ pub const Pair = struct {
 
 /// `parse_identifier_ref_atom`: `prefix:name`, or `name` when there is no inner colon.
 pub fn parseIdentifierRefAtom(atom: []const u8) IdentifierRef {
-    const idx = std.mem.indexOfScalar(u8, atom, ':') orelse return .{ .name = atom };
+    const idx = std.mem.findScalar(u8, atom, ':') orelse return .{ .name = atom };
     if (idx == 0 or idx >= atom.len - 1) return .{ .name = atom };
     return .{ .prefix = atom[0..idx], .name = atom[idx + 1 ..] };
 }
@@ -49,7 +49,7 @@ pub fn resolveValue(module: *Module, value: []const u8) ?Pair {
     if (value.len == 0) return null;
     var target: *Module = module;
     var name = value;
-    if (std.mem.indexOfScalar(u8, value, ':')) |i| {
+    if (std.mem.findScalar(u8, value, ':')) |i| {
         const mod_name = value[0..i];
         name = value[i + 1 ..];
         if (!std.mem.eql(u8, mod_name, module.name)) {
@@ -88,8 +88,8 @@ pub fn ancestorClosure(a: std.mem.Allocator, start: Pair) error{OutOfMemory}![]c
 
 /// `descendant_closure`: identities of `module` that derive from `base_local` over
 /// same-module unprefixed `base` edges (used by the native JSON form).
-pub fn descendantClosure(a: std.mem.Allocator, module: *const Module, base_local: []const u8) error{OutOfMemory}!std.StringArrayHashMapUnmanaged(void) {
-    var children: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
+pub fn descendantClosure(a: std.mem.Allocator, module: *const Module, base_local: []const u8) error{OutOfMemory}!std.array_hash_map.String(void) {
+    var children: std.array_hash_map.String(std.ArrayList([]const u8)) = .empty;
     for (module.identities.keys(), module.identities.values()) |name, stmt| {
         for (stmt.data.identity.bases.items) |b| {
             if (b.prefix) |p| if (p.len > 0) continue;
@@ -98,7 +98,7 @@ pub fn descendantClosure(a: std.mem.Allocator, module: *const Module, base_local
             try gop.value_ptr.append(a, name);
         }
     }
-    var out: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var out: std.array_hash_map.String(void) = .empty;
     try out.put(a, base_local, {});
     var stack: std.ArrayList([]const u8) = .empty;
     try stack.append(a, base_local);

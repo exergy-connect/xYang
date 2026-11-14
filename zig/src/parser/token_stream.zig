@@ -125,14 +125,14 @@ pub const TokenStream = struct {
     }
 
     pub fn failKind(self: *TokenStream, kind: errors.Kind, comptime fmt: []const u8, args: anytype) errors.Error {
-        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        const msg = try self.arena.print(fmt, args);
         self.diag.* = .{ .kind = kind, .message = msg, .line = self.line(), .filename = self.filename };
         return error.YangLoad;
     }
 
     /// An error without a source location (`YangSyntaxError(str(exc))` / `YangSemanticError`).
     pub fn failUnlocated(self: *TokenStream, kind: errors.Kind, comptime fmt: []const u8, args: anytype) errors.Error {
-        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        const msg = try self.arena.print(fmt, args);
         self.diag.* = .{ .kind = kind, .message = msg, .line = null, .filename = null };
         return error.YangLoad;
     }

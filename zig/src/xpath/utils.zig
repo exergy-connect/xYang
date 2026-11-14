@@ -176,7 +176,7 @@ pub fn firstValue(a: Allocator, v: Value) error{OutOfMemory}!Val {
 /// Python `str(v)`.
 pub fn pyStr(a: Allocator, v: Val) error{OutOfMemory}![]const u8 {
     if (v == .string) return v.string;
-    return std.fmt.allocPrint(a, "{f}", .{jv.pyStr(v)});
+    return a.print("{f}", .{jv.pyStr(v)});
 }
 
 const Pair = union(enum) {

@@ -33,6 +33,7 @@ test {
     _ = @import("ast.zig");
     _ = @import("errors.zig");
     _ = @import("pyfmt.zig");
+    _ = @import("utf8.zig");
     _ = @import("module.zig");
     _ = @import("parser/dispatch_registry.zig");
     _ = @import("parser/tokenizer.zig");

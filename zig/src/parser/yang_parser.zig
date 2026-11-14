@@ -7,6 +7,7 @@
 //! applies extension invocations and runs the semantic checks, in Python's order.
 
 const std = @import("std");
+const utf8 = @import("../utf8.zig");
 const ast = @import("../ast.zig");
 const errors = @import("../errors.zig");
 const pyfmt = @import("../pyfmt.zig");
@@ -44,8 +45,8 @@ pub const Loader = struct {
     /// Python's `expand_uses`: false keeps `uses`, `augment` and `deviation` as written.
     expand_uses: bool = true,
     /// Imported modules by resolved path. `parseFile` does not add to it; `cache` does.
-    module_cache: std.StringArrayHashMapUnmanaged(*Module) = .empty,
-    import_pending: std.StringArrayHashMapUnmanaged(void) = .empty,
+    module_cache: std.array_hash_map.String(*Module) = .empty,
+    import_pending: std.array_hash_map.String(void) = .empty,
     include_stack: std.ArrayList([]const u8) = .empty,
 
     pub fn init(arena: std.mem.Allocator, io: ?std.Io, diag: *Diagnostic, include_path: []const []const u8) Loader {
@@ -97,7 +98,7 @@ pub const Loader = struct {
             .arena = self.arena,
             .module = module,
             .loader = self,
-            .source_dir = if (source_path) |s| std.fs.path.dirname(s) orelse "/" else null,
+            .source_dir = if (source_path) |s| std.Io.Dir.path.dirname(s) orelse "/" else null,
         };
         if (!p.ts.hasMore()) return p.ts.fail("Empty input", .{});
         if (p.ts.atValue(kw.MODULE)) {
@@ -145,7 +146,7 @@ pub const Loader = struct {
         const path = try self.resolveModuleFile(p, name, revision_date, source_dir, "module");
         if (self.module_cache.get(path)) |cached| return cached;
         if (self.import_pending.contains(path)) {
-            self.reporter.diag.* = .{ .message = try std.fmt.allocPrint(self.arena, "Circular import: {s}", .{path}), .filename = path };
+            self.reporter.diag.* = .{ .message = try self.arena.print("Circular import: {s}", .{path}), .filename = path };
             return error.YangLoad;
         }
         try self.import_pending.put(self.arena, path, {});
@@ -171,13 +172,13 @@ pub const Loader = struct {
         try dirs.append(self.arena, source_dir);
         try dirs.appendSlice(self.arena, self.include_path);
         var candidates: std.ArrayList([]const u8) = .empty;
-        if (revision_date) |rev| try candidates.append(self.arena, try std.fmt.allocPrint(self.arena, "{s}@{s}.yang", .{ name, rev }));
-        try candidates.append(self.arena, try std.fmt.allocPrint(self.arena, "{s}.yang", .{name}));
+        if (revision_date) |rev| try candidates.append(self.arena, try self.arena.print("{s}@{s}.yang", .{ name, rev }));
+        try candidates.append(self.arena, try self.arena.print("{s}.yang", .{name}));
 
         var found: ?[]const u8 = null;
         search: for (dirs.items) |dir| {
             for (candidates.items) |candidate| {
-                const path = try std.fs.path.join(self.arena, &.{ dir, candidate });
+                const path = try std.Io.Dir.path.join(self.arena, &.{ dir, candidate });
                 const st = cwd.statFile(io, path, .{}) catch continue;
                 if (st.kind != .file) continue;
                 found = cwd.realPathFileAlloc(io, path, self.arena) catch |err| return ioError(self.arena, self.reporter.diag, err, path);
@@ -185,7 +186,7 @@ pub const Loader = struct {
             }
         }
         if (found == null) {
-            const glob_prefix = try std.fmt.allocPrint(self.arena, "{s}@", .{name});
+            const glob_prefix = try self.arena.print("{s}@", .{name});
             for (dirs.items) |dir| {
                 var d = cwd.openDir(io, dir, .{ .iterate = true }) catch continue;
                 defer d.close(io);
@@ -197,7 +198,7 @@ pub const Loader = struct {
                     if (best == null or std.mem.order(u8, entry.name, best.?) == .gt) best = try self.arena.dupe(u8, entry.name);
                 }
                 if (best) |b| {
-                    const path = try std.fs.path.join(self.arena, &.{ dir, b });
+                    const path = try std.Io.Dir.path.join(self.arena, &.{ dir, b });
                     found = cwd.realPathFileAlloc(io, path, self.arena) catch |err| return ioError(self.arena, self.reporter.diag, err, path);
                     break;
                 }
@@ -217,7 +218,7 @@ pub const Loader = struct {
         };
         if (revision_date) |rev| {
             const expected = candidates.items[0];
-            const base = std.fs.path.basename(path);
+            const base = std.Io.Dir.path.basename(path);
             if (!std.mem.eql(u8, base, expected)) {
                 const statement = if (std.mem.eql(u8, kind, "module")) "import" else "include";
                 try self.warn("{s} {f} revision-date {s} not found; using {s}", .{ statement, repr(name), rev, base });
@@ -248,7 +249,7 @@ pub const Loader = struct {
     fn parseSubmoduleFromPath(self: *Loader, path: []const u8) Error!*Module {
         for (self.include_stack.items) |open| {
             if (std.mem.eql(u8, open, path)) {
-                self.reporter.diag.* = .{ .message = try std.fmt.allocPrint(self.arena, "Circular submodule include: {s}", .{path}), .filename = path };
+                self.reporter.diag.* = .{ .message = try self.arena.print("Circular submodule include: {s}", .{path}), .filename = path };
                 return error.YangLoad;
             }
         }
@@ -352,7 +353,7 @@ fn propagateTypedefUnits(arena: std.mem.Allocator, module: *Module) Error!void {
 
         fn lookup(w: @This(), type_stmt: ?*ast.TypeStmt, mod: *Module, seen: *std.StringHashMapUnmanaged(void)) Error![]const u8 {
             const t = type_stmt orelse return "";
-            const key = try std.fmt.allocPrint(w.arena, "{x}\x00{s}\x00{s}", .{ @intFromPtr(mod), t.prefix orelse "", t.name });
+            const key = try w.arena.print("{x}\x00{s}\x00{s}", .{ @intFromPtr(mod), t.prefix orelse "", t.name });
             if (seen.contains(key)) return "";
             try seen.put(w.arena, key, {});
             const resolved = @import("../module.zig").resolveTypedef(t, mod) orelse return "";
@@ -393,7 +394,7 @@ fn readSource(arena: std.mem.Allocator, io: std.Io, path: []const u8, diag: *Dia
     if (firstUtf8Error(raw)) |bad| {
         diag.* = .{
             .kind = .io,
-            .message = try std.fmt.allocPrint(arena, "'utf-8' codec can't decode byte 0x{x:0>2} in position {d}: {s}", .{ raw[bad.pos], bad.pos, bad.reason }),
+            .message = try arena.print("'utf-8' codec can't decode byte 0x{x:0>2} in position {d}: {s}", .{ raw[bad.pos], bad.pos, bad.reason }),
         };
         return error.YangLoad;
     }
@@ -408,12 +409,12 @@ fn ioError(arena: std.mem.Allocator, diag: *Diagnostic, err: anyerror, path: []c
         error.OutOfMemory => return error.OutOfMemory,
         else => @errorName(err),
     };
-    diag.* = .{ .kind = .io, .message = try std.fmt.allocPrint(arena, "{s}: '{s}'", .{ errno_text, path }) };
+    diag.* = .{ .kind = .io, .message = try arena.print("{s}: '{s}'", .{ errno_text, path }) };
     return error.YangLoad;
 }
 
 fn universalNewlines(arena: std.mem.Allocator, raw: []const u8) Error![]const u8 {
-    if (std.mem.indexOfScalar(u8, raw, '\r') == null) return raw;
+    if (std.mem.findScalar(u8, raw, '\r') == null) return raw;
     var out = try std.ArrayList(u8).initCapacity(arena, raw.len);
     var i: usize = 0;
     while (i < raw.len) : (i += 1) {
@@ -445,7 +446,7 @@ fn firstUtf8Error(s: []const u8) ?Utf8Error {
             }
             return .{ .pos = i, .reason = "unexpected end of data" };
         }
-        _ = std.unicode.utf8Decode(s[i .. i + len]) catch return .{ .pos = i, .reason = "invalid continuation byte" };
+        _ = utf8.decode(s[i .. i + len]) catch return .{ .pos = i, .reason = "invalid continuation byte" };
         i += len;
     }
     return null;
@@ -486,7 +487,7 @@ fn expectError(source: []const u8, expected: []const u8) !void {
     var diag: Diagnostic = .{};
     try std.testing.expectError(error.YangLoad, parseString(arena.allocator(), source, "m.yang", &diag));
     var buf: [512]u8 = undefined;
-    try std.testing.expectEqualStrings(expected, try std.fmt.bufPrint(&buf, "{f}", .{diag}));
+    try std.testing.expectEqualStrings(expected, try std.mem.print(&buf, "{f}", .{diag}));
 }
 
 test "syntax errors carry Python's text and line" {
@@ -555,11 +556,11 @@ test "imports are shared; foreign augment edits the import, foreign deviation a 
     const dir = try tmp.dir.realPathFileAlloc(io, ".", a);
     var diag: Diagnostic = .{};
     var loader = Loader.init(a, io, &diag, &.{});
-    const m = loader.parseFile(try std.fs.path.join(a, &.{ dir, "m.yang" })) catch |err| {
+    const m = loader.parseFile(try std.Io.Dir.path.join(a, &.{ dir, "m.yang" })) catch |err| {
         std.debug.print("{f}\n", .{diag});
         return err;
     };
-    const cached = loader.module_cache.get(try std.fs.path.join(a, &.{ dir, "base.yang" })).?;
+    const cached = loader.module_cache.get(try std.Io.Dir.path.join(a, &.{ dir, "base.yang" })).?;
     const box = cached.statements.items[0];
     // The augment lands in the cached module; the deviation does not.
     try std.testing.expectEqual(@as(usize, 3), box.statements.items.len);

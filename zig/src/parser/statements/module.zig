@@ -259,7 +259,7 @@ fn parseAbsoluteSchemaPath(p: *Parser, path: []const u8, out: *std.ArrayList(ast
         const seg = std.mem.trim(u8, part, &std.ascii.whitespace);
         if (seg.len == 0) continue;
         count += 1;
-        const idx = std.mem.indexOfScalar(u8, seg, ':');
+        const idx = std.mem.findScalar(u8, seg, ':');
         if (idx == null or idx.? == 0 or idx.? >= seg.len - 1) {
             return p.ts.failUnlocated(.syntax, "Invalid schema path segment {f}: expected 'prefix:identifier'", .{repr(seg)});
         }

@@ -42,7 +42,7 @@ pub const Parser = struct {
     }
 
     fn fail(self: *Parser, err: Error, comptime fmt: []const u8, args: anytype) Error {
-        self.message = try std.fmt.allocPrint(self.a, fmt, args);
+        self.message = try self.a.print(fmt, args);
         return err;
     }
 
@@ -198,7 +198,7 @@ pub const Parser = struct {
                 try ascii.append(self.a, '0' + d);
             } else return self.fail(error.XPathSyntax, "Invalid number: {s}", .{raw});
         }
-        if (std.mem.indexOfScalar(u8, raw, '.') != null) {
+        if (std.mem.findScalar(u8, raw, '.') != null) {
             return .{ .float = std.fmt.parseFloat(f64, ascii.items) catch return self.fail(error.XPathSyntax, "Invalid number: {s}", .{raw}) };
         }
         return .{ .int = std.fmt.parseInt(i128, ascii.items, 10) catch
@@ -357,7 +357,7 @@ pub fn bindPrefixes(a: Allocator, node: ?*Expr, resolver: Resolver, expression: 
         .path => |*p| for (p.segments) |*seg| {
             if (seg.prefix()) |prefix| {
                 seg.module = resolver.resolve(resolver.ctx, prefix) orelse {
-                    message.* = try std.fmt.allocPrint(a, "xpath: unknown prefix {f} in {f} of {f}", .{ pyfmt.repr(prefix), pyfmt.repr(seg.step), pyfmt.repr(expression) });
+                    message.* = try a.print("xpath: unknown prefix {f} in {f} of {f}", .{ pyfmt.repr(prefix), pyfmt.repr(seg.step), pyfmt.repr(expression) });
                     return error.UnknownPrefix;
                 };
             }

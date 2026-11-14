@@ -10,7 +10,7 @@ const pyfmt = @import("pyfmt.zig");
 
 const Allocator = std.mem.Allocator;
 
-pub const Object = std.StringArrayHashMapUnmanaged(Val);
+pub const Object = std.array_hash_map.String(Val);
 
 /// A Python `Decimal`: `(-1)**negative * coefficient * 10**exponent`. `digits` has no
 /// leading zeros ("0" for zero).
@@ -28,7 +28,7 @@ pub const Decimal = struct {
             s = s[1..];
         }
         var exponent: i32 = 0;
-        if (std.mem.indexOfAny(u8, s, "eE")) |e| {
+        if (std.mem.findAny(u8, s, "eE")) |e| {
             exponent = std.fmt.parseInt(i32, s[e + 1 ..], 10) catch return error.InvalidDecimal;
             s = s[0..e];
         }
@@ -51,7 +51,7 @@ pub const Decimal = struct {
     }
 
     pub fn fromInt(a: Allocator, n: i128) error{OutOfMemory}!Decimal {
-        const mag = try std.fmt.allocPrint(a, "{d}", .{@abs(n)});
+        const mag = try a.print("{d}", .{@abs(n)});
         return .{ .negative = n < 0, .digits = mag, .exponent = 0 };
     }
 
@@ -79,7 +79,7 @@ pub const Decimal = struct {
     /// `float(Decimal)`.
     pub fn toFloat(self: Decimal) f64 {
         var buf: [512]u8 = undefined;
-        const text = std.fmt.bufPrint(&buf, "{s}{s}e{d}", .{ if (self.negative) "-" else "", self.digits, self.exponent }) catch return std.math.nan(f64);
+        const text = std.mem.print(&buf, "{s}{s}e{d}", .{ if (self.negative) "-" else "", self.digits, self.exponent }) catch return std.math.nan(f64);
         return std.fmt.parseFloat(f64, text) catch std.math.nan(f64);
     }
 
@@ -131,7 +131,7 @@ pub fn parse(a: Allocator, text: []const u8, message: *[]const u8) LoadError!Val
         .parse_numbers = false,
         .duplicate_field_behavior = .use_last,
     }) catch |err| {
-        message.* = try std.fmt.allocPrint(a, "invalid JSON: {s}", .{@errorName(err)});
+        message.* = try a.print("invalid JSON: {s}", .{@errorName(err)});
         return error.InvalidJson;
     };
     return fromStd(a, parsed, message);
@@ -163,7 +163,7 @@ fn fromStd(a: Allocator, v: std.json.Value, message: *[]const u8) LoadError!Val 
 fn number(a: Allocator, s: []const u8, message: *[]const u8) LoadError!Val {
     if (std.json.isNumberFormattedLikeAnInteger(s)) {
         const n = std.fmt.parseInt(i128, s, 10) catch {
-            message.* = try std.fmt.allocPrint(a, "xyang-zig cannot represent the JSON integer {s}: it is outside the 128-bit range", .{s});
+            message.* = try a.print("xyang-zig cannot represent the JSON integer {s}: it is outside the 128-bit range", .{s});
             return error.IntegerTooLarge;
         };
         return .{ .int = n };
@@ -181,7 +181,7 @@ pub const FloatRepr = struct {
         if (std.math.isInf(f)) return w.writeAll(if (f < 0) "-inf" else "inf");
         var buf: [64]u8 = undefined;
         const sci = std.fmt.float.render(&buf, @abs(f), .{ .mode = .scientific }) catch return w.writeAll("?");
-        const e_at = std.mem.indexOfScalar(u8, sci, 'e').?;
+        const e_at = std.mem.findScalar(u8, sci, 'e').?;
         const exp = std.fmt.parseInt(i32, sci[e_at + 1 ..], 10) catch 0;
         var digits_buf: [32]u8 = undefined;
         var nd: usize = 0;
@@ -489,16 +489,16 @@ test "python text of values" {
         .{ 0.00001, "1e-05" }, .{ -2.5e-7, "-2.5e-07" }, .{ 0.1, "0.1" },    .{ 123456789.125, "123456789.125" },
         .{ -0.0, "-0.0" },
     };
-    for (cases) |c| try std.testing.expectEqualStrings(c[1], try std.fmt.bufPrint(&buf, "{f}", .{floatRepr(c[0])}));
+    for (cases) |c| try std.testing.expectEqualStrings(c[1], try std.mem.print(&buf, "{f}", .{floatRepr(c[0])}));
     var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
     defer arena.deinit();
     const a = arena.allocator();
     const d = try Decimal.parse(a, "007.50");
-    try std.testing.expectEqualStrings("7.50", try std.fmt.bufPrint(&buf, "{f}", .{d}));
-    try std.testing.expectEqualStrings("0.00001", try std.fmt.bufPrint(&buf, "{f}", .{try Decimal.parse(a, "1e-05")}));
-    try std.testing.expectEqualStrings("1E+16", try std.fmt.bufPrint(&buf, "{f}", .{try Decimal.parse(a, "1e+16")}));
+    try std.testing.expectEqualStrings("7.50", try std.mem.print(&buf, "{f}", .{d}));
+    try std.testing.expectEqualStrings("0.00001", try std.mem.print(&buf, "{f}", .{try Decimal.parse(a, "1e-05")}));
+    try std.testing.expectEqualStrings("1E+16", try std.mem.print(&buf, "{f}", .{try Decimal.parse(a, "1e+16")}));
     try std.testing.expect(Decimal.eql(try Decimal.parse(a, "1.50"), try Decimal.parse(a, "1.5")));
     try std.testing.expect(pyEql(.{ .int = 1 }, .{ .bool = true }));
     try std.testing.expect(pyEql(.{ .int = 1 }, .{ .float = 1.0 }));
-    try std.testing.expectEqualStrings("Decimal('1.5')", try std.fmt.bufPrint(&buf, "{f}", .{pyRepr(.{ .decimal = try Decimal.parse(a, "1.5") })}));
+    try std.testing.expectEqualStrings("Decimal('1.5')", try std.mem.print(&buf, "{f}", .{pyRepr(.{ .decimal = try Decimal.parse(a, "1.5") })}));
 }

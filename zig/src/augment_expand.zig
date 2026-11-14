@@ -40,7 +40,7 @@ fn absoluteSegments(r: *Reporter, path: []const u8, stored: []const IdentifierRe
     while (it.next()) |part| {
         const seg = std.mem.trim(u8, part, &refine_expand.pyWhitespace);
         if (seg.len == 0) continue;
-        const idx = std.mem.indexOfScalar(u8, seg, ':');
+        const idx = std.mem.findScalar(u8, seg, ':');
         if (idx == null or idx.? == 0 or idx.? >= seg.len - 1) {
             return r.fail(.syntax, "Invalid schema path segment {f}: expected 'prefix:identifier'", .{repr(seg)});
         }
@@ -185,14 +185,14 @@ pub fn applyAugmentations(r: *Reporter, root: *Module) Error!void {
 fn removeSchemaChild(r: *Reporter, parent: Owner, child: *Statement) Error!void {
     if (parent == .stmt and parent.stmt.kind() == .choice) {
         const cases = &parent.stmt.data.choice.cases;
-        if (std.mem.indexOfScalar(*Statement, cases.items, child)) |i| {
+        if (std.mem.findScalar(*Statement, cases.items, child)) |i| {
             _ = cases.orderedRemove(i);
-            if (std.mem.indexOfScalar(*Statement, parent.stmt.statements.items, child)) |j| _ = parent.stmt.statements.orderedRemove(j);
+            if (std.mem.findScalar(*Statement, parent.stmt.statements.items, child)) |j| _ = parent.stmt.statements.orderedRemove(j);
             return;
         }
     }
     const list = parent.statements();
-    if (std.mem.indexOfScalar(*Statement, list.items, child)) |i| {
+    if (std.mem.findScalar(*Statement, list.items, child)) |i| {
         _ = list.orderedRemove(i);
         return;
     }
@@ -221,7 +221,7 @@ fn schemaChildSlot(a: std.mem.Allocator, parent: Owner, name: []const u8) Error!
     }
     if (parent == .stmt) {
         if (try materializeOperationIo(a, parent.stmt, name)) |node| {
-            return .{ .cases = false, .index = std.mem.indexOfScalar(*Statement, parent.stmt.statements.items, node).? };
+            return .{ .cases = false, .index = std.mem.findScalar(*Statement, parent.stmt.statements.items, node).? };
         }
     }
     return null;
@@ -254,7 +254,7 @@ fn missingOnPath(r: *Reporter, segments: []const IdentifierRef, name: []const u8
     return r.fail(.semantic, "deviation: no child {f} under {f} (path {f})", .{ repr(name), repr(under), repr(joined.items) });
 }
 
-const Copies = std.AutoArrayHashMapUnmanaged(*Module, *Module);
+const Copies = std.array_hash_map.Auto(*Module, *Module);
 
 /// A module this build may edit: `root`, or a copy of an imported module made once and
 /// rebound in `root`'s imports, so the parser cache keeps the original.
@@ -336,7 +336,7 @@ fn applyDeviateDefaults(r: *Reporter, path: []const u8, node: *Statement, dv: *c
     if (dv.kind == .delete) {
         const matches = if (slot.*) |cur| std.mem.eql(u8, cur, values[0]) else false;
         if (!matches) {
-            const current = if (slot.*) |cur| try std.fmt.allocPrint(r.arena, "{f}", .{repr(cur)}) else "None";
+            const current = if (slot.*) |cur| try r.arena.print("{f}", .{repr(cur)}) else "None";
             return deviateFail(r, path, "cannot 'deviate delete' default {f}: target {s} {f} has default {s}", .{ repr(values[0]), nodeKeyword(node), repr(node.name), current });
         }
         slot.* = null;

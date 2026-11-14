@@ -1,13 +1,14 @@
 //! Python `repr()` of a `str`, so error messages quote values exactly like the Python CLI.
 
 const std = @import("std");
+const utf8 = @import("utf8.zig");
 
 pub const Repr = struct {
     s: []const u8,
 
     pub fn format(self: Repr, w: *std.Io.Writer) std.Io.Writer.Error!void {
-        const has_single = std.mem.indexOfScalar(u8, self.s, '\'') != null;
-        const has_double = std.mem.indexOfScalar(u8, self.s, '"') != null;
+        const has_single = std.mem.findScalar(u8, self.s, '\'') != null;
+        const has_double = std.mem.findScalar(u8, self.s, '"') != null;
         const quote: u8 = if (has_single and !has_double) '"' else '\'';
         try w.writeByte(quote);
         var i: usize = 0;
@@ -38,7 +39,7 @@ pub const Repr = struct {
                 try w.writeAll(self.s[i..]);
                 break;
             }
-            const cp = std.unicode.utf8Decode(self.s[i .. i + len]) catch {
+            const cp = utf8.decode(self.s[i .. i + len]) catch {
                 try w.writeByte(c);
                 i += 1;
                 continue;
@@ -75,9 +76,9 @@ pub fn repr(s: []const u8) Repr {
 
 test "repr quoting follows Python" {
     var buf: [64]u8 = undefined;
-    try std.testing.expectEqualStrings("'yes'", try std.fmt.bufPrint(&buf, "{f}", .{repr("yes")}));
-    try std.testing.expectEqualStrings("\"it's\"", try std.fmt.bufPrint(&buf, "{f}", .{repr("it's")}));
-    try std.testing.expectEqualStrings("'a\\'b\"'", try std.fmt.bufPrint(&buf, "{f}", .{repr("a'b\"")}));
-    try std.testing.expectEqualStrings("'a\\nb\\\\'", try std.fmt.bufPrint(&buf, "{f}", .{repr("a\nb\\")}));
-    try std.testing.expectEqualStrings("''", try std.fmt.bufPrint(&buf, "{f}", .{repr("")}));
+    try std.testing.expectEqualStrings("'yes'", try std.mem.print(&buf, "{f}", .{repr("yes")}));
+    try std.testing.expectEqualStrings("\"it's\"", try std.mem.print(&buf, "{f}", .{repr("it's")}));
+    try std.testing.expectEqualStrings("'a\\'b\"'", try std.mem.print(&buf, "{f}", .{repr("a'b\"")}));
+    try std.testing.expectEqualStrings("'a\\nb\\\\'", try std.mem.print(&buf, "{f}", .{repr("a\nb\\")}));
+    try std.testing.expectEqualStrings("''", try std.mem.print(&buf, "{f}", .{repr("")}));
 }

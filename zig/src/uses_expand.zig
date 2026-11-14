@@ -14,7 +14,7 @@ const Statement = ast.Statement;
 const Error = errors.Error;
 const Reporter = errors.Reporter;
 const repr = pyfmt.repr;
-const Groupings = std.StringArrayHashMapUnmanaged(*Statement);
+const Groupings = std.array_hash_map.String(*Statement);
 const StatementList = std.ArrayList(*Statement);
 
 /// `ExpandUsesContext`.
@@ -39,7 +39,7 @@ const Ctx = struct {
 
 fn extendRefinePath(a: std.mem.Allocator, prefix: []const u8, segment: []const u8) Error![]const u8 {
     if (prefix.len == 0) return segment;
-    return std.fmt.allocPrint(a, "{s}/{s}", .{ prefix, segment });
+    return a.print("{s}/{s}", .{ prefix, segment });
 }
 
 fn groupingBodyWithoutTypedefs(r: *Reporter, grouping: *Statement) Error!StatementList {
@@ -76,7 +76,7 @@ pub fn mergeWhenIntoRoots(a: std.mem.Allocator, roots: []const *Statement, uses_
         const old_desc = std.mem.trim(u8, old.description, &refine_expand.pyWhitespace);
         const merged = try a.create(ast.WhenStmt);
         merged.* = .{
-            .expression = try std.fmt.allocPrint(a, "({s}) and ({s})", .{ uw.expression, old.expression }),
+            .expression = try a.print("({s}) and ({s})", .{ uw.expression, old.expression }),
             .description = if (old_desc.len > 0) old_desc else std.mem.trim(u8, uw.description, &refine_expand.pyWhitespace),
             .evaluate_with_parent_context = true,
         };
@@ -141,7 +141,7 @@ const Resolved = struct { qname: []const u8, module: *Module, grouping: *Stateme
 /// The grouping a `uses` names: by prefix, else the lexical (container) scope, then the module.
 fn resolveUsesGrouping(a: std.mem.Allocator, s: *Statement, ctx: Ctx) Error!?Resolved {
     const u = s.data.uses;
-    const qname = if (u.grouping_prefix) |pre| try std.fmt.allocPrint(a, "{s}:{s}", .{ pre, u.grouping_name }) else u.grouping_name;
+    const qname = if (u.grouping_prefix) |pre| try a.print("{s}:{s}", .{ pre, u.grouping_name }) else u.grouping_name;
     var gmod: *Module = ctx.module;
     var grouping: ?*Statement = null;
     if (u.grouping_prefix) |pre| {
@@ -162,7 +162,7 @@ fn expandOneUses(r: *Reporter, s: *Statement, ctx: Ctx) Error!StatementList {
     const resolved = try resolveUsesGrouping(a, s, ctx) orelse {
         const u = s.data.uses;
         if (u.grouping_prefix) |pre| {
-            const qname = try std.fmt.allocPrint(a, "{s}:{s}", .{ pre, u.grouping_name });
+            const qname = try a.print("{s}:{s}", .{ pre, u.grouping_name });
             if (ctx.module.resolvePrefix(pre, s.included_from) == null) {
                 return r.fail(.semantic, "Unknown import prefix '{s}' in uses '{s}'", .{ pre, qname });
             }

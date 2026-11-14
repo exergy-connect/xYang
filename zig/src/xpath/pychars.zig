@@ -2,6 +2,7 @@
 //! points, from the Unicode general categories Python 15.0.0 uses.
 
 const std = @import("std");
+const utf8 = @import("../utf8.zig");
 const uc = @import("../unicode_categories.zig");
 
 fn categoryIndex(cp: u21) usize {
@@ -67,7 +68,7 @@ pub fn strip(s: []const u8) []const u8 {
     while (start < s.len) {
         const n = std.unicode.utf8ByteSequenceLength(s[start]) catch break;
         if (start + n > s.len) break;
-        const cp = std.unicode.utf8Decode(s[start .. start + n]) catch break;
+        const cp = utf8.decode(s[start .. start + n]) catch break;
         if (!isSpace(cp)) break;
         start += n;
     }
@@ -75,7 +76,7 @@ pub fn strip(s: []const u8) []const u8 {
     while (end > start) {
         var b = end - 1;
         while (b > start and (s[b] & 0xc0) == 0x80) b -= 1;
-        const cp = std.unicode.utf8Decode(s[b..end]) catch break;
+        const cp = utf8.decode(s[b..end]) catch break;
         if (!isSpace(cp)) break;
         end = b;
     }

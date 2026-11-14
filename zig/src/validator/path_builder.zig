@@ -14,10 +14,10 @@ pub const PathBuilder = struct {
     widths: std.ArrayList(u8) = .empty,
 
     pub fn push(self: *PathBuilder, name: []const u8, key: ?[]const u8, index: ?usize, pointer_name: ?[]const u8) error{OutOfMemory}!void {
-        try self.segments.append(self.a, if (key) |k| try std.fmt.allocPrint(self.a, "{s}[{s}]", .{ name, k }) else name);
+        try self.segments.append(self.a, if (key) |k| try self.a.print("{s}[{s}]", .{ name, k }) else name);
         try self.tokens.append(self.a, try instance.pointerToken(self.a, pointer_name orelse name));
         if (index) |i| {
-            try self.tokens.append(self.a, try std.fmt.allocPrint(self.a, "{d}", .{i}));
+            try self.tokens.append(self.a, try self.a.print("{d}", .{i}));
             try self.widths.append(self.a, 2);
         } else {
             try self.widths.append(self.a, 1);
@@ -32,22 +32,22 @@ pub const PathBuilder = struct {
 
     pub fn current(self: *const PathBuilder) error{OutOfMemory}![]const u8 {
         if (self.segments.items.len == 0) return "/";
-        return std.fmt.allocPrint(self.a, "/{s}", .{try std.mem.join(self.a, "/", self.segments.items)});
+        return self.a.print("/{s}", .{try std.mem.join(self.a, "/", self.segments.items)});
     }
 
     /// The document root is `""`.
     pub fn pointer(self: *const PathBuilder) error{OutOfMemory}![]const u8 {
         if (self.tokens.items.len == 0) return "";
-        return std.fmt.allocPrint(self.a, "/{s}", .{try std.mem.join(self.a, "/", self.tokens.items)});
+        return self.a.print("/{s}", .{try std.mem.join(self.a, "/", self.tokens.items)});
     }
 
     pub fn child(self: *const PathBuilder, name: []const u8) error{OutOfMemory}![]const u8 {
         const cur = try self.current();
-        return std.fmt.allocPrint(self.a, "{s}/{s}", .{ std.mem.trimEnd(u8, cur, "/"), name });
+        return self.a.print("{s}/{s}", .{ std.mem.trimEnd(u8, cur, "/"), name });
     }
 
     pub fn childPointer(self: *const PathBuilder, name: []const u8) error{OutOfMemory}![]const u8 {
-        return std.fmt.allocPrint(self.a, "{s}/{s}", .{ try self.pointer(), try instance.pointerToken(self.a, name) });
+        return self.a.print("{s}/{s}", .{ try self.pointer(), try instance.pointerToken(self.a, name) });
     }
 };
 

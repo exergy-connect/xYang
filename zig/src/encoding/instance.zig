@@ -39,13 +39,13 @@ pub const Node = struct {
 
 /// RFC 6901 reference token.
 pub fn pointerToken(a: Allocator, token: []const u8) error{OutOfMemory}![]const u8 {
-    if (std.mem.indexOfAny(u8, token, "~/") == null) return token;
+    if (std.mem.findAny(u8, token, "~/") == null) return token;
     const t1 = try std.mem.replaceOwned(u8, a, token, "~", "~0");
     return std.mem.replaceOwned(u8, a, t1, "/", "~1");
 }
 
 fn join(a: Allocator, prefix: []const u8, token: []const u8) error{OutOfMemory}![]const u8 {
-    return std.fmt.allocPrint(a, "{s}/{s}", .{ prefix, try pointerToken(a, token) });
+    return a.print("{s}/{s}", .{ prefix, try pointerToken(a, token) });
 }
 
 fn isContainerKind(s: *const Statement) bool {
@@ -79,7 +79,7 @@ fn decText(s: []const u8) ?[]const u8 {
 
 pub fn isDecText(t: []const u8) bool {
     const body = if (t.len > 0 and t[0] == '-') t[1..] else t;
-    const dot = std.mem.indexOfScalar(u8, body, '.');
+    const dot = std.mem.findScalar(u8, body, '.');
     const int_part = if (dot) |d| body[0..d] else body;
     if (int_part.len == 0) return false;
     for (int_part) |c| if (!std.ascii.isDigit(c)) return false;
@@ -202,7 +202,7 @@ pub const Walk = struct {
                     .int => |i| Val{ .decimal = try jv.Decimal.fromInt(self.a, i) },
                     .float => |f| blk: {
                         if (!std.math.isFinite(f)) break :blk null;
-                        const text = try std.fmt.allocPrint(self.a, "{f}", .{jv.floatRepr(f)});
+                        const text = try self.a.print("{f}", .{jv.floatRepr(f)});
                         break :blk Val{ .decimal = jv.Decimal.parse(self.a, text) catch break :blk null };
                     },
                     else => null,
@@ -227,7 +227,7 @@ pub const Walk = struct {
         var hits: std.ArrayList(*const Statement) = .empty;
         const parent = self.keys.parent_module;
         if (self.native) {
-            if (std.mem.indexOfScalar(u8, key, ':')) |colon| {
+            if (std.mem.findScalar(u8, key, ':')) |colon| {
                 const mod = key[0..colon];
                 const local = key[colon + 1 ..];
                 if (mod.len == 0 or local.len == 0) return &.{};
@@ -243,7 +243,7 @@ pub const Walk = struct {
             if (try self.keys.key(c)) |k| if (std.mem.eql(u8, k, key)) try hits.append(self.a, c);
         }
         if (hits.items.len > 0 or !at_root) return hits.items;
-        const colon = std.mem.indexOfScalar(u8, key, ':') orelse return hits.items;
+        const colon = std.mem.findScalar(u8, key, ':') orelse return hits.items;
         const mod = key[0..colon];
         const local = key[colon + 1 ..];
         if (mod.len == 0 or local.len == 0) return &.{};
@@ -279,7 +279,7 @@ pub const Walk = struct {
                 continue;
             }
             if (hits.len > 1) {
-                try nodes.append(self.a, try self.errNode(null, here, .ambiguous, "ambiguous-name", try std.fmt.allocPrint(self.a, "member name '{s}' matches more than one node", .{key})));
+                try nodes.append(self.a, try self.errNode(null, here, .ambiguous, "ambiguous-name", try self.a.print("member name '{s}' matches more than one node", .{key})));
                 continue;
             }
             const stmt = hits[0];
@@ -334,15 +334,15 @@ pub const Walk = struct {
     }
 
     fn hint(self: *Walk, kind: []const u8) error{OutOfMemory}![]const u8 {
-        if (self.native) return std.fmt.allocPrint(self.a, "{s} is a JSON number in native mode; the default is RFC 7951", .{kind});
-        return std.fmt.allocPrint(self.a, "{s} is a string in RFC 7951; pass --native-json for a JSON number", .{kind});
+        if (self.native) return self.a.print("{s} is a JSON number in native mode; the default is RFC 7951", .{kind});
+        return self.a.print("{s} is a string in RFC 7951; pass --native-json for a JSON number", .{kind});
     }
 
     fn walkLeafList(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8) Error!*Node {
         if (raw != .array) return self.errNode(stmt, pointer, .leaf_list, "type", "leaf-list must be an array");
         const n = try self.newNode(.{ .stmt = stmt, .pointer = pointer, .kind = .leaf_list });
         for (raw.array, 0..) |item, i| {
-            const child = try self.walkLeaf(item, stmt, try std.fmt.allocPrint(self.a, "{s}/{d}", .{ pointer, i }));
+            const child = try self.walkLeaf(item, stmt, try self.a.print("{s}/{d}", .{ pointer, i }));
             child.kind = .leaf_list_item;
             try n.children.append(self.a, child);
         }
@@ -365,7 +365,7 @@ pub const Walk = struct {
             return .{ .string = text };
         }
         if (registry.isDecimalName(eff.name) and isDecText(text)) {
-            if (std.mem.indexOfScalar(u8, text, '.') != null) return .{ .float = std.fmt.parseFloat(f64, text) catch return .{ .string = text } };
+            if (std.mem.findScalar(u8, text, '.') != null) return .{ .float = std.fmt.parseFloat(f64, text) catch return .{ .string = text } };
             if (std.fmt.parseInt(i128, text, 10)) |i| return .{ .int = i } else |_| return .{ .string = text };
         }
         if (std.mem.eql(u8, eff.name, registry.BOOLEAN) and (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false"))) {
@@ -403,7 +403,7 @@ pub const Walk = struct {
         var entries: std.ArrayList(Entry) = .empty;
         var keyed = false;
         if (raw == .array) {
-            for (raw.array, 0..) |item, i| try entries.append(self.a, .{ .token = try std.fmt.allocPrint(self.a, "{d}", .{i}), .item = item });
+            for (raw.array, 0..) |item, i| try entries.append(self.a, .{ .token = try self.a.print("{d}", .{i}), .item = item });
         } else if (self.native and raw == .object and keys.len == 1 and allObjects(raw.object)) {
             var it = raw.object.iterator();
             while (it.next()) |e| try entries.append(self.a, .{ .token = e.key_ptr.*, .item = e.value_ptr.* });
@@ -434,11 +434,11 @@ pub const Walk = struct {
                 }
                 const key_pointer = if (present) |p| p.pointer else try join(self.a, entry_pointer, key_token);
                 if (converted == null) {
-                    try n.errors.append(self.a, .{ .code = "type", .message = try std.fmt.allocPrint(self.a, "dict key '{s}' cannot be converted to the key type", .{entry.token}) });
+                    try n.errors.append(self.a, .{ .code = "type", .message = try self.a.print("dict key '{s}' cannot be converted to the key type", .{entry.token}) });
                 } else if (present == null) {
                     try body.insert(self.a, 0, try self.newNode(.{ .stmt = kl, .value = converted.?, .pointer = key_pointer, .kind = .leaf }));
                 } else if (!same(present.?.value, converted.?)) {
-                    try present.?.errors.append(self.a, .{ .code = "key-mismatch", .message = try std.fmt.allocPrint(self.a, "key leaf does not match dict key '{s}'", .{entry.token}) });
+                    try present.?.errors.append(self.a, .{ .code = "key-mismatch", .message = try self.a.print("key leaf does not match dict key '{s}'", .{entry.token}) });
                 }
             };
             const e = try self.newNode(.{ .stmt = stmt, .pointer = entry_pointer, .kind = .entry });
@@ -505,7 +505,7 @@ fn projectLevel(a: Allocator, keys: *rfc7951.MemberKeys, nodes: []const *Node, p
                 var rows: std.ArrayList(Val) = .empty;
                 for (n.children.items) |entry| {
                     if (!entry.include) continue;
-                    const entry_canon = try std.fmt.allocPrint(a, "{s}/{d}", .{ canon, rows.items.len });
+                    const entry_canon = try a.print("{s}/{d}", .{ canon, rows.items.len });
                     try map.put(a, entry_canon, entry.pointer);
                     try rows.append(a, .{ .object = try projectLevel(a, keys, entry.children.items, entry_canon, map) });
                 }
@@ -515,7 +515,7 @@ fn projectLevel(a: Allocator, keys: *rfc7951.MemberKeys, nodes: []const *Node, p
                 var values: std.ArrayList(Val) = .empty;
                 for (n.children.items) |item| {
                     if (!item.include) continue;
-                    try map.put(a, try std.fmt.allocPrint(a, "{s}/{d}", .{ canon, values.items.len }), item.pointer);
+                    try map.put(a, try a.print("{s}/{d}", .{ canon, values.items.len }), item.pointer);
                     try values.append(a, item.value);
                 }
                 try out.put(a, key, .{ .array = values.items });
@@ -538,7 +538,7 @@ pub fn remapPointer(a: Allocator, pointer: []const u8, map: *const PointerMap) e
         const prefix = try std.mem.join(a, "/", parts.items[0..index]);
         if (map.get(prefix)) |base| {
             const rest = try std.mem.join(a, "/", parts.items[index..]);
-            return if (rest.len > 0) std.fmt.allocPrint(a, "{s}/{s}", .{ base, rest }) else base;
+            return if (rest.len > 0) a.print("{s}/{s}", .{ base, rest }) else base;
         }
     }
     return pointer;

@@ -90,7 +90,7 @@ pub fn isRfc8791(node: *const Statement, name: []const u8) bool {
 
 pub fn augmentOwner(module: *Module, path: []const u8, file: ?[]const u8) ?*Module {
     const raw = std.mem.trimStart(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "/");
-    const colon = std.mem.indexOfScalar(u8, raw, ':') orelse return null;
+    const colon = std.mem.findScalar(u8, raw, ':') orelse return null;
     return module.resolvePrefix(raw[0..colon], file);
 }
 
@@ -126,7 +126,7 @@ fn walk(r: *Reporter, module: *Module, statements: []const *Statement, export_vi
             }
         }
         if (cur == null and at_root and foreign and !export_view) {
-            if (std.mem.indexOfScalar(*Statement, module.foreign_structure_augments.items, s) == null) {
+            if (std.mem.findScalar(*Statement, module.foreign_structure_augments.items, s) == null) {
                 try module.foreign_structure_augments.append(r.arena, s);
                 try module.foreign_structure_slots.append(r.arena, kept_extensions);
             }

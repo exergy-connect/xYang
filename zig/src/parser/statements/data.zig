@@ -178,7 +178,7 @@ fn parseImplicitCase(p: *Parser, choice: *ast.Statement) Error!void {
 
 /// RFC 7950 7.9: the cases of a choice share one namespace.
 fn validateCaseUniqueChildNames(p: *Parser, choice: *ast.Statement) Error!void {
-    var seen: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
+    var seen: std.array_hash_map.String([]const u8) = .empty;
     for (choice.data.choice.cases.items) |case| {
         for (case.statements.items) |sub| {
             const seg = sub.schemaNode() orelse continue;
@@ -347,7 +347,7 @@ pub fn parseListUnique(p: *Parser, parent: Parent) Error!void {
         var segs: std.ArrayList([]const u8) = .empty;
         var seg_it = std.mem.tokenizeScalar(u8, path, '/');
         while (seg_it.next()) |seg| {
-            const local = if (std.mem.indexOfScalar(u8, seg, ':')) |i| seg[i + 1 ..] else seg;
+            const local = if (std.mem.findScalar(u8, seg, ':')) |i| seg[i + 1 ..] else seg;
             try segs.append(p.arena, local);
         }
         try paths.append(p.arena, try std.mem.join(p.arena, "/", segs.items));

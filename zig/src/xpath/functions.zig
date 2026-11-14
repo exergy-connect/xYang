@@ -130,7 +130,7 @@ fn fContains(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node)
     try requireArity(ev, call, 2);
     const source = try asString(ev, call.args[0], ctx, node);
     const needle = try asString(ev, call.args[1], ctx, node);
-    return Value.boolean(std.mem.indexOf(u8, source, needle) != null);
+    return Value.boolean(std.mem.find(u8, source, needle) != null);
 }
 
 fn fStartsWith(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
@@ -145,7 +145,7 @@ fn fSubstringBefore(ev: *Evaluator, call: *const Call, ctx: Context, node: *cons
     try requireArity(ev, call, 2);
     const source = try asString(ev, call.args[0], ctx, node);
     const needle = try asString(ev, call.args[1], ctx, node);
-    const i = std.mem.indexOf(u8, source, needle) orelse return str(ev, "");
+    const i = std.mem.find(u8, source, needle) orelse return str(ev, "");
     return str(ev, source[0..i]);
 }
 
@@ -154,7 +154,7 @@ fn fSubstringAfter(ev: *Evaluator, call: *const Call, ctx: Context, node: *const
     try requireArity(ev, call, 2);
     const source = try asString(ev, call.args[0], ctx, node);
     const needle = try asString(ev, call.args[1], ctx, node);
-    const i = std.mem.indexOf(u8, source, needle) orelse return str(ev, "");
+    const i = std.mem.find(u8, source, needle) orelse return str(ev, "");
     return str(ev, source[i + needle.len ..]);
 }
 

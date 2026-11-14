@@ -70,7 +70,7 @@ pub const Outcome = union(enum) {
 /// argparse's name for the option in messages.
 fn displayName(arena: std.mem.Allocator, o: *const Opt) ![]const u8 {
     const short = o.short orelse return o.long;
-    return std.fmt.allocPrint(arena, "{s}/{s}", .{ short, o.long });
+    return arena.print("{s}/{s}", .{ short, o.long });
 }
 
 /// argparse's negative-number matcher (`^-\d+$|^-\d*\.\d+$`). Those strings are
@@ -78,8 +78,8 @@ fn displayName(arena: std.mem.Allocator, o: *const Opt) ![]const u8 {
 pub fn isNegativeNumber(a: []const u8) bool {
     if (a.len < 2 or a[0] != '-') return false;
     const s = a[1..];
-    if (std.mem.indexOfScalar(u8, s, '.')) |dot| {
-        if (std.mem.indexOfScalarPos(u8, s, dot + 1, '.') != null) return false;
+    if (std.mem.findScalar(u8, s, '.')) |dot| {
+        if (std.mem.findScalarPos(u8, s, dot + 1, '.') != null) return false;
         const frac = s[dot + 1 ..];
         if (frac.len == 0) return false;
         return allDigits(s[0..dot]) and allDigits(frac);
@@ -118,7 +118,7 @@ fn match(spec: Spec, arena: std.mem.Allocator, arg: []const u8, flag_part: []con
             found = o;
         }
     }
-    if (names.items.len > 1) return .{ .ambiguous = try std.fmt.allocPrint(arena, "ambiguous option: {s} could match {s}", .{ arg, try std.mem.join(arena, ", ", names.items) }) };
+    if (names.items.len > 1) return .{ .ambiguous = try arena.print("ambiguous option: {s} could match {s}", .{ arg, try std.mem.join(arena, ", ", names.items) }) };
     if (help) return .help;
     if (found) |o| return .{ .opt = o };
     return .none;
@@ -135,7 +135,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
 
     const usageError = struct {
         fn f(s: Spec, a: std.mem.Allocator, comptime fmt: []const u8, fargs: anytype) !Outcome {
-            return .{ .usage_error = .{ .usage = s.usage, .prog = s.prog, .message = try std.fmt.allocPrint(a, fmt, fargs) } };
+            return .{ .usage_error = .{ .usage = s.usage, .prog = s.prog, .message = try a.print(fmt, fargs) } };
         }
     }.f;
 
@@ -170,7 +170,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
             try out.writeAll(spec.help);
             return .help;
         }
-        var eq = std.mem.indexOfScalar(u8, a, '=');
+        var eq = std.mem.findScalar(u8, a, '=');
         var flag_part = if (eq) |e| a[0..e] else a;
         var attached: ?[]const u8 = null;
         if (a.len > 2 and a[1] != '-') {
@@ -214,7 +214,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
                     } else false;
                     if (!ok) {
                         var quoted: std.ArrayList([]const u8) = .empty;
-                        for (choices) |choice| try quoted.append(arena, try std.fmt.allocPrint(arena, "'{s}'", .{choice}));
+                        for (choices) |choice| try quoted.append(arena, try arena.print("'{s}'", .{choice}));
                         return usageError(spec, arena, "argument {s}: invalid choice: '{s}' (choose from {s})", .{ name, v, try std.mem.join(arena, ", ", quoted.items) });
                     }
                 }
@@ -231,7 +231,7 @@ pub fn parse(arena: std.mem.Allocator, spec: Spec, args: []const []const u8, mai
     }
     if (missing.items.len > 0) return usageError(spec, arena, "the following arguments are required: {s}", .{try std.mem.join(arena, ", ", missing.items)});
     if (extras.items.len > 0) {
-        return .{ .usage_error = .{ .usage = main_usage, .prog = main_prog, .message = try std.fmt.allocPrint(arena, "unrecognized arguments: {s}", .{try std.mem.join(arena, " ", extras.items)}) } };
+        return .{ .usage_error = .{ .usage = main_usage, .prog = main_prog, .message = try arena.print("unrecognized arguments: {s}", .{try std.mem.join(arena, " ", extras.items)}) } };
     }
     return .{ .parsed = p };
 }
