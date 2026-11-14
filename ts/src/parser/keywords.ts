@@ -10,25 +10,27 @@ export const TYPEDEF = "typedef";
 export const IDENTITY = "identity";
 export const BASE = "base";
 export const TYPE = "type";
-export const BINARY = "binary";
-export const BITS = "bits";
-export const BOOLEAN = "boolean";
-export const DECIMAL64 = "decimal64";
-export const EMPTY = "empty";
-export const ENUMERATION = "enumeration";
-export const IDENTITYREF = "identityref";
-export const INSTANCE_IDENTIFIER = "instance-identifier";
-export const INT8 = "int8";
-export const INT16 = "int16";
-export const INT32 = "int32";
-export { INT64 } from "../types/registry";
-export const LEAFREF = "leafref";
-export const STRING_KW = "string";
-export const UINT8 = "uint8";
-export const UINT16 = "uint16";
-export const UINT32 = "uint32";
-export const UINT64 = "uint64";
-export const UNION = "union";
+export {
+  BINARY,
+  BITS,
+  BOOLEAN,
+  DECIMAL64,
+  EMPTY,
+  ENUMERATION,
+  IDENTITYREF,
+  INSTANCE_IDENTIFIER,
+  INT8,
+  INT16,
+  INT32,
+  INT64,
+  LEAFREF,
+  STRING as STRING_KW,
+  UINT8,
+  UINT16,
+  UINT32,
+  UINT64,
+  UNION
+} from "../types/registry";
 export const PATH = "path";
 export const REQUIRE_INSTANCE = "require-instance";
 export const ENUM = "enum";

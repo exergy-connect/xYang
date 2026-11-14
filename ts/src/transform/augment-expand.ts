@@ -10,6 +10,7 @@ import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangStatement, YangModule, type DeviateRecord } from "../core/model";
 import { resolvePrefixedModule } from "../validator/if-feature-eval";
+import { mergeParentWhen } from "./parent-when";
 
 type ModuleData = YangModule;
 
@@ -544,28 +545,6 @@ function mergeIfFeaturesFromAugment(aug: YangStatement, child: YangStatement): v
   child.if_features = [...ufs, ...existing];
 }
 
-function mergeWhenFromAugment(aug: YangStatement, child: YangStatement): void {
-  const uw = aug.when as Record<string, unknown> | undefined;
-  if (!uw || typeof uw.expression !== "string" || uw.expression.trim() === "") {
-    return;
-  }
-  const usesWhen: Record<string, unknown> = {
-    ...(JSON.parse(JSON.stringify(uw)) as Record<string, unknown>),
-    evaluate_with_parent_context: true
-  };
-  const existing = child.when as Record<string, unknown> | undefined;
-  if (!existing?.expression) {
-    child.when = usesWhen;
-    return;
-  }
-  child.when = {
-    ...existing,
-    expression: `(${String(existing.expression)}) and (${uw.expression})`,
-    description: String(existing.description ?? ""),
-    evaluate_with_parent_context: true
-  };
-}
-
 function mergeAugmentIntoTarget(
   aug: YangStatement,
   target: YangStatement,
@@ -575,7 +554,7 @@ function mergeAugmentIntoTarget(
   for (const c of copies) {
     stampDefiningModule(c, sourceModuleName);
     mergeIfFeaturesFromAugment(aug, c);
-    mergeWhenFromAugment(aug, c);
+    mergeParentWhen(aug, c);
   }
   const targetChildren = asStatements(target.statements);
   for (const c of copies) {

@@ -250,17 +250,16 @@ function resolveName(
   atRoot: boolean
 ): YangStatement[] {
   if (native) {
-    if (key.includes(":")) {
-      const colon = key.indexOf(":");
-      const moduleName = key.slice(0, colon);
-      const local = key.slice(colon + 1);
-      if (!moduleName || !local) return [];
-      return children.filter((child) => child.name === local && definingModule(child, parent) === moduleName);
-    }
+    if (key.includes(":")) return byQualifiedName(key, children, parent);
     return children.filter((child) => child.name === key);
   }
   const canonical = children.filter((child) => memberKey(child, parent) === key);
   if (canonical.length > 0 || !atRoot || !key.includes(":")) return canonical;
+  return byQualifiedName(key, children, parent);
+}
+
+/** Children matching a `module:name` key by local name and defining module. */
+function byQualifiedName(key: string, children: YangStatement[], parent: string): YangStatement[] {
   const colon = key.indexOf(":");
   const moduleName = key.slice(0, colon);
   const local = key.slice(colon + 1);

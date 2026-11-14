@@ -20,6 +20,11 @@ class XPathParser {
       throw new XPathSyntaxError("Empty expression", { expression: this.expression, position: 0 });
     }
     const node = this.parseExpression();
+    this.expectEof();
+    return node;
+  }
+
+  private expectEof(): void {
     const token = this.current();
     if (token.kind !== "eof") {
       throw new XPathSyntaxError(`Unexpected token: ${token.value || token.kind}`, {
@@ -27,7 +32,6 @@ class XPathParser {
         position: token.position
       });
     }
-    return node;
   }
 
   private current(): XPathToken {
@@ -328,13 +332,7 @@ class XPathParser {
       this.consume("slash");
     }
     const node = this.parsePath(isAbsolute, undefined, allowPredicate);
-    const token = this.current();
-    if (token.kind !== "eof") {
-      throw new XPathSyntaxError(`Unexpected token: ${token.value || token.kind}`, {
-        expression: this.expression,
-        position: token.position
-      });
-    }
+    this.expectEof();
     if (node.kind === "path") {
       for (const segment of node.segments) {
         if (isWildcardStep(segment.step)) {
