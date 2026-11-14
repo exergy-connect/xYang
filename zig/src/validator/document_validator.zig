@@ -49,6 +49,13 @@ pub const ValidationError = struct {
     document: []const u8 = "data",
 };
 
+/// `instance.encodingErrors` as validation errors; an empty pointer displays as `/`.
+pub fn appendEncodingErrors(a: Allocator, out: *std.ArrayList(ValidationError), nodes: []const *instance.Node) error{OutOfMemory}!void {
+    for (try instance.encodingErrors(a, nodes)) |e| {
+        try out.append(a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
+    }
+}
+
 /// The schema node whose children are walked: the module or a statement.
 const Owner = union(enum) {
     module: *Module,
@@ -147,23 +154,25 @@ pub const DocumentValidator = struct {
 
     /// `validate`: walk the canonical tree from the module root.
     pub fn validate(self: *DocumentValidator, data: Val) Error![]ValidationError {
-        self.errors = .empty;
-        self.case_stack = .empty;
-        self.case_data_stack = .empty;
-        var path: PathBuilder = .{ .a = self.a };
-        self.root = try xpath.node.newNode(self.a, data, .{ .module = self.module }, null);
-        try self.visitChildren(data, .{ .module = self.module }, &path, true, self.root);
-        return self.errors.items;
+        return self.validateFrom(data, .{ .module = self.module });
     }
 
     /// `validate` with an RFC 8791 structure as the root schema (`module_root` false).
     pub fn validateStructure(self: *DocumentValidator, data: Val, structure: *Statement) Error![]ValidationError {
+        return self.validateFrom(data, .{ .stmt = structure });
+    }
+
+    fn validateFrom(self: *DocumentValidator, data: Val, root: Owner) Error![]ValidationError {
         self.errors = .empty;
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         var path: PathBuilder = .{ .a = self.a };
-        self.root = try xpath.node.newNode(self.a, data, .{ .stmt = structure }, null);
-        try self.visitChildren(data, .{ .stmt = structure }, &path, true, self.root);
+        const schema: xpath.node.Schema = switch (root) {
+            .module => |m| .{ .module = m },
+            .stmt => |st| .{ .stmt = st },
+        };
+        self.root = try xpath.node.newNode(self.a, data, schema, null);
+        try self.visitChildren(data, root, &path, true, self.root);
         return self.errors.items;
     }
 
@@ -204,9 +213,7 @@ pub const DocumentValidator = struct {
         const nodes = try walk.walkObject(params.object, run.operation, "", false);
         const projection = try instance.project(self.a, self.keys, nodes.items);
         const canonical = projection.data;
-        for (try instance.encodingErrors(self.a, nodes.items)) |e| {
-            try out.append(self.a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
-        }
+        try appendEncodingErrors(self.a, &out, nodes.items);
 
         var root_data = try self.a.create(Object);
         root_data.* = .empty;

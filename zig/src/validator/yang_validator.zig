@@ -109,9 +109,7 @@ pub const YangValidator = struct {
             const projection = try instance.project(self.a, &keys, nodes.items);
             canonical = .{ .object = projection.data };
             map = projection.map;
-            for (try instance.encodingErrors(self.a, nodes.items)) |e| {
-                try out.append(self.a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
-            }
+            try document_validator.appendEncodingErrors(self.a, &out, nodes.items);
         }
         const found = if (structure) |s| try dv.validateStructure(canonical, s) else try dv.validate(canonical);
         for (found) |e| {

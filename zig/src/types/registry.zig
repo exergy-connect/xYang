@@ -360,6 +360,11 @@ fn toBoolean(e: gen.Emit, _: *const Builtin, _: *const ast.TypeStmt) gen.Error!*
     return typeOnly(e.g.a, "boolean");
 }
 
+/// `x-yang.range`, when the type has a non-empty `range`.
+fn putRange(a: Allocator, xy: *Object, t: *const ast.TypeStmt) gen.Error!void {
+    if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+}
+
 fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     if (b.json_encoding == .@"string-number") {
@@ -367,7 +372,7 @@ fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
         try out.put(a, K.PATTERN, gen.str(b.pattern.?));
         const xy = try obj(a);
         try xy.put(a, K.xy.TYPE, gen.str(b.name));
-        if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+        try putRange(a, xy, t);
         try out.put(a, K.X_YANG, gen.objVal(xy));
         return out;
     }
@@ -385,7 +390,7 @@ fn toDecimal(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(DECIMAL64));
     if (t.fractionDigits()) |fd| try xy.put(a, K.xy.FRACTION_DIGITS, .{ .int = fd });
-    if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+    try putRange(a, xy, t);
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }

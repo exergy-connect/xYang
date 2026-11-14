@@ -96,6 +96,13 @@ pub fn isIntText(t: []const u8) bool {
     return intText(t) != null and std.mem.eql(u8, intText(t).?, t);
 }
 
+/// `true` / `false` exactly, as a YANG boolean key.
+fn boolFromText(t: []const u8) ?bool {
+    if (std.mem.eql(u8, t, "true")) return true;
+    if (std.mem.eql(u8, t, "false")) return false;
+    return null;
+}
+
 pub const Walk = struct {
     a: Allocator,
     module: *Module,
@@ -225,17 +232,8 @@ pub const Walk = struct {
     fn resolve(self: *Walk, key: []const u8, schema: ?*const Statement, at_root: bool) Error![]const *const Statement {
         const children = try self.dataNodes(schema);
         var hits: std.ArrayList(*const Statement) = .empty;
-        const parent = self.keys.parent_module;
         if (self.native) {
-            if (std.mem.findScalar(u8, key, ':')) |colon| {
-                const mod = key[0..colon];
-                const local = key[colon + 1 ..];
-                if (mod.len == 0 or local.len == 0) return &.{};
-                for (children) |c| {
-                    if (std.mem.eql(u8, c.name, local) and std.mem.eql(u8, rfc7951.definingModuleName(c, parent), mod)) try hits.append(self.a, c);
-                }
-                return hits.items;
-            }
+            if (std.mem.findScalar(u8, key, ':')) |colon| return self.byQualifiedName(key, colon, children);
             for (children) |c| if (std.mem.eql(u8, c.name, key)) try hits.append(self.a, c);
             return hits.items;
         }
@@ -244,11 +242,17 @@ pub const Walk = struct {
         }
         if (hits.items.len > 0 or !at_root) return hits.items;
         const colon = std.mem.findScalar(u8, key, ':') orelse return hits.items;
+        return self.byQualifiedName(key, colon, children);
+    }
+
+    /// The `children` named `key[colon + 1 ..]` whose defining module is `key[0..colon]`.
+    fn byQualifiedName(self: *Walk, key: []const u8, colon: usize, children: []const *const Statement) Error![]const *const Statement {
         const mod = key[0..colon];
         const local = key[colon + 1 ..];
         if (mod.len == 0 or local.len == 0) return &.{};
+        var hits: std.ArrayList(*const Statement) = .empty;
         for (children) |c| {
-            if (std.mem.eql(u8, c.name, local) and std.mem.eql(u8, rfc7951.definingModuleName(c, parent), mod)) try hits.append(self.a, c);
+            if (std.mem.eql(u8, c.name, local) and std.mem.eql(u8, rfc7951.definingModuleName(c, self.keys.parent_module), mod)) try hits.append(self.a, c);
         }
         return hits.items;
     }
@@ -368,9 +372,7 @@ pub const Walk = struct {
             if (std.mem.findScalar(u8, text, '.') != null) return .{ .float = std.fmt.parseFloat(f64, text) catch return .{ .string = text } };
             if (std.fmt.parseInt(i128, text, 10)) |i| return .{ .int = i } else |_| return .{ .string = text };
         }
-        if (std.mem.eql(u8, eff.name, registry.BOOLEAN) and (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false"))) {
-            return .{ .bool = std.mem.eql(u8, text, "true") };
-        }
+        if (std.mem.eql(u8, eff.name, registry.BOOLEAN)) if (boolFromText(text)) |b| return .{ .bool = b };
         return .{ .string = text };
     }
 
@@ -385,9 +387,7 @@ pub const Walk = struct {
         if (registry.isDecimalName(eff.name) and decText(text) != null) {
             return .{ .decimal = jv.Decimal.parse(self.a, text) catch return null };
         }
-        if (std.mem.eql(u8, eff.name, registry.BOOLEAN) and (std.mem.eql(u8, text, "true") or std.mem.eql(u8, text, "false"))) {
-            return .{ .bool = std.mem.eql(u8, text, "true") };
-        }
+        if (std.mem.eql(u8, eff.name, registry.BOOLEAN)) if (boolFromText(text)) |b| return .{ .bool = b };
         if (registry.isStringishName(eff.name)) return .{ .string = text };
         return null;
     }

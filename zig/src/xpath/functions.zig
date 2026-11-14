@@ -125,35 +125,33 @@ fn fConcat(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) E
     return str(ev, out.items);
 }
 
+/// The two string arguments of `contains`, `starts-with`, `substring-before` and `substring-after`.
+fn stringPair(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!struct { []const u8, []const u8 } {
+    try requireArity(ev, call, 2);
+    return .{ try asString(ev, call.args[0], ctx, node), try asString(ev, call.args[1], ctx, node) };
+}
+
 /// `contains(source, needle)`: an empty needle is contained.
 fn fContains(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
-    try requireArity(ev, call, 2);
-    const source = try asString(ev, call.args[0], ctx, node);
-    const needle = try asString(ev, call.args[1], ctx, node);
+    const source, const needle = try stringPair(ev, call, ctx, node);
     return Value.boolean(std.mem.find(u8, source, needle) != null);
 }
 
 fn fStartsWith(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
-    try requireArity(ev, call, 2);
-    const source = try asString(ev, call.args[0], ctx, node);
-    const needle = try asString(ev, call.args[1], ctx, node);
+    const source, const needle = try stringPair(ev, call, ctx, node);
     return Value.boolean(std.mem.startsWith(u8, source, needle));
 }
 
 /// The substring before the first needle; empty when the needle is empty or absent.
 fn fSubstringBefore(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
-    try requireArity(ev, call, 2);
-    const source = try asString(ev, call.args[0], ctx, node);
-    const needle = try asString(ev, call.args[1], ctx, node);
+    const source, const needle = try stringPair(ev, call, ctx, node);
     const i = std.mem.find(u8, source, needle) orelse return str(ev, "");
     return str(ev, source[0..i]);
 }
 
 /// The substring after the first needle; an empty needle returns the whole source.
 fn fSubstringAfter(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
-    try requireArity(ev, call, 2);
-    const source = try asString(ev, call.args[0], ctx, node);
-    const needle = try asString(ev, call.args[1], ctx, node);
+    const source, const needle = try stringPair(ev, call, ctx, node);
     const i = std.mem.find(u8, source, needle) orelse return str(ev, "");
     return str(ev, source[i + needle.len ..]);
 }

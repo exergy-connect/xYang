@@ -178,11 +178,7 @@ fn findCases(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8) ![]con
         std.mem.replaceScalar(u8, cid, std.Io.Dir.path.sep, '/');
         try ids.append(arena, cid);
     }
-    std.mem.sort([]const u8, ids.items, {}, struct {
-        fn lt(_: void, a: []const u8, b: []const u8) bool {
-            return std.mem.order(u8, a, b) == .lt;
-        }
-    }.lt);
+    xyang.strings.sortStrings(ids.items);
     return ids.items;
 }
 
@@ -228,11 +224,7 @@ fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, m
         if (std.mem.eql(u8, entry.name, module_name)) continue;
         try names.append(arena, try arena.dupe(u8, entry.name));
     }
-    std.mem.sort([]const u8, names.items, {}, struct {
-        fn lt(_: void, a: []const u8, b: []const u8) bool {
-            return std.mem.order(u8, a, b) == .lt;
-        }
-    }.lt);
+    xyang.strings.sortStrings(names.items);
     for (names.items) |name| {
         const path = try std.Io.Dir.path.join(arena, &.{ case_dir, name });
         const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .unlimited);

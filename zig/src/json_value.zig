@@ -6,6 +6,7 @@
 //! member keeps its first position and takes the last value, like a Python `dict`.
 
 const std = @import("std");
+const strings = @import("strings.zig");
 const pyfmt = @import("pyfmt.zig");
 
 const Allocator = std.mem.Allocator;
@@ -360,12 +361,20 @@ pub fn jsonToken(a: Allocator, v: Val) error{OutOfMemory}![]const u8 {
     return out.written();
 }
 
-fn writeJsonToken(a: Allocator, w: *std.Io.Writer, v: Val) (std.Io.Writer.Error || error{OutOfMemory})!void {
+/// `null`, `bool`, `int` or `float` (NaN and the infinities as Python's `json` spells them).
+fn writeScalar(w: *std.Io.Writer, v: Val) std.Io.Writer.Error!void {
     switch (v) {
         .null => try w.writeAll("null"),
         .bool => |b| try w.writeAll(if (b) "true" else "false"),
         .int => |i| try w.print("{d}", .{i}),
         .float => |f| if (std.math.isNan(f)) try w.writeAll("NaN") else if (std.math.isInf(f)) try w.writeAll(if (f < 0) "-Infinity" else "Infinity") else try floatRepr(f).format(w),
+        else => unreachable,
+    }
+}
+
+fn writeJsonToken(a: Allocator, w: *std.Io.Writer, v: Val) (std.Io.Writer.Error || error{OutOfMemory})!void {
+    switch (v) {
+        .null, .bool, .int, .float => try writeScalar(w, v),
         .decimal => |d| {
             var buf: [256]u8 = undefined;
             var bw: std.Io.Writer = .fixed(&buf);
@@ -383,11 +392,7 @@ fn writeJsonToken(a: Allocator, w: *std.Io.Writer, v: Val) (std.Io.Writer.Error 
         },
         .object => |obj| {
             const keys = try a.dupe([]const u8, obj.keys());
-            std.mem.sort([]const u8, keys, {}, struct {
-                fn lt(_: void, p: []const u8, q: []const u8) bool {
-                    return std.mem.order(u8, p, q) == .lt;
-                }
-            }.lt);
+            strings.sortStrings(keys);
             try w.writeByte('{');
             for (keys, 0..) |k, i| {
                 if (i > 0) try w.writeAll(", ");
@@ -413,10 +418,7 @@ fn newline(w: *std.Io.Writer, indent: usize, level: usize) std.Io.Writer.Error!v
 
 fn dumpAt(w: *std.Io.Writer, v: Val, indent: usize, level: usize) std.Io.Writer.Error!void {
     switch (v) {
-        .null => try w.writeAll("null"),
-        .bool => |b| try w.writeAll(if (b) "true" else "false"),
-        .int => |i| try w.print("{d}", .{i}),
-        .float => |f| if (std.math.isNan(f)) try w.writeAll("NaN") else if (std.math.isInf(f)) try w.writeAll(if (f < 0) "-Infinity" else "Infinity") else try floatRepr(f).format(w),
+        .null, .bool, .int, .float => try writeScalar(w, v),
         .decimal => |d| try d.format(w),
         .string => |s| try writePyJsonString(w, s),
         .array => |items| {

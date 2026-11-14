@@ -4,6 +4,7 @@
 pub const ast = @import("ast.zig");
 pub const errors = @import("errors.zig");
 pub const pyfmt = @import("pyfmt.zig");
+pub const strings = @import("strings.zig");
 pub const module = @import("module.zig");
 pub const Module = module.Module;
 pub const dispatch_registry = @import("parser/dispatch_registry.zig");
@@ -34,6 +35,7 @@ test {
     _ = @import("errors.zig");
     _ = @import("pyfmt.zig");
     _ = @import("utf8.zig");
+    _ = @import("strings.zig");
     _ = @import("module.zig");
     _ = @import("parser/dispatch_registry.zig");
     _ = @import("parser/tokenizer.zig");

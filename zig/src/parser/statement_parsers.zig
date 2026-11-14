@@ -82,16 +82,17 @@ pub const Parser = struct {
     /// raises the XPath error unwrapped, so the message has no file or line.
     pub fn compileXPath(p: *Parser, expression: []const u8) Error!?*xpath.Expr {
         var failure: xpath.Failure = .{};
-        return xpath.compile(p.arena, expression, p.module, &failure) catch |err| switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
-        };
+        return xpath.compile(p.arena, expression, p.module, &failure) catch |err| p.xpathFailure(&failure, err);
     }
 
     /// A leafref `path` parsed as a schema path and bound to this module's prefixes.
     pub fn compileXPathPath(p: *Parser, path: []const u8) Error!*xpath.Expr {
         var failure: xpath.Failure = .{};
-        return xpath.compilePath(p.arena, path, p.module, &failure) catch |err| switch (err) {
+        return xpath.compilePath(p.arena, path, p.module, &failure) catch |err| p.xpathFailure(&failure, err);
+    }
+
+    fn xpathFailure(p: *Parser, failure: *const xpath.Failure, err: xpath.CompileError) Error {
+        return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
         };

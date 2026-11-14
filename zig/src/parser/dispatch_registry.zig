@@ -6,6 +6,7 @@
 //! parity snapshot that `zig/tests/cross_check.py` compares against Python.
 
 const std = @import("std");
+const strings = @import("../strings.zig");
 const kw = @import("keywords.zig");
 
 pub const METADATA_SUBSTATEMENTS = [_][]const u8{ kw.DESCRIPTION, kw.REFERENCE, kw.UNITS, kw.STATUS };
@@ -186,11 +187,7 @@ pub fn writeParitySnapshot(w: *std.Io.Writer, gpa: std.mem.Allocator) !void {
         if (i != 0) try w.writeAll(", ");
         const sorted = try gpa.dupe([]const u8, p.keywords);
         defer gpa.free(sorted);
-        std.mem.sort([]const u8, sorted, {}, struct {
-            fn lt(_: void, a: []const u8, b: []const u8) bool {
-                return std.mem.order(u8, a, b) == .lt;
-            }
-        }.lt);
+        strings.sortStrings(sorted);
         try w.print("\"{s}\": {{\"rfc\": \"{s}\", \"keywords\": [", .{ p.name, p.rfc });
         for (sorted, 0..) |k, j| {
             if (j != 0) try w.writeAll(", ");

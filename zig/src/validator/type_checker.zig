@@ -268,17 +268,7 @@ pub const TypeChecker = struct {
             const n: i128 = @intCast(std.unicode.utf8CountCodepoints(s) catch s.len);
             if (try self.lengthIssue(n, length, false, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| try errors.append(self.a, i);
         }
-        for (t.patterns()) |*p| {
-            if (p.pattern.len == 0) continue;
-            const matched = try p.compiled.?.matches(self.a, s);
-            if (matched == p.invert_match) {
-                const default = if (!p.invert_match)
-                    try self.a.print("Value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
-                else
-                    try self.a.print("Value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
-                try errors.append(self.a, .{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) });
-            }
-        }
+        for (t.patterns()) |*p| if (try self.patternIssue(s, p, "Value")) |i| try errors.append(self.a, i);
         if (t.enums().len > 0) {
             const known = for (t.enums()) |e| {
                 if (std.mem.eql(u8, e, s)) break true;
@@ -343,18 +333,20 @@ pub const TypeChecker = struct {
         if (t.lengthRestriction().expression) |length| {
             if (try self.lengthIssue(@intCast(decoded_len), length, true, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| return self.one(i);
         }
-        for (t.patterns()) |*p| {
-            if (p.pattern.len == 0) continue;
-            const matched = try p.compiled.?.matches(self.a, s);
-            if (matched == p.invert_match) {
-                const default = if (!p.invert_match)
-                    try self.a.print("binary value {f} does not match pattern {f}", .{ repr(s), repr(p.pattern) })
-                else
-                    try self.a.print("binary value {f} matches forbidden pattern {f} (invert-match)", .{ repr(s), repr(p.pattern) });
-                return self.one(.{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) });
-            }
-        }
+        for (t.patterns()) |*p| if (try self.patternIssue(s, p, "binary value")) |i| return self.one(i);
         return &.{};
+    }
+
+    /// The `pattern` issue for `s` against one `pattern` (honouring `invert-match`), if any.
+    fn patternIssue(self: *TypeChecker, s: []const u8, p: *const ast.PatternSpec, label: []const u8) Error!?Issue {
+        if (p.pattern.len == 0) return null;
+        const matched = try p.compiled.?.matches(self.a, s);
+        if (matched != p.invert_match) return null;
+        const default = if (!p.invert_match)
+            try self.a.print("{s} {f} does not match pattern {f}", .{ label, repr(s), repr(p.pattern) })
+        else
+            try self.a.print("{s} {f} matches forbidden pattern {f} (invert-match)", .{ label, repr(s), repr(p.pattern) });
+        return .{ .code = "pattern", .message = try violationMessage(self.a, default, p.error_message, p.error_app_tag) };
     }
 
     /// `_parse_ranges`: split on `|`, then each part on `..`; `min` / `max` are open ends.
