@@ -345,7 +345,7 @@ pub fn pythonClassName(k: Kind) []const u8 {
 pub const Container = struct {
     presence: ?[]const u8 = null,
     /// Groupings declared in this container; visible here and in descendants only.
-    groupings: std.StringArrayHashMapUnmanaged(*Statement) = .empty,
+    groupings: std.array_hash_map.String(*Statement) = .empty,
 };
 
 /// `min-elements` / `max-elements`: `null` is unset or `unbounded`, like Python's `None`.

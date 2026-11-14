@@ -7,9 +7,9 @@ const Module = @import("module.zig").Module;
 const identity_graph = @import("identity_graph.zig");
 
 const Allocator = std.mem.Allocator;
-pub const FeatureSet = std.StringArrayHashMapUnmanaged(void);
+pub const FeatureSet = std.array_hash_map.String(void);
 /// Module name -> enabled feature names.
-pub const EnabledFeatures = std.StringArrayHashMapUnmanaged(FeatureSet);
+pub const EnabledFeatures = std.array_hash_map.String(FeatureSet);
 
 /// `reachable_modules`: `root` and every module reachable over `import`.
 pub fn reachableModules(a: Allocator, root: *Module) error{OutOfMemory}![]const *Module {
@@ -19,7 +19,7 @@ pub fn reachableModules(a: Allocator, root: *Module) error{OutOfMemory}![]const 
 }
 
 fn walk(a: Allocator, m: *Module, out: *std.ArrayList(*Module)) error{OutOfMemory}!void {
-    if (std.mem.indexOfScalar(*Module, out.items, m) != null) return;
+    if (std.mem.findScalar(*Module, out.items, m) != null) return;
     try out.append(a, m);
     for (m.import_prefixes.values()) |im| try walk(a, im, out);
     for (m.included_files.values()) |sub| {

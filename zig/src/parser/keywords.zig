@@ -1,5 +1,7 @@
 //! YANG keyword lexemes used by the parser (mirrors `src/xyang/parser/keywords.py`).
 
+const registry = @import("../types/registry.zig");
+
 pub const MODULE = "module";
 pub const SUBMODULE = "submodule";
 pub const YANG_VERSION = "yang-version";
@@ -46,10 +48,10 @@ pub const DEFAULT = "default";
 pub const ERROR_MESSAGE = "error-message";
 pub const ERROR_APP_TAG = "error-app-tag";
 
-pub const BITS = "bits";
-pub const ENUMERATION = "enumeration";
-pub const IDENTITYREF = "identityref";
-pub const UNION = "union";
+pub const BITS = registry.BITS;
+pub const ENUMERATION = registry.ENUMERATION;
+pub const IDENTITYREF = registry.IDENTITYREF;
+pub const UNION = registry.UNION;
 pub const PATH = "path";
 pub const REQUIRE_INSTANCE = "require-instance";
 pub const ENUM = "enum";

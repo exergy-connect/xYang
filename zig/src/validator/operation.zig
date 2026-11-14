@@ -15,6 +15,7 @@
 //! Python raises `ValueError`.
 
 const std = @import("std");
+const utf8 = @import("../utf8.zig");
 const ast = @import("../ast.zig");
 const jv = @import("../json_value.zig");
 const module_mod = @import("../module.zig");
@@ -35,7 +36,7 @@ pub const Usage = struct {
     message: []const u8 = "",
 
     pub fn fail(self: *Usage, comptime fmt: []const u8, args: anytype) Error {
-        self.message = try std.fmt.allocPrint(self.a, fmt, args);
+        self.message = try self.a.print(fmt, args);
         return error.Usage;
     }
 };
@@ -86,7 +87,7 @@ fn lessThan(_: void, x: []const u8, y: []const u8) bool {
 pub fn findRpc(u: *Usage, module: *Module, name: []const u8) Error!OperationTarget {
     for (module.statements.items) |s| {
         if (s.kind() == .rpc and std.mem.eql(u8, s.name, name)) {
-            return .{ .operation = s, .module_name = module.name, .label = try std.fmt.allocPrint(u.a, "rpc '{s}'", .{name}) };
+            return .{ .operation = s, .module_name = module.name, .label = try u.a.print("rpc '{s}'", .{name}) };
         }
     }
     var known: std.ArrayList([]const u8) = .empty;
@@ -108,7 +109,7 @@ fn isIdentifier(s: []const u8) bool {
 
 /// `urllib.parse.unquote`: `%XX` escapes as UTF-8 bytes, invalid UTF-8 replaced by U+FFFD.
 pub fn unquote(a: Allocator, s: []const u8) error{OutOfMemory}![]const u8 {
-    if (std.mem.indexOfScalar(u8, s, '%') == null) return s;
+    if (std.mem.findScalar(u8, s, '%') == null) return s;
     var bytes: std.ArrayList(u8) = .empty;
     var i: usize = 0;
     while (i < s.len) {
@@ -126,7 +127,7 @@ pub fn unquote(a: Allocator, s: []const u8) error{OutOfMemory}![]const u8 {
     while (j < bytes.items.len) {
         const len = std.unicode.utf8ByteSequenceLength(bytes.items[j]) catch 0;
         if (len > 0 and j + len <= bytes.items.len) {
-            if (std.unicode.utf8Decode(bytes.items[j .. j + len])) |_| {
+            if (utf8.decode(bytes.items[j .. j + len])) |_| {
                 try out.appendSlice(a, bytes.items[j .. j + len]);
                 j += len;
                 continue;
@@ -148,9 +149,9 @@ fn parseApiPath(u: *Usage, text: []const u8) Error![]const Segment {
     var out: std.ArrayList(Segment) = .empty;
     var it = std.mem.splitScalar(u8, text[1..], '/');
     while (it.next()) |raw| {
-        const eq = std.mem.indexOfScalar(u8, raw, '=');
+        const eq = std.mem.findScalar(u8, raw, '=');
         const ident = if (eq) |e| raw[0..e] else raw;
-        const colon = std.mem.lastIndexOfScalar(u8, ident, ':');
+        const colon = std.mem.findScalarLast(u8, ident, ':');
         const module_name = if (colon) |c| ident[0..c] else "";
         const name = if (colon) |c| ident[c + 1 ..] else ident;
         if ((colon != null and !isIdentifier(module_name)) or !isIdentifier(name)) {
@@ -183,7 +184,7 @@ fn findDataChild(a: Allocator, parent: []const *Statement, name: []const u8, mod
             if (s.kind() == .choice) {
                 try branches.appendSlice(a, s.data.choice.cases.items);
                 for (s.statements.items) |c| {
-                    if (c.kind() == .case and std.mem.indexOfScalar(*Statement, branches.items, c) == null) try branches.append(a, c);
+                    if (c.kind() == .case and std.mem.findScalar(*Statement, branches.items, c) == null) try branches.append(a, c);
                 }
             } else {
                 try branches.append(a, s);
@@ -256,7 +257,7 @@ pub fn resolveAction(u: *Usage, module: *Module, path: []const u8) Error!Operati
     if (last.keys != null) return u.fail("action {f}: the action segment takes no key values", .{repr(path)});
     for (statements) |s| {
         if (s.kind() == .action and std.mem.eql(u8, s.name, last.name) and std.mem.eql(u8, rfc7951.definingModuleName(s, module.name), namespace)) {
-            return .{ .operation = s, .module_name = namespace, .label = try std.fmt.allocPrint(a, "action {f}", .{repr(path)}), .parents = parents.items };
+            return .{ .operation = s, .module_name = namespace, .label = try a.print("action {f}", .{repr(path)}), .parents = parents.items };
         }
     }
     var known: std.ArrayList([]const u8) = .empty;
@@ -337,7 +338,7 @@ pub fn accessibleModule(a: Allocator, module: *const Module, target: OperationTa
     };
     var parent_copies: std.ArrayList(*Statement) = .empty;
     for (target.parents) |step| {
-        const i = std.mem.indexOfScalar(*Statement, originals.items, step.stmt).?;
+        const i = std.mem.findScalar(*Statement, originals.items, step.stmt).?;
         try parent_copies.append(a, copies.items[i]);
     }
     return .{ .module = accessible, .parent_copies = parent_copies.items };
@@ -348,7 +349,7 @@ pub fn lexical(a: Allocator, v: Val) error{OutOfMemory}![]const u8 {
     return switch (v) {
         .bool => |b| if (b) "true" else "false",
         .decimal => |d| fixedDecimal(a, d),
-        else => std.fmt.allocPrint(a, "{f}", .{jv.pyStr(v)}),
+        else => a.print("{f}", .{jv.pyStr(v)}),
     };
 }
 
@@ -376,7 +377,7 @@ fn fixedDecimal(a: Allocator, d: jv.Decimal) error{OutOfMemory}![]const u8 {
 
 /// `wrapper_member`: RFC 8040 3.6 member name of the operation body.
 pub fn wrapperMember(a: Allocator, module_name: []const u8, direction: []const u8) error{OutOfMemory}![]const u8 {
-    return std.fmt.allocPrint(a, "{s}:{s}", .{ module_name, direction });
+    return a.print("{s}:{s}", .{ module_name, direction });
 }
 
 test "api-path parsing and percent-decoding" {

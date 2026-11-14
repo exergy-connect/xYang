@@ -66,14 +66,6 @@ pub const TokenStream = struct {
         return v;
     }
 
-    pub fn consumeIf(self: *TokenStream, expected: []const u8) bool {
-        if (self.atValue(expected)) {
-            self.index += 1;
-            return true;
-        }
-        return false;
-    }
-
     /// `consume_type(YangTokenType.X)`.
     pub fn consumeType(self: *TokenStream, expected: TokenType) errors.Error![]const u8 {
         if (!self.hasMore()) return self.fail("Unexpected end of input", .{});
@@ -93,25 +85,6 @@ pub const TokenStream = struct {
         return false;
     }
 
-    /// `consume_oneof([...])` over token types.
-    pub fn consumeOneOf(self: *TokenStream, allowed: []const TokenType) errors.Error![]const u8 {
-        if (!self.hasMore()) return self.fail("Unexpected end of input", .{});
-        const tok = self.tokens[self.index];
-        for (allowed) |a| {
-            if (tok.type == a) {
-                self.index += 1;
-                return tok.value;
-            }
-        }
-        var names: std.Io.Writer.Allocating = .init(self.arena);
-        for (allowed, 0..) |a, i| {
-            if (i != 0) names.writer.writeAll(", ") catch return error.OutOfMemory;
-            names.writer.writeAll(a.pyName()) catch return error.OutOfMemory;
-        }
-        const got = if (tok.type == .identifier) tok.value else tok.type.pyName();
-        return self.fail("Expected one of ({s}), got {f}", .{ names.written(), repr(got) });
-    }
-
     /// Line of the current token (or the last one at the end), like `position()`.
     pub fn line(self: *const TokenStream) usize {
         if (self.index < self.tokens.len) return self.tokens[self.index].line;
@@ -125,14 +98,14 @@ pub const TokenStream = struct {
     }
 
     pub fn failKind(self: *TokenStream, kind: errors.Kind, comptime fmt: []const u8, args: anytype) errors.Error {
-        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        const msg = try self.arena.print(fmt, args);
         self.diag.* = .{ .kind = kind, .message = msg, .line = self.line(), .filename = self.filename };
         return error.YangLoad;
     }
 
     /// An error without a source location (`YangSyntaxError(str(exc))` / `YangSemanticError`).
     pub fn failUnlocated(self: *TokenStream, kind: errors.Kind, comptime fmt: []const u8, args: anytype) errors.Error {
-        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        const msg = try self.arena.print(fmt, args);
         self.diag.* = .{ .kind = kind, .message = msg, .line = null, .filename = null };
         return error.YangLoad;
     }

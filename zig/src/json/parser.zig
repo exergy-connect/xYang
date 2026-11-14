@@ -43,7 +43,7 @@ pub const Parse = struct {
     context: []const u8 = "",
 
     pub fn fail(p: *Parse, comptime fmt: []const u8, args: anytype) Error {
-        p.message = try std.fmt.allocPrint(p.a, fmt, args);
+        p.message = try p.a.print(fmt, args);
         return error.JsonForm;
     }
 
@@ -253,7 +253,7 @@ fn whenOf(p: *Parse, xy: *const Object) Error!?*ast.WhenStmt {
     const cond = raw.object.get(K.when_entry.CONDITION) orelse return null;
     if (cond != .string or cond.string.len == 0) return null;
     const d = raw.object.get(K.DESCRIPTION);
-    const desc: []const u8 = if (!truthy(d)) "" else if (d.? == .string) d.?.string else try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(d.?)});
+    const desc: []const u8 = if (!truthy(d)) "" else if (d.? == .string) d.?.string else try p.a.print("{f}", .{jv.pyStr(d.?)});
     const w = try p.a.create(ast.WhenStmt);
     w.* = .{ .expression = cond.string, .description = desc };
     w.evaluate_with_parent_context = truthy(raw.object.get(K.when_entry.EVALUATE_WITH_PARENT_CONTEXT));
@@ -266,7 +266,7 @@ pub fn coerceIdentifierRef(v: Val) ?ast.IdentifierRef {
     switch (v) {
         .string => |s| {
             if (s.len == 0) return null;
-            const idx = std.mem.indexOfScalar(u8, s, ':') orelse return .{ .name = s };
+            const idx = std.mem.findScalar(u8, s, ':') orelse return .{ .name = s };
             if (idx == 0 or idx >= s.len - 1) return .{ .name = s };
             return .{ .prefix = s[0..idx], .name = s[idx + 1 ..] };
         },
@@ -323,11 +323,11 @@ pub fn formatDecimal64Bound(a: Allocator, value: Val, fraction_digits: ?i64) err
     if (fraction_digits) |fd| if (fd > 0) {
         if (xutils.pyFloat(value)) |f| if (std.math.isFinite(f)) {
             var buf: [4096]u8 = undefined;
-            const s = std.fmt.float.render(&buf, f, .{ .mode = .decimal, .precision = @intCast(@min(fd, 1000)) }) catch return std.fmt.allocPrint(a, "{f}", .{jv.pyStr(value)});
+            const s = std.fmt.float.render(&buf, f, .{ .mode = .decimal, .precision = @intCast(@min(fd, 1000)) }) catch return a.print("{f}", .{jv.pyStr(value)});
             return a.dupe(u8, s);
         };
     };
-    return std.fmt.allocPrint(a, "{f}", .{jv.pyStr(value)});
+    return a.print("{f}", .{jv.pyStr(value)});
 }
 
 /// `_fraction_digits_from_multiple_of`: n when the value is 10^-n for n in 1..18.
@@ -335,7 +335,7 @@ pub fn fractionDigitsFromMultipleOf(a: Allocator, raw: ?Val) error{OutOfMemory}!
     const value = raw orelse return null;
     const t = switch (value) {
         .null, .bool, .array, .object => return null,
-        else => try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(value)}),
+        else => try a.print("{f}", .{jv.pyStr(value)}),
     };
     const d = jv.Decimal.parse(a, t) catch return null;
     if (d.negative) return null;
@@ -425,7 +425,7 @@ fn buildTypedef(p: *Parse, name: []const u8, def: *const Object) Error!*Statemen
     s.data.typedef.type = try typeFromSchema(p, p.defs, def, xy) orelse try stringType(p);
     if (def.get(K.DEFAULT)) |d| if (d != .null) {
         s.data.typedef.default_value = d;
-        s.data.typedef.default = try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(d)});
+        s.data.typedef.default = try p.a.print("{f}", .{jv.pyStr(d)});
     };
     const units = unitsOf(xy);
     if (units.len > 0) s.units = units;
@@ -523,7 +523,7 @@ fn stringItems(a: Allocator, v: ?Val) error{OutOfMemory}![]const []const u8 {
     return out.items;
 }
 
-const NameSet = std.StringArrayHashMapUnmanaged(void);
+const NameSet = std.array_hash_map.String(void);
 
 fn toSet(a: Allocator, items: []const []const u8) error{OutOfMemory}!NameSet {
     var out: NameSet = .empty;
@@ -565,7 +565,7 @@ fn propertiesOf(p: *Parse, o: *const Object) Error!*const Object {
 
 /// `validate_case_unique_child_names` (RFC 7950 7.9).
 fn validateCaseUniqueChildNames(p: *Parse, choice: *const Statement) Error!void {
-    var seen: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
+    var seen: std.array_hash_map.String([]const u8) = .empty;
     for (choice.data.choice.cases.items) |case| {
         for (case.statements.items) |sub| {
             const seg = sub.schemaNode() orelse continue;
@@ -614,7 +614,7 @@ fn parseHoistedChoiceOneOf(p: *Parse, one_of: []const Val, defs: *const Object, 
         for (try sorted(a, &common_keys)) |k| {
             const pv = tb_props.get(k) orelse continue;
             if (pv == .null) continue;
-            if (try convertProperty(p, k, try asObject(p, k, pv), defs, try std.fmt.allocPrint(a, "{s}/{s}", .{ parent_path, k }), common_mandatory.contains(k))) |s| try out.append(a, s);
+            if (try convertProperty(p, k, try asObject(p, k, pv), defs, try a.print("{s}/{s}", .{ parent_path, k }), common_mandatory.contains(k))) |s| try out.append(a, s);
         }
     }
     var cases: std.ArrayList(*Statement) = .empty;
@@ -627,7 +627,7 @@ fn parseHoistedChoiceOneOf(p: *Parse, one_of: []const Val, defs: *const Object, 
         for (disc) |dk| {
             const pv = bprops.get(dk) orelse continue;
             if (pv == .null) continue;
-            if (try convertProperty(p, dk, try asObject(p, dk, pv), defs, try std.fmt.allocPrint(a, "{s}/{s}", .{ parent_path, dk }), null)) |s| try case_statements.append(a, s);
+            if (try convertProperty(p, dk, try asObject(p, dk, pv), defs, try a.print("{s}/{s}", .{ parent_path, dk }), null)) |s| try case_statements.append(a, s);
         }
         if (case_statements.items.len == 0) continue;
         const bxy_raw = branch.get(K.X_YANG) orelse Val.null;
@@ -635,9 +635,9 @@ fn parseHoistedChoiceOneOf(p: *Parse, one_of: []const Val, defs: *const Object, 
         var case_name: []const u8 = "";
         if (bxy_raw == .object) {
             const n = bxy.get(K.NAME);
-            if (truthy(n)) case_name = gen.pyStrip(try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(n.?)}));
+            if (truthy(n)) case_name = gen.pyStrip(try a.print("{f}", .{jv.pyStr(n.?)}));
         }
-        if (case_name.len == 0) case_name = try std.fmt.allocPrint(a, "{s}-case", .{if (disc.len > 0) disc[0] else "case"});
+        if (case_name.len == 0) case_name = try a.print("{s}-case", .{if (disc.len > 0) disc[0] else "case"});
         const d = branch.get(K.DESCRIPTION);
         const case = try newStatement(p, case_name, .{ .case = {} });
         case.description = if (d != null and d.? == .string) d.?.string else "";
@@ -668,8 +668,8 @@ fn hoistedChoice(p: *Parse, one_of: []const Val, defs: *const Object, path: []co
     const man: ?bool = if (m == null or m.? == .null) null else truthy(m);
     const name_v = meta.get(K.NAME);
     const desc_v = meta.get(K.DESCRIPTION);
-    const name = if (truthy(name_v)) try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(name_v.?)}) else "hoisted-choice";
-    const desc = if (truthy(desc_v)) try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(desc_v.?)}) else "";
+    const name = if (truthy(name_v)) try p.a.print("{f}", .{jv.pyStr(name_v.?)}) else "hoisted-choice";
+    const desc = if (truthy(desc_v)) try p.a.print("{f}", .{jv.pyStr(desc_v.?)}) else "";
     return parseHoistedChoiceOneOf(p, one_of, defs, path, man, name, desc, meta);
 }
 
@@ -678,7 +678,7 @@ fn convertChildren(p: *Parse, props: *const Object, required: []const []const u8
     const req = try toSet(p.a, required);
     for (props.keys(), props.values()) |name, v| {
         if (skip_non_objects and v != .object) continue;
-        const child = try convertProperty(p, name, try asObject(p, name, v), defs, try std.fmt.allocPrint(p.a, "{s}/{s}", .{ base_path, name }), req.contains(name)) orelse continue;
+        const child = try convertProperty(p, name, try asObject(p, name, v), defs, try p.a.print("{s}/{s}", .{ base_path, name }), req.contains(name)) orelse continue;
         try out.append(p.a, child);
     }
     return out;
@@ -687,7 +687,7 @@ fn convertChildren(p: *Parse, props: *const Object, required: []const []const u8
 fn convertContainer(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, defs: *const Object, parent_path: []const u8, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
     const saved_context = p.context;
     defer p.context = saved_context;
-    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
+    p.context = try p.a.print("{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const props = try propertiesOf(p, schema);
     const one_of = schema.get(K.ONE_OF);
     var children: std.ArrayList(*Statement) = .empty;
@@ -703,7 +703,7 @@ fn convertContainer(p: *Parse, name: []const u8, schema: *const Object, xy: *con
     c.must_statements = musts;
     c.when = try whenOf(p, xy);
     if (xy.get(K.xy.PRESENCE)) |pr| if (pr != .null) {
-        c.data.container.presence = try std.fmt.allocPrint(p.a, "{f}", .{jv.pyStr(pr)});
+        c.data.container.presence = try p.a.print("{f}", .{jv.pyStr(pr)});
     };
     try setNodeAnnotations(p, c, xy);
     setConfig(c, xy);
@@ -727,13 +727,13 @@ fn bound(p: *Parse, schema: *const Object, key: []const u8) Error!?i64 {
 fn convertList(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, defs: *const Object, parent_path: []const u8, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
     const saved_context = p.context;
     defer p.context = saved_context;
-    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
+    p.context = try p.a.print("{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const a = p.a;
     const key = xy.get(K.xy.KEY);
     const items = try resolveSchema(p, try objectOr(p, schema, K.ITEMS), defs);
     const item_props = try propertiesOf(p, items);
     const items_one = items.get(K.ONE_OF);
-    const item_base = try std.fmt.allocPrint(a, "{s}/{s}", .{ parent_path, name });
+    const item_base = try a.print("{s}/{s}", .{ parent_path, name });
     var children: std.ArrayList(*Statement) = .empty;
     const t = items.get(K.TYPE);
     const hoisted = t != null and t.? == .string and std.mem.eql(u8, t.?.string, "object") and items_one != null and items_one.? == .array and items_one.?.array.len > 0 and item_props.count() == 0;
@@ -805,7 +805,7 @@ fn convertLeaf(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
             default = switch (d) {
                 .bool => |b| if (b) "true" else "false",
                 .string => |s| try std.ascii.allocLowerString(a, s),
-                else => try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(d)}),
+                else => try a.print("{f}", .{jv.pyStr(d)}),
             };
         } else if (std.mem.eql(u8, st_name, "integer") and (d == .int or d == .float or d == .bool)) {
             const n: i128 = switch (d) {
@@ -814,9 +814,9 @@ fn convertLeaf(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
                 .float => |f| if (std.math.isFinite(f) and @abs(f) < 1e38) @intFromFloat(@trunc(f)) else return p.fail("default {f} is not an integer", .{jv.pyRepr(d)}),
                 else => unreachable,
             };
-            default = try std.fmt.allocPrint(a, "{d}", .{n});
+            default = try a.print("{d}", .{n});
         } else {
-            default = if (d == .bool) (if (d.bool) "true" else "false") else try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(d)});
+            default = if (d == .bool) (if (d.bool) "true" else "false") else try a.print("{f}", .{jv.pyStr(d)});
         }
     };
     const leaf = try newStatement(p, name, .{ .leaf = .{ .type = t, .mandatory = mandatoryOf(name, schema, xy, override), .default = default } });
@@ -857,7 +857,7 @@ fn convertLeafList(p: *Parse, name: []const u8, schema: *const Object, xy: *cons
     if (schema.get(K.DEFAULT)) |d| if (d != .null) {
         const vals: []const Val = if (d == .array) d.array else try a.dupe(Val, &.{d});
         ll.data.leaf_list.default_values = vals;
-        for (vals) |v| try ll.data.leaf_list.defaults.append(a, try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(v)}));
+        for (vals) |v| try ll.data.leaf_list.defaults.append(a, try a.print("{f}", .{jv.pyStr(v)}));
     };
     try setNodeAnnotations(p, ll, xy);
     const units = unitsOf(xy);
@@ -875,16 +875,16 @@ fn convertChoice(p: *Parse, name: []const u8, schema: *const Object, xy: *const 
         if (cv != .object or isEmptyBranch(cv)) continue;
         const cs = cv.object;
         const cxy = try xyangOf(p, cs);
-        var case_name: []const u8 = if (truthy(cxy.get(K.NAME))) try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(cxy.get(K.NAME).?)}) else "";
+        var case_name: []const u8 = if (truthy(cxy.get(K.NAME))) try a.print("{f}", .{jv.pyStr(cxy.get(K.NAME).?)}) else "";
         if (case_name.len == 0 and truthy(cs.get(K.REQUIRED))) {
             const req = cs.get(K.REQUIRED).?;
-            case_name = if (req == .array and req.array.len == 1 and req.array[0] == .string) try std.fmt.allocPrint(a, "{s}-case", .{req.array[0].string}) else "";
+            case_name = if (req == .array and req.array.len == 1 and req.array[0] == .string) try a.print("{s}-case", .{req.array[0].string}) else "";
         }
         const case_props = try propertiesOf(p, cs);
-        if (case_name.len == 0 and case_props.count() == 1) case_name = try std.fmt.allocPrint(a, "{s}-case", .{case_props.keys()[0]});
+        if (case_name.len == 0 and case_props.count() == 1) case_name = try a.print("{s}-case", .{case_props.keys()[0]});
         var case_statements: std.ArrayList(*Statement) = .empty;
         for (case_props.keys(), case_props.values()) |pn, pv| {
-            const path = try std.fmt.allocPrint(a, "{s}/{s}/{s}/{s}", .{ parent_path, name, case_name, pn });
+            const path = try a.print("{s}/{s}/{s}/{s}", .{ parent_path, name, case_name, pn });
             if (try convertProperty(p, pn, try asObject(p, pn, pv), defs, path, null)) |s| try case_statements.append(a, s);
         }
         const d = cs.get(K.DESCRIPTION);
@@ -908,7 +908,7 @@ fn convertChoice(p: *Parse, name: []const u8, schema: *const Object, xy: *const 
 fn convertIoBlock(p: *Parse, schema: *const Object, defs: *const Object, parent_path: []const u8, io_type: []const u8) Error!?*Statement {
     const saved_context = p.context;
     defer p.context = saved_context;
-    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, io_type) });
+    p.context = try p.a.print("{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, io_type) });
     const xy = try xyangOf(p, schema);
     if (!xyTypeIs(xy, io_type)) return null;
     const musts = try mustList(p, xy);
@@ -928,7 +928,7 @@ fn convertIoBlock(p: *Parse, schema: *const Object, defs: *const Object, parent_
 fn convertRpc(p: *Parse, name: []const u8, value: *const Object, defs: *const Object, kind: []const u8) Error!*Statement {
     const saved_context = p.context;
     defer p.context = saved_context;
-    p.context = try std.fmt.allocPrint(p.a, "{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
+    p.context = try p.a.print("{s}/{s}", .{ saved_context, try @import("../typedef_scope.zig").pointerEscape(p.a, name) });
     const a = p.a;
     const xy = try xyangOf(p, value);
     if (!xyTypeIs(xy, kind)) {
@@ -939,7 +939,7 @@ fn convertRpc(p: *Parse, name: []const u8, value: *const Object, defs: *const Ob
     for ([_][]const u8{ K.types.INPUT, K.types.OUTPUT }) |io| {
         const raw = value.get(io) orelse continue;
         if (raw != .object) continue;
-        if (try convertIoBlock(p, raw.object, defs, try std.fmt.allocPrint(a, "/{s}/{s}", .{ name, io }), io)) |s| try statements.append(a, s);
+        if (try convertIoBlock(p, raw.object, defs, try a.print("/{s}/{s}", .{ name, io }), io)) |s| try statements.append(a, s);
     }
     const is_action = std.mem.eql(u8, kind, K.types.ACTION);
     const rpc = try newStatement(p, name, if (is_action) .{ .action = {} } else .{ .rpc = {} });
@@ -953,7 +953,7 @@ fn convertRpc(p: *Parse, name: []const u8, value: *const Object, defs: *const Ob
 
 /// `_convert_property`: a `module:name` key is a node another module defines.
 fn convertProperty(p: *Parse, name: []const u8, prop: *const Object, defs: *const Object, parent_path: []const u8, override: ?bool) Error!?*Statement {
-    const colon = std.mem.indexOfScalar(u8, name, ':') orelse {
+    const colon = std.mem.findScalar(u8, name, ':') orelse {
         const s = try convertPropertyLocal(p, name, prop, defs, parent_path, override);
         return attachActions(p, s, prop, defs, parent_path);
     };
@@ -981,7 +981,7 @@ fn attachActions(p: *Parse, s: ?*Statement, prop: *const Object, defs: *const Ob
     p.context = try @import("../typedef_scope.zig").path(p.a, saved_context, stmt);
     for (actions.object.keys(), actions.object.values()) |action_name, v| {
         if (v != .object) return p.fail("action {f} at {s} must be an object", .{ repr(action_name), parent_path });
-        const colon = std.mem.lastIndexOfScalar(u8, action_name, ':');
+        const colon = std.mem.findScalarLast(u8, action_name, ':');
         const local = if (colon) |c| action_name[c + 1 ..] else action_name;
         const action = try convertRpc(p, local, v.object, defs, K.types.ACTION);
         if (colon) |c| action.defining_module = action_name[0..c];
@@ -1056,13 +1056,13 @@ fn invocationFromJson(p: *Parse, raw: Val) Error!*Statement {
     const a = p.a;
     const bad = raw != .object or blk: {
         const n = raw.object.get(K.NAME) orelse break :blk true;
-        break :blk n != .string or std.mem.indexOfScalar(u8, n.string, ':') == null;
+        break :blk n != .string or std.mem.findScalar(u8, n.string, ':') == null;
     };
     if (bad) return p.fail("extension invocation must be an object with \"name\" of the form \"prefix:ext\", got {f}", .{jv.pyRepr(raw)});
     if (!p.in_body) return p.fail("extension invocations require parse_json_schema", .{});
     const o = raw.object;
     const name = o.get(K.NAME).?.string;
-    const colon = std.mem.indexOfScalar(u8, name, ':').?;
+    const colon = std.mem.findScalar(u8, name, ':').?;
     const prefix = name[0..colon];
     const ext_name = name[colon + 1 ..];
     const owner: *Module = if (std.mem.eql(u8, prefix, p.module.ownPrefix())) p.module else p.module.import_prefixes.get(prefix) orelse
@@ -1093,7 +1093,7 @@ fn invocationFromJson(p: *Parse, raw: Val) Error!*Statement {
         const node = item.object.get("node");
         const schema = item.object.get("schema");
         if (node != null and node.? == .string and schema != null and schema.? == .object) {
-            const child = try convertProperty(p, node.?.string, schema.?.object, p.defs, try std.fmt.allocPrint(a, "/{s}", .{node.?.string}), null) orelse
+            const child = try convertProperty(p, node.?.string, schema.?.object, p.defs, try a.print("/{s}", .{node.?.string}), null) orelse
                 return p.fail("extension invocation {f}: body node {f} is not a schema node", .{ repr(name), repr(node.?.string) });
             try inv.statements.append(a, child);
             continue;
@@ -1236,7 +1236,7 @@ fn parseInto(p: *Parse, data: Val) Error!void {
     for (props.keys(), props.values()) |name, v| {
         if (v != .object) continue;
         if (getObj(v.object, K.X_YANG) == null) return p.fail("JSON Schema property \"{s}\" has no \"x-yang\" annotation", .{name});
-        if (try convertProperty(p, name, v.object, defs, try std.fmt.allocPrint(a, "/{s}", .{name}), null)) |s| try m.statements.append(a, s);
+        if (try convertProperty(p, name, v.object, defs, try a.print("/{s}", .{name}), null)) |s| try m.statements.append(a, s);
     }
     const rpcs = try objectOr(p, root_xy, K.xy.RPCS);
     for (rpcs.keys(), rpcs.values()) |name, v| {

@@ -145,10 +145,6 @@ pub fn yangBool(v: Value) bool {
     };
 }
 
-pub fn isNodeset(v: Value) bool {
-    return v == .nodes;
-}
-
 /// `node_set_values`: data of a node-set or `Node`, or the scalar itself (none for `None`).
 /// A tuple is one value, compared as its Python `str`.
 pub fn nodeSetValues(a: Allocator, v: Value) error{OutOfMemory}![]const Val {
@@ -176,7 +172,7 @@ pub fn firstValue(a: Allocator, v: Value) error{OutOfMemory}!Val {
 /// Python `str(v)`.
 pub fn pyStr(a: Allocator, v: Val) error{OutOfMemory}![]const u8 {
     if (v == .string) return v.string;
-    return std.fmt.allocPrint(a, "{f}", .{jv.pyStr(v)});
+    return a.print("{f}", .{jv.pyStr(v)});
 }
 
 const Pair = union(enum) {

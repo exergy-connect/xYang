@@ -102,14 +102,14 @@ pub fn tokenize(arena: std.mem.Allocator, content: []const u8, diag: *errors.Dia
         if (c == '/' and i + 1 < n) {
             const nxt = content[i + 1];
             if (nxt == '*') {
-                const close = std.mem.indexOfPos(u8, content, i + 2, "*/");
+                const close = std.mem.findPos(u8, content, i + 2, "*/");
                 const end = if (close) |e| e + 2 else n;
                 countLines(content, i, end, &line, &line_start);
                 i = end;
                 continue;
             }
             if (nxt == '/') {
-                i = std.mem.indexOfScalarPos(u8, content, i + 2, '\n') orelse n;
+                i = std.mem.findScalarPos(u8, content, i + 2, '\n') orelse n;
                 continue;
             }
         }

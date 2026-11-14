@@ -49,7 +49,7 @@ const SINGLE_ESCAPE_LITERALS = "\\|.-^?*+{}()[]";
 
 /// XSD `SingleCharEsc` punctuation, plus any other ASCII printable non-alphanumeric (#204).
 fn isLiteralPunctuation(ch: u21) bool {
-    if (ch < 0x80 and std.mem.indexOfScalar(u8, SINGLE_ESCAPE_LITERALS, @intCast(ch)) != null) return true;
+    if (ch < 0x80 and std.mem.findScalar(u8, SINGLE_ESCAPE_LITERALS, @intCast(ch)) != null) return true;
     if (ch < 0x20 or ch > 0x7E) return false;
     const c: u8 = @intCast(ch);
     if (c >= '0' and c <= '9') return false;
@@ -156,17 +156,17 @@ const Translator = struct {
 
     fn unsupported(t: *Translator, construct: []const u21) Error {
         const text = try encodeUtf8(t.a, construct);
-        t.failure.* = .{ .message = try std.fmt.allocPrint(t.a, "unsupported XSD regex construct {f} in pattern {f}", .{ repr(text), repr(t.pattern) }) };
+        t.failure.* = .{ .message = try t.a.print("unsupported XSD regex construct {f} in pattern {f}", .{ repr(text), repr(t.pattern) }) };
         return error.InvalidPattern;
     }
 
     fn unsupportedText(t: *Translator, text: []const u8) Error {
-        t.failure.* = .{ .message = try std.fmt.allocPrint(t.a, "unsupported XSD regex construct {f} in pattern {f}", .{ repr(text), repr(t.pattern) }) };
+        t.failure.* = .{ .message = try t.a.print("unsupported XSD regex construct {f} in pattern {f}", .{ repr(text), repr(t.pattern) }) };
         return error.InvalidPattern;
     }
 
     fn semantic(t: *Translator, comptime fmt: []const u8) Error {
-        t.failure.* = .{ .message = try std.fmt.allocPrint(t.a, fmt, .{repr(t.pattern)}) };
+        t.failure.* = .{ .message = try t.a.print(fmt, .{repr(t.pattern)}) };
         return error.InvalidPattern;
     }
 
@@ -181,11 +181,11 @@ const Translator = struct {
                 if (t.peek(0) != '{') {
                     return t.unsupported(&.{ '\\', ch });
                 }
-                const end = std.mem.indexOfScalarPos(u21, t.src, t.pos, '}') orelse return t.unsupported(t.src[t.pos - 2 ..]);
+                const end = std.mem.findScalarPos(u21, t.src, t.pos, '}') orelse return t.unsupported(t.src[t.pos - 2 ..]);
                 const name = try encodeUtf8(t.a, t.src[t.pos + 1 .. end]);
                 t.pos = end + 1;
                 if (groupOf(name) == null and !isSubcategory(name)) {
-                    return t.unsupportedText(try std.fmt.allocPrint(t.a, "\\{u}{{{s}}}", .{ ch, name }));
+                    return t.unsupportedText(try t.a.print("\\{u}{{{s}}}", .{ ch, name }));
                 }
                 return .{ .ranges = try categoryRanges(t.a, name), .negated = ch == 'P' };
             },
@@ -243,12 +243,12 @@ const Translator = struct {
                 break;
             }
             if (ch == '-' and t.peek(1) == '[') {
-                const end = std.mem.indexOfScalarPos(u21, t.src, t.pos, ']');
+                const end = std.mem.findScalarPos(u21, t.src, t.pos, ']');
                 const stop = if (end) |e| @min(e + 2, t.src.len) else t.src.len;
                 return t.unsupported(t.src[start..stop]);
             }
             first = false;
-            const single = ch != '\\' or (if (t.peek(1)) |n| (n >= 0x80 or std.mem.indexOfScalar(u8, "pPdDsSwWiIcC", @intCast(n)) == null) else false);
+            const single = ch != '\\' or (if (t.peek(1)) |n| (n >= 0x80 or std.mem.findScalar(u8, "pPdDsSwWiIcC", @intCast(n)) == null) else false);
             const lo_ranges = try t.classAtom();
             const next1 = t.peek(1);
             if (single and t.peek(0) == '-' and next1 != ']' and next1 != '[') {
@@ -281,9 +281,9 @@ const Translator = struct {
         for (ranges) |r| {
             var buf: [24]u8 = undefined;
             const text = if (r[0] == r[1])
-                std.fmt.bufPrint(&buf, "\\U{X:0>8}", .{r[0]})
+                std.mem.print(&buf, "\\U{X:0>8}", .{r[0]})
             else
-                std.fmt.bufPrint(&buf, "\\U{X:0>8}-\\U{X:0>8}", .{ r[0], r[1] });
+                std.mem.print(&buf, "\\U{X:0>8}-\\U{X:0>8}", .{ r[0], r[1] });
             try t.emit(text catch unreachable);
         }
         try t.emit("]");
@@ -291,7 +291,7 @@ const Translator = struct {
 
     /// `re.escape(ch)`.
     fn emitEscaped(t: *Translator, ch: u21) Error!void {
-        if (ch < 0x80 and std.mem.indexOfScalar(u8, RE_SPECIAL, @intCast(ch)) != null) try t.out.append(t.a, '\\');
+        if (ch < 0x80 and std.mem.findScalar(u8, RE_SPECIAL, @intCast(ch)) != null) try t.out.append(t.a, '\\');
         try t.out.append(t.a, ch);
     }
 
@@ -465,7 +465,7 @@ const ReParser = struct {
     pattern: []const u8,
 
     fn reError(p: *ReParser, msg: []const u8, at: usize) Error {
-        p.failure.* = .{ .message = try std.fmt.allocPrint(p.a, "invalid pattern {f}: {s} at position {d}", .{ repr(p.pattern), msg, at }) };
+        p.failure.* = .{ .message = try p.a.print("invalid pattern {f}: {s} at position {d}", .{ repr(p.pattern), msg, at }) };
         return error.InvalidPattern;
     }
 
@@ -531,7 +531,7 @@ const ReParser = struct {
         } else if (p.pos < p.src.len and p.src[p.pos] == '+') {
             const text = try encodeUtf8(p.a, p.src[at .. p.pos + 1]);
             p.failure.* = .{
-                .message = try std.fmt.allocPrint(p.a, "xyang-zig cannot match the possessive quantifier {f} in pattern {f}", .{ repr(text), repr(p.pattern) }),
+                .message = try p.a.print("xyang-zig cannot match the possessive quantifier {f} in pattern {f}", .{ repr(text), repr(p.pattern) }),
                 .unsupported = true,
             };
             return error.InvalidPattern;
@@ -668,7 +668,7 @@ const MAX_PROGRAM = 1 << 20;
 /// `translate`: compile an XSD regex; on failure `failure` holds the message.
 pub fn translate(a: Allocator, pattern: []const u8, failure: *Failure) Error!*Regex {
     const src = decodeUtf8(a, pattern) catch {
-        failure.* = .{ .message = try std.fmt.allocPrint(a, "invalid pattern {f}: not UTF-8", .{repr(pattern)}) };
+        failure.* = .{ .message = try a.print("invalid pattern {f}: not UTF-8", .{repr(pattern)}) };
         return error.InvalidPattern;
     };
     var t: Translator = .{ .a = a, .pattern = pattern, .src = src, .failure = failure };
@@ -681,7 +681,7 @@ pub fn translate(a: Allocator, pattern: []const u8, failure: *Failure) Error!*Re
     if (p.pos < body.len) return p.reError("unbalanced parenthesis", p.pos);
     if (programSize(root) > MAX_PROGRAM) {
         failure.* = .{
-            .message = try std.fmt.allocPrint(a, "xyang-zig cannot match pattern {f}: its repetition bounds are too large", .{repr(pattern)}),
+            .message = try a.print("xyang-zig cannot match pattern {f}: its repetition bounds are too large", .{repr(pattern)}),
             .unsupported = true,
         };
         return error.InvalidPattern;

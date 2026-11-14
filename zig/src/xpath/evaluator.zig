@@ -113,7 +113,7 @@ pub const Evaluator = struct {
     message: []const u8 = "",
 
     pub fn fail(self: *Evaluator, comptime fmt: []const u8, args: anytype) Error {
-        self.message = try std.fmt.allocPrint(self.a, fmt, args);
+        self.message = try self.a.print(fmt, args);
         return error.XPathEval;
     }
 
@@ -173,7 +173,7 @@ pub const Evaluator = struct {
     fn memberKey(self: *Evaluator, stmt: *const Statement, root_module: []const u8) error{OutOfMemory}![]const u8 {
         const def = rfc7951.definingModuleName(stmt, root_module);
         if (std.mem.eql(u8, def, root_module)) return stmt.name;
-        return std.fmt.allocPrint(self.a, "{s}:{s}", .{ def, stmt.name });
+        return self.a.print("{s}:{s}", .{ def, stmt.name });
     }
 
     /// `*` / `prefix:*`: every data-node child present in the instance (or by default).

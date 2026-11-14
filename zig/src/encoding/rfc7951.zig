@@ -27,7 +27,7 @@ pub const MemberKeys = struct {
         const k: ?[]const u8 = if (stmt.name.len == 0) null else blk: {
             const def = definingModuleName(stmt, self.parent_module);
             if (std.mem.eql(u8, def, self.parent_module)) break :blk stmt.name;
-            break :blk try std.fmt.allocPrint(self.a, "{s}:{s}", .{ def, stmt.name });
+            break :blk try self.a.print("{s}:{s}", .{ def, stmt.name });
         };
         try self.cache.put(self.a, stmt, k);
         return k;

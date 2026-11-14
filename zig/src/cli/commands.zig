@@ -30,7 +30,7 @@ pub const Command = struct {
     run: *const fn (ctx: Io, cmd: *const Command, parsed: *const args_mod.Parsed) anyerror!u8,
 
     fn spec(self: *const Command, arena: std.mem.Allocator) !args_mod.Spec {
-        const prog = try std.fmt.allocPrint(arena, "{s} {s}", .{ PROG, self.name });
+        const prog = try arena.print("{s} {s}", .{ PROG, self.name });
         return .{ .prog = prog, .usage = self.usage, .help = self.help, .options = self.options, .positionals = self.positionals };
     }
 };
@@ -237,12 +237,12 @@ const LONGS = [_]LongOpt{
 const TopKind = union(enum) { help, version, unknown, err: []const u8 };
 
 fn ignoredExplicit(arena: std.mem.Allocator, display: []const u8, value: []const u8) !TopKind {
-    return .{ .err = try std.fmt.allocPrint(arena, "argument {s}: ignored explicit argument '{s}'", .{ display, value }) };
+    return .{ .err = try arena.print("argument {s}: ignored explicit argument '{s}'", .{ display, value }) };
 }
 
 /// Long-option prefix match, including `--opt=value` on a flag (`nargs == 0`).
 fn classifyLong(arena: std.mem.Allocator, arg: []const u8) !TopKind {
-    const eq = std.mem.indexOfScalar(u8, arg, '=');
+    const eq = std.mem.findScalar(u8, arg, '=');
     const prefix = if (eq) |e| arg[0..e] else arg;
     var matched: [LONGS.len]usize = undefined;
     var n: usize = 0;
@@ -256,7 +256,7 @@ fn classifyLong(arena: std.mem.Allocator, arg: []const u8) !TopKind {
     if (n > 1) {
         var parts: [LONGS.len][]const u8 = undefined;
         for (matched[0..n], 0..) |idx, k| parts[k] = LONGS[idx].name;
-        return .{ .err = try std.fmt.allocPrint(arena, "ambiguous option: {s} could match {s}", .{ arg, try std.mem.join(arena, ", ", parts[0..n]) }) };
+        return .{ .err = try arena.print("ambiguous option: {s} could match {s}", .{ arg, try std.mem.join(arena, ", ", parts[0..n]) }) };
     }
     const o = LONGS[matched[0]];
     if (eq) |e| return ignoredExplicit(arena, o.display, arg[e + 1 ..]);
@@ -267,7 +267,7 @@ fn classifyLong(arena: std.mem.Allocator, arg: []const u8) !TopKind {
 /// later `=` in the same argv element is an ignored explicit argument (argparse raises
 /// that while collecting the cluster, before running the first action).
 fn classifyShort(arena: std.mem.Allocator, arg: []const u8) !TopKind {
-    if (std.mem.indexOfScalar(u8, arg, '=')) |eq| {
+    if (std.mem.findScalar(u8, arg, '=')) |eq| {
         const left = arg[0..eq];
         if (std.mem.eql(u8, left, "-h") or std.mem.eql(u8, left, "-V")) {
             const display = if (left[1] == 'h') "-h/--help" else "-V/--version";
@@ -368,14 +368,14 @@ pub fn runTop(ctx: Io, args: []const []const u8) !u8 {
 }
 
 test "top-level help lists registered commands and options" {
-    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "[-h] [-V] {parse,validate,convert}") != null);
-    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "-V, --version") != null);
-    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xYang: Parse YANG modules") != null);
-    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xyang-zig -V\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, MAIN_HELP, "xyang-zig convert module.yang -o module.yang.json\n") != null);
-    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].usage, "[-o PATH]") != null);
-    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].help, "-o, --output PATH") != null);
-    try std.testing.expect(std.mem.indexOf(u8, COMMANDS[2].help, "-o PATH, --output PATH") == null);
+    try std.testing.expect(std.mem.find(u8, MAIN_HELP, "[-h] [-V] {parse,validate,convert}") != null);
+    try std.testing.expect(std.mem.find(u8, MAIN_HELP, "-V, --version") != null);
+    try std.testing.expect(std.mem.find(u8, MAIN_HELP, "xYang: Parse YANG modules") != null);
+    try std.testing.expect(std.mem.find(u8, MAIN_HELP, "xyang-zig -V\n") != null);
+    try std.testing.expect(std.mem.find(u8, MAIN_HELP, "xyang-zig convert module.yang -o module.yang.json\n") != null);
+    try std.testing.expect(std.mem.find(u8, COMMANDS[2].usage, "[-o PATH]") != null);
+    try std.testing.expect(std.mem.find(u8, COMMANDS[2].help, "-o, --output PATH") != null);
+    try std.testing.expect(std.mem.find(u8, COMMANDS[2].help, "-o PATH, --output PATH") == null);
 }
 
 fn pad(comptime s: []const u8, comptime width: usize) []const u8 {
@@ -558,11 +558,11 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
     }
     const out_path = if (parsed.value("--output")) |o| blk: {
         const op = try pyPath(ctx.arena, o);
-        const name = std.fs.path.basename(op);
+        const name = std.Io.Dir.path.basename(op);
         if (std.mem.endsWith(u8, name, ".yang.json")) break :blk op;
-        const parent = std.fs.path.dirname(op);
-        const file = try std.fmt.allocPrint(ctx.arena, "{s}.yang.json", .{pathStem(name)});
-        break :blk if (parent) |d| try std.fs.path.join(ctx.arena, &.{ d, file }) else file;
+        const parent = std.Io.Dir.path.dirname(op);
+        const file = try ctx.arena.print("{s}.yang.json", .{pathStem(name)});
+        break :blk if (parent) |d| try std.Io.Dir.path.join(ctx.arena, &.{ d, file }) else file;
     } else try withSuffix(ctx.arena, p, ".yang.json");
 
     var dirs: std.ArrayList([]const u8) = .empty;
@@ -591,7 +591,7 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
         else => return err,
     };
     const cwd = std.Io.Dir.cwd();
-    if (std.fs.path.dirname(out_path)) |d| cwd.createDirPath(ctx.io, d) catch |err| {
+    if (std.Io.Dir.path.dirname(out_path)) |d| cwd.createDirPath(ctx.io, d) catch |err| {
         try ctx.err.print("Error: cannot create {s}: {s}\n", .{ d, @errorName(err) });
         return 1;
     };
@@ -623,7 +623,7 @@ fn pyPath(arena: std.mem.Allocator, p: []const u8) ![]const u8 {
 
 /// `PurePath.suffix` start: the last `.` of the name, unless it leads or ends the name.
 fn suffixIndex(name: []const u8) ?usize {
-    const i = std.mem.lastIndexOfScalar(u8, name, '.') orelse return null;
+    const i = std.mem.findScalarLast(u8, name, '.') orelse return null;
     if (i == 0 or i == name.len - 1) return null;
     return i;
 }
@@ -634,21 +634,21 @@ fn pathStem(name: []const u8) []const u8 {
 
 /// `Path.with_suffix(suffix)`.
 fn withSuffix(arena: std.mem.Allocator, p: []const u8, suffix: []const u8) ![]const u8 {
-    const name = std.fs.path.basename(p);
+    const name = std.Io.Dir.path.basename(p);
     const head = p[0 .. p.len - name.len];
-    return std.fmt.allocPrint(arena, "{s}{s}{s}", .{ head, pathStem(name), suffix });
+    return arena.print("{s}{s}{s}", .{ head, pathStem(name), suffix });
 }
 
 /// `_load_instance_data` for a JSON file: its text, or null with `message` set. YAML is
 /// refused loudly.
 fn readInstanceFile(ctx: Io, path: []const u8, message: *[]const u8) !?[]const u8 {
-    const lower = try std.ascii.allocLowerString(ctx.arena, std.fs.path.extension(path));
+    const lower = try std.ascii.allocLowerString(ctx.arena, std.Io.Dir.path.extension(path));
     if (std.mem.eql(u8, lower, ".yaml") or std.mem.eql(u8, lower, ".yml")) {
-        message.* = try std.fmt.allocPrint(ctx.arena, "xyang-zig cannot read YAML instance data ({s}); pass JSON", .{path});
+        message.* = try ctx.arena.print("xyang-zig cannot read YAML instance data ({s}); pass JSON", .{path});
         return null;
     }
     return std.Io.Dir.cwd().readFileAlloc(ctx.io, path, ctx.arena, .unlimited) catch |err| {
-        message.* = try std.fmt.allocPrint(ctx.arena, "cannot read {s}: {s}", .{ path, @errorName(err) });
+        message.* = try ctx.arena.print("cannot read {s}: {s}", .{ path, @errorName(err) });
         return null;
     };
 }
@@ -663,6 +663,6 @@ fn fail(ctx: Io, comptime fmt: []const u8, args: anytype) !u8 {
 fn resolvePath(ctx: Io, p: []const u8) ![]const u8 {
     return std.Io.Dir.cwd().realPathFileAlloc(ctx.io, p, ctx.arena) catch {
         const cwd = try std.process.currentPathAlloc(ctx.io, ctx.arena);
-        return std.fs.path.resolveAlloc(ctx.arena, &.{ cwd, p });
+        return std.Io.Dir.path.resolveAlloc(ctx.arena, &.{ cwd, p });
     };
 }

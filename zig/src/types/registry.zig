@@ -84,7 +84,7 @@ pub const Builtin = struct {
 };
 
 fn issue(a: Allocator, code: []const u8, comptime fmt: []const u8, args: anytype) error{OutOfMemory}!?Issue {
-    return .{ .code = code, .message = try std.fmt.allocPrint(a, fmt, args) };
+    return .{ .code = code, .message = try a.print(fmt, args) };
 }
 
 fn integerJsonError(a: Allocator, _: *const Builtin, value: Val, _: *const ast.TypeStmt) error{OutOfMemory}!?Issue {
@@ -128,7 +128,7 @@ fn enumerationCheck(a: Allocator, _: *const Builtin, value: Val, t: *const ast.T
     if (t.enums().len == 0) {
         return issue(a, "enum", "enumeration type has no enum definitions in schema; cannot validate instance data", .{});
     }
-    const text = try std.fmt.allocPrint(a, "{f}", .{jv.pyStr(value)});
+    const text = try a.print("{f}", .{jv.pyStr(value)});
     for (t.enums()) |e| if (std.mem.eql(u8, e, text)) return null;
     const allowed = try std.mem.join(a, ", ", t.enums());
     return issue(a, "enum", "Value {f} is not one of the allowed enum values: {s}", .{ jv.pyRepr(value), allowed });
@@ -236,7 +236,7 @@ fn plainString(e: gen.Emit, _: *const Builtin, _: *const ast.TypeStmt) gen.Error
 
 fn anchored(a: Allocator, p: []const u8) error{OutOfMemory}![]const u8 {
     if (std.mem.startsWith(u8, p, "^") and std.mem.endsWith(u8, p, "$")) return p;
-    return std.fmt.allocPrint(a, "^{s}$", .{p});
+    return a.print("^{s}$", .{p});
 }
 
 fn toString(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
@@ -302,7 +302,7 @@ fn toEnumeration(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Err
 fn reEscape(a: Allocator, s: []const u8) error{OutOfMemory}![]const u8 {
     var out: std.ArrayList(u8) = .empty;
     for (s) |c| {
-        if (std.mem.indexOfScalar(u8, "()[]{}?*+-|^$\\.&~# \t\n\r\x0b\x0c", c) != null) try out.append(a, '\\');
+        if (std.mem.findScalar(u8, "()[]{}?*+-|^$\\.&~# \t\n\r\x0b\x0c", c) != null) try out.append(a, '\\');
         try out.append(a, c);
     }
     return out.items;
@@ -319,7 +319,7 @@ fn bitsPattern(a: Allocator, names: []const []const u8) error{OutOfMemory}![]con
     for (names, 0..) |n, i| escaped[i] = try reEscape(a, n);
     std.mem.sort([]const u8, escaped, {}, byLenDesc);
     const alt = try std.mem.join(a, "|", escaped);
-    return std.fmt.allocPrint(a, "^$|^(?:{s})(?:\\s+(?:{s}))*$", .{ alt, alt });
+    return a.print("^$|^(?:{s})(?:\\s+(?:{s}))*$", .{ alt, alt });
 }
 
 fn bitLess(_: void, x: ast.BitStmt, y: ast.BitStmt) bool {
@@ -340,7 +340,7 @@ fn toBits(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Obj
         try bits_obj.put(a, bit.name, .{ .int = bit.position orelse 0 });
         names[i] = bit.name;
     }
-    const desc = try std.fmt.allocPrint(a, "YANG bits (RFC 7950): space-separated subset of these names (order irrelevant; no duplicate names in instance data). Positions: see x-yang.bits. Names: {s}.", .{try std.mem.join(a, ", ", names)});
+    const desc = try a.print("YANG bits (RFC 7950): space-separated subset of these names (order irrelevant; no duplicate names in instance data). Positions: see x-yang.bits. Names: {s}.", .{try std.mem.join(a, ", ", names)});
     var examples: std.ArrayList(Val) = .empty;
     try examples.append(a, gen.str(""));
     try examples.append(a, gen.str(names[0]));
@@ -360,6 +360,11 @@ fn toBoolean(e: gen.Emit, _: *const Builtin, _: *const ast.TypeStmt) gen.Error!*
     return typeOnly(e.g.a, "boolean");
 }
 
+/// `x-yang.range`, when the type has a non-empty `range`.
+fn putRange(a: Allocator, xy: *Object, t: *const ast.TypeStmt) gen.Error!void {
+    if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+}
+
 fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     if (b.json_encoding == .@"string-number") {
@@ -367,7 +372,7 @@ fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
         try out.put(a, K.PATTERN, gen.str(b.pattern.?));
         const xy = try obj(a);
         try xy.put(a, K.xy.TYPE, gen.str(b.name));
-        if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+        try putRange(a, xy, t);
         try out.put(a, K.X_YANG, gen.objVal(xy));
         return out;
     }
@@ -385,7 +390,7 @@ fn toDecimal(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(DECIMAL64));
     if (t.fractionDigits()) |fd| try xy.put(a, K.xy.FRACTION_DIGITS, .{ .int = fd });
-    if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
+    try putRange(a, xy, t);
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }
@@ -483,7 +488,7 @@ pub fn typeToSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object {
 /// `_imported_typedef_schema`: the JSON form's `$defs` hold only this module's typedefs.
 fn importedTypedefSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
-    const label = if (t.prefix) |p| (if (p.len > 0) try std.fmt.allocPrint(a, "{s}:{s}", .{ p, t.name }) else t.name) else t.name;
+    const label = if (t.prefix) |p| (if (p.len > 0) try a.print("{s}:{s}", .{ p, t.name }) else t.name) else t.name;
     const resolved = module_mod.resolveTypedef(t, e.module);
     const td_type: ?*ast.TypeStmt = if (resolved) |r| r.typedef.data.typedef.type else null;
     if (resolved == null or td_type == null) return e.g.fail("cannot export type {f}: its typedef is not found where the type is written", .{pyfmt.repr(label)});
@@ -498,7 +503,7 @@ fn parseRange(range: []const u8) [2]?i128 {
     var parts = std.mem.splitSequence(u8, range, "..");
     const lo_s = gen.pyStrip(parts.first());
     const rest = parts.rest();
-    const has_hi = std.mem.indexOf(u8, range, "..") != null;
+    const has_hi = std.mem.find(u8, range, "..") != null;
     const hi_s = gen.pyStrip(rest);
     var out: [2]?i128 = .{ null, null };
     if (lo_s.len > 0 and !std.ascii.eqlIgnoreCase(lo_s, "min")) out[0] = xutils.pyInt(lo_s);
@@ -516,7 +521,7 @@ fn jsonIntegerBounds(name: []const u8, range: ?[]const u8) [2]?i128 {
     const lo_s = gen.pyStrip(parts.first());
     const hi_s = gen.pyStrip(parts.rest());
     if (std.ascii.eqlIgnoreCase(lo_s, "min")) out[0] = b[0];
-    if (std.mem.indexOf(u8, r, "..") != null and std.ascii.eqlIgnoreCase(hi_s, "max")) out[1] = b[1];
+    if (std.mem.find(u8, r, "..") != null and std.ascii.eqlIgnoreCase(hi_s, "max")) out[1] = b[1];
     return out;
 }
 
@@ -574,9 +579,9 @@ fn integerFromBounds(a: Allocator, min: ?Val, max: ?Val) error{OutOfMemory}!stru
     if (lo != null and lo.? == 0 and hi != null) {
         for ([_][]const u8{ INT8, INT16, INT32, INT64 }) |n| if (hi.? == get(n).?.bounds.?[1]) return .{ .name = n, .range = "0..max" };
     }
-    const lo_s = if (lo) |v| try std.fmt.allocPrint(a, "{d}", .{v}) else "min";
-    const hi_s = if (hi) |v| try std.fmt.allocPrint(a, "{d}", .{v}) else "max";
-    return .{ .name = narrowestInteger(lo, hi), .range = try std.fmt.allocPrint(a, "{s}..{s}", .{ lo_s, hi_s }) };
+    const lo_s = if (lo) |v| try a.print("{d}", .{v}) else "min";
+    const hi_s = if (hi) |v| try a.print("{d}", .{v}) else "max";
+    return .{ .name = narrowestInteger(lo, hi), .range = try a.print("{s}..{s}", .{ lo_s, hi_s }) };
 }
 
 fn integerFromFragment(p: *jparse.Parse, f: Fragment) jparse.Error!*ast.TypeStmt {
@@ -631,7 +636,7 @@ fn fromDecimal(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*
     if ((min != null and min.? != .null) or (max != null and max.? != .null)) {
         const lo = if (min == null or min.? == .null) "min" else try jparse.formatDecimal64Bound(p.a, min.?, t.fractionDigits());
         const hi = if (max == null or max.? == .null) "max" else try jparse.formatDecimal64Bound(p.a, max.?, t.fractionDigits());
-        (try t.ensureRange(p.a)).expression = try std.fmt.allocPrint(p.a, "{s}..{s}", .{ lo, hi });
+        (try t.ensureRange(p.a)).expression = try p.a.print("{s}..{s}", .{ lo, hi });
     }
     return t;
 }
@@ -767,11 +772,11 @@ fn fromString(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*a
     const has_min = min_len != null and min_len.? != .null;
     const has_max = max_len != null and max_len.? != .null;
     if (has_min and has_max) {
-        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "{f}..{f}", .{ jv.pyStr(min_len.?), jv.pyStr(max_len.?) });
+        (try t.ensureLength(p.a)).expression = try p.a.print("{f}..{f}", .{ jv.pyStr(min_len.?), jv.pyStr(max_len.?) });
     } else if (has_max) {
-        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "0..{f}", .{jv.pyStr(max_len.?)});
+        (try t.ensureLength(p.a)).expression = try p.a.print("0..{f}", .{jv.pyStr(max_len.?)});
     } else if (has_min) {
-        (try t.ensureLength(p.a)).expression = try std.fmt.allocPrint(p.a, "{f}..", .{jv.pyStr(min_len.?)});
+        (try t.ensureLength(p.a)).expression = try p.a.print("{f}..", .{jv.pyStr(min_len.?)});
     }
     const merged = try jparse.mergeSchemaXyang(p.a, f.schema, f.xyang);
     const meta = jparse.patternMetadata(merged);

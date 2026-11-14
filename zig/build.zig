@@ -11,9 +11,9 @@ fn packageVersion(b: *std.Build) []const u8 {
         .limited(1 << 20),
     ) catch |err| std.process.fatal("reading {s}: {t}", .{ joined.sub_path, err });
     const needle = "version = \"";
-    const at = std.mem.indexOf(u8, text, needle) orelse std.process.fatal("pyproject.toml has no version", .{});
+    const at = std.mem.find(u8, text, needle) orelse std.process.fatal("pyproject.toml has no version", .{});
     const rest = text[at + needle.len ..];
-    const end = std.mem.indexOfScalar(u8, rest, '"') orelse std.process.fatal("pyproject.toml version is unterminated", .{});
+    const end = std.mem.findScalar(u8, rest, '"') orelse std.process.fatal("pyproject.toml version is unterminated", .{});
     return rest[0..end];
 }
 

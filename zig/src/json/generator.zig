@@ -50,10 +50,10 @@ pub const Gen = struct {
     reporter: errors.Reporter,
     identities_used: std.ArrayList(identity_graph.Pair) = .empty,
     extensions_used: std.ArrayList(ExtUse) = .empty,
-    scoped_typedefs: std.StringArrayHashMapUnmanaged(ScopedTypedef) = .empty,
+    scoped_typedefs: std.array_hash_map.String(ScopedTypedef) = .empty,
 
     pub fn fail(g: *Gen, comptime fmt: []const u8, args: anytype) Error {
-        g.reporter.diag.* = .{ .kind = .semantic, .message = try std.fmt.allocPrint(g.a, fmt, args) };
+        g.reporter.diag.* = .{ .kind = .semantic, .message = try g.a.print(fmt, args) };
         return error.Export;
     }
 };
@@ -63,7 +63,7 @@ fn collectScopedTypedefs(g: *Gen, module: *Module, visited: *std.AutoHashMapUnma
     try visited.put(g.a, module, {});
     for (module.typedefs.keys(), module.typedefs.values()) |key, td| {
         if (td.data.typedef.scope == null) continue;
-        const exported = if (module == g.root) key else try std.fmt.allocPrint(g.a, "@{s}:{s}", .{ module.name, key });
+        const exported = if (module == g.root) key else try g.a.print("@{s}:{s}", .{ module.name, key });
         if (g.scoped_typedefs.contains(exported)) return g.fail("Conflicting scoped typedef key '{s}'", .{exported});
         try g.scoped_typedefs.put(g.a, exported, .{ .typedef = td, .module = module });
     }
@@ -241,7 +241,7 @@ fn schemaTypeName(o: *const Object) ?[]const u8 {
 // ---------------------------------------------------------------------------
 // XPath
 
-fn collectPrefixes(a: Allocator, e: ?*const xast.Expr, found: *std.StringArrayHashMapUnmanaged([]const u8)) error{OutOfMemory}!void {
+fn collectPrefixes(a: Allocator, e: ?*const xast.Expr, found: *std.array_hash_map.String([]const u8)) error{OutOfMemory}!void {
     const node = e orelse return;
     switch (node.*) {
         .path => |p| for (p.segments) |seg| {
@@ -259,7 +259,7 @@ fn collectPrefixes(a: Allocator, e: ?*const xast.Expr, found: *std.StringArrayHa
 
 /// `_with_xpath_prefixes`: the module each prefixed step is bound to.
 pub fn withXpathPrefixes(a: Allocator, out: *Object, e: ?*const xast.Expr) error{OutOfMemory}!void {
-    var found: std.StringArrayHashMapUnmanaged([]const u8) = .empty;
+    var found: std.array_hash_map.String([]const u8) = .empty;
     try collectPrefixes(a, e, &found);
     if (found.count() == 0) return;
     const m = try newObject(a);
@@ -400,19 +400,19 @@ pub fn identityBaseForJson(g: *Gen, base: ast.IdentifierRef, scope: *Module, mod
     const pair = identity_graph.resolveBaseRef(scope, base, null) orelse
         return g.fail("cannot export identity base {f}: it does not resolve in module {f}", .{ repr(try formatRef(a, base)), repr(scope.name) });
     if (std.mem.eql(u8, pair.module.name, module.name)) {
-        return .{ pair.name, try std.fmt.allocPrint(a, "#/{s}/{s}", .{ K.DEFS, pair.name }) };
+        return .{ pair.name, try a.print("#/{s}/{s}", .{ K.DEFS, pair.name }) };
     }
     try g.identities_used.append(a, pair);
     const key = try importKey(g, g.root, pair.module);
     return .{
-        try std.fmt.allocPrint(a, "{s}:{s}", .{ key, pair.name }),
-        try std.fmt.allocPrint(a, "#/{s}/{s}/{s}/{s}/{s}", .{ K.X_YANG, K.xy.IMPORTS, key, K.xy.IDENTITIES, pair.name }),
+        try a.print("{s}:{s}", .{ key, pair.name }),
+        try a.print("#/{s}/{s}/{s}/{s}/{s}", .{ K.X_YANG, K.xy.IMPORTS, key, K.xy.IDENTITIES, pair.name }),
     };
 }
 
 /// `format_identifier_ref`.
 pub fn formatRef(a: Allocator, ref: ast.IdentifierRef) error{OutOfMemory}![]const u8 {
-    if (ref.prefix) |p| if (p.len > 0) return std.fmt.allocPrint(a, "{s}:{s}", .{ p, ref.name });
+    if (ref.prefix) |p| if (p.len > 0) return a.print("{s}:{s}", .{ p, ref.name });
     return ref.name;
 }
 
@@ -430,11 +430,11 @@ fn importKey(g: *Gen, root: *Module, module: *const Module) Error![]const u8 {
     return module.name;
 }
 
-const NameSet = std.StringArrayHashMapUnmanaged(void);
-const NamesByModule = std.StringArrayHashMapUnmanaged(NameSet);
+const NameSet = std.array_hash_map.String(void);
+const NamesByModule = std.array_hash_map.String(NameSet);
 
 fn qualifiedIdentityName(a: Allocator, module: *const Module, local: []const u8) error{OutOfMemory}![]const u8 {
-    return std.fmt.allocPrint(a, "{s}:{s}", .{ std.mem.trim(u8, module.prefix, "\"'"), local });
+    return a.print("{s}:{s}", .{ std.mem.trim(u8, module.prefix, "\"'"), local });
 }
 
 /// `_identity_to_def`: the identity's `$defs` entry. `only` limits the enum to the
@@ -576,7 +576,7 @@ fn rejectSemanticExtension(g: *Gen, inv: *const Statement) Error!void {
 
 /// The loaded module named `name`: the root or a module it reaches through `import`.
 fn findModule(a: Allocator, root: *Module, name: []const u8) error{OutOfMemory}!?*Module {
-    var seen: std.AutoArrayHashMapUnmanaged(*Module, void) = .empty;
+    var seen: std.array_hash_map.Auto(*Module, void) = .empty;
     try seen.put(a, root, {});
     var i: usize = 0;
     while (i < seen.count()) : (i += 1) {
@@ -597,13 +597,6 @@ fn recordImportedExtension(g: *Gen, inv: *const Statement) Error!void {
         if (std.mem.eql(u8, u.owner.name, owner.name) and std.mem.eql(u8, u.name, d.resolved_extension.name)) return;
     }
     try g.extensions_used.append(g.a, .{ .owner = owner, .name = d.resolved_extension.name });
-}
-
-fn isContainerLike(k: ast.Kind) bool {
-    return switch (k) {
-        .container, .notification, .input, .output => true,
-        else => false,
-    };
 }
 
 /// `_one_extension_invocation`: `{name, argument?, ...}` plus a nested body, in source order.
@@ -662,7 +655,7 @@ fn extensionInvocationsJson(g: *Gen, statements: []const *Statement, names: *con
 fn mergeExtensionImports(g: *Gen, root: *Module, imports: *Object) Error!*Object {
     const a = g.a;
     var owners: std.ArrayList(*Module) = .empty;
-    var by_owner: std.StringArrayHashMapUnmanaged(std.ArrayList([]const u8)) = .empty;
+    var by_owner: std.array_hash_map.String(std.ArrayList([]const u8)) = .empty;
     for (g.extensions_used.items) |u| {
         const gop = try by_owner.getOrPut(a, u.owner.name);
         if (!gop.found_existing) {
@@ -714,7 +707,7 @@ fn placementNode(s: *const Statement) bool {
 
 fn usesQName(a: Allocator, u: *const Statement) error{OutOfMemory}![]const u8 {
     const d = u.data.uses;
-    if (d.grouping_prefix) |p| if (p.len > 0) return std.fmt.allocPrint(a, "{s}:{s}", .{ p, d.grouping_name });
+    if (d.grouping_prefix) |p| if (p.len > 0) return a.print("{s}:{s}", .{ p, d.grouping_name });
     return d.grouping_name;
 }
 
@@ -831,7 +824,7 @@ fn buildXyang(a: Allocator, node_type: []const u8, o: XyangOpts) Error!*Object {
 /// `_property_key`: `module:name` for a node another module defines (augment).
 pub fn propertyKey(a: Allocator, s: *const Statement, module: *const Module) error{OutOfMemory}![]const u8 {
     if (s.defining_module) |owner| if (owner.len > 0 and !std.mem.eql(u8, owner, module.name)) {
-        return std.fmt.allocPrint(a, "{s}:{s}", .{ owner, s.name });
+        return a.print("{s}:{s}", .{ owner, s.name });
     };
     return s.name;
 }
@@ -1391,9 +1384,9 @@ fn applyOwnDeviations(g: *Gen, schema_module: *Module) Error!void {
 
 fn firstPathPrefix(path: []const u8) []const u8 {
     const raw = std.mem.trimStart(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "/");
-    const end = std.mem.indexOfScalar(u8, raw, '/') orelse raw.len;
+    const end = std.mem.findScalar(u8, raw, '/') orelse raw.len;
     const seg = raw[0..end];
-    const colon = std.mem.indexOfScalar(u8, seg, ':') orelse return "";
+    const colon = std.mem.findScalar(u8, seg, ':') orelse return "";
     return seg[0..colon];
 }
 
@@ -1464,7 +1457,7 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
         try invocations.append(g.a, node);
     };
     try invocations.appendSlice(g.a, root.foreign_structure_augments.items);
-    var seen: std.AutoArrayHashMapUnmanaged(*Module, void) = .empty;
+    var seen: std.array_hash_map.Auto(*Module, void) = .empty;
     for (invocations.items) |inv| {
         const owner = capabilities.augmentOwner(root, inv.data.extension_invocation.argument orelse "", inv.included_from) orelse continue;
         if (owner == root or std.mem.eql(u8, owner.name, root.name) or seen.contains(owner)) continue;
@@ -1483,7 +1476,7 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
         try capabilities.applyForExport(&g.reporter, view);
         var structures = try view.statements.clone(g.a);
         for (view.structures.values()) |structure| {
-            if (std.mem.indexOfScalar(*Statement, structures.items, structure) == null) try structures.append(g.a, structure);
+            if (std.mem.findScalar(*Statement, structures.items, structure) == null) try structures.append(g.a, structure);
         }
         var bodies: std.ArrayList(Val) = .empty;
         const none: Names = .empty;
@@ -1578,7 +1571,7 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
 
     const root = try newObject(a);
     try root.put(a, K.SCHEMA, str("https://json-schema.org/draft/2020-12/schema"));
-    try root.put(a, K.ID, str(if (module.namespace.len > 0) module.namespace else try std.fmt.allocPrint(a, "urn:{s}", .{if (module.name.len > 0) module.name else "unknown"})));
+    try root.put(a, K.ID, str(if (module.namespace.len > 0) module.namespace else try a.print("urn:{s}", .{if (module.name.len > 0) module.name else "unknown"})));
     try withDescription(a, root, module.description);
     try root.put(a, K.X_YANG, objVal(root_xy));
     try root.put(a, K.TYPE, str("object"));
@@ -1701,15 +1694,15 @@ test "convert applies the module's own deviations; a foreign target fails (#195,
     const a = arena.allocator();
     var diag: errors.Diagnostic = .{};
     const text = try convertForTest(a, "module t { prefix t; leaf a { type string; } leaf b { type string; } deviation \"/t:a\" { deviate replace { type int8; } } deviation \"/t:b\" { deviate not-supported; } }", &diag);
-    try std.testing.expect(std.mem.indexOf(u8, text, "\"maximum\": 127") != null);
-    try std.testing.expect(std.mem.indexOf(u8, text, "\"b\"") == null);
+    try std.testing.expect(std.mem.find(u8, text, "\"maximum\": 127") != null);
+    try std.testing.expect(std.mem.find(u8, text, "\"b\"") == null);
 }
 
 fn structureFixture(a: Allocator, diag: *errors.Diagnostic, name: []const u8, expand: bool) !*Module {
-    const dir = try std.fmt.allocPrint(a, "../tests/cases/modules/{s}", .{name});
+    const dir = try a.print("../tests/cases/modules/{s}", .{name});
     var loader = @import("../parser/yang_parser.zig").Loader.init(a, std.testing.io, diag, &.{dir});
     loader.expand_uses = expand;
-    return loader.parseFile(try std.fs.path.join(a, &.{ dir, "m.yang" }));
+    return loader.parseFile(try std.Io.Dir.path.join(a, &.{ dir, "m.yang" }));
 }
 
 test "RFC 8791 own augment export leaves the source tree untouched (#164)" {

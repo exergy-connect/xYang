@@ -20,21 +20,21 @@ pub const Module = struct {
     reference: []const u8 = "",
     revisions: std.ArrayList(Revision) = .empty,
     belongs_to_module: []const u8 = "",
-    typedefs: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
-    identities: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
-    groupings: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
-    features: std.StringArrayHashMapUnmanaged(void) = .empty,
-    feature_if_features: std.StringArrayHashMapUnmanaged(ast.StringList) = .empty,
+    typedefs: std.array_hash_map.String(*ast.Statement) = .empty,
+    identities: std.array_hash_map.String(*ast.Statement) = .empty,
+    groupings: std.array_hash_map.String(*ast.Statement) = .empty,
+    features: std.array_hash_map.String(void) = .empty,
+    feature_if_features: std.array_hash_map.String(ast.StringList) = .empty,
     /// Import prefix (local) -> loaded module (RFC 7950 `import`).
     /// The module file's own imports. A submodule's imports stay on that file.
-    import_prefixes: std.StringArrayHashMapUnmanaged(*Module) = .empty,
+    import_prefixes: std.array_hash_map.String(*Module) = .empty,
     /// Submodule name -> the included file, which keeps its own `import_prefixes`.
-    included_files: std.StringArrayHashMapUnmanaged(*Module) = .empty,
-    extensions: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
+    included_files: std.array_hash_map.String(*Module) = .empty,
+    extensions: std.array_hash_map.String(*ast.Statement) = .empty,
     statements: std.ArrayList(*ast.Statement) = .empty,
     /// RFC 8791 `sx:structure` invocations by name, registered when the extension is
     /// applied (Python's `extension_runtime["ietf-yang-structure-ext:structure-index"]`).
-    structures: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
+    structures: std.array_hash_map.String(*ast.Statement) = .empty,
     /// Removed foreign augments and their positions among retained root invocations.
     foreign_structure_augments: std.ArrayList(*ast.Statement) = .empty,
     foreign_structure_slots: std.ArrayList(usize) = .empty,
@@ -42,10 +42,10 @@ pub const Module = struct {
     is_submodule: bool = false,
     included_parent: ?*Module = null,
     /// Submodule that contributed an included feature or its if-feature list.
-    feature_included_from: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
-    feature_if_included_from: std.StringArrayHashMapUnmanaged([]const u8) = .empty,
+    feature_included_from: std.array_hash_map.String([]const u8) = .empty,
+    feature_if_included_from: std.array_hash_map.String([]const u8) = .empty,
     /// Submodule names whose statements are already on this module.
-    included_submodules: std.StringArrayHashMapUnmanaged(void) = .empty,
+    included_submodules: std.array_hash_map.String(void) = .empty,
 
     /// `own_prefix_stripped()`.
     pub fn ownPrefix(self: *const Module) []const u8 {

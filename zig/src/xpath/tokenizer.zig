@@ -2,6 +2,7 @@
 //! code point offsets, as Python indexes a `str`.
 
 const std = @import("std");
+const utf8 = @import("../utf8.zig");
 const tokens = @import("tokens.zig");
 const pychars = @import("pychars.zig");
 
@@ -25,7 +26,7 @@ fn isOperatorChar(cp: u21) bool {
 
 /// `normalize_yang_escaped_quotes`: YANG-style `\"` / `\'` become the quote character.
 pub fn normalizeYangEscapedQuotes(a: Allocator, expression: []const u8) error{OutOfMemory}![]const u8 {
-    if (std.mem.indexOfScalar(u8, expression, '\\') == null) return expression;
+    if (std.mem.findScalar(u8, expression, '\\') == null) return expression;
     var out: std.ArrayList(u8) = .empty;
     var i: usize = 0;
     while (i < expression.len) {
@@ -58,7 +59,7 @@ pub const Tokenizer = struct {
         while (i < text.len) {
             const n = std.unicode.utf8ByteSequenceLength(text[i]) catch 1;
             const end = @min(i + n, text.len);
-            const cp: u21 = std.unicode.utf8Decode(text[i..end]) catch text[i];
+            const cp: u21 = utf8.decode(text[i..end]) catch text[i];
             try cps.append(a, cp);
             try offs.append(a, i);
             i = if (end > i) end else i + 1;

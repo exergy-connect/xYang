@@ -42,21 +42,21 @@ pub const Reporter = struct {
     /// A failure with no source location: `YangSemanticError(msg)` (`.semantic`) or
     /// `YangSyntaxError(msg)` (`.syntax`), which print the same text.
     pub fn fail(self: *Reporter, kind: Kind, comptime fmt: []const u8, args: anytype) Error {
-        const msg = try std.fmt.allocPrint(self.arena, fmt, args);
+        const msg = try self.arena.print(fmt, args);
         self.diag.* = .{ .kind = kind, .message = msg };
         return error.YangLoad;
     }
 
     pub fn warn(self: *Reporter, comptime fmt: []const u8, args: anytype) Error!void {
-        try self.warnings.append(self.arena, try std.fmt.allocPrint(self.arena, fmt, args));
+        try self.warnings.append(self.arena, try self.arena.print(fmt, args));
     }
 };
 
 test "headline format matches YangSyntaxError" {
     var buf: [128]u8 = undefined;
     const d = Diagnostic{ .message = "boom", .line = 8, .filename = "/m.yang" };
-    const s = try std.fmt.bufPrint(&buf, "{f}", .{d});
+    const s = try std.mem.print(&buf, "{f}", .{d});
     try std.testing.expectEqualStrings("/m.yang: 8: boom", s);
     const sem = Diagnostic{ .kind = .semantic, .message = "bad", .line = 3, .filename = "/m.yang" };
-    try std.testing.expectEqualStrings("bad", try std.fmt.bufPrint(&buf, "{f}", .{sem}));
+    try std.testing.expectEqualStrings("bad", try std.mem.print(&buf, "{f}", .{sem}));
 }

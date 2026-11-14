@@ -109,9 +109,7 @@ pub const YangValidator = struct {
             const projection = try instance.project(self.a, &keys, nodes.items);
             canonical = .{ .object = projection.data };
             map = projection.map;
-            for (try instance.encodingErrors(self.a, nodes.items)) |e| {
-                try out.append(self.a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
-            }
+            try document_validator.appendEncodingErrors(self.a, &out, nodes.items);
         }
         const found = if (structure) |s| try dv.validateStructure(canonical, s) else try dv.validate(canonical);
         for (found) |e| {
@@ -154,7 +152,7 @@ pub const YangValidator = struct {
                 var found: []const u8 = jv.typeName(data);
                 if (data == .object) {
                     var names: std.ArrayList([]const u8) = .empty;
-                    for (data.object.keys()) |k| try names.append(self.a, try std.fmt.allocPrint(self.a, "{f}", .{pyfmt.repr(k)}));
+                    for (data.object.keys()) |k| try names.append(self.a, try self.a.print("{f}", .{pyfmt.repr(k)}));
                     found = if (names.items.len > 0) try std.mem.join(self.a, ", ", names.items) else "no members";
                 }
                 const kind = if (options.rpc != null) "rpc" else "action";
@@ -163,7 +161,7 @@ pub const YangValidator = struct {
                     .path = "/",
                     .pointer = "",
                     .code = "operation-wrapper",
-                    .message = try std.fmt.allocPrint(self.a, "{s} {s} must be an object with the single member '{s}' (RFC 8040 \u{a7}3.6); found {s}. Pass native_json=True for the bare parameter object", .{ kind, options.direction, m, found }),
+                    .message = try self.a.print("{s} {s} must be an object with the single member '{s}' (RFC 8040 \u{a7}3.6); found {s}. Pass native_json=True for the bare parameter object", .{ kind, options.direction, m, found }),
                 };
                 return one;
             }
@@ -171,10 +169,10 @@ pub const YangValidator = struct {
             if (params != .object) {
                 const one = try self.a.alloc(ValidationError, 1);
                 one[0] = .{
-                    .path = try std.fmt.allocPrint(self.a, "/{s}", .{m}),
+                    .path = try self.a.print("/{s}", .{m}),
                     .pointer = try prefixMember(self.a, m, ""),
                     .code = "type",
-                    .message = try std.fmt.allocPrint(self.a, "{s} must be an object", .{options.direction}),
+                    .message = try self.a.print("{s} must be an object", .{options.direction}),
                 };
                 return one;
             }
@@ -219,7 +217,7 @@ pub const YangValidator = struct {
         const inner = data.object.values()[0];
         if (inner != .object) return null;
         var name = key;
-        if (std.mem.indexOfScalar(u8, key, ':')) |colon| {
+        if (std.mem.findScalar(u8, key, ':')) |colon| {
             if (!std.mem.eql(u8, key[0..colon], self.module.name) or colon + 1 == key.len) return null;
             name = key[colon + 1 ..];
         }
@@ -231,16 +229,16 @@ pub const YangValidator = struct {
 /// `_prefix_member`: a path or JSON Pointer under the member as written.
 fn prefixMember(a: Allocator, json_key: []const u8, location: []const u8) error{OutOfMemory}![]const u8 {
     const token = try instance.pointerToken(a, json_key);
-    if (location.len == 0 or std.mem.eql(u8, location, "/")) return std.fmt.allocPrint(a, "/{s}", .{token});
-    if (location[0] == '/') return std.fmt.allocPrint(a, "/{s}{s}", .{ token, location });
-    return std.fmt.allocPrint(a, "/{s}/{s}", .{ token, location });
+    if (location.len == 0 or std.mem.eql(u8, location, "/")) return a.print("/{s}", .{token});
+    if (location[0] == '/') return a.print("/{s}{s}", .{ token, location });
+    return a.print("/{s}/{s}", .{ token, location });
 }
 
 /// `ValidationError.__str__` / `YangValidator._format_error`.
 pub fn formatError(a: Allocator, e: ValidationError) error{OutOfMemory}![]const u8 {
-    const where = if (std.mem.eql(u8, e.document, "data")) e.path else try std.fmt.allocPrint(a, "{s} {s}", .{ e.document, e.path });
-    if (e.expression) |x| if (x.len > 0) return std.fmt.allocPrint(a, "{s}: {s} (expression: {s})", .{ where, e.message, x });
-    return std.fmt.allocPrint(a, "{s}: {s}", .{ where, e.message });
+    const where = if (std.mem.eql(u8, e.document, "data")) e.path else try a.print("{s} {s}", .{ e.document, e.path });
+    if (e.expression) |x| if (x.len > 0) return a.print("{s}: {s} (expression: {s})", .{ where, e.message, x });
+    return a.print("{s}: {s}", .{ where, e.message });
 }
 
 /// `_feature_map` on a parsed `--features` / case-file value; null enables everything.
@@ -257,13 +255,13 @@ pub fn featureMap(a: Allocator, value: Val, message: *[]const u8) error{ OutOfMe
         const name = e.key_ptr.*;
         const feats = e.value_ptr.*;
         if (feats != .array) {
-            message.* = try std.fmt.allocPrint(a, "features[{f}] must be an iterable of feature name strings", .{pyfmt.repr(name)});
+            message.* = try a.print("features[{f}] must be an iterable of feature name strings", .{pyfmt.repr(name)});
             return error.InvalidFeatures;
         }
         var set: if_feature_eval.FeatureSet = .empty;
         for (feats.array) |f| {
             if (f != .string) {
-                message.* = try std.fmt.allocPrint(a, "features[{f}] must be an iterable of feature name strings", .{pyfmt.repr(name)});
+                message.* = try a.print("features[{f}] must be an iterable of feature name strings", .{pyfmt.repr(name)});
                 return error.InvalidFeatures;
             }
             try set.put(a, f.string, {});

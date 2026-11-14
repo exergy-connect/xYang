@@ -13,13 +13,13 @@ pub fn inScope(restriction: ?[]const u8, context: []const u8) bool {
 pub fn path(a: std.mem.Allocator, context: []const u8, stmt: *const ast.Statement) error{OutOfMemory}![]const u8 {
     const name = switch (stmt.kind()) {
         .container, .list, .rpc, .action, .notification => stmt.name,
-        .grouping => try std.fmt.allocPrint(a, "@grouping:{s}", .{stmt.name}),
+        .grouping => try a.print("@grouping:{s}", .{stmt.name}),
         .input => "input",
         .output => "output",
         else => return context,
     };
     const escaped = try pointerEscape(a, name);
-    return std.fmt.allocPrint(a, "{s}/{s}", .{ context, escaped });
+    return a.print("{s}/{s}", .{ context, escaped });
 }
 
 pub fn pointerEscape(a: std.mem.Allocator, name: []const u8) error{OutOfMemory}![]const u8 {
@@ -42,12 +42,12 @@ pub fn register(r: *errors.Reporter, module: *Module, td: *ast.Statement) errors
     }
     if (@import("types/registry.zig").get(td.name) != null)
         return r.fail(.semantic, "Duplicate typedef '{s}': built-in type", .{td.name});
-    const key = if (td.data.typedef.scope) |scope| try std.fmt.allocPrint(r.arena, "{s}/{s}", .{ scope, td.name }) else td.name;
+    const key = if (td.data.typedef.scope) |scope| try r.arena.print("{s}/{s}", .{ scope, td.name }) else td.name;
     try module.typedefs.put(r.arena, key, td);
 }
 
 pub fn valid(value: []const u8) bool {
-    if (value.len == 0 or value[0] != '/' or value[value.len - 1] == '/' or std.mem.indexOf(u8, value, "//") != null) return false;
+    if (value.len == 0 or value[0] != '/' or value[value.len - 1] == '/' or std.mem.find(u8, value, "//") != null) return false;
     for (value, 0..) |c, i| if (c == '~' and (i + 1 == value.len or (value[i + 1] != '0' and value[i + 1] != '1'))) return false;
     return true;
 }

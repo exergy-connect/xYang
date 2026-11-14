@@ -6,14 +6,14 @@ const std = @import("std");
 /// when it has no backslash; otherwise a new slice allocated with `gpa`.
 pub fn unescapeQuoted(gpa: std.mem.Allocator, content: []const u8, quote: u8) ![]const u8 {
     std.debug.assert(quote == '"' or quote == '\'');
-    if (std.mem.indexOfScalar(u8, content, '\\') == null) return content;
+    if (std.mem.findScalar(u8, content, '\\') == null) return content;
 
     var out: std.ArrayList(u8) = .empty;
     errdefer out.deinit(gpa);
     var i: usize = 0;
     const n = content.len;
     while (i < n) {
-        const backslash = std.mem.indexOfScalarPos(u8, content, i, '\\') orelse {
+        const backslash = std.mem.findScalarPos(u8, content, i, '\\') orelse {
             try out.appendSlice(gpa, content[i..]);
             break;
         };

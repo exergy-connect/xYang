@@ -2,6 +2,7 @@
 //! (`zig/tests/cross_check.py`). Not a public format.
 
 const std = @import("std");
+const strings = @import("strings.zig");
 const ast = @import("ast.zig");
 const Module = @import("module.zig").Module;
 
@@ -31,11 +32,7 @@ pub fn writeModule(w: *std.Io.Writer, arena: std.mem.Allocator, m: *const Module
 
 fn sortedKeys(s: *Stringify, arena: std.mem.Allocator, name: []const u8, keys: []const []const u8) (Error || error{OutOfMemory})!void {
     const sorted = try arena.dupe([]const u8, keys);
-    std.mem.sort([]const u8, sorted, {}, struct {
-        fn lt(_: void, a: []const u8, b: []const u8) bool {
-            return std.mem.order(u8, a, b) == .lt;
-        }
-    }.lt);
+    strings.sortStrings(sorted);
     try s.objectField(name);
     try s.write(sorted);
 }

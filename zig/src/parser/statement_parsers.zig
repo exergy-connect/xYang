@@ -75,23 +75,24 @@ pub const Parser = struct {
     }
 
     pub fn label(p: *Parser, comptime fmt: []const u8, args: anytype) Error![]const u8 {
-        return std.fmt.allocPrint(p.arena, fmt, args);
+        return p.arena.print(fmt, args);
     }
 
     /// A `must` / `when` expression parsed and bound to this module's prefixes. Python
     /// raises the XPath error unwrapped, so the message has no file or line.
     pub fn compileXPath(p: *Parser, expression: []const u8) Error!?*xpath.Expr {
         var failure: xpath.Failure = .{};
-        return xpath.compile(p.arena, expression, p.module, &failure) catch |err| switch (err) {
-            error.OutOfMemory => error.OutOfMemory,
-            error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
-        };
+        return xpath.compile(p.arena, expression, p.module, &failure) catch |err| p.xpathFailure(&failure, err);
     }
 
     /// A leafref `path` parsed as a schema path and bound to this module's prefixes.
     pub fn compileXPathPath(p: *Parser, path: []const u8) Error!*xpath.Expr {
         var failure: xpath.Failure = .{};
-        return xpath.compilePath(p.arena, path, p.module, &failure) catch |err| switch (err) {
+        return xpath.compilePath(p.arena, path, p.module, &failure) catch |err| p.xpathFailure(&failure, err);
+    }
+
+    fn xpathFailure(p: *Parser, failure: *const xpath.Failure, err: xpath.CompileError) Error {
+        return switch (err) {
             error.OutOfMemory => error.OutOfMemory,
             error.Invalid => p.ts.failUnlocated(if (failure.unsupported) .unsupported else .syntax, "{s}", .{failure.message}),
         };
@@ -208,22 +209,16 @@ pub const Parser = struct {
     /// `name` or `prefix:name`, quoted or unquoted (RFC 7950 identifier-ref-arg-str).
     pub fn consumeIdentifierRef(p: *Parser) Error!ast.IdentifierRef {
         const raw = try p.parseStringArgument();
-        if (std.mem.indexOfScalar(u8, raw, ':')) |colon| {
+        if (std.mem.findScalar(u8, raw, ':')) |colon| {
             const prefix = raw[0..colon];
             const name = raw[colon + 1 ..];
-            if (prefix.len > 0 and name.len > 0 and std.mem.indexOfScalar(u8, name, ':') == null and isIdentifier(prefix) and isIdentifier(name)) {
+            if (prefix.len > 0 and name.len > 0 and std.mem.findScalar(u8, name, ':') == null and isIdentifier(prefix) and isIdentifier(name)) {
                 return .{ .prefix = prefix, .name = name };
             }
             return p.ts.fail("Expected an identifier or prefix:identifier, got {f}", .{repr(raw)});
         }
         if (!isIdentifier(raw)) return p.ts.fail("Expected an identifier, got {f}", .{repr(raw)});
         return .{ .name = raw };
-    }
-
-    pub fn consumeQName(p: *Parser) Error![]const u8 {
-        const ref = try p.consumeIdentifierRef();
-        if (ref.prefix) |pre| return p.label("{s}:{s}", .{ pre, ref.name });
-        return ref.name;
     }
 
     /// Quoted string with `+` concatenation, or one unquoted argument.

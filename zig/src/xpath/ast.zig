@@ -60,13 +60,13 @@ pub const Segment = struct {
     /// Lexical prefix of a `prefix:name` or `prefix:*` step.
     pub fn prefix(self: Segment) ?[]const u8 {
         if (std.mem.eql(u8, self.step, ".") or std.mem.eql(u8, self.step, "..")) return null;
-        const colon = std.mem.indexOfScalar(u8, self.step, ':') orelse return null;
+        const colon = std.mem.findScalar(u8, self.step, ':') orelse return null;
         return self.step[0..colon];
     }
 
     /// Local name (`name` for `prefix:name`).
     pub fn local(self: Segment) []const u8 {
-        const colon = std.mem.indexOfScalar(u8, self.step, ':') orelse return self.step;
+        const colon = std.mem.findScalar(u8, self.step, ':') orelse return self.step;
         return self.step[colon + 1 ..];
     }
 

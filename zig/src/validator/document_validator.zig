@@ -49,6 +49,13 @@ pub const ValidationError = struct {
     document: []const u8 = "data",
 };
 
+/// `instance.encodingErrors` as validation errors; an empty pointer displays as `/`.
+pub fn appendEncodingErrors(a: Allocator, out: *std.ArrayList(ValidationError), nodes: []const *instance.Node) error{OutOfMemory}!void {
+    for (try instance.encodingErrors(a, nodes)) |e| {
+        try out.append(a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
+    }
+}
+
 /// The schema node whose children are walked: the module or a statement.
 const Owner = union(enum) {
     module: *Module,
@@ -128,12 +135,12 @@ pub const DocumentValidator = struct {
     fn checkMust(self: *DocumentValidator, s: *const Statement, node: *const XNode, path: []const u8, pointer: []const u8) error{OutOfMemory}!void {
         for (s.must_statements.items) |must| {
             const result = try self.evalExpr(must.ast, node) orelse {
-                try self.addExpr(path, pointer, "xpath-error", try std.fmt.allocPrint(self.a, "Error evaluating must expression on '{s}'", .{s.name}), must.expression);
+                try self.addExpr(path, pointer, "xpath-error", try self.a.print("Error evaluating must expression on '{s}'", .{s.name}), must.expression);
                 continue;
             };
             if (!result) {
-                const base = if (must.error_message.len > 0) must.error_message else try std.fmt.allocPrint(self.a, "must constraint not satisfied on '{s}'", .{s.name});
-                const message = if (must.error_app_tag.len > 0) try std.fmt.allocPrint(self.a, "{s} (error-app-tag: {s})", .{ base, must.error_app_tag }) else base;
+                const base = if (must.error_message.len > 0) must.error_message else try self.a.print("must constraint not satisfied on '{s}'", .{s.name});
+                const message = if (must.error_app_tag.len > 0) try self.a.print("{s} (error-app-tag: {s})", .{ base, must.error_app_tag }) else base;
                 try self.addExpr(path, pointer, "must", message, must.expression);
             }
         }
@@ -147,23 +154,25 @@ pub const DocumentValidator = struct {
 
     /// `validate`: walk the canonical tree from the module root.
     pub fn validate(self: *DocumentValidator, data: Val) Error![]ValidationError {
-        self.errors = .empty;
-        self.case_stack = .empty;
-        self.case_data_stack = .empty;
-        var path: PathBuilder = .{ .a = self.a };
-        self.root = try xpath.node.newNode(self.a, data, .{ .module = self.module }, null);
-        try self.visitChildren(data, .{ .module = self.module }, &path, true, self.root);
-        return self.errors.items;
+        return self.validateFrom(data, .{ .module = self.module });
     }
 
     /// `validate` with an RFC 8791 structure as the root schema (`module_root` false).
     pub fn validateStructure(self: *DocumentValidator, data: Val, structure: *Statement) Error![]ValidationError {
+        return self.validateFrom(data, .{ .stmt = structure });
+    }
+
+    fn validateFrom(self: *DocumentValidator, data: Val, root: Owner) Error![]ValidationError {
         self.errors = .empty;
         self.case_stack = .empty;
         self.case_data_stack = .empty;
         var path: PathBuilder = .{ .a = self.a };
-        self.root = try xpath.node.newNode(self.a, data, .{ .stmt = structure }, null);
-        try self.visitChildren(data, .{ .stmt = structure }, &path, true, self.root);
+        const schema: xpath.node.Schema = switch (root) {
+            .module => |m| .{ .module = m },
+            .stmt => |st| .{ .stmt = st },
+        };
+        self.root = try xpath.node.newNode(self.a, data, schema, null);
+        try self.visitChildren(data, root, &path, true, self.root);
         return self.errors.items;
     }
 
@@ -204,9 +213,7 @@ pub const DocumentValidator = struct {
         const nodes = try walk.walkObject(params.object, run.operation, "", false);
         const projection = try instance.project(self.a, self.keys, nodes.items);
         const canonical = projection.data;
-        for (try instance.encodingErrors(self.a, nodes.items)) |e| {
-            try out.append(self.a, .{ .path = if (e.pointer.len > 0) e.pointer else "/", .pointer = e.pointer, .code = e.code, .message = e.message });
-        }
+        try appendEncodingErrors(self.a, &out, nodes.items);
 
         var root_data = try self.a.create(Object);
         root_data.* = .empty;
@@ -240,7 +247,7 @@ pub const DocumentValidator = struct {
                     if (matches) break r.object;
                 } else null;
                 const entry = row orelse {
-                    return self.missingParent(target, try std.fmt.allocPrint(self.a, "no '{s}' entry with key {s}", .{ step.stmt.name, try std.mem.join(self.a, ", ", step.keys.?) }));
+                    return self.missingParent(target, try self.a.print("no '{s}' entry with key {s}", .{ step.stmt.name, try std.mem.join(self.a, ", ", step.keys.?) }));
                 };
                 holder = entry;
                 holder_node = try xpath.node.newNode(self.a, .{ .object = entry }, .{ .stmt = copied }, holder_node);
@@ -248,12 +255,12 @@ pub const DocumentValidator = struct {
                 var obj: *Object = undefined;
                 if (value) |v| {
                     if (v != .object) {
-                        return self.missingParent(target, try std.fmt.allocPrint(self.a, "presence container '{s}' is absent", .{step.stmt.name}));
+                        return self.missingParent(target, try self.a.print("presence container '{s}' is absent", .{step.stmt.name}));
                     }
                     obj = v.object;
                 } else {
                     if (presence(step.stmt) != null) {
-                        return self.missingParent(target, try std.fmt.allocPrint(self.a, "presence container '{s}' is absent", .{step.stmt.name}));
+                        return self.missingParent(target, try self.a.print("presence container '{s}' is absent", .{step.stmt.name}));
                     }
                     // RFC 7950 7.5.1: a non-presence container exists implicitly.
                     obj = try self.a.create(Object);
@@ -289,7 +296,7 @@ pub const DocumentValidator = struct {
             .pointer = "",
             .document = "context",
             .code = "action-parent",
-            .message = try std.fmt.allocPrint(self.a, "{s} is invoked on an instance that is not in the context: {s}", .{ target.label, detail }),
+            .message = try self.a.print("{s} is invoked on an instance that is not in the context: {s}", .{ target.label, detail }),
         };
         return out;
     }
@@ -435,7 +442,7 @@ pub const DocumentValidator = struct {
         }
         for (obj.keys()) |key| {
             if (visited.contains(key)) continue;
-            try self.add(try path.child(key), try path.childPointer(key), "unknown-field", try std.fmt.allocPrint(self.a, "Unknown field '{s}'", .{key}));
+            try self.add(try path.child(key), try path.childPointer(key), "unknown-field", try self.a.print("Unknown field '{s}'", .{key}));
         }
     }
 
@@ -460,7 +467,7 @@ pub const DocumentValidator = struct {
 
         if (!try self.ifFeaturesActive(s)) {
             if (present) {
-                try self.add(child_path, child_pointer, "if-feature", try std.fmt.allocPrint(self.a, "Node '{s}' is present but its 'if-feature' condition is false \u{2014} this node must not exist", .{name}));
+                try self.add(child_path, child_pointer, "if-feature", try self.a.print("Node '{s}' is present but its 'if-feature' condition is false \u{2014} this node must not exist", .{name}));
             }
             return;
         }
@@ -473,7 +480,7 @@ pub const DocumentValidator = struct {
             const ok = try self.evalExpr(w.ast, if (w.evaluate_with_parent_context) parent else curr) orelse true;
             if (!ok) {
                 if (present) {
-                    try self.addExpr(child_path, child_pointer, "when", try std.fmt.allocPrint(self.a, "Node '{s}' is present but its 'when' condition evaluates to false \u{2014} this node must not exist", .{name}), w.expression);
+                    try self.addExpr(child_path, child_pointer, "when", try self.a.print("Node '{s}' is present but its 'when' condition evaluates to false \u{2014} this node must not exist", .{name}), w.expression);
                 }
                 return;
             }
@@ -492,7 +499,7 @@ pub const DocumentValidator = struct {
                 }
                 for (v.array, 0..) |entry, i| {
                     if (entry != .object) {
-                        try self.add(try std.fmt.allocPrint(self.a, "{s}[{d}]", .{ child_path, i }), try std.fmt.allocPrint(self.a, "{s}/{d}", .{ child_pointer, i }), "type", "list item must be an object");
+                        try self.add(try self.a.print("{s}[{d}]", .{ child_path, i }), try self.a.print("{s}/{d}", .{ child_pointer, i }), "type", "list item must be an object");
                     }
                 }
             }
@@ -521,7 +528,7 @@ pub const DocumentValidator = struct {
                 const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
                 for (items, 0..) |item, i| {
                     const item_node = try parent.step(self.a, item, .{ .stmt = s });
-                    try self.checkMust(s, item_node, try std.fmt.allocPrint(self.a, "{s}[{d}]", .{ child_path, i }), try std.fmt.allocPrint(self.a, "{s}/{d}", .{ child_pointer, i }));
+                    try self.checkMust(s, item_node, try self.a.print("{s}[{d}]", .{ child_path, i }), try self.a.print("{s}/{d}", .{ child_pointer, i }));
                 }
             } else {
                 try self.checkMust(s, curr, child_path, child_pointer);
@@ -534,8 +541,8 @@ pub const DocumentValidator = struct {
         if (s.kind() == .leaf_list) if (leafType(s)) |t| {
             const items: []const Val = if (val) |v| (if (v == .array) v.array else &.{}) else &.{};
             for (items, 0..) |item, i| {
-                const item_path = try std.fmt.allocPrint(self.a, "{s}[{d}]", .{ child_path, i });
-                const item_pointer = try std.fmt.allocPrint(self.a, "{s}/{d}", .{ child_pointer, i });
+                const item_path = try self.a.print("{s}[{d}]", .{ child_path, i });
+                const item_pointer = try self.a.print("{s}/{d}", .{ child_pointer, i });
                 const item_node = try parent.step(self.a, item, .{ .stmt = s });
                 for (try self.checker.checkIn(item, t, self.context(item_node))) |iss| try self.add(item_path, item_pointer, iss.code, iss.message);
             }
@@ -573,7 +580,7 @@ pub const DocumentValidator = struct {
     fn entryKey(self: *DocumentValidator, entry: *const Object, key_names: []const []const u8) error{OutOfMemory}!?[]const u8 {
         if (key_names.len == 0) return null;
         var parts: std.ArrayList([]const u8) = .empty;
-        for (key_names) |k| try parts.append(self.a, try std.fmt.allocPrint(self.a, "{s}='{f}'", .{ k, jv.pyStr(entry.get(k) orelse .null) }));
+        for (key_names) |k| try parts.append(self.a, try self.a.print("{s}='{f}'", .{ k, jv.pyStr(entry.get(k) orelse .null) }));
         return try std.mem.join(self.a, ", ", parts.items);
     }
 
@@ -602,7 +609,7 @@ pub const DocumentValidator = struct {
         const cname = choice.name;
         if (!try self.ifFeaturesActive(choice)) {
             for (choice.data.choice.cases.items) |c| if (try self.caseHasAnyData(c, data)) {
-                try self.add(try path.current(), try path.pointer(), "if-feature", try std.fmt.allocPrint(self.a, "Choice '{s}' has data but its 'if-feature' condition is false \u{2014} this branch must not exist", .{cname}));
+                try self.add(try path.current(), try path.pointer(), "if-feature", try self.a.print("Choice '{s}' has data but its 'if-feature' condition is false \u{2014} this branch must not exist", .{cname}));
                 break;
             };
             return;
@@ -610,7 +617,7 @@ pub const DocumentValidator = struct {
         if (choice.when) |w| {
             if (!(try self.evalExpr(w.ast, parent) orelse true)) {
                 for (choice.data.choice.cases.items) |c| if (try self.caseHasAnyData(c, data)) {
-                    try self.addExpr(try path.current(), try path.pointer(), "when", try std.fmt.allocPrint(self.a, "Choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{cname}), w.expression);
+                    try self.addExpr(try path.current(), try path.pointer(), "when", try self.a.print("Choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{cname}), w.expression);
                     break;
                 };
                 return;
@@ -620,7 +627,7 @@ pub const DocumentValidator = struct {
         for (choice.data.choice.cases.items) |case| {
             if (!try self.ifFeaturesActive(case)) {
                 if (try self.caseHasAnyData(case, data)) {
-                    try self.add(try path.current(), try path.pointer(), "if-feature", try std.fmt.allocPrint(self.a, "Case '{s}' of choice '{s}' has data but its 'if-feature' condition is false \u{2014} this branch must not exist", .{ case.name, cname }));
+                    try self.add(try path.current(), try path.pointer(), "if-feature", try self.a.print("Case '{s}' of choice '{s}' has data but its 'if-feature' condition is false \u{2014} this branch must not exist", .{ case.name, cname }));
                     return;
                 }
                 continue;
@@ -628,7 +635,7 @@ pub const DocumentValidator = struct {
             if (!try self.caseHasAnyData(case, data)) continue;
             if (case.when) |w| {
                 if (!(try self.evalExpr(w.ast, parent) orelse true)) {
-                    try self.addExpr(try path.current(), try path.pointer(), "when", try std.fmt.allocPrint(self.a, "Case '{s}' of choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{ case.name, cname }), w.expression);
+                    try self.addExpr(try path.current(), try path.pointer(), "when", try self.a.print("Case '{s}' of choice '{s}' has data but its 'when' evaluates to false \u{2014} this branch must not exist", .{ case.name, cname }), w.expression);
                     return;
                 }
             }
@@ -637,12 +644,12 @@ pub const DocumentValidator = struct {
         if (active.items.len > 1) {
             var names: std.ArrayList([]const u8) = .empty;
             for (active.items) |c| try names.append(self.a, c.name);
-            try self.add(try path.current(), try path.pointer(), "choice-multiple-cases", try std.fmt.allocPrint(self.a, "Choice '{s}' allows only one case; data matches multiple cases: {s}", .{ cname, try std.mem.join(self.a, ", ", names.items) }));
+            try self.add(try path.current(), try path.pointer(), "choice-multiple-cases", try self.a.print("Choice '{s}' allows only one case; data matches multiple cases: {s}", .{ cname, try std.mem.join(self.a, ", ", names.items) }));
             return;
         }
         if (active.items.len == 0) {
             if (try self.mandatoryChoiceViolation(choice, enforce)) {
-                try self.add(try path.current(), try path.pointer(), "mandatory-choice", try std.fmt.allocPrint(self.a, "Mandatory choice '{s}' has no active case", .{cname}));
+                try self.add(try path.current(), try path.pointer(), "mandatory-choice", try self.a.print("Mandatory choice '{s}' has no active case", .{cname}));
             }
             return;
         }
@@ -666,7 +673,7 @@ pub const DocumentValidator = struct {
                 if (leafType(s)) |t| if (std.mem.eql(u8, t.name, registry.EMPTY) and present) return true;
                 if (!eff_present and mandatoryOf(s)) {
                     if (try self.leafMandatoryMustExist(enforce)) {
-                        try self.add(path, pointer, "mandatory", try std.fmt.allocPrint(self.a, "Mandatory leaf '{s}' is missing", .{name}));
+                        try self.add(path, pointer, "mandatory", try self.a.print("Mandatory leaf '{s}' is missing", .{name}));
                     }
                 }
                 return eff_present;
@@ -675,7 +682,7 @@ pub const DocumentValidator = struct {
                 if (!eff_present and mandatoryOf(s)) {
                     if (try self.leafMandatoryMustExist(enforce)) {
                         const kind = if (s.kind() == .anydata) "anydata" else "anyxml";
-                        try self.add(path, pointer, "mandatory", try std.fmt.allocPrint(self.a, "Mandatory {s} '{s}' is missing", .{ kind, name }));
+                        try self.add(path, pointer, "mandatory", try self.a.print("Mandatory {s} '{s}' is missing", .{ kind, name }));
                     }
                 }
                 return eff_present;
@@ -685,10 +692,10 @@ pub const DocumentValidator = struct {
                 const min_e = if (s.kind() == .list) s.data.list.min_elements else s.data.leaf_list.min_elements;
                 const max_e = if (s.kind() == .list) s.data.list.max_elements else s.data.leaf_list.max_elements;
                 if (min_e) |m| if (@as(i64, @intCast(count)) < m) {
-                    try self.add(path, pointer, "min-elements", try std.fmt.allocPrint(self.a, "'{s}' has {d} element(s) but requires at least {d}", .{ name, count, m }));
+                    try self.add(path, pointer, "min-elements", try self.a.print("'{s}' has {d} element(s) but requires at least {d}", .{ name, count, m }));
                 };
                 if (max_e) |m| if (present and @as(i64, @intCast(count)) > m) {
-                    try self.add(path, pointer, "max-elements", try std.fmt.allocPrint(self.a, "'{s}' has {d} element(s) but allows at most {d}", .{ name, count, m }));
+                    try self.add(path, pointer, "max-elements", try self.a.print("'{s}' has {d} element(s) but allows at most {d}", .{ name, count, m }));
                 };
                 return present;
             },
@@ -701,14 +708,14 @@ pub const DocumentValidator = struct {
         return switch (v) {
             .null => "N",
             .bool => |b| if (b) "#1" else "#0",
-            .int => |i| std.fmt.allocPrint(self.a, "#{d}", .{i}),
+            .int => |i| self.a.print("#{d}", .{i}),
             .float => |f| if (std.math.isFinite(f) and @floor(f) == f and @abs(f) < 1e38)
-                std.fmt.allocPrint(self.a, "#{d}", .{@as(i128, @intFromFloat(f))})
+                self.a.print("#{d}", .{@as(i128, @intFromFloat(f))})
             else
-                std.fmt.allocPrint(self.a, "#{f}", .{jv.floatRepr(f)}),
-            .decimal => |d| if (d.toInt()) |i| std.fmt.allocPrint(self.a, "#{d}", .{i}) else std.fmt.allocPrint(self.a, "#{f}", .{jv.floatRepr(d.toFloat())}),
-            .string => |s| std.fmt.allocPrint(self.a, "S{s}", .{s}),
-            else => std.fmt.allocPrint(self.a, "R{f}", .{jv.pyRepr(v)}),
+                self.a.print("#{f}", .{jv.floatRepr(f)}),
+            .decimal => |d| if (d.toInt()) |i| self.a.print("#{d}", .{i}) else self.a.print("#{f}", .{jv.floatRepr(d.toFloat())}),
+            .string => |s| self.a.print("S{s}", .{s}),
+            else => self.a.print("R{f}", .{jv.pyRepr(v)}),
         };
     }
 
@@ -722,8 +729,8 @@ pub const DocumentValidator = struct {
             const token = try std.mem.join(self.a, "\x00", parts.items);
             if (seen.get(token)) |first| {
                 var shown: std.ArrayList([]const u8) = .empty;
-                for (key_names) |k| try shown.append(self.a, try std.fmt.allocPrint(self.a, "{s}='{f}'", .{ k, jv.pyStr(entry.object.get(k) orelse .null) }));
-                try self.add(path, pointer, "duplicate-key", try std.fmt.allocPrint(self.a, "Duplicate key in list '{s}': {s} (entries at index {d} and {d})", .{ list_name, try std.mem.join(self.a, ", ", shown.items), first, i }));
+                for (key_names) |k| try shown.append(self.a, try self.a.print("{s}='{f}'", .{ k, jv.pyStr(entry.object.get(k) orelse .null) }));
+                try self.add(path, pointer, "duplicate-key", try self.a.print("Duplicate key in list '{s}': {s} (entries at index {d} and {d})", .{ list_name, try std.mem.join(self.a, ", ", shown.items), first, i }));
                 return;
             }
             try seen.put(self.a, token, i);
@@ -743,7 +750,7 @@ pub const DocumentValidator = struct {
     /// `_unique_display`.
     fn uniqueDisplay(self: *DocumentValidator, v: Val) error{OutOfMemory}![]const u8 {
         if (v == .bool) return if (v.bool) "true" else "false";
-        return std.fmt.allocPrint(self.a, "{f}", .{jv.pyStr(v)});
+        return self.a.print("{f}", .{jv.pyStr(v)});
     }
 
     /// RFC 7950 7.8.3: one error per `unique` set whose values repeat across entries.
@@ -756,8 +763,8 @@ pub const DocumentValidator = struct {
                 const token = try jv.jsonToken(self.a, .{ .array = values.items });
                 if (seen.get(token)) |first| {
                     var shown: std.ArrayList([]const u8) = .empty;
-                    for (paths, values.items) |p, v| try shown.append(self.a, try std.fmt.allocPrint(self.a, "{s}='{s}'", .{ p, try self.uniqueDisplay(v) }));
-                    try self.add(path, pointer, "unique", try std.fmt.allocPrint(self.a, "Unique constraint violated in list '{s}': {s} (entries at index {d} and {d})", .{ s.name, try std.mem.join(self.a, ", ", shown.items), first, i }));
+                    for (paths, values.items) |p, v| try shown.append(self.a, try self.a.print("{s}='{s}'", .{ p, try self.uniqueDisplay(v) }));
+                    try self.add(path, pointer, "unique", try self.a.print("Unique constraint violated in list '{s}': {s} (entries at index {d} and {d})", .{ s.name, try std.mem.join(self.a, ", ", shown.items), first, i }));
                     break;
                 }
                 try seen.put(self.a, token, i);

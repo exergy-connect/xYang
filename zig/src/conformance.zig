@@ -135,8 +135,8 @@ pub fn main(init: std.process.Init) !u8 {
     return 0;
 }
 
-fn loadPending(arena: std.mem.Allocator, io: std.Io, path: []const u8, out: *std.Io.Writer, failures: *usize) !std.StringArrayHashMapUnmanaged(PendingEntry) {
-    var map: std.StringArrayHashMapUnmanaged(PendingEntry) = .empty;
+fn loadPending(arena: std.mem.Allocator, io: std.Io, path: []const u8, out: *std.Io.Writer, failures: *usize) !std.array_hash_map.String(PendingEntry) {
+    var map: std.array_hash_map.String(PendingEntry) = .empty;
     const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .unlimited);
     var lines = std.mem.splitScalar(u8, text, '\n');
     var n: usize = 0;
@@ -173,16 +173,12 @@ fn findCases(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8) ![]con
     var ids: std.ArrayList([]const u8) = .empty;
     while (try walker.next(io)) |entry| {
         if (entry.kind != .file or !std.mem.eql(u8, entry.basename, "case.json")) continue;
-        const parent = std.fs.path.dirname(entry.path) orelse continue;
+        const parent = std.Io.Dir.path.dirname(entry.path) orelse continue;
         const cid = try arena.dupe(u8, parent);
-        std.mem.replaceScalar(u8, cid, std.fs.path.sep, '/');
+        std.mem.replaceScalar(u8, cid, std.Io.Dir.path.sep, '/');
         try ids.append(arena, cid);
     }
-    std.mem.sort([]const u8, ids.items, {}, struct {
-        fn lt(_: void, a: []const u8, b: []const u8) bool {
-            return std.mem.order(u8, a, b) == .lt;
-        }
-    }.lt);
+    xyang.strings.sortStrings(ids.items);
     return ids.items;
 }
 
@@ -211,7 +207,7 @@ const Load = union(enum) {
 /// first failure wins.
 fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_name: []const u8) !Load {
     var diag: xyang.Diagnostic = .{};
-    const primary = try std.fs.path.join(arena, &.{ case_dir, module_name });
+    const primary = try std.Io.Dir.path.join(arena, &.{ case_dir, module_name });
     const include_path = try arena.dupe([]const u8, &.{case_dir});
     var loader = xyang.Loader.init(arena, io, &diag, include_path);
     const parsed = loader.parseFile(primary) catch |err| switch (err) {
@@ -228,13 +224,9 @@ fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, m
         if (std.mem.eql(u8, entry.name, module_name)) continue;
         try names.append(arena, try arena.dupe(u8, entry.name));
     }
-    std.mem.sort([]const u8, names.items, {}, struct {
-        fn lt(_: void, a: []const u8, b: []const u8) bool {
-            return std.mem.order(u8, a, b) == .lt;
-        }
-    }.lt);
+    xyang.strings.sortStrings(names.items);
     for (names.items) |name| {
-        const path = try std.fs.path.join(arena, &.{ case_dir, name });
+        const path = try std.Io.Dir.path.join(arena, &.{ case_dir, name });
         const text = try std.Io.Dir.cwd().readFileAlloc(io, path, arena, .unlimited);
         if (std.mem.startsWith(u8, std.mem.trimStart(u8, text, &std.ascii.whitespace), "submodule")) continue;
         _ = loader.parseFile(path) catch |err| switch (err) {
@@ -248,8 +240,8 @@ fn loadCaseModules(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, m
 /// Print the resolved primary module of a case as JSON, or `{"error": message}` when the
 /// load fails. `--cases` must come first.
 fn dumpCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []const u8, out: *std.Io.Writer) !u8 {
-    const case_dir = try std.fs.path.join(arena, &.{ cases_dir, cid });
-    const text = try std.Io.Dir.cwd().readFileAlloc(io, try std.fs.path.join(arena, &.{ case_dir, "case.json" }), arena, .unlimited);
+    const case_dir = try std.Io.Dir.path.join(arena, &.{ cases_dir, cid });
+    const text = try std.Io.Dir.cwd().readFileAlloc(io, try std.Io.Dir.path.join(arena, &.{ case_dir, "case.json" }), arena, .unlimited);
     const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, text, .{});
     switch (try loadCaseModules(arena, io, case_dir, root.object.get("module").?.string)) {
         .ok => |m| try xyang.schema_dump.writeModule(out, arena, m),
@@ -257,7 +249,7 @@ fn dumpCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []
             var s: std.json.Stringify = .{ .writer = out };
             try s.beginObject();
             try s.objectField("error");
-            try s.write(try std.fmt.allocPrint(arena, "{f}", .{diag}));
+            try s.write(try arena.print("{f}", .{diag}));
             try s.endObject();
         },
     }
@@ -266,8 +258,8 @@ fn dumpCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []
 }
 
 fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []const u8) !Outcome {
-    const case_dir = try std.fs.path.join(arena, &.{ cases_dir, cid });
-    const case_path = try std.fs.path.join(arena, &.{ case_dir, "case.json" });
+    const case_dir = try std.Io.Dir.path.join(arena, &.{ cases_dir, cid });
+    const case_path = try std.Io.Dir.path.join(arena, &.{ case_dir, "case.json" });
     const text = try std.Io.Dir.cwd().readFileAlloc(io, case_path, arena, .unlimited);
     const root = try std.json.parseFromSliceLeaky(std.json.Value, arena, text, .{});
     const case = root.object;
@@ -275,8 +267,8 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
 
     if (field(case, "export_error")) |want| if (truthy(want)) {
         return switch (try jsonForm(arena, io, case_dir, module_name)) {
-            .ok => .{ .pending = try std.fmt.allocPrint(arena, "expected an export error containing {s}; the module converts", .{want.string}) },
-            .failed => |msg| if (std.mem.indexOf(u8, msg, want.string) != null) .pass else .{ .pending = try std.fmt.allocPrint(arena, "export error {s} does not contain {s}", .{ msg, want.string }) },
+            .ok => .{ .pending = try arena.print("expected an export error containing {s}; the module converts", .{want.string}) },
+            .failed => |msg| if (std.mem.find(u8, msg, want.string) != null) .pass else .{ .pending = try arena.print("export error {s} does not contain {s}", .{ msg, want.string }) },
         };
     };
 
@@ -295,11 +287,11 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
             .ok => return .{ .pending = "expected a load error; the module loads" },
             .failed => |d| d,
         };
-        const msg = try std.fmt.allocPrint(arena, "{f}", .{diag});
-        if (diag.kind == .unsupported) return .{ .pending = try std.fmt.allocPrint(arena, "unsupported: {s}", .{msg}) };
+        const msg = try arena.print("{f}", .{diag});
+        if (diag.kind == .unsupported) return .{ .pending = try arena.print("unsupported: {s}", .{msg}) };
         if (field(case, "code")) |code| {
-            if (code == .string and std.mem.indexOf(u8, msg, code.string) == null) {
-                return .{ .pending = try std.fmt.allocPrint(arena, "load error {s} does not contain {s}", .{ msg, code.string }) };
+            if (code == .string and std.mem.find(u8, msg, code.string) == null) {
+                return .{ .pending = try arena.print("load error {s} does not contain {s}", .{ msg, code.string }) };
             }
         }
         return .pass;
@@ -308,12 +300,12 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
     switch (load) {
         .ok => {},
         .failed => |diag| {
-            const msg = try std.fmt.allocPrint(arena, "{f}", .{diag});
+            const msg = try arena.print("{f}", .{diag});
             if (diag.kind != .unsupported) {
                 if (caseXfailPython(case) != null) return .{ .pending = msg };
-                return .{ .regression = try std.fmt.allocPrint(arena, "the module loads in Python but xyang-zig rejects it: {s}", .{msg}) };
+                return .{ .regression = try arena.print("the module loads in Python but xyang-zig rejects it: {s}", .{msg}) };
             }
-            return .{ .pending = try std.fmt.allocPrint(arena, "unsupported: {s}", .{msg}) };
+            return .{ .pending = try arena.print("unsupported: {s}", .{msg}) };
         },
     }
     const instances = field(case, "instances") orelse return .{ .regression = "the case has no instances" };
@@ -324,8 +316,8 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
             const from_json = try runInstance(arena, case, inst_value.object, m);
             switch (from_json) {
                 .pass => {},
-                .pending => |why| return .{ .pending = try std.fmt.allocPrint(arena, "native JSON form: {s}", .{why}) },
-                .regression => |why| return .{ .regression = try std.fmt.allocPrint(arena, "native JSON form: {s}", .{why}) },
+                .pending => |why| return .{ .pending = try arena.print("native JSON form: {s}", .{why}) },
+                .regression => |why| return .{ .regression = try arena.print("native JSON form: {s}", .{why}) },
             }
         };
     }
@@ -341,12 +333,12 @@ fn jsonForm(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_n
     const include_path = try arena.dupe([]const u8, &.{case_dir});
     var loader = xyang.Loader.init(arena, io, &diag, include_path);
     loader.expand_uses = false;
-    const module = loader.parseFile(try std.fs.path.join(arena, &.{ case_dir, module_name })) catch |err| switch (err) {
-        error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "{f}", .{diag}) },
+    const module = loader.parseFile(try std.Io.Dir.path.join(arena, &.{ case_dir, module_name })) catch |err| switch (err) {
+        error.YangLoad => return .{ .failed = try arena.print("{f}", .{diag}) },
         else => return err,
     };
     const text = xyang.json_generator.schemaToYangJson(arena, module, &diag) catch |err| switch (err) {
-        error.Export, error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "{f}", .{diag}) },
+        error.Export, error.YangLoad => return .{ .failed = try arena.print("{f}", .{diag}) },
         else => return err,
     };
     return .{ .ok = text };
@@ -360,24 +352,24 @@ const Reloaded = union(enum) { ok: *xyang.Module, failed: []const u8 };
 fn checkJsonForm(arena: std.mem.Allocator, io: std.Io, case_dir: []const u8, module_name: []const u8) !Reloaded {
     const text = switch (try jsonForm(arena, io, case_dir, module_name)) {
         .ok => |t| t,
-        .failed => |msg| return .{ .failed = try std.fmt.allocPrint(arena, "native JSON form fails: {s}", .{msg}) },
+        .failed => |msg| return .{ .failed = try arena.print("native JSON form fails: {s}", .{msg}) },
     };
     var msg: []const u8 = "";
-    const golden_path = try std.fs.path.join(arena, &.{ case_dir, "expected.yang.json" });
+    const golden_path = try std.Io.Dir.path.join(arena, &.{ case_dir, "expected.yang.json" });
     const golden_text = std.Io.Dir.cwd().readFileAlloc(io, golden_path, arena, .unlimited) catch |err| {
-        return .{ .failed = try std.fmt.allocPrint(arena, "cannot read {s}: {s}", .{ golden_path, @errorName(err) }) };
+        return .{ .failed = try arena.print("cannot read {s}: {s}", .{ golden_path, @errorName(err) }) };
     };
     const golden = try xyang.json_value.parse(arena, golden_text, &msg);
     const form = try xyang.json_value.parse(arena, text, &msg);
     if (!jsonEqual(form, golden)) return .{ .failed = "the native JSON form differs from expected.yang.json" };
     if (!std.mem.eql(u8, text, golden_text)) return .{ .failed = "the native JSON form is not byte-identical to expected.yang.json" };
     const module = xyang.json_parser.parseJsonSchema(arena, form, &msg) catch |err| switch (err) {
-        error.JsonForm => return .{ .failed = try std.fmt.allocPrint(arena, "parse_json_schema fails: {s}", .{msg}) },
+        error.JsonForm => return .{ .failed = try arena.print("parse_json_schema fails: {s}", .{msg}) },
         else => return err,
     };
     var diag: xyang.Diagnostic = .{};
     const again = xyang.json_generator.schemaToYangJson(arena, module, &diag) catch |err| switch (err) {
-        error.Export, error.YangLoad => return .{ .failed = try std.fmt.allocPrint(arena, "generate(parse(json)) fails: {f}", .{diag}) },
+        error.Export, error.YangLoad => return .{ .failed = try arena.print("generate(parse(json)) fails: {f}", .{diag}) },
         else => return err,
     };
     if (!jsonEqual(try xyang.json_value.parse(arena, again, &msg), form)) return .{ .failed = "generate(parse(json)) != json" };
@@ -490,7 +482,7 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     if (field(case, "features")) |f| {
         const f_text = try std.json.Stringify.valueAlloc(arena, f, .{});
         features = xyang.yang_validator.featureMap(arena, try xyang.json_value.parse(arena, f_text, &msg), &msg) catch |err| switch (err) {
-            error.InvalidFeatures => return .{ .regression = try std.fmt.allocPrint(arena, "case features: {s}", .{msg}) },
+            error.InvalidFeatures => return .{ .regression = try arena.print("case features: {s}", .{msg}) },
             else => return err,
         };
     }
@@ -506,20 +498,20 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     };
     const usage_error: ?[]const u8 = if (inst.get("usage_error")) |e| e.string else null;
     const result = validator.validate(data, options) catch |err| switch (err) {
-        error.Unsupported => return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unsupported: {s}", .{ name, validator.unsupported orelse "?" }) },
-        error.Raised => return .{ .regression = try std.fmt.allocPrint(arena, "instance {s}: validation raised: {s}", .{ name, validator.unsupported orelse "?" }) },
+        error.Unsupported => return .{ .pending = try arena.print("instance {s}: unsupported: {s}", .{ name, validator.unsupported orelse "?" }) },
+        error.Raised => return .{ .regression = try arena.print("instance {s}: validation raised: {s}", .{ name, validator.unsupported orelse "?" }) },
         error.Usage => {
             const got = validator.usage orelse "";
-            const want = usage_error orelse return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: unexpected usage error: {s}", .{ name, got }) };
-            if (std.mem.indexOf(u8, got, want) == null) return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: usage error {s} does not contain {s}", .{ name, got, want }) };
+            const want = usage_error orelse return .{ .pending = try arena.print("instance {s}: unexpected usage error: {s}", .{ name, got }) };
+            if (std.mem.find(u8, got, want) == null) return .{ .pending = try arena.print("instance {s}: usage error {s} does not contain {s}", .{ name, got, want }) };
             return .pass;
         },
         else => return err,
     };
-    if (usage_error) |want| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: expected a usage error containing {s}; the call validates", .{ name, want }) };
+    if (usage_error) |want| return .{ .pending = try arena.print("instance {s}: expected a usage error containing {s}; the call validates", .{ name, want }) };
     const mismatch = try compareInstance(arena, inst, result);
     if (xfail) |_| return .pass;
-    if (mismatch) |m| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: {s}", .{ name, m }) };
+    if (mismatch) |m| return .{ .pending = try arena.print("instance {s}: {s}", .{ name, m }) };
     return .pass;
 }
 
@@ -544,9 +536,9 @@ fn caseXfailPython(case: std.json.ObjectMap) ?[]const u8 {
 
 /// Null when the result matches the instance, else what differs.
 fn compareInstance(arena: std.mem.Allocator, inst: std.json.ObjectMap, result: xyang.yang_validator.Result) !?[]const u8 {
-    var got: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var got: std.array_hash_map.String(void) = .empty;
     for (result.errors) |e| try got.put(arena, try where(arena, e.document, e.pointer, e.code), {});
-    var want: std.StringArrayHashMapUnmanaged(void) = .empty;
+    var want: std.array_hash_map.String(void) = .empty;
     const expected: []const std.json.Value = if (inst.get("errors")) |e| e.array.items else &.{};
     for (expected) |e| {
         const doc = if (e.object.get("document")) |d| d.string else "data";
@@ -556,23 +548,23 @@ fn compareInstance(arena: std.mem.Allocator, inst: std.json.ObjectMap, result: x
     for (want.keys()) |k| {
         if (!got.contains(k)) same = false;
     }
-    if (!same) return try std.fmt.allocPrint(arena, "errors {s} != expected {s}", .{ try std.mem.join(arena, ", ", got.keys()), try std.mem.join(arena, ", ", want.keys()) });
+    if (!same) return try arena.print("errors {s} != expected {s}", .{ try std.mem.join(arena, ", ", got.keys()), try std.mem.join(arena, ", ", want.keys()) });
     for (expected) |e| {
         const m = e.object.get("message") orelse continue;
         if (m != .string or m.string.len == 0) continue;
         const code = e.object.get("code").?.string;
         const found = for (result.errors) |r| {
-            if (std.mem.eql(u8, r.code, code) and std.mem.indexOf(u8, r.message, m.string) != null) break true;
+            if (std.mem.eql(u8, r.code, code) and std.mem.find(u8, r.message, m.string) != null) break true;
         } else false;
-        if (!found) return try std.fmt.allocPrint(arena, "no {s} error message contains {s}", .{ code, m.string });
+        if (!found) return try arena.print("no {s} error message contains {s}", .{ code, m.string });
     }
     const valid = if (inst.get("valid")) |v| v == .bool and v.bool else false;
-    if (valid != result.valid()) return try std.fmt.allocPrint(arena, "valid is {}, expected {}", .{ result.valid(), valid });
+    if (valid != result.valid()) return try arena.print("valid is {}, expected {}", .{ result.valid(), valid });
     return null;
 }
 
 /// `_where`: `path`, or `document:path` for an issue about another document.
 fn where(arena: std.mem.Allocator, document: []const u8, path: []const u8, code: []const u8) ![]const u8 {
-    if (std.mem.eql(u8, document, "data")) return std.fmt.allocPrint(arena, "({s} {s})", .{ path, code });
-    return std.fmt.allocPrint(arena, "({s}:{s} {s})", .{ document, path, code });
+    if (std.mem.eql(u8, document, "data")) return arena.print("({s} {s})", .{ path, code });
+    return arena.print("({s}:{s} {s})", .{ document, path, code });
 }
