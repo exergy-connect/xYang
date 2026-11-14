@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-11-14
+
 ### Added
 
 - **WebAssembly release assets:** new releases include the freestanding `xyang.wasm` validation library and its JavaScript wrapper, `xyang.mjs`. The Zig release workflow builds with `ReleaseSmall` and runs the Wasm host API tests before attaching the assets; manual runs upload workflow artifacts only.
@@ -473,7 +475,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/exergy-connect/xYang/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0

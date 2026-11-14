@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.3] — 2026-11-14
+
 ## [1.0.2] — 2026-11-13
 
 ### Fixed
@@ -262,7 +264,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.2...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.3...HEAD
+[1.0.3]: https://github.com/exergy-connect/xYang/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0
