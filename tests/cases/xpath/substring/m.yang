@@ -1,0 +1,68 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf addr {
+      type string;
+      must "substring(., 1, 4) != 'FE80'";
+    }
+    leaf round {
+      type string;
+      must "substring(., 1.5, 2.6) = '234'";
+    }
+    leaf tie {
+      type string;
+      must "substring(., 2.5, 1.5) = '34'";
+    }
+    leaf from-zero {
+      type string;
+      must "substring(., 0, 3) = '12'";
+    }
+    leaf to-end {
+      type string;
+      must "substring(., 2) = '2345'";
+    }
+    leaf spec {
+      type string;
+      must "substring('12345', 1.5, 2.6) = '234' and substring('12345', 0, 3) = '12' and substring('12345', 2, 3) = '234' and substring('12345', 2) = '2345'";
+    }
+    leaf nan-start {
+      type string;
+      must "substring('12345', 0 div 0, 3) = ''";
+    }
+    leaf nan-length {
+      type string;
+      must "substring('12345', 1, 0 div 0) = ''";
+    }
+    leaf inf-length {
+      type string;
+      must "substring('12345', -42, 1 div 0) = '12345'";
+    }
+    leaf inf-both {
+      type string;
+      must "substring('12345', -1 div 0, 1 div 0) = ''";
+    }
+    leaf neg-half {
+      type string;
+      must "substring('12345', -0.5, 2) = '1'";
+    }
+    leaf missing {
+      type string;
+      must "substring() = ''";
+    }
+    leaf one-arg {
+      type string;
+      must "substring(.) = ''";
+    }
+    leaf extra {
+      type string;
+      must "substring(., 1, 4, 1) = ''";
+    }
+    leaf qty {
+      type int32;
+      must "substring(., 1, 2) = '12'";
+    }
+  }
+}

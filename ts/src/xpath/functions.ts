@@ -16,6 +16,7 @@ export const XPATH_FUNCTION_NAMES = new Set([
   "starts-with",
   "string",
   "string-length",
+  "substring",
   "substring-after",
   "substring-before",
   "translate",

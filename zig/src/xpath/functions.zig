@@ -37,6 +37,7 @@ const FUNCTIONS = std.StaticStringMap(Fn).initComptime(.{
     .{ "concat", fConcat },
     .{ "contains", fContains },
     .{ "starts-with", fStartsWith },
+    .{ "substring", fSubstring },
     .{ "substring-before", fSubstringBefore },
     .{ "substring-after", fSubstringAfter },
     .{ "translate", fTranslate },
@@ -140,6 +141,74 @@ fn fContains(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node)
 fn fStartsWith(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
     const source, const needle = try stringPair(ev, call, ctx, node);
     return Value.boolean(std.mem.startsWith(u8, source, needle));
+}
+
+/// XPath 1.0 `round`: half toward +∞. NaN and infinities are unchanged.
+fn xpathRound(x: f64) f64 {
+    if (std.math.isNan(x) or std.math.isInf(x)) return x;
+    if (x == 0) return x;
+    if (x >= -0.5 and x < 0) return -0.0;
+    return std.math.floor(x + 0.5);
+}
+
+fn asNumber(ev: *Evaluator, arg: *const xast.Expr, ctx: Context, node: *const Node) Error!f64 {
+    const v = try utils.firstValue(ev.a, try ev.eval(arg, ctx, node));
+    return utils.pyFloat(v) orelse std.math.nan(f64);
+}
+
+/// 0-based index of a 1-based position boundary, clamped to `[0, n]`.
+fn substringOffset(boundary: f64, n: usize) usize {
+    if (!(boundary > 1)) return 0;
+    const index = boundary - 1;
+    const limit: f64 = @floatFromInt(n);
+    if (!(index < limit)) return n;
+    return @intFromFloat(index);
+}
+
+fn charCount(s: []const u8) usize {
+    return std.unicode.utf8CountCodepoints(s) catch s.len;
+}
+
+fn charOffset(s: []const u8, index: usize) usize {
+    if (std.unicode.utf8CountCodepoints(s)) |_| {
+        var i: usize = 0;
+        var seen: usize = 0;
+        while (seen < index and i < s.len) {
+            const len = std.unicode.utf8ByteSequenceLength(s[i]) catch 1;
+            const n = if (len == 0 or i + len > s.len) 1 else len;
+            i += n;
+            seen += 1;
+        }
+        return i;
+    } else |_| return @min(index, s.len);
+}
+
+/// Characters whose 1-based position `p` satisfies `start <= p < end` (IEEE).
+fn substringChars(s: []const u8, start: f64, end: f64) []const u8 {
+    if (std.math.isNan(start) or std.math.isNan(end)) return "";
+    if (std.math.isInf(start) and start > 0) return "";
+    if (std.math.isInf(end) and end < 0) return "";
+    const n = charCount(s);
+    const lo = substringOffset(start, n);
+    const hi = if (std.math.isInf(end)) n else substringOffset(end, n);
+    if (lo >= hi) return "";
+    return s[charOffset(s, lo)..charOffset(s, hi)];
+}
+
+/// `substring(source, start)` / `substring(source, start, length)`. 1-based; round half toward +∞.
+/// `substring('12345', 1.5, 2.6)` is `234`. `substring('12345', 0, 3)` is `12`.
+/// Two or three arguments; any other count is an evaluation error.
+fn fSubstring(ev: *Evaluator, call: *const Call, ctx: Context, node: *const Node) Error!Value {
+    const n = call.args.len;
+    if (n != 2 and n != 3) {
+        var buf: [64]u8 = undefined;
+        const name = if (call.name.len <= buf.len) std.ascii.lowerString(&buf, call.name) else call.name;
+        return ev.fail("{s}() expects 2 or 3 arguments, got {d}", .{ name, n });
+    }
+    const source = try asString(ev, call.args[0], ctx, node);
+    const start = xpathRound(try asNumber(ev, call.args[1], ctx, node));
+    const end = if (n == 3) start + xpathRound(try asNumber(ev, call.args[2], ctx, node)) else std.math.inf(f64);
+    return str(ev, substringChars(source, start, end));
 }
 
 /// The substring before the first needle; empty when the needle is empty or absent.
