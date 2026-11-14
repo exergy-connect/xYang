@@ -1,0 +1,9 @@
+{
+  "description": "RFC 7950 §6.5: an unprefixed schema-node-id segment refers to the current module. An augment may target a node an earlier augment added without repeating the prefix (#217).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "leaf under unprefixed path", "data": { "top": { "v": { "cfg": { "x": "ok" } } } }, "valid": true },
+    { "name": "leaf type", "data": { "top": { "v": { "cfg": { "x": 1 } } } }, "valid": false,
+      "errors": [{ "path": "/top/v/cfg/x", "code": "type" }] }
+  ]
+}

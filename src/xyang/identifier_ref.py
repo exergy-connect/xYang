@@ -34,8 +34,16 @@ def parse_identifier_ref_atom(atom: str) -> YangIdentifierRef:
     return YangIdentifierRef(prefix=atom[:idx], name=atom[idx + 1 :])
 
 
-def parse_absolute_schema_path(path: str) -> list[YangIdentifierRef]:
-    """Parse absolute schema-node path (``/prefix:a/prefix:b``) into segment refs."""
+def parse_absolute_schema_path(
+    path: str, default_prefix: str | None = None
+) -> list[YangIdentifierRef]:
+    """Parse an absolute schema-node path into segment refs.
+
+    A segment with no prefix refers to the current module (RFC 7950 §6.5) and is
+    filled with *default_prefix*, the writing file's own prefix (a submodule's
+    ``belongs-to`` prefix). The path string itself is left unchanged. A segment
+    that is not ``prefix:identifier`` and has no default still fails.
+    """
     raw = path.strip().strip('"').strip("'")
     if not raw.startswith("/"):
         raise ValueError(f"Schema path must be absolute, got {path!r}")
@@ -46,9 +54,11 @@ def parse_absolute_schema_path(path: str) -> list[YangIdentifierRef]:
     for seg in parts:
         ref = parse_identifier_ref_atom(seg)
         if not ref.prefix:
-            raise ValueError(
-                f"Invalid schema path segment {seg!r}: expected 'prefix:identifier'"
-            )
+            if ":" in seg or not default_prefix:
+                raise ValueError(
+                    f"Invalid schema path segment {seg!r}: expected 'prefix:identifier'"
+                )
+            ref = YangIdentifierRef(prefix=default_prefix, name=ref.name)
         out.append(ref)
     return out
 

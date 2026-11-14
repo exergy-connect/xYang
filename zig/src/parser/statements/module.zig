@@ -246,9 +246,11 @@ fn extensionOf(parent: Parent) ?*@FieldType(ast.Data, "extension") {
     };
 }
 
-/// `parse_absolute_schema_path`: `/prefix:a/prefix:b` into prefixed segments. Errors are
-/// `YangSyntaxError(str(ValueError))` in Python, so they carry no location.
-fn parseAbsoluteSchemaPath(p: *Parser, path: []const u8, out: *std.ArrayList(ast.IdentifierRef)) Error!void {
+/// `parse_absolute_schema_path`: `/prefix:a/b` into segments. A segment with no prefix
+/// refers to the current module (RFC 7950 6.5) and is filled with `default_prefix`,
+/// the writing file's own prefix. Errors are `YangSyntaxError(str(ValueError))` in
+/// Python, so they carry no location.
+fn parseAbsoluteSchemaPath(p: *Parser, path: []const u8, out: *std.ArrayList(ast.IdentifierRef), default_prefix: ?[]const u8) Error!void {
     const raw = std.mem.trim(u8, std.mem.trim(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "\""), "'");
     if (!std.mem.startsWith(u8, raw, "/")) {
         return p.ts.failUnlocated(.syntax, "Schema path must be absolute, got {f}", .{repr(path)});
@@ -260,7 +262,15 @@ fn parseAbsoluteSchemaPath(p: *Parser, path: []const u8, out: *std.ArrayList(ast
         if (seg.len == 0) continue;
         count += 1;
         const idx = std.mem.findScalar(u8, seg, ':');
-        if (idx == null or idx.? == 0 or idx.? >= seg.len - 1) {
+        if (idx == null) {
+            const prefix = default_prefix orelse "";
+            if (prefix.len == 0) {
+                return p.ts.failUnlocated(.syntax, "Invalid schema path segment {f}: expected 'prefix:identifier'", .{repr(seg)});
+            }
+            try out.append(p.arena, .{ .prefix = prefix, .name = seg });
+            continue;
+        }
+        if (idx.? == 0 or idx.? >= seg.len - 1) {
             return p.ts.failUnlocated(.syntax, "Invalid schema path segment {f}: expected 'prefix:identifier'", .{repr(seg)});
         }
         try out.append(p.arena, .{ .prefix = seg[0..idx.?], .name = seg[idx.? + 1 ..] });
@@ -268,12 +278,17 @@ fn parseAbsoluteSchemaPath(p: *Parser, path: []const u8, out: *std.ArrayList(ast
     if (count == 0) return p.ts.failUnlocated(.syntax, "Empty schema path: {f}", .{repr(path)});
 }
 
+fn writingPrefix(p: *Parser) ?[]const u8 {
+    const own = p.module.ownPrefix();
+    return if (own.len == 0) null else own;
+}
+
 pub fn parseAugment(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.AUGMENT);
     const path = try p.parseStringConcatenation();
     const aug = try p.newStatement("augment", .{ .augment = .{ .augment_path = path } });
     const raw = std.mem.trim(u8, std.mem.trim(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "\""), "'");
-    if (std.mem.startsWith(u8, raw, "/")) try parseAbsoluteSchemaPath(p, path, &aug.data.augment.augment_path_segments);
+    if (std.mem.startsWith(u8, raw, "/")) try parseAbsoluteSchemaPath(p, path, &aug.data.augment.augment_path_segments, writingPrefix(p));
     try p.parseOptionalBlock(.{ .stmt = aug }, .augment, "augment");
     switch (parent) {
         .stmt => |s| switch (s.data) {
@@ -289,7 +304,7 @@ pub fn parseDeviation(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.DEVIATION);
     const path = try p.parseStringArgument();
     const dev = try p.newStatement("deviation", .{ .deviation = .{ .target_path = path } });
-    try parseAbsoluteSchemaPath(p, path, &dev.data.deviation.target_path_segments);
+    try parseAbsoluteSchemaPath(p, path, &dev.data.deviation.target_path_segments, writingPrefix(p));
     try p.parseOptionalBlock(.{ .stmt = dev }, .deviation, "deviation");
     if (dev.data.deviation.not_supported and dev.data.deviation.deviates.items.len > 0) {
         return p.ts.fail("deviation {f}: 'deviate not-supported' cannot be combined with other deviate statements (RFC 7950 \u{a7}7.20.3.2)", .{repr(path)});

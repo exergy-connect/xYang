@@ -5,6 +5,14 @@ import { YangStatement, type DeviateRecord } from "../../core/model";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
+/** Prefix of the file being parsed, or undefined when that statement has not been seen. */
+function writingPrefix(module: unknown): string | undefined {
+  const raw = (module as { prefix?: unknown } | null)?.prefix;
+  if (typeof raw !== "string") return undefined;
+  const prefix = raw.replace(/^['"]+|['"]+$/g, "");
+  return prefix.length > 0 ? prefix : undefined;
+}
+
 type DeviationHolder = {
   description: string;
   reference: string;
@@ -21,7 +29,7 @@ export class DeviationStatementParser {
     const path = this.parsers.parse_string_argument(tokens);
     let segments: ReturnType<typeof parseAbsoluteSchemaPath>;
     try {
-      segments = parseAbsoluteSchemaPath(path);
+      segments = parseAbsoluteSchemaPath(path, writingPrefix(context.module));
     } catch (err) {
       throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
     }

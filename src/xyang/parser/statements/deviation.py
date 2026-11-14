@@ -25,7 +25,9 @@ class DeviationStatementParser:
         tokens.consume(kw.DEVIATION)
         path = self._parsers.parse_string_argument(tokens)
         try:
-            segments = parse_absolute_schema_path(path)
+            segments = parse_absolute_schema_path(
+                path, context.module.own_prefix_stripped() or None
+            )
         except ValueError as exc:
             raise YangSyntaxError(str(exc)) from exc
         dev = YangDeviationStmt(

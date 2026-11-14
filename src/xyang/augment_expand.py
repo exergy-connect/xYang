@@ -140,13 +140,8 @@ def _walk_absolute_schema_path(
         except ValueError as exc:
             raise YangSyntaxError(str(exc)) from exc
     first = segments[0]
-    pref0 = first.prefix
+    pref0 = first.prefix or ""
     name0 = first.name
-    if not pref0:
-        raise YangSyntaxError(
-            f"{kind}: invalid first segment in path {path!r} "
-            "(expected 'prefix:identifier')"
-        )
     mod0 = ctx_module.resolve_prefixed_module(pref0, file)
     if mod0 is None:
         raise YangSyntaxError(
@@ -161,13 +156,8 @@ def _walk_absolute_schema_path(
         )
     parent: YangStatementList = mod0
     for seg in segments[1:]:
-        pref = seg.prefix
+        pref = seg.prefix or ""
         nm = seg.name
-        if not pref:
-            raise YangSyntaxError(
-                f"{kind}: invalid path segment {nm!r} in path {path!r} "
-                "(expected 'prefix:identifier')"
-            )
         if ctx_module.resolve_prefixed_module(pref, file) is None:
             raise YangSyntaxError(
                 f"{kind}: unknown prefix {pref!r} in path {path!r}"

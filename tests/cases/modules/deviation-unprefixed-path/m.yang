@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    container v {
+      container cfg {
+        leaf x { type string; }
+        leaf y { type uint8; }
+      }
+    }
+  }
+
+  deviation "/m:top/v/cfg/x" {
+    deviate not-supported;
+  }
+}
