@@ -23,7 +23,7 @@ class ModuleStatementParser:
     def parse_module(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module statement."""
         tokens.consume(kw.MODULE)
-        module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        module_name = self._parsers.parse_identifier_argument(tokens, "module")
         tokens.consume_type(YangTokenType.LBRACE)
 
         context.module.name = module_name
@@ -42,7 +42,7 @@ class ModuleStatementParser:
     def parse_import_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse import and load the referenced module (RFC 7950)."""
         tokens.consume(kw.IMPORT)
-        imported_module_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        imported_module_name = self._parsers.parse_identifier_argument(tokens, "import")
         if tokens.consume_if_type(YangTokenType.SEMICOLON):
             return
         if not tokens.consume_if_type(YangTokenType.LBRACE):
@@ -68,7 +68,7 @@ class ModuleStatementParser:
     def parse_include_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse include and merge the submodule into the current module (RFC 7950)."""
         tokens.consume(kw.INCLUDE)
-        sub_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        sub_name = self._parsers.parse_identifier_argument(tokens, "include")
         revision_date = None
         if tokens.consume_if_type(YangTokenType.LBRACE):
             self._parsers._include_revision_date = None
@@ -101,15 +101,7 @@ class ModuleStatementParser:
         if acc is None:
             raise tokens.make_error("internal: import prefix outside import block")
         tokens.consume(kw.PREFIX)
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            acc.local_prefix = tokens.consume_type(YangTokenType.STRING)
-        elif tt == YangTokenType.IDENTIFIER:
-            acc.local_prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
-        else:
-            raise tokens.make_error(
-                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
-            )
+        acc.local_prefix = self._parsers.parse_identifier_argument(tokens, "prefix")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def _parse_import_revision_date_binding(
@@ -142,25 +134,17 @@ class ModuleStatementParser:
     def parse_prefix(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse module-level prefix statement."""
         tokens.consume(kw.PREFIX)
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            context.module.prefix = tokens.consume_type(YangTokenType.STRING)
-        elif tt == YangTokenType.IDENTIFIER:
-            context.module.prefix = tokens.consume_type(YangTokenType.IDENTIFIER)
-        else:
-            raise tokens.make_error(
-                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
-            )
+        context.module.prefix = self._parsers.parse_identifier_argument(tokens, "prefix")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_organization(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse organization statement."""
         tokens.consume(kw.ORGANIZATION)
-        context.module.organization = tokens.consume_type(YangTokenType.STRING)
+        context.module.organization = self._parsers.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_contact(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse contact statement."""
         tokens.consume(kw.CONTACT)
-        context.module.contact = tokens.consume_type(YangTokenType.STRING)
+        context.module.contact = self._parsers.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)

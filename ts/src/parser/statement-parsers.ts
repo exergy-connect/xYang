@@ -57,9 +57,13 @@ import {
 } from "./statements";
 import {
   is_unsupported_construct_start,
-  skip_status_substatement,
   skip_unsupported_construct
 } from "./unsupported-skip";
+
+/** RFC 7950 identifier: ASCII letter or `_`, then letters, digits, `_`, `-`, `.`. */
+function isIdentifierText(text: string): boolean {
+  return /^[A-Za-z_][A-Za-z0-9_.\-]*$/.test(text);
+}
 
 type DispatchFn = (tokens: TokenStream, context: ParserContext, ...args: any[]) => void;
 
@@ -571,6 +575,41 @@ export class StatementParsers {
     return parts.join("");
   }
 
+  /** One argument, then reject text that is not an identifier. */
+  parse_identifier_argument(tokens: TokenStream, statement: string): string {
+    const raw = this.parse_string_argument(tokens);
+    if (!isIdentifierText(raw)) {
+      tokens.syntaxError(`${statement} argument must be an identifier, got '${raw}'`);
+    }
+    return raw;
+  }
+
+  /** One argument, then reject text outside the statement's keyword grammar. */
+  parse_keyword_argument(tokens: TokenStream, statement: string, allowed: readonly string[]): string {
+    const raw = this.parse_string_argument(tokens);
+    if (!allowed.includes(raw)) {
+      tokens.syntaxError(`${statement} argument must be ${allowed.map((item) => `'${item}'`).join(" or ")}, got '${raw}'`);
+    }
+    return raw;
+  }
+
+  /** One argument that is a signed decimal integer. */
+  parse_integer_argument(tokens: TokenStream, statement: string): number {
+    const raw = this.parse_string_argument(tokens);
+    if (!/^[+-]?\d+$/.test(raw)) {
+      tokens.syntaxError(`${statement} argument must be an integer, got '${raw}'`);
+    }
+    return Number.parseInt(raw, 10);
+  }
+
+  /** ``status current|deprecated|obsolete``, quoted or unquoted. */
+  parse_status_argument(tokens: TokenStream): string {
+    tokens.consume(kw.STATUS);
+    const value = this.parse_keyword_argument(tokens, "status", ["current", "deprecated", "obsolete"]);
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+    return value;
+  }
+
   /** `min-elements` / `max-elements`: an integer, or `unbounded` (no bound). */
   parse_integer_or_unbounded(tokens: TokenStream, statement: string): number | undefined {
     const raw = this.parse_string_argument(tokens);
@@ -801,10 +840,7 @@ export class StatementParsers {
         tokens.syntaxError("internal: import prefix outside import block");
         return;
       }
-      acc.localPrefix =
-        tokens.peek_type() === YangTokenType.STRING
-          ? tokens.consume_type(YangTokenType.STRING)
-          : tokens.consume_type(YangTokenType.IDENTIFIER);
+      acc.localPrefix = this.parse_identifier_argument(tokens, "prefix");
       tokens.consume_if_type(YangTokenType.SEMICOLON);
     };
     const importRevision: DispatchFn = (tokens) => {
@@ -873,6 +909,9 @@ export class StatementParsers {
       must: {
         [kw.ERROR_MESSAGE]: (t, c) => {
           this.must_parser.parse_must_error_message(t, c);
+        },
+        [kw.ERROR_APP_TAG]: (t, c) => {
+          this.must_parser.parse_must_error_app_tag(t, c);
         }
       },
       extension: {
@@ -1018,15 +1057,24 @@ export class StatementParsers {
   }
 
   /**
-   * Consume ``name`` or ``prefix:name`` into a structured identifier-ref.
-   * Prefix splitting and identifier normalization happen here once.
+   * ``name`` or ``prefix:name``, quoted or unquoted (RFC 7950 identifier-ref-arg-str).
+   * The argument is read by {@link parse_string_argument}, then checked.
    */
   consume_identifier_ref(tokens: TokenStream): { prefix?: string; name: string } {
-    const first = tokens.consume_type(YangTokenType.IDENTIFIER).trim();
-    if (!tokens.consume_if_type(YangTokenType.COLON)) {
-      return { name: first };
+    const raw = this.parse_string_argument(tokens);
+    const colon = raw.indexOf(":");
+    if (colon < 0) {
+      if (!isIdentifierText(raw)) {
+        tokens.syntaxError(`Expected an identifier, got '${raw}'`);
+      }
+      return { name: raw };
     }
-    return { prefix: first, name: tokens.consume_type(YangTokenType.IDENTIFIER).trim() };
+    const prefix = raw.slice(0, colon);
+    const name = raw.slice(colon + 1);
+    if (prefix && name && !name.includes(":") && isIdentifierText(prefix) && isIdentifierText(name)) {
+      return { prefix, name };
+    }
+    tokens.syntaxError(`Expected an identifier or prefix:identifier, got '${raw}'`);
   }
 
   /** Joined ``prefix:name`` form; prefer {@link consume_identifier_ref} for new code. */
@@ -1057,7 +1105,7 @@ export class StatementParsers {
 
   private parse_top_level_module(tokens: TokenStream, context: ParserContext): YangStatement {
     tokens.consume(kw.MODULE);
-    const moduleName = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const moduleName = this.parse_identifier_argument(tokens, "module");
     (context.module as Record<string, unknown>).name = moduleName;
     tokens.consume_type(YangTokenType.LBRACE);
 
@@ -1313,6 +1361,7 @@ export class StatementParsers {
       name: must_stmt.expression,
       argument: must_stmt.expression,
       error_message: must_stmt.error_message,
+      ...(must_stmt.error_app_tag ? { error_app_tag: must_stmt.error_app_tag } : {}),
       description: must_stmt.description,
       xpath_prefixes: must_stmt.xpath_prefixes,
       statements: []
@@ -1391,7 +1440,7 @@ export class StatementParsers {
 
   parse_description(tokens: TokenStream, context: ParserContext): string {
     tokens.consume(kw.DESCRIPTION);
-    const desc = tokens.consume_type(YangTokenType.STRING);
+    const desc = this.parse_string_argument(tokens);
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
         tokens.consume();
@@ -1425,7 +1474,7 @@ export class StatementParsers {
 
   parse_reference(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.REFERENCE);
-    const ref = tokens.consume_type(YangTokenType.STRING);
+    const ref = this.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     const parent = context.current_parent;
     if (parent && typeof parent === "object" && "reference" in parent) {
@@ -1438,7 +1487,7 @@ export class StatementParsers {
   }
 
   parse_status_ignored(tokens: TokenStream, _context: ParserContext): void {
-    skip_status_substatement(tokens);
+    this.parse_status_argument(tokens);
   }
 
   parse_config(tokens: TokenStream, context: ParserContext): void {
@@ -1500,13 +1549,13 @@ export class StatementParsers {
 
   parse_ordered_by(tokens: TokenStream): void {
     tokens.consume(kw.ORDERED_BY);
-    tokens.consume();
+    this.parse_keyword_argument(tokens, "ordered-by", ["user", "system"]);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_list_key(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.KEY);
-    const [value] = tokens.consume_oneof([YangTokenType.STRING, YangTokenType.IDENTIFIER]);
+    const value = this.parse_string_argument(tokens);
     const parent: any = context.current_parent;
     if (parent && "key" in parent) parent.key = value;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
@@ -1584,25 +1633,13 @@ export class StatementParsers {
   parse_presence(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.PRESENCE);
     const parent: any = context.current_parent;
-    const value = tokens.consume_type(YangTokenType.STRING);
+    const value = this.parse_string_argument(tokens);
     if (parent && "presence" in parent) parent.presence = value;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_default_value_tokens(tokens: TokenStream): string {
-    const tt = tokens.peek_type();
-    if (tt === YangTokenType.STRING) return tokens.consume_type(YangTokenType.STRING);
-    if (tt === YangTokenType.INTEGER) return tokens.consume_type(YangTokenType.INTEGER);
-    if (tt === YangTokenType.IDENTIFIER) return tokens.consume_type(YangTokenType.IDENTIFIER);
-    if (tt === kw.TRUE) {
-      tokens.consume(kw.TRUE);
-      return "true";
-    }
-    if (tt === kw.FALSE) {
-      tokens.consume(kw.FALSE);
-      return "false";
-    }
-    throw new YangSemanticError(`Expected default value, got ${tt}`);
+    return this.parse_string_argument(tokens);
   }
 
   private parse_prefixed_extension_statement(tokens: TokenStream, context: ParserContext): YangStatement {

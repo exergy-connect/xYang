@@ -11,10 +11,7 @@ export class DeviationStatementParser {
 
   parse_deviation(tokens: TokenStream, context: ParserContext): YangStatement {
     tokens.consume(kw.DEVIATION);
-    if (tokens.peek_type() !== YangTokenType.STRING) {
-      tokens.syntaxError("deviation argument must be a quoted absolute schema path");
-    }
-    const path = this.parsers.parse_string_concatenation(tokens);
+    const path = this.parsers.parse_string_argument(tokens);
     let segments: ReturnType<typeof parseAbsoluteSchemaPath>;
     try {
       segments = parseAbsoluteSchemaPath(path);
@@ -62,10 +59,7 @@ export class DeviationStatementParser {
   /** Returns true when the substatement is ``deviate not-supported``. */
   private parseDeviate(tokens: TokenStream, path: string): boolean {
     tokens.consume(kw.DEVIATE);
-    if (tokens.peek_type() !== YangTokenType.IDENTIFIER) {
-      tokens.syntaxError(`Expected deviate argument, got '${tokens.peek() ?? ""}'`);
-    }
-    const kind = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const kind = this.parsers.parse_string_argument(tokens);
     if (kind === kw.NOT_SUPPORTED) {
       tokens.consume_if_type(YangTokenType.SEMICOLON);
       return true;

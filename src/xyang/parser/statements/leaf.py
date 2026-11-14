@@ -24,7 +24,7 @@ class LeafStatementParser:
     def parse_leaf(self, tokens: TokenStream, context: ParserContext) -> YangLeafStmt:
         """Parse leaf statement."""
         tokens.consume(kw.LEAF)
-        leaf_name = tokens.consume()  # identifier or keyword (e.g. type)
+        leaf_name = self._parsers.parse_identifier_argument(tokens, "leaf")
         leaf_stmt = YangLeafStmt(name=leaf_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(leaf_stmt)

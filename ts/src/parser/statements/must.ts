@@ -29,9 +29,20 @@ export class MustStatementParser {
 
   parse_must_error_message(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.ERROR_MESSAGE);
+    const value = this.parsers.parse_string_argument(tokens);
     const parent = context.current_parent as YangMustStmt;
     if (parent instanceof YangMustStmt) {
-      parent.error_message = tokens.consume_type(YangTokenType.STRING);
+      parent.error_message = value;
+    }
+    tokens.consume_if_type(YangTokenType.SEMICOLON);
+  }
+
+  parse_must_error_app_tag(tokens: TokenStream, context: ParserContext): void {
+    tokens.consume(kw.ERROR_APP_TAG);
+    const value = this.parsers.parse_string_argument(tokens);
+    const parent = context.current_parent as YangMustStmt;
+    if (parent instanceof YangMustStmt) {
+      parent.error_app_tag = value;
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

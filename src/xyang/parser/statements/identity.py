@@ -25,7 +25,7 @@ class IdentityStatementParser:
     def parse_identity(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse identity statement."""
         tokens.consume(kw.IDENTITY)
-        identity_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        identity_name = self._parsers.parse_identifier_argument(tokens, "identity")
         identity_stmt = YangIdentityStmt(name=identity_name)
         if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             tokens.consume_type(YangTokenType.LBRACE)

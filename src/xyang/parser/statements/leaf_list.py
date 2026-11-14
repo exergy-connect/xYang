@@ -26,7 +26,7 @@ class LeafListStatementParser:
     ) -> YangLeafListStmt:
         """Parse leaf-list statement."""
         tokens.consume(kw.LEAF_LIST)
-        leaf_list_name = tokens.consume()  # identifier or keyword
+        leaf_list_name = self._parsers.parse_identifier_argument(tokens, "leaf-list")
         leaf_list_stmt = YangLeafListStmt(name=leaf_list_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(leaf_list_stmt)

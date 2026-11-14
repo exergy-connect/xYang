@@ -8,7 +8,7 @@ export class AnyxmlStatementParser {
 
   parse_anyxml(tokens: TokenStream, context: ParserContext): YangAnyxmlStmt {
     tokens.consume(kw.ANYXML);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "anyxml");
     const stmt = new YangAnyxmlStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

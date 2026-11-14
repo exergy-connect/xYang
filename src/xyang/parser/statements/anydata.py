@@ -26,7 +26,7 @@ class AnydataStatementParser:
     ) -> YangAnydataStmt:
         """Parse anydata statement (RFC 7950 §7.12)."""
         tokens.consume(kw.ANYDATA)
-        anydata_name = tokens.consume()
+        anydata_name = self._parsers.parse_identifier_argument(tokens, "anydata")
         anydata_stmt = YangAnydataStmt(name=anydata_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(anydata_stmt)

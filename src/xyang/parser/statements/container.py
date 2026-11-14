@@ -24,7 +24,7 @@ class ContainerStatementParser:
     def parse_container(self, tokens: TokenStream, context: ParserContext) -> YangContainerStmt:
         """Parse container statement."""
         tokens.consume(kw.CONTAINER)
-        container_name = tokens.consume()  # identifier or keyword (e.g. type)
+        container_name = self._parsers.parse_identifier_argument(tokens, "container")
         container_stmt = YangContainerStmt(name=container_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(container_stmt)

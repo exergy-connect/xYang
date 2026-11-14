@@ -25,7 +25,7 @@ class ExtensionStatementParser:
     def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse extension definition (RFC 7950 §7.17)."""
         tokens.consume(kw.EXTENSION)
-        name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        name = self._parsers.parse_identifier_argument(tokens, "extension")
         ext = YangExtensionStmt(name=name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(ext)
@@ -50,15 +50,7 @@ class ExtensionStatementParser:
     ) -> None:
         """Parse ``argument`` substatement inside ``extension``."""
         tokens.consume(kw.ARGUMENT)
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            arg = tokens.consume_type(YangTokenType.STRING)
-        elif tt == YangTokenType.IDENTIFIER:
-            arg = tokens.consume_type(YangTokenType.IDENTIFIER)
-        else:
-            raise tokens.make_error(
-                f"Expected extension argument identifier/string, got {tt.name if tt else 'end'}"
-            )
+        arg = self._parsers.parse_identifier_argument(tokens, "argument")
         parent = context.current_parent
         if isinstance(parent, YangExtensionStmt):
             parent.argument_name = arg

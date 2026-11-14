@@ -24,11 +24,7 @@ class DeviationStatementParser:
     def parse_deviation(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``deviation "<absolute-schema-path>" { ... }``."""
         tokens.consume(kw.DEVIATION)
-        if tokens.peek_type() != YangTokenType.STRING:
-            raise tokens.make_error(
-                "deviation argument must be a quoted absolute schema path"
-            )
-        path = self._parsers.parse_string_concatenation(tokens)
+        path = self._parsers.parse_string_argument(tokens)
         try:
             segments = parse_absolute_schema_path(path)
         except ValueError as exc:
@@ -53,11 +49,7 @@ class DeviationStatementParser:
 
     def _parse_deviate(self, tokens: TokenStream, dev: YangDeviationStmt) -> None:
         tokens.consume(kw.DEVIATE)
-        if tokens.peek_type() != YangTokenType.IDENTIFIER:
-            raise tokens.make_error(
-                f"Expected deviate argument, got {tokens.peek()!r}"
-            )
-        kind = tokens.consume_type(YangTokenType.IDENTIFIER)
+        kind = self._parsers.parse_string_argument(tokens)
         if kind == kw.NOT_SUPPORTED:
             dev.not_supported = True
             tokens.consume_if_type(YangTokenType.SEMICOLON)

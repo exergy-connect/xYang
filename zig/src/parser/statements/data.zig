@@ -22,7 +22,7 @@ const repr = pyfmt.repr;
 /// anyxml, notification, rpc and action share this shape.
 fn parseNamedNode(p: *Parser, parent: Parent, comptime keyword: []const u8, comptime id: registry.ParentId, data: ast.Data) Error!*ast.Statement {
     _ = try p.ts.consume(keyword);
-    const name = try p.ts.consumeAny();
+    const name = try p.parseIdentifierArgument(keyword);
     const stmt = try p.newStatement(name, data);
     try p.parseOptionalBlock(.{ .stmt = stmt }, id, try p.label(keyword ++ " '{s}'", .{name}));
     try p.addToParentOrModule(parent, stmt);
@@ -80,7 +80,7 @@ pub fn parseOutput(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseContainer(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.CONTAINER);
-    const name = try p.ts.consumeAny();
+    const name = try p.parseIdentifierArgument(kw.CONTAINER);
     const stmt = try p.newStatement(name, .{ .container = .{} });
     if (p.ts.consumeIfType(.lbrace)) {
         try p.parseBody(.{ .stmt = stmt }, .container, try p.label("container '{s}'", .{name}));
@@ -94,7 +94,7 @@ pub fn parseContainer(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseTypedef(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.TYPEDEF);
-    const name = try p.ts.consumeType(.identifier);
+    const name = try p.parseIdentifierArgument(kw.TYPEDEF);
     const stmt = try p.newStatement(name, .{ .typedef = .{} });
     try p.parseOptionalBlock(.{ .stmt = stmt }, .typedef, try p.label("typedef '{s}'", .{name}));
     stmt.data.typedef.scope = if (p.context.len > 0) p.context else null;
@@ -110,7 +110,7 @@ pub fn parseTypedef(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseGrouping(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.GROUPING);
-    const name = try p.ts.consumeAny();
+    const name = try p.parseIdentifierArgument(kw.GROUPING);
     const stmt = try p.newStatement(name, .{ .grouping = .{} });
     try p.parseOptionalBlock(.{ .stmt = stmt }, .grouping, try p.label("grouping '{s}'", .{name}));
     const container: ?*ast.Container = switch (parent) {
@@ -140,7 +140,7 @@ fn isInlineChoiceKey(p: *const Parser) bool {
 
 pub fn parseChoice(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.CHOICE);
-    const name = try p.ts.consumeAny();
+    const name = try p.parseIdentifierArgument(kw.CHOICE);
     const choice = try p.newStatement(name, .{ .choice = .{} });
     if (p.ts.consumeIfType(.lbrace)) {
         const ctx = try p.label("choice '{s}'", .{name});
@@ -196,7 +196,7 @@ fn validateCaseUniqueChildNames(p: *Parser, choice: *ast.Statement) Error!void {
 
 pub fn parseCase(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.CASE);
-    const name = try p.ts.consumeAny();
+    const name = try p.parseIdentifierArgument(kw.CASE);
     const case = try p.newStatement(name, .{ .case = {} });
     try p.parseOptionalBlock(.{ .stmt = case }, .case, try p.label("case '{s}'", .{name}));
     switch (parent) {
@@ -218,7 +218,7 @@ pub fn parseChoiceMandatory(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseChoiceDefault(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.DEFAULT);
-    const name = try p.parseStringArgument();
+    const name = try p.parseIdentifierArgument(kw.DEFAULT);
     if (stmtData(parent, .choice)) |s| s.data.choice.default = name;
     _ = p.ts.consumeIfType(.semicolon);
 }
@@ -232,15 +232,9 @@ fn stmtData(parent: Parent, kind: ast.Kind) ?*ast.Statement {
 
 pub fn parseUses(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.USES);
-    var name: []const u8 = undefined;
-    var prefix: ?[]const u8 = null;
-    if ((try p.ts.peekType()) == .identifier) {
-        const ref = try p.consumeIdentifierRef();
-        name = ref.name;
-        prefix = ref.prefix;
-    } else {
-        name = std.mem.trim(u8, try p.ts.consumeAny(), &std.ascii.whitespace);
-    }
+    const ref = try p.consumeIdentifierRef();
+    const name = ref.name;
+    const prefix = ref.prefix;
     const uses = try p.newStatement("uses", .{ .uses = .{ .grouping_name = name, .grouping_prefix = prefix } });
     const qname = if (prefix) |pre| try p.label("{s}:{s}", .{ pre, name }) else name;
     try p.parseOptionalBlock(.{ .stmt = uses }, .uses, try p.label("uses '{s}'", .{qname}));
@@ -252,13 +246,7 @@ pub fn parseUses(p: *Parser, parent: Parent) Error!void {
 /// applied when `uses` is expanded.
 pub fn parseRefine(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REFINE);
-    var parts: std.ArrayList([]const u8) = .empty;
-    try parts.append(p.arena, if ((try p.ts.peekType()) == .identifier) try p.consumeQName() else try p.ts.consumeAny());
-    while (p.ts.at(.slash)) {
-        _ = try p.ts.consumeType(.slash);
-        try parts.append(p.arena, if ((try p.ts.peekType()) == .identifier) try p.consumeQName() else try p.ts.consumeAny());
-    }
-    const path_arg = try std.mem.join(p.arena, "/", parts.items);
+    const path_arg = try p.parseStringArgument();
     // Python keeps the parsed path; matching and messages use its `to_string()`.
     var xp = try xpath.Parser.init(p.arena, path_arg);
     const parsed = xp.parsePath(true) catch |err| switch (err) {
@@ -302,8 +290,19 @@ pub fn parseMust(p: *Parser, parent: Parent) Error!void {
 
 pub fn parseMustErrorMessage(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.ERROR_MESSAGE);
+    const value = try p.parseStringArgument();
     switch (parent) {
-        .must => |m| m.error_message = try p.ts.consumeType(.string),
+        .must => |m| m.error_message = value,
+        else => {},
+    }
+    _ = p.ts.consumeIfType(.semicolon);
+}
+
+pub fn parseMustErrorAppTag(p: *Parser, parent: Parent) Error!void {
+    _ = try p.ts.consume(kw.ERROR_APP_TAG);
+    const value = try p.parseStringArgument();
+    switch (parent) {
+        .must => |m| m.error_app_tag = value,
         else => {},
     }
     _ = p.ts.consumeIfType(.semicolon);
@@ -326,13 +325,15 @@ pub fn parseWhen(p: *Parser, parent: Parent) Error!void {
 
 pub fn parsePresence(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.PRESENCE);
-    if (stmtData(parent, .container)) |s| s.data.container.presence = try p.ts.consumeType(.string);
+    const value = try p.parseStringArgument();
+    if (stmtData(parent, .container)) |s| s.data.container.presence = value;
     _ = p.ts.consumeIfType(.semicolon);
 }
 
 pub fn parseListKey(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.KEY);
-    if (stmtData(parent, .list)) |s| s.data.list.key = try p.ts.consumeOneOf(&.{ .string, .identifier });
+    const key = try p.parseStringArgument();
+    if (stmtData(parent, .list)) |s| s.data.list.key = key;
     _ = p.ts.consumeIfType(.semicolon);
 }
 
@@ -383,10 +384,7 @@ pub fn parseMaxElements(p: *Parser, parent: Parent) Error!void {
 /// `ordered-by user|system` is checked and not stored, like Python.
 pub fn parseOrderedBy(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.ORDERED_BY);
-    const arg = try p.ts.consumeAny();
-    if (!std.mem.eql(u8, arg, "user") and !std.mem.eql(u8, arg, "system")) {
-        return p.ts.fail("ordered-by must be 'user' or 'system', got {f}", .{repr(arg)});
-    }
+    _ = try p.parseKeywordArgument(kw.ORDERED_BY, &.{ "user", "system" });
     _ = p.ts.consumeIfType(.semicolon);
 }
 

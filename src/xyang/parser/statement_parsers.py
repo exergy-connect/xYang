@@ -57,10 +57,19 @@ from .unsupported_skip import (
     skip_unsupported_construct,
 )
 
+
+def _is_identifier(text: str) -> bool:
+    """An identifier, using the same letters the tokenizer accepts."""
+    if not text or not (text[0].isalpha() or text[0] == "_"):
+        return False
+    return all(ch.isalnum() or ch in "_-." for ch in text[1:])
+
+
 if TYPE_CHECKING:
     from .yang_parser import YangParser
     from ..ast import YangCaseStmt, YangChoiceStmt, YangStatement
     from ..module import YangModule
+
 
 class StatementParsers:
     """Collection of statement parsing methods."""
@@ -281,7 +290,10 @@ class StatementParsers:
             },
             "identity": {kw.BASE: ident._parse_identity_base},
             "if-feature": {kw.DESCRIPTION: self._parse_discarded_description},
-            "must": {kw.ERROR_MESSAGE: self.parse_must_error_message},
+            "must": {
+                kw.ERROR_MESSAGE: self.parse_must_error_message,
+                kw.ERROR_APP_TAG: self.parse_must_error_app_tag,
+            },
             "extension": {kw.ARGUMENT: ext._parse_extension_argument_stmt},
             "argument": {kw.YIN_ELEMENT: ext._parse_extension_argument_yin_element},
             "deviation": {kw.DEVIATE: dev.parse_deviate_substatement},
@@ -367,32 +379,37 @@ class StatementParsers:
         )
 
     def consume_identifier_ref(self, tokens: TokenStream) -> tuple[Optional[str], str]:
-        """Consume ``name`` or ``prefix:name`` into ``(prefix|None, local_name)``.
+        """``name`` or ``prefix:name``, quoted or unquoted (RFC 7950 identifier-ref-arg-str).
 
-        Prefix splitting and identifier normalization happen here once.
-        Current token must be IDENTIFIER.
+        The argument is read by :meth:`parse_string_argument`, then checked as an
+        identifier or a single ``prefix:identifier``.
         """
-        first = tokens.consume_type(YangTokenType.IDENTIFIER).strip()
-        if not tokens.consume_if_type(YangTokenType.COLON):
-            return None, first
-        return first, tokens.consume_type(YangTokenType.IDENTIFIER).strip()
+        raw = self.parse_string_argument(tokens)
+        if ":" not in raw:
+            if not _is_identifier(raw):
+                raise tokens.make_error(f"Expected an identifier, got {raw!r}")
+            return None, raw
+        prefix, name = raw.split(":", 1)
+        if (
+            prefix
+            and name
+            and ":" not in name
+            and _is_identifier(prefix)
+            and _is_identifier(name)
+        ):
+            return prefix, name
+        raise tokens.make_error(
+            f"Expected an identifier or prefix:identifier, got {raw!r}"
+        )
 
     def consume_qname_from_identifier(self, tokens: TokenStream) -> str:
         """Joined ``prefix:name`` form; prefer :meth:`consume_identifier_ref` for new code."""
         prefix, name = self.consume_identifier_ref(tokens)
         return f"{prefix}:{name}" if prefix else name
 
-    def _consume_prefix_argument(self, tokens: TokenStream) -> None:
-        """Prefix argument as string or bare identifier (common in example modules)."""
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            tokens.consume_type(YangTokenType.STRING)
-        elif tt == YangTokenType.IDENTIFIER:
-            tokens.consume_type(YangTokenType.IDENTIFIER)
-        else:
-            raise tokens.make_error(
-                f"Expected prefix string or identifier, got {tt.name if tt else 'end'}"
-            )
+    def _consume_prefix_argument(self, tokens: TokenStream) -> str:
+        """Prefix argument: an identifier, quoted or unquoted."""
+        return self.parse_identifier_argument(tokens, "prefix")
 
     def _consume_optional_extension_argument(
         self, tokens: TokenStream
@@ -504,7 +521,7 @@ class StatementParsers:
     def parse_description(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse description statement (optional braced extension substatements are skipped)."""
         tokens.consume(kw.DESCRIPTION)
-        desc = tokens.consume_type(YangTokenType.STRING)
+        desc = self.parse_string_argument(tokens)
         if tokens.has_more() and tokens.peek_type() == YangTokenType.LBRACE:
             _consume_balanced_braces(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
@@ -523,7 +540,7 @@ class StatementParsers:
     def parse_reference(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse reference statement into ``current_parent.reference`` when present."""
         tokens.consume(kw.REFERENCE)
-        ref = tokens.consume_type(YangTokenType.STRING)
+        ref = self.parse_string_argument(tokens)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
         parent = context.current_parent
         if parent is not None and hasattr(parent, "reference"):
@@ -606,8 +623,8 @@ class StatementParsers:
     def parse_list_key(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse key in list statement."""
         tokens.consume(kw.KEY)
+        value = self.parse_string_argument(tokens)
         if context.current_parent and isinstance(context.current_parent, YangListStmt):
-            value, _ = tokens.consume_oneof([YangTokenType.STRING, YangTokenType.IDENTIFIER])
             context.current_parent.key = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
@@ -654,9 +671,7 @@ class StatementParsers:
         and discarded after syntax check.
         """
         tokens.consume(kw.ORDERED_BY)
-        arg = tokens.consume()
-        if arg not in ("user", "system"):
-            raise tokens.make_error(f"ordered-by must be 'user' or 'system', got {arg!r}")
+        self.parse_keyword_argument(tokens, "ordered-by", ("user", "system"))
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_leaf_mandatory(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -668,19 +683,9 @@ class StatementParsers:
             parent.mandatory = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
     
-    def parse_default_value_tokens(self, tokens: TokenStream) -> str | int:
+    def parse_default_value_tokens(self, tokens: TokenStream) -> str:
         """Consume a YANG ``default`` value (after the ``default`` keyword)."""
-        tt = tokens.peek_type()
-        if tt == YangTokenType.STRING:
-            return tokens.consume_type(YangTokenType.STRING)
-        if tt == YangTokenType.INTEGER:
-            return tokens.consume_type(YangTokenType.INTEGER)
-        if tt == YangTokenType.IDENTIFIER:
-            return tokens.consume_type(YangTokenType.IDENTIFIER)
-        raise tokens.make_error(
-            f"Expected default value (string, integer, identifier, or true/false), "
-            f"got {tt.name if tt else 'end'}"
-        )
+        return self.parse_string_argument(tokens)
 
     def parse_leaf_default(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse default in leaf statement."""
@@ -700,8 +705,9 @@ class StatementParsers:
     def parse_presence(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse presence statement for container."""
         tokens.consume(kw.PRESENCE)
+        value = self.parse_string_argument(tokens)
         if context.current_parent and isinstance(context.current_parent, YangContainerStmt):
-            context.current_parent.presence = tokens.consume_type(YangTokenType.STRING)
+            context.current_parent.presence = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_config(self, tokens: TokenStream, context: ParserContext) -> None:
@@ -717,14 +723,9 @@ class StatementParsers:
             parent.config = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
-    def parse_status_ignored(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse ``status`` substatement; consume tokens without storing on AST."""
-        from .unsupported_skip import skip_status_substatement
-
-        parent = context.current_parent
-        name = getattr(parent, "name", None) if parent is not None else None
-        ctx = f"{type(parent).__name__}" + (f" '{name}'" if name else "")
-        skip_status_substatement(tokens, context=ctx)
+    def parse_status_ignored(self, tokens: TokenStream, _context: ParserContext) -> None:
+        """Parse ``status``; the value is checked and not stored on the AST."""
+        self.parse_status_argument(tokens)
 
     def parse_units(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse ``units`` substatement (RFC 7950 §7.21.4) into ``current_parent.units``."""
@@ -785,6 +786,45 @@ class StatementParsers:
             raise tokens.make_error(f"Expected statement argument, got {got!r}")
         return "".join(parts)
 
+    def parse_identifier_argument(self, tokens: TokenStream, statement: str) -> str:
+        """One argument, then reject text that is not an identifier."""
+        raw = self.parse_string_argument(tokens)
+        if not _is_identifier(raw):
+            raise tokens.make_error(
+                f"{statement} argument must be an identifier, got {raw!r}"
+            )
+        return raw
+
+    def parse_keyword_argument(
+        self, tokens: TokenStream, statement: str, allowed: tuple[str, ...]
+    ) -> str:
+        """One argument, then reject text outside the statement's keyword grammar."""
+        raw = self.parse_string_argument(tokens)
+        if raw not in allowed:
+            choices = " or ".join(repr(item) for item in allowed)
+            raise tokens.make_error(
+                f"{statement} argument must be {choices}, got {raw!r}"
+            )
+        return raw
+
+    def parse_integer_argument(self, tokens: TokenStream, statement: str) -> int:
+        """One argument that is a signed decimal integer."""
+        raw = self.parse_string_argument(tokens)
+        if re.fullmatch(r"[+-]?\d+", raw) is None:
+            raise tokens.make_error(
+                f"{statement} argument must be an integer, got {raw!r}"
+            )
+        return int(raw)
+
+    def parse_status_argument(self, tokens: TokenStream) -> str:
+        """``status current|deprecated|obsolete``, quoted or unquoted."""
+        tokens.consume(kw.STATUS)
+        value = self.parse_keyword_argument(
+            tokens, "status", ("current", "deprecated", "obsolete")
+        )
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        return value
+
     def parse_boolean_argument(self, tokens: TokenStream, statement: str) -> bool:
         """Exact lexical ``true`` or ``false``, quoted or unquoted.
 
@@ -827,6 +867,9 @@ class StatementParsers:
 
     def parse_must_error_message(self, tokens: TokenStream, context: ParserContext) -> None:
         self._must_parser.parse_must_error_message(tokens, context)
+
+    def parse_must_error_app_tag(self, tokens: TokenStream, context: ParserContext) -> None:
+        self._must_parser.parse_must_error_app_tag(tokens, context)
 
     def parse_when(self, tokens: TokenStream, context: ParserContext) -> None:
         self._when_parser.parse_when(tokens, context)

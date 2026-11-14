@@ -8,7 +8,7 @@ export class IdentityStatementParser {
 
   parse_identity(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.IDENTITY);
-    const name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name = this.parsers.parse_identifier_argument(tokens, "identity");
     const stmt = new YangIdentityStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

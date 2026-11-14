@@ -24,7 +24,7 @@ class GroupingStatementParser:
     def parse_grouping(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse grouping statement."""
         tokens.consume(kw.GROUPING)
-        grouping_name = tokens.consume()  # identifier or keyword
+        grouping_name = self._parsers.parse_identifier_argument(tokens, "grouping")
         grouping_stmt = YangGroupingStmt(name=grouping_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(grouping_stmt)

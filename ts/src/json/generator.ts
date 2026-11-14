@@ -450,6 +450,9 @@ function mustToXYang(stmt: YangStatement): Array<Record<string, unknown>> {
     const entry: Record<string, unknown> = {
       must: child.argument,
       "error-message": typeof child.error_message === "string" ? child.error_message : "",
+      ...(typeof child.error_app_tag === "string" && child.error_app_tag.length > 0
+        ? { "error-app-tag": child.error_app_tag }
+        : {}),
       ...xpathPrefixesEntry(child.xpath_prefixes)
     };
     withDescription(entry, child.description);

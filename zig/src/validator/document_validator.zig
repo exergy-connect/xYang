@@ -132,7 +132,8 @@ pub const DocumentValidator = struct {
                 continue;
             };
             if (!result) {
-                const message = if (must.error_message.len > 0) must.error_message else try std.fmt.allocPrint(self.a, "must constraint not satisfied on '{s}'", .{s.name});
+                const base = if (must.error_message.len > 0) must.error_message else try std.fmt.allocPrint(self.a, "must constraint not satisfied on '{s}'", .{s.name});
+                const message = if (must.error_app_tag.len > 0) try std.fmt.allocPrint(self.a, "{s} (error-app-tag: {s})", .{ base, must.error_app_tag }) else base;
                 try self.addExpr(path, pointer, "must", message, must.expression);
             }
         }

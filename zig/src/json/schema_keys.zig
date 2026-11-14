@@ -99,6 +99,7 @@ pub const types = struct {
 pub const must_entry = struct {
     pub const MUST = "must";
     pub const ERROR_MESSAGE = "error-message";
+    pub const ERROR_APP_TAG = "error-app-tag";
 };
 
 /// Keys of `x-yang.when`.

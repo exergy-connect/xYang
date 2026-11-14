@@ -275,6 +275,7 @@ pub const MustStmt = struct {
     description: []const u8 = "",
     reference: []const u8 = "",
     error_message: []const u8 = "",
+    error_app_tag: []const u8 = "",
 };
 
 pub const WhenStmt = struct {

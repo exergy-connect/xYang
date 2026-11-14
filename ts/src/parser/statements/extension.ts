@@ -9,7 +9,7 @@ export class ExtensionStatementParser {
 
   parse_extension_stmt(tokens: TokenStream, context: ParserContext): YangExtensionStmt {
     tokens.consume(kw.EXTENSION);
-    const name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name = this.parsers.parse_identifier_argument(tokens, "extension");
     const ext = new YangExtensionStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(ext);
@@ -30,9 +30,7 @@ export class ExtensionStatementParser {
 
   parse_extension_argument_stmt(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.ARGUMENT);
-    const arg = tokens.peek_type() === YangTokenType.STRING
-      ? tokens.consume_type(YangTokenType.STRING)
-      : tokens.consume_type(YangTokenType.IDENTIFIER);
+    const arg = this.parsers.parse_identifier_argument(tokens, "argument");
     const parent = context.current_parent as YangExtensionStmt;
     if (parent instanceof YangExtensionStmt) {
       parent.argument_name = arg;

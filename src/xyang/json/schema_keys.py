@@ -136,6 +136,7 @@ class XYangMustEntryKey:
 
     MUST = "must"
     ERROR_MESSAGE = "error-message"
+    ERROR_APP_TAG = "error-app-tag"
 
 
 class XYangWhenEntryKey:
