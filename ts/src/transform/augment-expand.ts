@@ -101,7 +101,7 @@ function findToplevelSchemaChild(module: ModuleData, name: string): YangStatemen
  * Resolve an absolute augment path to the target schema node that receives new children.
  * Prefers parse-time ``augment_path_segments``; falls back to parsing ``path`` once.
  */
-export function resolveAugmentTarget(
+function resolveAugmentTarget(
   ctxModule: ModuleData,
   path: string,
   aug?: YangStatement
@@ -172,7 +172,7 @@ function walkAbsoluteSchemaPath(options: SchemaPathOptions): { parent: ModuleDat
   return { parent, node: cur };
 }
 
-export function resolveAbsoluteSchemaPath(options: SchemaPathOptions): YangStatement {
+function resolveAbsoluteSchemaPath(options: SchemaPathOptions): YangStatement {
   const cur = walkAbsoluteSchemaPath(options).node;
   if (!Array.isArray(cur.statements) && cur.statements !== undefined) {
     throw new YangSyntaxError(

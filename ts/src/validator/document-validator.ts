@@ -62,40 +62,6 @@ function missingParent(target: OperationTarget, detail: string): InternalIssue {
   };
 }
 
-/**
- * Message-to-code table previously stored in tests/cases/error-codes.json.
- * Type-checker issues already carry a code. This table is for other messages. Order matters.
- */
-const MESSAGE_CODES: Array<[string, RegExp]> = [
-  ["unknown-field", /Unknown field '/],
-  ["if-feature", /'if-feature' condition is false/],
-  ["when", /'when' (condition )?evaluates to false|not allowed by when condition/],
-  ["mandatory-choice", /[Mm]andatory choice .*has no active case/],
-  ["mandatory", /^Mandatory (leaf|anydata|anyxml) '|^mandatory (leaf|anydata|anyxml) is missing/],
-  ["min-elements", /requires at least \d+$/],
-  ["max-elements", /allows at most \d+$/],
-  ["duplicate-key", /^Duplicate key in list '/],
-  ["unique", /^Unique constraint violated/],
-  ["xpath-unknown-function", /xpath-unknown-function: unknown XPath function/],
-  ["xpath-error", /^Error evaluating (must|when) expression/],
-  ["must", /^must constraint not satisfied on '/],
-  ["leafref", /^[Ll]eafref/],
-  ["instance-identifier", /^instance-identifier/],
-  ["identityref", /^identityref value/],
-  ["union", /does not match any union member type/],
-  ["length", /^String length \d+|^binary decoded length|^Binary length/],
-  ["pattern", /does not match pattern|matches forbidden pattern/],
-  ["fraction-digits", /fraction digits/],
-  ["range", /is less than minimum|exceeds maximum|^(Integer|Number) \S+ does not match /],
-  ["enum", /is not in enum|is not one of|^Expected enumeration value/],
-  ["bits", /[Bb]it token|bit '|[Bb]its value/],
-  ["type", /^Expected |is not a valid |should have no value|must be an? (object|array|string)|base64/]
-];
-
-function codeForMessage(message: string): string | undefined {
-  return MESSAGE_CODES.find(([, rx]) => rx.test(message))?.[0];
-}
-
 /** TS display path (`top.items[0].v`) -> JSON Pointer (`/top/items/0/v`). Root is `""`. */
 function pointerFromLabel(path: string): string {
   return path
@@ -227,15 +193,6 @@ export class DocumentValidator {
       errors: collected.errors.map(toPublicIssue),
       warnings: collected.warnings.map(toPublicIssue)
     };
-  }
-
-  /**
-   * Validate instance data against one module’s top-level data nodes. Used for the root document
-   * and, recursively, for each anydata payload shape without constructing a second DocumentValidator.
-   */
-  private validateWithContext(ctx: ValidationContext, data: unknown): [boolean, string[], string[]] {
-    const collected = this.collect(ctx, data);
-    return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
   /**
@@ -655,7 +612,7 @@ export class DocumentValidator {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
       if (keyword === YangTokenType.ANYDATA) {
-        this.runAnydataSubtreeValidation(stmt, value, path, errors);
+        this.runAnydataSubtreeValidation(value, path, errors);
       }
     }
   }
@@ -1258,7 +1215,6 @@ export class DocumentValidator {
    * Nested validation uses anydata-complete (full constraints) vs anydata-candidate (no constraint checks).
    */
   private runAnydataSubtreeValidation(
-    stmt: YangStatement,
     value: unknown,
     anydataPath: string,
     errors: InternalIssue[]

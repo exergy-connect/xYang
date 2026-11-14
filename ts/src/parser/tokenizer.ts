@@ -195,9 +195,4 @@ export class YangTokenizer {
   }
 }
 
-// Compatibility helper for existing TS parser code.
-export function tokenizeYang(source: string): YangToken[] {
-  return new YangTokenizer().tokenize(source).token_list;
-}
-
 export type { YangToken };

@@ -82,9 +82,9 @@ export const YIN_ELEMENT = "yin-element";
 export const DEVIATION = "deviation";
 export const DEVIATE = "deviate";
 export const NOT_SUPPORTED = "not-supported";
-export const ADD = "add";
-export const DELETE = "delete";
-export const REPLACE = "replace";
+const ADD = "add";
+const DELETE = "delete";
+const REPLACE = "replace";
 /** Substatements each ``deviate`` argument allows (RFC 7950 §7.20.3.2 grammar). */
 export const DEVIATE_SUBSTATEMENTS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
   [ADD, new Set(["units", "must", "unique", "default", "config", "mandatory", "min-elements", "max-elements"])],

@@ -157,13 +157,6 @@ const PUNCTUATION = new Set<YangTokenType>([
   YangTokenType.DOT
 ]);
 
-const LITERAL_TYPES = new Set<YangTokenType>([
-  YangTokenType.STRING,
-  YangTokenType.IDENTIFIER,
-  YangTokenType.INTEGER,
-  YangTokenType.DOTTED_NUMBER
-]);
-
 export function diagnosticSourceLines(content: string): string[] {
   if (!content) {
     return [];

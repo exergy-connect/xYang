@@ -1,20 +1,5 @@
 import type { YangModule, YangStatement } from "../core/model";
 
-export type ExtensionCapability = {
-  id: string;
-  description?: string;
-};
-
-const capabilities = new Map<string, ExtensionCapability>();
-
-export function registerCapability(capability: ExtensionCapability): void {
-  capabilities.set(capability.id, capability);
-}
-
-export function getCapability(id: string): ExtensionCapability | undefined {
-  return capabilities.get(id);
-}
-
 /** Marker that an extension is applied at parse time. Export fails unless the JSON form supports it. */
 export type ExtensionApplyCallback = (
   invocation: YangStatement,

@@ -652,7 +652,3 @@ export class XPathEvaluator {
     throw unknownFunctionError(name);
   }
 }
-
-export function evaluateXPath(ast: XPathAstNode, context: XPathContext, node: XPathNode): unknown {
-  return new XPathEvaluator().eval(ast, context, node);
-}

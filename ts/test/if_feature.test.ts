@@ -9,8 +9,7 @@ import {
   parseYangString,
   reachableModuleData,
   stmtIfFeaturesSatisfied,
-  YangParser,
-  YangValidator
+  YangParser
 } from "../src";
 
 describe("python parity: test_if_feature", () => {

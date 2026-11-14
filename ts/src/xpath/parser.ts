@@ -1,5 +1,5 @@
 import { XPathSyntaxError, YangSyntaxError } from "../core/errors";
-import { XPathAstNode, XPathBinaryNode, XPathFunctionNode, XPathLiteralNode, XPathPathNode, isWildcardStep, stepPrefix } from "./ast";
+import { XPathAstNode, XPathFunctionNode, XPathPathNode, isWildcardStep, stepPrefix } from "./ast";
 import { unknownFunctionError, XPATH_FUNCTION_NAMES } from "./functions";
 import { XPathToken, tokenizeXPath } from "./tokenizer";
 

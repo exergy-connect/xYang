@@ -3,7 +3,6 @@ import { YangSemanticError } from "./errors";
 import type { YangIdentifierRef } from "./identifier-ref";
 import { bindXPathPrefixes, parseXPath, xpathPrefixes } from "../xpath/parser";
 import type { XPathAstNode } from "../xpath/ast";
-import { warnDeprecatedOnce } from "./deprecation";
 import { translateXsdRegex } from "../xsd-regex";
 
 /**
@@ -24,20 +23,8 @@ export class YangStatementList {
     this.statements = statements;
   }
 
-  /** @deprecated use findStatement */
-  find_statement(name: string): YangStatement | undefined {
-    warnDeprecatedOnce("find_statement", "findStatement");
-    return this.findStatement(name);
-  }
-
   findStatement(name: string): YangStatement | undefined {
     return this.statements.find((stmt) => stmt.name === name);
-  }
-
-  /** @deprecated use getAllLeaves */
-  get_all_leaves(): YangLeafStmt[] {
-    warnDeprecatedOnce("get_all_leaves", "getAllLeaves");
-    return this.getAllLeaves();
   }
 
   getAllLeaves(): YangLeafStmt[] {
@@ -101,7 +88,7 @@ export class YangStatement extends YangStatementList {
   }
 }
 
-export class YangStatementWithMust extends YangStatement {
+class YangStatementWithMust extends YangStatement {
   must_statements: YangMustStmt[];
 
   constructor(init: Partial<YangStatementWithMust> = {}) {
@@ -497,7 +484,7 @@ export function modulePrefixResolver(module: unknown, file?: string): (prefix: s
   };
 }
 
-export class YangParsedXPathBase {
+class YangParsedXPathBase {
   expression: string;
   description: string;
   ast?: ASTNode;
@@ -543,16 +530,6 @@ export class YangWhenStmt extends YangParsedXPathBase {
 
   get condition(): string {
     return this.expression;
-  }
-}
-
-export class YangLeafrefStmt {
-  path: string;
-  require_instance: boolean;
-
-  constructor(init: Partial<YangLeafrefStmt> = {}) {
-    this.path = init.path ?? "";
-    this.require_instance = init.require_instance ?? true;
   }
 }
 

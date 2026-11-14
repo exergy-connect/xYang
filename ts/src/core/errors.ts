@@ -1,4 +1,4 @@
-export class YangError extends Error {
+class YangError extends Error {
   constructor(message: string) {
     super(message);
     this.name = "YangError";

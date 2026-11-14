@@ -103,7 +103,7 @@ function matchesRange(value: number, raw: string): boolean {
 }
 
 /** @internal JSON number that is an integer. Strings are not integers (RFC 7951 §6.1). */
-export function integerLike(value: unknown): number | null {
+function integerLike(value: unknown): number | null {
   if (typeof value === "number" && Number.isFinite(value) && Number.isInteger(value)) {
     return value;
   }

@@ -1,7 +1,6 @@
 import * as kw from "../keywords";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
-import { ModuleStatementParser } from "./module";
 
 /** Header and linkage statements are applied for their side effects, not copied as schema nodes. */
 const INCLUDED_STATEMENT_SKIP = new Set([
@@ -19,10 +18,7 @@ const INCLUDED_STATEMENT_SKIP = new Set([
 ]);
 
 export class SubmoduleStatementParser {
-  constructor(
-    private readonly parsers: StatementParsers,
-    private readonly module_parser: ModuleStatementParser
-  ) {}
+  constructor(private readonly parsers: StatementParsers) {}
 
   parse_submodule(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.SUBMODULE);

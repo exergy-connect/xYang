@@ -14,7 +14,7 @@ import { YangModule, YangStatement } from "../core/model";
 
 export type OperationDirection = "input" | "output";
 
-export const DIRECTIONS: readonly OperationDirection[] = ["input", "output"];
+const DIRECTIONS: readonly OperationDirection[] = ["input", "output"];
 
 export type OperationOptions = {
   /** Name of an rpc of the module. When set, `data` is that rpc's `direction` instance. */
