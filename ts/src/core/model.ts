@@ -130,6 +130,8 @@ interface YangStatementFields {
   not_supported?: boolean;
   deviates?: DeviateRecord[];
   defining_module?: string;
+  /** Submodule file that contributed this statement. Absent on statements written in the module file. */
+  included_from?: string;
   data_node_kind?: string;
   refine_target_path?: string;
   refined_mandatory?: boolean;

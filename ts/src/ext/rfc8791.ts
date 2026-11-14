@@ -1,6 +1,7 @@
 import { YangSemanticError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangStatement, type YangModule } from "../core/model";
+import { resolvePrefixedModule as resolvePrefixInFile } from "../validator/if-feature-eval";
 
 type ModuleShape = YangModule;
 
@@ -70,14 +71,7 @@ function resolvePrefixedModule(
   kind: string,
   file?: string
 ): ModuleShape {
-  const ownPrefix = String(ctxModule.prefix ?? "").replace(/^['"]|['"]$/g, "");
-  if (prefix === ownPrefix) {
-    return ctxModule;
-  }
-  const fileImports = (ctxModule as { file_imports?: Record<string, Record<string, unknown>> }).file_imports;
-  const selected = file ? fileImports?.[file] : isObject(ctxModule.import_prefixes) ? ctxModule.import_prefixes : undefined;
-  const imports = isObject(selected) ? selected : undefined;
-  const resolved = imports && isObject(imports[prefix]) ? (imports[prefix] as ModuleShape) : undefined;
+  const resolved = resolvePrefixInFile(ctxModule, prefix, file);
   if (!resolved) {
     throw new YangSemanticError(`${kind}: unknown prefix '${prefix}' in path '${fullPath}'`);
   }

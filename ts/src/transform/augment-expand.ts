@@ -37,7 +37,7 @@ function asStatements(value: unknown): YangStatement[] {
   return Array.isArray(value) ? (value as YangStatement[]) : [];
 }
 
-function sourceFileOf(stmt: { included_from?: string } | undefined): string | undefined {
+function sourceFileOf(stmt: YangStatement | undefined): string | undefined {
   return stmt?.included_from;
 }
 
@@ -116,14 +116,17 @@ export function resolveAugmentTarget(
   });
 }
 
-function walkAbsoluteSchemaPath(options: {
+/** An absolute schema path and the source file (submodule name) whose imports bind its prefixes. */
+export type SchemaPathOptions = {
   ctxModule: ModuleData;
   path: string;
   segments?: YangIdentifierRef[];
   kind: string;
   findToplevel: (module: ModuleData, name: string) => YangStatement | undefined;
   file?: string;
-}): { parent: ModuleData | YangStatement; node: YangStatement } {
+};
+
+function walkAbsoluteSchemaPath(options: SchemaPathOptions): { parent: ModuleData | YangStatement; node: YangStatement } {
   const { ctxModule, path, kind, findToplevel, file } = options;
   let segments = options.segments;
   if (!segments || segments.length === 0) {
@@ -169,13 +172,7 @@ function walkAbsoluteSchemaPath(options: {
   return { parent, node: cur };
 }
 
-export function resolveAbsoluteSchemaPath(options: {
-  ctxModule: ModuleData;
-  path: string;
-  segments?: YangIdentifierRef[];
-  kind: string;
-  findToplevel: (module: ModuleData, name: string) => YangStatement | undefined;
-}): YangStatement {
+export function resolveAbsoluteSchemaPath(options: SchemaPathOptions): YangStatement {
   const cur = walkAbsoluteSchemaPath(options).node;
   if (!Array.isArray(cur.statements) && cur.statements !== undefined) {
     throw new YangSyntaxError(
