@@ -97,4 +97,25 @@ module dev {
     expect(kept.isValid).toBe(true);
     expect(alone).not.toBe(deviated);
   });
+
+  it("deviate replace edits a copy of the imported leaf; the cached module keeps the original (#196)", () => {
+    const dir = mkdtempSync(join(tmpdir(), "xyang-deviation-replace-"));
+    const basePath = writeModule(
+      dir,
+      "base.yang",
+      'module base { yang-version 1.1; namespace "urn:b"; prefix b; container top { leaf a { type string; } } }'
+    );
+    const devPath = writeModule(
+      dir,
+      "dev.yang",
+      'module dev { yang-version 1.1; namespace "urn:dev"; prefix d; import base { prefix b; }' +
+        ' deviation "/b:top/b:a" { deviate replace { type uint8; } } }'
+    );
+    const parser = new YangParser();
+    const dev = parser.parseFile(devPath);
+    const replaced = new YangValidator(dev.import_prefixes.b!).validate({ top: { a: "x" } });
+    expect(replaced.isValid).toBe(false);
+    const alone = parser.parseFile(basePath);
+    expect(new YangValidator(alone).validate({ top: { a: "x" } }).isValid).toBe(true);
+  });
 });

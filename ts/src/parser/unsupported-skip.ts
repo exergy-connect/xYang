@@ -54,12 +54,6 @@ export function skip_unsupported_construct(tokens: TokenStream, { context }: { c
   tokens.consume_if_type(YangTokenType.SEMICOLON);
 }
 
-/** ``deviate add|replace|delete`` stays unsupported; say which kind and path. */
-export function warn_unsupported_deviate(kind: string, path: string): void {
-  // eslint-disable-next-line no-console
-  console.warn(`Ignoring unsupported 'deviate ${kind}' for ${path}`);
-}
-
 export function is_unsupported_construct_start(tokens: TokenStream): boolean {
   const tok = tokens.peek_token();
   return tok !== undefined && UNSUPPORTED_CONSTRUCT_TYPES.has(tok.value);

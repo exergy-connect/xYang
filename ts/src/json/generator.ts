@@ -7,7 +7,7 @@ import {
 } from "../core/identifier-ref";
 import { YangModule, YangStatement, type YangStatementInit } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
-import { applyAugments } from "../transform/augment-expand";
+import { applyAugments, applyDeviations } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
 import { YangExportError } from "../core/errors";
 import { applyBuiltinExtensionInvocations } from "../ext/rfc8791";
@@ -1193,6 +1193,30 @@ function applyOwnAugments(effective: YangModule): void {
   applyAugments(effective);
 }
 
+/**
+ * Apply the module's `deviation` statements to its own (augmented) tree. Like an augment, a deviation of
+ * another module's tree has no place in this module's JSON: an error, not dropped.
+ */
+function applyOwnDeviations(effective: YangModule): void {
+  for (const stmt of effective.statements) {
+    if (stmt.keyword !== "deviation") {
+      continue;
+    }
+    const path = String(stmt.deviation_path ?? stmt.argument ?? "");
+    const first = (Array.isArray(stmt.deviation_path_segments) && stmt.deviation_path_segments.length > 0
+      ? stmt.deviation_path_segments
+      : parseAbsoluteSchemaPath(path))[0];
+    const own = String(effective.prefix ?? "").replace(/^['"]|['"]$/g, "");
+    if (first?.prefix !== own) {
+      throw new YangExportError(
+        `cannot export deviation '${path}': its target belongs to another module, ` +
+          `which the native JSON form of module '${effective.name}' does not carry`
+      );
+    }
+  }
+  applyDeviations(effective);
+}
+
 const FOREIGN_AUGMENTS = "ietf-yang-structure-ext:foreign-augment-structure";
 const FOREIGN_SLOTS = "ietf-yang-structure-ext:foreign-augment-structure-slots";
 const STRUCTURE_INDEX = "ietf-yang-structure-ext:structure-index";
@@ -1424,6 +1448,7 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
     Object.defineProperty(effectiveModule, "module_registry", { value: module.module_registry, enumerable: false });
   }
   applyOwnAugments(effectiveModule);
+  applyOwnDeviations(effectiveModule);
   // Merge a same-module sx:augment-structure. A cross-module one stays an invocation.
   applyBuiltinExtensionInvocations(effectiveModule, { exportView: true });
   const properties: Record<string, unknown> = {};

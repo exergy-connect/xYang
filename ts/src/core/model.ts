@@ -126,6 +126,7 @@ interface YangStatementFields {
   deviation_path?: string;
   deviation_path_segments?: YangIdentifierRef[];
   not_supported?: boolean;
+  deviates?: DeviateRecord[];
   defining_module?: string;
   data_node_kind?: string;
   refine_target_path?: string;
@@ -152,6 +153,22 @@ function isStatementInit(value: unknown): value is YangStatementInit {
 
 // Declaration merging shares the common fields without emitting unused properties.
 export interface YangStatement extends YangStatementFields {}
+
+/** One ``deviate add|replace|delete`` (RFC 7950 §7.20.3.2) and the properties it names. */
+export type DeviateRecord = {
+  kind: string;
+  config?: boolean;
+  defaults: string[];
+  mandatory?: boolean;
+  min_elements?: number;
+  /** ``max-elements`` named; ``max_elements`` undefined then means ``unbounded``. */
+  max_elements_set?: boolean;
+  max_elements?: number;
+  must: YangStatement[];
+  type?: StatementTypeShape;
+  units?: string;
+  unique: string[][];
+};
 
 export class YangStatement {
   declare local_groupings?: Record<string, YangStatement>;

@@ -85,8 +85,12 @@ export const NOT_SUPPORTED = "not-supported";
 export const ADD = "add";
 export const DELETE = "delete";
 export const REPLACE = "replace";
-/** ``deviate`` arguments that stay unsupported. ``not-supported`` is applied. */
-export const UNSUPPORTED_DEVIATE_KINDS = new Set<string>([ADD, DELETE, REPLACE]);
+/** Substatements each ``deviate`` argument allows (RFC 7950 §7.20.3.2 grammar). */
+export const DEVIATE_SUBSTATEMENTS: ReadonlyMap<string, ReadonlySet<string>> = new Map([
+  [ADD, new Set(["units", "must", "unique", "default", "config", "mandatory", "min-elements", "max-elements"])],
+  [DELETE, new Set(["units", "must", "unique", "default"])],
+  [REPLACE, new Set(["type", "units", "default", "config", "mandatory", "min-elements", "max-elements"])]
+]);
 export const EXTENSION = "extension";
 export const RPC = "rpc";
 export const ACTION = "action";

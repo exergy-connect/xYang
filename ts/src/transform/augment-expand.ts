@@ -8,7 +8,7 @@
 
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
-import { YangStatement, YangModule } from "../core/model";
+import { YangStatement, YangModule, type DeviateRecord } from "../core/model";
 
 type ModuleData = YangModule;
 
@@ -66,13 +66,34 @@ function isSchemaNode(stmt: YangStatement): boolean {
   return Boolean(stmt.name) && SCHEMA_NODE_KEYWORDS.has(kw);
 }
 
+/**
+ * RFC 7950 §7.14.2 / §7.14.3: every rpc and action has ``input`` and ``output`` schema
+ * nodes, written or not. Add the empty node a schema node identifier names.
+ */
+function materializeOperationIo(parent: YangStatement | ModuleData, name: string): YangStatement | undefined {
+  const keyword = (parent as { keyword?: unknown }).keyword;
+  if ((keyword !== "rpc" && keyword !== "action") || (name !== "input" && name !== "output")) {
+    return undefined;
+  }
+  const node = new YangStatement({ keyword: name, name, statements: [] });
+  const children = asStatements(parent.statements);
+  const outputIdx = children.findIndex((child) => child.keyword === "output");
+  if (name === "input" && outputIdx >= 0) {
+    children.splice(outputIdx, 0, node);
+  } else {
+    children.push(node);
+  }
+  parent.statements = children;
+  return node;
+}
+
 function findNamedSchemaChild(parent: YangStatement, name: string): YangStatement | undefined {
   for (const child of asStatements(parent.statements)) {
     if (child.name === name && isSchemaNode(child)) {
       return child;
     }
   }
-  return undefined;
+  return materializeOperationIo(parent, name);
 }
 
 function findToplevelSchemaChild(module: ModuleData, name: string): YangStatement | undefined {
@@ -217,45 +238,40 @@ function cowModuleData(data: ModuleData): ModuleData {
 }
 
 function schemaChildIndex(parent: ModuleData | YangStatement, name: string): number {
-  return asStatements((parent as { statements?: unknown }).statements).findIndex(
+  const idx = asStatements((parent as { statements?: unknown }).statements).findIndex(
     (stmt) => stmt.name === name && isSchemaNode(stmt)
   );
+  if (idx >= 0) {
+    return idx;
+  }
+  const node = materializeOperationIo(parent, name);
+  return node ? parent.statements.indexOf(node) : -1;
 }
 
-function detachCopiedPath(moduleData: ModuleData, segments: YangIdentifierRef[]): void {
+/** Copy the ancestors of the node *segments* name; return the copied parent and the target index. */
+function copiedPathToTarget(
+  moduleData: ModuleData,
+  segments: YangIdentifierRef[]
+): { parent: ModuleData | YangStatement; index: number } {
   const pathText = `/${segments.map((seg) => `${seg.prefix}:${seg.name}`).join("/")}`;
-  const top = asStatements(moduleData.statements);
-  const topIdx = schemaChildIndex(moduleData, segments[0]!.name);
-  if (topIdx < 0) {
-    throw new YangSemanticError(`deviation: no schema node for path '${pathText}'`);
+  const missing = (name: string, under: string) =>
+    new YangSemanticError(`deviation: no child '${name}' under '${under}' (path '${pathText}')`);
+  let parent: ModuleData | YangStatement = moduleData;
+  parent.statements = asStatements(parent.statements).slice();
+  let index = schemaChildIndex(parent, segments[0]!.name);
+  if (index < 0) {
+    throw missing(segments[0]!.name, String(moduleData.name ?? "?"));
   }
-  if (segments.length === 1) {
-    top.splice(topIdx, 1);
-    moduleData.statements = top;
-    return;
-  }
-  let current = cowStatement(top[topIdx]!);
-  top[topIdx] = current;
-  moduleData.statements = top;
-  for (const seg of segments.slice(1, -1)) {
-    const children = asStatements(current.statements);
-    const idx = schemaChildIndex(current, seg.name);
-    if (idx < 0) {
-      throw new YangSemanticError(`deviation: no child '${seg.name}' under '${String(current.name ?? "?")}'`);
+  for (const seg of segments.slice(1)) {
+    const current = cowStatement(parent.statements[index]!);
+    parent.statements[index] = current;
+    parent = current;
+    index = schemaChildIndex(current, seg.name);
+    if (index < 0) {
+      throw missing(seg.name, String(current.name ?? "?"));
     }
-    const next = cowStatement(children[idx]!);
-    children[idx] = next;
-    current.statements = children;
-    current = next;
   }
-  const last = segments[segments.length - 1]!.name;
-  const children = asStatements(current.statements);
-  const idx = schemaChildIndex(current, last);
-  if (idx < 0) {
-    throw new YangSemanticError(`deviation: no child '${last}' under '${String(current.name ?? "?")}'`);
-  }
-  children.splice(idx, 1);
-  current.statements = children;
+  return { parent, index };
 }
 
 function privateTargetModule(
@@ -287,11 +303,168 @@ function privateTargetModule(
   return cloned;
 }
 
-function applyNotSupported(
-  ctxModule: ModuleData,
-  dev: YangStatement,
-  copies: Map<ModuleData, ModuleData>
-): void {
+class DeviateError extends YangSemanticError {}
+
+function single(node: YangStatement, deviate: DeviateRecord, prop: string, present: boolean, alwaysPresent = false): void {
+  if (deviate.kind === "add" && present) {
+    throw new DeviateError(
+      `cannot 'deviate add' ${prop}: target ${String(node.keyword)} '${String(node.name)}' already has it (use 'deviate replace')`
+    );
+  }
+  if (deviate.kind === "replace" && !present && !alwaysPresent) {
+    throw new DeviateError(
+      `cannot 'deviate replace' ${prop}: target ${String(node.keyword)} '${String(node.name)}' has no ${prop} (use 'deviate add')`
+    );
+  }
+}
+
+function requireKind(node: YangStatement, prop: string, keywords: readonly string[]): void {
+  if (!keywords.includes(String(node.keyword))) {
+    throw new DeviateError(`${prop} does not apply to target ${String(node.keyword)} '${String(node.name)}'`);
+  }
+}
+
+const CONFIG_NODES = ["container", "leaf", "leaf-list", "list", "choice", "case", "anydata", "anyxml"];
+const MUST_NODES = ["container", "leaf", "leaf-list", "list", "anydata", "anyxml", "input", "output", "notification"];
+
+function applyDeviateDefaults(node: YangStatement, deviate: DeviateRecord): void {
+  const values = deviate.defaults;
+  if (node.keyword === "leaf-list") {
+    const current = Array.isArray(node.defaults) ? [...(node.defaults as string[])] : [];
+    if (deviate.kind === "add") {
+      node.defaults = [...current, ...values];
+    } else if (deviate.kind === "replace") {
+      if (current.length === 0) {
+        throw new DeviateError(`cannot 'deviate replace' default: target leaf-list '${String(node.name)}' has no default`);
+      }
+      node.defaults = [...values];
+    } else {
+      for (const value of values) {
+        const idx = current.indexOf(value);
+        if (idx < 0) {
+          throw new DeviateError(
+            `cannot 'deviate delete' default '${value}': target leaf-list '${String(node.name)}' has no such default`
+          );
+        }
+        current.splice(idx, 1);
+      }
+      node.defaults = current;
+    }
+    return;
+  }
+  requireKind(node, "default", ["leaf", "choice"]);
+  if (values.length !== 1) {
+    throw new DeviateError(`target ${String(node.keyword)} '${String(node.name)}' takes one default, got ${values.length}`);
+  }
+  const present = node.default !== undefined && node.default !== null;
+  if (deviate.kind === "delete") {
+    if (!present || String(node.default) !== values[0]) {
+      throw new DeviateError(
+        `cannot 'deviate delete' default '${values[0]}': target ${String(node.keyword)} '${String(node.name)}' has default ${present ? `'${String(node.default)}'` : "None"}`
+      );
+    }
+    delete node.default;
+    return;
+  }
+  single(node, deviate, "default", present);
+  node.default = values[0];
+}
+
+function applyDeviateMusts(node: YangStatement, deviate: DeviateRecord): void {
+  requireKind(node, "must", MUST_NODES);
+  const children = [...node.statements];
+  if (deviate.kind === "add") {
+    node.statements = [...children, ...deviate.must.map((m) => new YangStatement(m))];
+    return;
+  }
+  for (const must of deviate.must) {
+    const idx = children.findIndex((c) => c.keyword === "must" && c.argument === must.argument);
+    if (idx < 0) {
+      throw new DeviateError(
+        `cannot 'deviate delete' must '${String(must.argument)}': target ${String(node.keyword)} '${String(node.name)}' has no such must`
+      );
+    }
+    children.splice(idx, 1);
+  }
+  node.statements = children;
+}
+
+function applyDeviateUnique(node: YangStatement, deviate: DeviateRecord): void {
+  requireKind(node, "unique", ["list"]);
+  const current = Array.isArray(node.unique) ? (node.unique as string[][]).map((u) => [...u]) : [];
+  if (deviate.kind === "add") {
+    node.unique = [...current, ...deviate.unique.map((u) => [...u])];
+    return;
+  }
+  for (const paths of deviate.unique) {
+    const idx = current.findIndex((u) => u.length === paths.length && u.every((p, i) => p === paths[i]));
+    if (idx < 0) {
+      throw new DeviateError(
+        `cannot 'deviate delete' unique '${paths.join(" ")}': target list '${String(node.name)}' has no such unique`
+      );
+    }
+    current.splice(idx, 1);
+  }
+  node.unique = current;
+}
+
+/** Apply one ``deviate add|replace|delete`` to *node* (RFC 7950 §7.20.3.2). */
+function applyDeviate(node: YangStatement, deviate: DeviateRecord): void {
+  if (deviate.config !== undefined) {
+    requireKind(node, "config", CONFIG_NODES);
+    single(node, deviate, "config", typeof node.config === "boolean", true);
+    node.config = deviate.config;
+  }
+  if (deviate.mandatory !== undefined) {
+    requireKind(node, "mandatory", ["leaf", "choice", "anydata", "anyxml"]);
+    single(node, deviate, "mandatory", node.mandatory === true, true);
+    node.mandatory = deviate.mandatory;
+  }
+  if (deviate.min_elements !== undefined) {
+    requireKind(node, "min-elements", ["list", "leaf-list"]);
+    single(node, deviate, "min-elements", typeof node.min_elements === "number", true);
+    node.min_elements = deviate.min_elements;
+  }
+  if (deviate.max_elements_set) {
+    requireKind(node, "max-elements", ["list", "leaf-list"]);
+    single(node, deviate, "max-elements", typeof node.max_elements === "number", true);
+    if (deviate.max_elements === undefined) {
+      delete node.max_elements;
+    } else {
+      node.max_elements = deviate.max_elements;
+    }
+  }
+  if (deviate.type !== undefined) {
+    requireKind(node, "type", ["leaf", "leaf-list"]);
+    node.type = deviate.type;
+  }
+  if (deviate.units !== undefined) {
+    requireKind(node, "units", ["leaf", "leaf-list"]);
+    const units = typeof node.units === "string" ? node.units : "";
+    if (deviate.kind === "delete") {
+      if (units !== deviate.units) {
+        throw new DeviateError(
+          `cannot 'deviate delete' units '${deviate.units}': target ${String(node.keyword)} '${String(node.name)}' has units '${units}'`
+        );
+      }
+      delete node.units;
+    } else {
+      single(node, deviate, "units", units !== "");
+      node.units = deviate.units;
+    }
+  }
+  if (deviate.defaults.length > 0) {
+    applyDeviateDefaults(node, deviate);
+  }
+  if (deviate.must.length > 0) {
+    applyDeviateMusts(node, deviate);
+  }
+  if (deviate.unique.length > 0) {
+    applyDeviateUnique(node, deviate);
+  }
+}
+
+function applyDeviation(ctxModule: ModuleData, dev: YangStatement, copies: Map<ModuleData, ModuleData>): void {
   const path = String(dev.deviation_path ?? dev.argument ?? "");
   const stored = dev.deviation_path_segments;
   const segments =
@@ -315,18 +488,39 @@ function applyNotSupported(
   if (!owner) {
     throw new YangSemanticError(`deviation: unknown prefix '${segments[0]!.prefix}' in path '${path}'`);
   }
+  let node = located.node;
   if (owner === ctxModule) {
-    removeSchemaChild(located.parent, located.node);
-    return;
+    if (dev.not_supported === true) {
+      removeSchemaChild(located.parent, node);
+      return;
+    }
+  } else {
+    const { parent, index } = copiedPathToTarget(privateTargetModule(ctxModule, owner, copies), segments);
+    if (dev.not_supported === true) {
+      parent.statements.splice(index, 1);
+      return;
+    }
+    node = cowStatement(parent.statements[index]!);
+    parent.statements[index] = node;
   }
-  const privateModule = privateTargetModule(ctxModule, owner, copies);
-  detachCopiedPath(privateModule, segments);
+  const deviates = dev.deviates ?? [];
+  for (const deviate of deviates) {
+    try {
+      applyDeviate(node, deviate);
+    } catch (err) {
+      if (err instanceof DeviateError) {
+        throw new YangSemanticError(`deviation '${path}': ${err.message}`);
+      }
+      throw err;
+    }
+  }
 }
 
 /**
- * Remove each ``deviate not-supported`` target, then drop ``deviation`` statements.
- * Same absolute-path resolution as ``augment``. A missing target is a {@link YangSemanticError}.
- * A target in another module is removed on a copy owned by this build; the cached module is unchanged.
+ * Apply each ``deviation`` in order, then drop ``deviation`` statements.
+ * Same absolute-path resolution as ``augment``. A missing target, or a ``deviate`` the target
+ * cannot take (RFC 7950 §7.20.3.2), is a {@link YangSemanticError}.
+ * A target in another module is changed on a copy owned by this build; the cached module is unchanged.
  */
 export function applyDeviations(module: YangModule): YangModule {
   const data = module;
@@ -334,9 +528,7 @@ export function applyDeviations(module: YangModule): YangModule {
   const deviations = statements.filter((s) => s.keyword === "deviation");
   const copies = new Map<ModuleData, ModuleData>();
   for (const dev of deviations) {
-    if (dev.not_supported === true) {
-      applyNotSupported(data, dev, copies);
-    }
+    applyDeviation(data, dev, copies);
   }
   if (deviations.length > 0) {
     data.statements = statements.filter((s) => s.keyword !== "deviation");

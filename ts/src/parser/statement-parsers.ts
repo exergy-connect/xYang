@@ -1346,6 +1346,16 @@ export class StatementParsers {
     return out;
   }
 
+  /** Generic ``must`` statement for a parsed ``must`` (a ``deviate`` keeps these). */
+  mustStatement(must_stmt: YangMustStmt): YangStatement {
+    return this.fromMust(must_stmt);
+  }
+
+  /** Type shape for a parsed ``type`` (a ``deviate replace`` keeps this). */
+  typeShape(type_stmt: YangTypeStmt) {
+    return normalizeTypeShape(this.fromTypeShape(type_stmt));
+  }
+
   private fromType(type_stmt: YangTypeStmt): YangStatement {
     const qname = formatIdentifierRef({ name: type_stmt.name, prefix: type_stmt.prefix });
     return new YangStatement({      keyword: "type",
