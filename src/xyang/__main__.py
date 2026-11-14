@@ -407,7 +407,6 @@ def main() -> int:
     if args.cmd == "validate":
         from xyang import parse_yang_file, YangValidator
         from xyang.ext.anydata_validation import AnydataValidationMode
-        from xyang.module import YangModule
         from xyang.validator import ValidatorExtension
 
         p = Path(args.yang_file)

@@ -34,7 +34,7 @@ const CASES = join(dirname(fileURLToPath(import.meta.url)), "../../tests/cases")
 const readJson = (p: string) => JSON.parse(readFileSync(p, "utf8"));
 
 function loadCaseModule(dir: string, moduleFile: string) {
-  const parser = new YangParser({ include_path: [dir], expand_uses: true });
+  const parser = new YangParser({ includePath: [dir], expandUses: true });
   const primary = resolve(dir, moduleFile);
   const module = parser.parseFile(primary);
   for (const file of readdirSync(dir)) {
@@ -51,7 +51,7 @@ function loadCaseModule(dir: string, moduleFile: string) {
 
 /** The case module's native JSON form, as a Worker without a filesystem would receive it. */
 function jsonForm(dir: string, moduleFile: string): Record<string, unknown> {
-  const parsed = new YangParser({ include_path: [dir], expand_uses: false }).parseFile(resolve(dir, moduleFile));
+  const parsed = new YangParser({ includePath: [dir], expandUses: false }).parseFile(resolve(dir, moduleFile));
   return JSON.parse(JSON.stringify(generateJsonSchema(parsed)));
 }
 

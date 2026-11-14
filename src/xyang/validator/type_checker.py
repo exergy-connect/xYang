@@ -162,19 +162,11 @@ class TypeChecker:
             scope = type_stmt.scope or root_schema
             if scope.resolve_prefixed_module(type_stmt.prefix) is None:
                 return [_issue("type", f"unknown type prefix {type_stmt.prefix!r} in type {name!r}")]
-            typedef, _module = resolve_typedef(type_stmt, root_schema)
-            if typedef is not None and typedef.type is not None:
-                return self._check_typedef_reference(
-                    value,
-                    type_stmt,
-                    typedef.type,
-                    path,
-                    root_data,
-                    root_schema,
-                    ctx,
-                    evaluator,
-                    leafref_current,
-                )
+            issues = self._check_resolved_typedef(
+                value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current
+            )
+            if issues is not None:
+                return issues
             return [_issue("type", f"unknown typedef {name!r} in imported module {type_stmt.prefix!r}")]
 
         spec = REGISTRY.get(name)
@@ -198,20 +190,39 @@ class TypeChecker:
             return self._check_decimal(value, type_stmt)
         # Resolve typedef and check against the underlying type
         if type_stmt.scope is not None or getattr(root_schema, "get_typedef", None) is not None:
-            typedef, _module = resolve_typedef(type_stmt, root_schema)
-            if typedef is not None and typedef.type is not None:
-                return self._check_typedef_reference(
-                    value,
-                    type_stmt,
-                    typedef.type,
-                    path,
-                    root_data,
-                    root_schema,
-                    ctx,
-                    evaluator,
-                    leafref_current,
-                )
+            issues = self._check_resolved_typedef(
+                value, type_stmt, path, root_data, root_schema, ctx, evaluator, leafref_current
+            )
+            if issues is not None:
+                return issues
         return []
+
+    def _check_resolved_typedef(
+        self,
+        value: Any,
+        type_stmt: YangTypeStmt,
+        path: str,
+        root_data: Any,
+        root_schema: Any,
+        ctx: Context,
+        evaluator: Any,
+        leafref_current: Optional[Node],
+    ) -> Optional[list[TypeIssue]]:
+        """Check against the typedef ``type_stmt`` names, or None when it does not resolve."""
+        typedef, _module = resolve_typedef(type_stmt, root_schema)
+        if typedef is None or typedef.type is None:
+            return None
+        return self._check_typedef_reference(
+            value,
+            type_stmt,
+            typedef.type,
+            path,
+            root_data,
+            root_schema,
+            ctx,
+            evaluator,
+            leafref_current,
+        )
 
     def _check_builtin(
         self,
@@ -482,21 +493,7 @@ class TypeChecker:
             )
             if issue is not None:
                 errors.append(issue)
-        patterns = list(getattr(type_stmt, "patterns", None) or [])
-        if patterns:
-            for p in patterns:
-                patt = getattr(p, "pattern", None)
-                if not isinstance(patt, str) or not patt:
-                    continue
-                matched = _compiled_pattern(p).match(s) is not None
-                invert = bool(getattr(p, "invert_match", False))
-                if (not invert and not matched) or (invert and matched):
-                    default_msg = (
-                        f"Value {s!r} does not match pattern {patt!r}"
-                        if not invert
-                        else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
-                    )
-                    errors.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
+        errors.extend(self._pattern_issues(s, type_stmt, "Value"))
         enums = getattr(type_stmt, "enums", None)
         if enums:
             if s not in [str(e) for e in enums]:
@@ -525,15 +522,9 @@ class TypeChecker:
             n = value
         else:
             n = int(value)
-        if getattr(type_stmt, "range", None):
-            issue = self._numeric_range_issue(
-                n,
-                getattr(type_stmt, "range", None),
-                error_message=getattr(type_stmt, "range_error_message", None),
-                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
-            )
-            if issue is not None:
-                return [issue]
+        issue = self._type_range_issue(n, type_stmt)
+        if issue is not None:
+            return [issue]
         bounds = spec.bounds if spec is not None and spec.bounds is not None else None
         if bounds:
             lo, hi = bounds
@@ -552,15 +543,9 @@ class TypeChecker:
         if gate is not None:
             return [gate]
         n = float(value)
-        if getattr(type_stmt, "range", None):
-            issue = self._numeric_range_issue(
-                n,
-                getattr(type_stmt, "range", None),
-                error_message=getattr(type_stmt, "range_error_message", None),
-                error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
-            )
-            if issue is not None:
-                return [issue]
+        issue = self._type_range_issue(n, type_stmt)
+        if issue is not None:
+            return [issue]
         fd = getattr(type_stmt, "fraction_digits", None)
         if fd is not None and fd >= 0:
             s = str(value).strip()
@@ -615,8 +600,12 @@ class TypeChecker:
             )
             if issue is not None:
                 return [issue]
-        patterns = list(getattr(type_stmt, "patterns", None) or [])
-        for p in patterns:
+        return self._pattern_issues(s, type_stmt, "binary value")[:1]
+
+    def _pattern_issues(self, s: str, type_stmt: YangTypeStmt, label: str) -> list[TypeIssue]:
+        """One issue per ``pattern`` that ``s`` violates, honoring ``invert-match``."""
+        issues: list[TypeIssue] = []
+        for p in getattr(type_stmt, "patterns", None) or []:
             patt = getattr(p, "pattern", None)
             if not isinstance(patt, str) or not patt:
                 continue
@@ -624,12 +613,12 @@ class TypeChecker:
             invert = bool(getattr(p, "invert_match", False))
             if (not invert and not matched) or (invert and matched):
                 default_msg = (
-                    f"binary value {s!r} does not match pattern {patt!r}"
+                    f"{label} {s!r} does not match pattern {patt!r}"
                     if not invert
-                    else f"binary value {s!r} matches forbidden pattern {patt!r} (invert-match)"
+                    else f"{label} {s!r} matches forbidden pattern {patt!r} (invert-match)"
                 )
-                return [_issue("pattern", _pattern_entry_violation_message(p, default=default_msg))]
-        return []
+                issues.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
+        return issues
 
     def _parse_ranges(self, text: str) -> list[tuple[Optional[float], Optional[float]]]:
         """Split a YANG range or length on ``|``, then each part on ``..``.
@@ -679,6 +668,21 @@ class TypeChecker:
                 return ("max", hi)
         return ("max", n)
 
+    def _type_range_issue(self, n: float, type_stmt: YangTypeStmt) -> Optional[TypeIssue]:
+        """The ``range`` restriction on ``type_stmt`` applied to ``n``, if any."""
+        text = getattr(type_stmt, "range", None)
+        if not text:
+            return None
+        return self._numeric_range_issue(
+            n,
+            text,
+            error_message=getattr(type_stmt, "range_error_message", None),
+            error_app_tag=getattr(type_stmt, "range_error_app_tag", None),
+        )
+
+    def _range_bound_miss(self, n: float, text: str) -> Optional[tuple[str, float]]:
+        return self._range_miss(n, self._parse_ranges(text))
+
     def _numeric_range_issue(
         self,
         n: float,
@@ -687,7 +691,7 @@ class TypeChecker:
         error_message: Optional[str] = None,
         error_app_tag: Optional[str] = None,
     ) -> Optional[TypeIssue]:
-        miss = self._range_miss(n, self._parse_ranges(text))
+        miss = self._range_bound_miss(n, text)
         if miss is None:
             return None
         kind, bound = miss
@@ -709,7 +713,7 @@ class TypeChecker:
         error_message: Optional[str] = None,
         error_app_tag: Optional[str] = None,
     ) -> Optional[TypeIssue]:
-        miss = self._range_miss(n, self._parse_ranges(text))
+        miss = self._range_bound_miss(n, text)
         if miss is None:
             return None
         kind, bound = miss

@@ -8,7 +8,6 @@ from typing import TYPE_CHECKING, Optional, Union
 
 from .identifier_ref import (
     YangIdentifierRef,
-    format_identifier_ref,
     parse_identifier_ref_atom,
 )
 
@@ -65,12 +64,6 @@ def resolve_identity_value(module: "YangModule", value: str) -> Optional[Identit
     if name not in target.identities:
         return None
     return (target, name)
-
-
-def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
-    """Local name of the identity if ``qname`` resolves in *importer* scope; else None."""
-    pair = resolve_identity_qname_pair(importer, qname)
-    return pair[1] if pair else None
 
 
 def resolve_identity_base_ref(
@@ -203,14 +196,6 @@ def is_derived_from_strict(
         return False
     anc = strict_ancestors(module, value_local)
     return target_local in anc
-
-
-def is_derived_from_or_self(
-    module: "YangModule", value_local: str, target_local: str
-) -> bool:
-    if value_local == target_local:
-        return True
-    return is_derived_from_strict(module, value_local, target_local)
 
 
 def identityref_value_valid(

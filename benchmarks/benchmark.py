@@ -191,7 +191,7 @@ def benchmark_xpath_count():
 
 def benchmark_type_validation():
     """Benchmark type validation."""
-    from xyang import TypeSystem
+    from xyang.types import TypeSystem
     from xyang.types import TypeConstraint
 
     type_system = TypeSystem()

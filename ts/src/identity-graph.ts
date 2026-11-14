@@ -23,7 +23,7 @@ function asBaseRef(base: string | YangIdentifierRef): YangIdentifierRef {
   return base.prefix ? { prefix: base.prefix, name: base.name } : { name: base.name };
 }
 
-export function resolvePrefixedModuleData(
+function resolvePrefixedModuleData(
   importer: YangModule,
   prefix: string,
   file?: string
@@ -32,7 +32,7 @@ export function resolvePrefixedModuleData(
 }
 
 /** Resolve an RFC 7951 identityref instance value (``prefix:name`` string). */
-export function resolveIdentityQnamePair(importer: YangModule, qname: string): IdentityPair | null {
+function resolveIdentityQnamePair(importer: YangModule, qname: string): IdentityPair | null {
   const ref = parseIdentifierRefAtom(qname);
   if (!ref.prefix) {
     return null;

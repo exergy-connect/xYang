@@ -27,7 +27,6 @@ class TypeSystem:
 
     def __init__(self):
         self.typedefs: dict[str, 'TypeDefinition'] = {}
-        self._pattern_cache: dict[str, re.Pattern] = {}  # Cache compiled regex patterns
         self._validators: dict[str, Callable] = {}
         self._init_builtin_types()
         # Register built-in validators after all methods are defined
@@ -196,7 +195,7 @@ class TypeSystem:
     def _validate_decimal64(self, value: Any, constraints: Optional[TypeConstraint]) -> tuple[bool, Optional[str]]:
         """Validate decimal64 value."""
         try:
-            float_val = float(value)
+            float(value)
             if constraints and constraints.fraction_digits:
                 # Check fraction digits
                 str_val = str(value)

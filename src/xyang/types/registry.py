@@ -928,10 +928,6 @@ def yang_integer_from_json_bounds(
     return base, range_str
 
 
-def integer_bounds_for(name: str) -> tuple[int, int] | None:
-    return YANG_INTEGER_BOUNDS.get(name)
-
-
 def is_string_number(name: str) -> bool:
     spec = REGISTRY.get(name)
     return spec is not None and spec.json_encoding == "string-number"

@@ -86,12 +86,3 @@ class UsesStatementParser:
 
         return expanded
 
-    def _expand_uses_with_statements(
-        self,
-        statements: list,
-        refines: list,
-        module: Optional["YangModule"] = None,
-    ) -> list:
-        """Apply path-based refines to an already-expanded statement list (legacy helper)."""
-        apply_refines_by_path(statements, refines)
-        return statements

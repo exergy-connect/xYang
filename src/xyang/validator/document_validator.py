@@ -510,7 +510,6 @@ class DocumentValidator:
     def _mandatory_choice_violation(
         self,
         choice: YangChoiceStmt,
-        data: dict[str, Any],
         enforce_mandatory_choice: bool,
     ) -> bool:
         """True if mandatory ``choice`` with no active case should be reported (§7.9.4)."""
@@ -525,7 +524,6 @@ class DocumentValidator:
     def _leaf_mandatory_must_exist(
         self,
         leaf: YangLeafStmt | YangAnydataStmt | YangAnyxmlStmt,
-        data: dict[str, Any],
         enforce_mandatory_choice: bool,
     ) -> bool:
         """RFC 7950 §7.6.5: when a mandatory leaf's absence is invalid."""
@@ -934,7 +932,7 @@ class DocumentValidator:
         active_case = active_cases[0] if active_cases else None
 
         if active_case is None:
-            if self._mandatory_choice_violation(choice, data, enforce_mandatory_choice):
+            if self._mandatory_choice_violation(choice, enforce_mandatory_choice):
                 self._add(
                     path=path.current(),
                     pointer=path.pointer(),
@@ -981,7 +979,7 @@ class DocumentValidator:
             if type_name == "empty" and present:
                 return True
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
+                if self._leaf_mandatory_must_exist(stmt, enforce_mandatory_choice):
                     self._add(
                         path=path,
                         pointer=pointer,
@@ -992,7 +990,7 @@ class DocumentValidator:
 
         if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
             if effective is None and stmt.mandatory:
-                if self._leaf_mandatory_must_exist(stmt, data, enforce_mandatory_choice):
+                if self._leaf_mandatory_must_exist(stmt, enforce_mandatory_choice):
                     kind = "anydata" if isinstance(stmt, YangAnydataStmt) else "anyxml"
                     self._add(
                         path=path,
@@ -1146,8 +1144,3 @@ class DocumentValidator:
         parts = [f"{k}='{entry.get(k)}'" for k in key_names]
         return ", ".join(parts) if parts else None
 
-    def _entry_key(self, entry: Any, list_stmt: YangListStmt) -> Optional[str]:
-        if not isinstance(entry, dict) or not list_stmt.key:
-            return None
-        key_names = [k.strip() for k in list_stmt.key.split()]
-        return self._entry_key_from_names(entry, key_names)

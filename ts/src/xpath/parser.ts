@@ -1,5 +1,5 @@
 import { XPathSyntaxError, YangSyntaxError } from "../core/errors";
-import { XPathAstNode, XPathBinaryNode, XPathFunctionNode, XPathLiteralNode, XPathPathNode, isWildcardStep, stepPrefix } from "./ast";
+import { XPathAstNode, XPathFunctionNode, XPathPathNode, isWildcardStep, stepPrefix } from "./ast";
 import { unknownFunctionError, XPATH_FUNCTION_NAMES } from "./functions";
 import { XPathToken, tokenizeXPath } from "./tokenizer";
 
@@ -20,6 +20,11 @@ class XPathParser {
       throw new XPathSyntaxError("Empty expression", { expression: this.expression, position: 0 });
     }
     const node = this.parseExpression();
+    this.expectEof();
+    return node;
+  }
+
+  private expectEof(): void {
     const token = this.current();
     if (token.kind !== "eof") {
       throw new XPathSyntaxError(`Unexpected token: ${token.value || token.kind}`, {
@@ -27,7 +32,6 @@ class XPathParser {
         position: token.position
       });
     }
-    return node;
   }
 
   private current(): XPathToken {
@@ -328,13 +332,7 @@ class XPathParser {
       this.consume("slash");
     }
     const node = this.parsePath(isAbsolute, undefined, allowPredicate);
-    const token = this.current();
-    if (token.kind !== "eof") {
-      throw new XPathSyntaxError(`Unexpected token: ${token.value || token.kind}`, {
-        expression: this.expression,
-        position: token.position
-      });
-    }
+    this.expectEof();
     if (node.kind === "path") {
       for (const segment of node.segments) {
         if (isWildcardStep(segment.step)) {

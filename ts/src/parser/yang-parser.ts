@@ -7,7 +7,6 @@ import { ModuleSource, YangStatement, YangModule, type IdentityBases, type Modul
 import { ParserContext, TokenStream } from "./parser-context";
 import { StatementParsers } from "./statement-parsers";
 import { YangTokenizer } from "./tokenizer";
-import { warnDeprecatedOnce } from "../core/deprecation";
 import { applyBuiltinExtensionInvocations } from "../ext";
 import { applyAugments, applyDeviations } from "../transform/augment-expand";
 import { expandUses } from "../transform/uses-expand";
@@ -16,10 +15,6 @@ import { validateSemantics } from "../validator/semantic-validation";
 type ParserOptions = {
   expandUses?: boolean;
   includePath?: string[];
-  /** @deprecated use expandUses */
-  expand_uses?: boolean;
-  /** @deprecated use includePath */
-  include_path?: string[];
 };
 
 function serializeIdentities(
@@ -109,14 +104,8 @@ export class YangParser {
   });
 
   constructor(options: ParserOptions = {}) {
-    if ("expand_uses" in options) {
-      warnDeprecatedOnce("expand_uses", "expandUses");
-    }
-    if ("include_path" in options) {
-      warnDeprecatedOnce("include_path", "includePath");
-    }
-    this.expandUses = options.expandUses ?? options.expand_uses ?? true;
-    this.includePath = (options.includePath ?? options.include_path ?? []).map((p) => resolve(p));
+    this.expandUses = options.expandUses ?? true;
+    this.includePath = (options.includePath ?? []).map((p) => resolve(p));
   }
 
   /** Resolve `import` / `include` like Python `YangParser._resolve_module_file`. */

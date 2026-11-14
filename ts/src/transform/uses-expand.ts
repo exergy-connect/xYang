@@ -6,10 +6,7 @@ import {
 import { YangStatement, YangModule, type ModuleInit, type YangStatementInit } from "../core/model";
 import { resolvePrefixedModule } from "../validator/if-feature-eval";
 import { YangTokenType } from "../parser/parser-context";
-
-function deepClone<T>(value: T): T {
-  return JSON.parse(JSON.stringify(value)) as T;
-}
+import { deepClone, mergeParentWhen } from "./parent-when";
 
 function deepCloneStatement(stmt: YangStatement): YangStatement {
   return new YangStatement(JSON.parse(JSON.stringify(stmt)) as YangStatement);
@@ -168,30 +165,13 @@ function mergeXPathPrefixes(
 
 /** RFC 7950: `when` on `uses` applies to all schema nodes expanded from that `uses`. */
 function mergeWhenFromParentUses(usesStmt: YangStatement, child: YangStatement): void {
-  const uw = usesStmt.when as Record<string, unknown> | undefined;
-  if (!uw || typeof uw.expression !== "string" || uw.expression.trim() === "") {
-    return;
-  }
-  const usesWhen: Record<string, unknown> = {
-    ...deepClone(uw),
-    evaluate_with_parent_context: true
-  };
-  const existing = child.when as Record<string, unknown> | undefined;
-  if (!existing?.expression) {
-    child.when = usesWhen as YangStatement["when"];
-    return;
-  }
-  const prefixes = mergeXPathPrefixes(
-    existing.xpath_prefixes as Record<string, string> | undefined,
-    uw.xpath_prefixes as Record<string, string> | undefined
-  );
-  child.when = {
-    ...existing,
-    expression: `(${existing.expression}) and (${uw.expression})`,
-    ...(prefixes ? { xpath_prefixes: prefixes } : {}),
-    description: String(existing.description ?? ""),
-    evaluate_with_parent_context: true
-  };
+  mergeParentWhen(usesStmt, child, (existing, usesWhen) => {
+    const prefixes = mergeXPathPrefixes(
+      existing.xpath_prefixes as Record<string, string> | undefined,
+      usesWhen.xpath_prefixes as Record<string, string> | undefined
+    );
+    return prefixes ? { xpath_prefixes: prefixes } : {};
+  });
 }
 
 /** Depth-first match for schema node name (refine targets may sit under choice/case). */

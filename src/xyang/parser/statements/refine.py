@@ -14,7 +14,6 @@ from ...errors import XPathSyntaxError
 from ...xpath import XPathParser
 
 if TYPE_CHECKING:
-    from ...xpath.ast import PathNode
     from ..statement_parsers import StatementParsers
 
 

@@ -116,17 +116,18 @@ function compareEq(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function compareLt(left: unknown, right: unknown): boolean {
+function compareOrdered(left: unknown, right: unknown, op: "<" | ">"): boolean {
+  const before = (a: number | string, b: number | string): boolean => (op === "<" ? a < b : a > b);
   for (const leftValue of nodeSetValues(left)) {
     for (const rightValue of nodeSetValues(right)) {
       const [cl, cr] = coercePair(leftValue, rightValue);
       if (typeof cl === "number" && typeof cr === "number") {
-        if (cl < cr) {
+        if (before(cl, cr)) {
           return true;
         }
         continue;
       }
-      if (`${cl}` < `${cr}`) {
+      if (before(`${cl}`, `${cr}`)) {
         return true;
       }
     }
@@ -134,22 +135,17 @@ function compareLt(left: unknown, right: unknown): boolean {
   return false;
 }
 
-function compareGt(left: unknown, right: unknown): boolean {
-  for (const leftValue of nodeSetValues(left)) {
-    for (const rightValue of nodeSetValues(right)) {
-      const [cl, cr] = coercePair(leftValue, rightValue);
-      if (typeof cl === "number" && typeof cr === "number") {
-        if (cl > cr) {
-          return true;
-        }
-        continue;
-      }
-      if (`${cl}` > `${cr}`) {
-        return true;
-      }
-    }
+/** List / leaf-list instance arrays step through each entry; other nodes return null. */
+function expandEntries(node: XPathNode, step: (entry: XPathNode) => XPathNode[]): XPathNode[] | null {
+  const schema = node.schema;
+  if (!Array.isArray(node.data) || (schema?.keyword !== "list" && schema?.keyword !== "leaf-list")) {
+    return null;
   }
-  return false;
+  const expanded: XPathNode[] = [];
+  for (const item of node.data) {
+    expanded.push(...step({ data: item, schema, parent: node }));
+  }
+  return expanded;
 }
 
 function getSchemaChildren(schema: XPathSchema | null): XPathSchema[] {
@@ -186,12 +182,9 @@ function stepWildcard(node: XPathNode, context: XPathContext, module: string | u
   const data = node.data;
   const schema = node.schema;
 
-  if (Array.isArray(data) && (schema?.keyword === "list" || schema?.keyword === "leaf-list")) {
-    const expanded: XPathNode[] = [];
-    for (const item of data) {
-      expanded.push(...stepWildcard({ data: item, schema, parent: node }, context, module));
-    }
-    return expanded;
+  const entries = expandEntries(node, (entry) => stepWildcard(entry, context, module));
+  if (entries) {
+    return entries;
   }
   if (!data || typeof data !== "object") {
     return [];
@@ -282,19 +275,12 @@ function stepNamed(node: XPathNode, segment: XPathPathSegment, rootModule: strin
 }
 
 function stepNode(node: XPathNode, step: string, rootModule: string): XPathNode[] {
-  const data = node.data;
-  const schema = node.schema;
-
-  if (Array.isArray(data) && (schema?.keyword === "list" || schema?.keyword === "leaf-list")) {
-    const expanded: XPathNode[] = [];
-    for (const item of data) {
-      const entryNode: XPathNode = { data: item, schema, parent: node };
-      expanded.push(...stepNode(entryNode, step, rootModule));
-    }
-    return expanded;
+  const entries = expandEntries(node, (entry) => stepNode(entry, step, rootModule));
+  if (entries) {
+    return entries;
   }
 
-  const childSchema = findSchemaChild(schema, step);
+  const childSchema = findSchemaChild(node.schema, step);
   return stepChild(node, childSchema ? memberName(childSchema, rootModule) : step, childSchema);
 }
 
@@ -436,16 +422,16 @@ export class XPathEvaluator {
       return !compareEq(left, right);
     }
     if (op === "<") {
-      return compareLt(left, right);
+      return compareOrdered(left, right, "<");
     }
     if (op === ">") {
-      return compareGt(left, right);
+      return compareOrdered(left, right, ">");
     }
     if (op === "<=") {
-      return compareEq(left, right) || compareLt(left, right);
+      return compareEq(left, right) || compareOrdered(left, right, "<");
     }
     if (op === ">=") {
-      return compareEq(left, right) || compareGt(left, right);
+      return compareEq(left, right) || compareOrdered(left, right, ">");
     }
     if (op === "+") {
       const sum = Number(firstValue(left)) + Number(firstValue(right));
@@ -469,6 +455,11 @@ export class XPathEvaluator {
     }
 
     return null;
+  }
+
+  private stringPair(fn: string, args: XPathAstNode[], context: XPathContext, node: XPathNode): [string, string] {
+    requireArity(fn, args, 2);
+    return [asXPathString(this.eval(args[0], context, node)), asXPathString(this.eval(args[1], context, node))];
   }
 
   private evalFunction(name: string, args: XPathAstNode[], context: XPathContext, node: XPathNode): unknown {
@@ -528,21 +519,15 @@ export class XPathEvaluator {
       return args.map((arg) => String(firstValue(this.eval(arg, context, node)) ?? "")).join("");
     }
     if (fn === "contains") {
-      requireArity(fn, args, 2);
-      const source = asXPathString(this.eval(args[0], context, node));
-      const needle = asXPathString(this.eval(args[1], context, node));
+      const [source, needle] = this.stringPair(fn, args, context, node);
       return source.includes(needle);
     }
     if (fn === "starts-with") {
-      requireArity(fn, args, 2);
-      const source = asXPathString(this.eval(args[0], context, node));
-      const needle = asXPathString(this.eval(args[1], context, node));
+      const [source, needle] = this.stringPair(fn, args, context, node);
       return source.startsWith(needle);
     }
     if (fn === "substring-before") {
-      requireArity(fn, args, 2);
-      const source = asXPathString(this.eval(args[0], context, node));
-      const needle = asXPathString(this.eval(args[1], context, node));
+      const [source, needle] = this.stringPair(fn, args, context, node);
       const index = source.indexOf(needle);
       if (index < 0) {
         return "";
@@ -550,9 +535,7 @@ export class XPathEvaluator {
       return source.slice(0, index);
     }
     if (fn === "substring-after") {
-      requireArity(fn, args, 2);
-      const source = asXPathString(this.eval(args[0], context, node));
-      const needle = asXPathString(this.eval(args[1], context, node));
+      const [source, needle] = this.stringPair(fn, args, context, node);
       const index = source.indexOf(needle);
       if (index < 0) {
         return "";
@@ -651,8 +634,4 @@ export class XPathEvaluator {
 
     throw unknownFunctionError(name);
   }
-}
-
-export function evaluateXPath(ast: XPathAstNode, context: XPathContext, node: XPathNode): unknown {
-  return new XPathEvaluator().eval(ast, context, node);
 }
