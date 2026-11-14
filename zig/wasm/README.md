@@ -3,6 +3,15 @@
 Build the existing Zig validation core as a freestanding Wasm library with Zig
 0.17.1. It imports no host functions and needs neither WASI nor a filesystem.
 
+The release workflow builds and tests this library, then attaches `xyang.wasm`
+and its dependency-free JavaScript wrapper, `xyang.mjs`, to new
+[GitHub Releases](https://github.com/exergy-connect/xYang/releases). Download
+both assets from the same release. A manual run of **Release Zig binaries**
+uploads them in the `xyang-zig-binaries` workflow artifact without publishing a
+release.
+
+To build from source:
+
 ```bash
 cd zig
 zig build

@@ -1,7 +1,8 @@
-# Build xyang-zig for Linux, macOS, and Windows (x86_64 and aarch64) and attach
-# the binaries to a GitHub Release. Not part of pull-request CI. Runs when a
-# release is published, and on a manual workflow_dispatch (build and smoke test
-# only; nothing is attached unless this run is a published release).
+# Build xyang-zig for Linux, macOS, and Windows (x86_64 and aarch64), plus the
+# freestanding Wasm library and JavaScript wrapper, and attach them to a GitHub
+# Release. Not part of pull-request CI. Runs when a release is published, and
+# on a manual workflow_dispatch (build and test only; nothing is attached unless
+# this run is a published release).
 #
 # One Linux runner cross-compiles every target. Zig 0.17.1 is pinned the same
 # way as zig.yml: ZIG_VERSION equals minimum_zig_version in zig/build.zig.zon,
@@ -102,16 +103,36 @@ jobs:
           "$bin" -V
           "$bin" parse examples/meta-model.yang
 
-      - name: Upload binaries
+      - name: Set up Node.js for Wasm host tests
+        uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+
+      - name: Build and test the freestanding Wasm library
+        working-directory: zig
+        shell: bash
+        run: |
+          set -euo pipefail
+          zig build wasm -Doptimize=ReleaseSmall
+          # Operation tests generate native JSON models with the native CLI.
+          cp dist/xyang-zig-linux-x64 zig-out/bin/xyang-zig
+          node --test tests/wasm.test.mjs
+          cp zig-out/bin/xyang.wasm dist/xyang.wasm
+          cp wasm/xyang.mjs dist/xyang.mjs
+
+      - name: Upload binaries and Wasm assets
         if: github.event_name == 'workflow_dispatch'
         uses: actions/upload-artifact@v7
         with:
           name: xyang-zig-binaries
-          path: zig/dist/xyang-zig-*
+          path: |
+            zig/dist/xyang-zig-*
+            zig/dist/xyang.wasm
+            zig/dist/xyang.mjs
           if-no-files-found: error
 
-      - name: Attach binaries to the release
+      - name: Attach binaries and Wasm assets to the release
         if: github.event_name == 'release'
         env:
           GH_TOKEN: ${{ github.token }}
-        run: gh release upload "${{ github.event.release.tag_name }}" zig/dist/xyang-zig-* --clobber
+        run: gh release upload "${{ github.event.release.tag_name }}" zig/dist/xyang-zig-* zig/dist/xyang.wasm zig/dist/xyang.mjs --clobber

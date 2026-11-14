@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- **WebAssembly release assets:** new releases include the freestanding `xyang.wasm` validation library and its JavaScript wrapper, `xyang.mjs`. The Zig release workflow builds with `ReleaseSmall` and runs the Wasm host API tests before attaching the assets; manual runs upload workflow artifacts only.
+
 ### Fixed
 
 - **Statement arguments (Python, TypeScript, and Zig)** ([#187](https://github.com/exergy-connect/xYang/issues/187), [#191](https://github.com/exergy-connect/xYang/issues/191), [#192](https://github.com/exergy-connect/xYang/issues/192), [#193](https://github.com/exergy-connect/xYang/issues/193)): every statement argument is read by one shared reader, quoted or unquoted, including `+` concatenation, and is then checked against that statement's grammar. `presence root;`, `base "b";`, `belongs-to "m"`, and `status "deprecated";` load. An argument that is not an identifier, an identifier-ref, or the keyword the statement allows fails with an error that names the statement and the text. `must` accepts `error-app-tag` next to `error-message`, keeps it on the parsed constraint, and includes it in the validation message. Shared cases `syntax/unquoted-presence-187`, `syntax/quoted-identifier-191`, `syntax/quoted-status-192`, and `syntax/must-error-app-tag-193`.
