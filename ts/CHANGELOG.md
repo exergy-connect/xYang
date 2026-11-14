@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-11-13
+
 ### Fixed
 
 - **Typedef scope:** nested typedefs are visible only in their declaration context and descendants. Lookup checks scope during existing resolution, including imported groupings and includes. Native JSON preserves scope restrictions in global `$defs` with optional `x-yang.scope`, `x-yang.name`, and reference context metadata, and rejects scoped reference restrictions that cannot be exported without loss.
@@ -260,7 +262,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0
 [0.1.11]: https://github.com/exergy-connect/xYang/compare/v0.1.10...v0.1.11
