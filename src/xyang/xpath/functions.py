@@ -7,6 +7,7 @@ ctx and node follow the same contract as evaluator methods.
 
 from __future__ import annotations
 
+import math
 from collections.abc import Callable
 from typing import TYPE_CHECKING, Any
 
@@ -64,6 +65,48 @@ def _require_arity(ast: FunctionCallNode, expected: int) -> None:
         raise XPathEvaluationError(f"{ast.name.lower()}() expects {expected} arguments, got {len(ast.args)}")
 
 
+def _as_xpath_number(ev: "XPathEvaluator", arg: Any, ctx: Context, node: Node) -> float:
+    """XPath 1.0 number conversion, the same as ``number()`` for one argument."""
+    v = first_value(ev.eval(arg, ctx, node))
+    try:
+        return float(v)
+    except (TypeError, ValueError):
+        return float("nan")
+
+
+def _xpath_round(value: float) -> float:
+    """XPath 1.0 ``round``: half toward +∞. NaN and infinities are unchanged."""
+    if math.isnan(value) or math.isinf(value):
+        return value
+    if value == 0.0:
+        return value
+    if -0.5 <= value < 0.0:
+        return -0.0
+    return float(math.floor(value + 0.5))
+
+
+def _substring_offset(boundary: float, length: int) -> int:
+    """0-based index of a 1-based position boundary, clamped to ``[0, length]``."""
+    if not boundary > 1:
+        return 0
+    index = int(boundary) - 1
+    if index > length:
+        return length
+    return index
+
+
+def _substring_slice(source: str, start: float, end: float) -> str:
+    """Characters whose 1-based position ``p`` satisfies ``start <= p < end`` (IEEE)."""
+    if math.isnan(start) or math.isnan(end) or (math.isinf(start) and start > 0) or (math.isinf(end) and end < 0):
+        return ""
+    n = len(source)
+    lo = _substring_offset(start, n)
+    hi = n if math.isinf(end) else _substring_offset(end, n)
+    if lo >= hi:
+        return ""
+    return source[lo:hi]
+
+
 def f_contains(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
     """contains(source, needle): true when needle occurs in source. Empty needle is true."""
     _require_arity(ast, 2)
@@ -87,6 +130,24 @@ def _split_on_needle(
     source = _as_xpath_string(ev, ast.args[0], ctx, node)
     needle = _as_xpath_string(ev, ast.args[1], ctx, node)
     return source, needle, source.find(needle)
+
+
+def f_substring(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
+    """substring(source, start [, length]): XPath 1.0, 1-based, rounded half toward +∞.
+
+    ``substring('12345', 1.5, 2.6)`` is ``234``. ``substring('12345', 0, 3)`` is ``12``.
+    Two or three arguments; any other count is an evaluation error.
+    """
+    count = len(ast.args)
+    if count != 2 and count != 3:
+        raise XPathEvaluationError(f"{ast.name.lower()}() expects 2 or 3 arguments, got {count}")
+    source = _as_xpath_string(ev, ast.args[0], ctx, node)
+    start = _xpath_round(_as_xpath_number(ev, ast.args[1], ctx, node))
+    if count == 3:
+        end = start + _xpath_round(_as_xpath_number(ev, ast.args[2], ctx, node))
+    else:
+        end = float("inf")
+    return _substring_slice(source, start, end)
 
 
 def f_substring_before(ev: "XPathEvaluator", ast: FunctionCallNode, ctx: Context, node: Node) -> Any:
@@ -243,6 +304,7 @@ FUNCTIONS = {
     "concat": f_concat,
     "contains": f_contains,
     "starts-with": f_starts_with,
+    "substring": f_substring,
     "substring-before": f_substring_before,
     "substring-after": f_substring_after,
     "translate": f_translate,

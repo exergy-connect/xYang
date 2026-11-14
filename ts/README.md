@@ -75,7 +75,7 @@ The browser entry point parses YANG source strings without filesystem access.
 - Export JSON Schema 2020-12 with `x-yang` metadata.
 - Optionally validate qualified JSON subtrees under `anydata`.
 
-Unsupported YANG constructs may be skipped with a warning. `deviate not-supported` is applied; other `deviate` forms warn. XPath `contains`, `starts-with`, `substring-before`, and `substring-after` are supported. See the [feature matrix and known gaps](https://github.com/exergy-connect/xYang/blob/main/FEATURES.md) and [RFC deviations](https://github.com/exergy-connect/xYang/blob/main/FEATURES.md#deviations-from-rfc-7950--rfc-7951).
+Unsupported YANG constructs may be skipped with a warning. `deviate not-supported` is applied; other `deviate` forms warn. XPath `contains`, `starts-with`, `substring`, `substring-before`, and `substring-after` are supported. See the [feature matrix and known gaps](https://github.com/exergy-connect/xYang/blob/main/FEATURES.md) and [RFC deviations](https://github.com/exergy-connect/xYang/blob/main/FEATURES.md#deviations-from-rfc-7950--rfc-7951).
 
 [Source and documentation](https://github.com/exergy-connect/xYang) · [Report an issue](https://github.com/exergy-connect/xYang/issues)
 

@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **XPath `substring()` (Python, TypeScript, and Zig)** ([#215](https://github.com/exergy-connect/xYang/issues/215)): `substring(source, start)` and `substring(source, start, length)` follow XPath 1.0. Positions are 1-based and the numeric arguments are rounded as XPath `round` does (half toward positive infinity). `substring('12345', 1.5, 2.6)` is `234` and `substring('12345', 0, 3)` is `12`. Any other argument count is `xpath-error`. Shared case `xpath/substring`. This is the function `huawei-bgp-epe` (Huawei NE8000 8.22.0, Huawei/yang 1a06948) uses at line 559.
 - **`benchmarks/benchmark.py` type validation benchmark:** it imported `TypeSystem` from `xyang`, which does not export it, and raised `ImportError`. It now imports from `xyang.types`.
 
 - **Parenthesized XPath comparison starting with a literal (Python, TypeScript, and Zig)** ([#202](https://github.com/exergy-connect/xYang/issues/202)): `(1>=../a)` is an expression. The value-list lookahead no longer consumes the leading literal and drops it when no comma follows. `(1)` and `('a','b')` are unchanged. Shared case `xpath/paren-literal-comparison-202`.
