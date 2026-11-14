@@ -7,7 +7,8 @@ metadata or data-node keywords into a handler map.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable
+from typing import TYPE_CHECKING, Any
+from collections.abc import Callable
 
 from . import keywords as kw
 from .dispatch_registry import DATA_NODE_SUBSTATEMENTS, METADATA_SUBSTATEMENTS

@@ -2,7 +2,8 @@
 xYang validator: uses xpath DocumentValidator for validation.
 """
 
-from typing import AbstractSet, Any, Dict, List, Optional, Tuple
+from typing import Any, Optional
+from collections.abc import Set
 
 from ..ast import YangStatementList
 from ..encoding import resolve_structure_instance
@@ -25,7 +26,7 @@ class YangValidator:
         self,
         module: YangModule,
         *,
-        enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = None,
+        enabled_features_by_module: Optional[dict[str, Set[str]]] = None,
     ) -> None:
         """
         Args:
@@ -35,12 +36,12 @@ class YangValidator:
                 Same semantics as TypeScript ``YangValidator(module, { enabledFeaturesByModule })``.
         """
         self.module = module
-        self._enabled_features_by_module: Optional[Dict[str, AbstractSet[str]]] = (
+        self._enabled_features_by_module: Optional[dict[str, Set[str]]] = (
             {name: frozenset(feats) for name, feats in enabled_features_by_module.items()}
             if enabled_features_by_module is not None
             else None
         )
-        self._extensions: List[Tuple[ValidatorExtension, Dict[str, Any]]] = []
+        self._extensions: list[tuple[ValidatorExtension, dict[str, Any]]] = []
 
     def enable_extension(self, extension: ValidatorExtension, /, **kwargs: Any) -> None:
         """Enable a :class:`DocumentValidator` extension (see ``ValidatorExtension``)."""
@@ -66,15 +67,15 @@ class YangValidator:
 
     def validate(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Tuple[bool, List[str], List[str]]:
+        context: Optional[dict[str, Any]] = None,
+    ) -> tuple[bool, list[str], list[str]]:
         """
         Validate data against the YANG module, or against one rpc's or action's input or output.
 
@@ -106,15 +107,15 @@ class YangValidator:
 
     def validate_detailed(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> Dict[str, Any]:
+        context: Optional[dict[str, Any]] = None,
+    ) -> dict[str, Any]:
         """
         Validate data and return structured issues.
 
@@ -139,15 +140,15 @@ class YangValidator:
 
     def _collect(
         self,
-        data: Dict[str, Any],
+        data: dict[str, Any],
         *,
         leafref_severity: Severity,
         native_json: bool = False,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
-        context: Optional[Dict[str, Any]] = None,
-    ) -> List[ValidationError]:
+        context: Optional[dict[str, Any]] = None,
+    ) -> list[ValidationError]:
         _operation.check_operation_options(rpc, action, direction, context)
         if rpc is not None or action is not None:
             return self._collect_operation(
@@ -160,7 +161,7 @@ class YangValidator:
                 native_json=native_json,
             )
         root_schema: YangStatementList = self.module
-        instance: Dict[str, Any] = data
+        instance: dict[str, Any] = data
         structure_key: Optional[str] = None
         structure = resolve_structure_instance(data, self.module)
         if structure is not None:
@@ -185,16 +186,16 @@ class YangValidator:
         rpc: Optional[str],
         action: Optional[str],
         direction: str,
-        context: Optional[Dict[str, Any]],
+        context: Optional[dict[str, Any]],
         leafref_severity: Severity,
         native_json: bool,
-    ) -> List[ValidationError]:
+    ) -> list[ValidationError]:
         if rpc is not None:
             target = _operation.find_rpc(self.module, rpc)
         else:
             target = _operation.resolve_action(self.module, action or "")
         operation = _operation.operation_node(target.operation, _operation.find_body(target.operation, direction))
-        context_issues: List[ValidationError] = []
+        context_issues: list[ValidationError] = []
         if context is not None:
             # RFC 7950 §6.4.1: the operation reads the server data, so it must be valid data first.
             context_issues = self._collect(context, leafref_severity=leafref_severity, native_json=native_json)
@@ -250,8 +251,8 @@ class YangValidator:
         return context_issues + errors
 
     @staticmethod
-    def _issue(e: ValidationError) -> Dict[str, Any]:
-        issue: Dict[str, Any] = {
+    def _issue(e: ValidationError) -> dict[str, Any]:
+        issue: dict[str, Any] = {
             "code": e.code,
             "path": e.pointer,
             "message": e.message,

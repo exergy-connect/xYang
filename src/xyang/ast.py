@@ -4,7 +4,8 @@ Abstract Syntax Tree (AST) nodes for YANG statements.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, Callable, Dict, List, Optional
+from typing import TYPE_CHECKING, Any, Optional
+from collections.abc import Callable
 from dataclasses import dataclass, field
 
 from .errors import YangSemanticError
@@ -24,7 +25,7 @@ def _empty_path_node():
 @dataclass
 class YangStatementList:
     """Base for nodes that contain a list of YANG statements (module body or statement body)."""
-    statements: List['YangStatement'] = field(default_factory=list)
+    statements: list['YangStatement'] = field(default_factory=list)
 
     def find_statement(self, name: str) -> Optional['YangStatement']:
         """Find a statement by name."""
@@ -33,14 +34,14 @@ class YangStatementList:
                 return stmt
         return None
 
-    def get_all_leaves(self) -> List['YangLeafStmt']:
+    def get_all_leaves(self) -> list['YangLeafStmt']:
         """Get all leaf statements recursively."""
         leaves = []
         for stmt in self.statements:
             leaves.extend(self._collect_leaves(stmt))
         return leaves
 
-    def _collect_leaves(self, stmt: 'YangStatement') -> List['YangLeafStmt']:
+    def _collect_leaves(self, stmt: 'YangStatement') -> list['YangLeafStmt']:
         """Recursively collect leaf statements."""
         leaves = []
         if isinstance(stmt, YangLeafStmt):
@@ -75,7 +76,7 @@ class YangStatement(YangStatementList):
 @dataclass
 class YangStatementWithMust(YangStatement):
     """Statement that can have must constraints (leaf, leaf-list, container, list)."""
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
+    must_statements: list['YangMustStmt'] = field(default_factory=list)
 
 
 @dataclass
@@ -84,7 +85,7 @@ class YangStatementWithWhen(YangStatement):
 
     when: Optional['YangWhenStmt'] = None
     # RFC 7950 / 7952: one or more ``if-feature`` substatements (AND of expressions).
-    if_features: List[str] = field(default_factory=list)
+    if_features: list[str] = field(default_factory=list)
     # RFC 7950 §7.21.1: explicit ``config true|false``; ``None`` means inherit from parent.
     config: Optional[bool] = None
     # RFC 7951: module that defined this node when it differs from the enclosing parent
@@ -119,8 +120,8 @@ class YangTypedefStmt(YangStatement):
 class YangIdentityStmt(YangStatement):
     """Identity statement (RFC 7950); may have multiple ``base`` substatements (YANG 1.1)."""
 
-    bases: List[YangIdentifierRef] = field(default_factory=list)
-    if_features: List[str] = field(default_factory=list)
+    bases: list[YangIdentifierRef] = field(default_factory=list)
+    if_features: list[str] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -229,22 +230,22 @@ class YangBinaryTypeStmt(YangTypeStmt, _LengthAttributes):
 
 @dataclass(slots=True)
 class YangStringTypeStmt(YangBinaryTypeStmt):
-    patterns: Optional[List[YangPatternSpec]] = None
+    patterns: Optional[list[YangPatternSpec]] = None
 
 
 @dataclass(slots=True)
 class YangEnumerationTypeStmt(YangTypeStmt):
-    enums: List[str] = field(default_factory=list)
+    enums: list[str] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class YangBitsTypeStmt(YangTypeStmt):
-    bits: List[YangBitStmt] = field(default_factory=list)
+    bits: list[YangBitStmt] = field(default_factory=list)
 
 
 @dataclass(slots=True)
 class YangUnionTypeStmt(YangTypeStmt):
-    types: List[YangTypeStmt] = field(default_factory=list)
+    types: list[YangTypeStmt] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -259,7 +260,7 @@ class YangLeafrefTypeStmt(YangInstanceIdentifierTypeStmt):
 
 @dataclass(slots=True)
 class YangIdentityrefTypeStmt(YangTypeStmt):
-    identityref_bases: List[YangIdentifierRef] = field(default_factory=list)
+    identityref_bases: list[YangIdentifierRef] = field(default_factory=list)
 
 
 @dataclass(slots=True)
@@ -268,10 +269,10 @@ class YangDerivedTypeStmt(YangTypeStmt, _RangeAttributes, _LengthAttributes):
 
     range_restriction: Optional[YangRestriction] = None
     length_restriction: Optional[YangRestriction] = None
-    patterns: Optional[List[YangPatternSpec]] = None
+    patterns: Optional[list[YangPatternSpec]] = None
     # Enumeration and bits may be narrowed on derived references.
-    enums: Optional[List[str]] = None
-    bits: Optional[List[YangBitStmt]] = None
+    enums: Optional[list[str]] = None
+    bits: Optional[list[YangBitStmt]] = None
     require_instance: Optional[bool] = None
 
 
@@ -293,7 +294,7 @@ class YangContainerStmt(YangStatementWithMust, YangStatementWithWhen):
     """Container statement."""
     presence: Optional[str] = None
     # Groupings declared in this container. Visible here and in descendants only.
-    groupings: Dict[str, "YangGroupingStmt"] = field(default_factory=dict)
+    groupings: dict[str, "YangGroupingStmt"] = field(default_factory=dict)
 
 
 @dataclass
@@ -335,7 +336,7 @@ class YangListStmt(YangStatementWithMust, YangStatementWithWhen):
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
     #: One entry per ``unique`` statement: descendant paths with prefixes stripped (``a/b``).
-    unique: List[List[str]] = field(default_factory=list)
+    unique: list[list[str]] = field(default_factory=list)
 
 
 @dataclass
@@ -354,7 +355,7 @@ class YangLeafListStmt(YangStatementWithMust, YangStatementWithWhen):
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
     # RFC 7950: 0..n ``default`` substatements (ordered set of default values); filled by refine too
-    defaults: List[Any] = field(default_factory=list)
+    defaults: list[Any] = field(default_factory=list)
 
 
 @dataclass
@@ -432,7 +433,7 @@ class YangParsedXPathBase:
             from .xpath import XPathParser
             self.ast = XPathParser(self.expression).parse()
 
-    def bind_prefixes(self, module: Any, recorded: Optional[Dict[str, str]] = None) -> None:
+    def bind_prefixes(self, module: Any, recorded: Optional[dict[str, str]] = None) -> None:
         """Bind prefixed steps to the modules *module* maps their prefixes to.
 
         *recorded* is a ``{prefix: module}`` map kept in the native JSON form; when given it
@@ -476,7 +477,7 @@ class YangGroupingStmt(YangStatement):
     """Grouping statement - defines reusable schema components."""
 
     # Typedef names declared directly in this grouping (for ``uses`` expansion).
-    typedef_names: List[str] = field(default_factory=list)
+    typedef_names: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -487,9 +488,9 @@ class YangUsesStmt(YangStatementWithWhen):
     # is stored separately so expanders do not re-split qname strings.
     grouping_name: str = ""
     grouping_prefix: Optional[str] = None
-    refines: List['YangRefineStmt'] = field(default_factory=list)
+    refines: list['YangRefineStmt'] = field(default_factory=list)
     # RFC 7950 §7.17: ``augment`` substatements (relative descendant paths).
-    augmentations: List['YangAugmentStmt'] = field(default_factory=list)
+    augmentations: list['YangAugmentStmt'] = field(default_factory=list)
 
     def grouping_qname(self) -> str:
         """Display / cycle-key form ``name`` or ``prefix:name``."""
@@ -506,7 +507,7 @@ class YangAugmentStmt(YangStatementWithWhen):
     """Augment statement (RFC 7950). After parse, children are merged into the target node (see ``augment_expand``)."""
 
     augment_path: str = ""
-    augment_path_segments: List[YangIdentifierRef] = field(default_factory=list)
+    augment_path_segments: list[YangIdentifierRef] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -522,15 +523,15 @@ class YangDeviateStmt:
 
     kind: str = ""
     config: Optional[bool] = None
-    defaults: List[str] = field(default_factory=list)
+    defaults: list[str] = field(default_factory=list)
     mandatory: Optional[bool] = None
     min_elements: Optional[int] = None
     max_elements: Optional[int] = None
     max_elements_set: bool = False
-    must_statements: List['YangMustStmt'] = field(default_factory=list)
+    must_statements: list['YangMustStmt'] = field(default_factory=list)
     type: Optional['YangTypeStmt'] = None
     units: Optional[str] = None
-    unique: List[List[str]] = field(default_factory=list)
+    unique: list[list[str]] = field(default_factory=list)
 
 
 @dataclass
@@ -539,9 +540,9 @@ class YangDeviationStmt(YangStatement):
     target, ``add``/``replace``/``delete`` change its properties (``deviates``, in order)."""
 
     target_path: str = ""
-    target_path_segments: List[YangIdentifierRef] = field(default_factory=list)
+    target_path_segments: list[YangIdentifierRef] = field(default_factory=list)
     not_supported: bool = False
-    deviates: List[YangDeviateStmt] = field(default_factory=list)
+    deviates: list[YangDeviateStmt] = field(default_factory=list)
 
     def get_schema_node(self) -> Optional[str]:
         return None
@@ -558,13 +559,13 @@ class YangRefineStmt(YangStatementWithMust):
     min_elements: Optional[int] = None  # Refined min-elements (list / leaf-list)
     max_elements: Optional[int] = None  # Refined max-elements (list / leaf-list)
     # RFC 7950 §7.13.2: ``default`` substatements (one value each); one for leaf targets, 1..n for leaf-list
-    refined_defaults: List[Any] = field(default_factory=list)
+    refined_defaults: list[Any] = field(default_factory=list)
     # RFC 7950 §7.13.2: leaf / choice may get a different mandatory; None = omit from refine
     refined_mandatory: Optional[bool] = None
     # RFC 7950 §7.13.2: container / leaf / list / leaf-list may get config refined
     refined_config: Optional[bool] = None
     # RFC 7950 §7.13.2: additional if-feature expressions (AND with target node's own).
-    if_features: List[str] = field(default_factory=list)
+    if_features: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -574,7 +575,7 @@ class YangChoiceStmt(YangStatementWithWhen):
     mandatory: bool = False
     # RFC 7950 §7.9.3: name of the default case (or the shorthand child).
     default: Optional[str] = None
-    cases: List['YangCaseStmt'] = field(default_factory=list)
+    cases: list['YangCaseStmt'] = field(default_factory=list)
 
     def child_names(self, data: dict) -> set[str]:
         for case in self.cases:
