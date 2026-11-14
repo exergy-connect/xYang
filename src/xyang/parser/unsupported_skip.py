@@ -2,8 +2,7 @@
 Skip unsupported YANG constructs after emitting a warning.
 
 Statements that are not modeled in the AST (none today) have their tokens
-consumed so the rest of the module can parse. ``deviation`` is parsed;
-only ``deviate add|replace|delete`` is skipped here.
+consumed so the rest of the module can parse.
 """
 
 from __future__ import annotations
@@ -74,11 +73,6 @@ def skip_unsupported_construct(tokens: TokenStream, *, context: str) -> None:
             return
         tokens.consume()
     tokens.consume_if_type(YangTokenType.SEMICOLON)
-
-
-def warn_unsupported_deviate(kind: str, path: str) -> None:
-    """``deviate add|replace|delete`` stays unsupported; say which kind and path."""
-    logger.warning("Ignoring unsupported 'deviate %s' for %s", kind, path)
 
 
 def is_unsupported_construct_start(tokens: TokenStream) -> bool:

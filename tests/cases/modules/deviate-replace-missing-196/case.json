@@ -1,0 +1,6 @@
+{
+  "description": "RFC 7950 §7.20.3.2: deviate replace of a property the target does not have is an error (#196).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "cannot 'deviate replace' units"
+}

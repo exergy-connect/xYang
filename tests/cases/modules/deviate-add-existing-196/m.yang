@@ -1,0 +1,11 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  leaf l { type string; default "a"; }
+
+  deviation "/m:l" {
+    deviate add { default "x"; }
+  }
+}

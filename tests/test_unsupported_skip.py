@@ -1,4 +1,4 @@
-"""Unsupported YANG statements (rpc, deviation, …) are skipped with a warning.
+"""rpc, input/output and notification are parsed, not skipped with a warning.
 
 Top-level input/output and rpc-in-container syntax errors live under
 ``tests/cases/parser/``.
@@ -19,11 +19,6 @@ module ex {
   yang-version 1.1;
   namespace "urn:ex";
   prefix ex;
-  deviation "/ex:foo" {
-    deviate add {
-      leaf extra { type string; }
-    }
-  }
   extension ext { argument name; }
   rpc reset {
     input { leaf in-arg { type string; } }
@@ -37,8 +32,6 @@ module ex {
         mod = parse_yang_string(yang)
     warn_msgs = " ".join(r.getMessage() for r in caplog.records)
     # ``rpc`` and nested ``input``/``output`` are parsed.
-    # ``deviate add`` is skipped with a warning that names the kind and path.
-    assert "ignoring unsupported 'deviate add' for /ex:foo" in warn_msgs.lower()
     assert "rpc" not in warn_msgs.lower()
     assert "input" not in warn_msgs.lower()
     assert "output" not in warn_msgs.lower()
