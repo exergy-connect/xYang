@@ -84,7 +84,9 @@ cd zig && zig build -Doptimize=ReleaseSafe
 
 An experimental [WebAssembly build](zig/wasm/README.md) embeds the same Zig
 validation core in browsers and Wasm hosts, loading canonical `.yang.json` models
-without WASI or filesystem access: `cd zig && zig build wasm -Doptimize=ReleaseSmall`.
+without WASI or filesystem access. New releases include `xyang.wasm` and its
+JavaScript wrapper, `xyang.mjs`, as downloadable assets. To build from source:
+`cd zig && zig build wasm -Doptimize=ReleaseSmall`.
 
 ### Standalone binary
 
@@ -418,7 +420,7 @@ cd ts && npm install && npm test
 |----------|------|---------|
 | **Tests (TypeScript)** | [`.github/workflows/tests-ts.yml`](.github/workflows/tests-ts.yml) | `npm run lint`, `npm run build:check`, `npm run build:ci`, and `npm test` in `ts/` on the Node version in `.nvmrc` and on the latest LTS. The `build:ci` step is a check only: it does not commit or upload |
 | **Release TypeScript artifacts** | [`.github/workflows/release-artifacts.yml`](.github/workflows/release-artifacts.yml) | On a published release, runs `npm run build:ci` and attaches `artifacts/xyang-ts.mjs` and `docs/xyang.umd.min.js`. On `workflow_dispatch`, uploads those files as workflow artifacts only |
-| **Release Zig binaries** | [`.github/workflows/zig-release.yml`](.github/workflows/zig-release.yml) | On a published release, builds six `xyang-zig` executables for Linux, macOS, and Windows (x64 and arm64), smoke-tests Linux x64, and attaches the binaries. A manual run uploads workflow artifacts only |
+| **Release Zig binaries** | [`.github/workflows/zig-release.yml`](.github/workflows/zig-release.yml) | On a published release, builds six `xyang-zig` executables for Linux, macOS, and Windows (x64 and arm64), smoke-tests Linux x64, builds and tests the freestanding Wasm library, and attaches the binaries plus `xyang.wasm` and `xyang.mjs`. A manual run uploads workflow artifacts only |
 | **Benchmark** | [`.github/workflows/benchmark.yml`](.github/workflows/benchmark.yml) | On a published release, measures time, peak memory, and source lines, attaches `benchmark-<tag>.json` to the release, and opens a pull request that refreshes the README benchmark section. On `workflow_dispatch`, measures and uploads a workflow artifact (`open_pr` also proposes the README update). On pull requests touching benchmark files, a smoke run only |
 | **Ontology example** | [`.github/workflows/ontology-example.yml`](.github/workflows/ontology-example.yml) | On a published release, runs `pytest -m ontology` with the optional pyang and OWL RL tools installed, and `npm run test:ontology`. A skipped Python test fails the job. `workflow_dispatch` runs the same checks and publishes nothing. Pull requests do not run these tests |
 
