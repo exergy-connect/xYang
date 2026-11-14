@@ -248,8 +248,11 @@ pub const Parser = struct {
             .paren_open => {
                 _ = try self.consume(.paren_open);
                 // XPath 2.0 value list: ( 'a', 'b', 'c' ) when the first token is a literal.
+                // A leading literal that is not a list, such as (1 >= ../a), is the left
+                // operand. Restore it and parse the parenthesized expression.
                 const peek = self.current();
                 if (peek.type == .string or peek.type == .number) {
+                    const mark = self.position;
                     const first = try self.parsePrimary();
                     if (first.* == .literal and self.current().type == .comma) {
                         var values: std.ArrayList(Literal) = .empty;
@@ -267,6 +270,7 @@ pub const Parser = struct {
                         _ = try self.consume(.paren_close);
                         return first;
                     }
+                    self.position = mark;
                 }
                 const expr = try self.parseExpression();
                 _ = try self.consume(.paren_close);
@@ -399,8 +403,10 @@ test "the parser builds Python's tree" {
     try std.testing.expectEqual(@as(usize, 3), path.segments.len);
     try std.testing.expectEqualStrings("../a/c", try path.toString(a));
     try std.testing.expect(path.segments[1].predicate != null);
-    // Python reads `(1 + 2)` as the literal 1 followed by the expression `+ 2`.
-    try std.testing.expectEqual(@as(i128, 2), e.binary.right.literal.int);
+    // `(1 + 2)` keeps the leading literal as the left operand.
+    try std.testing.expectEqualStrings("+", e.binary.right.binary.operator);
+    try std.testing.expectEqual(@as(i128, 1), e.binary.right.binary.left.literal.int);
+    try std.testing.expectEqual(@as(i128, 2), e.binary.right.binary.right.literal.int);
     var vl = try Parser.init(a, ". = ('a', 1)");
     try std.testing.expectEqual(@as(usize, 2), (try vl.parse()).binary.right.literal.tuple.len);
 }

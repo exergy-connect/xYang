@@ -26,9 +26,9 @@ pub fn parseIdentifierRefAtom(atom: []const u8) IdentifierRef {
 }
 
 /// `resolve_identity_base_ref`: a `base` (possibly prefixed) in `from` scope.
-pub fn resolveBaseRef(from: *Module, ref: IdentifierRef) ?Pair {
+pub fn resolveBaseRef(from: *Module, ref: IdentifierRef, file: ?[]const u8) ?Pair {
     if (ref.prefix) |pre| {
-        const m = from.resolvePrefixedModule(pre) orelse return null;
+        const m = from.resolvePrefix(pre, file) orelse return null;
         if (!m.identities.contains(ref.name)) return null;
         return .{ .module = m, .name = ref.name };
     }
@@ -40,7 +40,7 @@ pub fn resolveBaseRef(from: *Module, ref: IdentifierRef) ?Pair {
 pub fn resolveQNamePair(importer: *Module, qname: []const u8) ?Pair {
     const ref = parseIdentifierRefAtom(qname);
     if (ref.prefix == null) return null;
-    return resolveBaseRef(importer, ref);
+    return resolveBaseRef(importer, ref, null);
 }
 
 /// `resolve_identity_value`: an RFC 7951 identityref value (section 6.8). `modname:name`
@@ -53,9 +53,17 @@ pub fn resolveValue(module: *Module, value: []const u8) ?Pair {
         const mod_name = value[0..i];
         name = value[i + 1 ..];
         if (!std.mem.eql(u8, mod_name, module.name)) {
-            target = for (module.import_prefixes.values()) |m| {
-                if (std.mem.eql(u8, m.name, mod_name)) break m;
-            } else return null;
+            target = found: {
+                for (module.import_prefixes.values()) |m| {
+                    if (std.mem.eql(u8, m.name, mod_name)) break :found m;
+                }
+                for (module.included_files.values()) |sub| {
+                    for (sub.import_prefixes.values()) |m| {
+                        if (std.mem.eql(u8, m.name, mod_name)) break :found m;
+                    }
+                }
+                return null;
+            };
         }
     }
     if (!target.identities.contains(name)) return null;
@@ -72,7 +80,7 @@ pub fn ancestorClosure(a: std.mem.Allocator, start: Pair) error{OutOfMemory}![]c
         try out.append(a, pair);
         const stmt = pair.module.identities.get(pair.name) orelse continue;
         for (stmt.data.identity.bases.items) |b| {
-            if (resolveBaseRef(pair.module, b)) |nxt| try stack.append(a, nxt);
+            if (resolveBaseRef(pair.module, b, stmt.included_from)) |nxt| try stack.append(a, nxt);
         }
     }
     return out.items;
@@ -131,7 +139,7 @@ pub fn identityrefValueValid(a: std.mem.Allocator, importer: *Module, value: []c
     const pv = resolveValue(importer, value) orelse return false;
     const closure = try ancestorClosure(a, pv);
     for (bases) |b| {
-        const br = resolveBaseRef(base_scope orelse importer, b) orelse return false;
+        const br = resolveBaseRef(base_scope orelse importer, b, null) orelse return false;
         if (!contains(closure, br)) return false;
     }
     return true;

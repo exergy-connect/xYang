@@ -208,7 +208,10 @@ class XPathParser {
 
     if (token.kind === "paren_open") {
       this.consume("paren_open");
+      // A leading literal that is not a value list, such as (1 >= ../a), is the
+      // left operand. Put it back and parse the parenthesized expression.
       if (this.current().kind === "string" || this.current().kind === "number") {
+        const mark = this.position;
         const first = this.parsePrimary();
         if (first.kind === "literal" && this.current().kind === "comma") {
           const values: unknown[] = [first.value];
@@ -230,6 +233,7 @@ class XPathParser {
           this.consume("paren_close");
           return first;
         }
+        this.position = mark;
       }
       const inner = this.parseExpression();
       this.consume("paren_close");

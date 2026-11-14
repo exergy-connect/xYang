@@ -80,10 +80,12 @@ pub fn parseInclude(p: *Parser, _: Parent) Error!void {
     try p.loader.mergeIncludedSubmodule(p, name, acc.revision_date);
 }
 
-/// `prefix` inside `include` or `belongs-to`: syntax-checked, not stored.
+/// `prefix` inside `include` is syntax-checked and dropped. Under `belongs-to` it is
+/// the prefix this file uses for its module.
 pub fn parsePrefixValue(p: *Parser, _: Parent) Error!void {
     _ = try p.ts.consume(kw.PREFIX);
-    _ = try p.consumePrefixArgument();
+    const prefix = try p.consumePrefixArgument();
+    if (p.module.is_submodule and p.module.prefix.len == 0) p.module.prefix = prefix;
     _ = p.ts.consumeIfType(.semicolon);
 }
 

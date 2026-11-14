@@ -26,7 +26,10 @@ pub const Module = struct {
     features: std.StringArrayHashMapUnmanaged(void) = .empty,
     feature_if_features: std.StringArrayHashMapUnmanaged(ast.StringList) = .empty,
     /// Import prefix (local) -> loaded module (RFC 7950 `import`).
+    /// The module file's own imports. A submodule's imports stay on that file.
     import_prefixes: std.StringArrayHashMapUnmanaged(*Module) = .empty,
+    /// Submodule name -> the included file, which keeps its own `import_prefixes`.
+    included_files: std.StringArrayHashMapUnmanaged(*Module) = .empty,
     extensions: std.StringArrayHashMapUnmanaged(*ast.Statement) = .empty,
     statements: std.ArrayList(*ast.Statement) = .empty,
     /// RFC 8791 `sx:structure` invocations by name, registered when the extension is
@@ -56,15 +59,40 @@ pub const Module = struct {
         return scope;
     }
 
-    /// `resolve_prefixed_module(prefix)`: this module for its own prefix, else the import.
+    /// `prefix` -> module in source file `file` (a submodule name, or null for this file).
+    /// The defining module's prefix resolves to that module in every one of its files.
+    /// Any other prefix resolves only in that file's import map.
+    pub fn resolvePrefix(self: *Module, prefix: []const u8, file: ?[]const u8) ?*Module {
+        const defining = self.definingModule();
+        const source = self.sourceFile(file) orelse return null;
+        const own = defining.ownPrefix();
+        if (std.mem.eql(u8, prefix, own) or (source.ownPrefix().len > 0 and std.mem.eql(u8, prefix, source.ownPrefix()))) {
+            return defining;
+        }
+        return source.import_prefixes.get(prefix);
+    }
+
+    fn sourceFile(self: *Module, file: ?[]const u8) ?*Module {
+        const defining = self.definingModule();
+        if (file) |name| {
+            if (!std.mem.eql(u8, name, defining.name)) {
+                if (defining.included_files.get(name)) |found| return found;
+                if (std.mem.eql(u8, self.name, name)) return self;
+                return null;
+            }
+        }
+        if (self != defining and (self.belongs_to_module.len > 0 or self.included_parent != null)) return self;
+        return defining;
+    }
+
+    /// `resolve_prefixed_module(prefix)`: this file's own prefix or its imports.
     pub fn resolvePrefixedModule(self: *Module, prefix: []const u8) ?*Module {
-        if (std.mem.eql(u8, prefix, self.ownPrefix())) return self;
-        return self.import_prefixes.get(prefix);
+        return self.resolvePrefix(prefix, null);
     }
 
     /// `resolve_prefix_to_module_name(prefix)`: a submodule resolves to its parent module.
     pub fn resolvePrefixToModuleName(self: *Module, prefix: []const u8) ?[]const u8 {
-        const target = self.resolvePrefixedModule(prefix) orelse return null;
+        const target = self.resolvePrefix(prefix, null) orelse return null;
         return if (target.belongs_to_module.len > 0) target.belongs_to_module else target.name;
     }
 
@@ -78,6 +106,14 @@ pub const Module = struct {
         out.foreign_structure_augments = try self.foreign_structure_augments.clone(arena);
         out.foreign_structure_slots = try self.foreign_structure_slots.clone(arena);
         out.import_prefixes = try self.import_prefixes.clone(arena);
+        out.included_files = .empty;
+        var files = self.included_files.iterator();
+        while (files.next()) |e| {
+            const file = try arena.create(Module);
+            file.* = e.value_ptr.*.*;
+            file.import_prefixes = try e.value_ptr.*.import_prefixes.clone(arena);
+            try out.included_files.put(arena, e.key_ptr.*, file);
+        }
         return out;
     }
 };
@@ -87,9 +123,9 @@ pub const Module = struct {
 pub const ResolvedTypedef = struct { typedef: *ast.Statement, module: *Module };
 
 pub fn resolveTypedef(type_stmt: *const ast.TypeStmt, fallback: ?*Module) ?ResolvedTypedef {
-    var scope = type_stmt.scope orelse fallback orelse return null;
-    scope = scope.definingModule();
-    const target = if (type_stmt.prefix) |pre| scope.resolvePrefixedModule(pre) orelse return null else scope;
+    const file_scope = type_stmt.scope orelse fallback orelse return null;
+    const defining = file_scope.definingModule();
+    const target = if (type_stmt.prefix) |pre| file_scope.resolvePrefix(pre, null) orelse return null else defining;
     const scopes = @import("typedef_scope.zig");
     const context = type_stmt.context orelse "";
     if (target.typedefs.get(type_stmt.name)) |td| {

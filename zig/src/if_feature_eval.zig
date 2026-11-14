@@ -22,6 +22,9 @@ fn walk(a: Allocator, m: *Module, out: *std.ArrayList(*Module)) error{OutOfMemor
     if (std.mem.indexOfScalar(*Module, out.items, m) != null) return;
     try out.append(a, m);
     for (m.import_prefixes.values()) |im| try walk(a, im, out);
+    for (m.included_files.values()) |sub| {
+        for (sub.import_prefixes.values()) |im| try walk(a, im, out);
+    }
 }
 
 /// `build_enabled_features_map`. `override == null` enables every declared feature; a
@@ -47,7 +50,7 @@ pub fn buildEnabledFeatures(a: Allocator, root: *Module, override: ?*const Enabl
                 const fname = set.keys()[i];
                 const reqs = m.feature_if_features.get(fname) orelse continue;
                 if (reqs.items.len == 0) continue;
-                if (!try ifFeaturesSatisfied(a, reqs.items, m, &frozen)) {
+                if (!try ifFeaturesSatisfied(a, reqs.items, m, &frozen, m.feature_if_included_from.get(fname))) {
                     set.orderedRemoveAt(i);
                     changed = true;
                 }
@@ -58,9 +61,9 @@ pub fn buildEnabledFeatures(a: Allocator, root: *Module, override: ?*const Enabl
 }
 
 /// `feature_is_supported`: `name` or `prefix:name` in the scope of `ctx_module`.
-pub fn featureIsSupported(ctx_module: *Module, enabled: *const EnabledFeatures, ref_text: []const u8) bool {
+pub fn featureIsSupported(ctx_module: *Module, enabled: *const EnabledFeatures, ref_text: []const u8, file: ?[]const u8) bool {
     const ref = identity_graph.parseIdentifierRefAtom(ref_text);
-    const mod = if (ref.prefix) |pre| ctx_module.resolvePrefixedModule(pre) orelse return false else ctx_module;
+    const mod = if (ref.prefix) |pre| ctx_module.resolvePrefix(pre, file) orelse return false else ctx_module;
     if (!mod.features.contains(ref.name)) return false;
     const set = enabled.get(mod.name) orelse return false;
     return set.contains(ref.name);
@@ -73,6 +76,7 @@ const ExprParser = struct {
     i: usize = 0,
     ctx: *Module,
     enabled: *const EnabledFeatures,
+    file: ?[]const u8 = null,
 
     fn peek(p: *const ExprParser) ?[]const u8 {
         return if (p.i < p.toks.len) p.toks[p.i] else null;
@@ -122,7 +126,7 @@ const ExprParser = struct {
             return v;
         }
         _ = try p.eat(null);
-        return featureIsSupported(p.ctx, p.enabled, t);
+        return featureIsSupported(p.ctx, p.enabled, t, p.file);
     }
 };
 
@@ -149,10 +153,10 @@ fn tokenize(a: Allocator, text: []const u8) error{OutOfMemory}![]const []const u
 }
 
 /// `evaluate_if_feature_expression`: a malformed expression is false (the node is inactive).
-pub fn evaluate(a: Allocator, text: []const u8, ctx_module: *Module, enabled: *const EnabledFeatures) error{OutOfMemory}!bool {
+pub fn evaluate(a: Allocator, text: []const u8, ctx_module: *Module, enabled: *const EnabledFeatures, file: ?[]const u8) error{OutOfMemory}!bool {
     const trimmed = std.mem.trim(u8, text, &std.ascii.whitespace);
     if (trimmed.len == 0) return false;
-    var p: ExprParser = .{ .toks = try tokenize(a, trimmed), .ctx = ctx_module, .enabled = enabled };
+    var p: ExprParser = .{ .toks = try tokenize(a, trimmed), .ctx = ctx_module, .enabled = enabled, .file = file };
     const out = p.expr() catch |err| switch (err) {
         error.Malformed => return false,
         error.OutOfMemory => return error.OutOfMemory,
@@ -162,9 +166,9 @@ pub fn evaluate(a: Allocator, text: []const u8, ctx_module: *Module, enabled: *c
 }
 
 /// `stmt_if_features_satisfied`: every expression holds.
-pub fn ifFeaturesSatisfied(a: Allocator, if_features: []const []const u8, ctx_module: *Module, enabled: *const EnabledFeatures) error{OutOfMemory}!bool {
+pub fn ifFeaturesSatisfied(a: Allocator, if_features: []const []const u8, ctx_module: *Module, enabled: *const EnabledFeatures, file: ?[]const u8) error{OutOfMemory}!bool {
     for (if_features) |e| {
-        if (!try evaluate(a, e, ctx_module, enabled)) return false;
+        if (!try evaluate(a, e, ctx_module, enabled, file)) return false;
     }
     return true;
 }
@@ -177,11 +181,11 @@ test "if-feature expressions and dependent features" {
     var diag: @import("errors.zig").Diagnostic = .{};
     const m = try yang_parser.parseString(a, "module m { prefix m; feature a; feature b; feature c { if-feature \"a and b\"; } }", "m.yang", &diag);
     var all = try buildEnabledFeatures(a, m, null);
-    try std.testing.expect(try evaluate(a, "a and (b or not c)", m, &all));
-    try std.testing.expect(try evaluate(a, "m:c", m, &all));
-    try std.testing.expect(!try evaluate(a, "a and", m, &all));
-    try std.testing.expect(!try evaluate(a, "a b", m, &all));
-    try std.testing.expect(!try evaluate(a, "unknown", m, &all));
+    try std.testing.expect(try evaluate(a, "a and (b or not c)", m, &all, null));
+    try std.testing.expect(try evaluate(a, "m:c", m, &all, null));
+    try std.testing.expect(!try evaluate(a, "a and", m, &all, null));
+    try std.testing.expect(!try evaluate(a, "a b", m, &all, null));
+    try std.testing.expect(!try evaluate(a, "unknown", m, &all, null));
     var only_a: EnabledFeatures = .empty;
     var set: FeatureSet = .empty;
     try set.put(a, "a", {});
@@ -190,5 +194,5 @@ test "if-feature expressions and dependent features" {
     const pruned = try buildEnabledFeatures(a, m, &only_a);
     try std.testing.expect(pruned.get("m").?.contains("a"));
     try std.testing.expect(!pruned.get("m").?.contains("c"));
-    try std.testing.expect(!try ifFeaturesSatisfied(a, &.{ "a", "c" }, m, &pruned));
+    try std.testing.expect(!try ifFeaturesSatisfied(a, &.{ "a", "c" }, m, &pruned, null));
 }

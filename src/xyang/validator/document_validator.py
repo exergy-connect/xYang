@@ -336,7 +336,12 @@ class DocumentValidator:
         if self._if_feature_module is None:
             return True
         feats = getattr(stmt, "if_features", None) or []
-        return stmt_if_features_satisfied(feats, self._if_feature_module, self._enabled_features)
+        return stmt_if_features_satisfied(
+            feats,
+            self._if_feature_module,
+            self._enabled_features,
+            getattr(stmt, "included_from", None),
+        )
 
     def _encoding_parent_module(self) -> str:
         """Module name for RFC 7951 member encoding of children under the current subtree."""

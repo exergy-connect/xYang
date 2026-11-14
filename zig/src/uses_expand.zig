@@ -145,7 +145,7 @@ fn resolveUsesGrouping(a: std.mem.Allocator, s: *Statement, ctx: Ctx) Error!?Res
     var gmod: *Module = ctx.module;
     var grouping: ?*Statement = null;
     if (u.grouping_prefix) |pre| {
-        gmod = ctx.module.resolvePrefixedModule(pre) orelse return null;
+        gmod = ctx.module.resolvePrefix(pre, s.included_from) orelse return null;
         grouping = gmod.groupings.get(u.grouping_name);
     } else {
         if (ctx.local_groupings) |local| grouping = local.get(u.grouping_name);
@@ -163,7 +163,7 @@ fn expandOneUses(r: *Reporter, s: *Statement, ctx: Ctx) Error!StatementList {
         const u = s.data.uses;
         if (u.grouping_prefix) |pre| {
             const qname = try std.fmt.allocPrint(a, "{s}:{s}", .{ pre, u.grouping_name });
-            if (ctx.module.resolvePrefixedModule(pre) == null) {
+            if (ctx.module.resolvePrefix(pre, s.included_from) == null) {
                 return r.fail(.semantic, "Unknown import prefix '{s}' in uses '{s}'", .{ pre, qname });
             }
             return r.fail(.semantic, "Unknown grouping '{s}'", .{qname});

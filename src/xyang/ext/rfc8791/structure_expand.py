@@ -72,24 +72,27 @@ def _lookup_registered_structure(
     return None
 
 
-def resolve_augment_structure_target(ctx_module: YangModule, path: str) -> YangStatement:
+def resolve_augment_structure_target(
+    ctx_module: YangModule, path: str, file: str | None = None
+) -> YangStatement:
     """Resolve absolute augment-structure path to its target schema node."""
     return resolve_absolute_schema_path(
         ctx_module=ctx_module,
         path=path,
         kind="augment-structure",
         find_toplevel=_lookup_registered_structure,
+        file=file,
     )
 
 
-def _target_module(ctx_module: YangModule, path: str) -> YangModule:
+def _target_module(ctx_module: YangModule, path: str, file: str | None = None) -> YangModule:
     """Module that owns the first node of an absolute ``augment-structure`` path."""
     try:
         first = parse_absolute_schema_path(path)[0]
     except ValueError as exc:
         raise YangSyntaxError(str(exc)) from exc
     prefix = first.prefix or ""
-    owner = ctx_module.resolve_prefixed_module(prefix)
+    owner = ctx_module.resolve_prefixed_module(prefix, file)
     if owner is None:
         raise YangSyntaxError(
             f"augment-structure: unknown prefix {prefix!r} in path {path!r} "
@@ -128,8 +131,9 @@ def apply_augment_structure_invocation(
         return None
     if not invocation.argument:
         raise YangSyntaxError("augment-structure requires an absolute path argument")
-    target = resolve_augment_structure_target(context_module, invocation.argument)
-    foreign = _target_module(context_module, invocation.argument) is not context_module
+    source_file = getattr(invocation, "included_from", None)
+    target = resolve_augment_structure_target(context_module, invocation.argument, source_file)
+    foreign = _target_module(context_module, invocation.argument, source_file) is not context_module
     if foreign and _export_view():
         # The invocation is the JSON form. Merging would edit the imported module.
         return invocation

@@ -265,7 +265,7 @@ export class DocumentValidator {
     const { target, operation, parentCopies, params, rootData, wrapper } = input;
     const ctx = this.rootCtx;
     const active = (stmt: YangStatement): boolean =>
-      stmtIfFeaturesSatisfied(Array.isArray(stmt.if_features) ? (stmt.if_features as string[]) : [], ctx.ifFeatureCtx, ctx.enabledByModule);
+      stmtIfFeaturesSatisfied(Array.isArray(stmt.if_features) ? (stmt.if_features as string[]) : [], ctx.ifFeatureCtx, ctx.enabledByModule, stmt.included_from);
     for (const step of target.parents) {
       for (const stmt of [...step.wrappers, step.stmt]) {
         if (!active(stmt)) {
@@ -462,7 +462,7 @@ export class DocumentValidator {
 
     const ifFeatures = stmt.if_features;
     const ifFeatureList = Array.isArray(ifFeatures) ? (ifFeatures as string[]) : [];
-    if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
+    if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, stmt.included_from)) {
       if (value !== undefined) {
         errors.push(
           issue(
@@ -728,7 +728,7 @@ export class DocumentValidator {
     const obj = parentValue as Record<string, unknown>;
 
     const choiceIfs = Array.isArray(choice.if_features) ? (choice.if_features as string[]) : [];
-    const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule);
+    const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, choice.included_from);
     if (!choiceActive && this.choiceHasBranchData(choice, obj)) {
       errors.push(
         issue(
@@ -760,7 +760,7 @@ export class DocumentValidator {
         continue;
       }
       const caseIfs = Array.isArray(c.if_features) ? (c.if_features as string[]) : [];
-      if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule)) {
+      if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, c.included_from)) {
         errors.push(
           issue(
             path,

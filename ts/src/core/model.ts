@@ -27,6 +27,8 @@ type TypeIdentity = {
   name: string;
   prefix?: string;
   scope_module?: string;
+  /** Submodule file that wrote this `type`, when it is not the module file. */
+  source_file?: string;
   context?: string;
   units?: string;
 };
@@ -65,7 +67,7 @@ const TYPE_FIELDS: Record<TypeStatementKind, readonly string[]> = {
   "instance-identifier": ["require_instance"], identityref: ["identityref_bases"],
   derived: [...RANGE_FIELDS, ...LENGTH_FIELDS, "patterns", "pattern", "enums", "bits", "require_instance"]
 };
-const COMMON_TYPE_FIELDS = new Set(["name", "prefix", "scope_module", "context", "units"]);
+const COMMON_TYPE_FIELDS = new Set(["name", "prefix", "scope_module", "source_file", "context", "units"]);
 
 export function normalizeTypeShape(input: StatementTypeInput): StatementTypeShape {
   const name = input.name ?? "";
@@ -238,6 +240,8 @@ export type ModuleInit = {
   typedefs?: Record<string, unknown>;
   identities?: Record<string, IdentityBases>;
   import_prefixes?: Record<string, YangModule>;
+  /** Submodule name -> that file's import prefix map. Not merged into {@link import_prefixes}. */
+  file_imports?: Record<string, Record<string, YangModule>>;
   extensions?: Record<string, unknown>;
   extension_runtime?: Record<string, unknown>;
   features?: Set<string> | string[];
@@ -263,6 +267,8 @@ export class YangModule {
   identities: Record<string, IdentityBases> = {};
   /** Prefix → imported module. The same object the parser cached for that file. */
   import_prefixes: Record<string, YangModule> = {};
+  /** Submodule name -> that file's import prefixes. The module file uses {@link import_prefixes}. */
+  file_imports: Record<string, Record<string, YangModule>> = {};
   extensions: Record<string, unknown> = {};
   extension_runtime: Record<string, unknown> = {};
   features: Set<string> = new Set();
@@ -288,6 +294,7 @@ export class YangModule {
     this.typedefs = init.typedefs ?? {};
     this.identities = init.identities ?? {};
     this.import_prefixes = init.import_prefixes ?? {};
+    this.file_imports = init.file_imports ?? {};
     this.extensions = init.extensions ?? {};
     this.extension_runtime = init.extension_runtime ?? {};
     this.features =

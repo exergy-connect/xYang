@@ -9,6 +9,7 @@
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { parseAbsoluteSchemaPath, type YangIdentifierRef } from "../core/identifier-ref";
 import { YangStatement, YangModule, type DeviateRecord } from "../core/model";
+import { resolvePrefixedModule } from "../validator/if-feature-eval";
 
 type ModuleData = YangModule;
 
@@ -36,17 +37,8 @@ function asStatements(value: unknown): YangStatement[] {
   return Array.isArray(value) ? (value as YangStatement[]) : [];
 }
 
-function ownPrefix(module: ModuleData): string {
-  return String(module.prefix ?? "").replace(/^['"]|['"]$/g, "");
-}
-
-function resolvePrefixedModule(ctxModule: ModuleData, prefix: string): ModuleData | undefined {
-  if (prefix === ownPrefix(ctxModule)) {
-    return ctxModule;
-  }
-  const imports = ctxModule.import_prefixes as Record<string, ModuleData> | undefined;
-  const resolved = imports?.[prefix];
-  return resolved && typeof resolved === "object" ? resolved : undefined;
+function sourceFileOf(stmt: { included_from?: string } | undefined): string | undefined {
+  return stmt?.included_from;
 }
 
 function pathSegmentsFromAugment(aug: YangStatement, path: string): YangIdentifierRef[] {
@@ -119,7 +111,8 @@ export function resolveAugmentTarget(
     path,
     segments: aug ? pathSegmentsFromAugment(aug, path) : undefined,
     kind: "augment",
-    findToplevel: findToplevelSchemaChild
+    findToplevel: findToplevelSchemaChild,
+    file: sourceFileOf(aug)
   });
 }
 
@@ -129,8 +122,9 @@ function walkAbsoluteSchemaPath(options: {
   segments?: YangIdentifierRef[];
   kind: string;
   findToplevel: (module: ModuleData, name: string) => YangStatement | undefined;
+  file?: string;
 }): { parent: ModuleData | YangStatement; node: YangStatement } {
-  const { ctxModule, path, kind, findToplevel } = options;
+  const { ctxModule, path, kind, findToplevel, file } = options;
   let segments = options.segments;
   if (!segments || segments.length === 0) {
     try {
@@ -142,7 +136,7 @@ function walkAbsoluteSchemaPath(options: {
   const first = segments[0]!;
   const pref0 = first.prefix!;
   const name0 = first.name;
-  const mod0 = resolvePrefixedModule(ctxModule, pref0);
+  const mod0 = resolvePrefixedModule(ctxModule, pref0, file);
   if (!mod0) {
     throw new YangSyntaxError(
       `${kind}: unknown prefix '${pref0}' in path '${path}' ` +
@@ -160,7 +154,7 @@ function walkAbsoluteSchemaPath(options: {
   for (const seg of segments.slice(1)) {
     const pref = seg.prefix!;
     const nm = seg.name;
-    if (!resolvePrefixedModule(ctxModule, pref)) {
+    if (!resolvePrefixedModule(ctxModule, pref, file)) {
       throw new YangSyntaxError(`${kind}: unknown prefix '${pref}' in path '${path}'`);
     }
     const nxt = findNamedSchemaChild(cur, nm);
@@ -476,7 +470,8 @@ function applyDeviation(ctxModule: ModuleData, dev: YangStatement, copies: Map<M
       path,
       segments,
       kind: "deviation",
-      findToplevel: findToplevelSchemaChild
+      findToplevel: findToplevelSchemaChild,
+      file: sourceFileOf(dev)
     });
   } catch (err) {
     if (err instanceof YangSyntaxError) {
@@ -484,7 +479,7 @@ function applyDeviation(ctxModule: ModuleData, dev: YangStatement, copies: Map<M
     }
     throw err;
   }
-  const owner = resolvePrefixedModule(ctxModule, segments[0]!.prefix!);
+  const owner = resolvePrefixedModule(ctxModule, segments[0]!.prefix!, sourceFileOf(dev));
   if (!owner) {
     throw new YangSemanticError(`deviation: unknown prefix '${segments[0]!.prefix}' in path '${path}'`);
   }

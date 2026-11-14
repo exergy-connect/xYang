@@ -278,18 +278,10 @@ class YangParser:
                 )
             parent.feature_if_features[fname] = list(ifs)
             parent.feature_if_included_from[fname] = origin
-        own = parent.own_prefix_stripped()
-        for pref, im in sub.import_prefixes.items():
-            if pref == own:
-                continue
-            existing = parent.import_prefixes.get(pref)
-            if existing is not None and existing.name != im.name:
-                raise tokens.make_error(
-                    f"Import prefix {pref!r} from include of {sub.name!r} "
-                    f"conflicts with existing import of {existing.name!r}"
-                )
-            if existing is None:
-                parent.import_prefixes[pref] = im
+        # Import prefixes stay on the file that declared them (RFC 7950 §7.1.5).
+        parent.included_files[sub.name] = sub
+        for name, nested in sub.included_files.items():
+            parent.included_files.setdefault(name, nested)
         kept = []
         for stmt in sub.statements:
             origin = getattr(stmt, "included_from", None) or sub.name
@@ -309,7 +301,6 @@ class YangParser:
         sub.feature_if_features.clear()
         sub.feature_included_from.clear()
         sub.feature_if_included_from.clear()
-        sub.import_prefixes = parent.import_prefixes
 
     @staticmethod
     def _merge_included_map(

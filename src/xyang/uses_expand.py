@@ -177,7 +177,9 @@ def _resolve_uses_grouping(
     module = ctx.module
     qname = stmt.grouping_qname()
     if stmt.grouping_prefix:
-        gmod = module.resolve_prefixed_module(stmt.grouping_prefix)
+        gmod = module.resolve_prefixed_module(
+            stmt.grouping_prefix, getattr(stmt, "included_from", None)
+        )
         lookup_name = stmt.grouping_name
         grouping = gmod.get_grouping(lookup_name) if gmod is not None else None
     else:

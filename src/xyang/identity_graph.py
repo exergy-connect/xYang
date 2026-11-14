@@ -54,7 +54,10 @@ def resolve_identity_value(module: "YangModule", value: str) -> Optional[Identit
         if mod_name == module.name:
             target: Optional["YangModule"] = module
         else:
-            target = next((m for m in module.import_prefixes.values() if m.name == mod_name), None)
+            imported = list(module.import_prefixes.values())
+            for sub in module.included_files.values():
+                imported.extend(sub.import_prefixes.values())
+            target = next((m for m in imported if m.name == mod_name), None)
         if target is None:
             return None
     else:
@@ -71,12 +74,15 @@ def resolve_identity_qname(importer: "YangModule", qname: str) -> Optional[str]:
 
 
 def resolve_identity_base_ref(
-    from_mod: "YangModule", base: BaseRef
+    from_mod: "YangModule", base: BaseRef, file: str | None = None
 ) -> Optional[IdentityPair]:
-    """Resolve a ``base`` substatement (possibly prefixed) to (module, local identity)."""
+    """Resolve a ``base`` substatement (possibly prefixed) to (module, local identity).
+
+    *file* is the source file that wrote the ``base`` (a submodule name, or None).
+    """
     ref = _as_base_ref(base)
     if ref.prefix:
-        m = from_mod.resolve_prefixed_module(ref.prefix)
+        m = from_mod.resolve_prefixed_module(ref.prefix, file)
         if m is None or ref.name not in m.identities:
             return None
         return (m, ref.name)
@@ -117,7 +123,7 @@ def identity_ancestor_closure(
         if not stmt:
             continue
         for b in stmt.bases:
-            nxt = resolve_identity_base_ref(m, b)
+            nxt = resolve_identity_base_ref(m, b, getattr(stmt, "included_from", None))
             if nxt:
                 stack.append(nxt)
     return out

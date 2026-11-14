@@ -97,15 +97,15 @@ pub const FindToplevel = *const fn (module: *Module, name: []const u8) ?*Stateme
 
 /// `_walk_absolute_schema_path`: `/prefix:name/...` to `(parent, target)`. Every prefix
 /// must be bound in `ctx_module`; children are matched by name, through choices and cases.
-fn walkAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef) Error!Walked {
-    return walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, findToplevelSchemaChild);
+fn walkAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef, file: ?[]const u8) Error!Walked {
+    return walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, findToplevelSchemaChild, file);
 }
 
-fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef, find_toplevel: FindToplevel) Error!Walked {
+fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef, find_toplevel: FindToplevel, file: ?[]const u8) Error!Walked {
     const first = segments[0];
     const pref0 = first.prefix orelse "";
     if (pref0.len == 0) return r.fail(.syntax, "{s}: invalid first segment in path {f} (expected 'prefix:identifier')", .{ kind, repr(path) });
-    const mod0 = ctx_module.resolvePrefixedModule(pref0) orelse
+    const mod0 = ctx_module.resolvePrefix(pref0, file) orelse
         return r.fail(.syntax, "{s}: unknown prefix {f} in path {f} (module {f})", .{ kind, repr(pref0), repr(path), repr(ctx_module.name) });
     var cur = find_toplevel(mod0, first.name) orelse
         return r.fail(.syntax, "{s}: no top-level schema node {f} in module {f} (path {f})", .{ kind, repr(first.name), repr(mod0.name), repr(path) });
@@ -113,7 +113,7 @@ fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u
     for (segments[1..]) |seg| {
         const pref = seg.prefix orelse "";
         if (pref.len == 0) return r.fail(.syntax, "{s}: invalid path segment {f} in path {f} (expected 'prefix:identifier')", .{ kind, repr(seg.name), repr(path) });
-        if (ctx_module.resolvePrefixedModule(pref) == null) return r.fail(.syntax, "{s}: unknown prefix {f} in path {f}", .{ kind, repr(pref), repr(path) });
+        if (ctx_module.resolvePrefix(pref, file) == null) return r.fail(.syntax, "{s}: unknown prefix {f} in path {f}", .{ kind, repr(pref), repr(path) });
         const nxt = (try findNamedSchemaChild(r.arena, cur, seg.name)) orelse
             return r.fail(.syntax, "{s}: no child {f} under node in path {f} (after {f})", .{ kind, repr(seg.name), repr(path), repr(cur.name) });
         parent = .{ .stmt = cur };
@@ -124,16 +124,16 @@ fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u
 
 /// `resolve_absolute_schema_path`: an absolute schema path whose first segment is found
 /// with `find_toplevel` (RFC 8791 `augment-structure` looks up registered structures).
-pub fn resolveAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, find_toplevel: FindToplevel) Error!*Statement {
+pub fn resolveAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, find_toplevel: FindToplevel, file: ?[]const u8) Error!*Statement {
     const segments = try absoluteSegments(r, path, &.{});
-    return (try walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, find_toplevel)).target;
+    return (try walkAbsoluteSchemaPathWith(r, ctx_module, path, kind, segments, find_toplevel, file)).target;
 }
 
 /// `resolve_augment_target`: the schema node that receives the augment's children.
 pub fn resolveAugmentTarget(r: *Reporter, ctx_module: *Module, aug: *Statement) Error!*Statement {
     const d = aug.data.augment;
     const segments = try absoluteSegments(r, d.augment_path, d.augment_path_segments.items);
-    return (try walkAbsoluteSchemaPath(r, ctx_module, d.augment_path, "augment", segments)).target;
+    return (try walkAbsoluteSchemaPath(r, ctx_module, d.augment_path, "augment", segments, aug.included_from)).target;
 }
 
 /// Mark a node and its descendants as defined in `module_name` (RFC 7951 qualified names).
@@ -266,6 +266,11 @@ fn privateTargetModule(r: *Reporter, root: *Module, owner: *Module, copies: *Cop
     try copies.put(r.arena, owner, cloned);
     for (root.import_prefixes.values()) |*mod| {
         if (mod.* == owner) mod.* = cloned;
+    }
+    for (root.included_files.values()) |sub| {
+        for (sub.import_prefixes.values()) |*mod| {
+            if (mod.* == owner) mod.* = cloned;
+        }
     }
     return cloned;
 }
@@ -434,11 +439,11 @@ fn applyDeviation(r: *Reporter, root: *Module, dev: *Statement, copies: *Copies)
     const d = dev.data.deviation;
     const path = d.target_path;
     const segments = try absoluteSegments(r, path, d.target_path_segments.items);
-    const walked = walkAbsoluteSchemaPath(r, root, path, "deviation", segments) catch |err| {
+    const walked = walkAbsoluteSchemaPath(r, root, path, "deviation", segments, dev.included_from) catch |err| {
         if (err == error.YangLoad and r.diag.kind == .syntax) r.diag.kind = .semantic;
         return err;
     };
-    const owner = root.resolvePrefixedModule(segments[0].prefix orelse "") orelse
+    const owner = root.resolvePrefix(segments[0].prefix orelse "", dev.included_from) orelse
         return r.fail(.semantic, "deviation: unknown prefix {f} in path {f}", .{ repr(segments[0].prefix orelse ""), repr(path) });
     var node = walked.target;
     if (owner == root) {

@@ -69,6 +69,8 @@ export class YangStatement extends YangStatementList {
   description: string;
   reference: string;
   units: string;
+  /** Submodule that contributed this statement. Absent on statements written in the module file. */
+  included_from?: string;
 
   constructor(init: Partial<YangStatement> = {}) {
     super(init.statements ?? []);
@@ -77,6 +79,9 @@ export class YangStatement extends YangStatementList {
     this.description = init.description ?? "";
     this.reference = init.reference ?? "";
     this.units = init.units ?? "";
+    if (typeof init.included_from === "string" && init.included_from.length > 0) {
+      this.included_from = init.included_from;
+    }
   }
 
   get_schema_node(): string | undefined {
@@ -478,14 +483,16 @@ type PrefixScope = {
   prefix?: string;
   belongs_to_module?: string;
   import_prefixes?: Record<string, PrefixScope>;
+  file_imports?: Record<string, Record<string, PrefixScope>>;
 };
 
-/** Prefix -> module name in `module`'s scope: its own prefix or an `import`; a submodule names its parent. */
-export function modulePrefixResolver(module: unknown): (prefix: string) => string | undefined {
+/** Prefix -> module name in file *file* of `module`: its own prefix, or that file's `import`. */
+export function modulePrefixResolver(module: unknown, file?: string): (prefix: string) => string | undefined {
   const scope = module as PrefixScope;
   return (prefix) => {
     const own = (scope.prefix ?? "").replace(/^['"]|['"]$/g, "");
-    const target = prefix === own ? scope : scope.import_prefixes?.[prefix];
+    const imports = file ? scope.file_imports?.[file] : scope.import_prefixes;
+    const target = prefix === own ? scope : imports?.[prefix];
     return target ? target.belongs_to_module || target.name : undefined;
   };
 }
@@ -505,11 +512,11 @@ export class YangParsedXPathBase {
     }
   }
 
-  /** Bind prefixed steps to the modules `module` maps their prefixes to; an unknown prefix throws. */
-  bindPrefixes(module: unknown): void {
+  /** Bind prefixed steps to the modules `module` maps their prefixes to in file *file*; an unknown prefix throws. */
+  bindPrefixes(module: unknown, file?: string): void {
     const used = xpathPrefixes(this.ast);
     if (used.size === 0) return;
-    const resolve = modulePrefixResolver(module);
+    const resolve = modulePrefixResolver(module, file);
     bindXPathPrefixes(this.ast, resolve, this.expression);
     this.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
   }

@@ -55,7 +55,10 @@ export function resolveTypedef(
     }
     scope = loaded as unknown as ModuleData;
   }
-  const target = typeof type.prefix === "string" && type.prefix ? resolvePrefixedModule(scope, type.prefix) : scope;
+  const sourceFile = typeof (type as { source_file?: unknown }).source_file === "string"
+    ? (type as { source_file: string }).source_file
+    : undefined;
+  const target = typeof type.prefix === "string" && type.prefix ? resolvePrefixedModule(scope, type.prefix, sourceFile) : scope;
   const typedefs = target?.typedefs as Record<string, TypedefShape> | undefined;
   if (!typedefs) return undefined;
   const direct = typedefs[type.name];

@@ -21,6 +21,9 @@ export class TypeStatementParser {
     const writer = context.module as { name?: string; belongs_to_module?: string };
     const scope = writer.belongs_to_module || writer.name;
     if (scope) type_stmt.scope_module = scope;
+    if (this.parsers.includingSubmoduleName) {
+      (type_stmt as { source_file?: string }).source_file = this.parsers.includingSubmoduleName;
+    }
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(type_stmt);
@@ -160,7 +163,7 @@ export class TypeStatementParser {
     const ast = parseXPathPath(path);
     const used = xpathPrefixes(ast);
     if (used.size > 0) {
-      const resolve = modulePrefixResolver(context.module);
+      const resolve = modulePrefixResolver(context.module, this.parsers.includingSubmoduleName);
       bindXPathPrefixes(ast, resolve, path);
       type_stmt.xpath_prefixes = Object.fromEntries([...used].map((prefix) => [prefix, resolve(prefix) as string]));
     }

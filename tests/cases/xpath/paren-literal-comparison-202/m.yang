@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  container top {
+    leaf a { type int32; }
+    leaf b { type int32; }
+    leaf ge {
+      type string;
+      must "(1>=../a)";
+    }
+    leaf eq {
+      type string;
+      must "(2 = ../b)";
+    }
+  }
+}
