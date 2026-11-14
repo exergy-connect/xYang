@@ -50,4 +50,13 @@ Test count: `python tests/inventory.py`. Before adding a test, read [`tests/READ
 
 A pull request head commit may carry the trailer line `Local-Tests: passed`. Add it only after `pytest -q`, `pytest tests/test_cases.py -q -rxX`, and `cd ts && npm test` have all passed locally (`npm test` runs `tsc --noEmit` first through `pretest`; Vitest alone does not type-check, which let #207 break `main`). CI then skips the Python matrix, the Node minimum and latest LTS jobs, and the conformance cases. Pushes to `main`, tags, and releases always run the full suite. Do not use `[skip ci]`.
 
+## Releases
+
+- A release PR only bumps the version and moves changelog entries. It does not run the test suites (main is already verified) and carries no `Local-Tests` trailer.
+- Bump the version in `pyproject.toml`, `ts/package.json`, and both root entries of `ts/package-lock.json` (same version for Python and TypeScript; patch bump unless the maintainer says otherwise).
+- In `CHANGELOG.md` and `ts/CHANGELOG.md`, move the `[Unreleased]` entries under `## [X.Y.Z] — YYYY-MM-DD`, leave an empty `## [Unreleased]`, and update the compare links at the bottom. Do not rewrite entries; the TS changelog lists every change that affects the npm package.
+- Title the PR `Release xYang X.Y.Z`; squash-merge it.
+- Publish a GitHub release with tag `vX.Y.Z` on the merge commit, titled `xYang X.Y.Z`. Notes start with 'Python `xyang` and TypeScript `@exergy-connect/xyang` are now version X.Y.Z.', then Highlights, any breaking changes with the replacement, Fixed / Changed / Removed with issue links, and end with links to both changelogs at the tag.
+- Publishing the release runs `publish-pypi.yml`, `publish-npm.yml`, `zig-release.yml` (Zig binaries, `xyang.wasm`, `xyang.mjs`), `release-artifacts.yml`, and the ontology tests; check that they succeed.
+
 Author models with [`skills/xyang-model/SKILL.md`](skills/xyang-model/SKILL.md). Validate instances and integrate xYang in scripts or CI with [`skills/xyang-validate/SKILL.md`](skills/xyang-validate/SKILL.md).
