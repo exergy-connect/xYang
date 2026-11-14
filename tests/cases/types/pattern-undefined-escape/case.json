@@ -1,0 +1,6 @@
+{
+  "description": "An undefined letter escape such as \\q is not an XSD single-character escape and fails the module load (#204).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "unsupported XSD regex construct"
+}

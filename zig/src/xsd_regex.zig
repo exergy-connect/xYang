@@ -46,6 +46,18 @@ const NAME_CHAR_EXTRA = [_]Range{ .{ 0x2D, 0x2E }, .{ 0x30, 0x39 }, .{ 0xB7, 0xB
 const XSD_SPACE = [_]Range{ .{ 0x9, 0xA }, .{ 0xD, 0xD }, .{ 0x20, 0x20 } };
 const XSD_DOT_EXCLUDED = [_]Range{ .{ 0xA, 0xA }, .{ 0xD, 0xD } };
 const SINGLE_ESCAPE_LITERALS = "\\|.-^?*+{}()[]";
+
+/// XSD `SingleCharEsc` punctuation, plus any other ASCII printable non-alphanumeric (#204).
+fn isLiteralPunctuation(ch: u21) bool {
+    if (ch < 0x80 and std.mem.indexOfScalar(u8, SINGLE_ESCAPE_LITERALS, @intCast(ch)) != null) return true;
+    if (ch < 0x20 or ch > 0x7E) return false;
+    const c: u8 = @intCast(ch);
+    if (c >= '0' and c <= '9') return false;
+    if (c >= 'A' and c <= 'Z') return false;
+    if (c >= 'a' and c <= 'z') return false;
+    return true;
+}
+
 /// Characters `re.escape` prefixes with a backslash (Python 3.7+).
 const RE_SPECIAL = "()[]{}?*+-|^$\\.&~# \t\n\r\x0b\x0c";
 
@@ -197,7 +209,7 @@ const Translator = struct {
                 return .{ .ranges = all.items, .negated = ch == 'C' };
             },
             else => {
-                if (ch < 0x80 and std.mem.indexOfScalar(u8, SINGLE_ESCAPE_LITERALS, @intCast(ch)) != null) {
+                if (isLiteralPunctuation(ch)) {
                     return .{ .ranges = try t.a.dupe(Range, &.{.{ ch, ch }}), .negated = false };
                 }
                 return t.unsupported(&.{ '\\', ch });
@@ -735,12 +747,18 @@ test "anchored XSD matching" {
     try expectMatch("^a$", "^a$", true);
     try expectMatch("", "", true);
     try expectMatch("", "x", false);
+    try expectMatch("[b\\*\\-\\#$@&:]+", "b#@", true);
+    try expectMatch("[b\\*\\-\\#$@&:]+", "x", false);
+    try expectMatch("a\\#b\\%c", "a#b%c", true);
+    try expectMatch("a\\#b\\%c", "a#bc", false);
 }
 
 test "errors follow xsd_regex.py and re" {
     try expectFailure("[a-z-[aeiou]]+", "unsupported XSD regex construct '[a-z-[aeiou]]' in pattern '[a-z-[aeiou]]+'");
     try expectFailure("\\p{IsBasicLatin}", "unsupported XSD regex construct '\\\\p{IsBasicLatin}' in pattern '\\\\p{IsBasicLatin}'");
     try expectFailure("(?i)a", "unsupported XSD regex construct '(?' in pattern '(?i)a'");
+    try expectFailure("\\q", "unsupported XSD regex construct '\\\\q' in pattern '\\\\q'");
+    try expectFailure("\\1", "unsupported XSD regex construct '\\\\1' in pattern '\\\\1'");
     try expectFailure("[z-a]", "invalid character range in pattern '[z-a]'");
     try expectFailure("[ab", "unterminated character class in pattern '[ab'");
     try expectFailure("*a", "invalid pattern '*a': nothing to repeat at position 3");

@@ -5,8 +5,10 @@ XML Schema Part 2 Appendix F) into compiled Python ``re`` patterns.
 Supported beyond plain characters, classes, groups, ``|`` and quantifiers:
 ``\\p{X}`` / ``\\P{X}`` for Unicode general categories, ``\\i`` / ``\\I`` / ``\\c`` / ``\\C``
 (XML name characters), and the XSD meanings of ``.``, ``\\d``, ``\\s``, ``\\w`` and their
-negations. The whole pattern is anchored. Other XSD constructs (block escapes such as
-``\\p{IsBasicLatin}``, class subtraction ``[a-z-[aeiou]]``) raise :class:`YangSemanticError`.
+negations. The whole pattern is anchored. A backslash before any other ASCII printable
+non-alphanumeric character is a literal of that character (#204). Other XSD constructs
+(block escapes such as ``\\p{IsBasicLatin}``, class subtraction ``[a-z-[aeiou]]``, and an
+undefined letter or digit escape such as ``\\q``) raise :class:`YangSemanticError`.
 """
 
 from __future__ import annotations
@@ -49,6 +51,18 @@ _XSD_DOT_EXCLUDED: Ranges = [(0xA, 0xA), (0xD, 0xD)]
 # Single-character escapes (XSD SingleCharEsc).
 _SINGLE_ESCAPES = {"n": 0xA, "r": 0xD, "t": 0x9}
 _SINGLE_ESCAPE_LITERALS = set("\\|.-^?*+{}()[]")
+
+
+def _is_literal_punctuation(ch: str) -> bool:
+    """A backslash before this character is a literal of it.
+
+    XSD ``SingleCharEsc`` punctuation, plus any other ASCII printable
+    non-alphanumeric (#204). Letters and digits are defined escapes or errors.
+    """
+    if ch in _SINGLE_ESCAPE_LITERALS:
+        return True
+    o = ord(ch)
+    return 0x20 <= o <= 0x7E and not ch.isalnum()
 
 
 def _normalize(ranges: Ranges) -> Ranges:
@@ -138,7 +152,7 @@ class _Translator:
         if ch in _SINGLE_ESCAPES:
             cp = _SINGLE_ESCAPES[ch]
             return [(cp, cp)], False
-        if ch in _SINGLE_ESCAPE_LITERALS:
+        if _is_literal_punctuation(ch):
             return [(ord(ch), ord(ch))], False
         if ch in "dD":
             return list(_category_ranges("Nd")), ch == "D"

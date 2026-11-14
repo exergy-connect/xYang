@@ -1,0 +1,12 @@
+{
+  "description": "A backslash before ASCII punctuation that is not an XSD single-character escape is a literal of that character, inside a class ([b\\*\\-\\#$@&:]) and outside one (a\\#b\\%c) (#204).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "class punctuation", "data": { "top": { "marks": "b#@" } }, "valid": true },
+    { "name": "literal punctuation", "data": { "top": { "coded": "a#b%c" } }, "valid": true },
+    { "name": "outside the class", "data": { "top": { "marks": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/marks", "code": "pattern" }] },
+    { "name": "not the escaped literal", "data": { "top": { "coded": "a#bc" } }, "valid": false,
+      "errors": [{ "path": "/top/coded", "code": "pattern" }] }
+  ]
+}

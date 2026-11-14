@@ -4,8 +4,10 @@
  *
  * Supported beyond plain characters, classes, groups, `|` and quantifiers: `\p{X}` / `\P{X}`
  * for Unicode general categories, `\i` / `\I` / `\c` / `\C` (XML name characters), and the
- * XSD meanings of `.`, `\d`, `\s`, `\w` and their negations. Other XSD constructs (block
- * escapes such as `\p{IsBasicLatin}`, class subtraction `[a-z-[aeiou]]`) throw
+ * XSD meanings of `.`, `\d`, `\s`, `\w` and their negations. A backslash before any other
+ * ASCII printable non-alphanumeric character is a literal of that character (#204). Other
+ * XSD constructs (block escapes such as `\p{IsBasicLatin}`, class subtraction
+ * `[a-z-[aeiou]]`, and an undefined letter or digit escape such as `\q`) throw
  * {@link YangSemanticError}. Same rules as Python `xyang.xsd_regex`.
  */
 import { YangSemanticError } from "./core/errors";
@@ -43,6 +45,18 @@ const XSD_DOT_EXCLUDED: Range[] = [[0xa, 0xa], [0xd, 0xd]];
 const SINGLE_ESCAPES: Record<string, number> = { n: 0xa, r: 0xd, t: 0x9 };
 const SINGLE_ESCAPE_LITERALS = new Set("\\|.-^?*+{}()[]".split(""));
 const XSD_W_EXCLUDED = "\\p{P}\\p{Z}\\p{C}";
+
+/** XSD single-char punctuation, plus any other ASCII printable non-alphanumeric (#204). */
+function isLiteralPunctuation(ch: string): boolean {
+  if (SINGLE_ESCAPE_LITERALS.has(ch)) {
+    return true;
+  }
+  const n = ch.charCodeAt(0);
+  if (ch.length !== 1 || n < 0x20 || n > 0x7e) {
+    return false;
+  }
+  return !((n >= 0x30 && n <= 0x39) || (n >= 0x41 && n <= 0x5a) || (n >= 0x61 && n <= 0x7a));
+}
 
 function normalize(ranges: Range[]): Range[] {
   const out: Range[] = [];
@@ -125,7 +139,7 @@ class Translator {
       const n = SINGLE_ESCAPES[ch]!;
       return { body: cp(n), single: n };
     }
-    if (SINGLE_ESCAPE_LITERALS.has(ch)) {
+    if (isLiteralPunctuation(ch)) {
       const n = ch.codePointAt(0)!;
       return { body: cp(n), single: n };
     }
