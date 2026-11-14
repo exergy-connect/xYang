@@ -1,0 +1,16 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  include a;
+  include b;
+
+  container top {
+    uses g;
+    leaf flagged {
+      if-feature f;
+      type string;
+    }
+  }
+}

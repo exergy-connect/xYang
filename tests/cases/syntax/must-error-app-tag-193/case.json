@@ -1,0 +1,13 @@
+{
+  "description": "RFC 7950 §7.5.4: must takes error-message and error-app-tag. A failing must reports both (#193).",
+  "module": "m.yang",
+  "xfail": {
+    "python": "error-app-tag inside must (#193)",
+    "ts": "error-app-tag inside must (#193)"
+  },
+  "instances": [
+    { "name": "positive", "data": { "l": 1 }, "valid": true },
+    { "name": "not positive", "data": { "l": 0 }, "valid": false,
+      "errors": [{ "path": "/l", "code": "must", "message": "pos" }, { "path": "/l", "code": "must", "message": "too-small" }] }
+  ]
+}

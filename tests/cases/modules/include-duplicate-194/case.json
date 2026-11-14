@@ -1,0 +1,6 @@
+{
+  "description": "Two included submodules that each define grouping g are a real duplicate and must fail the load (#194).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Duplicate grouping"
+}

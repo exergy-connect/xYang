@@ -1,0 +1,12 @@
+{
+  "description": "RFC 7950 §7.20.3.2: deviate delete removes the named must. A value the must rejected is then valid (#196).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "must removed", "data": { "l": "y" }, "valid": true,
+      "xfail": {
+        "python": "deviate delete is skipped (#196)",
+        "ts": "deviate delete is skipped (#196)"
+      } },
+    { "name": "other value still a string", "data": { "l": "x" }, "valid": true }
+  ]
+}

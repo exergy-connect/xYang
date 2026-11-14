@@ -4,7 +4,9 @@
 //! Every case either passes or is listed in `zig/conformance-pending.txt` with the phase
 //! of #165 that delivers it. The run fails when an unlisted case fails, when a listed case
 //! passes (remove it from the list), when the list names a missing case, or when the
-//! parser rejects a module Python loads.
+//! parser rejects a module the case expects to load and Python is not marked `xfail`
+//! (Python loads it). A case whose `xfail` names Python, and whose load xyang-zig
+//! rejects, is pending: list it until the load succeeds.
 //!
 //! What a case needs, and which phase provides it:
 //! - `schema_error`: the load (parse and module resolution) fails with a message
@@ -308,6 +310,7 @@ fn runCase(arena: std.mem.Allocator, io: std.Io, cases_dir: []const u8, cid: []c
         .failed => |diag| {
             const msg = try std.fmt.allocPrint(arena, "{f}", .{diag});
             if (diag.kind != .unsupported) {
+                if (caseXfailPython(case) != null) return .{ .pending = msg };
                 return .{ .regression = try std.fmt.allocPrint(arena, "the module loads in Python but xyang-zig rejects it: {s}", .{msg}) };
             }
             return .{ .pending = try std.fmt.allocPrint(arena, "unsupported: {s}", .{msg}) };
@@ -473,9 +476,10 @@ fn validateReloaded(arena: std.mem.Allocator, io: std.Io, form_path: []const u8,
 }
 
 /// One instance, as `test_case` in `tests/test_cases.py` checks it: the set of
-/// `(path, code)` pairs, each expected `message` as a substring, and `valid`. xyang-zig
-/// follows Python, so a `python` xfail (case or instance) is strict: the instance must
-/// then not match.
+/// `(path, code)` pairs, each expected `message` as a substring, and `valid`. A
+/// `python` xfail (case or instance) is pytest's strict marker for a Python miss.
+/// xyang-zig is not failed for sharing that miss, and meeting the case while Python
+/// still xfails it is a pass.
 fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.json.ObjectMap, module: *xyang.Module) !Outcome {
     const name = if (inst.get("name")) |n| n.string else "?";
     const xfail = xfailReason(case, inst);
@@ -514,10 +518,7 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     };
     if (usage_error) |want| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: expected a usage error containing {s}; the call validates", .{ name, want }) };
     const mismatch = try compareInstance(arena, inst, result);
-    if (xfail) |why| {
-        if (mismatch == null) return .{ .regression = try std.fmt.allocPrint(arena, "instance {s} passes but Python xfails it ({s})", .{ name, why }) };
-        return .pass;
-    }
+    if (xfail) |_| return .pass;
     if (mismatch) |m| return .{ .pending = try std.fmt.allocPrint(arena, "instance {s}: {s}", .{ name, m }) };
     return .pass;
 }
@@ -529,9 +530,16 @@ fn jsonVal(arena: std.mem.Allocator, value: std.json.Value) !xyang.json_value.Va
 }
 
 fn xfailReason(case: std.json.ObjectMap, inst: std.json.ObjectMap) ?[]const u8 {
-    if (inst.get("xfail")) |x| if (x == .object) if (x.object.get("python")) |r| return r.string;
-    if (case.get("xfail")) |x| if (x == .object) if (x.object.get("python")) |r| return r.string;
-    return null;
+    if (inst.get("xfail")) |x| if (x == .object) if (x.object.get("python")) |r| if (r == .string) return r.string;
+    return caseXfailPython(case);
+}
+
+fn caseXfailPython(case: std.json.ObjectMap) ?[]const u8 {
+    const x = case.get("xfail") orelse return null;
+    if (x != .object) return null;
+    const reason = x.object.get("python") orelse return null;
+    if (reason != .string) return null;
+    return reason.string;
 }
 
 /// Null when the result matches the instance, else what differs.

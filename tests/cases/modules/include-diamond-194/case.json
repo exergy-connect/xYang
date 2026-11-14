@@ -1,0 +1,10 @@
+{
+  "description": "RFC 7950 §5.1: one submodule reached through two includes (m includes a and b, b includes a) contributes its grouping and feature once. That is not a duplicate definition (#194).",
+  "module": "m.yang",
+  "xfail": {
+    "python": "duplicate grouping when the same submodule is included twice (#194)"
+  },
+  "instances": [
+    { "name": "grouping and feature", "data": { "top": { "a": "ok", "flagged": "on" } }, "valid": true }
+  ]
+}
