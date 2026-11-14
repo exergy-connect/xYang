@@ -36,7 +36,7 @@ class TypedefStatementParser:
     ) -> Optional[YangTypedefStmt]:
         """Parse typedef statement."""
         tokens.consume(kw.TYPEDEF)
-        typedef_name = tokens.consume_type(YangTokenType.IDENTIFIER)
+        typedef_name = self._parsers.parse_identifier_argument(tokens, "typedef")
         typedef_stmt = YangTypedefStmt(name=typedef_name, scope=context.typedef_context or None)
         unsupported_ctx = f"typedef '{typedef_name}'"
 

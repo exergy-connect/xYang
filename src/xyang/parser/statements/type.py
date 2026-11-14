@@ -6,8 +6,6 @@ from __future__ import annotations
 
 from ...ast import make_type_stmt
 
-import re
-
 from .. import keywords as kw
 
 from types import SimpleNamespace
@@ -55,11 +53,7 @@ class TypeStatementParser:
     def parse_type(self, tokens: TokenStream, context: ParserContext) -> YangTypeStmt:
         """Parse type statement."""
         tokens.consume(kw.TYPE)
-        type_prefix: str | None = None
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            type_prefix, type_name = self._parsers.consume_identifier_ref(tokens)
-        else:
-            type_name = tokens.consume()
+        type_prefix, type_name = self._parsers.consume_identifier_ref(tokens)
         type_stmt = make_type_stmt(name=type_name, prefix=type_prefix)
         type_stmt.scope = context.module
         type_stmt.context = context.typedef_context
@@ -196,7 +190,7 @@ class TypeStatementParser:
         if not isinstance(type_stmt, YangDecimalTypeStmt):
             raise tokens.make_error("fraction-digits requires decimal64")
         tokens.consume(kw.FRACTION_DIGITS)
-        type_stmt.fraction_digits = int(tokens.consume_type(YangTokenType.INTEGER))
+        type_stmt.fraction_digits = self._parsers.parse_integer_argument(tokens, "fraction-digits")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_enum(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
@@ -248,18 +242,14 @@ class TypeStatementParser:
 
     def parse_pattern_modifier(self, tokens: TokenStream, _context: ParserContext) -> None:
         tokens.consume(kw.MODIFIER)
-        modifier = tokens.consume()
-        self._pattern_stack[-1].invert_match = modifier == "invert-match"
+        self._parsers.parse_keyword_argument(tokens, "modifier", ("invert-match",))
+        self._pattern_stack[-1].invert_match = True
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_enum_value(self, tokens: TokenStream, _context: ParserContext) -> None:
         tokens.consume(kw.VALUE)
-        raw = self._parsers.parse_string_argument(tokens)
-        if re.fullmatch(r"[+-]?\d+", raw) is None:
-            raise tokens.make_error(f"value argument must be an integer, got {raw!r}")
+        self._parsers.parse_integer_argument(tokens, "value")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_enum_status(self, tokens: TokenStream, _context: ParserContext) -> None:
-        tokens.consume(kw.STATUS)
-        tokens.consume_type(YangTokenType.IDENTIFIER)
-        tokens.consume_if_type(YangTokenType.SEMICOLON)
+        self._parsers.parse_status_argument(tokens)

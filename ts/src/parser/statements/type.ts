@@ -14,15 +14,9 @@ export class TypeStatementParser {
 
   parse_type(tokens: TokenStream, context: ParserContext): YangTypeStmt {
     tokens.consume(kw.TYPE);
-    let prefix: string | undefined;
-    let name: string;
-    if (tokens.peek_type() === YangTokenType.IDENTIFIER) {
-      const ref = this.parsers.consume_identifier_ref(tokens);
-      prefix = ref.prefix;
-      name = ref.name;
-    } else {
-      name = tokens.consume().trim();
-    }
+    const ref = this.parsers.consume_identifier_ref(tokens);
+    const prefix = ref.prefix;
+    const name = ref.name;
     const type_stmt = createTypeStmt({ name, prefix, context: context.typedef_context });
     const writer = context.module as { name?: string; belongs_to_module?: string };
     const scope = writer.belongs_to_module || writer.name;
@@ -142,7 +136,7 @@ export class TypeStatementParser {
   parse_type_fraction_digits(tokens: TokenStream, _context: ParserContext, type_stmt: YangTypeStmt): void {
     if (!(type_stmt instanceof YangDecimalTypeStmt)) tokens.syntaxError("fraction-digits requires decimal64");
     tokens.consume(kw.FRACTION_DIGITS);
-    type_stmt.fraction_digits = Number.parseInt(tokens.consume_type(YangTokenType.INTEGER), 10);
+    type_stmt.fraction_digits = this.parsers.parse_integer_argument(tokens, "fraction-digits");
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
@@ -195,22 +189,18 @@ export class TypeStatementParser {
 
   parse_pattern_modifier(tokens: TokenStream, _context: ParserContext): void {
     tokens.consume(kw.MODIFIER);
-    this.patternBody!.invert = tokens.consume() === "invert-match";
+    this.parsers.parse_keyword_argument(tokens, "modifier", ["invert-match"]);
+    this.patternBody!.invert = true;
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_enum_value(tokens: TokenStream, _context: ParserContext): void {
     tokens.consume(kw.VALUE);
-    const raw = this.parsers.parse_string_argument(tokens);
-    if (!/^[+-]?\d+$/.test(raw)) {
-      tokens.syntaxError(`value argument must be an integer, got '${raw}'`);
-    }
+    this.parsers.parse_integer_argument(tokens, "value");
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }
 
   parse_enum_status(tokens: TokenStream, _context: ParserContext): void {
-    tokens.consume(kw.STATUS);
-    tokens.consume_type(YangTokenType.IDENTIFIER);
-    tokens.consume_if_type(YangTokenType.SEMICOLON);
+    this.parsers.parse_status_argument(tokens);
   }
 }

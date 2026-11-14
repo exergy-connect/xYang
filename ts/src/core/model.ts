@@ -110,6 +110,7 @@ interface YangStatementFields {
   when?: WhenShape;
   presence?: string;
   error_message?: string;
+  error_app_tag?: string;
   /** Module each prefixed step in a `must` expression is bound to, by prefix. */
   xpath_prefixes?: Record<string, string>;
   grouping_name?: string;

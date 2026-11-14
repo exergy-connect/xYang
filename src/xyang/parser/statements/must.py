@@ -44,6 +44,17 @@ class MustStatementParser:
     ) -> None:
         """Parse ``error-message`` under ``must``."""
         tokens.consume(kw.ERROR_MESSAGE)
+        value = self._parsers.parse_string_argument(tokens)
         if context.current_parent and isinstance(context.current_parent, YangMustStmt):
-            context.current_parent.error_message = tokens.consume_type(YangTokenType.STRING)
+            context.current_parent.error_message = value
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_must_error_app_tag(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> None:
+        """Parse ``error-app-tag`` under ``must`` (RFC 7950 §7.5.4)."""
+        tokens.consume(kw.ERROR_APP_TAG)
+        value = self._parsers.parse_string_argument(tokens)
+        if context.current_parent and isinstance(context.current_parent, YangMustStmt):
+            context.current_parent.error_app_tag = value
         tokens.consume_if_type(YangTokenType.SEMICOLON)

@@ -205,12 +205,19 @@ pub const Parser = struct {
     // Arguments
     // ------------------------------------------------------------------
 
-    /// `consume_identifier_ref`: `name` or `prefix:name`.
+    /// `name` or `prefix:name`, quoted or unquoted (RFC 7950 identifier-ref-arg-str).
     pub fn consumeIdentifierRef(p: *Parser) Error!ast.IdentifierRef {
-        const first = std.mem.trim(u8, try p.ts.consumeType(.identifier), " \t\r\n");
-        if (!p.ts.consumeIfType(.colon)) return .{ .name = first };
-        const second = std.mem.trim(u8, try p.ts.consumeType(.identifier), " \t\r\n");
-        return .{ .prefix = first, .name = second };
+        const raw = try p.parseStringArgument();
+        if (std.mem.indexOfScalar(u8, raw, ':')) |colon| {
+            const prefix = raw[0..colon];
+            const name = raw[colon + 1 ..];
+            if (prefix.len > 0 and name.len > 0 and std.mem.indexOfScalar(u8, name, ':') == null and isIdentifier(prefix) and isIdentifier(name)) {
+                return .{ .prefix = prefix, .name = name };
+            }
+            return p.ts.fail("Expected an identifier or prefix:identifier, got {f}", .{repr(raw)});
+        }
+        if (!isIdentifier(raw)) return p.ts.fail("Expected an identifier, got {f}", .{repr(raw)});
+        return .{ .name = raw };
     }
 
     pub fn consumeQName(p: *Parser) Error![]const u8 {
@@ -264,6 +271,35 @@ pub const Parser = struct {
         return out.items;
     }
 
+    /// One argument, then reject text that is not an identifier.
+    pub fn parseIdentifierArgument(p: *Parser, statement: []const u8) Error![]const u8 {
+        const raw = try p.parseStringArgument();
+        if (!isIdentifier(raw)) return p.ts.fail("{s} argument must be an identifier, got {f}", .{ statement, repr(raw) });
+        return raw;
+    }
+
+    /// One argument, then reject text outside the statement's keyword grammar.
+    pub fn parseKeywordArgument(p: *Parser, statement: []const u8, allowed: []const []const u8) Error![]const u8 {
+        const raw = try p.parseStringArgument();
+        for (allowed) |item| if (std.mem.eql(u8, raw, item)) return raw;
+        return p.ts.fail("{s} argument must be {s}, got {f}", .{ statement, try keywordChoices(p, allowed), repr(raw) });
+    }
+
+    /// One argument that is a signed decimal integer.
+    pub fn parseIntegerArgument(p: *Parser, statement: []const u8) Error!i64 {
+        const raw = try p.parseStringArgument();
+        if (!isSignedDecimal(raw)) return p.ts.fail("{s} argument must be an integer, got {f}", .{ statement, repr(raw) });
+        return p.parseInt(raw);
+    }
+
+    /// `status current|deprecated|obsolete`, quoted or unquoted.
+    pub fn parseStatusArgument(p: *Parser) Error![]const u8 {
+        _ = try p.ts.consume(kw.STATUS);
+        const value = try p.parseKeywordArgument("status", &.{ "current", "deprecated", "obsolete" });
+        _ = p.ts.consumeIfType(.semicolon);
+        return value;
+    }
+
     /// Exactly `true` or `false`, quoted or unquoted.
     pub fn parseBooleanArgument(p: *Parser, statement: []const u8) Error!bool {
         if (!p.ts.hasMore() or p.ts.at(.semicolon) or p.ts.at(.lbrace) or p.ts.at(.rbrace)) {
@@ -292,24 +328,40 @@ pub const Parser = struct {
             p.ts.failKind(.unsupported, "xyang-zig does not support integer {f} outside the 64-bit range yet", .{repr(text)});
     }
 
-    /// `default` value: one STRING, INTEGER or IDENTIFIER token.
+    /// `default` value: one statement argument.
     pub fn parseDefaultValueTokens(p: *Parser) Error![]const u8 {
-        const tt = try p.ts.peekType();
-        switch (tt) {
-            .string, .integer, .identifier => return p.ts.consumeAny(),
-            else => return p.ts.fail("Expected default value (string, integer, identifier, or true/false), got {s}", .{tt.pyName()}),
-        }
+        return p.parseStringArgument();
     }
 
-    /// `prefix` argument as a string or a bare identifier.
+    /// `prefix` argument: an identifier, quoted or unquoted.
     pub fn consumePrefixArgument(p: *Parser) Error![]const u8 {
-        const tt = if (p.ts.hasMore()) p.ts.tokens[p.ts.index].type else return p.ts.fail("Unexpected end of input", .{});
-        return switch (tt) {
-            .string, .identifier => p.ts.consumeAny(),
-            else => p.ts.fail("Expected prefix string or identifier, got {s}", .{tt.pyName()}),
-        };
+        return p.parseIdentifierArgument("prefix");
     }
 };
+
+pub fn isIdentifier(text: []const u8) bool {
+    if (text.len == 0) return false;
+    if (!isIdentChar(text[0], true)) return false;
+    for (text[1..]) |c| if (!isIdentChar(c, false)) return false;
+    return true;
+}
+
+fn isIdentChar(c: u8, start: bool) bool {
+    const alpha = (c >= 'A' and c <= 'Z') or (c >= 'a' and c <= 'z');
+    if (start) return alpha or c == '_';
+    return alpha or (c >= '0' and c <= '9') or c == '_' or c == '-' or c == '.';
+}
+
+fn keywordChoices(p: *Parser, allowed: []const []const u8) Error![]const u8 {
+    var out: std.ArrayList(u8) = .empty;
+    for (allowed, 0..) |item, i| {
+        if (i != 0) try out.appendSlice(p.arena, " or ");
+        try out.append(p.arena, '\'');
+        try out.appendSlice(p.arena, item);
+        try out.append(p.arena, '\'');
+    }
+    return out.items;
+}
 
 pub fn isSignedDecimal(raw: []const u8) bool {
     var s = raw;
@@ -326,7 +378,7 @@ pub fn isSignedDecimal(raw: []const u8) bool {
 /// `description` (a braced extension body after it is skipped, like Python).
 pub fn parseDescription(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.DESCRIPTION);
-    const desc = try p.ts.consumeType(.string);
+    const desc = try p.parseStringArgument();
     if (p.ts.at(.lbrace)) try consumeBalancedBraces(p);
     _ = p.ts.consumeIfType(.semicolon);
     p.setDescription(parent, desc);
@@ -338,7 +390,7 @@ fn parseDiscardedDescription(p: *Parser, _: Parent) Error!void {
 
 pub fn parseReference(p: *Parser, parent: Parent) Error!void {
     _ = try p.ts.consume(kw.REFERENCE);
-    const ref = try p.ts.consumeType(.string);
+    const ref = try p.parseStringArgument();
     _ = p.ts.consumeIfType(.semicolon);
     p.setReference(parent, ref);
 }
@@ -354,11 +406,9 @@ pub fn parseUnits(p: *Parser, parent: Parent) Error!void {
     }
 }
 
-/// `status current|deprecated|obsolete;` (not stored on the AST, like Python).
+/// `status current|deprecated|obsolete;` (checked, not stored on the AST).
 pub fn parseStatusIgnored(p: *Parser, _: Parent) Error!void {
-    _ = try p.ts.consume(kw.STATUS);
-    if ((try p.ts.peekType()) == .identifier) _ = try p.ts.consumeType(.identifier);
-    _ = p.ts.consumeIfType(.semicolon);
+    _ = try p.parseStatusArgument();
 }
 
 pub fn consumeBalancedBraces(p: *Parser) Error!void {
@@ -459,7 +509,10 @@ const OVERRIDES = [_]Override{
     } },
     .{ .identity, &.{.{ kw.BASE, module_parsers.parseIdentityBase }} },
     .{ .if_feature, &.{.{ kw.DESCRIPTION, parseDiscardedDescription }} },
-    .{ .must, &.{.{ kw.ERROR_MESSAGE, data_parsers.parseMustErrorMessage }} },
+    .{ .must, &.{
+        .{ kw.ERROR_MESSAGE, data_parsers.parseMustErrorMessage },
+        .{ kw.ERROR_APP_TAG, data_parsers.parseMustErrorAppTag },
+    } },
     .{ .extension, &.{.{ kw.ARGUMENT, module_parsers.parseExtensionArgument }} },
     .{ .argument, &.{.{ kw.YIN_ELEMENT, module_parsers.parseYinElement }} },
     .{ .deviation, &.{.{ kw.DEVIATE, module_parsers.parseDeviate }} },

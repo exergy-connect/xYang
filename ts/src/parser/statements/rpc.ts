@@ -43,7 +43,7 @@ export class RpcStatementParser {
 
   private parseOperation(tokens: TokenStream, context: ParserContext, keyword: string, stmt: YangRpcStmt): YangRpcStmt {
     tokens.consume(keyword);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, keyword);
     stmt.name = name;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

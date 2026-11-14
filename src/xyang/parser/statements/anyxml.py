@@ -26,7 +26,7 @@ class AnyxmlStatementParser:
     ) -> YangAnyxmlStmt:
         """Parse anyxml statement (RFC 7950 §7.11)."""
         tokens.consume(kw.ANYXML)
-        anyxml_name = tokens.consume()
+        anyxml_name = self._parsers.parse_identifier_argument(tokens, "anyxml")
         anyxml_stmt = YangAnyxmlStmt(name=anyxml_name)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             new_context = context.push_parent(anyxml_stmt)

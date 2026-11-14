@@ -9,7 +9,7 @@ export class NotificationStatementParser {
 
   parse_notification(tokens: TokenStream, context: ParserContext): YangNotificationStmt {
     tokens.consume(kw.NOTIFICATION);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "notification");
     const stmt = new YangNotificationStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

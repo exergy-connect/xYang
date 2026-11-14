@@ -1166,9 +1166,13 @@ export class DocumentValidator {
         const result = this.xpath.eval(ast, context, currentNode);
         const ok = this.xpathBoolean(result);
         if (!ok) {
-          const errorMessage = typeof mustStmt.error_message === "string" && mustStmt.error_message.trim().length > 0
+          let errorMessage = typeof mustStmt.error_message === "string" && mustStmt.error_message.trim().length > 0
             ? mustStmt.error_message
             : `must constraint not satisfied on '${stmt.name ?? "node"}'`;
+          const appTag = typeof mustStmt.error_app_tag === "string" ? mustStmt.error_app_tag : "";
+          if (appTag.length > 0) {
+            errorMessage = `${errorMessage} (error-app-tag: ${appTag})`;
+          }
           errors.push(issue(path, "must", errorMessage, expression));
         }
       } catch {

@@ -1,5 +1,5 @@
 import * as kw from "../keywords";
-import { hasTokenType, ParserContext, TokenStream, YangTokenType } from "../parser-context";
+import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
 export class RevisionStatementParser {
@@ -7,14 +7,7 @@ export class RevisionStatementParser {
 
   parse_revision(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.REVISION);
-    let date = "";
-    if (tokens.peek_type() === YangTokenType.STRING) {
-      date = tokens.consume_type(YangTokenType.STRING);
-    } else {
-      while (tokens.has_more() && !hasTokenType(tokens.peek_type(), [YangTokenType.LBRACE, YangTokenType.SEMICOLON])) {
-        date += tokens.consume();
-      }
-    }
+    const date = this.parsers.parse_string_argument(tokens);
     const rev: { date: string; description: string; reference: string } = {
       date,
       description: "",
@@ -34,14 +27,7 @@ export class RevisionStatementParser {
 
   parse_revision_date_statement(tokens: TokenStream): string {
     tokens.consume(kw.REVISION_DATE);
-    let date = "";
-    if (tokens.peek_type() === YangTokenType.STRING) {
-      date = tokens.consume_type(YangTokenType.STRING);
-    } else {
-      while (tokens.has_more() && tokens.peek_type() !== YangTokenType.SEMICOLON) {
-        date += tokens.consume();
-      }
-    }
+    const date = this.parsers.parse_string_argument(tokens);
     tokens.consume_if_type(YangTokenType.SEMICOLON);
     return date;
   }

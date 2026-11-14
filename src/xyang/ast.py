@@ -448,6 +448,7 @@ class YangParsedXPathBase:
 class YangMustStmt(YangParsedXPathBase):
     """Must statement (constraint)."""
     error_message: str = ""
+    error_app_tag: str = ""
 
 
 @dataclass

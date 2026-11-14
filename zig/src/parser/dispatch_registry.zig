@@ -152,7 +152,7 @@ pub const PARENTS = [_]DispatchParent{
     })),
     parent(.anydata, "anydata", "7.10.1", &(DATA_NODE_SUBSTATEMENTS ++ [_][]const u8{ kw.WHEN, kw.MUST, kw.IF_FEATURE, kw.MANDATORY })),
     parent(.anyxml, "anyxml", "7.11.1", &(DATA_NODE_SUBSTATEMENTS ++ [_][]const u8{ kw.WHEN, kw.MUST, kw.IF_FEATURE, kw.MANDATORY })),
-    parent(.must, "must", "7.5.4", &.{ kw.ERROR_MESSAGE, kw.DESCRIPTION, kw.REFERENCE }),
+    parent(.must, "must", "7.5.4", &.{ kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.DESCRIPTION, kw.REFERENCE }),
     parent(.when, "when", "7.21.5", &.{ kw.DESCRIPTION, kw.REFERENCE }),
     parent(.feature, "feature", "7.20.1", &.{ kw.DESCRIPTION, kw.IF_FEATURE, kw.REFERENCE }),
     parent(.if_feature, "if-feature", "7.20.2", &.{ kw.DESCRIPTION, kw.REFERENCE }),

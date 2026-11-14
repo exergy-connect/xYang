@@ -28,7 +28,7 @@ class BitsStatementParser:
         if type_stmt.bits is None:
             type_stmt.bits = []
         tokens.consume(kw.BIT)
-        bit_name = tokens.consume()
+        bit_name = self._parsers.parse_identifier_argument(tokens, "bit")
         bit_stmt = YangBitStmt(name=bit_name, position=None)
         if tokens.consume_if_type(YangTokenType.LBRACE):
             bit_ctx = context.push_parent(bit_stmt)
@@ -43,7 +43,7 @@ class BitsStatementParser:
         parent = context.current_parent
         if isinstance(parent, YangBitStmt) and parent.position is not None:
             raise tokens.make_error("Duplicate position in bit statement")
-        pos = int(tokens.consume_type(YangTokenType.INTEGER))
+        pos = self._parsers.parse_integer_argument(tokens, "position")
         if isinstance(parent, YangBitStmt):
             parent.position = pos
         tokens.consume_if_type(YangTokenType.SEMICOLON)

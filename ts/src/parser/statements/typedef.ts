@@ -9,7 +9,7 @@ export class TypedefStatementParser {
 
   parse_typedef(tokens: TokenStream, context: ParserContext): YangTypedefStmt {
     tokens.consume(kw.TYPEDEF);
-    const name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    const name = this.parsers.parse_identifier_argument(tokens, "typedef");
     const stmt = new YangTypedefStmt({ name, scope: context.typedef_context || undefined });
     const unsupportedCtx = `typedef '${name}'`;
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {

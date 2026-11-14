@@ -8,7 +8,7 @@ export class ContainerStatementParser {
 
   parse_container(tokens: TokenStream, context: ParserContext): YangContainerStmt {
     tokens.consume(kw.CONTAINER);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "container");
     const stmt = new YangContainerStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

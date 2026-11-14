@@ -44,17 +44,7 @@ class RefineStatementParser:
     def parse_refine(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse refine statement (supports descendant paths ``a/b``)."""
         tokens.consume(kw.REFINE)
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            parts = [self._parsers.consume_qname_from_identifier(tokens)]
-        else:
-            parts = [tokens.consume()]
-        while tokens.has_more() and tokens.peek_type() == YangTokenType.SLASH:
-            tokens.consume_type(YangTokenType.SLASH)
-            if tokens.peek_type() == YangTokenType.IDENTIFIER:
-                parts.append(self._parsers.consume_qname_from_identifier(tokens))
-            else:
-                parts.append(tokens.consume())
-        path_arg = "/".join(parts)
+        path_arg = self._parsers.parse_string_argument(tokens)
         try:
             path_node = XPathParser(path_arg).parse_path()
         except XPathSyntaxError as e:

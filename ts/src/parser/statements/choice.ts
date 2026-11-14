@@ -18,7 +18,7 @@ export class ChoiceStatementParser {
 
   parse_choice(tokens: TokenStream, context: ParserContext): YangChoiceStmt {
     tokens.consume(kw.CHOICE);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "choice");
     const stmt = new YangChoiceStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
@@ -69,7 +69,7 @@ export class ChoiceStatementParser {
 
   parse_case(tokens: TokenStream, context: ParserContext): YangCaseStmt {
     tokens.consume(kw.CASE);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "case");
     const stmt = new YangCaseStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);
@@ -98,7 +98,7 @@ export class ChoiceStatementParser {
 
   parse_choice_default(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.DEFAULT);
-    const name = this.parsers.parse_string_argument(tokens);
+    const name = this.parsers.parse_identifier_argument(tokens, "default");
     const parent = context.current_parent;
     if (parent instanceof YangChoiceStmt) {
       parent.default = name;

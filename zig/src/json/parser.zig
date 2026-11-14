@@ -454,6 +454,7 @@ fn mustList(p: *Parse, xy: *const Object) Error!std.ArrayList(*ast.MustStmt) {
         must.* = .{
             .expression = try textField(p, m.object, K.must_entry.MUST, ""),
             .error_message = try textField(p, m.object, K.must_entry.ERROR_MESSAGE, ""),
+            .error_app_tag = try textField(p, m.object, K.must_entry.ERROR_APP_TAG, ""),
             .description = try textField(p, m.object, K.DESCRIPTION, ""),
         };
         must.ast = try p.expression(must.expression, m.object.get(K.xy.XPATH_PREFIXES));

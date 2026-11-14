@@ -33,11 +33,7 @@ class UsesStatementParser:
         have been parsed. A YangUsesStmt node is created as a placeholder.
         """
         tokens.consume(kw.USES)
-        grouping_prefix: Optional[str] = None
-        if tokens.peek_type() == YangTokenType.IDENTIFIER:
-            grouping_prefix, grouping_name = self._parsers.consume_identifier_ref(tokens)
-        else:
-            grouping_name = tokens.consume().strip()
+        grouping_prefix, grouping_name = self._parsers.consume_identifier_ref(tokens)
         uses_stmt = YangUsesStmt(
             name="uses",
             grouping_name=grouping_name,

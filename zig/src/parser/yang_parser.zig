@@ -469,7 +469,7 @@ test "syntax errors carry Python's text and line" {
     try expectError("", "m.yang: 1: Empty input");
     try expectError("module m {\n  container c {\n", "m.yang: 2: Unexpected end of input");
     try expectError("module m { leaf a { type enumeration; } }", "m.yang: 1: enumeration type requires at least one \"enum\" statement (RFC 7950)");
-    try expectError("module m { description foo; }", "m.yang: 1: Expected STRING, got IDENTIFIER ('foo')");
+    try expectError("module m { leaf \"a b\"; }", "m.yang: 1: leaf argument must be an identifier, got 'a b'");
     try expectError("module m { choice c; }", "m.yang: 1: Invalid or unknown statement in module body: 'choice'");
     try expectError("module m { container t { choice c { leaf a { type string; } case b { leaf a { type string; } } } } }", "Choice 'c': schema node 'a' appears in case 'a' and again in case 'b' (RFC 7950: names of nodes in the cases of a choice must be unique).");
 }

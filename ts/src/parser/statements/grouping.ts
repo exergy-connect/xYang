@@ -8,7 +8,7 @@ export class GroupingStatementParser {
 
   parse_grouping(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.GROUPING);
-    const name = tokens.consume();
+    const name = this.parsers.parse_identifier_argument(tokens, "grouping");
     const stmt = new YangGroupingStmt({ name });
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(stmt);

@@ -26,7 +26,7 @@ export class SubmoduleStatementParser {
 
   parse_submodule(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.SUBMODULE);
-    (context.module as any).name = tokens.consume_type(YangTokenType.IDENTIFIER);
+    (context.module as any).name = this.parsers.parse_identifier_argument(tokens, "submodule");
     tokens.consume_type(YangTokenType.LBRACE);
     const scoped = context.with_dispatch("submodule", "submodule body");
     while (tokens.has_more() && tokens.peek_type() !== YangTokenType.RBRACE) {
@@ -44,7 +44,7 @@ export class SubmoduleStatementParser {
 
   parse_belongs_to(tokens: TokenStream, context: ParserContext): void {
     tokens.consume(kw.BELONGS_TO);
-    (context.module as any).belongs_to_module = tokens.consume_type(YangTokenType.IDENTIFIER);
+    (context.module as any).belongs_to_module = this.parsers.parse_identifier_argument(tokens, "belongs-to");
     tokens.consume_type(YangTokenType.LBRACE);
     this.parsers.parseBody(tokens, context, "belongs-to", "belongs-to");
     tokens.consume_type(YangTokenType.RBRACE);

@@ -23,29 +23,7 @@ class RevisionStatementParser:
     def parse_revision(self, tokens: TokenStream, context: ParserContext) -> None:
         """Parse top-level ``revision`` statement."""
         tokens.consume(kw.REVISION)
-        tt0 = tokens.peek_type()
-        if tt0 == YangTokenType.STRING:
-            date = tokens.consume_type(YangTokenType.STRING)
-        else:
-            chunks: list[str] = []
-            while tokens.has_more() and tokens.peek_type() not in (
-                YangTokenType.LBRACE,
-                YangTokenType.SEMICOLON,
-            ):
-                tt = tokens.peek_type()
-                if tt in (
-                    YangTokenType.IDENTIFIER,
-                    YangTokenType.DOTTED_NUMBER,
-                    YangTokenType.INTEGER,
-                ):
-                    chunks.append(tokens.consume_type(tt))
-                else:
-                    break
-            date = "".join(chunks)
-            if not date:
-                raise tokens.make_error(
-                    f"Expected revision date, got {tt0.name if tt0 else 'end'}"
-                )
+        date = self._parsers.parse_string_argument(tokens)
         revision: dict[str, str] = {"date": date, "description": "", "reference": ""}
         if tokens.consume_if_type(YangTokenType.LBRACE):
             body = SimpleNamespace(description="", reference="")
@@ -66,22 +44,4 @@ class RevisionStatementParser:
 
     def _parse_revision_date_argument(self, tokens: TokenStream) -> str:
         """Parse revision-date value only (no keyword or trailing ``;``)."""
-        tt0 = tokens.peek_type()
-        if tt0 == YangTokenType.STRING:
-            return tokens.consume_type(YangTokenType.STRING)
-        chunks: list[str] = []
-        while tokens.has_more() and tokens.peek_type() != YangTokenType.SEMICOLON:
-            tt = tokens.peek_type()
-            if tt in (
-                YangTokenType.IDENTIFIER,
-                YangTokenType.DOTTED_NUMBER,
-                YangTokenType.INTEGER,
-            ):
-                chunks.append(tokens.consume_type(tt))
-            else:
-                break
-        if not chunks:
-            raise tokens.make_error(
-                f"Expected revision-date value, got {tt0.name if tt0 else 'end'}"
-            )
-        return "".join(chunks)
+        return self._parsers.parse_string_argument(tokens)

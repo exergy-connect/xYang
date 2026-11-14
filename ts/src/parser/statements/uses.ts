@@ -8,15 +8,9 @@ export class UsesStatementParser {
 
   parse_uses(tokens: TokenStream, context: ParserContext): YangUsesStmt {
     tokens.consume(kw.USES);
-    let grouping_prefix: string | undefined;
-    let grouping_name: string;
-    if (tokens.peek_type() === YangTokenType.IDENTIFIER) {
-      const ref = this.parsers.consume_identifier_ref(tokens);
-      grouping_prefix = ref.prefix;
-      grouping_name = ref.name;
-    } else {
-      grouping_name = tokens.consume().trim();
-    }
+    const ref = this.parsers.consume_identifier_ref(tokens);
+    const grouping_prefix = ref.prefix;
+    const grouping_name = ref.name;
     const stmt = new YangUsesStmt({
       name: "uses",
       grouping_name,
