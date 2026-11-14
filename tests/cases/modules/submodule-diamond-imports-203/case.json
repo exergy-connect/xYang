@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §7.1.5 / §5.1: one submodule reached through two includes (m includes s1 and s2, s1 includes s2) is one definition. Re-parsing it does not reject the submodule's import prefix, and the nested prefixed uses still resolves (#203, #214).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "diamond include", "data": { "top": { "from-a": "v" } }, "valid": true }
+  ]
+}

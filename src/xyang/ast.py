@@ -59,6 +59,9 @@ class YangStatement(YangStatementList):
     description: str = ""
     reference: str = ""
     units: str = ""
+    # Submodule this statement was parsed from. Prefixes resolve in that file.
+    # None means the module file itself. A dataclass field so copies keep it.
+    included_from: Optional[str] = None
 
     def get_schema_node(self) -> Optional[str]:
         """Path segment for this statement in the schema tree, or None if it adds no node.

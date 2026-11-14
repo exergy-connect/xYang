@@ -1,0 +1,7 @@
+{
+  "description": "RFC 7950 §7.1.5: a prefixed uses nested inside a submodule grouping resolves in that submodule's imports. s1 includes s2; s2 imports a as x and grouping g2 uses x:ga (#203, #214).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "nested prefix", "data": { "top": { "from-a": "v" } }, "valid": true }
+  ]
+}

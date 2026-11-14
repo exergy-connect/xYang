@@ -311,10 +311,15 @@ pub const Loader = struct {
                 try parent.included_files.put(a, e.key_ptr.*, e.value_ptr.*);
             }
         }
+        // Snapshot first: this include keeps every statement of one submodule.
+        // A later include of an origin already present (a diamond) still skips.
+        var already: std.array_hash_map.String(void) = .empty;
+        var prior = parent.included_submodules.iterator();
+        while (prior.next()) |e| try already.put(a, e.key_ptr.*, {});
         for (sub.statements.items) |stmt| {
             const origin = stmt.included_from orelse sub.name;
             stmt.included_from = origin;
-            if (parent.included_submodules.contains(origin)) continue;
+            if (already.contains(origin)) continue;
             try parent.statements.append(a, stmt);
             try parent.included_submodules.put(a, origin, {});
         }

@@ -212,6 +212,10 @@ export class YangParser {
       throw new YangSyntaxError(`Circular submodule include: ${path}`, { filename: path });
     }
     this.includeStack.push(path);
+    // A submodule reached through two includes is parsed again into this module.
+    // Clear that file's prefix map first; a duplicate prefix inside one file still fails.
+    const fileImports = ((module.file_imports ??= {}) as Record<string, Record<string, YangModule>>);
+    fileImports[submoduleName] = {};
     const saved = snapshotModuleHeader(module);
     const releaseGuards = guardIncludeDefinitions(module, submoduleName);
     const previousInclude = this.parsers.includingSubmoduleName;
