@@ -54,6 +54,12 @@ function pathSegmentsFromAugment(aug: YangStatement, path: string): YangIdentifi
   }
 }
 
+/** Path length. A node added by a path of k segments lives at depth >= k + 1. */
+function augmentSegmentCount(aug: YangStatement): number {
+  const path = String(aug.augment_path ?? aug.argument ?? "");
+  return pathSegmentsFromAugment(aug, path).length;
+}
+
 function isSchemaNode(stmt: YangStatement): boolean {
   const kw = typeof stmt.keyword === "string" ? stmt.keyword : "";
   return Boolean(stmt.name) && SCHEMA_NODE_KEYWORDS.has(kw);
@@ -604,6 +610,8 @@ export function applyAugmentationsAcrossModuleMap(modules: Map<string, YangModul
       }
     }
   }
+  // Stable: equal depths keep source order. Shorter paths add the nodes longer ones name.
+  pending.sort((a, b) => augmentSegmentCount(a.aug) - augmentSegmentCount(b.aug));
   for (const { mod, aug } of pending) {
     const path = String(aug.augment_path ?? aug.argument ?? "");
     const target = resolveAugmentTarget(mod, path, aug);
@@ -634,6 +642,7 @@ export function applyAugments(module: YangModule): YangModule {
   if (augments.length === 0) {
     return module;
   }
+  augments.sort((a, b) => augmentSegmentCount(a) - augmentSegmentCount(b));
   const sourceName = String(module.name ?? "");
   for (const aug of augments) {
     const path = String(aug.augment_path ?? aug.argument ?? "");

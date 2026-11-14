@@ -27,6 +27,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 ### Fixed
 
 - **Included submodule statements (Python, TypeScript, and Zig)** ([#214](https://github.com/exergy-connect/xYang/issues/214)): an included submodule keeps every top-level statement, not only the first. Nested statements in a submodule resolve prefixes in that submodule's import map. A submodule reached through two include paths no longer fails with a duplicate import prefix. This also loads the remaining modules from [#203](https://github.com/exergy-connect/xYang/issues/203). Shared cases `modules/submodule-all-statements-200`, `modules/submodule-nested-uses-prefix-203`, and `modules/submodule-diamond-imports-203`.
+- **Augment targeting a node added by a later augment (Python, TypeScript, and Zig)** ([#216](https://github.com/exergy-connect/xYang/issues/216)): statement order has no meaning in YANG (RFC 7950). Top-level `augment` statements are applied shortest path first, so an augment can target a node a later augment adds. A path that names no node still fails with the same error. Shared case `reuse/augment-target-from-later-augment`.
+
 - **`benchmarks/benchmark.py` type validation benchmark:** it imported `TypeSystem` from `xyang`, which does not export it, and raised `ImportError`. It now imports from `xyang.types`.
 
 - **Parenthesized XPath comparison starting with a literal (Python, TypeScript, and Zig)** ([#202](https://github.com/exergy-connect/xYang/issues/202)): `(1>=../a)` is an expression. The value-list lookahead no longer consumes the leading literal and drops it when no comma follows. `(1)` and `('a','b')` are unchanged. Shared case `xpath/paren-literal-comparison-202`.
