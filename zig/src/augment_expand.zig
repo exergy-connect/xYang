@@ -160,19 +160,35 @@ fn mergeAugmentIntoTarget(r: *Reporter, aug: *Statement, target: *Statement, sou
     }
 }
 
+const PendingAugment = struct { stmt: *Statement, depth: usize };
+
+/// Shorter paths first. Equal depths keep source order (`std.mem.sort` is stable).
+/// A node added by a path of k segments lives at depth >= k + 1.
+fn lessAugmentDepth(_: void, a: PendingAugment, b: PendingAugment) bool {
+    return a.depth < b.depth;
+}
+
+fn augmentDepth(s: *Statement) usize {
+    return s.data.augment.augment_path_segments.items.len;
+}
+
 /// `apply_augmentations`: merge each top-level `augment` (already `uses`-expanded) into its
 /// target, in this module or an imported one, then drop the `augment` statements.
+///
+/// Paths are applied shortest first. Statement order has no meaning (RFC 7950), so an
+/// augment may name a node a later augment adds. A path that names no node still fails
+/// in `resolveAugmentTarget`.
 pub fn applyAugmentations(r: *Reporter, root: *Module) Error!void {
-    var kept: StatementList = .empty;
+    var pending: std.ArrayList(PendingAugment) = .empty;
     for (root.statements.items) |s| {
-        if (s.kind() != .augment) try kept.append(r.arena, s);
-    }
-    if (kept.items.len == root.statements.items.len) return;
-    const all = try root.statements.clone(r.arena);
-    for (all.items) |s| {
         if (s.kind() != .augment) continue;
-        const target = try resolveAugmentTarget(r, root, s);
-        try mergeAugmentIntoTarget(r, s, target, root);
+        try pending.append(r.arena, .{ .stmt = s, .depth = augmentDepth(s) });
+    }
+    if (pending.items.len == 0) return;
+    std.mem.sort(PendingAugment, pending.items, {}, lessAugmentDepth);
+    for (pending.items) |item| {
+        const target = try resolveAugmentTarget(r, root, item.stmt);
+        try mergeAugmentIntoTarget(r, item.stmt, target, root);
     }
     var out: StatementList = .empty;
     for (root.statements.items) |s| {
