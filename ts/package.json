@@ -1,6 +1,6 @@
 {
   "name": "@exergy-connect/xyang",
-  "version": "1.0.1",
+  "version": "1.0.2",
   "description": "Parse YANG modules, validate RFC 7951 JSON instance data, and export JSON Schema — TypeScript library and xyang-ts CLI",
   "keywords": ["yang", "rfc7950", "rfc7951", "netconf", "restconf", "json-schema", "validation", "schema", "mcp", "agents"],
   "license": "MIT",

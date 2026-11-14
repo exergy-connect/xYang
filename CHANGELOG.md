@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.2] — 2026-11-13
+
 ### Fixed
 
 - **Python 3.11 compatibility:** fix an enum validation error message whose f-string reused its enclosing quote character, preventing the package from importing on Python 3.11.
@@ -436,7 +438,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.1...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.2...HEAD
+[1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
 [1.0.0]: https://github.com/exergy-connect/xYang/compare/v0.1.11...v1.0.0
 [0.1.11]: https://github.com/exergy-connect/xYang/compare/v0.1.10...v0.1.11
