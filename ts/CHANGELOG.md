@@ -11,6 +11,14 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [1.0.3] — 2026-11-14
 
+### Removed
+
+- **Deprecated TypeScript snake_case aliases:** `YangStatementList.find_statement`, `YangStatementList.get_all_leaves`, `YangValidator.enable_extension`, and the `YangParser` options `expand_uses` and `include_path`. They have warned since 1.0.0 that they would be removed in the next release. Use `findStatement`, `getAllLeaves`, `enableExtension`, `expandUses`, and `includePath`.
+
+### Fixed
+
+- Huawei NE8000 8.22.0 load fixes (#186-#196, #202-#204, #214-#217); see the root CHANGELOG.md.
+
 ## [1.0.2] — 2026-11-13
 
 ### Fixed
