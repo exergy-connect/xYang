@@ -497,12 +497,13 @@ class TypeChecker:
                         else f"Value {s!r} matches forbidden pattern {patt!r} (invert-match)"
                     )
                     errors.append(_issue("pattern", _pattern_entry_violation_message(p, default=default_msg)))
-        if getattr(type_stmt, "enums", None):
-            if s not in [str(e) for e in getattr(type_stmt, "enums", None)]:
+        enums = getattr(type_stmt, "enums", None)
+        if enums:
+            if s not in [str(e) for e in enums]:
                 errors.append(
                     _issue(
                         "enum",
-                        f"Value {s!r} is not one of: " f"{', '.join(str(e) for e in getattr(type_stmt, "enums", None))}",
+                        f"Value {s!r} is not one of: {', '.join(str(e) for e in enums)}",
                     )
                 )
         return errors
