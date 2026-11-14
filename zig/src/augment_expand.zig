@@ -104,7 +104,6 @@ fn walkAbsoluteSchemaPath(r: *Reporter, ctx_module: *Module, path: []const u8, k
 fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u8, kind: []const u8, segments: []const IdentifierRef, find_toplevel: FindToplevel, file: ?[]const u8) Error!Walked {
     const first = segments[0];
     const pref0 = first.prefix orelse "";
-    if (pref0.len == 0) return r.fail(.syntax, "{s}: invalid first segment in path {f} (expected 'prefix:identifier')", .{ kind, repr(path) });
     const mod0 = ctx_module.resolvePrefix(pref0, file) orelse
         return r.fail(.syntax, "{s}: unknown prefix {f} in path {f} (module {f})", .{ kind, repr(pref0), repr(path), repr(ctx_module.name) });
     var cur = find_toplevel(mod0, first.name) orelse
@@ -112,7 +111,6 @@ fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u
     var parent: Owner = .{ .module = mod0 };
     for (segments[1..]) |seg| {
         const pref = seg.prefix orelse "";
-        if (pref.len == 0) return r.fail(.syntax, "{s}: invalid path segment {f} in path {f} (expected 'prefix:identifier')", .{ kind, repr(seg.name), repr(path) });
         if (ctx_module.resolvePrefix(pref, file) == null) return r.fail(.syntax, "{s}: unknown prefix {f} in path {f}", .{ kind, repr(pref), repr(path) });
         const nxt = (try findNamedSchemaChild(r.arena, cur, seg.name)) orelse
             return r.fail(.syntax, "{s}: no child {f} under node in path {f} (after {f})", .{ kind, repr(seg.name), repr(path), repr(cur.name) });
