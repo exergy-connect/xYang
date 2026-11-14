@@ -32,10 +32,13 @@ export function parseIdentifierRefAtom(atom: string): YangIdentifierRef {
 }
 
 /**
- * Parse an absolute schema-node path (``/prefix:a/prefix:b``) into segment refs.
- * Used when a path arrives as a YANG string argument (augment, rfc8791).
+ * Parse an absolute schema-node path (``/prefix:a/b``) into segment refs.
+ * A segment with no prefix refers to the current module (RFC 7950 §6.5) and is
+ * filled with ``defaultPrefix``, the writing file's own prefix (a submodule's
+ * ``belongs-to`` prefix). The path string itself is left unchanged.
+ * Used when a path arrives as a YANG string argument (augment, deviation, rfc8791).
  */
-export function parseAbsoluteSchemaPath(path: string): YangIdentifierRef[] {
+export function parseAbsoluteSchemaPath(path: string, defaultPrefix?: string): YangIdentifierRef[] {
   const raw = path.replace(/^["']|["']$/g, "");
   if (!raw.startsWith("/")) {
     throw new Error(`Schema path must be absolute, got '${path}'`);
@@ -50,10 +53,11 @@ export function parseAbsoluteSchemaPath(path: string): YangIdentifierRef[] {
   }
   return parts.map((seg) => {
     const ref = parseIdentifierRefAtom(seg);
-    if (!ref.prefix) {
+    if (ref.prefix) return ref;
+    if (seg.includes(":") || !defaultPrefix) {
       throw new Error(`Invalid schema path segment '${seg}': expected 'prefix:identifier'`);
     }
-    return ref;
+    return { prefix: defaultPrefix, name: ref.name };
   });
 }
 
