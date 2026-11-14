@@ -872,8 +872,10 @@ export class StatementParsers {
         }
       },
       "belongs-to": {
-        [kw.PREFIX]: (t) => {
-          mod.parse_prefix_value_stmt(t);
+        [kw.PREFIX]: (t, c) => {
+          t.consume(kw.PREFIX);
+          (c.module as { prefix?: string }).prefix = this.parse_identifier_argument(t, "prefix");
+          t.consume_if_type(YangTokenType.SEMICOLON);
         }
       },
       typedef: {

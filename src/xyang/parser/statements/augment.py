@@ -31,7 +31,9 @@ class AugmentStatementParser:
         raw = path.strip().strip('"').strip("'")
         if raw.startswith("/"):
             try:
-                augment_path_segments = parse_absolute_schema_path(path)
+                augment_path_segments = parse_absolute_schema_path(
+                    path, context.module.own_prefix_stripped() or None
+                )
             except ValueError as exc:
                 raise YangSyntaxError(str(exc)) from exc
         aug = YangAugmentStmt(

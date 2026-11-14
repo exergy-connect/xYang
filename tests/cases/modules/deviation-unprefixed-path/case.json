@@ -1,0 +1,9 @@
+{
+  "description": "RFC 7950 §6.5: an unprefixed schema-node-id segment in a deviation path refers to the current module (#217).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "sibling remains", "data": { "top": { "v": { "cfg": { "y": 1 } } } }, "valid": true },
+    { "name": "removed leaf", "data": { "top": { "v": { "cfg": { "x": "a" } } } }, "valid": false,
+      "errors": [{ "path": "/top/v/cfg/x", "code": "unknown-field" }] }
+  ]
+}

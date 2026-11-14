@@ -5,6 +5,14 @@ import { YangSyntaxError } from "../../core/errors";
 import { ParserContext, TokenStream, YangTokenType } from "../parser-context";
 import type { StatementParsers } from "../statement-parsers";
 
+/** Prefix of the file being parsed, or undefined when that statement has not been seen. */
+function writingPrefix(module: unknown): string | undefined {
+  const raw = (module as { prefix?: unknown } | null)?.prefix;
+  if (typeof raw !== "string") return undefined;
+  const prefix = raw.replace(/^['"]+|['"]+$/g, "");
+  return prefix.length > 0 ? prefix : undefined;
+}
+
 export class AugmentStatementParser {
   constructor(private readonly parsers: StatementParsers) {}
 
@@ -17,7 +25,7 @@ export class AugmentStatementParser {
     const raw = augment_path.replace(/^["']|["']$/g, "");
     if (raw.startsWith("/")) {
       try {
-        augment_path_segments = parseAbsoluteSchemaPath(augment_path);
+        augment_path_segments = parseAbsoluteSchemaPath(augment_path, writingPrefix(context.module));
       } catch (err) {
         throw new YangSyntaxError(err instanceof Error ? err.message : String(err));
       }

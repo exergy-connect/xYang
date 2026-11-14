@@ -26,6 +26,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Unprefixed schema-node-id segments (Python, TypeScript, and Zig)** ([#217](https://github.com/exergy-connect/xYang/issues/217)): a segment without a prefix in an `augment` or `deviation` path refers to the current module (RFC 7950 §6.5). The parser fills that segment with the writing file's prefix (a submodule's `belongs-to` prefix) and leaves the path string unchanged. An unknown prefix still fails the load. Shared cases `reuse/augment-unprefixed-path` and `modules/deviation-unprefixed-path`.
 - **Augment targeting a node added by a later augment (Python, TypeScript, and Zig)** ([#216](https://github.com/exergy-connect/xYang/issues/216)): statement order has no meaning in YANG (RFC 7950). Top-level `augment` statements are applied shortest path first, so an augment can target a node a later augment adds. A path that names no node still fails with the same error. Shared case `reuse/augment-target-from-later-augment`.
 
 - **`benchmarks/benchmark.py` type validation benchmark:** it imported `TypeSystem` from `xyang`, which does not export it, and raised `ImportError`. It now imports from `xyang.types`.
