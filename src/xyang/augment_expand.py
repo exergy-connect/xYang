@@ -51,6 +51,16 @@ def _path_segments_from_augment(aug: YangAugmentStmt, path: str) -> list[YangIde
         raise YangSyntaxError(str(exc)) from exc
 
 
+def _augment_segment_count(aug: YangAugmentStmt) -> int:
+    """Number of schema-path segments.
+
+    A node added by a path of *k* segments lives at depth ``>= k + 1``, so a
+    shorter path is applied first. Statement order has no meaning (RFC 7950);
+    a path that names no node still fails in :func:`resolve_augment_target`.
+    """
+    return len(_path_segments_from_augment(aug, aug.augment_path))
+
+
 def _materialize_operation_io(parent: YangStatement, name: str) -> Optional[YangStatement]:
     """RFC 7950 §7.14.2 / §7.14.3: every rpc and action has ``input`` and ``output`` schema
     nodes, written or not. Add the empty node a schema node identifier names."""
@@ -620,6 +630,7 @@ def apply_augmentations_across_module_map(modules: dict[str, YangModule]) -> Non
         for stmt in mod.statements:
             if isinstance(stmt, YangAugmentStmt):
                 pending.append((mod, stmt))
+    pending.sort(key=lambda item: _augment_segment_count(item[1]))
     for aug_module, aug in pending:
         target = resolve_augment_target(aug_module, aug.augment_path, aug)
         _merge_augment_into_target(aug, target, source_module=aug_module)
@@ -643,6 +654,7 @@ def apply_augmentations(root: YangModule) -> None:
     ``augment`` statement from *root*.
     """
     augments = [s for s in root.statements if isinstance(s, YangAugmentStmt)]
+    augments.sort(key=_augment_segment_count)
     for aug in augments:
         target = resolve_augment_target(root, aug.augment_path, aug)
         _merge_augment_into_target(aug, target, source_module=root)
