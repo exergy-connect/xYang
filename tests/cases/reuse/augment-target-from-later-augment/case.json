@@ -1,0 +1,17 @@
+{
+  "description": "An augment may target a node added by a later augment. Statement order has no meaning (RFC 7950) (#216).",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "leaf on a node a later augment adds",
+      "data": { "top": { "ext": { "cfg": { "x": "ok" } } } },
+      "valid": true
+    },
+    {
+      "name": "leaf type",
+      "data": { "top": { "ext": { "cfg": { "x": 1 } } } },
+      "valid": false,
+      "errors": [{ "path": "/top/ext/cfg/x", "code": "type" }]
+    }
+  ]
+}
