@@ -1,0 +1,8 @@
+submodule s {
+  yang-version 1.1;
+  belongs-to m { prefix m; }
+
+  import b { prefix x; }
+
+  leaf from-b { type x:tb; }
+}

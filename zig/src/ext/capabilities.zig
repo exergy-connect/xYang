@@ -63,7 +63,7 @@ fn applyAugmentStructure(r: *Reporter, invocation: *Statement, context_module: *
     if (invocation.rfc8791_applied) return null;
     const path = invocation.data.extension_invocation.argument orelse "";
     if (path.len == 0) return r.fail(.syntax, "augment-structure requires an absolute path argument", .{});
-    const target = try augment_expand.resolveAbsoluteSchemaPath(r, context_module, path, "augment-structure", lookupRegisteredStructure);
+    const target = try augment_expand.resolveAbsoluteSchemaPath(r, context_module, path, "augment-structure", lookupRegisteredStructure, invocation.included_from);
     const copies = try refine_expand.copyStatements(r, invocation.statements.items);
     try uses_expand.mergeIfFeaturesIntoRoots(r.arena, copies.items, invocation.if_features.items);
     const when = if (invocation.when) |original| blk: {
@@ -88,10 +88,10 @@ pub fn isRfc8791(node: *const Statement, name: []const u8) bool {
     return std.mem.eql(u8, inv.resolved_module, RFC8791_MODULE) and std.mem.eql(u8, inv.resolved_extension.name, name);
 }
 
-pub fn augmentOwner(module: *Module, path: []const u8) ?*Module {
+pub fn augmentOwner(module: *Module, path: []const u8, file: ?[]const u8) ?*Module {
     const raw = std.mem.trimStart(u8, std.mem.trim(u8, path, &std.ascii.whitespace), "/");
     const colon = std.mem.indexOfScalar(u8, raw, ':') orelse return null;
-    return module.resolvePrefixedModule(raw[0..colon]);
+    return module.resolvePrefix(raw[0..colon], file);
 }
 
 /// Apply callbacks after loading YANG or native JSON.
@@ -115,12 +115,12 @@ fn walk(r: *Reporter, module: *Module, statements: []const *Statement, export_vi
         if (s.kind() == .extension_invocation) {
             const inv = s.data.extension_invocation;
             if (isRfc8791(s, "augment-structure")) {
-                const owner = augmentOwner(module, inv.argument orelse "");
+                const owner = augmentOwner(module, inv.argument orelse "", s.included_from);
                 foreign = owner != null and owner.? != module;
             }
             if (export_view and foreign) {
                 // Validate the target without merging into the imported module.
-                _ = try augment_expand.resolveAbsoluteSchemaPath(r, module, inv.argument orelse "", "augment-structure", lookupRegisteredStructure);
+                _ = try augment_expand.resolveAbsoluteSchemaPath(r, module, inv.argument orelse "", "augment-structure", lookupRegisteredStructure, s.included_from);
             } else {
                 if (find(inv.resolved_extension.data.extension.module_name, inv.resolved_extension.name)) |cap| cur = try cap.apply(r, s, module);
             }

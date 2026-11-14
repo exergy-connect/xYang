@@ -104,6 +104,7 @@ def resolve_augment_target(
         segments=_path_segments_from_augment(aug, path) if aug is not None else None,
         kind="augment",
         find_toplevel=_find_toplevel_schema_child,
+        file=getattr(aug, "included_from", None) if aug is not None else None,
     )
 
 
@@ -114,6 +115,7 @@ def _walk_absolute_schema_path(
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
     segments: List[YangIdentifierRef] | None = None,
+    file: str | None = None,
 ) -> tuple[YangStatementList, YangStatement]:
     """Resolve ``/prefix:name/...`` to ``(parent, target)``.
 
@@ -134,7 +136,7 @@ def _walk_absolute_schema_path(
             f"{kind}: invalid first segment in path {path!r} "
             "(expected 'prefix:identifier')"
         )
-    mod0 = ctx_module.resolve_prefixed_module(pref0)
+    mod0 = ctx_module.resolve_prefixed_module(pref0, file)
     if mod0 is None:
         raise YangSyntaxError(
             f"{kind}: unknown prefix {pref0!r} in path {path!r} "
@@ -155,7 +157,7 @@ def _walk_absolute_schema_path(
                 f"{kind}: invalid path segment {nm!r} in path {path!r} "
                 "(expected 'prefix:identifier')"
             )
-        if ctx_module.resolve_prefixed_module(pref) is None:
+        if ctx_module.resolve_prefixed_module(pref, file) is None:
             raise YangSyntaxError(
                 f"{kind}: unknown prefix {pref!r} in path {path!r}"
             )
@@ -177,6 +179,7 @@ def resolve_absolute_schema_path(
     kind: str,
     find_toplevel: Callable[[YangModule, str], Optional[YangStatement]],
     segments: List[YangIdentifierRef] | None = None,
+    file: str | None = None,
 ) -> YangStatement:
     """Resolve absolute ``/prefix:name/...`` path into a target schema node.
 
@@ -190,6 +193,7 @@ def resolve_absolute_schema_path(
         kind=kind,
         find_toplevel=find_toplevel,
         segments=segments,
+        file=file,
     )
     if not hasattr(cur, "statements"):
         raise YangSyntaxError(
@@ -229,6 +233,16 @@ def _cow_module(mod: YangModule) -> YangModule:
     cloned = copy.copy(mod)
     cloned.statements = list(mod.statements)
     cloned.import_prefixes = dict(mod.import_prefixes)
+    cloned.included_files = {
+        name: _cow_included_file(sub) for name, sub in mod.included_files.items()
+    }
+    return cloned
+
+
+def _cow_included_file(sub: YangModule) -> YangModule:
+    """A build-local copy of an included file's import map. Definitions stay shared."""
+    cloned = copy.copy(sub)
+    cloned.import_prefixes = dict(sub.import_prefixes)
     return cloned
 
 
@@ -305,6 +319,10 @@ def _private_target_module(
     for prefix, mod in list(root.import_prefixes.items()):
         if mod is owner:
             root.import_prefixes[prefix] = cloned
+    for sub in root.included_files.values():
+        for prefix, mod in list(sub.import_prefixes.items()):
+            if mod is owner:
+                sub.import_prefixes[prefix] = cloned
     return cloned
 
 
@@ -325,11 +343,14 @@ def _deviation_target(
             kind="deviation",
             find_toplevel=_find_toplevel_schema_child,
             segments=segments,
+            file=getattr(dev, "included_from", None),
         )
     except YangSyntaxError as exc:
         raise YangSemanticError(str(exc)) from exc
     resolved = list(segments) if segments else parse_absolute_schema_path(path)
-    owner = root.resolve_prefixed_module(resolved[0].prefix or "")
+    owner = root.resolve_prefixed_module(
+        resolved[0].prefix or "", getattr(dev, "included_from", None)
+    )
     if owner is None:
         raise YangSemanticError(
             f"deviation: unknown prefix {resolved[0].prefix!r} in path {path!r}"

@@ -28,6 +28,9 @@ def reachable_modules(root: YangModule) -> List[YangModule]:
         out.append(m)
         for im in m.import_prefixes.values():
             walk(im)
+        for sub in m.included_files.values():
+            for im in sub.import_prefixes.values():
+                walk(im)
 
     walk(root)
     return out
@@ -58,6 +61,7 @@ def feature_is_supported(
     ctx_module: YangModule,
     enabled_by_module: Mapping[str, AbstractSet[str]],
     ref: str | YangIdentifierRef,
+    file: str | None = None,
 ) -> bool:
     """
     Whether feature reference *ref* (``name`` or ``prefix:name``) is supported
@@ -65,7 +69,7 @@ def feature_is_supported(
     """
     id_ref = parse_identifier_ref_atom(ref) if isinstance(ref, str) else ref
     if id_ref.prefix:
-        mod = ctx_module.resolve_prefixed_module(id_ref.prefix)
+        mod = ctx_module.resolve_prefixed_module(id_ref.prefix, file)
         if mod is None:
             return False
         fname = id_ref.name
@@ -102,18 +106,20 @@ def _tokenize(expr: str) -> List[str]:
 
 
 class _IfFeatureParser:
-    __slots__ = ("_ctx", "_enabled", "_i", "_toks")
+    __slots__ = ("_ctx", "_enabled", "_file", "_i", "_toks")
 
     def __init__(
         self,
         tokens: List[str],
         ctx_module: YangModule,
         enabled_by_module: Mapping[str, AbstractSet[str]],
+        file: str | None = None,
     ) -> None:
         self._toks = tokens
         self._i = 0
         self._ctx = ctx_module
         self._enabled = enabled_by_module
+        self._file = file
 
     def _peek(self) -> Optional[str]:
         return self._toks[self._i] if self._i < len(self._toks) else None
@@ -158,7 +164,7 @@ class _IfFeatureParser:
         if t is None:
             raise IfFeatureEvalError("unexpected end of expression")
         self._eat()
-        return feature_is_supported(self._ctx, self._enabled, t)
+        return feature_is_supported(self._ctx, self._enabled, t, self._file)
 
     def at_end(self) -> bool:
         return self._i >= len(self._toks)
@@ -168,6 +174,7 @@ def evaluate_if_feature_expression(
     expr: str,
     ctx_module: YangModule,
     enabled_by_module: Mapping[str, AbstractSet[str]],
+    file: str | None = None,
 ) -> bool:
     """
     Evaluate a single ``if-feature`` argument string.
@@ -178,7 +185,7 @@ def evaluate_if_feature_expression(
     if not expr:
         return False
     try:
-        p = _IfFeatureParser(_tokenize(expr), ctx_module, enabled_by_module)
+        p = _IfFeatureParser(_tokenize(expr), ctx_module, enabled_by_module, file)
         out = p.parse_expr()
         if not p.at_end():
             return False
@@ -191,12 +198,13 @@ def stmt_if_features_satisfied(
     if_features: List[str],
     ctx_module: YangModule,
     enabled_by_module: Mapping[str, AbstractSet[str]],
+    file: str | None = None,
 ) -> bool:
     """True iff every ``if-feature`` substatement on the node passes (AND)."""
     if not if_features:
         return True
     return all(
-        evaluate_if_feature_expression(e, ctx_module, enabled_by_module)
+        evaluate_if_feature_expression(e, ctx_module, enabled_by_module, file)
         for e in if_features
     )
 
@@ -216,7 +224,9 @@ def _prune_per_feature_if_features(
                 reqs = m.feature_if_features.get(fname)
                 if not reqs:
                     continue
-                if not stmt_if_features_satisfied(reqs, m, frozen):
+                if not stmt_if_features_satisfied(
+                    reqs, m, frozen, m.feature_if_included_from.get(fname)
+                ):
                     mutable[m.name].discard(fname)
                     changed = True
     return {k: frozenset(v) for k, v in mutable.items()}

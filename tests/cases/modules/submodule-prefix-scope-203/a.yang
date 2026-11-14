@@ -1,0 +1,11 @@
+module a {
+  yang-version 1.1;
+  namespace "urn:a";
+  prefix a;
+
+  typedef ta {
+    type enumeration {
+      enum from-a;
+    }
+  }
+}

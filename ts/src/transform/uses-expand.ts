@@ -4,6 +4,7 @@ import {
   type YangIdentifierRef
 } from "../core/identifier-ref";
 import { YangStatement, YangModule, type ModuleInit, type YangStatementInit } from "../core/model";
+import { resolvePrefixedModule } from "../validator/if-feature-eval";
 import { YangTokenType } from "../parser/parser-context";
 
 function deepClone<T>(value: T): T {
@@ -44,6 +45,7 @@ function cloneStatementShell(stmt: YangStatement): YangStatement {
 type GroupingScope = {
   groupings: Record<string, YangStatement>;
   import_prefixes: Record<string, YangModule>;
+  file_imports?: Record<string, Record<string, YangModule>>;
   /** This module's own prefix. ``uses own:grouping`` resolves locally (RFC 7950). */
   prefix?: string;
 };
@@ -92,7 +94,8 @@ function usesGroupingRef(usesStmt: YangStatement): YangIdentifierRef | undefined
  */
 function resolveGrouping(
   ref: YangIdentifierRef,
-  scope: GroupingScope
+  scope: GroupingScope,
+  file?: string
 ): { key: string; grouping: YangStatement; nestedScope: GroupingScope } {
   const key = formatIdentifierRef(ref);
   if (!ref.name) {
@@ -106,7 +109,12 @@ function resolveGrouping(
       }
       return { key, grouping, nestedScope: scope };
     }
-    const imp = scope.import_prefixes[ref.prefix];
+    const view = {
+      prefix: scope.prefix,
+      import_prefixes: scope.import_prefixes,
+      file_imports: scope.file_imports
+    } as YangModule;
+    const imp = resolvePrefixedModule(view, ref.prefix, file);
     if (!imp) {
       throw new YangSemanticError(`Unknown import prefix '${ref.prefix}' in uses '${key}'`);
     }
@@ -121,6 +129,7 @@ function resolveGrouping(
       nestedScope: {
         groupings,
         import_prefixes: asImportMap(imp.import_prefixes),
+        file_imports: imp.file_imports,
         prefix: modulePrefix(imp)
       }
     };
@@ -447,9 +456,10 @@ function applyRefinesFromUses(usesStmt: YangStatement, expanded: YangStatement[]
 function expandGroupingBody(
   ref: YangIdentifierRef,
   scope: GroupingScope,
-  stack: string[]
+  stack: string[],
+  file?: string
 ): YangStatement[] {
-  const resolved = resolveGrouping(ref, scope);
+  const resolved = resolveGrouping(ref, scope, file);
   if (stack.includes(resolved.key)) {
     throw new YangCircularUsesError(stack, resolved.key);
   }
@@ -462,7 +472,7 @@ function expandGroupingBody(
       if (!childRef) {
         continue;
       }
-      const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack);
+      const body = expandGroupingBody(childRef, resolved.nestedScope, nextStack, child.included_from);
       applyAugmentsFromUses(child, body);
       applyRefinesFromUses(child, body);
       for (const stmt of body) {
@@ -510,7 +520,7 @@ function expandStatementList(
       if (!ref) {
         continue;
       }
-      const expanded = expandGroupingBody(ref, scope, stack);
+      const expanded = expandGroupingBody(ref, scope, stack, stmt.included_from);
       applyAugmentsFromUses(stmt, expanded);
       applyRefinesFromUses(stmt, expanded);
       for (const e of expanded) {
@@ -550,6 +560,7 @@ export function expandUses(module: YangModule): YangModule {
     statements: module.statements
   }) as ModuleInit;
   cloned.import_prefixes = sharedImports;
+  cloned.file_imports = module.file_imports;
   cloned.extensions = { ...module.extensions };
   cloned.features = new Set(module.features);
   cloned.feature_if_features = { ...module.feature_if_features };
@@ -558,6 +569,7 @@ export function expandUses(module: YangModule): YangModule {
   const expandScope: GroupingScope = {
     groupings: asGroupingMap(cloned.groupings),
     import_prefixes: sharedImports,
+    file_imports: module.file_imports,
     prefix: modulePrefix(module)
   };
 

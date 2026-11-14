@@ -1,0 +1,17 @@
+{
+  "description": "RFC 7950 §7.1.5: import prefixes are scoped to the file that declares them. Module m imports a as x and submodule s imports b as x; each x: typedef resolves in the file that wrote it (#203).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "each prefix resolves in its file",
+      "data": { "from-a": "from-a", "from-b": "from-b" },
+      "valid": true },
+    { "name": "module typedef rejects the submodule enum",
+      "data": { "from-a": "from-b", "from-b": "from-b" },
+      "valid": false,
+      "errors": [{ "path": "/from-a", "code": "enum" }] },
+    { "name": "submodule typedef rejects the module enum",
+      "data": { "from-a": "from-a", "from-b": "from-a" },
+      "valid": false,
+      "errors": [{ "path": "/from-b", "code": "enum" }] }
+  ]
+}

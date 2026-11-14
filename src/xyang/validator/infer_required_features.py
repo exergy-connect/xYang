@@ -17,7 +17,7 @@ def infer_required_features(module: YangModule, instance: object) -> list[str]:
     required: set[str] = set()
     active: set[str] = set()
 
-    def add_conditions(conditions, ctx):
+    def add_conditions(conditions, ctx, file=None):
         for expression in conditions or []:
             atoms = re.split(r"\s+and\s+", expression.strip())
             if any(not re.fullmatch(r"[A-Za-z_][\w.-]*(?::[A-Za-z_][\w.-]*)?", a, re.ASCII)
@@ -26,7 +26,7 @@ def infer_required_features(module: YangModule, instance: object) -> list[str]:
             for atom in atoms:
                 parts = atom.split(":")
                 name = parts[-1]
-                owner = ctx.resolve_prefixed_module(parts[0]) if len(parts) == 2 else ctx
+                owner = ctx.resolve_prefixed_module(parts[0], file) if len(parts) == 2 else ctx
                 if owner is None or name not in owner.features:
                     raise ValueError(f"Unknown feature: {atom}")
                 key = f"{owner.name}:{name}"
@@ -35,7 +35,11 @@ def infer_required_features(module: YangModule, instance: object) -> list[str]:
                 if key in required:
                     continue
                 active.add(key)
-                add_conditions(owner.feature_if_features.get(name), owner)
+                add_conditions(
+                    owner.feature_if_features.get(name),
+                    owner,
+                    owner.feature_if_included_from.get(name),
+                )
                 active.remove(key)
                 required.add(key)
 
@@ -63,8 +67,8 @@ def infer_required_features(module: YangModule, instance: object) -> list[str]:
                 raise ValueError(f"Unknown or ambiguous instance element: {key}")
             stmt, gates, local = matches[0]
             for gate, gate_ctx in gates:
-                add_conditions(gate.if_features, gate_ctx)
-            add_conditions(stmt.if_features, local)
+                add_conditions(gate.if_features, gate_ctx, getattr(gate, "included_from", None))
+            add_conditions(stmt.if_features, local, getattr(stmt, "included_from", None))
             if isinstance(stmt, YangListStmt):
                 if not isinstance(child, list):
                     raise ValueError(f"List array expected: {key}")

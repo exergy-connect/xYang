@@ -1,0 +1,17 @@
+{
+  "description": "A parenthesized comparison that starts with a literal, such as (1>=../a), is an expression. The leading literal is the left operand, not a dropped value-list item (#202).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "both comparisons hold",
+      "data": { "top": { "a": 1, "b": 2, "ge": "ok", "eq": "ok" } },
+      "valid": true },
+    { "name": "greater-or-equal fails",
+      "data": { "top": { "a": 2, "b": 2, "ge": "bad", "eq": "ok" } },
+      "valid": false,
+      "errors": [{ "path": "/top/ge", "code": "must" }] },
+    { "name": "equality fails",
+      "data": { "top": { "a": 1, "b": 1, "ge": "ok", "eq": "bad" } },
+      "valid": false,
+      "errors": [{ "path": "/top/eq", "code": "must" }] }
+  ]
+}

@@ -397,7 +397,7 @@ pub fn typeToSchema(g: *Gen, t: ?*const ast.TypeStmt, names: *const Names, modul
 /// `x-yang.imports`.
 pub fn identityBaseForJson(g: *Gen, base: ast.IdentifierRef, scope: *Module, module: *Module) Error![2][]const u8 {
     const a = g.a;
-    const pair = identity_graph.resolveBaseRef(scope, base) orelse
+    const pair = identity_graph.resolveBaseRef(scope, base, null) orelse
         return g.fail("cannot export identity base {f}: it does not resolve in module {f}", .{ repr(try formatRef(a, base)), repr(scope.name) });
     if (std.mem.eql(u8, pair.module.name, module.name)) {
         return .{ pair.name, try std.fmt.allocPrint(a, "#/{s}/{s}", .{ K.DEFS, pair.name }) };
@@ -488,7 +488,7 @@ fn identityStub(g: *Gen, module: *Module, names: *const NamesByModule) Error!*Ob
         const identity = module.identities.get(name) orelse continue;
         try identities.put(a, name, try identityToDef(g, name, identity, module, mine));
         for (identity.data.identity.bases.items) |base| {
-            const pair = identity_graph.resolveBaseRef(module, base) orelse {
+            const pair = identity_graph.resolveBaseRef(module, base, identity.included_from) orelse {
                 return g.fail("cannot export identity {f} of module {f}: base {f} does not resolve there", .{ repr(name), repr(module.name), repr(try formatRef(a, base)) });
             };
             if (!std.mem.eql(u8, pair.module.name, module.name)) {
@@ -519,7 +519,7 @@ fn importsForJson(g: *Gen, root: *Module) Error!*Object {
     const a = g.a;
     for (root.identities.keys(), root.identities.values()) |name, identity| {
         for (identity.data.identity.bases.items) |base| {
-            if (identity_graph.resolveBaseRef(root, base) == null) {
+            if (identity_graph.resolveBaseRef(root, base, identity.included_from) == null) {
                 return g.fail("cannot export identity {f}: base {f} does not resolve in module {f}", .{ repr(name), repr(try formatRef(a, base)), repr(root.name) });
             }
         }
@@ -1365,7 +1365,7 @@ fn applyOwnAugments(g: *Gen, schema_module: *Module) Error!void {
             d.augment_path_segments.items[0].prefix orelse ""
         else
             firstPathPrefix(d.augment_path);
-        if (schema_module.resolvePrefixedModule(first_prefix) != schema_module) {
+        if (schema_module.resolvePrefix(first_prefix, s.included_from) != schema_module) {
             return g.fail("cannot export augment {f}: its target belongs to another module, which the native JSON form of module {f} does not carry", .{ repr(d.augment_path), repr(schema_module.name) });
         }
     }
@@ -1382,7 +1382,7 @@ fn applyOwnDeviations(g: *Gen, schema_module: *Module) Error!void {
             d.target_path_segments.items[0].prefix orelse ""
         else
             firstPathPrefix(d.target_path);
-        if (schema_module.resolvePrefixedModule(first_prefix) != schema_module) {
+        if (schema_module.resolvePrefix(first_prefix, s.included_from) != schema_module) {
             return g.fail("cannot export deviation {f}: its target belongs to another module, which the native JSON form of module {f} does not carry", .{ repr(d.target_path), repr(schema_module.name) });
         }
     }
@@ -1466,7 +1466,7 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
     try invocations.appendSlice(g.a, root.foreign_structure_augments.items);
     var seen: std.AutoArrayHashMapUnmanaged(*Module, void) = .empty;
     for (invocations.items) |inv| {
-        const owner = capabilities.augmentOwner(root, inv.data.extension_invocation.argument orelse "") orelse continue;
+        const owner = capabilities.augmentOwner(root, inv.data.extension_invocation.argument orelse "", inv.included_from) orelse continue;
         if (owner == root or std.mem.eql(u8, owner.name, root.name) or seen.contains(owner)) continue;
         try seen.put(g.a, owner, {});
         const key = try importKey(g, root, owner);

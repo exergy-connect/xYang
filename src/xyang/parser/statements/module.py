@@ -88,9 +88,17 @@ class ModuleStatementParser:
     def parse_prefix_value_stmt(
         self, tokens: TokenStream, _context: ParserContext
     ) -> None:
-        """Prefix substatement inside import or belongs-to (not module-level prefix)."""
+        """Prefix substatement inside ``include`` (not module-level prefix)."""
         tokens.consume(kw.PREFIX)
         self._parsers._consume_prefix_argument(tokens)
+        tokens.consume_if_type(YangTokenType.SEMICOLON)
+
+    def parse_belongs_to_prefix(
+        self, tokens: TokenStream, context: ParserContext
+    ) -> None:
+        """``prefix`` under ``belongs-to``: the prefix this file uses for its module."""
+        tokens.consume(kw.PREFIX)
+        context.module.prefix = self._parsers.parse_identifier_argument(tokens, "prefix")
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_import_prefix_binding(

@@ -1,0 +1,6 @@
+{
+  "description": "A prefix that only an included submodule imports is not in scope in the parent module body. The reference fails the load instead of resolving through the submodule (#203).",
+  "module": "m.yang",
+  "schema_error": true,
+  "code": "Unknown typedef 'tb' in lexical scope"
+}

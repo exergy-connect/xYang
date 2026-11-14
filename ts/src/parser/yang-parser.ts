@@ -78,6 +78,7 @@ function buildModuleData(root: YangStatement, moduleState: Record<string, unknow
     typedefs,
     identities: serializeIdentities(moduleState.identities as Record<string, { bases?: string[] }> | undefined),
     import_prefixes: (moduleState.import_prefixes as Record<string, YangModule> | undefined) ?? {},
+    file_imports: (moduleState.file_imports as Record<string, Record<string, YangModule>> | undefined) ?? {},
     extensions: (moduleState.extensions as Record<string, unknown>) ?? {},
     extension_runtime: (moduleState.extension_runtime as Record<string, unknown>) ?? {},
     features: features instanceof Set ? new Set(features as Set<string>) : new Set<string>(),
@@ -279,6 +280,7 @@ export class YangParser {
       features: new Set<string>(),
       feature_if_features: {},
       import_prefixes: {},
+      file_imports: {},
       extensions: {},
       extension_runtime: {},
       __source_path:

@@ -278,7 +278,7 @@ class StatementParsers:
                 kw.DESCRIPTION: self._parse_discarded_description,
                 kw.REVISION_DATE: self._parse_include_revision_date,
             },
-            "belongs-to": {kw.PREFIX: mod.parse_prefix_value_stmt},
+            "belongs-to": {kw.PREFIX: mod.parse_belongs_to_prefix},
             "typedef": {kw.DEFAULT: self.parse_typedef_default},
             "choice": {
                 kw.MANDATORY: choice.parse_choice_mandatory,

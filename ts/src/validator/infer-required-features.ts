@@ -6,7 +6,7 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
   const modules = reachableModuleData(module);
   const required = new Set<string>();
   const active = new Set<string>();
-  const addConditions = (conditions: unknown, ctx: ModuleData): void => {
+  const addConditions = (conditions: unknown, ctx: ModuleData, file?: string): void => {
     for (const expression of (conditions ?? []) as string[]) {
       // Only positive conjunctions are supported; reject ambiguity rather than guess.
       const atoms = expression.trim().split(/\s+and\s+/);
@@ -16,7 +16,7 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
       for (const atom of atoms) {
         const parts = atom.split(":");
         const name = parts.at(-1)!;
-        const owner = parts.length === 2 ? resolvePrefixedModule(ctx, parts[0]!) : ctx;
+        const owner = parts.length === 2 ? resolvePrefixedModule(ctx, parts[0]!, file) : ctx;
         if (!owner || !declaredFeatures(owner).has(name)) throw new Error(`Unknown feature: ${atom}`);
         const key = `${String(owner.name)}:${name}`;
         if (active.has(key)) throw new Error(`Cyclic feature prerequisite: ${key}`);
@@ -47,8 +47,8 @@ export function inferRequiredFeatures(module: YangModule, instance: unknown): st
         (key === e.stmt.name && e.ctx === ctx));
       if (matches.length !== 1) throw new Error(`Unknown or ambiguous instance element: ${key}`);
       const { stmt, gates, ctx: local } = matches[0]!;
-      for (const gate of gates) addConditions(gate.stmt.if_features, gate.ctx);
-      addConditions(stmt.if_features, local);
+      for (const gate of gates) addConditions(gate.stmt.if_features, gate.ctx, gate.stmt.included_from);
+      addConditions(stmt.if_features, local, stmt.included_from);
       if (stmt.keyword === "container") walk(stmt.statements, child, local);
       if (stmt.keyword === "list") {
         if (!Array.isArray(child)) throw new Error(`List array expected: ${key}`);

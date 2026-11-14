@@ -10,7 +10,7 @@ export class WhenStatementParser {
     tokens.consume(kw.WHEN);
     const expression = this.parsers.parse_string_concatenation(tokens);
     const whenStmt = new YangWhenStmt({ expression });
-    whenStmt.bindPrefixes(context.module);
+    whenStmt.bindPrefixes(context.module, this.parsers.includingSubmoduleName);
 
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       const child = context.push_parent(whenStmt);

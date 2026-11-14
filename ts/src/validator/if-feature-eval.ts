@@ -34,12 +34,19 @@ export function declaredFeatures(m: ModuleData): Set<string> {
   return new Set();
 }
 
-export function resolvePrefixedModule(ctx: ModuleData, prefix: string): ModuleData | undefined {
+/**
+ * `prefix` -> module in the context of source file *file*.
+ *
+ * *file* is a submodule name, or omitted for the module file. The module's own
+ * prefix resolves to *ctx*. Any other prefix resolves only in that file's import map.
+ */
+export function resolvePrefixedModule(ctx: ModuleData, prefix: string, file?: string): ModuleData | undefined {
   const own = stripQuotes(ctx.prefix);
   if (prefix === own) {
     return ctx;
   }
-  const imports = ctx.import_prefixes as Record<string, ModuleData> | undefined;
+  const maps = ctx.file_imports;
+  const imports = file ? maps?.[file] : (ctx.import_prefixes as Record<string, ModuleData> | undefined);
   const hit = imports?.[prefix];
   if (hit && typeof hit === "object") {
     return hit;
@@ -65,6 +72,17 @@ export function reachableModuleData(root: ModuleData): ModuleData[] {
         walk(v);
       }
     }
+    const files = m.file_imports;
+    if (!files) {
+      return;
+    }
+    for (const map of Object.values(files)) {
+      for (const v of Object.values(map ?? {})) {
+        if (v && typeof v === "object") {
+          walk(v);
+        }
+      }
+    }
   };
   walk(root);
   return out;
@@ -73,12 +91,13 @@ export function reachableModuleData(root: ModuleData): ModuleData[] {
 export function featureIsSupported(
   ctxModule: ModuleData,
   enabledByModule: Readonly<Record<string, ReadonlySet<string>>>,
-  ref: string | YangIdentifierRef
+  ref: string | YangIdentifierRef,
+  file?: string
 ): boolean {
   const id = typeof ref === "string" ? parseIdentifierRefAtom(ref) : ref;
   let mod: ModuleData;
   if (id.prefix) {
-    const resolved = resolvePrefixedModule(ctxModule, id.prefix);
+    const resolved = resolvePrefixedModule(ctxModule, id.prefix, file);
     if (!resolved) {
       return false;
     }
@@ -128,7 +147,8 @@ class IfFeatureParser {
   constructor(
     private readonly toks: string[],
     private readonly ctx: ModuleData,
-    private readonly enabled: Readonly<Record<string, ReadonlySet<string>>>
+    private readonly enabled: Readonly<Record<string, ReadonlySet<string>>>,
+    private readonly file?: string
   ) {}
 
   private peek(): string | undefined {
@@ -183,7 +203,7 @@ class IfFeatureParser {
       throw new Error("unexpected end of expression");
     }
     this.eat();
-    return featureIsSupported(this.ctx, this.enabled, t);
+    return featureIsSupported(this.ctx, this.enabled, t, this.file);
   }
 
   atEnd(): boolean {
@@ -194,14 +214,15 @@ class IfFeatureParser {
 export function evaluateIfFeatureExpression(
   expr: string,
   ctxModule: ModuleData,
-  enabledByModule: Readonly<Record<string, ReadonlySet<string>>>
+  enabledByModule: Readonly<Record<string, ReadonlySet<string>>>,
+  file?: string
 ): boolean {
   const trimmed = expr.trim();
   if (!trimmed) {
     return false;
   }
   try {
-    const p = new IfFeatureParser(tokenize(trimmed), ctxModule, enabledByModule);
+    const p = new IfFeatureParser(tokenize(trimmed), ctxModule, enabledByModule, file);
     const out = p.parseExpr();
     if (!p.atEnd()) {
       return false;
@@ -215,12 +236,13 @@ export function evaluateIfFeatureExpression(
 export function stmtIfFeaturesSatisfied(
   ifFeatures: string[] | undefined,
   ctxModule: ModuleData,
-  enabledByModule: Readonly<Record<string, ReadonlySet<string>>>
+  enabledByModule: Readonly<Record<string, ReadonlySet<string>>>,
+  file?: string
 ): boolean {
   if (!ifFeatures || ifFeatures.length === 0) {
     return true;
   }
-  return ifFeatures.every((e) => evaluateIfFeatureExpression(e, ctxModule, enabledByModule));
+  return ifFeatures.every((e) => evaluateIfFeatureExpression(e, ctxModule, enabledByModule, file));
 }
 
 function normalizeOverride(

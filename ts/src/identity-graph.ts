@@ -1,15 +1,12 @@
 import type { YangIdentifierRef } from "./core/identifier-ref";
 import { parseIdentifierRefAtom } from "./core/identifier-ref";
 import type { YangModule } from "./core/model";
+import { resolvePrefixedModule } from "./validator/if-feature-eval";
 
 /** (defining module, local identity name) */
 export type IdentityPair = { mod: YangModule; local: string };
 
-function ownPrefixStripped(mod: YangModule): string {
-  return String(mod.prefix ?? "").replace(/^['"]|['"]$/g, "");
-}
-
-type IdentityInfo = { bases: Array<string | YangIdentifierRef> };
+type IdentityInfo = { bases: Array<string | YangIdentifierRef>; included_from?: string };
 
 function getIdentities(mod: YangModule): Record<string, IdentityInfo> {
   const raw = mod.identities;
@@ -26,13 +23,12 @@ function asBaseRef(base: string | YangIdentifierRef): YangIdentifierRef {
   return base.prefix ? { prefix: base.prefix, name: base.name } : { name: base.name };
 }
 
-export function resolvePrefixedModuleData(importer: YangModule, prefix: string): YangModule | undefined {
-  const own = ownPrefixStripped(importer);
-  if (prefix === own) {
-    return importer;
-  }
-  const m = importer.import_prefixes[prefix];
-  return m && typeof m === "object" ? m : undefined;
+export function resolvePrefixedModuleData(
+  importer: YangModule,
+  prefix: string,
+  file?: string
+): YangModule | undefined {
+  return resolvePrefixedModule(importer, prefix, file);
 }
 
 /** Resolve an RFC 7951 identityref instance value (``prefix:name`` string). */
@@ -60,8 +56,11 @@ export function resolveIdentityValue(moduleData: YangModule, value: unknown): Id
     const modName = value.slice(0, colon);
     local = value.slice(colon + 1);
     if (modName !== moduleData.name) {
-      const imports = moduleData.import_prefixes;
-      target = Object.values(imports).find((m) => m && typeof m === "object" && m.name === modName);
+      const imported = [
+        ...Object.values(moduleData.import_prefixes),
+        ...Object.values(moduleData.file_imports ?? {}).flatMap((map) => Object.values(map ?? {}))
+      ];
+      target = imported.find((m) => m && typeof m === "object" && m.name === modName);
     }
   }
   if (!target || !(local in getIdentities(target))) {
@@ -93,11 +92,12 @@ export function identityrefValueValid(
 
 export function resolveIdentityBaseRef(
   fromMod: YangModule,
-  base: string | YangIdentifierRef
+  base: string | YangIdentifierRef,
+  file?: string
 ): IdentityPair | null {
   const ref = asBaseRef(base);
   if (ref.prefix) {
-    const m = resolvePrefixedModuleData(fromMod, ref.prefix);
+    const m = resolvePrefixedModuleData(fromMod, ref.prefix, file);
     if (!m || !(ref.name in getIdentities(m))) {
       return null;
     }
@@ -156,7 +156,7 @@ export function identityAncestorClosure(
       continue;
     }
     for (const b of stmt.bases) {
-      const parent = resolveIdentityBaseRef(cur.mod, b);
+      const parent = resolveIdentityBaseRef(cur.mod, b, stmt.included_from);
       if (parent) {
         stack.push(parent);
       }

@@ -81,11 +81,12 @@ def test_example_3_b_import_loads_modules_and_expands_prefixed_uses() -> None:
     assert "baz" in names
 
 
-def test_example_3_a_merges_submodule_import_prefixes() -> None:
-    """Submodule ``import`` entries are merged into the parent so ``inet:`` resolves."""
+def test_example_3_a_keeps_submodule_import_prefixes() -> None:
+    """Submodule ``import`` entries stay on that file. ``inet:`` resolves there, not on the parent."""
     mod = YangParser(expand_uses=True).parse_file(EX3_DIR / "example-3-a@2017-08-01.yang")
-    assert "inet" in mod.import_prefixes
-    assert mod.import_prefixes["inet"].name == "ietf-inet-types"
+    assert "inet" not in mod.import_prefixes
+    sub = mod.included_files["example-3-suba"]
+    assert sub.import_prefixes["inet"].name == "ietf-inet-types"
     assert not any(isinstance(s, YangAugmentStmt) for s in mod.statements)
     top = mod.find_statement("top")
     assert top is not None

@@ -36,7 +36,11 @@ class YangModule(YangStatementList):
     # Per-feature ``if-feature`` substatements (RFC 7950 §7.20.1.1); AND of expressions.
     feature_if_features: Dict[str, List[str]] = field(default_factory=dict)
     # import prefix (local) -> parsed module (RFC 7950 ``import``).
+    # This map is the module file's own imports. A submodule's imports stay on
+    # that file (``included_files``) and are not merged here.
     import_prefixes: Dict[str, "YangModule"] = field(default_factory=dict)
+    # Submodule name -> the included file, which keeps its own ``import_prefixes``.
+    included_files: Dict[str, "YangModule"] = field(default_factory=dict)
     # The module this included submodule was merged into. Its definitions are
     # visible across that module (RFC 7950 §5.1).
     included_parent: Optional["YangModule"] = None
@@ -61,15 +65,41 @@ class YangModule(YangStatementList):
             scope = scope.included_parent
         return scope
 
-    def resolve_prefixed_module(self, prefix: str) -> Optional["YangModule"]:
-        """Module for ``prefix`` in this module's scope (own prefix or ``import``)."""
-        if prefix == self.own_prefix_stripped():
-            return self
-        return self.import_prefixes.get(prefix)
+    def resolve_prefixed_module(self, prefix: str, file: str | None = None) -> Optional["YangModule"]:
+        """``prefix`` -> module in the context of source file *file*.
 
-    def resolve_prefix_to_module_name(self, prefix: str) -> Optional[str]:
-        """Name of the module ``prefix`` is bound to here (a submodule resolves to its parent module)."""
-        target = self.resolve_prefixed_module(prefix)
+        *file* is a submodule name (``included_from``) or None. None on a submodule
+        is that submodule's own file; None on a module is the module file. The
+        defining module's prefix, and a submodule's ``belongs-to`` prefix, resolve
+        to the defining module in every file of that module. Other prefixes resolve
+        only in the import map of file *file*.
+        """
+        defining = self.defining_module()
+        source = self._source_file(file)
+        if source is None:
+            return None
+        own = defining.own_prefix_stripped()
+        if prefix == own or (source.own_prefix_stripped() and prefix == source.own_prefix_stripped()):
+            return defining
+        return source.import_prefixes.get(prefix)
+
+    def _source_file(self, file: str | None) -> Optional["YangModule"]:
+        """The module or submodule object whose imports bind prefixes in *file*."""
+        defining = self.defining_module()
+        if file and file != defining.name:
+            found = defining.included_files.get(file)
+            if found is not None:
+                return found
+            if self.name == file:
+                return self
+            return None
+        if self is not defining and (self.belongs_to_module or self.included_parent is not None):
+            return self
+        return defining
+
+    def resolve_prefix_to_module_name(self, prefix: str, file: str | None = None) -> Optional[str]:
+        """Name of the module ``prefix`` is bound to in file *file* (a submodule resolves to its parent module)."""
+        target = self.resolve_prefixed_module(prefix, file)
         if target is None:
             return None
         return target.belongs_to_module or target.name
@@ -99,12 +129,14 @@ def resolve_typedef(type_stmt: Any, fallback: Any) -> tuple[Optional["YangTypede
     scope against the reference context (§5.5). A ``type`` without a scope (built from the native JSON
     form) resolves in *fallback*. ``(None, None)`` when the prefix or the typedef is unknown.
     """
-    scope = getattr(type_stmt, "scope", None) or fallback
-    if not isinstance(scope, YangModule):
+    file_scope = getattr(type_stmt, "scope", None) or fallback
+    if not isinstance(file_scope, YangModule):
         return None, None
-    scope = scope.defining_module()
+    defining = file_scope.defining_module()
     prefix = getattr(type_stmt, "prefix", None)
-    target = scope.resolve_prefixed_module(prefix) if prefix else scope
+    # A prefixed name resolves in the file that wrote the ``type``. An unprefixed
+    # name is module-wide: typedefs from every included file live on the defining module.
+    target = file_scope.resolve_prefixed_module(prefix) if prefix else defining
     if target is None:
         return None, None
     from .typedef_scope import in_scope

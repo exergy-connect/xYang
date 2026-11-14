@@ -203,7 +203,11 @@ def _identity_stub(module: YangModule, names: dict[str, set[str]]) -> dict[str, 
         identities[name] = _identity_to_def(name, identity, module, only=mine)
         for base in identity.bases:
             ref = coerce_identifier_ref(base)
-            pair = resolve_identity_base_ref(module, ref) if ref is not None else None
+            pair = (
+                resolve_identity_base_ref(module, ref, getattr(identity, "included_from", None))
+                if ref is not None
+                else None
+            )
             if ref is None or pair is None:
                 raise YangExportError(
                     f"cannot export identity {name!r} of module {module.name!r}: base {base!r} does not resolve there"
@@ -233,7 +237,7 @@ def _imports_for_json(root: YangModule, used: list[IdentityPair]) -> dict[str, A
     for name, identity in root.identities.items():
         for base in identity.bases:
             ref = coerce_identifier_ref(base)
-            if resolve_identity_base_ref(root, base) is None:
+            if resolve_identity_base_ref(root, base, getattr(identity, "included_from", None)) is None:
                 raise YangExportError(
                     f"cannot export identity {name!r}: base {(format_identifier_ref(ref) if ref is not None else str(base))!r} "
                     f"does not resolve in module {root.name!r}"
@@ -1625,7 +1629,7 @@ def _add_imported_structures(root: YangModule, imports: dict[str, Any], typedef_
             first = parse_absolute_schema_path(inv.argument)[0]
         except ValueError:
             continue
-        owner = root.resolve_prefixed_module(first.prefix or "")
+        owner = root.resolve_prefixed_module(first.prefix or "", getattr(inv, "included_from", None))
         if owner is None or owner is root or owner.name == root.name:
             continue
         key = _import_key(root, owner)
@@ -1675,7 +1679,9 @@ def _apply_own_augments(schema_module: YangModule) -> None:
         if not isinstance(stmt, YangAugmentStmt):
             continue
         first = (stmt.augment_path_segments or parse_absolute_schema_path(stmt.augment_path))[0]
-        if schema_module.resolve_prefixed_module(first.prefix or "") is not schema_module:
+        if schema_module.resolve_prefixed_module(
+            first.prefix or "", getattr(stmt, "included_from", None)
+        ) is not schema_module:
             raise YangExportError(
                 f"cannot export augment {stmt.augment_path!r}: its target belongs to another module, "
                 f"which the native JSON form of module {schema_module.name!r} does not carry"
@@ -1693,7 +1699,9 @@ def _apply_own_deviations(schema_module: YangModule) -> None:
         if not isinstance(stmt, YangDeviationStmt):
             continue
         first = (stmt.target_path_segments or parse_absolute_schema_path(stmt.target_path))[0]
-        if schema_module.resolve_prefixed_module(first.prefix or "") is not schema_module:
+        if schema_module.resolve_prefixed_module(
+            first.prefix or "", getattr(stmt, "included_from", None)
+        ) is not schema_module:
             raise YangExportError(
                 f"cannot export deviation {stmt.target_path!r}: its target belongs to another module, "
                 f"which the native JSON form of module {schema_module.name!r} does not carry"

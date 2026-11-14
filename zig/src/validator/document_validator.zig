@@ -142,7 +142,7 @@ pub const DocumentValidator = struct {
     fn ifFeaturesActive(self: *DocumentValidator, s: *const Statement) error{OutOfMemory}!bool {
         if (!self.module_root) return true;
         if (!s.hasIfFeatures() or s.if_features.items.len == 0) return true;
-        return if_feature_eval.ifFeaturesSatisfied(self.a, s.if_features.items, self.module, &self.enabled);
+        return if_feature_eval.ifFeaturesSatisfied(self.a, s.if_features.items, self.module, &self.enabled, s.included_from);
     }
 
     /// `validate`: walk the canonical tree from the module root.

@@ -26,6 +26,7 @@ import {
 import { formatIdentifierRef } from "../core/identifier-ref";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { YangModule, YangStatement, normalizeTypeShape } from "../core/model";
+import { resolvePrefixedModule } from "../validator/if-feature-eval";
 import { DISPATCH_REGISTRY } from "./dispatch-registry";
 import { ParserContext, TokenStream, YangTokenType } from "./parser-context";
 import {
@@ -89,6 +90,7 @@ type TypeShape = {
   name: string;
   prefix?: string;
   scope_module?: string;
+  source_file?: string;
   context?: string;
   xpath_prefixes?: Record<string, string>;
   patterns?: Array<{
@@ -1084,6 +1086,10 @@ export class StatementParsers {
   }
 
   add_to_parent_or_module(context: ParserContext, stmt: unknown): void {
+    const file = this.includingSubmoduleName;
+    if (file && stmt && typeof stmt === "object" && !("included_from" in stmt && (stmt as { included_from?: string }).included_from)) {
+      (stmt as { included_from?: string }).included_from = file;
+    }
     const parent: any = context.current_parent as any;
     if (parent && Array.isArray(parent.statements)) {
       parent.statements.push(stmt);
@@ -1170,6 +1176,8 @@ export class StatementParsers {
       statements: children
 });
 
+    const includedFrom = (stmt as { included_from?: string }).included_from;
+    if (includedFrom) out.included_from = includedFrom;
     if (keyword === "typedef" && (stmt as { scope?: string }).scope) {
       (out as unknown as { scope: string }).scope = (stmt as unknown as { scope: string }).scope;
     }
@@ -1382,6 +1390,8 @@ export class StatementParsers {
     const shape: TypeShape = { name: type_stmt.name };
     if (type_stmt.prefix !== undefined) shape.prefix = type_stmt.prefix;
     if (type_stmt.scope_module !== undefined) shape.scope_module = type_stmt.scope_module;
+    const sourceFile = (type_stmt as { source_file?: string }).source_file;
+    if (sourceFile) shape.source_file = sourceFile;
     if (type_stmt.context !== undefined) shape.context = type_stmt.context;
     if (type_stmt instanceof YangStringTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
       if (type_stmt.patterns?.length) shape.patterns = type_stmt.patterns.map((p) => ({
@@ -1534,20 +1544,19 @@ export class StatementParsers {
       throw new YangSemanticError(`Import prefix '${localPrefix}' must differ from this module's prefix`);
     }
 
-    const imports = (module.import_prefixes as Record<string, YangModule> | undefined) ?? {};
-    module.import_prefixes = imports;
+    const includedFrom = this.includingSubmoduleName;
+    let imports: Record<string, YangModule>;
+    if (includedFrom) {
+      const maps = (module.file_imports ?? {}) as Record<string, Record<string, YangModule>>;
+      module.file_imports = maps;
+      imports = maps[includedFrom] ?? {};
+      maps[includedFrom] = imports;
+    } else {
+      imports = (module.import_prefixes as Record<string, YangModule> | undefined) ?? {};
+      module.import_prefixes = imports;
+    }
 
     if (imports[localPrefix]) {
-      const includedFrom = this.includingSubmoduleName;
-      if (includedFrom) {
-        const existingName = String((imports[localPrefix] as { name?: string }).name ?? "");
-        if (existingName === moduleName) {
-          return;
-        }
-        throw new YangSemanticError(
-          `Import prefix '${localPrefix}' from include of '${includedFrom}' conflicts with existing import of '${existingName}'`
-        );
-      }
       throw new YangSemanticError(`Duplicate import prefix '${localPrefix}'`);
     }
 
@@ -1709,13 +1718,7 @@ export class StatementParsers {
     context: ParserContext,
     prefix: string
   ): YangModule | Record<string, unknown> | undefined {
-    const module = context.module as Record<string, unknown>;
-    const ownPrefix = String(module.prefix ?? "").replace(/^['"]|['"]$/g, "");
-    if (prefix === ownPrefix) {
-      return module;
-    }
-    const imports = module.import_prefixes as Record<string, YangModule> | undefined;
-    return imports?.[prefix];
+    return resolvePrefixedModule(context.module as YangModule, prefix, this.includingSubmoduleName);
   }
 
   private resolve_extension_definition(

@@ -63,12 +63,20 @@ function parsePrefixedPath(path: string, kind: string): YangIdentifierRef[] {
   }
 }
 
-function resolvePrefixedModule(ctxModule: ModuleShape, prefix: string, fullPath: string, kind: string): ModuleShape {
+function resolvePrefixedModule(
+  ctxModule: ModuleShape,
+  prefix: string,
+  fullPath: string,
+  kind: string,
+  file?: string
+): ModuleShape {
   const ownPrefix = String(ctxModule.prefix ?? "").replace(/^['"]|['"]$/g, "");
   if (prefix === ownPrefix) {
     return ctxModule;
   }
-  const imports = isObject(ctxModule.import_prefixes) ? ctxModule.import_prefixes : undefined;
+  const fileImports = (ctxModule as { file_imports?: Record<string, Record<string, unknown>> }).file_imports;
+  const selected = file ? fileImports?.[file] : isObject(ctxModule.import_prefixes) ? ctxModule.import_prefixes : undefined;
+  const imports = isObject(selected) ? selected : undefined;
   const resolved = imports && isObject(imports[prefix]) ? (imports[prefix] as ModuleShape) : undefined;
   if (!resolved) {
     throw new YangSemanticError(`${kind}: unknown prefix '${prefix}' in path '${fullPath}'`);
@@ -96,17 +104,17 @@ function findTopLevelStructure(moduleData: ModuleShape, name: string): YangState
   });
 }
 
-function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): YangStatement {
+function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string, file?: string): YangStatement {
   const segments = parsePrefixedPath(path, "augment-structure");
   const first = segments[0]!;
   const pref0 = first.prefix!;
-  const firstModule = resolvePrefixedModule(ctxModule, pref0, path, "augment-structure");
+  const firstModule = resolvePrefixedModule(ctxModule, pref0, path, "augment-structure", file);
   let current = findTopLevelStructure(firstModule, first.name);
   if (!current) {
     throw new YangSemanticError(`augment-structure: no top-level structure '${first.name}' in path '${path}'`);
   }
   for (const segment of segments.slice(1)) {
-    resolvePrefixedModule(ctxModule, segment.prefix!, path, "augment-structure");
+    resolvePrefixedModule(ctxModule, segment.prefix!, path, "augment-structure", file);
     const next = findNamedChild(current, segment.name);
     if (!next) {
       throw new YangSemanticError(`augment-structure: no child '${segment.name}' in path '${path}'`);
@@ -116,9 +124,9 @@ function resolveAugmentStructureTarget(ctxModule: ModuleShape, path: string): Ya
   return current;
 }
 
-function targetModule(ctxModule: ModuleShape, path: string): ModuleShape {
+function targetModule(ctxModule: ModuleShape, path: string, file?: string): ModuleShape {
   const segments = parsePrefixedPath(path, "augment-structure");
-  return resolvePrefixedModule(ctxModule, segments[0]!.prefix!, path, "augment-structure");
+  return resolvePrefixedModule(ctxModule, segments[0]!.prefix!, path, "augment-structure", file);
 }
 
 function applyRFC8791Invocation(stmt: YangStatement, contextModule: ModuleShape): YangStatement | undefined {
@@ -158,9 +166,9 @@ function applyRFC8791Invocation(stmt: YangStatement, contextModule: ModuleShape)
       return undefined;
     }
     const targetPath = String(stmt.argument ?? "");
-    const foreign = targetModule(contextModule, targetPath) !== contextModule;
+    const foreign = targetModule(contextModule, targetPath, stmt.included_from) !== contextModule;
     // Resolve even when the invocation is exported verbatim, so a bad path fails here.
-    const target = resolveAugmentStructureTarget(contextModule, targetPath);
+    const target = resolveAugmentStructureTarget(contextModule, targetPath, stmt.included_from);
     if (foreign && exportView) {
       return stmt;
     }

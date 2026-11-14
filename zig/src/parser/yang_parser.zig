@@ -302,16 +302,13 @@ pub const Loader = struct {
             try parent.feature_if_features.put(a, fname, try ifs.clone(a));
             try parent.feature_if_included_from.put(a, fname, origin);
         }
-        const own = parent.ownPrefix();
-        for (sub.import_prefixes.keys(), sub.import_prefixes.values()) |pref, im| {
-            if (std.mem.eql(u8, pref, own)) continue;
-            if (parent.import_prefixes.get(pref)) |existing| {
-                if (!std.mem.eql(u8, existing.name, im.name)) {
-                    return p.ts.fail("Import prefix {f} from include of {f} conflicts with existing import of {f}", .{ repr(pref), repr(sub.name), repr(existing.name) });
-                }
-                continue;
+        // Import prefixes stay on the file that declared them (RFC 7950 7.1.5).
+        try parent.included_files.put(a, sub.name, sub);
+        var nested = sub.included_files.iterator();
+        while (nested.next()) |e| {
+            if (!parent.included_files.contains(e.key_ptr.*)) {
+                try parent.included_files.put(a, e.key_ptr.*, e.value_ptr.*);
             }
-            try parent.import_prefixes.put(a, pref, im);
         }
         for (sub.statements.items) |stmt| {
             const origin = stmt.included_from orelse sub.name;
@@ -330,7 +327,6 @@ pub const Loader = struct {
         sub.feature_if_features = .empty;
         sub.feature_included_from = .empty;
         sub.feature_if_included_from = .empty;
-        sub.import_prefixes = .empty;
     }
 };
 

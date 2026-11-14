@@ -63,7 +63,9 @@ class UsesStatementParser:
                 nested_grouping = None
                 if module is not None:
                     if stmt.grouping_prefix:
-                        gmod = module.resolve_prefixed_module(stmt.grouping_prefix)
+                        gmod = module.resolve_prefixed_module(
+                            stmt.grouping_prefix, getattr(stmt, "included_from", None)
+                        )
                         nested_grouping = (
                             gmod.get_grouping(stmt.grouping_name) if gmod is not None else None
                         )

@@ -302,9 +302,12 @@ class XPathParser:
             return self._parse_path(is_absolute=True)
         if t.type == TokenType.PAREN_OPEN:
             self._consume(TokenType.PAREN_OPEN)
-            # XPath 2.0 value list: ( 'a', 'b', 'c' ) when first token is string/number
+            # XPath 2.0 value list: ( 'a', 'b', 'c' ) when first token is string/number.
+            # A leading literal that is not a list, such as (1 >= ../a), is the left
+            # operand of the parenthesized expression. Restore it and parse that expression.
             peek = self._current()
             if peek.type in (TokenType.STRING, TokenType.NUMBER):
+                mark = self.position
                 first, _ = self._parse_primary()
                 if isinstance(first, LiteralNode) and self._current().type == TokenType.COMMA:
                     values: List[Any] = [first.value]
@@ -323,6 +326,7 @@ class XPathParser:
                 if self._current().type == TokenType.PAREN_CLOSE:
                     self._consume(TokenType.PAREN_CLOSE)
                     return first, isinstance(first.value, int) if isinstance(first, LiteralNode) else False
+                self.position = mark
             # Single expression in parentheses
             expr, cacheable = self._parse_expression()
             self._consume(TokenType.PAREN_CLOSE)
