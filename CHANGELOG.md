@@ -9,6 +9,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- **Python 3.11 compatibility:** fix an enum validation error message whose f-string reused its enclosing quote character, preventing the package from importing on Python 3.11.
 - **Typedef scope (Python, TypeScript, and Zig):** nested typedefs are restricted to their declaration context and descendants instead of leaking across the module. Lookup checks scope during existing resolution, including imported groupings and includes. Native JSON preserves these restrictions in global `$defs` through optional `x-yang.scope`, `x-yang.name`, and reference context metadata; exports fail loudly when scoped reference restrictions cannot be represented without loss.
 
 ### Changed
