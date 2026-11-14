@@ -68,7 +68,6 @@ def _is_identifier(text: str) -> bool:
 if TYPE_CHECKING:
     from .yang_parser import YangParser
     from ..ast import YangCaseStmt, YangChoiceStmt, YangStatement
-    from ..module import YangModule
 
 
 class StatementParsers:
@@ -136,13 +135,6 @@ class StatementParsers:
         if tokens.peek_type() == YangTokenType.IDENTIFIER:
             return cast(str, tokens.peek())
         return tokens.peek_type()
-
-    def substatement_handler(
-        self, tokens: TokenStream, dispatch: dict[str, Callable[..., Any]]
-    ) -> Optional[Callable[..., Any]]:
-        """Resolve a handler from a keyword-keyed map; non-identifier peek types never match."""
-        key = self.dispatch_key(tokens)
-        return dispatch.get(key) if isinstance(key, str) else None
 
     def handler_for(self, parent: str, keyword: str) -> Optional[Callable[..., Any]]:
         """Handler for *keyword* under *parent*, or ``None`` when the registry does not allow it."""
@@ -402,11 +394,6 @@ class StatementParsers:
             f"Expected an identifier or prefix:identifier, got {raw!r}"
         )
 
-    def consume_qname_from_identifier(self, tokens: TokenStream) -> str:
-        """Joined ``prefix:name`` form; prefer :meth:`consume_identifier_ref` for new code."""
-        prefix, name = self.consume_identifier_ref(tokens)
-        return f"{prefix}:{name}" if prefix else name
-
     def _consume_prefix_argument(self, tokens: TokenStream) -> str:
         """Prefix argument: an identifier, quoted or unquoted."""
         return self.parse_identifier_argument(tokens, "prefix")
@@ -493,10 +480,6 @@ class StatementParsers:
     ) -> None:
         """Parse ``revision-date`` substatement (e.g. under ``include``)."""
         self._revision_parser.parse_revision_date_statement(tokens)
-
-    def parse_reference_string_only(self, tokens: TokenStream, context: ParserContext) -> None:
-        """Parse ``reference``; store on parent when it has a ``reference`` field."""
-        self.parse_reference(tokens, context)
 
     def parse_extension_stmt(self, tokens: TokenStream, context: ParserContext) -> None:
         self._extension_parser.parse_extension_stmt(tokens, context)
@@ -893,8 +876,3 @@ class StatementParsers:
         """Create a copy of a statement, handling AST nodes properly."""
         return copy_yang_statement(stmt)
 
-    def _apply_refine(self, stmt: 'YangStatement', refine: 'YangRefineStmt') -> None:
-        """Apply refine modifications to a statement."""
-        from ..refine_expand import apply_refine_to_node
-
-        apply_refine_to_node(stmt, refine)

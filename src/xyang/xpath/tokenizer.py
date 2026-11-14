@@ -46,8 +46,6 @@ class XPathTokenizer:
         '=', '<', '>', '+', '-', '*', '/',
     ]
 
-    KEYWORDS = ['or', 'and', 'not', 'true', 'false', 'current']
-
     def __init__(self, expression: str):
         self.expression = normalize_yang_escaped_quotes(expression)
         self.position = 0

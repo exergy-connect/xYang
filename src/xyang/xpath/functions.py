@@ -7,14 +7,13 @@ ctx and node follow the same contract as evaluator methods.
 
 from __future__ import annotations
 
-from typing import TYPE_CHECKING, Any, List, Optional
+from typing import TYPE_CHECKING, Any, List
 
 from ..errors import UnsupportedXPathError, XPathEvaluationError
 from .ast import FunctionCallNode
 from .node import Context, Node
 
 if TYPE_CHECKING:
-    from ..module import YangModule
     from .evaluator import XPathEvaluator
 from .utils import first_value, is_nodeset, yang_bool
 

@@ -14,7 +14,6 @@ from ..errors import YangSyntaxError
 if TYPE_CHECKING:
     from ..module import YangModule
     from ..ast import (
-        YangStatement,
         YangStatementList,
         YangTypeStmt,
         YangMustStmt,
@@ -121,13 +120,6 @@ class TokenStream:
         self.index += 1
         return token_val
 
-    def consume_if(self, expected: str) -> bool:
-        """Consume token if it matches expected, return True if consumed."""
-        if self.peek() == expected:
-            self.consume()
-            return True
-        return False
-
     def peek_type(self) -> YangTokenType:
         """Peek at current token type without consuming. Raises at end of input."""
         if self.index >= len(self._token_list):
@@ -169,25 +161,6 @@ class TokenStream:
             return False
         self.consume_type(expected)
         return True
-
-    def consume_oneof(
-        self, allowed_types: List[Union[YangTokenType, str]]
-    ) -> Tuple[str, Union[YangTokenType, str]]:
-        """Consume current token if it matches one of allowed kinds; return (value, matched)."""
-        if self.index >= len(self._token_list):
-            raise self.make_error("Unexpected end of input")
-        tok = self._token_list[self.index]
-        for allowed in allowed_types:
-            if isinstance(allowed, str):
-                if tok.type == YangTokenType.IDENTIFIER and tok.value == allowed:
-                    self.index += 1
-                    return (tok.value, allowed)
-            elif tok.type == allowed:
-                self.index += 1
-                return (tok.value, allowed)
-        names = ", ".join(t if isinstance(t, str) else t.name for t in allowed_types)
-        got = tok.value if tok.type == YangTokenType.IDENTIFIER else tok.type.name
-        raise self.make_error(f"Expected one of ({names}), got {got!r}")
 
     def has_more(self) -> bool:
         """Check if there are more tokens."""

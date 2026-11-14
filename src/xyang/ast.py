@@ -67,10 +67,6 @@ class YangStatement(YangStatementList):
         """
         return None
 
-    def child_names(self, _data: dict) -> set[str]:
-        """Instance member names contributed by this node (override when none)."""
-        return {self.name} if getattr(self, "name", None) else set()
-
 
 @dataclass
 class YangStatementWithMust(YangStatement):
@@ -109,10 +105,6 @@ class YangTypedefStmt(YangStatement):
 
     def get_schema_node(self) -> Optional[str]:
         return None
-
-    def child_names(self, _data: dict) -> set[str]:
-        """Typedefs are schema-only; they are not present in instance data."""
-        return set()
 
 
 @dataclass
@@ -199,8 +191,6 @@ class _RangeAttributes:
     range = _restriction_attribute("range_restriction", "expression")
     range_error_message = _restriction_attribute("range_restriction", "error_message")
     range_error_app_tag = _restriction_attribute("range_restriction", "error_app_tag")
-    range_description = _restriction_attribute("range_restriction", "description", "")
-    range_reference = _restriction_attribute("range_restriction", "reference", "")
 
 
 class _LengthAttributes:
@@ -208,8 +198,6 @@ class _LengthAttributes:
     length = _restriction_attribute("length_restriction", "expression")
     length_error_message = _restriction_attribute("length_restriction", "error_message")
     length_error_app_tag = _restriction_attribute("length_restriction", "error_app_tag")
-    length_description = _restriction_attribute("length_restriction", "description", "")
-    length_reference = _restriction_attribute("length_restriction", "reference", "")
 
 
 @dataclass(slots=True)
@@ -465,13 +453,6 @@ class YangWhenStmt(YangParsedXPathBase):
 
 
 @dataclass
-class YangLeafrefStmt:
-    """Leafref type statement."""
-    path: str = ""
-    require_instance: bool = True
-
-
-@dataclass
 class YangGroupingStmt(YangStatement):
     """Grouping statement - defines reusable schema components."""
 
@@ -546,9 +527,6 @@ class YangDeviationStmt(YangStatement):
     def get_schema_node(self) -> Optional[str]:
         return None
 
-    def child_names(self, _data: dict) -> set[str]:
-        return set()
-
 
 @dataclass
 class YangRefineStmt(YangStatementWithMust):
@@ -576,12 +554,6 @@ class YangChoiceStmt(YangStatementWithWhen):
     default: Optional[str] = None
     cases: List['YangCaseStmt'] = field(default_factory=list)
 
-    def child_names(self, data: dict) -> set[str]:
-        for case in self.cases:
-            if any(getattr(s, "name", None) in data for s in case.statements):
-                return {s.name for s in case.statements if getattr(s, "name", None)}
-        return set()
-
     def validate_case_unique_child_names(self) -> None:
         """RFC 7950 §7.9: case branches share one namespace; schema node names must be unique."""
         seen: dict[str, str] = {}
@@ -603,6 +575,3 @@ class YangChoiceStmt(YangStatementWithWhen):
 @dataclass
 class YangCaseStmt(YangStatementWithWhen):
     """Case statement - defines one alternative in a choice."""
-
-    def child_names(self, _data: dict) -> set[str]:
-        return {s.name for s in self.statements if getattr(s, "name", None)}

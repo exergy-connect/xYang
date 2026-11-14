@@ -112,10 +112,6 @@ class YangModule(YangStatementList):
         """Get a grouping by name."""
         return self.groupings.get(name)
 
-    def get_identity(self, name: str) -> Optional['YangIdentityStmt']:
-        """Get an identity by name."""
-        return self.identities.get(name)
-
     def get_extension(self, name: str) -> Optional["YangExtensionStmt"]:
         """Get an extension definition by local name."""
         return self.extensions.get(name)

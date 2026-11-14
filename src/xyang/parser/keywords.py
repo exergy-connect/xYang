@@ -52,27 +52,29 @@ DEFAULT = "default"
 ERROR_MESSAGE = "error-message"
 ERROR_APP_TAG = "error-app-tag"
 
-from ..types.registry import INT64
+# Built-in type names live in the type registry.
+from ..types.registry import (  # noqa: F401
+    BINARY,
+    BITS,
+    BOOLEAN,
+    DECIMAL64,
+    EMPTY,
+    ENUMERATION,
+    IDENTITYREF,
+    INSTANCE_IDENTIFIER,
+    INT8,
+    INT16,
+    INT32,
+    INT64,
+    LEAFREF,
+    UINT8,
+    UINT16,
+    UINT32,
+    UINT64,
+    UNION,
+)
 
-# Type substatements and builtins
-BINARY = "binary"
-BITS = "bits"
-BOOLEAN = "boolean"
-DECIMAL64 = "decimal64"
-EMPTY = "empty"
-ENUMERATION = "enumeration"
-IDENTITYREF = "identityref"
-INSTANCE_IDENTIFIER = "instance-identifier"
-INT8 = "int8"
-INT16 = "int16"
-INT32 = "int32"
-LEAFREF = "leafref"
-STRING_KW = "string"
-UINT8 = "uint8"
-UINT16 = "uint16"
-UINT32 = "uint32"
-UINT64 = "uint64"
-UNION = "union"
+# Type substatements
 PATH = "path"
 REQUIRE_INSTANCE = "require-instance"
 ENUM = "enum"
