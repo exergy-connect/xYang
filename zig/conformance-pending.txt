@@ -5,4 +5,3 @@
 # `zig build conformance` fails when a listed case passes (remove it) or an unlisted case
 # fails. The port is complete when this list is empty.
 # A case Python xfails, whose load xyang-zig still rejects, is listed here too.
-operations/action-io-path-195 phase-5

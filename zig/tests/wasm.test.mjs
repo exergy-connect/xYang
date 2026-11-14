@@ -160,46 +160,23 @@ for (const dir of await nativeForms(new URL("../../tests/cases/", import.meta.ur
 }
 
 // Generate operation models from their existing YANG sources; never hand-edit forms.
-// A listed case may fail convert for the named reason only. Remove the entry when convert succeeds.
-const CONVERT_EXCEPTIONS = new Map([
-  ["tests/cases/operations/action-io-path-195", "convert cannot copy YangDeviationStmt, tracked by #195"],
-]);
 const temporary = await mkdtemp(join(tmpdir(), "xyang-wasm-"));
 try {
   const cases = new URL("../../tests/cases/operations/", import.meta.url);
   for (const entry of (await readdir(cases)).sort()) {
     const dir = new URL(`${entry}/`, cases);
-    const casePath = `tests/cases/operations/${entry}`;
     const spec = JSON.parse(await readFile(new URL("case.json", dir), "utf8"));
     const validator = await createValidator(bytes);
-    let convertSkip = "";
     if (!spec.features) {
       const output = join(temporary, `${entry}.yang.json`);
       const binary = `../zig-out/bin/xyang-zig${process.platform === "win32" ? ".exe" : ""}`;
-      let converted = false;
-      try {
-        execFileSync(fileURLToPath(new URL(binary, import.meta.url)), [
-          "convert", fileURLToPath(new URL(spec.module, dir)), "-o", output,
-        ]);
-        converted = true;
-        validator.loadModel(await readFile(output, "utf8"));
-      } catch (error) {
-        if (error.code === "ENOENT") throw error;
-        const allowed = CONVERT_EXCEPTIONS.get(casePath);
-        const detail = `${error.stderr ?? ""}${error.stdout ?? ""}`;
-        if (allowed && detail.includes("YangDeviationStmt")) {
-          convertSkip = allowed;
-        } else {
-          throw error;
-        }
-      }
-      if (converted && CONVERT_EXCEPTIONS.has(casePath)) {
-        throw new Error(`${casePath} converts; remove it from CONVERT_EXCEPTIONS`);
-      }
+      execFileSync(fileURLToPath(new URL(binary, import.meta.url)), [
+        "convert", fileURLToPath(new URL(spec.module, dir)), "-o", output,
+      ]);
+      validator.loadModel(await readFile(output, "utf8"));
     }
     for (const item of spec.instances) {
-      const skip = convertSkip ? convertSkip
-        : spec.features ? "Feature selection is not exposed by the Wasm API"
+      const skip = spec.features ? "Feature selection is not exposed by the Wasm API"
         : item.encoding === "native" ? "Native instance encoding is not exposed by the Wasm API"
         : item.action?.includes("/aug:") ? "This fixture requires loading a separate augmenting YANG module"
         : false;

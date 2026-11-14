@@ -8,6 +8,7 @@ preserving ``uses``/grouping structure for round-trip convert paths.
 from __future__ import annotations
 
 import copy
+import re
 from typing import Callable, Dict, List, Optional
 
 from .ast import (
@@ -346,7 +347,9 @@ class _DeviateError(YangSemanticError):
 
 
 def _node_kind(node: YangStatement) -> str:
-    return type(node).__name__.removeprefix("Yang").removesuffix("Stmt").lower()
+    """YANG keyword of *node* (``YangLeafListStmt`` -> ``leaf-list``)."""
+    name = type(node).__name__.removeprefix("Yang").removesuffix("Stmt")
+    return re.sub(r"(?<!^)(?=[A-Z])", "-", name).lower()
 
 
 def _single(

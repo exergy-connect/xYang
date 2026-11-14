@@ -8,6 +8,8 @@ const errors = @import("../../errors.zig");
 const pyfmt = @import("../../pyfmt.zig");
 const kw = @import("../keywords.zig");
 const sp = @import("../statement_parsers.zig");
+const data_parsers = @import("data.zig");
+const type_parsers = @import("type.zig");
 
 const Parser = sp.Parser;
 const Parent = sp.Parent;
@@ -287,13 +289,15 @@ pub fn parseDeviation(p: *Parser, parent: Parent) Error!void {
     const dev = try p.newStatement("deviation", .{ .deviation = .{ .target_path = path } });
     try parseAbsoluteSchemaPath(p, path, &dev.data.deviation.target_path_segments);
     try p.parseOptionalBlock(.{ .stmt = dev }, .deviation, "deviation");
+    if (dev.data.deviation.not_supported and dev.data.deviation.deviates.items.len > 0) {
+        return p.ts.fail("deviation {f}: 'deviate not-supported' cannot be combined with other deviate statements (RFC 7950 \u{a7}7.20.3.2)", .{repr(path)});
+    }
     try p.addToParentOrModule(parent, dev);
     _ = p.ts.consumeIfType(.semicolon);
 }
 
-/// `deviate not-supported` is recorded. `add`, `replace` and `delete` are not applied:
-/// like Python, the load warns `Ignoring unsupported 'deviate KIND' for PATH` and skips
-/// the braced body.
+/// `deviate not-supported` marks the deviation; `add`, `replace` and `delete` record the
+/// properties they name (RFC 7950 7.20.3.2), applied after augments.
 pub fn parseDeviate(p: *Parser, parent: Parent) Error!void {
     const dev = switch (parent) {
         .stmt => |s| switch (s.data) {
@@ -306,15 +310,76 @@ pub fn parseDeviate(p: *Parser, parent: Parent) Error!void {
     const kind = try p.parseStringArgument();
     if (std.mem.eql(u8, kind, kw.NOT_SUPPORTED)) {
         dev.not_supported = true;
+        if (p.ts.consumeIfType(.lbrace)) _ = try p.ts.consumeType(.rbrace);
         _ = p.ts.consumeIfType(.semicolon);
         return;
     }
-    for (kw.UNSUPPORTED_DEVIATE_KINDS) |k| {
-        if (!std.mem.eql(u8, kind, k)) continue;
-        try p.loader.warn("Ignoring unsupported 'deviate {s}' for {s}", .{ kind, dev.target_path });
-        if (p.ts.at(.lbrace)) try sp.consumeBalancedBraces(p);
-        _ = p.ts.consumeIfType(.semicolon);
+    const DeviateSpec = struct { name: []const u8, kind: ast.DeviateKind, allowed: []const []const u8 };
+    const specs = [_]DeviateSpec{
+        .{ .name = kw.ADD, .kind = .add, .allowed = &kw.DEVIATE_ADD_SUBSTATEMENTS },
+        .{ .name = kw.REPLACE, .kind = .replace, .allowed = &kw.DEVIATE_REPLACE_SUBSTATEMENTS },
+        .{ .name = kw.DELETE, .kind = .delete, .allowed = &kw.DEVIATE_DELETE_SUBSTATEMENTS },
+    };
+    const spec = for (specs) |sp_| {
+        if (std.mem.eql(u8, kind, sp_.name)) break sp_;
+    } else return p.ts.fail("Unknown deviate argument {f}", .{repr(kind)});
+    const deviate = try p.new(ast.Deviate, .{ .kind = spec.kind });
+    if (p.ts.consumeIfType(.lbrace)) {
+        while (p.ts.hasMore() and !p.ts.at(.rbrace)) {
+            const keyword = p.ts.peek() orelse "";
+            const allowed = for (spec.allowed) |a| {
+                if (std.mem.eql(u8, a, keyword)) break true;
+            } else false;
+            if (!allowed) return p.ts.fail("{f} is not allowed in 'deviate {s}' (RFC 7950 \u{a7}7.20.3.2)", .{ repr(keyword), kind });
+            try parseDeviateProperty(p, deviate, kind, keyword);
+        }
+        _ = try p.ts.consumeType(.rbrace);
+    }
+    _ = p.ts.consumeIfType(.semicolon);
+    try dev.deviates.append(p.arena, deviate);
+}
+
+fn parseDeviateProperty(p: *Parser, deviate: *ast.Deviate, kind: []const u8, keyword: []const u8) Error!void {
+    const eql = std.mem.eql;
+    if (eql(u8, keyword, kw.MUST) or eql(u8, keyword, kw.TYPE)) {
+        const scratch = try p.newStatement("", .{ .leaf = .{} });
+        if (eql(u8, keyword, kw.MUST)) {
+            try data_parsers.parseMust(p, .{ .stmt = scratch });
+            try deviate.must_statements.appendSlice(p.arena, scratch.must_statements.items);
+            return;
+        }
+        if (deviate.type != null) return p.ts.fail("duplicate 'type' in 'deviate {s}'", .{kind});
+        try type_parsers.parseType(p, .{ .stmt = scratch });
+        deviate.type = scratch.data.leaf.type;
         return;
     }
-    return p.ts.fail("Unknown deviate argument {f}", .{repr(kind)});
+    if (eql(u8, keyword, kw.UNIQUE)) {
+        const scratch = try p.newStatement("", .{ .list = .{} });
+        try data_parsers.parseListUnique(p, .{ .stmt = scratch });
+        try deviate.unique.appendSlice(p.arena, scratch.data.list.unique.items);
+        return;
+    }
+    _ = try p.ts.consume(keyword);
+    const duplicate = (eql(u8, keyword, kw.CONFIG) and deviate.config != null) or
+        (eql(u8, keyword, kw.MANDATORY) and deviate.mandatory != null) or
+        (eql(u8, keyword, kw.MIN_ELEMENTS) and deviate.min_elements != null) or
+        (eql(u8, keyword, kw.MAX_ELEMENTS) and deviate.max_elements_set) or
+        (eql(u8, keyword, kw.UNITS) and deviate.units != null);
+    if (duplicate) return p.ts.fail("duplicate {f} in 'deviate {s}'", .{ repr(keyword), kind });
+    if (eql(u8, keyword, kw.CONFIG)) {
+        deviate.config = try p.parseBooleanArgument("config");
+    } else if (eql(u8, keyword, kw.MANDATORY)) {
+        deviate.mandatory = try p.parseBooleanArgument("mandatory");
+    } else if (eql(u8, keyword, kw.MIN_ELEMENTS)) {
+        deviate.min_elements = (try p.parseIntegerOrUnbounded("min-elements")) orelse
+            return p.ts.fail("min-elements cannot be 'unbounded'", .{});
+    } else if (eql(u8, keyword, kw.MAX_ELEMENTS)) {
+        deviate.max_elements = try p.parseIntegerOrUnbounded("max-elements");
+        deviate.max_elements_set = true;
+    } else if (eql(u8, keyword, kw.UNITS)) {
+        deviate.units = try p.parseStringArgument();
+    } else if (eql(u8, keyword, kw.DEFAULT)) {
+        try deviate.defaults.append(p.arena, try p.parseDefaultValueTokens());
+    }
+    _ = p.ts.consumeIfType(.semicolon);
 }

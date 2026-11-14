@@ -1,5 +1,5 @@
 //! Resolve RFC 7950 `augment` targets, merge augmented schema into the target module
-//! (this module's tree or an imported one), and apply `deviate not-supported` (mirrors
+//! (this module's tree or an imported one), and apply `deviation` (mirrors
 //! `src/xyang/augment_expand.py`).
 
 const std = @import("std");
@@ -57,7 +57,27 @@ fn findToplevelSchemaChild(module: *Module, name: []const u8) ?*Statement {
     return null;
 }
 
-fn findNamedSchemaChild(parent: *Statement, name: []const u8) ?*Statement {
+/// RFC 7950 7.14.2 / 7.14.3: every rpc and action has `input` and `output` schema nodes,
+/// written or not. Add the empty node a schema node identifier names.
+fn materializeOperationIo(a: std.mem.Allocator, parent: *Statement, name: []const u8) Error!?*Statement {
+    if (parent.kind() != .rpc and parent.kind() != .action) return null;
+    const is_input = std.mem.eql(u8, name, "input");
+    if (!is_input and !std.mem.eql(u8, name, "output")) return null;
+    const node = try a.create(Statement);
+    node.* = if (is_input) .{ .name = "input", .data = .{ .input = .{} } } else .{ .name = "output", .data = .{ .output = .{} } };
+    if (is_input) {
+        for (parent.statements.items, 0..) |s, i| {
+            if (s.kind() == .output) {
+                try parent.statements.insert(a, i, node);
+                return node;
+            }
+        }
+    }
+    try parent.statements.append(a, node);
+    return node;
+}
+
+fn findNamedSchemaChild(a: std.mem.Allocator, parent: *Statement, name: []const u8) Error!?*Statement {
     if (parent.kind() == .choice) {
         for (parent.data.choice.cases.items) |case| {
             if (std.mem.eql(u8, case.name, name)) return case;
@@ -67,7 +87,7 @@ fn findNamedSchemaChild(parent: *Statement, name: []const u8) ?*Statement {
     for (parent.statements.items) |s| {
         if (std.mem.eql(u8, s.name, name) and s.schemaNode() != null) return s;
     }
-    return null;
+    return materializeOperationIo(a, parent, name);
 }
 
 const Walked = struct { parent: Owner, target: *Statement };
@@ -94,7 +114,7 @@ fn walkAbsoluteSchemaPathWith(r: *Reporter, ctx_module: *Module, path: []const u
         const pref = seg.prefix orelse "";
         if (pref.len == 0) return r.fail(.syntax, "{s}: invalid path segment {f} in path {f} (expected 'prefix:identifier')", .{ kind, repr(seg.name), repr(path) });
         if (ctx_module.resolvePrefixedModule(pref) == null) return r.fail(.syntax, "{s}: unknown prefix {f} in path {f}", .{ kind, repr(pref), repr(path) });
-        const nxt = findNamedSchemaChild(cur, seg.name) orelse
+        const nxt = (try findNamedSchemaChild(r.arena, cur, seg.name)) orelse
             return r.fail(.syntax, "{s}: no child {f} under node in path {f} (after {f})", .{ kind, repr(seg.name), repr(path), repr(cur.name) });
         parent = .{ .stmt = cur };
         cur = nxt;
@@ -190,7 +210,7 @@ fn cowStatement(a: std.mem.Allocator, s: *const Statement) Error!*Statement {
 
 const Slot = struct { cases: bool, index: usize };
 
-fn schemaChildSlot(parent: Owner, name: []const u8) ?Slot {
+fn schemaChildSlot(a: std.mem.Allocator, parent: Owner, name: []const u8) Error!?Slot {
     if (parent == .stmt and parent.stmt.kind() == .choice) {
         for (parent.stmt.data.choice.cases.items, 0..) |case, i| {
             if (std.mem.eql(u8, case.name, name) and case.schemaNode() != null) return .{ .cases = true, .index = i };
@@ -199,6 +219,11 @@ fn schemaChildSlot(parent: Owner, name: []const u8) ?Slot {
     for (parent.statements().items, 0..) |s, i| {
         if (std.mem.eql(u8, s.name, name) and s.schemaNode() != null) return .{ .cases = false, .index = i };
     }
+    if (parent == .stmt) {
+        if (try materializeOperationIo(a, parent.stmt, name)) |node| {
+            return .{ .cases = false, .index = std.mem.indexOfScalar(*Statement, parent.stmt.statements.items, node).? };
+        }
+    }
     return null;
 }
 
@@ -206,37 +231,27 @@ fn slotList(parent: Owner, slot: Slot) *StatementList {
     return if (slot.cases) &parent.stmt.data.choice.cases else parent.statements();
 }
 
-/// Remove the node named by `segments` from a module copy, copying its ancestors only.
-fn detachCopiedPath(r: *Reporter, module: *Module, segments: []const IdentifierRef) Error!void {
+const Located = struct { owner: Owner, slot: Slot };
+
+/// Copy the ancestors of the node `segments` name in a module copy; return the copied
+/// parent and the target's slot in it. The target itself is not copied.
+fn copiedPathToTarget(r: *Reporter, module: *Module, segments: []const IdentifierRef) Error!Located {
     const a = r.arena;
-    const root: Owner = .{ .module = module };
-    var slot = schemaChildSlot(root, segments[0].name) orelse {
-        var joined: std.ArrayList(u8) = .empty;
-        for (segments, 0..) |s, i| {
-            if (i != 0) try joined.append(a, '/');
-            try joined.print(a, "{s}:{s}", .{ s.prefix orelse "None", s.name });
-        }
-        return r.fail(.semantic, "deviation: no schema node for path '/{s}'", .{joined.items});
-    };
-    if (segments.len == 1) {
-        _ = slotList(root, slot).orderedRemove(slot.index);
-        return;
+    var owner: Owner = .{ .module = module };
+    var slot = (try schemaChildSlot(a, owner, segments[0].name)) orelse return missingOnPath(r, segments, segments[0].name, module.name);
+    for (segments[1..]) |seg| {
+        const current = try cowStatement(a, slotList(owner, slot).items[slot.index]);
+        slotList(owner, slot).items[slot.index] = current;
+        owner = .{ .stmt = current };
+        slot = (try schemaChildSlot(a, owner, seg.name)) orelse return missingOnPath(r, segments, seg.name, current.name);
     }
-    var current = try cowStatement(a, slotList(root, slot).items[slot.index]);
-    slotList(root, slot).items[slot.index] = current;
-    for (segments[1 .. segments.len - 1]) |seg| {
-        const owner: Owner = .{ .stmt = current };
-        slot = schemaChildSlot(owner, seg.name) orelse
-            return r.fail(.semantic, "deviation: no child {f} under {f}", .{ repr(seg.name), repr(current.name) });
-        const nxt = try cowStatement(a, slotList(owner, slot).items[slot.index]);
-        slotList(owner, slot).items[slot.index] = nxt;
-        current = nxt;
-    }
-    const owner: Owner = .{ .stmt = current };
-    const last = segments[segments.len - 1];
-    slot = schemaChildSlot(owner, last.name) orelse
-        return r.fail(.semantic, "deviation: no child {f} under {f}", .{ repr(last.name), repr(current.name) });
-    _ = slotList(owner, slot).orderedRemove(slot.index);
+    return .{ .owner = owner, .slot = slot };
+}
+
+fn missingOnPath(r: *Reporter, segments: []const IdentifierRef, name: []const u8, under: []const u8) Error {
+    var joined: std.ArrayList(u8) = .empty;
+    for (segments) |s| try joined.print(r.arena, "/{s}:{s}", .{ s.prefix orelse "None", s.name });
+    return r.fail(.semantic, "deviation: no child {f} under {f} (path {f})", .{ repr(name), repr(under), repr(joined.items) });
 }
 
 const Copies = std.AutoArrayHashMapUnmanaged(*Module, *Module);
@@ -255,7 +270,167 @@ fn privateTargetModule(r: *Reporter, root: *Module, owner: *Module, copies: *Cop
     return cloned;
 }
 
-fn applyNotSupported(r: *Reporter, root: *Module, dev: *Statement, copies: *Copies) Error!void {
+/// YANG keyword of a schema node, for messages.
+fn nodeKeyword(s: *const Statement) []const u8 {
+    return switch (s.kind()) {
+        .leaf_list => "leaf-list",
+        else => @tagName(s.kind()),
+    };
+}
+
+/// A `deviate` the target cannot take (RFC 7950 7.20.3.2): fail loudly, naming the deviation.
+fn deviateFail(r: *Reporter, path: []const u8, comptime fmt: []const u8, args: anytype) Error {
+    return r.fail(.semantic, "deviation {f}: " ++ fmt, .{repr(path)} ++ args);
+}
+
+fn requireKind(r: *Reporter, path: []const u8, node: *const Statement, prop: []const u8, ok: bool) Error!void {
+    if (!ok) return deviateFail(r, path, "{s} does not apply to target {s} {f}", .{ prop, nodeKeyword(node), repr(node.name) });
+}
+
+/// `_single`: an `add` of a property the target has, or a `replace` of one it lacks, fails.
+/// `always_present` properties (config, mandatory, min/max-elements) have an RFC default.
+fn checkSingle(r: *Reporter, path: []const u8, node: *const Statement, dv: *const ast.Deviate, prop: []const u8, present: bool, always_present: bool) Error!void {
+    if (dv.kind == .add and present) {
+        return deviateFail(r, path, "cannot 'deviate add' {s}: target {s} {f} already has it (use 'deviate replace')", .{ prop, nodeKeyword(node), repr(node.name) });
+    }
+    if (dv.kind == .replace and !present and !always_present) {
+        return deviateFail(r, path, "cannot 'deviate replace' {s}: target {s} {f} has no {s} (use 'deviate add')", .{ prop, nodeKeyword(node), repr(node.name), prop });
+    }
+}
+
+fn applyDeviateDefaults(r: *Reporter, path: []const u8, node: *Statement, dv: *const ast.Deviate) Error!void {
+    const a = r.arena;
+    const values = dv.defaults.items;
+    if (node.kind() == .leaf_list) {
+        const d = &node.data.leaf_list;
+        var current = try d.defaults.clone(a);
+        switch (dv.kind) {
+            .add => try current.appendSlice(a, values),
+            .replace => {
+                if (current.items.len == 0) return deviateFail(r, path, "cannot 'deviate replace' default: target leaf-list {f} has no default", .{repr(node.name)});
+                current = .empty;
+                try current.appendSlice(a, values);
+            },
+            .delete => for (values) |value| {
+                const idx = for (current.items, 0..) |v, i| {
+                    if (std.mem.eql(u8, v, value)) break i;
+                } else return deviateFail(r, path, "cannot 'deviate delete' default {f}: target leaf-list {f} has no such default", .{ repr(value), repr(node.name) });
+                _ = current.orderedRemove(idx);
+            },
+        }
+        d.defaults = current;
+        d.default_values = null;
+        return;
+    }
+    const slot: *?[]const u8 = switch (node.data) {
+        .leaf => |*d| &d.default,
+        .choice => |*d| &d.default,
+        else => return requireKind(r, path, node, "default", false),
+    };
+    if (values.len != 1) return deviateFail(r, path, "target {s} {f} takes one default, got {d}", .{ nodeKeyword(node), repr(node.name), values.len });
+    if (dv.kind == .delete) {
+        const matches = if (slot.*) |cur| std.mem.eql(u8, cur, values[0]) else false;
+        if (!matches) {
+            const current = if (slot.*) |cur| try std.fmt.allocPrint(r.arena, "{f}", .{repr(cur)}) else "None";
+            return deviateFail(r, path, "cannot 'deviate delete' default {f}: target {s} {f} has default {s}", .{ repr(values[0]), nodeKeyword(node), repr(node.name), current });
+        }
+        slot.* = null;
+        return;
+    }
+    try checkSingle(r, path, node, dv, "default", slot.* != null, false);
+    slot.* = values[0];
+}
+
+fn applyDeviateMusts(r: *Reporter, path: []const u8, node: *Statement, dv: *const ast.Deviate) Error!void {
+    try requireKind(r, path, node, "must", node.hasMust());
+    var current = try node.must_statements.clone(r.arena);
+    if (dv.kind == .add) {
+        try current.appendSlice(r.arena, dv.must_statements.items);
+    } else for (dv.must_statements.items) |must| {
+        const idx = for (current.items, 0..) |m, i| {
+            if (std.mem.eql(u8, m.expression, must.expression)) break i;
+        } else return deviateFail(r, path, "cannot 'deviate delete' must {f}: target {s} {f} has no such must", .{ repr(must.expression), nodeKeyword(node), repr(node.name) });
+        _ = current.orderedRemove(idx);
+    }
+    node.must_statements = current;
+}
+
+fn sameUnique(x: []const []const u8, y: []const []const u8) bool {
+    if (x.len != y.len) return false;
+    for (x, y) |p, q| if (!std.mem.eql(u8, p, q)) return false;
+    return true;
+}
+
+fn applyDeviateUnique(r: *Reporter, path: []const u8, node: *Statement, dv: *const ast.Deviate) Error!void {
+    try requireKind(r, path, node, "unique", node.kind() == .list);
+    const d = &node.data.list;
+    var current = try d.unique.clone(r.arena);
+    if (dv.kind == .add) {
+        try current.appendSlice(r.arena, dv.unique.items);
+    } else for (dv.unique.items) |paths| {
+        const idx = for (current.items, 0..) |u, i| {
+            if (sameUnique(u, paths)) break i;
+        } else {
+            const joined = try std.mem.join(r.arena, " ", paths);
+            return deviateFail(r, path, "cannot 'deviate delete' unique {f}: target list {f} has no such unique", .{ repr(joined), repr(node.name) });
+        };
+        _ = current.orderedRemove(idx);
+    }
+    d.unique = current;
+}
+
+/// `_apply_deviate`: one `deviate add|replace|delete` on `node` (RFC 7950 7.20.3.2).
+fn applyDeviate(r: *Reporter, path: []const u8, node: *Statement, dv: *const ast.Deviate) Error!void {
+    if (dv.config) |value| {
+        try requireKind(r, path, node, "config", node.hasWhen() and node.kind() != .rpc and node.kind() != .action);
+        try checkSingle(r, path, node, dv, "config", node.config != null, true);
+        node.config = value;
+    }
+    if (dv.mandatory) |value| {
+        const slot: *bool = switch (node.data) {
+            .leaf => |*d| &d.mandatory,
+            .choice => |*d| &d.mandatory,
+            .anydata => |*d| &d.mandatory,
+            .anyxml => |*d| &d.mandatory,
+            else => return requireKind(r, path, node, "mandatory", false),
+        };
+        try checkSingle(r, path, node, dv, "mandatory", slot.*, true);
+        slot.* = value;
+    }
+    if (dv.min_elements) |value| {
+        const slot = if (node.kind() == .refine) null else node.minElementsSlot();
+        try requireKind(r, path, node, "min-elements", slot != null);
+        try checkSingle(r, path, node, dv, "min-elements", slot.?.* != null, true);
+        slot.?.* = value;
+    }
+    if (dv.max_elements_set) {
+        const slot = if (node.kind() == .refine) null else node.maxElementsSlot();
+        try requireKind(r, path, node, "max-elements", slot != null);
+        try checkSingle(r, path, node, dv, "max-elements", slot.?.* != null, true);
+        slot.?.* = dv.max_elements;
+    }
+    if (dv.type) |t| {
+        try requireKind(r, path, node, "type", node.kind() == .leaf or node.kind() == .leaf_list);
+        node.typeSlot().?.* = t;
+    }
+    if (dv.units) |units| {
+        try requireKind(r, path, node, "units", node.kind() == .leaf or node.kind() == .leaf_list);
+        if (dv.kind == .delete) {
+            if (!std.mem.eql(u8, node.units, units)) {
+                return deviateFail(r, path, "cannot 'deviate delete' units {f}: target {s} {f} has units {f}", .{ repr(units), nodeKeyword(node), repr(node.name), repr(node.units) });
+            }
+            node.units = "";
+        } else {
+            try checkSingle(r, path, node, dv, "units", node.units.len > 0, false);
+            node.units = units;
+        }
+    }
+    if (dv.defaults.items.len > 0) try applyDeviateDefaults(r, path, node, dv);
+    if (dv.must_statements.items.len > 0) try applyDeviateMusts(r, path, node, dv);
+    if (dv.unique.items.len > 0) try applyDeviateUnique(r, path, node, dv);
+}
+
+fn applyDeviation(r: *Reporter, root: *Module, dev: *Statement, copies: *Copies) Error!void {
     const d = dev.data.deviation;
     const path = d.target_path;
     const segments = try absoluteSegments(r, path, d.target_path_segments.items);
@@ -265,14 +440,25 @@ fn applyNotSupported(r: *Reporter, root: *Module, dev: *Statement, copies: *Copi
     };
     const owner = root.resolvePrefixedModule(segments[0].prefix orelse "") orelse
         return r.fail(.semantic, "deviation: unknown prefix {f} in path {f}", .{ repr(segments[0].prefix orelse ""), repr(path) });
-    if (owner == root) return removeSchemaChild(r, walked.parent, walked.target);
-    const private = try privateTargetModule(r, root, owner, copies);
-    try detachCopiedPath(r, private, segments);
+    var node = walked.target;
+    if (owner == root) {
+        if (d.not_supported) return removeSchemaChild(r, walked.parent, walked.target);
+    } else {
+        const private = try privateTargetModule(r, root, owner, copies);
+        const at = try copiedPathToTarget(r, private, segments);
+        const list = slotList(at.owner, at.slot);
+        if (d.not_supported) {
+            _ = list.orderedRemove(at.slot.index);
+            return;
+        }
+        node = try cowStatement(r.arena, list.items[at.slot.index]);
+        list.items[at.slot.index] = node;
+    }
+    for (d.deviates.items) |dv| try applyDeviate(r, path, node, dv);
 }
 
-/// `apply_deviations`: remove each `deviate not-supported` target, then drop the
-/// `deviation` statements. `deviate add|replace|delete` were reported as warnings when
-/// parsed and are not applied.
+/// `apply_deviations`: apply each `deviation` in order, then drop the `deviation`
+/// statements. A target in another module is changed on a copy owned by `root`.
 pub fn applyDeviations(r: *Reporter, root: *Module) Error!void {
     var pending: StatementList = .empty;
     for (root.statements.items) |s| {
@@ -280,9 +466,7 @@ pub fn applyDeviations(r: *Reporter, root: *Module) Error!void {
     }
     if (pending.items.len == 0) return;
     var copies: Copies = .empty;
-    for (pending.items) |dev| {
-        if (dev.data.deviation.not_supported) try applyNotSupported(r, root, dev, &copies);
-    }
+    for (pending.items) |dev| try applyDeviation(r, root, dev, &copies);
     var out: StatementList = .empty;
     for (root.statements.items) |s| {
         if (s.kind() != .deviation) try out.append(r.arena, s);
