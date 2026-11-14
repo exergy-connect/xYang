@@ -15,12 +15,12 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - **CI:** `cd ts && npm test` now runs `tsc --noEmit` first (`pretest`). Vitest strips types without checking them, so a PR head carrying the `Local-Tests: passed` trailer could skip CI's lint job without the type check ever running; that is how #207 broke `main` (fixed in #208).
 - **`deviate replace` of a defaulted property** ([#196](https://github.com/exergy-connect/xYang/issues/196)): documented as a deliberate choice of practice over the strict RFC 7950 §7.20.3.2 reading. Replace requires the property to exist in the target; a strict implementation rejects `deviate replace { config false; }` on a node that inherits `config`. `config`, `mandatory`, `min-elements` and `max-elements` count as present when the target omits them, because each has an RFC default. Huawei NE8000 8.22.0 deviation modules (Huawei/yang 1a06948, `network-router/8.22.0/ne8000-m4m8m14`) use that form on nodes that do not write `config`. `default`, `units` and `type` stay strict. Shared cases `modules/deviate-replace-defaulted-196` and `modules/deviate-replace-missing-default-196`.
-- **Internal duplicate code (Python and TypeScript):** the duplicates listed in `docs/code-audit-2026-11.md` share one helper each. The parser `keywords` modules import the built-in type names from the type registry instead of redefining them.
+- **Internal duplicate code (Python and TypeScript):** the duplicates listed in the November 2026 code audit ([#209](https://github.com/exergy-connect/xYang/pull/209)) share one helper each. The parser `keywords` modules import the built-in type names from the type registry instead of redefining them.
 
 ### Removed
 
 - **Deprecated TypeScript snake_case aliases:** `YangStatementList.find_statement`, `YangStatementList.get_all_leaves`, `YangValidator.enable_extension`, and the `YangParser` options `expand_uses` and `include_path`. They have warned since 1.0.0 that they would be removed in the next release. Use `findStatement`, `getAllLeaves`, `enableExtension`, `expandUses`, and `includePath`.
-- **Unused code (Python and TypeScript)** listed in `docs/code-audit-2026-11.md`, including `src/xyang/parser/metadata_substatements.py`, `ts/src/parser/metadata-substatements.ts`, `ts/src/transform/refine-expand.ts`, `YangLeafrefStmt` (Python and TypeScript), and `TokenStream.consume_if` / `consume_oneof` (Python).
+- **Unused code (Python and TypeScript)** listed in the November 2026 code audit ([#209](https://github.com/exergy-connect/xYang/pull/209)), including `src/xyang/parser/metadata_substatements.py`, `ts/src/parser/metadata-substatements.ts`, `ts/src/transform/refine-expand.ts`, `YangLeafrefStmt` (Python and TypeScript), and `TokenStream.consume_if` / `consume_oneof` (Python).
 
 ### Fixed
 
