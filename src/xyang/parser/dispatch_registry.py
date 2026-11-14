@@ -59,75 +59,45 @@ _IO = _parent(
     frozenset({kw.TYPEDEF, kw.WHEN, kw.MUST, kw.IF_FEATURE}),
 )
 
+# RFC 7950 body-stmts, plus linkage, meta and revision. A submodule body (7.2)
+# accepts this same set; a module body (7.1) adds the header statements
+# namespace and prefix. One table, not two lists.
+_BODY_STATEMENTS = frozenset(
+    {
+        kw.LEAF,
+        kw.LIST,
+        kw.LEAF_LIST,
+        kw.CONTAINER,
+        kw.NOTIFICATION,
+        kw.RPC,
+        kw.ANYDATA,
+        kw.ANYXML,
+        kw.TYPEDEF,
+        kw.GROUPING,
+        kw.USES,
+        kw.IMPORT,
+        kw.INCLUDE,
+        kw.REVISION,
+        kw.DESCRIPTION,
+        kw.REFERENCE,
+        kw.FEATURE,
+        kw.IDENTITY,
+        kw.EXTENSION,
+        kw.AUGMENT,
+        kw.DEVIATION,
+        kw.YANG_VERSION,
+        kw.ORGANIZATION,
+        kw.CONTACT,
+    }
+)
+
 # Insertion order is the parity snapshot order. Keep the TypeScript table in this order.
 _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
     (
         "module",
-        _parent(
-            "7.1.1",
-            frozenset(
-                {
-                    kw.LEAF,
-                    kw.LIST,
-                    kw.LEAF_LIST,
-                    kw.CONTAINER,
-                    kw.NOTIFICATION,
-                    kw.RPC,
-                    kw.ANYDATA,
-                    kw.ANYXML,
-                    kw.TYPEDEF,
-                    kw.GROUPING,
-                    kw.IMPORT,
-                    kw.INCLUDE,
-                    kw.REVISION,
-                    kw.DESCRIPTION,
-                    kw.REFERENCE,
-                    kw.FEATURE,
-                    kw.IDENTITY,
-                    kw.EXTENSION,
-                    kw.AUGMENT,
-                    kw.DEVIATION,
-                    kw.YANG_VERSION,
-                    kw.NAMESPACE,
-                    kw.PREFIX,
-                    kw.ORGANIZATION,
-                    kw.CONTACT,
-                }
-            ),
-        ),
+        _parent("7.1.1", _BODY_STATEMENTS, frozenset({kw.NAMESPACE, kw.PREFIX})),
     ),
-    (
-        "submodule",
-        _parent(
-            "7.2.1",
-            frozenset(
-                {
-                    kw.YANG_VERSION,
-                    kw.ORGANIZATION,
-                    kw.CONTACT,
-                    kw.DESCRIPTION,
-                    kw.REFERENCE,
-                    kw.IMPORT,
-                    kw.INCLUDE,
-                    kw.REVISION,
-                    kw.FEATURE,
-                    kw.EXTENSION,
-                    kw.TYPEDEF,
-                    kw.IDENTITY,
-                    kw.GROUPING,
-                    kw.AUGMENT,
-                    kw.DEVIATION,
-                    kw.CONTAINER,
-                    kw.LIST,
-                    kw.LEAF,
-                    kw.LEAF_LIST,
-                    kw.ANYDATA,
-                    kw.ANYXML,
-                    kw.NOTIFICATION,
-                }
-            ),
-        ),
-    ),
+    ("submodule", _parent("7.2.1", _BODY_STATEMENTS)),
     ("belongs-to", _parent("7.2.2", frozenset({kw.PREFIX}))),
     (
         "import",

@@ -1,10 +1,6 @@
 {
   "description": "RFC 7950 §7.1.1: uses is a data-def statement and is valid at the top of the module body (#188).",
   "module": "m.yang",
-  "xfail": {
-    "python": "top-level uses in the module body (#188)",
-    "ts": "top-level uses in the module body (#188)"
-  },
   "instances": [
     { "name": "expanded container", "data": { "c": { "l": "ok" } }, "valid": true }
   ]

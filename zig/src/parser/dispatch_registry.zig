@@ -94,20 +94,18 @@ fn parent(comptime id: ParentId, comptime name: []const u8, comptime rfc: []cons
 
 const IO_KEYWORDS = METADATA_SUBSTATEMENTS ++ DATA_DEF_SUBSTATEMENTS ++ [_][]const u8{ kw.TYPEDEF, kw.WHEN, kw.MUST, kw.IF_FEATURE };
 
+/// RFC 7950 body-stmts, plus linkage, meta and revision. A submodule body (7.2)
+/// accepts this same set; a module body (7.1) adds namespace and prefix.
+const BODY_STATEMENTS = [_][]const u8{
+    kw.LEAF,        kw.LIST,      kw.LEAF_LIST, kw.CONTAINER,    kw.NOTIFICATION, kw.RPC,       kw.ANYDATA,
+    kw.ANYXML,      kw.TYPEDEF,   kw.GROUPING,  kw.USES,         kw.IMPORT,       kw.INCLUDE,   kw.REVISION,
+    kw.DESCRIPTION, kw.REFERENCE, kw.FEATURE,   kw.IDENTITY,     kw.EXTENSION,    kw.AUGMENT,   kw.DEVIATION,
+    kw.YANG_VERSION, kw.ORGANIZATION, kw.CONTACT,
+};
+
 pub const PARENTS = [_]DispatchParent{
-    parent(.module, "module", "7.1.1", &.{
-        kw.LEAF,     kw.LIST,        kw.LEAF_LIST,    kw.CONTAINER, kw.NOTIFICATION, kw.RPC,
-        kw.ANYDATA,  kw.ANYXML,      kw.TYPEDEF,      kw.GROUPING,  kw.IMPORT,       kw.INCLUDE,
-        kw.REVISION, kw.DESCRIPTION, kw.REFERENCE,    kw.FEATURE,   kw.IDENTITY,     kw.EXTENSION,
-        kw.AUGMENT,  kw.DEVIATION,   kw.YANG_VERSION, kw.NAMESPACE, kw.PREFIX,       kw.ORGANIZATION,
-        kw.CONTACT,
-    }),
-    parent(.submodule, "submodule", "7.2.1", &.{
-        kw.YANG_VERSION, kw.ORGANIZATION, kw.CONTACT,   kw.DESCRIPTION,  kw.REFERENCE, kw.IMPORT,
-        kw.INCLUDE,      kw.REVISION,     kw.FEATURE,   kw.EXTENSION,    kw.TYPEDEF,   kw.IDENTITY,
-        kw.GROUPING,     kw.AUGMENT,      kw.DEVIATION, kw.CONTAINER,    kw.LIST,      kw.LEAF,
-        kw.LEAF_LIST,    kw.ANYDATA,      kw.ANYXML,    kw.NOTIFICATION,
-    }),
+    parent(.module, "module", "7.1.1", &(BODY_STATEMENTS ++ [_][]const u8{ kw.NAMESPACE, kw.PREFIX })),
+    parent(.submodule, "submodule", "7.2.1", &BODY_STATEMENTS),
     parent(.belongs_to, "belongs-to", "7.2.2", &.{kw.PREFIX}),
     parent(.import, "import", "7.1.5", &.{ kw.PREFIX, kw.REFERENCE, kw.REVISION_DATE, kw.DESCRIPTION }),
     parent(.include, "include", "7.1.6", &.{ kw.PREFIX, kw.REFERENCE, kw.REVISION_DATE, kw.DESCRIPTION }),

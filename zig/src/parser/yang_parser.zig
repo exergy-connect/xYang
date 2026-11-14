@@ -24,6 +24,16 @@ pub const Diagnostic = errors.Diagnostic;
 const Error = errors.Error;
 const repr = pyfmt.repr;
 
+/// Same submodule and same statement, reached again through another include, is one definition.
+fn skipSameInclude(existing: ?*ast.Statement, stmt: *ast.Statement, sub_name: []const u8) bool {
+    const origin = stmt.included_from orelse sub_name;
+    stmt.included_from = origin;
+    const prior = existing orelse return false;
+    if (prior == stmt) return true;
+    const tagged = prior.included_from orelse return false;
+    return std.mem.eql(u8, tagged, origin);
+}
+
 pub const Loader = struct {
     arena: std.mem.Allocator,
     /// Needed to read files; `parseString` without a source path never touches it.
@@ -248,8 +258,8 @@ pub const Loader = struct {
         return self.parseString(content, path, path, false);
     }
 
-    /// `_merge_submodule_definitions`: the same typedef reached twice through includes is
-    /// one definition; any other duplicate is an error.
+    /// `_merge_submodule_definitions`: one submodule reached through two includes is one
+    /// definition. Two distinct definitions of the same name still fail.
     fn mergeSubmoduleDefinitions(self: *Loader, p: *sp.Parser, parent: *Module, sub: *Module) Error!void {
         const a = self.arena;
         for (sub.typedefs.keys(), sub.typedefs.values()) |n, td| {
@@ -263,22 +273,34 @@ pub const Loader = struct {
             try @import("../typedef_scope.zig").register(&self.reporter, parent, td);
         }
         for (sub.identities.keys(), sub.identities.values()) |n, ident| {
+            if (skipSameInclude(parent.identities.get(n), ident, sub.name)) continue;
             if (parent.identities.contains(n)) return p.ts.fail("Duplicate identity {f} from include of {f}", .{ repr(n), repr(sub.name) });
             try parent.identities.put(a, n, ident);
         }
         for (sub.groupings.keys(), sub.groupings.values()) |n, grp| {
+            if (skipSameInclude(parent.groupings.get(n), grp, sub.name)) continue;
             if (parent.groupings.contains(n)) return p.ts.fail("Duplicate grouping {f} from include of {f}", .{ repr(n), repr(sub.name) });
             try parent.groupings.put(a, n, grp);
         }
         for (sub.features.keys()) |fname| {
-            if (parent.features.contains(fname)) return p.ts.fail("Duplicate feature {f} from include of {f}", .{ repr(fname), repr(sub.name) });
+            const origin = sub.feature_included_from.get(fname) orelse sub.name;
+            if (parent.features.contains(fname)) {
+                const existing = parent.feature_included_from.get(fname);
+                if (existing != null and std.mem.eql(u8, existing.?, origin)) continue;
+                return p.ts.fail("Duplicate feature {f} from include of {f}", .{ repr(fname), repr(sub.name) });
+            }
             try parent.features.put(a, fname, {});
+            try parent.feature_included_from.put(a, fname, origin);
         }
         for (sub.feature_if_features.keys(), sub.feature_if_features.values()) |fname, ifs| {
+            const origin = sub.feature_if_included_from.get(fname) orelse sub.name;
             if (parent.feature_if_features.contains(fname)) {
+                const existing = parent.feature_if_included_from.get(fname);
+                if (existing != null and std.mem.eql(u8, existing.?, origin)) continue;
                 return p.ts.fail("Duplicate feature if-feature for {f} from include of {f}", .{ repr(fname), repr(sub.name) });
             }
             try parent.feature_if_features.put(a, fname, try ifs.clone(a));
+            try parent.feature_if_included_from.put(a, fname, origin);
         }
         const own = parent.ownPrefix();
         for (sub.import_prefixes.keys(), sub.import_prefixes.values()) |pref, im| {
@@ -291,7 +313,14 @@ pub const Loader = struct {
             }
             try parent.import_prefixes.put(a, pref, im);
         }
-        try parent.statements.appendSlice(a, sub.statements.items);
+        for (sub.statements.items) |stmt| {
+            const origin = stmt.included_from orelse sub.name;
+            stmt.included_from = origin;
+            if (parent.included_submodules.contains(origin)) continue;
+            try parent.statements.append(a, stmt);
+            try parent.included_submodules.put(a, origin, {});
+        }
+        try parent.included_submodules.put(a, sub.name, {});
         sub.included_parent = parent;
         sub.statements = .empty;
         sub.typedefs = .empty;
@@ -299,6 +328,8 @@ pub const Loader = struct {
         sub.groupings = .empty;
         sub.features = .empty;
         sub.feature_if_features = .empty;
+        sub.feature_included_from = .empty;
+        sub.feature_if_included_from = .empty;
         sub.import_prefixes = .empty;
     }
 };

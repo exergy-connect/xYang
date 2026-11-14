@@ -1,10 +1,6 @@
 {
   "description": "RFC 7950 §7.1 / §14: rpc-stmt is a body statement, so a submodule may define an rpc. The including module exposes it (#186).",
   "module": "m.yang",
-  "xfail": {
-    "python": "rpc in a submodule body (#186)",
-    "ts": "rpc in a submodule body (#186)"
-  },
   "instances": [
     { "name": "rpc input", "rpc": "r", "data": { "m:input": { "a": "ok" } }, "valid": true }
   ]
