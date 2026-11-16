@@ -14,7 +14,7 @@ from .errors import (
     YangSemanticError,
     YangSyntaxError,
 )
-from .json import generate_json_schema, parse_json_schema
+from .json import generate_json_schema, parse_json_schema, generate_jsonld_context, generate_jsonld_vocab
 from .parser import parse_yang_file, parse_yang_string
 from .validator.yang_validator import YangValidator
 from .module import YangModule
@@ -32,6 +32,8 @@ __all__ = [
     "YangRefineTargetNotFoundError",
     "YangSyntaxError",
     "generate_json_schema",
+    "generate_jsonld_context",
+    "generate_jsonld_vocab",
     "parse_json_schema",
 ]
 

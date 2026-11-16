@@ -335,9 +335,9 @@ def build_parser() -> argparse.ArgumentParser:
     convert_parser = subparsers.add_parser(
         "convert",
         parents=[path_parent],
-        help="Convert .yang to .yang.json (JSON Schema with x-yang)",
+        help="Export JSON Schema with x-yang, or JSON-LD",
         description=(
-            "Write JSON Schema (2020-12) with x-yang to a file.\n"
+            "Write JSON Schema (2020-12) with x-yang, or a JSON-LD context/vocabulary.\n"
             "Default path: <stem>.yang.json beside the input."
         ),
         formatter_class=_CliHelpFormatter,
@@ -358,7 +358,7 @@ def build_parser() -> argparse.ArgumentParser:
         default=None,
         metavar="PATH",
         help=(
-            "Output file (default: <stem>.yang.json beside the input). "
+            "Output file (default: <stem>.yang.json, .context.jsonld, or .vocab.jsonld beside the input). "
             "An explicit path is used exactly as given"
         ),
     )
@@ -368,6 +368,9 @@ def build_parser() -> argparse.ArgumentParser:
     )
     convert_parser.add_argument("--native-json", action="store_true",
                                 help="Export int64/uint64 as integers and decimal64 as numbers (default: RFC 7951 strings)")
+    jsonld = convert_parser.add_mutually_exclusive_group()
+    jsonld.add_argument("--jsonld", action="store_true", help="Export a JSON-LD 1.1 context instead of JSON Schema")
+    jsonld.add_argument("--jsonld-vocab", action="store_true", help="Export a JSON-LD vocabulary instead of JSON Schema")
     for command in (validate_parser, convert_parser):
         command.add_argument("--no-jsonld", action="store_false", dest="allow_jsonld", default=True,
                              help="Reject JSON-LD annotation keywords (allowed by default)")
@@ -501,6 +504,8 @@ def main() -> int:
             return 2
 
     if args.cmd == "convert":
+        if (args.jsonld or args.jsonld_vocab) and (args.schema_id is not None or args.native_json or not args.allow_jsonld or not args.allow_json_schema):
+            parser.error("JSON-LD output cannot be combined with JSON Schema export options")
         from xyang.parser import YangParser
         from xyang.json import schema_to_yang_json
 
@@ -510,15 +515,21 @@ def main() -> int:
             return 1
         out = args.output
         if out is None:
-            out = p.with_suffix(".yang.json")
+            out = p.with_suffix(".context.jsonld" if args.jsonld else ".vocab.jsonld" if args.jsonld_vocab else ".yang.json")
         else:
             out = Path(out)
         try:
             include_path = tuple(Path(p) for p in _include_path_from_args(args))
             yang_parser = YangParser(expand_uses=False, include_path=include_path)
             module = yang_parser.parse_file(p)
-            schema_to_yang_json(module, output_path=out, schema_id=args.schema_id,
-                                allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, native_json=args.native_json)
+            if args.jsonld or args.jsonld_vocab:
+                from xyang.json import generate_jsonld_context, generate_jsonld_vocab
+                document = generate_jsonld_context(module) if args.jsonld else generate_jsonld_vocab(module)
+                out.parent.mkdir(parents=True, exist_ok=True)
+                out.write_text(json.dumps(document, indent=2, ensure_ascii=False) + "\n", encoding="utf-8")
+            else:
+                schema_to_yang_json(module, output_path=out, schema_id=args.schema_id,
+                                    allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, native_json=args.native_json)
             print(f"Wrote {out}")
         except YangExportError as e:
             _print_cli_error(e)

@@ -147,11 +147,11 @@ pub const COMMANDS = [_]Command{
     },
     .{
         .name = "convert",
-        .summary = "Convert .yang to .yang.json (JSON Schema with x-yang)",
+        .summary = "Export JSON Schema with x-yang, or JSON-LD",
         .usage = "usage: " ++ PROG ++ " convert [-h] [--include-path DIR] [-o PATH] yang_file\n",
         .help =
         \\
-        \\Write JSON Schema (2020-12) with x-yang to a file.
+        \\Write JSON Schema (2020-12) with x-yang, or a JSON-LD context/vocabulary.
         \\Default path: <stem>.yang.json beside the input.
         \\
         \\positional arguments:
@@ -161,12 +161,14 @@ pub const COMMANDS = [_]Command{
         \\  -h, --help          show this help message and exit
         \\  --include-path DIR  Directory to search for imported modules (repeatable; searched
         \\                      after the main file's directory). Default: none
-        \\  -o, --output PATH   Output file (default: <stem>.yang.json beside the input). An explicit
+        \\  -o, --output PATH   Output file (default: <stem>.yang.json, .context.jsonld, or .vocab.jsonld). An explicit
         \\                      path is used exactly as given
         \\
         \\  --no-jsonld                   Reject JSON-LD annotations (allowed by default)
         \\  --no-json-schema-annotations  Reject JSON Schema $ annotations (allowed by default)
         \\  --native-json      Export int64/uint64 as integers and decimal64 as numbers
+        \\  --jsonld           Export a JSON-LD context (default: <stem>.context.jsonld)
+        \\  --jsonld-vocab     Export a JSON-LD vocabulary (default: <stem>.vocab.jsonld)
         \\  --schema-id URI    Schema resource $id (default: the YANG namespace)
         \\
         \\examples:
@@ -177,7 +179,7 @@ pub const COMMANDS = [_]Command{
         \\  xyang-zig convert --include-path ./modules module.yang -o out.yang.json
         \\
         ,
-        .options = &.{ .{ .long = "--no-jsonld" }, .{ .long = "--no-json-schema-annotations" }, INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" }, .{ .long = "--schema-id", .metavar = "URI" }, .{ .long = "--native-json" } },
+        .options = &.{ .{ .long = "--no-jsonld" }, .{ .long = "--no-json-schema-annotations" }, INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" }, .{ .long = "--schema-id", .metavar = "URI" }, .{ .long = "--native-json" }, .{ .long = "--jsonld" }, .{ .long = "--jsonld-vocab" } },
         .positionals = &.{.{ .name = "yang_file" }},
         .run = runConvert,
     },
@@ -552,9 +554,28 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
     return 1;
 }
 
+fn convertText(ctx: Io, module: *xyang.Module, diag: *xyang.Diagnostic, parsed: *const args_mod.Parsed) xyang.json_generator.Error![]const u8 {
+    if (parsed.flag("--jsonld") or parsed.flag("--jsonld-vocab")) {
+        const docs = try xyang.jsonld.generate(ctx.arena, module, diag);
+        var out: std.Io.Writer.Allocating = .init(ctx.arena);
+        xyang.json_value.dumpIndented(&out.writer, if (parsed.flag("--jsonld")) docs.context else docs.vocab, 2) catch return error.OutOfMemory;
+        out.writer.writeByte('\n') catch return error.OutOfMemory;
+        return out.written();
+    }
+    return xyang.json_generator.schemaToYangJsonWithOptions(ctx.arena, module, diag, .{ .schema_id = parsed.value("--schema-id"), .native_json = parsed.flag("--native-json"), .allow_jsonld = !parsed.flag("--no-jsonld"), .allow_json_schema = !parsed.flag("--no-json-schema-annotations") });
+}
+
 /// `xyang convert`: parse without expanding `uses` and write the native JSON form. An
 /// export error exits 2, a module error 1.
 fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerror!u8 {
+    if (parsed.flag("--jsonld") and parsed.flag("--jsonld-vocab")) {
+        try ctx.err.writeAll("Error: --jsonld and --jsonld-vocab are mutually exclusive\n");
+        return 2;
+    }
+    if ((parsed.flag("--jsonld") or parsed.flag("--jsonld-vocab")) and (parsed.value("--schema-id") != null or parsed.flag("--native-json") or parsed.flag("--no-jsonld") or parsed.flag("--no-json-schema-annotations"))) {
+        try ctx.err.writeAll("Error: JSON-LD output cannot be combined with JSON Schema export options\n");
+        return 2;
+    }
     const raw = parsed.positional("yang_file").?;
     const p = try pyPath(ctx.arena, raw);
     if (!exists(ctx, raw)) {
@@ -564,7 +585,7 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
     const out_path = if (parsed.value("--output")) |o|
         try pyPath(ctx.arena, o)
     else
-        try withSuffix(ctx.arena, p, ".yang.json");
+        try withSuffix(ctx.arena, p, if (parsed.flag("--jsonld")) ".context.jsonld" else if (parsed.flag("--jsonld-vocab")) ".vocab.jsonld" else ".yang.json");
 
     var dirs: std.ArrayList([]const u8) = .empty;
     for (parsed.all("--include-path")) |dir| try dirs.append(ctx.arena, try resolvePath(ctx, dir));
@@ -580,7 +601,7 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
         },
         else => return err,
     };
-    const text = xyang.json_generator.schemaToYangJsonWithOptions(ctx.arena, module, &diag, .{ .schema_id = parsed.value("--schema-id"), .native_json = parsed.flag("--native-json"), .allow_jsonld = !parsed.flag("--no-jsonld"), .allow_json_schema = !parsed.flag("--no-json-schema-annotations") }) catch |err| switch (err) {
+    const text = convertText(ctx, module, &diag, parsed) catch |err| switch (err) {
         error.Export => {
             try ctx.err.print("Error: {f}\n", .{diag});
             return 2;

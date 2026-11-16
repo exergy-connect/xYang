@@ -37,7 +37,7 @@ export class CliUsageError extends Error {
 }
 
 type IncludeState = { includePaths: string[] };
-export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string; nativeJson?: boolean };
+export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string; nativeJson?: boolean; jsonld?: boolean; jsonldVocab?: boolean };
 type ConvertState = Omit<ConvertCliArgs, "positional">;
 
 type ValidateState = Omit<ValidateCliArgs, "positional">;
@@ -276,10 +276,16 @@ const validateCommand: CliCommand<ValidateState> = {
 
 const convertCommand: CliCommand<ConvertState> = {
   name: "convert",
-  summary: "Print JSON Schema with x-yang to stdout",
-  description: "Print JSON Schema (2020-12) with x-yang metadata to stdout. Does not write a file.",
+  summary: "Print JSON Schema with x-yang, or JSON-LD, to stdout",
+  description: "Print JSON Schema (2020-12) with x-yang metadata, or a JSON-LD context/vocabulary, to stdout. Does not write a file.",
   positionals: [{ name: "<file.yang>", help: "Path to the .yang file." }],
   options: [includePathOption(), ...annotationOptions<ConvertState>(), {
+    name: "--jsonld", takesValue: false, help: "Print a JSON-LD 1.1 context instead of JSON Schema.",
+    apply(state) { state.jsonld = true; }
+  }, {
+    name: "--jsonld-vocab", takesValue: false, help: "Print a JSON-LD vocabulary instead of JSON Schema.",
+    apply(state) { state.jsonldVocab = true; }
+  }, {
     name: "--native-json", takesValue: false,
     help: "Export int64/uint64 as integers and decimal64 as numbers (default: RFC 7951 strings).",
     apply(state) { state.nativeJson = true; }
@@ -374,6 +380,10 @@ export function parseCommonArgs(rest: string[], commandName: "parse" | "convert"
 export function parseConvertArgs(rest: string[]): ConvertCliArgs {
   const state: ConvertState = { includePaths: [] };
   const positional = collectPositionals(convertCommand, rest, state);
+  if (state.jsonld && state.jsonldVocab) throw new CliUsageError("--jsonld and --jsonld-vocab are mutually exclusive");
+  if ((state.jsonld || state.jsonldVocab) && (state.schemaId !== undefined || state.nativeJson || state.allowJsonld === false || state.allowJsonSchema === false)) {
+    throw new CliUsageError("JSON-LD output cannot be combined with JSON Schema export options");
+  }
   return { ...state, positional };
 }
 

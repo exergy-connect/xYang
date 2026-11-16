@@ -48,7 +48,7 @@ export {
   YangSyntaxError
 } from "./core/errors";
 export type { SchemaExportOptions } from "./json";
-export { generateJsonSchema, parseJsonSchema } from "./json";
+export { generateJsonSchema, parseJsonSchema, generateJsonldContext, generateJsonldVocab } from "./json";
 
 export { inferRequiredFeatures } from "./validator/infer-required-features";
 

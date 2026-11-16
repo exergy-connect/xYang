@@ -1,0 +1,25 @@
+module xyang-jsonld {
+  yang-version 1.1;
+  namespace "https://exergy-connect.github.io/xYang/jsonld#";
+  prefix jl;
+  description "Portable JSON-LD mappings consumed by xYang's JSON-LD exporters.";
+  extension iri {
+    argument value;
+    description "Absolute property IRI (known compact prefixes schema/rdf/rdfs/skos/wd are expanded), or @id/@type for a keyword alias.";
+  }
+  extension iri-value {
+    description "Coerce this leaf's values to IRIs with JSON-LD @type: @id.";
+  }
+  extension class {
+    argument iri;
+    description "Class IRI recorded as the property's rdfs:range in the vocabulary.";
+  }
+  extension close-match {
+    argument iri;
+    description "Related IRI recorded as skos:closeMatch; may be repeated.";
+  }
+  extension unit-code {
+    argument code;
+    description "Unit code recorded as schema:unitCode in the vocabulary.";
+  }
+}

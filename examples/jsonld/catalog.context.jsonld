@@ -1,0 +1,37 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "@vocab": "https://example.invalid/catalog#",
+    "catalog": {
+      "@id": "https://example.invalid/catalog#",
+      "@prefix": true
+    },
+    "xyang-jsonld": {
+      "@id": "https://exergy-connect.github.io/xYang/jsonld#",
+      "@prefix": true
+    },
+    "seller": {
+      "@id": "https://schema.org/seller",
+      "@context": {
+        "name": {
+          "@id": "https://schema.org/name"
+        },
+        "url": {
+          "@id": "https://schema.org/url",
+          "@type": "@id"
+        }
+      }
+    },
+    "series": {
+      "@id": "https://schema.org/hasPart",
+      "@context": {
+        "name": {
+          "@id": "https://schema.org/model"
+        },
+        "resistance": {
+          "@id": "https://example.invalid/catalog#resistance"
+        }
+      }
+    }
+  }
+}

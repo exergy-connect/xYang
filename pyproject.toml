@@ -35,6 +35,7 @@ dev = [
     "pytest>=9.0.3",
     "black>=26.5.1",
     "PyYAML>=6.0.3",
+    "PyLD>=2.0.4",
 ]
 
 [project.urls]
