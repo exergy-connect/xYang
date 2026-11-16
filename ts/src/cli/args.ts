@@ -37,7 +37,7 @@ export class CliUsageError extends Error {
 }
 
 type IncludeState = { includePaths: string[] };
-export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string };
+export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string; nativeJson?: boolean };
 type ConvertState = Omit<ConvertCliArgs, "positional">;
 
 type ValidateState = Omit<ValidateCliArgs, "positional">;
@@ -280,6 +280,10 @@ const convertCommand: CliCommand<ConvertState> = {
   description: "Print JSON Schema (2020-12) with x-yang metadata to stdout. Does not write a file.",
   positionals: [{ name: "<file.yang>", help: "Path to the .yang file." }],
   options: [includePathOption(), ...annotationOptions<ConvertState>(), {
+    name: "--native-json", takesValue: false,
+    help: "Export int64/uint64 as integers and decimal64 as numbers (default: RFC 7951 strings).",
+    apply(state) { state.nativeJson = true; }
+  }, {
     name: "--schema-id", metavar: "URI", takesValue: true,
     help: "Schema resource $id (default: the YANG namespace); does not change x-yang.namespace.",
     apply(state, value) {

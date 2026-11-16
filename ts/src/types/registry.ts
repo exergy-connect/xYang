@@ -10,6 +10,7 @@ import {
   JSON_TYPE_OBJECT,
   JSON_TYPE_STRING
 } from "../json/type-constants";
+import { YangExportError } from "../core/errors";
 import { identityrefSchema } from "../json/identity-export";
 
 export const INT8 = "int8";
@@ -48,7 +49,7 @@ export type Builtin = {
   readonly bounds: readonly [number, number] | null;
   readonly boundsText: readonly [string, string] | null;
   readonly pattern: string | null;
-  toSchema(typeShape: Record<string, unknown>): Record<string, unknown>;
+  toSchema(typeShape: Record<string, unknown>, nativeJson?: boolean): Record<string, unknown>;
   fromSchema(fragment: Record<string, unknown>): Record<string, unknown> | null;
   checkValue(value: unknown, typeShape: Record<string, unknown> | null): string | null;
 };
@@ -58,8 +59,8 @@ const table = new Map<string, Builtin>();
 function define(spec: Omit<Builtin, "toSchema" | "fromSchema" | "checkValue"> & Partial<Pick<Builtin, "toSchema" | "fromSchema" | "checkValue">>): Builtin {
   const builtin: Builtin = {
     ...spec,
-    toSchema(typeShape) {
-      return emitSchema(builtin, typeShape);
+    toSchema(typeShape, nativeJson = false) {
+      return emitSchema(builtin, typeShape, nativeJson);
     },
     fromSchema(fragment) {
       return readSchema(builtin, fragment);
@@ -332,7 +333,27 @@ function stringSchema(typeShape: Record<string, unknown>): Record<string, unknow
   return out;
 }
 
-function emitSchema(spec: Builtin, typeShape: Record<string, unknown>): Record<string, unknown> {
+function emitSchema(spec: Builtin, typeShape: Record<string, unknown>, nativeJson = false): Record<string, unknown> {
+  if (nativeJson && spec.jsonEncoding === "string-number") {
+    const decimal = spec.name === DECIMAL64;
+    const fd = typeShape.fraction_digits;
+    if (decimal && typeof fd !== "number") throw new YangExportError("native decimal64 export requires fraction-digits");
+    const scale = decimal ? 10 ** (fd as number) : 1;
+    const [lo, hi] = decimal ? [-9223372036854775808 / scale, 9223372036854775807 / scale] : spec.bounds!;
+    const xy: Record<string, unknown> = { type: spec.name };
+    const out: Record<string, unknown> = { type: decimal ? "number" : "integer" };
+    if (decimal) { xy["fraction-digits"] = fd; out.multipleOf = 10 ** -(fd as number); }
+    const range = typeof typeShape.range === "string" && typeShape.range ? typeShape.range : undefined;
+    if (range) xy.range = range;
+    const bounds = (range ?? "min..max").split("|").map((part) => {
+      const ends = part.trim().split("..").map((s) => s.trim());
+      const value = (text: string): number => text === "min" ? lo : text === "max" ? hi : Number(text);
+      return { minimum: value(ends[0]), maximum: value(ends[1] ?? ends[0]) };
+    });
+    if (bounds.length === 1) Object.assign(out, bounds[0]); else out.anyOf = bounds;
+    out["x-yang"] = xy;
+    return out;
+  }
   if (spec.bounds && spec.jsonEncoding === "string-number") {
     const xYang: Record<string, unknown> = { type: spec.name };
     if (typeof typeShape.range === "string" && typeShape.range) {
@@ -388,21 +409,21 @@ function emitSchema(spec: Builtin, typeShape: Record<string, unknown>): Record<s
   }
   if (spec.name === UNION) {
     const members = Array.isArray(typeShape.types) ? typeShape.types : [];
-    return { oneOf: members.map((member) => leafTypeToSchema(member as Record<string, unknown>)) };
+    return { oneOf: members.map((member) => leafTypeToSchema(member as Record<string, unknown>, nativeJson)) };
   }
   return { type: JSON_TYPE_FREE_FORM };
 }
 
-export function leafTypeToSchema(typeShape: Record<string, unknown>): Record<string, unknown> {
+export function leafTypeToSchema(typeShape: Record<string, unknown>, nativeJson = false): Record<string, unknown> {
   const typeName = typeof typeShape.name === "string" ? typeShape.name : STRING;
   if (typeName === JSON_TYPE_NUMBER) {
-    return REGISTRY[DECIMAL64].toSchema(typeShape);
+    return REGISTRY[DECIMAL64].toSchema(typeShape, nativeJson);
   }
   const spec = REGISTRY[typeName];
   if (!spec) {
     return { type: JSON_TYPE_FREE_FORM };
   }
-  return spec.toSchema(typeShape);
+  return spec.toSchema(typeShape, nativeJson);
 }
 
 function fractionDigitsFromMultipleOf(value: unknown): number | undefined {

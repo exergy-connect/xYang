@@ -1020,7 +1020,7 @@ fn convertPropertyLocal(p: *Parse, name: []const u8, prop: *const Object, defs: 
     var node_type: []const u8 = if (tv != null and tv.? == .string) tv.?.string else "";
     if (std.mem.eql(u8, node_type, K.types.LEAFREF) or std.mem.eql(u8, node_type, K.types.IDENTITYREF) or std.mem.eql(u8, node_type, K.types.INSTANCE_IDENTIFIER)) node_type = "leaf";
     const st = schema.get(K.TYPE);
-    if (registry.isStringNumber(node_type) and st != null and st.? == .string and std.mem.eql(u8, st.?.string, "string")) node_type = "leaf";
+    if (registry.isStringNumber(node_type) and st != null and st.? == .string and (std.mem.eql(u8, st.?.string, "string") or std.mem.eql(u8, st.?.string, "integer") or std.mem.eql(u8, st.?.string, "number"))) node_type = "leaf";
     const with_must = for ([_][]const u8{ "leaf", "leaf-list", "container", "list", K.types.ANYDATA, K.types.ANYXML }) |n| {
         if (std.mem.eql(u8, n, node_type)) break true;
     } else false;

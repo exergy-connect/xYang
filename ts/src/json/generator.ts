@@ -638,7 +638,7 @@ function typedefRefOrInline(
   }
   if (!prefix && Object.prototype.hasOwnProperty.call(REGISTRY, typeName)) {
     if (typeName === "union") return { oneOf: ((typeShape.types ?? []) as Record<string, unknown>[]).map((member) => typedefRefOrInline(member, typedefNames, module)) };
-    return leafTypeToSchema(typeShape);
+    return leafTypeToSchema(typeShape, exportNativeJson);
   }
   // A typedef from another module is inlined; the JSON form's `$defs` hold only this module's.
   const label = prefix ? `${prefix}:${typeName}` : typeName;
@@ -1078,7 +1078,7 @@ function statementToSchemaBody(
     const { description: _leafTypeDescription, ...leafSchemaRest } = leafSchema;
     const out: Record<string, unknown> = {
       ...leafSchemaRest,
-      [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy }
+      [YANG_SCHEMA_KEYS.xYang]: { ...xYang, ...schemaXy, ...(typeName === YangTokenType.LEAFREF ? { type: YangTokenType.LEAFREF } : {}) }
     };
     withDescription(out, stmt.description);
     if (stmt.default !== undefined) {
@@ -1430,23 +1430,29 @@ function featuresJson(module: YangModule): Record<string, unknown> {
 /** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
 import { annotateSchema, type AnnotationOptions } from "../encoding/annotations";
 
+let exportNativeJson = false;
+
 export type SchemaExportOptions = AnnotationOptions & {
+  nativeJson?: boolean;
   /** Schema resource URI. Defaults to the YANG namespace; leaves x-yang.namespace unchanged. */
   schemaId?: string;
 };
 
 export function generateJsonSchema(module: YangModule, options: SchemaExportOptions = {}): Record<string, unknown> {
 
+  const previousNative = exportNativeJson;
   const previous = extensionUses;
   const previousScoped = scopedExportDefs;
   scopedExportDefs = scopedCatalog(module);
   extensionUses = [];
+  exportNativeJson = options.nativeJson === true;
   try {
     const schema = withIdentityExport(module, (used) => generateSchema(module, used));
     if (options.schemaId !== undefined) schema.$id = options.schemaId;
     annotateSchema(schema, options);
     return schema;
   } finally {
+    exportNativeJson = previousNative;
     extensionUses = previous;
     scopedExportDefs = previousScoped;
   }

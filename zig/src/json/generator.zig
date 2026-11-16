@@ -47,6 +47,7 @@ const ExtUse = struct { owner: *Module, name: []const u8 };
 pub const Gen = struct {
     a: Allocator,
     root: *Module,
+    native_json: bool = false,
     reporter: errors.Reporter,
     identities_used: std.ArrayList(identity_graph.Pair) = .empty,
     extensions_used: std.ArrayList(ExtUse) = .empty,
@@ -1515,14 +1516,14 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
 
 /// `generate_json_schema`: the module's native JSON form. On `error.Export` or
 /// `error.YangLoad`, `diag` holds the message.
-pub const Options = struct { schema_id: ?[]const u8 = null, allow_jsonld: bool = true, allow_json_schema: bool = true };
+pub const Options = struct { schema_id: ?[]const u8 = null, native_json: bool = false, allow_jsonld: bool = true, allow_json_schema: bool = true };
 
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
     return generateWithOptions(a, module, diag, .{});
 }
 
 pub fn generateWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error!Val {
-    var g: Gen = .{ .a = a, .root = module, .reporter = .{ .arena = a, .diag = diag } };
+    var g: Gen = .{ .a = a, .root = module, .native_json = options.native_json, .reporter = .{ .arena = a, .diag = diag } };
     var visited: std.AutoHashMapUnmanaged(*Module, void) = .empty;
     try collectScopedTypedefs(&g, module, &visited);
     const names = try typedefNameSet(a, module);
@@ -1783,4 +1784,27 @@ test "RFC 8791 export after application and reload applies foreign augment once 
     try capabilities.applyExtensionInvocations(&reporter, loaded);
     try std.testing.expectEqual(@as(usize, 2), box.statements.items.len);
     try std.testing.expect(jv.pyEql(form, try generate(a, loaded, &diag)));
+}
+
+test "native numeric schemas retain their types on reload (#226)" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: errors.Diagnostic = .{};
+    var loader = @import("../parser/yang_parser.zig").Loader.init(a, null, &diag, &.{});
+    const m = try loader.parseString(
+        \\module m { namespace "urn:m"; prefix m;
+        \\ typedef resistance { type decimal64 { fraction-digits 3; range "0..100"; } }
+        \\ leaf signed { type int64; } leaf unsigned { type uint64; }
+        \\ leaf ohms { type resistance; } leaf-list values { type resistance; }
+        \\ leaf slots { type int64 { range "1..3 | 10"; } }
+        \\ leaf mixed { type union { type int64; type boolean; } }
+        \\ leaf ref { type leafref { path "/signed"; require-instance false; } }
+        \\}
+    , "m.yang", null, true);
+    const schema = try generateWithOptions(a, m, &diag, .{ .native_json = true });
+    var msg: []const u8 = "";
+    const restored = try @import("parser.zig").parseJsonSchema(a, schema, &msg);
+    const again = try generateWithOptions(a, restored, &diag, .{ .native_json = true });
+    try std.testing.expect(jv.pyEql(schema, again));
 }

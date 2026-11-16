@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Native numeric JSON Schema export (`native_json=True` / `nativeJson: true`, CLI `convert --native-json`): emit int64/uint64 integers and decimal64 numbers with bounds, disjoint ranges, and fraction-digit `multipleOf`; retain `x-yang` type metadata for round trips ([#226](https://github.com/exergy-connect/xYang/issues/226)).
+
 - Accept opaque JSON-LD and JSON Schema annotation families at every instance object by default; add independent API and CLI opt-outs and matching `patternProperties` in exported object schemas ([#225](https://github.com/exergy-connect/xYang/issues/225)).
 
 - Optional schema resource ID for JSON Schema export (`schema_id` / `schemaId`, CLI `convert --schema-id`); the YANG namespace remains unchanged ([#227](https://github.com/exergy-connect/xYang/issues/227)).

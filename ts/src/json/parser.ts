@@ -19,6 +19,7 @@ import { XYANG_KEYS, YANG_SCHEMA_KEYS } from "./schema-keys";
 import {
   JSON_TYPE_ARRAY,
   JSON_TYPE_INTEGER,
+  JSON_TYPE_NUMBER,
   JSON_TYPE_OBJECT,
   JSON_TYPE_STRING
 } from "./type-constants";
@@ -441,7 +442,7 @@ function typeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<strin
 }
 
 function rawTypeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<string, unknown>): Record<string, unknown> {
-  if (schema.type === JSON_TYPE_STRING) {
+  if ([JSON_TYPE_STRING, JSON_TYPE_INTEGER, JSON_TYPE_NUMBER].includes(String(schema.type))) {
     const quoted = quotedNumericTypeShape(xy);
     if (quoted) {
       return quoted;
@@ -1003,7 +1004,7 @@ function parseLeafList(name: string, schema: Record<string, unknown>, defs: Reco
   const items = resolveSchemaWithOverlay(asRecord(schema.items), defs);
   const itemXy = asRecord(items[YANG_SCHEMA_KEYS.xYang]);
   const mergedXy = { ...xy, ...itemXy };
-  const typeShape = typeShapeFromJsonLeaf(items, mergedXy);
+  const typeShape = typeShapeFromJsonLeaf(asRecord(schema.items).$ref ? asRecord(schema.items) : items, mergedXy);
   const out: YangStatement = new YangStatement({
     keyword: YangTokenType.LEAF_LIST,
     name,
@@ -1169,7 +1170,7 @@ function localPropertyToStatement(
   ) {
     return parseLeaf(name, schema, defs);
   }
-  if (resolved.type === JSON_TYPE_STRING && isStringNumberBuiltin(xyType)) {
+  if ([JSON_TYPE_STRING, JSON_TYPE_INTEGER, JSON_TYPE_NUMBER].includes(String(resolved.type)) && isStringNumberBuiltin(xyType)) {
     return parseLeaf(name, schema, defs);
   }
   if (xyType === YangTokenType.ANYDATA) {
