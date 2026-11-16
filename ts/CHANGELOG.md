@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.4] — 2026-11-16
+
 ### Added
 
 - JSON-LD context and vocabulary exports (`generate_jsonld_context` / `generate_jsonld_vocab`, TypeScript camelCase equivalents, CLI `convert --jsonld` / `--jsonld-vocab`), with scoped terms, portable `xyang-jsonld` extensions, and schema.org/Wikidata/unit compatibility mappings. Includes a reproducible example and Linked Data expansion tests ([#229](https://github.com/exergy-connect/xYang/issues/229)).
@@ -286,7 +288,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.3...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.4...HEAD
+[1.0.4]: https://github.com/exergy-connect/xYang/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/exergy-connect/xYang/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
 [1.0.1]: https://github.com/exergy-connect/xYang/compare/v1.0.0...v1.0.1
