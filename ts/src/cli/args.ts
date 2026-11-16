@@ -274,7 +274,7 @@ const convertCommand: CliCommand<IncludeState> = {
     "xyang-ts convert --include-path ./modules module.yang"
   ],
   notes: [
-    "Python xyang convert writes <stem>.yang.json beside the input, or the path given by -o/--output (the name is forced to end with .yang.json). This command does not accept -o or --output."
+    "Python xyang convert writes <stem>.yang.json beside the input, or the path given by -o/--output. This command does not accept -o or --output."
   ]
 };
 
