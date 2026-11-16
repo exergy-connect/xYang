@@ -52,7 +52,8 @@ export { generateJsonSchema, parseJsonSchema } from "./json";
 
 export { inferRequiredFeatures } from "./validator/infer-required-features";
 
-export type ValidateOptions = {
+import type { AnnotationOptions } from "./encoding/annotations";
+export type ValidateOptions = AnnotationOptions & {
   /** Case-file shape ``{"module": ["feature", ...]}``. ``null`` enables every declared feature. */
   features?: Record<string, readonly string[]> | null;
   /** Extra directories for ``import`` / ``include``. Used only when ``schema`` is a path. */
@@ -109,6 +110,8 @@ export function validate(schema: string | YangModule, data: unknown, options: Va
   const validator = new YangValidator(module, enabled ? { enabledFeaturesByModule: enabled } : {});
   return validator.validateDetailed(data, {
     nativeJson: options.nativeJson === true,
+    allowJsonld: options.allowJsonld,
+    allowJsonSchema: options.allowJsonSchema,
     ...(options.rpc !== undefined ? { rpc: options.rpc } : {}),
     ...(options.action !== undefined ? { action: options.action } : {}),
     ...(options.direction !== undefined ? { direction: options.direction } : {}),

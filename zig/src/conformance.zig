@@ -490,6 +490,8 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
     var validator = xyang.YangValidator.init(arena, module);
     const options: xyang.yang_validator.Options = .{
         .native_json = native,
+        .allow_jsonld = if (inst.get("allow_jsonld")) |v| v.bool else true,
+        .allow_json_schema = if (inst.get("allow_json_schema")) |v| v.bool else true,
         .enabled_features_by_module = features,
         .rpc = if (inst.get("rpc")) |r| r.string else null,
         .action = if (inst.get("action")) |p| p.string else null,

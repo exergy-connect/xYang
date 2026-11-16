@@ -1,3 +1,4 @@
+import type { AnnotationOptions } from "../encoding/annotations";
 import { resolve } from "node:path";
 
 export type AnydataValidationCli = "off" | "complete" | "candidate";
@@ -7,7 +8,7 @@ export type CommonCliArgs = {
   positional: string[];
 };
 
-export type ValidateCliArgs = CommonCliArgs & {
+export type ValidateCliArgs = CommonCliArgs & AnnotationOptions & {
   anydataValidation: AnydataValidationCli;
   anydataModulePaths: string[];
   format: "text" | "json";
@@ -36,7 +37,7 @@ export class CliUsageError extends Error {
 }
 
 type IncludeState = { includePaths: string[] };
-export type ConvertCliArgs = CommonCliArgs & { schemaId?: string };
+export type ConvertCliArgs = CommonCliArgs & AnnotationOptions & { schemaId?: string };
 type ConvertState = Omit<ConvertCliArgs, "positional">;
 
 type ValidateState = Omit<ValidateCliArgs, "positional">;
@@ -95,6 +96,15 @@ function includePathOption<S extends IncludeState>(): CliOption<S> {
   };
 }
 
+function annotationOptions<S extends AnnotationOptions>(): CliOption<S>[] {
+  return [
+    { name: "--no-jsonld", takesValue: false, help: "Reject JSON-LD annotation keywords (allowed by default).",
+      apply(state) { state.allowJsonld = false; } },
+    { name: "--no-json-schema-annotations", takesValue: false, help: "Reject JSON Schema $ annotation keywords (allowed by default).",
+      apply(state) { state.allowJsonSchema = false; } }
+  ];
+}
+
 function parseFeaturesArg(raw: string | undefined): Record<string, string[]> | null {
   if (raw === undefined) {
     throw new CliUsageError("Missing JSON after --features");
@@ -150,6 +160,7 @@ const validateCommand: CliCommand<ValidateState> = {
   ],
   options: [
     includePathOption(),
+    ...annotationOptions<ValidateState>(),
     {
       name: "--native-json",
       takesValue: false,
@@ -268,7 +279,7 @@ const convertCommand: CliCommand<ConvertState> = {
   summary: "Print JSON Schema with x-yang to stdout",
   description: "Print JSON Schema (2020-12) with x-yang metadata to stdout. Does not write a file.",
   positionals: [{ name: "<file.yang>", help: "Path to the .yang file." }],
-  options: [includePathOption(), {
+  options: [includePathOption(), ...annotationOptions<ConvertState>(), {
     name: "--schema-id", metavar: "URI", takesValue: true,
     help: "Schema resource $id (default: the YANG namespace); does not change x-yang.namespace.",
     apply(state, value) {

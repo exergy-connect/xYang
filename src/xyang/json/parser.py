@@ -372,7 +372,10 @@ def _empty_optional_choice_branch(branch: Any) -> bool:
     return (
         isinstance(branch, dict)
         and branch.get(JsonSchemaKey.TYPE) == "object"
-        and branch.get(JsonSchemaKey.MAX_PROPERTIES) == 0
+        and (branch.get(JsonSchemaKey.MAX_PROPERTIES) == 0 or (
+            branch.get("additionalProperties") is False and "patternProperties" in branch
+            and not branch.get("properties")
+        ))
     )
 
 

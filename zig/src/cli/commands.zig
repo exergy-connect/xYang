@@ -90,6 +90,8 @@ pub const COMMANDS = [_]Command{
         \\                                searched after the main file's directory). Default: none
         \\  --format {text,json}          Output format: text (default) or json ({valid, errors}
         \\                                on stdout)
+        \\  --no-jsonld                   Reject JSON-LD annotations (allowed by default)
+        \\  --no-json-schema-annotations  Reject JSON Schema $ annotations (allowed by default)
         \\  --native-json                 Accept native dict-style JSON instead of strict RFC
         \\                                7951. Default: off (RFC 7951)
         \\  --rpc NAME                    Validate the data as rpc NAME (RFC 7950 §7.14): the RFC
@@ -133,16 +135,12 @@ pub const COMMANDS = [_]Command{
         \\
         ,
         .options = &.{
-            INCLUDE_PATH,
-            .{ .long = "--format", .metavar = "{text,json}", .choices = &.{ "text", "json" } },
-            .{ .long = "--native-json" },
-            .{ .long = "--rpc", .metavar = "NAME" },
-            .{ .long = "--action", .metavar = "PATH" },
-            .{ .long = "--output" },
-            .{ .long = "--context", .metavar = "FILE" },
-            .{ .long = "--features", .metavar = "JSON" },
-            .{ .long = "--anydata-validation", .metavar = "{off,complete,candidate}", .choices = &.{ "off", "complete", "candidate" } },
-            .{ .long = "--anydata-module", .metavar = "PATH", .repeat = true },
+            .{ .long = "--no-jsonld" },                                                                                                  .{ .long = "--no-json-schema-annotations" },
+            INCLUDE_PATH,                                                                                                                .{ .long = "--format", .metavar = "{text,json}", .choices = &.{ "text", "json" } },
+            .{ .long = "--native-json" },                                                                                                .{ .long = "--rpc", .metavar = "NAME" },
+            .{ .long = "--action", .metavar = "PATH" },                                                                                  .{ .long = "--output" },
+            .{ .long = "--context", .metavar = "FILE" },                                                                                 .{ .long = "--features", .metavar = "JSON" },
+            .{ .long = "--anydata-validation", .metavar = "{off,complete,candidate}", .choices = &.{ "off", "complete", "candidate" } }, .{ .long = "--anydata-module", .metavar = "PATH", .repeat = true },
         },
         .positionals = &.{ .{ .name = "yang_file" }, .{ .name = "data_file", .optional = true } },
         .run = runValidate,
@@ -167,6 +165,8 @@ pub const COMMANDS = [_]Command{
         \\                      path is used exactly as given
         \\
         \\examples:
+        \\  --no-jsonld                   Reject JSON-LD annotations (allowed by default)
+        \\  --no-json-schema-annotations  Reject JSON Schema $ annotations (allowed by default)
         \\  --schema-id URI    Schema resource $id (default: the YANG namespace)
         \\
         \\  xyang-zig convert --help
@@ -176,7 +176,7 @@ pub const COMMANDS = [_]Command{
         \\  xyang-zig convert --include-path ./modules module.yang -o out.yang.json
         \\
         ,
-        .options = &.{ INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" }, .{ .long = "--schema-id", .metavar = "URI" } },
+        .options = &.{ .{ .long = "--no-jsonld" }, .{ .long = "--no-json-schema-annotations" }, INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" }, .{ .long = "--schema-id", .metavar = "URI" } },
         .positionals = &.{.{ .name = "yang_file" }},
         .run = runConvert,
     },
@@ -498,6 +498,8 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
     var validator = xyang.YangValidator.init(ctx.arena, module);
     const result = validator.validate(data, .{
         .native_json = parsed.flag("--native-json"),
+        .allow_jsonld = !parsed.flag("--no-jsonld"),
+        .allow_json_schema = !parsed.flag("--no-json-schema-annotations"),
         .enabled_features_by_module = features,
         .rpc = rpc,
         .action = action,
@@ -577,7 +579,7 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
         },
         else => return err,
     };
-    const text = xyang.json_generator.schemaToYangJsonWithOptions(ctx.arena, module, &diag, .{ .schema_id = parsed.value("--schema-id") }) catch |err| switch (err) {
+    const text = xyang.json_generator.schemaToYangJsonWithOptions(ctx.arena, module, &diag, .{ .schema_id = parsed.value("--schema-id"), .allow_jsonld = !parsed.flag("--no-jsonld"), .allow_json_schema = !parsed.flag("--no-json-schema-annotations") }) catch |err| switch (err) {
         error.Export => {
             try ctx.err.print("Error: {f}\n", .{diag});
             return 2;

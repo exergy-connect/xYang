@@ -27,8 +27,16 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "patternProperties": {
+        "^@[A-Za-z]+$": true,
+        "^\\$[A-Za-z]+$": true
+      }
     }
   },
-  "additionalProperties": false
+  "additionalProperties": false,
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
+  }
 }

@@ -66,6 +66,8 @@ def validate(
     features: Mapping[str, Iterable[str]] | None = None,
     include_path: Iterable[str | Path] = (),
     native_json: bool = False,
+    allow_jsonld: bool = True,
+    allow_json_schema: bool = True,
     rpc: str | None = None,
     action: str | None = None,
     direction: str = "input",
@@ -95,5 +97,5 @@ def validate(
     else:
         raise TypeError(f"schema must be a path or YangModule, got {type(schema).__name__}")
     return YangValidator(module, enabled_features_by_module=enabled).validate_detailed(
-        data, native_json=native_json, rpc=rpc, action=action, direction=direction, context=context
+        data, native_json=native_json, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, rpc=rpc, action=action, direction=direction, context=context
     )

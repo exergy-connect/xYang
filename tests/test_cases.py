@@ -99,6 +99,9 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, 
             cmd.append("--output")
         if context_path:
             cmd += ["--context", context_path]
+        for field, flag in [("allow_jsonld", "--no-jsonld"), ("allow_json_schema", "--no-json-schema-annotations")]:
+            if operation.get(field) is False:
+                cmd.append(flag)
         cmd += ["--include-path", str(case_dir), "--features", json.dumps(case.get("features"))]
         try:
             proc = subprocess.run(cmd, capture_output=True, text=True, check=False)
@@ -122,7 +125,7 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, 
         parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
-    options = {key: operation[key] for key in ("rpc", "action", "direction", "context") if key in operation}
+    options = {key: operation[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema") if key in operation}
     try:
         result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
             data, native_json=native_json, **options
@@ -159,7 +162,7 @@ def test_case(case_dir, case, inst, impl, form):
             assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
-    operation = {key: inst[key] for key in ("rpc", "action", "direction", "context") if key in inst}
+    operation = {key: inst[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema") if key in inst}
     native = inst.get("encoding") == "native"
     if inst.get("usage_error"):
         with pytest.raises(UsageError) as excinfo:

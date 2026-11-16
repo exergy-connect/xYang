@@ -1,0 +1,255 @@
+{
+  "description": "JSON-LD and JSON Schema annotations are opaque by default, with independent opt-outs (#225).",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "both families by default at every depth",
+      "data": {
+        "name": "ok",
+        "@context": {
+          "name": "https://example.invalid/name"
+        },
+        "$schema": "urn:m",
+        "top": {
+          "@id": {
+            "opaque": true
+          },
+          "$comment": null,
+          "items": [
+            {
+              "id": "a",
+              "@type": [
+                "Item"
+              ],
+              "$id": 7
+            }
+          ]
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "JSON-LD disabled",
+      "data": {
+        "name": "ok",
+        "@context": {
+          "name": "https://example.invalid/name"
+        },
+        "$schema": "urn:m",
+        "top": {
+          "@id": {
+            "opaque": true
+          },
+          "$comment": null,
+          "items": [
+            {
+              "id": "a",
+              "@type": [
+                "Item"
+              ],
+              "$id": 7
+            }
+          ]
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/@context",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/@id",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/items/0/@type",
+          "code": "unknown-field"
+        }
+      ],
+      "allow_jsonld": false
+    },
+    {
+      "name": "JSON Schema disabled",
+      "data": {
+        "name": "ok",
+        "@context": {
+          "name": "https://example.invalid/name"
+        },
+        "$schema": "urn:m",
+        "top": {
+          "@id": {
+            "opaque": true
+          },
+          "$comment": null,
+          "items": [
+            {
+              "id": "a",
+              "@type": [
+                "Item"
+              ],
+              "$id": 7
+            }
+          ]
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/$schema",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/$comment",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/items/0/$id",
+          "code": "unknown-field"
+        }
+      ],
+      "allow_json_schema": false
+    },
+    {
+      "name": "both families disabled",
+      "data": {
+        "name": "ok",
+        "@context": {
+          "name": "https://example.invalid/name"
+        },
+        "$schema": "urn:m",
+        "top": {
+          "@id": {
+            "opaque": true
+          },
+          "$comment": null,
+          "items": [
+            {
+              "id": "a",
+              "@type": [
+                "Item"
+              ],
+              "$id": 7
+            }
+          ]
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/@context",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/@id",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/items/0/@type",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/$schema",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/$comment",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/top/items/0/$id",
+          "code": "unknown-field"
+        }
+      ],
+      "allow_jsonld": false,
+      "allow_json_schema": false
+    },
+    {
+      "name": "future alphabetic keywords",
+      "data": {
+        "name": "ok",
+        "@Future": {},
+        "$Future": [
+          null
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "nonalphabetic names remain unknown",
+      "data": {
+        "name": "ok",
+        "@1": null,
+        "@-x": null,
+        "$9": null,
+        "$-x": null
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/@1",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/@-x",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/$9",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/$-x",
+          "code": "unknown-field"
+        }
+      ]
+    },
+    {
+      "name": "ordinary schema words are not annotations",
+      "data": {
+        "name": "ok",
+        "title": "no",
+        "description": "no"
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/title",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/description",
+          "code": "unknown-field"
+        }
+      ]
+    },
+    {
+      "name": "annotations do not wrap or supply model data",
+      "data": {
+        "@graph": {
+          "name": "ok"
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/name",
+          "code": "mandatory"
+        }
+      ]
+    },
+    {
+      "name": "annotations on operation envelope and parameters",
+      "data": {
+        "@context": {},
+        "m:input": {
+          "name": "ok",
+          "@id": "urn:input",
+          "$comment": "opaque"
+        }
+      },
+      "valid": true,
+      "rpc": "ping"
+    }
+  ]
+}

@@ -75,5 +75,9 @@
         "name": "code"
       }
     }
+  },
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
   }
 }

@@ -106,6 +106,7 @@ pub const DocumentValidator = struct {
     /// not a `YangModule`): every `if-feature` holds. Defaults still resolve against
     /// the containing module, like Python's `_typedef_module`.
     module_root: bool = true,
+    annotations: @import("../encoding/annotations.zig").Options = .{},
 
     fn add(self: *DocumentValidator, path: []const u8, pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
         try self.errors.append(self.a, .{ .path = path, .pointer = pointer, .code = code, .message = message });
@@ -441,7 +442,7 @@ pub const DocumentValidator = struct {
             try self.visitStmt(s, obj, path, child_enforce, parent);
         }
         for (obj.keys()) |key| {
-            if (visited.contains(key)) continue;
+            if (visited.contains(key) or @import("../encoding/annotations.zig").isAnnotation(key, self.annotations)) continue;
             try self.add(try path.child(key), try path.childPointer(key), "unknown-field", try self.a.print("Unknown field '{s}'", .{key}));
         }
     }

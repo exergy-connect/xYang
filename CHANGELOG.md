@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Accept opaque JSON-LD and JSON Schema annotation families at every instance object by default; add independent API and CLI opt-outs and matching `patternProperties` in exported object schemas ([#225](https://github.com/exergy-connect/xYang/issues/225)).
+
 - Optional schema resource ID for JSON Schema export (`schema_id` / `schemaId`, CLI `convert --schema-id`); the YANG namespace remains unchanged ([#227](https://github.com/exergy-connect/xYang/issues/227)).
 
 ### Fixed
