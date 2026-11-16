@@ -6,7 +6,7 @@ import { parseYangFile, YangParser } from "./parser";
 import { ValidatorExtension } from "./validator/validator-extension";
 import { YangValidator } from "./validator/yang-validator";
 import type { ValidateCallOptions, ValidationIssue } from "./validator/yang-validator";
-import { generateJsonSchema } from "./json";
+import { generateJsonSchema, generateJsonldContext, generateJsonldVocab } from "./json";
 import { YangExportError } from "./core/errors";
 import {
   CliUsageError,
@@ -189,7 +189,7 @@ function main(argv: string[]): number {
     const module = new YangParser({ expandUses: false, includePath: includePaths }).parseFile(file);
     let schema: Record<string, unknown>;
     try {
-      schema = generateJsonSchema(module, options);
+      schema = options.jsonld ? generateJsonldContext(module) : options.jsonldVocab ? generateJsonldVocab(module) : generateJsonSchema(module, options);
     } catch (error) {
       if (!(error instanceof YangExportError)) {
         throw error;

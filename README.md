@@ -512,3 +512,5 @@ Pin `version` to a release tag that published the `xyang-ts.mjs` asset. v1.0.0 i
 ## License
 
 MIT License
+
+JSON-LD 1.1 contexts and vocabularies are available through `generate_jsonld_context` / `generate_jsonld_vocab` (TypeScript: `generateJsonldContext` / `generateJsonldVocab`), or `convert --jsonld` / `--jsonld-vocab`. See the [extension module and reproducible example](examples/jsonld/README.md). Use `convert --help` for output paths and options.

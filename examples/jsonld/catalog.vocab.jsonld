@@ -1,0 +1,54 @@
+{
+  "@context": {
+    "@version": 1.1,
+    "schema": "https://schema.org/",
+    "rdf": "http://www.w3.org/1999/02/22-rdf-syntax-ns#",
+    "rdfs": "http://www.w3.org/2000/01/rdf-schema#",
+    "skos": "http://www.w3.org/2004/02/skos/core#",
+    "wd": "http://www.wikidata.org/entity/"
+  },
+  "@graph": [
+    {
+      "@id": "https://example.invalid/catalog#resistance",
+      "@type": "rdf:Property",
+      "rdfs:label": "resistance",
+      "schema:unitCode": "OHM"
+    },
+    {
+      "@id": "https://schema.org/hasPart",
+      "@type": "rdf:Property",
+      "rdfs:label": "series",
+      "rdfs:range": {
+        "@id": "https://schema.org/ProductModel"
+      },
+      "skos:closeMatch": [
+        {
+          "@id": "http://www.wikidata.org/entity/Q1094444"
+        }
+      ]
+    },
+    {
+      "@id": "https://schema.org/model",
+      "@type": "rdf:Property",
+      "rdfs:label": "name"
+    },
+    {
+      "@id": "https://schema.org/name",
+      "@type": "rdf:Property",
+      "rdfs:label": "name"
+    },
+    {
+      "@id": "https://schema.org/seller",
+      "@type": "rdf:Property",
+      "rdfs:label": "seller",
+      "rdfs:range": {
+        "@id": "https://schema.org/Organization"
+      }
+    },
+    {
+      "@id": "https://schema.org/url",
+      "@type": "rdf:Property",
+      "rdfs:label": "url"
+    }
+  ]
+}

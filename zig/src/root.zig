@@ -21,6 +21,7 @@ pub const xpath = @import("xpath/xpath.zig");
 pub const yang_validator = @import("validator/yang_validator.zig");
 pub const YangValidator = yang_validator.YangValidator;
 pub const operation = @import("validator/operation.zig");
+pub const jsonld = @import("json/jsonld.zig");
 pub const json_generator = @import("json/generator.zig");
 pub const json_parser = @import("json/parser.zig");
 pub const schema_keys = @import("json/schema_keys.zig");

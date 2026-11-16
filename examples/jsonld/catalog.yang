@@ -1,0 +1,20 @@
+module catalog {
+  yang-version 1.1;
+  namespace "https://example.invalid/catalog#";
+  prefix c;
+  import xyang-jsonld { prefix jl; }
+  container seller {
+    jl:iri "schema:seller";
+    jl:class "schema:Organization";
+    leaf name { type string; jl:iri "schema:name"; }
+    leaf url { type string; jl:iri "schema:url"; jl:iri-value; }
+  }
+  list series {
+    key name;
+    jl:iri "schema:hasPart";
+    jl:class "schema:ProductModel";
+    jl:close-match "wd:Q1094444";
+    leaf name { type string; jl:iri "schema:model"; }
+    leaf resistance { type decimal64 { fraction-digits 3; } units "ohm"; jl:unit-code "OHM"; }
+  }
+}

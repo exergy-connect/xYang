@@ -728,6 +728,27 @@ def convert_path_failures() -> tuple[int, list[str]]:
     return same, failures
 
 
+def jsonld_failures() -> tuple[int, list[str]]:
+    """JSON-LD projections and exact/default output names match in Python and Zig."""
+    failures = []
+    same = 0
+    with tempfile.TemporaryDirectory() as tmp:
+        base = Path(tmp)
+        for source in (ROOT / "examples/jsonld").glob("*.yang"):
+            (base / source.name).write_text(source.read_text())
+        source = base / "catalog.yang"
+        for kind, flag in [("context", "--jsonld"), ("vocab", "--jsonld-vocab")]:
+            for explicit in (False, True):
+                target = base / (f"custom-{kind}.jsonld" if explicit else f"catalog.{kind}.jsonld")
+                args = [flag, str(source), *(["-o", str(target)] if explicit else [])]
+                py, zg = convert_pair(args, target)
+                if py == zg and py[0] == 0:
+                    same += 1
+                else:
+                    failures.append(f"JSON-LD {kind} (explicit={explicit}) differs: python {py[:3]}, zig {zg[:3]}")
+    return same, failures
+
+
 def _module_tree(mod) -> dict:
     return {
         "name": mod.name,
@@ -855,6 +876,8 @@ def main() -> int:
             continue
         failures.append(f"{rel}: results differ\n  python: {py}\n  zig:    {zg}")
 
+    jsonld_same, jsonld_diffs = jsonld_failures()
+    failures.extend(jsonld_diffs)
     failures.extend(resolution_failures())
     trees, tree_diffs = tree_failures()
     failures.extend(tree_diffs)
@@ -890,7 +913,7 @@ def main() -> int:
         f"{xpath_same} XPath scenarios identical; "
         f"{operation_same} operation and structure scenarios identical; "
         f"{converted} conversions byte-identical, {convert_divergent} meeting a case Python xfails, "
-        f"{path_same} output path scenarios identical; "
+        f"{path_same} output path scenarios identical; {jsonld_same} JSON-LD exports identical; "
         f"{reload_same} reload and regenerate scenarios identical, {round_trips} forms with "
         f"generate(parse(json)) == json; {reloaded_same} validate runs against reloaded forms identical; "
         f"{len(failures)} failure(s)"

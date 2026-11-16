@@ -11,6 +11,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
+- JSON-LD context and vocabulary exports (`generate_jsonld_context` / `generate_jsonld_vocab`, TypeScript camelCase equivalents, CLI `convert --jsonld` / `--jsonld-vocab`), with scoped terms, portable `xyang-jsonld` extensions, and schema.org/Wikidata/unit compatibility mappings. Includes a reproducible example and Linked Data expansion tests ([#229](https://github.com/exergy-connect/xYang/issues/229)).
+
 - Native numeric JSON Schema export (`native_json=True` / `nativeJson: true`, CLI `convert --native-json`): emit int64/uint64 integers and decimal64 numbers with bounds, disjoint ranges, and fraction-digit `multipleOf`; retain `x-yang` type metadata for round trips ([#226](https://github.com/exergy-connect/xYang/issues/226)).
 
 - Accept opaque JSON-LD and JSON Schema annotation families at every instance object by default; add independent API and CLI opt-outs and matching `patternProperties` in exported object schemas ([#225](https://github.com/exergy-connect/xYang/issues/225)).
