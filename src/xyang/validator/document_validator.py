@@ -800,6 +800,14 @@ class DocumentValidator:
                     index=i,
                     pointer_name=json_name,
                 )
+                for key in key_names:
+                    if key not in entry:
+                        self._add(
+                            path=f"{path.current()}/{key}",
+                            pointer=f"{path.pointer()}/{key}",
+                            code="mandatory",
+                            message=f"Missing list key '{key}'",
+                        )
                 entry_node = Node(entry, stmt, parent_node)
                 entry_ctx = curr_ctx.child(entry_node)
                 if self._constraint_checks:
@@ -1093,6 +1101,8 @@ class DocumentValidator:
         seen_keys: dict[tuple, int] = {}
         for i, entry in enumerate(val):
             if not isinstance(entry, dict):
+                continue
+            if any(k not in entry for k in key_names):
                 continue
             key_tuple = tuple(entry.get(k) for k in key_names)
             if key_tuple in seen_keys:

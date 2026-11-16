@@ -724,6 +724,21 @@ fn bound(p: *Parse, schema: *const Object, key: []const u8) Error!?i64 {
     return std.math.cast(i64, n) orelse p.fail("{s} {d} is out of range", .{ key, n });
 }
 
+// Key requirements in JSON Schema do not imply an explicit YANG mandatory.
+fn explicitKeyMandatory(items: *const Object, name: []const u8) bool {
+    if (items.get(K.PROPERTIES)) |props| if (props == .object) {
+        if (props.object.get(name)) |prop| if (prop == .object) {
+            if (prop.object.get(K.X_YANG)) |xy| if (xy == .object) {
+                if (xy.object.get(K.xy.MANDATORY)) |m| return m == .bool and m.bool;
+            };
+        };
+    };
+    if (items.get(K.ONE_OF)) |branches| if (branches == .array) {
+        for (branches.array) |branch| if (branch == .object and explicitKeyMandatory(branch.object, name)) return true;
+    };
+    return false;
+}
+
 fn convertList(p: *Parse, name: []const u8, schema: *const Object, xy: *const Object, defs: *const Object, parent_path: []const u8, musts: std.ArrayList(*ast.MustStmt)) Error!*Statement {
     const saved_context = p.context;
     defer p.context = saved_context;
@@ -748,6 +763,14 @@ fn convertList(p: *Parse, name: []const u8, schema: *const Object, xy: *const Ob
         if (k != .string) return p.fail("x-yang 'key' at {s} must be a string, got {f}", .{ item_base, jv.pyRepr(k) });
         l.data.list.key = k.string;
     };
+    if (l.data.list.key) |keys| {
+        var it = std.mem.tokenizeAny(u8, keys, &std.ascii.whitespace);
+        while (it.next()) |k| {
+            for (children.items) |child| {
+                if (child.kind() == .leaf and std.mem.eql(u8, child.name, k)) child.data.leaf.mandatory = explicitKeyMandatory(items, k);
+            }
+        }
+    }
     l.statements = children;
     l.must_statements = musts;
     l.data.list.unique = try uniqueOf(p, xy, item_base);

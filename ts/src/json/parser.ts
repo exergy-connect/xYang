@@ -942,12 +942,12 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
     ? resolvedItems.required.filter((x): x is string => typeof x === "string")
     : [];
   for (const ch of children) {
-    if (typeof ch.name === "string" && itemReq.includes(ch.name)) {
+    if (typeof ch.name === "string" && itemReq.includes(ch.name) && !(typeof xy.key === "string" && xy.key.split(/\s+/).includes(ch.name))) {
       ch.mandatory = true;
     }
   }
   const itemXy = asRecord(resolvedItems[YANG_SCHEMA_KEYS.xYang]);
-  const itemChoice = itemXy.choice;
+  const itemChoice = xy.choice ?? itemXy.choice;
   if (itemChoice && typeof itemChoice === "object") {
     const ch = asRecord(itemChoice);
     const branches = extractChoiceBranches(resolvedItems);
@@ -978,10 +978,20 @@ function parseList(name: string, schema: Record<string, unknown>, defs: Record<s
       children.push(choiceStmt);
     }
   }
+  out.statements = children;
   attachInvocations(out, xy);
   out.description = descriptionOrEmpty(schema.description);
   if (when) {
     out.when = when;
+  }
+  for (const child of children) {
+    if (child.keyword === YangTokenType.LEAF && typeof xy.key === "string" && xy.key.split(/\s+/).includes(child.name ?? "")) {
+      const shapes = [resolvedItems, ...((resolvedItems.oneOf as Record<string, unknown>[]) ?? [])];
+      child.mandatory = shapes.some((shape) => {
+        const prop = asRecord(asRecord(shape.properties)[child.name ?? ""]);
+        return asRecord(prop[YANG_SCHEMA_KEYS.xYang]).mandatory === true;
+      });
+    }
   }
   setConfigFromXyang(out, xy);
   return out;

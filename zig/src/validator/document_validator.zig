@@ -561,6 +561,9 @@ pub const DocumentValidator = struct {
                 if (entry != .object) continue;
                 try path.push(name, try self.entryKey(entry.object, key_names), i, json_name);
                 defer path.pop();
+                for (key_names) |k| {
+                    if (!entry.object.contains(k)) try self.add(try self.a.print("{s}/{s}", .{ try path.current(), k }), try self.a.print("{s}/{s}", .{ try path.pointer(), k }), "mandatory", try self.a.print("Missing list key '{s}'", .{k}));
+                }
                 const entry_node = try xpath.node.newNode(self.a, entry, .{ .stmt = s }, parent);
                 try self.checkMust(s, entry_node, try path.current(), try path.pointer());
                 try self.visitChildren(entry, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), entry_node);
@@ -724,6 +727,14 @@ pub const DocumentValidator = struct {
         var seen: std.StringHashMapUnmanaged(usize) = .empty;
         for (entries, 0..) |entry, i| {
             if (entry != .object) continue;
+            var missing = false;
+            for (key_names) |k| {
+                if (!entry.object.contains(k)) {
+                    missing = true;
+                    break;
+                }
+            }
+            if (missing) continue;
             var parts: std.ArrayList([]const u8) = .empty;
             for (key_names) |k| try parts.append(self.a, try self.hashKey(entry.object.get(k) orelse .null));
             const token = try std.mem.join(self.a, "\x00", parts.items);
