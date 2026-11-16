@@ -607,10 +607,18 @@ def _convert_list(
                 child_val,
                 defs,
                 f"{parent_path}/{name}/{child_name}",
-                mandatory_override=child_name in item_required,
+                mandatory_override=None if child_name in (key or "").split() else child_name in item_required,
             )
             if child is not None:
                 child_statements.append(child)
+    # Key presence is implicit, not an explicit mandatory statement (RFC 7950 §7.8.2).
+    for child in child_statements:
+        if isinstance(child, YangLeafStmt) and child.name in (key or "").split():
+            shapes = [items, *(items.get(JsonSchemaKey.ONE_OF) or [])]
+            child.mandatory = any(
+                shape.get(JsonSchemaKey.PROPERTIES, {}).get(child.name, {}).get("x-yang", {}).get("mandatory") is True
+                for shape in shapes
+            )
     lst = YangListStmt(name=name, description=description, key=key, statements=child_statements)
     lst.must_statements = must_list
     lst.unique = _unique_from_xyang(xyang, f"{parent_path}/{name}")

@@ -968,7 +968,9 @@ def _child_property_map(
         child_prop = _statement_to_property(child, typedef_names, module, parent=parent)
         if child_prop is not None:
             props[_property_key(child, module)] = child_prop
-            if _mandatory_schema_child(child):
+            if _mandatory_schema_child(child) or (
+                isinstance(parent, YangListStmt) and child.name in (parent.key or "").split()
+            ):
                 required.append(_property_key(child, module))
     return props, required
 

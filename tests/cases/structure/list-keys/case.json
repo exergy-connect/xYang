@@ -1,5 +1,5 @@
 {
-  "description": "List keys must be unique (single and composite keys); errors inside entries point at the entry by position.",
+  "description": "List keys must be unique (single and composite keys); errors inside entries point at the entry by position. Key leaves are implicitly mandatory (#224).",
   "module": "m.yang",
   "instances": [
     { "name": "unique keys", "data": { "top": { "items": [{ "id": "a", "v": 1 }, { "id": "b", "v": 2 }],
@@ -11,6 +11,11 @@
     { "name": "error in second entry", "data": { "top": { "items": [{ "id": "a", "v": 1 }, { "id": "b", "v": 20 }] } },
       "valid": false, "errors": [{ "path": "/top/items/1/v", "code": "range" }] },
     { "name": "duplicate key does not hide entry errors", "data": { "top": { "items": [{ "id": "a", "v": 20 }, { "id": "a", "v": 1 }] } },
-      "valid": false, "errors": [{ "path": "/top/items", "code": "duplicate-key" }, { "path": "/top/items/0/v", "code": "range" }] }
+      "valid": false, "errors": [{ "path": "/top/items", "code": "duplicate-key" }, { "path": "/top/items/0/v", "code": "range" }] },
+    {"name": "missing key", "data": {"top": {"items": [{"v": 1}]}}, "valid": false, "errors": [{"path": "/top/items/0/id", "code": "mandatory"}]},
+    {"name": "two missing keys", "data": {"top": {"items": [{}, {}]}}, "valid": false, "errors": [{"path": "/top/items/0/id", "code": "mandatory"}, {"path": "/top/items/1/id", "code": "mandatory"}]},
+    {"name": "missing composite component", "data": {"top": {"pairs": [{"a": "x"}]}}, "valid": false, "errors": [{"path": "/top/pairs/0/b", "code": "mandatory"}]},
+    {"name": "all composite components missing", "data": {"top": {"pairs": [{}]}}, "valid": false, "errors": [{"path": "/top/pairs/0/a", "code": "mandatory"}, {"path": "/top/pairs/0/b", "code": "mandatory"}]},
+    {"name": "empty list", "data": {"top": {"items": []}}, "valid": true}
   ]
 }

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Require list key leaves in instance validation and exported JSON Schema, while preserving their implicit requirement in native JSON round trips ([#224](https://github.com/exergy-connect/xYang/issues/224)).
+
 ## [1.0.3] — 2026-11-14
 
 ### Added

@@ -734,7 +734,8 @@ function buildSoleChoiceObjectSchema(
   others: YangStatement[],
   soleChoice: YangStatement,
   module: YangModule,
-  typedefNames: Set<string>
+  typedefNames: Set<string>,
+  keyNames: string[] = []
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
@@ -745,7 +746,7 @@ function buildSoleChoiceObjectSchema(
     properties[propertyKey(child, module)] = statementToSchema(child, module, typedefNames);
     if (
       hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
-      child.mandatory === true
+      (child.mandatory === true || keyNames.includes(child.name ?? ""))
     ) {
       required.push(propertyKey(child, module));
     }
@@ -800,7 +801,8 @@ function rpcToJson(
 function buildMultiChildObjectSchema(
   statements: YangStatement[],
   module: YangModule,
-  typedefNames: Set<string>
+  typedefNames: Set<string>,
+  keyNames: string[] = []
 ): Record<string, unknown> {
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
@@ -818,7 +820,7 @@ function buildMultiChildObjectSchema(
     properties[propertyKey(child, module)] = statementToSchema(child, module, typedefNames);
     if (
       hasTokenType(child.keyword ?? "", [YangTokenType.LEAF, YangTokenType.ANYDATA, YangTokenType.ANYXML]) &&
-      child.mandatory === true
+      (child.mandatory === true || keyNames.includes(child.name ?? ""))
     ) {
       required.push(propertyKey(child, module));
     }
@@ -969,9 +971,10 @@ function statementToSchemaBody(
     if (Array.isArray(unique) && unique.length > 0) {
       listXY.unique = (unique as string[][]).map((paths) => [...paths]);
     }
+    const keys = typeof stmt.key === "string" ? stmt.key.trim().split(/\s+/).filter(Boolean) : [];
     const itemSchema = soleChoice
-      ? buildSoleChoiceObjectSchema(others, soleChoice, module, typedefNames)
-      : buildMultiChildObjectSchema(stmt.statements, module, typedefNames);
+      ? buildSoleChoiceObjectSchema(others, soleChoice, module, typedefNames, keys)
+      : buildMultiChildObjectSchema(stmt.statements, module, typedefNames, keys);
     const out: Record<string, unknown> = {
       type: JSON_TYPE_ARRAY,
       items: itemSchema,

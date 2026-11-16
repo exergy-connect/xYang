@@ -499,6 +499,11 @@ export class DocumentValidator {
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
         }
         const row = item as Record<string, unknown>;
+        for (const key of keyNames) {
+          if (!(key in row)) {
+            errors.push(issue(`${path}[${i}]/${key}`, "mandatory", `Missing list key '${key}'`));
+          }
+        }
         for (const child of stmt.statements) {
           const childKw = this.effectiveKeyword(child);
           if (childKw === YangTokenType.CHOICE) {
@@ -870,6 +875,7 @@ export class DocumentValidator {
         continue;
       }
       const row = entry as Record<string, unknown>;
+      if (keyNames.some((k) => !(k in row))) continue;
       const keyTuple = keyNames.map((k) => row[k]);
       const keyStr = JSON.stringify(keyTuple);
       if (seenKeys.has(keyStr)) {

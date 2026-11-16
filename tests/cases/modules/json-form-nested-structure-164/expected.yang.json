@@ -61,7 +61,10 @@
                         }
                       }
                     },
-                    "additionalProperties": false
+                    "additionalProperties": false,
+                    "required": [
+                      "id"
+                    ]
                   },
                   "x-yang": {
                     "type": "list",

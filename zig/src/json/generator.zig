@@ -847,7 +847,17 @@ fn childPropertyMap(g: *Gen, children: []const *Statement, names: *const Names, 
         const prop = try statementToProperty(g, child, names, module, parent) orelse continue;
         const key = try propertyKey(g.a, child, module);
         try out.props.put(g.a, key, prop);
-        if (mandatorySchemaChild(child)) try out.required.append(g.a, key);
+        var is_key = false;
+        if (parent == .stmt and parent.stmt.kind() == .list) {
+            var it = std.mem.tokenizeAny(u8, parent.stmt.data.list.key orelse "", &std.ascii.whitespace);
+            while (it.next()) |k| {
+                if (std.mem.eql(u8, k, child.name)) {
+                    is_key = true;
+                    break;
+                }
+            }
+        }
+        if (mandatorySchemaChild(child) or is_key) try out.required.append(g.a, key);
     }
     return out;
 }

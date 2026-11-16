@@ -38,7 +38,10 @@
                 }
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ]
           },
           "description": "Router, switch, or end host in the lab.",
           "x-yang": {
@@ -74,7 +77,10 @@
                 }
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ]
           },
           "description": "Layer-3 or layer-2 edge between two nodes.",
           "x-yang": {
@@ -109,7 +115,10 @@
                 }
               }
             },
-            "additionalProperties": false
+            "additionalProperties": false,
+            "required": [
+              "name"
+            ]
           },
           "description": "Service or workload pinned to a node via instance-identifier (absolute path).",
           "x-yang": {

@@ -169,7 +169,10 @@
                     }
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "required": [
+                  "id"
+                ]
               },
               "x-yang": {
                 "type": "list",
@@ -240,7 +243,10 @@
                     }
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "required": [
+                  "id"
+                ]
               },
               "x-yang": {
                 "type": "list",
@@ -328,7 +334,10 @@
                     }
                   }
                 },
-                "additionalProperties": false
+                "additionalProperties": false,
+                "required": [
+                  "id"
+                ]
               },
               "x-yang": {
                 "type": "list",
