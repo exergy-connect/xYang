@@ -976,7 +976,7 @@ def _convert_property_local(
         node_type = "leaf"
     if node_type == XYangTypeValue.INSTANCE_IDENTIFIER:
         node_type = "leaf"
-    if is_string_number(node_type) and schema.get(JsonSchemaKey.TYPE) == "string":
+    if is_string_number(node_type) and schema.get(JsonSchemaKey.TYPE) in ("string", "integer", "number"):
         node_type = "leaf"
     must_list = _build_must_list(xyang) if node_type in (
         "leaf",

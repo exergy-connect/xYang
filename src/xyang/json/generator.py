@@ -1711,7 +1711,7 @@ def _apply_own_deviations(schema_module: YangModule) -> None:
 
 
 def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
-                         allow_jsonld: bool = True, allow_json_schema: bool = True) -> dict[str, Any]:
+                         allow_jsonld: bool = True, allow_json_schema: bool = True, native_json: bool = False) -> dict[str, Any]:
     """
     Build a JSON Schema dict from a YangModule AST.
 
@@ -1721,7 +1721,9 @@ def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
     """
     from ..typedef_scope import EXPORT_TYPEDEFS, scoped_export_catalog
 
+    from ..types.registry import NATIVE_EXPORT
     scope_token = EXPORT_TYPEDEFS.set(scoped_export_catalog(module))
+    native_token = NATIVE_EXPORT.set(native_json)
     export = _IdentityExport(root=module)
     token = _EXPORT.set(export)
     ext_token = _EXT_USED.set(_ExtensionUse(root=module))
@@ -1733,6 +1735,7 @@ def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
         annotate_schema(schema, allow_jsonld, allow_json_schema)
         return schema
     finally:
+        NATIVE_EXPORT.reset(native_token)
         EXPORT_TYPEDEFS.reset(scope_token)
         _EXPORT.reset(token)
         _EXT_USED.reset(ext_token)
@@ -1830,6 +1833,7 @@ def schema_to_yang_json(
     schema_id: str | None = None,
     allow_jsonld: bool = True,
     allow_json_schema: bool = True,
+    native_json: bool = False,
 ) -> str:
     """
     Serialize YangModule to JSON Schema string (and optionally write to file).
@@ -1843,7 +1847,7 @@ def schema_to_yang_json(
     Returns:
         JSON string of the schema.
     """
-    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema)
+    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, native_json=native_json)
     text = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
     if output_path is not None:
         path = Path(output_path)

@@ -55,6 +55,8 @@ _SchemaFn = Callable[["Builtin", YangTypeStmt], dict[str, Any]]
 _ParseFn = Callable[["Builtin", "SchemaFragment"], YangTypeStmt | None]
 _CheckFn = Callable[["Builtin", Any, YangTypeStmt], TypeIssue | None]
 
+NATIVE_EXPORT: contextvars.ContextVar[bool] = contextvars.ContextVar("xyang_native_export", default=False)
+
 _EMIT: contextvars.ContextVar[tuple[Any, Any, Any]] = contextvars.ContextVar("xyang_builtin_emit")
 
 
@@ -262,7 +264,42 @@ def _to_boolean(_builtin: Builtin, _type_stmt: YangTypeStmt) -> dict[str, Any]:
     return {JsonSchemaKey.TYPE: "boolean"}
 
 
+def _native_numeric(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
+    from decimal import Decimal
+    decimal = builtin.name == DECIMAL64
+    fd = getattr(type_stmt, "fraction_digits", None)
+    if decimal and fd is None:
+        raise YangExportError("native decimal64 export requires fraction-digits")
+    scale = Decimal(10) ** fd if decimal else 1
+    lo, hi = ((Decimal(-(2**63)) / scale, Decimal(2**63 - 1) / scale) if decimal else builtin.bounds)
+    numeric = (lambda value: float(Decimal(value))) if decimal else int
+    out = {"type": "number" if decimal else "integer"}
+    xy = {"type": builtin.name}
+    if decimal:
+        xy["fraction-digits"] = fd
+        out["multipleOf"] = float(Decimal(1) / scale)
+    rng = getattr(type_stmt, "range", None)
+    if rng:
+        xy["range"] = rng
+    bounds = []
+    for part in (rng or "min..max").split("|"):
+        ends = [s.strip() for s in part.strip().split("..")]
+        if len(ends) == 1:
+            ends *= 2
+        def bound(text):
+            return numeric(lo if text == "min" else hi if text == "max" else text)
+        bounds.append({"minimum": bound(ends[0]), "maximum": bound(ends[1])})
+    if len(bounds) == 1:
+        out.update(bounds[0])
+    else:
+        out["anyOf"] = bounds
+    out["x-yang"] = xy
+    return out
+
+
 def _to_integer(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
+    if NATIVE_EXPORT.get() and builtin.json_encoding == "string-number":
+        return _native_numeric(builtin, type_stmt)
     if builtin.json_encoding == "string-number":
         out: dict[str, Any] = {
             JsonSchemaKey.TYPE: "string",
@@ -283,6 +320,8 @@ def _to_integer(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
 
 
 def _to_decimal(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
+    if NATIVE_EXPORT.get():
+        return _native_numeric(builtin, type_stmt)
     out: dict[str, Any] = {
         JsonSchemaKey.TYPE: "string",
         JsonSchemaKey.PATTERN: builtin.pattern,
@@ -393,7 +432,7 @@ def _from_number_integer(builtin: Builtin, fragment: SchemaFragment) -> YangType
 
 
 def _from_quoted_integer(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
-    if fragment.schema.get(JsonSchemaKey.TYPE) != "string":
+    if fragment.schema.get(JsonSchemaKey.TYPE) not in ("string", "integer"):
         return None
     if fragment.xyang.get(XYangKey.TYPE) != builtin.name:
         return None
@@ -408,7 +447,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
     schema = fragment.schema
     xyang = fragment.xyang
     kind = schema.get(JsonSchemaKey.TYPE)
-    if kind == "string" and xyang.get(XYangKey.TYPE) == DECIMAL64:
+    if kind in ("string", "number") and xyang.get(XYangKey.TYPE) == DECIMAL64:
         type_stmt = make_type_stmt(name=DECIMAL64)
         rng = xyang.get("range")
         if isinstance(rng, str) and rng:
@@ -1053,6 +1092,11 @@ def type_stmt_from_schema(
         typedef_name = _ref_to_typedef_name(ref) if isinstance(ref, str) else None
         if typedef_name:
             return make_type_stmt(name=typedef_name, context=xyang.get("type-context"))
+    if schema.get(JsonSchemaKey.TYPE) in ("integer", "number"):
+        for name in (INT64, UINT64, DECIMAL64):
+            parsed = REGISTRY[name].from_schema(fragment)
+            if parsed is not None:
+                return parsed
     parsed = REGISTRY[ENUMERATION].from_schema(fragment)
     if parsed is not None:
         return parsed

@@ -716,6 +716,7 @@ def convert_path_failures() -> tuple[int, list[str]]:
             ([str(yang), "--schema-id", "https://example.invalid/published.json", "-o", str(base / "published.json")], base / "published.json"),
             *[([str(yang), *flags, "-o", str(base / f"policy-{i}.json")], base / f"policy-{i}.json")
               for i, flags in enumerate([["--no-jsonld"], ["--no-json-schema-annotations"], ["--no-jsonld", "--no-json-schema-annotations"]])],
+            ([str(yang), "--native-json", "-o", str(base / "native.json")], base / "native.json"),
             ([str(base / "missing.yang")], base / "missing.yang.json"),
         ]
         for args, out_path in calls:

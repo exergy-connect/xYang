@@ -365,8 +365,51 @@ fn putRange(a: Allocator, xy: *Object, t: *const ast.TypeStmt) gen.Error!void {
     if (t.rangeRestriction().expression) |r| if (r.len > 0) try xy.put(a, K.xy.RANGE, gen.str(r));
 }
 
+fn numericBound(e: gen.Emit, text: []const u8, lo: Val, hi: Val, decimal: bool) gen.Error!Val {
+    if (std.mem.eql(u8, text, "min")) return lo;
+    if (std.mem.eql(u8, text, "max")) return hi;
+    if (decimal) return .{ .float = std.fmt.parseFloat(f64, text) catch return e.g.fail("Invalid native numeric bound '{s}'", .{text}) };
+    return .{ .int = std.fmt.parseInt(i128, text, 10) catch return e.g.fail("Invalid native numeric bound '{s}'", .{text}) };
+}
+
+fn nativeNumeric(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
+    const a = e.g.a;
+    const decimal = std.mem.eql(u8, b.name, DECIMAL64);
+    const fd = if (decimal) t.fractionDigits() orelse return e.g.fail("native decimal64 export requires fraction-digits", .{}) else 0;
+    const scale = std.math.pow(f64, 10, @floatFromInt(fd));
+    const lo: Val = if (decimal) .{ .float = -9223372036854775808.0 / scale } else .{ .int = b.bounds.?[0] };
+    const hi: Val = if (decimal) .{ .float = 9223372036854775807.0 / scale } else .{ .int = b.bounds.?[1] };
+    const out = try typeOnly(a, if (decimal) "number" else "integer");
+    const xy = try obj(a);
+    try xy.put(a, K.xy.TYPE, gen.str(b.name));
+    if (decimal) {
+        try xy.put(a, K.xy.FRACTION_DIGITS, .{ .int = fd });
+        try out.put(a, K.MULTIPLE_OF, .{ .float = std.math.pow(f64, 10, -@as(f64, @floatFromInt(fd))) });
+    }
+    try putRange(a, xy, t);
+    var parts = std.mem.splitScalar(u8, t.rangeRestriction().expression orelse "min..max", '|');
+    var bounds: std.ArrayList(Val) = .empty;
+    while (parts.next()) |part| {
+        var ends = std.mem.splitSequence(u8, std.mem.trim(u8, part, &std.ascii.whitespace), "..");
+        const first = std.mem.trim(u8, ends.next().?, &std.ascii.whitespace);
+        const second = std.mem.trim(u8, ends.next() orelse first, &std.ascii.whitespace);
+        const bound = try obj(a);
+        try bound.put(a, K.MINIMUM, try numericBound(e, first, lo, hi, decimal));
+        try bound.put(a, K.MAXIMUM, try numericBound(e, second, lo, hi, decimal));
+        try bounds.append(a, gen.objVal(bound));
+    }
+    if (bounds.items.len == 1) {
+        const bound = bounds.items[0].object;
+        try out.put(a, K.MINIMUM, bound.get(K.MINIMUM).?);
+        try out.put(a, K.MAXIMUM, bound.get(K.MAXIMUM).?);
+    } else try out.put(a, "anyOf", .{ .array = try bounds.toOwnedSlice(a) });
+    try out.put(a, K.X_YANG, gen.objVal(xy));
+    return out;
+}
+
 fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
+    if (e.g.native_json and b.json_encoding == .@"string-number") return nativeNumeric(e, b, t);
     if (b.json_encoding == .@"string-number") {
         const out = try typeOnly(a, "string");
         try out.put(a, K.PATTERN, gen.str(b.pattern.?));
@@ -384,6 +427,7 @@ fn toInteger(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*
 }
 
 fn toDecimal(e: gen.Emit, b: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
+    if (e.g.native_json) return nativeNumeric(e, b, t);
     const a = e.g.a;
     const out = try typeOnly(a, "string");
     try out.put(a, K.PATTERN, gen.str(b.pattern.?));
@@ -598,7 +642,7 @@ fn fromNumberInteger(p: *jparse.Parse, b: *const Builtin, f: Fragment) jparse.Er
 }
 
 fn fromQuotedInteger(p: *jparse.Parse, b: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
-    if (!isStr(f.schema.get(K.TYPE), "string")) return null;
+    if (!isStr(f.schema.get(K.TYPE), "string") and !isStr(f.schema.get(K.TYPE), "integer")) return null;
     if (!isStr(f.xyang.get(K.xy.TYPE), b.name)) return null;
     const t = try newType(p, b.name);
     if (f.xyang.get(K.xy.RANGE)) |r| if (r == .string and r.string.len > 0) {
@@ -609,7 +653,7 @@ fn fromQuotedInteger(p: *jparse.Parse, b: *const Builtin, f: Fragment) jparse.Er
 
 fn fromDecimal(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     const kind = f.schema.get(K.TYPE);
-    if (isStr(kind, "string") and isStr(f.xyang.get(K.xy.TYPE), DECIMAL64)) {
+    if ((isStr(kind, "string") or isStr(kind, "number")) and isStr(f.xyang.get(K.xy.TYPE), DECIMAL64)) {
         const t = try newType(p, DECIMAL64);
         if (f.xyang.get(K.xy.RANGE)) |r| if (r == .string and r.string.len > 0) {
             (try t.ensureRange(p.a)).expression = r.string;
@@ -808,6 +852,11 @@ pub fn typeStmtFromSchema(p: *jparse.Parse, defs: *const Object, schema: *const 
     if (schema.get(K.REF)) |ref| if (ref == .string and ref.string.len > 0) {
         if (try jparse.refToTypedefName(p, ref.string)) |name| if (name.len > 0) return try newType(p, name);
     };
+    if (isStr(schema.get(K.TYPE), "integer") or isStr(schema.get(K.TYPE), "number")) {
+        for ([_][]const u8{ INT64, UINT64, DECIMAL64 }) |n| {
+            if (try get(n).?.fromSchema(p, f)) |t| return t;
+        }
+    }
     if (try get(ENUMERATION).?.fromSchema(p, f)) |t| return t;
     if (try singletonEnumString(p, f)) |t| return t;
     const kind = schema.get(K.TYPE);
