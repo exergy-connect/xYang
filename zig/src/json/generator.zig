@@ -1515,7 +1515,7 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
 
 /// `generate_json_schema`: the module's native JSON form. On `error.Export` or
 /// `error.YangLoad`, `diag` holds the message.
-pub const Options = struct { schema_id: ?[]const u8 = null };
+pub const Options = struct { schema_id: ?[]const u8 = null, allow_jsonld: bool = true, allow_json_schema: bool = true };
 
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
     return generateWithOptions(a, module, diag, .{});
@@ -1595,6 +1595,7 @@ pub fn generateWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnost
     try root.put(a, K.ADDITIONAL_PROPERTIES, .{ .bool = false });
     if (defs.count() > 0) try root.put(a, K.DEFS, objVal(defs));
     if (options.schema_id) |id| try root.put(a, K.ID, str(id));
+    try @import("../encoding/annotations.zig").annotateSchema(a, objVal(root), .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema });
     return objVal(root);
 }
 
@@ -1679,7 +1680,11 @@ test "the native JSON form is Python's text" {
         \\          }
         \\        }
         \\      },
-        \\      "additionalProperties": false
+        \\      "additionalProperties": false,
+        \\      "patternProperties": {
+        \\        "^@[A-Za-z]+$": true,
+        \\        "^\\$[A-Za-z]+$": true
+        \\      }
         \\    }
         \\  },
         \\  "additionalProperties": false,
@@ -1694,6 +1699,10 @@ test "the native JSON form is Python's text" {
         \\        "bases": []
         \\      }
         \\    }
+        \\  },
+        \\  "patternProperties": {
+        \\    "^@[A-Za-z]+$": true,
+        \\    "^\\$[A-Za-z]+$": true
         \\  }
         \\}
         \\

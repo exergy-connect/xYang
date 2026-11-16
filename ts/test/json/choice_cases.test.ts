@@ -131,6 +131,6 @@ describe("python parity: json/test_choice_cases", () => {
     const opt = dmProps.opt_choice_container as Record<string, unknown>;
     expect(Array.isArray(opt.oneOf)).toBe(true);
     expect((opt.oneOf as unknown[]).length).toBe(3);
-    expect((opt.oneOf as Array<Record<string, unknown>>)[0]).toEqual({ type: "object", maxProperties: 0 });
+    expect((opt.oneOf as Array<Record<string, unknown>>)[0]).toEqual({ type: "object", properties: {}, additionalProperties: false, patternProperties: { "^@[A-Za-z]+$": true, "^\\$[A-Za-z]+$": true } });
   });
 });

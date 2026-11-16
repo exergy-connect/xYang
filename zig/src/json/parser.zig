@@ -509,10 +509,7 @@ fn propertySchemaAndXyang(p: *Parse, prop: *const Object, defs: *const Object) E
 }
 
 fn isEmptyBranch(v: Val) bool {
-    if (v != .object) return false;
-    const t = v.object.get(K.TYPE) orelse return false;
-    const mp = v.object.get(K.MAX_PROPERTIES) orelse return false;
-    return t == .string and std.mem.eql(u8, t.string, "object") and jv.pyEql(mp, .{ .int = 0 });
+    return @import("../encoding/annotations.zig").isEmptyChoiceBranch(v);
 }
 
 fn stringItems(a: Allocator, v: ?Val) error{OutOfMemory}![]const []const u8 {

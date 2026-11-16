@@ -1,3 +1,4 @@
+import { isAnnotation, type AnnotationOptions } from "../encoding/annotations";
 import { YangModule, YangStatement } from "../core/model";
 import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { modulePrefixResolver } from "../core/ast";
@@ -112,7 +113,7 @@ export type EnabledFeaturesByModule = Record<string, ReadonlySet<string>>;
 export type LeafTypeMode = "full" | "none";
 
 /** Per-document validation context (host module or an anydata payload shape module). */
-export type ValidationContext = {
+export type ValidationContext = AnnotationOptions & {
   module: YangModule;
   typeChecker: TypeChecker;
   constraintChecks: boolean;
@@ -181,13 +182,13 @@ export class DocumentValidator {
     this.rootCtx.anydataValidation = parseAnydataExtensionConfig(config);
   }
 
-  validate(data: unknown): [boolean, string[], string[]] {
-    const collected = this.collect(this.rootCtx, data);
+  validate(data: unknown, options: AnnotationOptions = {}): [boolean, string[], string[]] {
+    const collected = this.collect({ ...this.rootCtx, ...options }, data);
     return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
-  validateDetailed(data: unknown): DetailedValidationResult {
-    const collected = this.collect(this.rootCtx, data);
+  validateDetailed(data: unknown, options: AnnotationOptions = {}): DetailedValidationResult {
+    const collected = this.collect({ ...this.rootCtx, ...options }, data);
     return {
       valid: collected.errors.length === 0,
       errors: collected.errors.map(toPublicIssue),
@@ -201,14 +202,14 @@ export class DocumentValidator {
    * parameter object without the RFC 8040 wrapper, `rootData` the accessible tree's root object
    * (server data plus the operation node) and `operation` the operation node.
    */
-  validateOperationDetailed(input: OperationInput): DetailedValidationResult {
-    const errors = this.collectOperation(input);
+  validateOperationDetailed(input: OperationInput, options: AnnotationOptions = {}): DetailedValidationResult {
+    const errors = this.collectOperation(input, options);
     return { valid: errors.length === 0, errors: errors.map(toPublicIssue), warnings: [] };
   }
 
   /** Same as `validateOperationDetailed`, as `[isValid, errors, warnings]` display strings. */
-  validateOperationText(input: OperationInput): [boolean, string[], string[]] {
-    const errors = this.collectOperation(input);
+  validateOperationText(input: OperationInput, options: AnnotationOptions = {}): [boolean, string[], string[]] {
+    const errors = this.collectOperation(input, options);
     return [errors.length === 0, errors.map(formatIssue), []];
   }
 
@@ -218,9 +219,9 @@ export class DocumentValidator {
    * of `target.parents` (see `accessibleModule`). `rootData` is the canonical server data, already
    * validated, which this call may extend (it is the caller's private copy).
    */
-  private collectOperation(input: OperationInput): InternalIssue[] {
+  private collectOperation(input: OperationInput, options: AnnotationOptions): InternalIssue[] {
     const { target, operation, parentCopies, params, rootData, wrapper } = input;
-    const ctx = this.rootCtx;
+    const ctx = { ...this.rootCtx, ...options };
     const active = (stmt: YangStatement): boolean =>
       stmtIfFeaturesSatisfied(Array.isArray(stmt.if_features) ? (stmt.if_features as string[]) : [], ctx.ifFeatureCtx, ctx.enabledByModule, stmt.included_from);
     for (const step of target.parents) {
@@ -642,7 +643,7 @@ export class DocumentValidator {
   private rejectUnknownListItemKeys(stmt: YangStatement | YangModule, row: Record<string, unknown>, path: string, errors: InternalIssue[]): void {
     const allowed = this.collectDirectChildKeys(stmt);
     for (const key of Object.keys(row)) {
-      if (!allowed.has(key)) {
+      if (!allowed.has(key) && !isAnnotation(key, this.ctx)) {
         errors.push(issue(path ? `${path}.${key}` : key, "unknown-field", `Unknown field '${key}'`, undefined, joinPointer(pointerFromLabel(path), key)));
       }
     }
@@ -1267,6 +1268,8 @@ export class DocumentValidator {
       const fragment = { [statementName]: childVal };
       const payloadIfCtx = mod;
       const payloadCtx: ValidationContext = {
+        allowJsonld: this.ctx.allowJsonld,
+        allowJsonSchema: this.ctx.allowJsonSchema,
         module: mod,
         typeChecker: new TypeChecker(mod, { typeValidationDebug: this.rootCtx.typeValidationDebug }),
         constraintChecks: mode === AnydataValidationMode.COMPLETE,

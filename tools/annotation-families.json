@@ -1,0 +1,4 @@
+{
+  "jsonld": {"prefix": "@", "pattern": "^@[A-Za-z]+$"},
+  "json_schema": {"prefix": "$", "pattern": "^\\$[A-Za-z]+$"}
+}

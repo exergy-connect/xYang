@@ -172,7 +172,11 @@
                 "additionalProperties": false,
                 "required": [
                   "id"
-                ]
+                ],
+                "patternProperties": {
+                  "^@[A-Za-z]+$": true,
+                  "^\\$[A-Za-z]+$": true
+                }
               },
               "x-yang": {
                 "type": "list",
@@ -202,7 +206,11 @@
             }
           },
           "required": [],
-          "additionalProperties": false
+          "additionalProperties": false,
+          "patternProperties": {
+            "^@[A-Za-z]+$": true,
+            "^\\$[A-Za-z]+$": true
+          }
         },
         {
           "type": "object",
@@ -246,7 +254,11 @@
                 "additionalProperties": false,
                 "required": [
                   "id"
-                ]
+                ],
+                "patternProperties": {
+                  "^@[A-Za-z]+$": true,
+                  "^\\$[A-Za-z]+$": true
+                }
               },
               "x-yang": {
                 "type": "list",
@@ -293,6 +305,10 @@
                 "argument": "A"
               }
             ]
+          },
+          "patternProperties": {
+            "^@[A-Za-z]+$": true,
+            "^\\$[A-Za-z]+$": true
           }
         },
         {
@@ -337,7 +353,11 @@
                 "additionalProperties": false,
                 "required": [
                   "id"
-                ]
+                ],
+                "patternProperties": {
+                  "^@[A-Za-z]+$": true,
+                  "^\\$[A-Za-z]+$": true
+                }
               },
               "x-yang": {
                 "type": "list",
@@ -378,9 +398,17 @@
           "additionalProperties": false,
           "x-yang": {
             "name": "b"
+          },
+          "patternProperties": {
+            "^@[A-Za-z]+$": true,
+            "^\\$[A-Za-z]+$": true
           }
         }
-      ]
+      ],
+      "patternProperties": {
+        "^@[A-Za-z]+$": true,
+        "^\\$[A-Za-z]+$": true
+      }
     }
   },
   "additionalProperties": false,
@@ -412,5 +440,9 @@
         ]
       }
     }
+  },
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
   }
 }

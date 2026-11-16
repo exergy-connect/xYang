@@ -1,3 +1,4 @@
+import { isEmptyChoiceBranch } from "../encoding/annotations";
 import { scopePath, validateScope } from "../typedef-scope";
 import { validateSemantics } from "../validator/semantic-validation";
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
@@ -473,7 +474,7 @@ function rawTypeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<st
   if (typedefRef) {
     return { name: typedefRef, ...(xy["type-context"] !== undefined ? { context: xy["type-context"] === "" ? "" : validateScope(xy["type-context"]) } : {}) };
   }
-  if (schema.type === JSON_TYPE_OBJECT && schema.maxProperties === 0) {
+  if (isEmptyChoiceBranch(schema)) {
     return { name: YangTokenType.EMPTY };
   }
   const hasStringEnum = schema.type === JSON_TYPE_STRING && Array.isArray(schema.enum);
@@ -678,7 +679,7 @@ function splitChoiceCommonProperties(branches: Record<string, unknown>[]): {
 } {
   const input = Array.isArray(branches) ? branches : [];
   const nonEmpty = input.filter(
-    (b) => !(b.type === JSON_TYPE_OBJECT && b.maxProperties === 0)
+    (b) => !(isEmptyChoiceBranch(b))
   );
   if (nonEmpty.length === 0) {
     return { commonProps: {}, strippedBranches: input };
@@ -752,7 +753,7 @@ function parseChoice(name: string, schema: Record<string, unknown>, defs: Record
   let caseIndex = 0;
   for (const branchRaw of extractChoiceBranches(schema)) {
     const branch = asRecord(branchRaw);
-    if (branch.type === JSON_TYPE_OBJECT && branch.maxProperties === 0) {
+    if (isEmptyChoiceBranch(branch)) {
       continue;
     }
     caseIndex += 1;

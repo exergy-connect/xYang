@@ -71,6 +71,8 @@ class YangValidator:
         *,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
+        allow_jsonld: bool = True,
+        allow_json_schema: bool = True,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
@@ -96,6 +98,8 @@ class YangValidator:
             data,
             leafref_severity=leafref_severity,
             native_json=native_json,
+            allow_jsonld=allow_jsonld,
+            allow_json_schema=allow_json_schema,
             rpc=rpc,
             action=action,
             direction=direction,
@@ -111,6 +115,8 @@ class YangValidator:
         *,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
+        allow_jsonld: bool = True,
+        allow_json_schema: bool = True,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
@@ -129,6 +135,8 @@ class YangValidator:
             data,
             leafref_severity=leafref_severity,
             native_json=native_json,
+            allow_jsonld=allow_jsonld,
+            allow_json_schema=allow_json_schema,
             rpc=rpc,
             action=action,
             direction=direction,
@@ -144,6 +152,8 @@ class YangValidator:
         *,
         leafref_severity: Severity,
         native_json: bool = False,
+        allow_jsonld: bool = True,
+        allow_json_schema: bool = True,
         rpc: Optional[str] = None,
         action: Optional[str] = None,
         direction: str = "input",
@@ -159,6 +169,8 @@ class YangValidator:
                 context=context,
                 leafref_severity=leafref_severity,
                 native_json=native_json,
+                allow_jsonld=allow_jsonld,
+                allow_json_schema=allow_json_schema,
             )
         root_schema: YangStatementList = self.module
         instance: dict[str, Any] = data
@@ -170,6 +182,8 @@ class YangValidator:
             instance,
             leafref_severity=leafref_severity,
             native_json=native_json,
+            allow_jsonld=allow_jsonld,
+            allow_json_schema=allow_json_schema,
             module=self.module,
             from_iterator=True,
         )
@@ -189,6 +203,8 @@ class YangValidator:
         context: Optional[dict[str, Any]],
         leafref_severity: Severity,
         native_json: bool,
+        allow_jsonld: bool,
+        allow_json_schema: bool,
     ) -> list[ValidationError]:
         if rpc is not None:
             target = _operation.find_rpc(self.module, rpc)
@@ -198,7 +214,8 @@ class YangValidator:
         context_issues: list[ValidationError] = []
         if context is not None:
             # RFC 7950 §6.4.1: the operation reads the server data, so it must be valid data first.
-            context_issues = self._collect(context, leafref_severity=leafref_severity, native_json=native_json)
+            context_issues = self._collect(context, leafref_severity=leafref_severity, native_json=native_json,
+                                           allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema)
             for issue in context_issues:
                 issue.document = "context"
             if any(issue.severity == Severity.ERROR for issue in context_issues):
@@ -207,7 +224,9 @@ class YangValidator:
         params: Any = data
         if not native_json:
             member = _operation.wrapper_member(target.module_name, direction)
-            if not isinstance(data, dict) or list(data) != [member]:
+            from ..encoding.annotations import is_annotation
+            members = [k for k in data if not is_annotation(k, allow_jsonld, allow_json_schema)] if isinstance(data, dict) else []
+            if not isinstance(data, dict) or members != [member]:
                 found = ", ".join(repr(k) for k in data) if isinstance(data, dict) else type(data).__name__
                 kind = "rpc" if rpc is not None else "action"
                 return [
@@ -242,6 +261,8 @@ class YangValidator:
             context=context,
             leafref_severity=leafref_severity,
             native_json=native_json,
+            allow_jsonld=allow_jsonld,
+            allow_json_schema=allow_json_schema,
         )
         if member is not None:
             for err in errors:

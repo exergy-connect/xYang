@@ -31,6 +31,8 @@ pub const Error = type_checker.Error || error{Usage};
 
 pub const Options = struct {
     native_json: bool = false,
+    allow_jsonld: bool = true,
+    allow_json_schema: bool = true,
     /// Module name -> enabled features; null enables every declared feature.
     enabled_features_by_module: ?*const EnabledFeatures = null,
     /// An rpc name: the data is that rpc's `direction` instance.
@@ -96,6 +98,7 @@ pub const YangValidator = struct {
             .enabled = try if_feature_eval.buildEnabledFeatures(self.a, self.module, options.enabled_features_by_module),
             .checker = &checker,
             .keys = &keys,
+            .annotations = .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema },
             .module_root = structure == null,
         };
         errdefer self.unsupported = checker.unsupported;
@@ -132,7 +135,7 @@ pub const YangValidator = struct {
         var out: std.ArrayList(ValidationError) = .empty;
         if (options.context) |context| {
             // RFC 7950 6.4.1: the operation reads the server data, so it must be valid data first.
-            const issues = try self.collect(u, context, .{ .native_json = options.native_json, .enabled_features_by_module = options.enabled_features_by_module });
+            const issues = try self.collect(u, context, .{ .native_json = options.native_json, .enabled_features_by_module = options.enabled_features_by_module, .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema });
             var has_error = false;
             for (issues) |issue| {
                 var e = issue;
@@ -147,7 +150,11 @@ pub const YangValidator = struct {
         if (!options.native_json) {
             const m = try operation.wrapperMember(self.a, target.module_name, options.direction);
             member = m;
-            const single = data == .object and data.object.count() == 1 and std.mem.eql(u8, data.object.keys()[0], m);
+            var members: std.ArrayList([]const u8) = .empty;
+            if (data == .object) for (data.object.keys()) |key| {
+                if (!@import("../encoding/annotations.zig").isAnnotation(key, .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema })) try members.append(self.a, key);
+            };
+            const single = data == .object and members.items.len == 1 and std.mem.eql(u8, members.items[0], m);
             if (!single) {
                 var found: []const u8 = jv.typeName(data);
                 if (data == .object) {
@@ -165,7 +172,7 @@ pub const YangValidator = struct {
                 };
                 return one;
             }
-            params = data.object.values()[0];
+            params = data.object.get(m).?;
             if (params != .object) {
                 const one = try self.a.alloc(ValidationError, 1);
                 one[0] = .{
@@ -186,6 +193,7 @@ pub const YangValidator = struct {
             .enabled = try if_feature_eval.buildEnabledFeatures(self.a, accessible.module, options.enabled_features_by_module),
             .checker = &checker,
             .keys = &keys,
+            .annotations = .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema },
         };
         errdefer self.unsupported = checker.unsupported;
         const errors = try dv.validateOperation(u, params, .{

@@ -56,6 +56,7 @@ when they share the schema.
 | `instances[].data` | The JSON instance document. |
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
+| `instances[].allow_jsonld` / `instances[].allow_json_schema` | Optional booleans, default `true`: accept opaque JSON-LD / JSON Schema annotation families at every object. |
 | `instances[].rpc` | Optional. Validate `data` as an instance of this rpc (`validate_detailed(rpc=)` / `{ rpc }`, CLI `--rpc`). |
 | `instances[].action` | Optional. Validate `data` as an instance of the action at this RFC 8040 §3.5.3 path (`action=` / `{ action }`, CLI `--action`). Needs `context`. |
 | `instances[].direction` | Optional, with `rpc` or `action`: `"input"` (default) or `"output"` (CLI `--output`). |

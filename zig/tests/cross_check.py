@@ -223,6 +223,9 @@ def operation_args(inst: dict, context_path: Path) -> list[str]:
     """``--rpc`` / ``--action`` / ``--output`` / ``--context`` for an instance, as
     ``tests/test_cases.py`` passes them to a CLI; the context is written to ``context_path``."""
     args: list[str] = []
+    for field, flag in [("allow_jsonld", "--no-jsonld"), ("allow_json_schema", "--no-json-schema-annotations")]:
+        if inst.get(field) is False:
+            args.append(flag)
     if inst.get("rpc") is not None:
         args += ["--rpc", inst["rpc"]]
     if inst.get("action") is not None:
@@ -711,6 +714,8 @@ def convert_path_failures() -> tuple[int, list[str]]:
             ([str(yang), f"-o{base / 'attached.yang.json'}"], base / "attached.yang.json"),
             ([str(yang), "--output", str(base / "long.yang.json")], base / "long.yang.json"),
             ([str(yang), "--schema-id", "https://example.invalid/published.json", "-o", str(base / "published.json")], base / "published.json"),
+            *[([str(yang), *flags, "-o", str(base / f"policy-{i}.json")], base / f"policy-{i}.json")
+              for i, flags in enumerate([["--no-jsonld"], ["--no-json-schema-annotations"], ["--no-jsonld", "--no-json-schema-annotations"]])],
             ([str(base / "missing.yang")], base / "missing.yang.json"),
         ]
         for args, out_path in calls:

@@ -366,6 +366,11 @@ def build_parser() -> argparse.ArgumentParser:
         "--schema-id", metavar="URI", default=None,
         help="Schema resource $id (default: the YANG namespace); does not change x-yang.namespace",
     )
+    for command in (validate_parser, convert_parser):
+        command.add_argument("--no-jsonld", action="store_false", dest="allow_jsonld", default=True,
+                             help="Reject JSON-LD annotation keywords (allowed by default)")
+        command.add_argument("--no-json-schema-annotations", action="store_false", dest="allow_json_schema", default=True,
+                             help="Reject JSON Schema $ annotation keywords (allowed by default)")
     return parser
 
 
@@ -474,12 +479,12 @@ def main() -> int:
             else:
                 data = json.load(sys.stdin)
             if args.format == "json":
-                result = validator.validate_detailed(data, native_json=args.native_json, **operation)
+                result = validator.validate_detailed(data, native_json=args.native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
                 for warning in result["warnings"]:
                     print(f"Warning: {warning['path']}: {warning['message']}", file=sys.stderr)
                 print(_json_validation_report(result))
                 return 0 if result["valid"] else 1
-            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json, **operation)
+            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
             if is_valid:
                 print("Valid.")
                 for w in warnings:
@@ -510,7 +515,8 @@ def main() -> int:
             include_path = tuple(Path(p) for p in _include_path_from_args(args))
             yang_parser = YangParser(expand_uses=False, include_path=include_path)
             module = yang_parser.parse_file(p)
-            schema_to_yang_json(module, output_path=out, schema_id=args.schema_id)
+            schema_to_yang_json(module, output_path=out, schema_id=args.schema_id,
+                                allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema)
             print(f"Wrote {out}")
         except YangExportError as e:
             _print_cli_error(e)

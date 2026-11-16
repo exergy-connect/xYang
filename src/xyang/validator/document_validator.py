@@ -113,6 +113,7 @@ class DocumentValidator:
     ) -> None:
         self._root_schema = root_schema
         self._constraint_checks = constraint_checks
+        self._annotation_options = (True, True)
         self._enabled_features_by_module = enabled_features_by_module
         self._type_checker = TypeChecker()
         self._evaluator = XPathEvaluator()
@@ -138,6 +139,8 @@ class DocumentValidator:
         leafref_root_data: Optional[Any] = None,
         path: Optional[PathBuilder] = None,
         native_json: bool = False,
+        allow_jsonld: bool = True,
+        allow_json_schema: bool = True,
         module: Optional[YangModule] = None,
         from_iterator: bool = False,
     ) -> list[ValidationError]:
@@ -158,6 +161,7 @@ class DocumentValidator:
         Returns:
             List of ValidationError (empty when valid).
         """
+        self._annotation_options = (allow_jsonld, allow_json_schema)
         encoding: list[ValidationError] = []
         pointer_map: dict[str, str] = {}
         host = module if module is not None else self._if_feature_module
@@ -211,6 +215,8 @@ class DocumentValidator:
         context: Optional[dict[str, Any]] = None,
         leafref_severity: Severity = Severity.ERROR,
         native_json: bool = False,
+        allow_jsonld: bool = True,
+        allow_json_schema: bool = True,
     ) -> list[ValidationError]:
         """Validate the parameters of one rpc or action ``input`` or ``output`` (RFC 7950 §7.14, §7.15).
 
@@ -224,6 +230,7 @@ class DocumentValidator:
         from ..encoding.rfc7951 import member_keys_cached
         from .operation import lexical
 
+        self._annotation_options = (allow_jsonld, allow_json_schema)
         for step in target.parents:
             for stmt in (*step.wrappers, step.stmt):
                 if not self._if_features_active(stmt):
@@ -561,8 +568,9 @@ class DocumentValidator:
             else:
                 visited_names.update(member_keys_cached(stmt, parent_mod))
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
+        from ..encoding.annotations import is_annotation
         for key in data:
-            if key not in visited_names:
+            if key not in visited_names and not is_annotation(key, *self._annotation_options):
                 self._add(
                     path=path.child(key),
                     pointer=path.child_pointer(key),

@@ -13,6 +13,8 @@ type Instance = {
   errors?: Expected[];
   xfail?: Record<string, string>;
   encoding?: string;
+  allow_jsonld?: boolean;
+  allow_json_schema?: boolean;
   rpc?: string;
   action?: string;
   direction?: "input" | "output";
@@ -60,6 +62,8 @@ function run(dir: string, c: Case, inst: Instance | undefined, form: "yang" | "j
   if (!inst) return;
   const features = c.features && Object.fromEntries(Object.entries(c.features).map(([m, f]) => [m, new Set(f)]));
   const operation = {
+    allowJsonld: inst.allow_jsonld,
+    allowJsonSchema: inst.allow_json_schema,
     ...(inst.rpc !== undefined ? { rpc: inst.rpc } : {}),
     ...(inst.action !== undefined ? { action: inst.action } : {}),
     ...(inst.direction !== undefined ? { direction: inst.direction } : {}),

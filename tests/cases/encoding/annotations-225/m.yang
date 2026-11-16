@@ -1,0 +1,9 @@
+module m {
+  namespace "urn:m"; prefix m;
+  leaf name { type string; mandatory true; }
+  container top {
+    leaf value { type string; }
+    list items { key id; leaf id { type string; } }
+  }
+  rpc ping { input { leaf name { type string; mandatory true; } } }
+}

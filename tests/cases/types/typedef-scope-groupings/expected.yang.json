@@ -32,7 +32,11 @@
           }
         }
       },
-      "additionalProperties": false
+      "additionalProperties": false,
+      "patternProperties": {
+        "^@[A-Za-z]+$": true,
+        "^\\$[A-Za-z]+$": true
+      }
     }
   },
   "additionalProperties": false,
@@ -60,5 +64,9 @@
         "name": "code"
       }
     }
+  },
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
   }
 }

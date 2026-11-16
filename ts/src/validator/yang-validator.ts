@@ -1,3 +1,4 @@
+import { isAnnotation, type AnnotationOptions } from "../encoding/annotations";
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
 import { encodingErrors, iterInstance, projectInstance } from "../encoding";
@@ -23,7 +24,7 @@ export type { DetailedValidationResult, ValidationIssue };
 export type { OperationDirection, OperationOptions } from "./operation";
 
 /** Per-call validation options. `rpc`, `direction` and `context` select an rpc instance (RFC 7950 §7.14). */
-export type ValidateCallOptions = { nativeJson?: boolean } & OperationOptions;
+export type ValidateCallOptions = AnnotationOptions & { nativeJson?: boolean } & OperationOptions;
 
 export type ValidationResult = {
   isValid: boolean;
@@ -96,7 +97,7 @@ export class YangValidator {
       return { isValid: detailed.valid, errors: detailed.errors.map(text), warnings: detailed.warnings.map(text) };
     }
     const prepared = this.prepare(data, options.nativeJson === true);
-    const [isValid, errors, warnings] = this.documentValidator.validate(prepared.data);
+    const [isValid, errors, warnings] = this.documentValidator.validate(prepared.data, options);
     const encoding = prepared.errors.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message));
     const all = [...encoding, ...errors];
     return { isValid: isValid && encoding.length === 0, errors: all, warnings };
@@ -112,12 +113,12 @@ export class YangValidator {
     if (options.rpc !== undefined || options.action !== undefined) {
       return this.validateOperation(data, options);
     }
-    return this.validateDocument(data, options.nativeJson === true);
+    return this.validateDocument(data, options.nativeJson === true, options);
   }
 
-  private validateDocument(data: unknown, nativeJson: boolean): DetailedValidationResult {
+  private validateDocument(data: unknown, nativeJson: boolean, options: AnnotationOptions): DetailedValidationResult {
     const prepared = this.prepare(data, nativeJson);
-    const result = this.documentValidator.validateDetailed(prepared.data);
+    const result = this.documentValidator.validateDetailed(prepared.data, options);
     const encoding: ValidationIssue[] = prepared.errors.map((issue) => ({
       code: issue.code,
       path: issue.path,
@@ -137,7 +138,7 @@ export class YangValidator {
     let contextWarnings: ValidationIssue[] = [];
     if (options.context !== undefined) {
       // RFC 7950 §6.4.1: the operation reads the server data, so it must be valid data first.
-      const checked = this.validateDocument(options.context, nativeJson);
+      const checked = this.validateDocument(options.context, nativeJson, options);
       const mark = (issue: ValidationIssue): ValidationIssue => ({ document: "context", ...issue });
       if (!checked.valid) {
         return { valid: false, errors: checked.errors.map(mark), warnings: checked.warnings.map(mark) };
@@ -153,7 +154,7 @@ export class YangValidator {
     });
     if (!nativeJson) {
       wrapper = wrapperMember(target.moduleName, direction);
-      const keys = data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data) : null;
+      const keys = data && typeof data === "object" && !Array.isArray(data) ? Object.keys(data).filter((key) => !isAnnotation(key, options)) : null;
       if (!keys || keys.length !== 1 || keys[0] !== wrapper) {
         const found = keys ? keys.map((key) => `'${key}'`).join(", ") : Array.isArray(data) ? "array" : typeof data;
         const kind = options.rpc !== undefined ? "rpc" : "action";
@@ -187,7 +188,7 @@ export class YangValidator {
       params: projected.data,
       rootData,
       wrapper
-    });
+    }, options);
     const encoding: ValidationIssue[] = encodingErrors(nodes).map((item) => ({
       code: item.code,
       path: wrapper === null ? item.path : `/${escapePointer(wrapper)}${item.path}`,

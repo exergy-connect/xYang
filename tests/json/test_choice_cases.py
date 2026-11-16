@@ -171,7 +171,8 @@ def test_choice_optional_schema_has_one_of_with_empty_branch(generated_schema):
     assert "properties" not in opt or not opt["properties"]
     branches = opt["oneOf"]
     assert len(branches) == 3
-    assert branches[0] == {"type": "object", "maxProperties": 0}
+    assert branches[0] == {"type": "object", "properties": {}, "additionalProperties": False,
+                           "patternProperties": {"^@[A-Za-z]+$": True, r"^\$[A-Za-z]+$": True}}
     keys_seen = set()
     for br in branches[1:]:
         assert br.get("type") == "object"
