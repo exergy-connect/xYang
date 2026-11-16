@@ -1,10 +1,10 @@
-# Build xyang-zig for Linux, macOS, and Windows (x86_64 and aarch64), plus the
+# Build xyang-zig for Linux x86_64 (other platforms are paused), plus the
 # freestanding Wasm library and JavaScript wrapper, and attach them to a GitHub
 # Release. Not part of pull-request CI. Runs when a release is published, and
 # on a manual workflow_dispatch (build and test only; nothing is attached unless
 # this run is a published release).
 #
-# One Linux runner cross-compiles every target. Zig 0.17.1 is pinned the same
+# One Linux runner builds the enabled targets. Zig 0.17.1 is pinned the same
 # way as zig.yml: ZIG_VERSION equals minimum_zig_version in zig/build.zig.zon,
 # and the tarball is verified against ZIG_SHA256.
 
@@ -62,7 +62,7 @@ jobs:
           echo "build.zig.zon pins ${pinned}; toolchain is ${actual}"
           [ "${pinned}" = "${ZIG_VERSION}" ] && [ "${actual}" = "${ZIG_VERSION}" ]
 
-      - name: Cross-compile the six release binaries
+      - name: Build the linux-x64 release binary
         working-directory: zig
         shell: bash
         run: |
@@ -71,11 +71,11 @@ jobs:
           # keeps the binary on the architecture's baseline, not the runner's CPU.
           targets=(
             "x86_64-linux-musl xyang-zig-linux-x64"
-            "aarch64-linux-musl xyang-zig-linux-arm64"
-            "x86_64-macos xyang-zig-macos-x64"
-            "aarch64-macos xyang-zig-macos-arm64"
-            "x86_64-windows xyang-zig-windows-x64.exe"
-            "aarch64-windows xyang-zig-windows-arm64.exe"
+            # "aarch64-linux-musl xyang-zig-linux-arm64"
+            # "x86_64-macos xyang-zig-macos-x64"
+            # "aarch64-macos xyang-zig-macos-arm64"
+            # "x86_64-windows xyang-zig-windows-x64.exe"
+            # "aarch64-windows xyang-zig-windows-arm64.exe"
           )
           mkdir -p dist
           for entry in "${targets[@]}"; do
