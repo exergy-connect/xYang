@@ -337,7 +337,7 @@ def build_parser() -> argparse.ArgumentParser:
         parents=[path_parent],
         help="Convert .yang to .yang.json (JSON Schema with x-yang)",
         description=(
-            "Write JSON Schema (2020-12) with x-yang to a file whose name ends in .yang.json.\n"
+            "Write JSON Schema (2020-12) with x-yang to a file.\n"
             "Default path: <stem>.yang.json beside the input."
         ),
         formatter_class=_CliHelpFormatter,
@@ -359,7 +359,7 @@ def build_parser() -> argparse.ArgumentParser:
         metavar="PATH",
         help=(
             "Output file (default: <stem>.yang.json beside the input). "
-            "If the name does not end in .yang.json, that suffix is added"
+            "An explicit path is used exactly as given"
         ),
     )
     return parser
@@ -502,8 +502,6 @@ def main() -> int:
             out = p.with_suffix(".yang.json")
         else:
             out = Path(out)
-            if not out.name.endswith(".yang.json"):
-                out = out.parent / (out.stem + ".yang.json")
         try:
             include_path = tuple(Path(p) for p in _include_path_from_args(args))
             yang_parser = YangParser(expand_uses=False, include_path=include_path)

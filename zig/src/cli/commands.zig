@@ -153,7 +153,7 @@ pub const COMMANDS = [_]Command{
         .usage = "usage: " ++ PROG ++ " convert [-h] [--include-path DIR] [-o PATH] yang_file\n",
         .help =
         \\
-        \\Write JSON Schema (2020-12) with x-yang to a file whose name ends in .yang.json.
+        \\Write JSON Schema (2020-12) with x-yang to a file.
         \\Default path: <stem>.yang.json beside the input.
         \\
         \\positional arguments:
@@ -163,8 +163,8 @@ pub const COMMANDS = [_]Command{
         \\  -h, --help          show this help message and exit
         \\  --include-path DIR  Directory to search for imported modules (repeatable; searched
         \\                      after the main file's directory). Default: none
-        \\  -o, --output PATH   Output file (default: <stem>.yang.json beside the input). If the
-        \\                      name does not end in .yang.json, that suffix is added
+        \\  -o, --output PATH   Output file (default: <stem>.yang.json beside the input). An explicit
+        \\                      path is used exactly as given
         \\
         \\examples:
         \\  xyang-zig convert --help
@@ -556,14 +556,10 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
         try ctx.err.print("Error: file not found: {s}\n", .{p});
         return 1;
     }
-    const out_path = if (parsed.value("--output")) |o| blk: {
-        const op = try pyPath(ctx.arena, o);
-        const name = std.Io.Dir.path.basename(op);
-        if (std.mem.endsWith(u8, name, ".yang.json")) break :blk op;
-        const parent = std.Io.Dir.path.dirname(op);
-        const file = try ctx.arena.print("{s}.yang.json", .{pathStem(name)});
-        break :blk if (parent) |d| try std.Io.Dir.path.join(ctx.arena, &.{ d, file }) else file;
-    } else try withSuffix(ctx.arena, p, ".yang.json");
+    const out_path = if (parsed.value("--output")) |o|
+        try pyPath(ctx.arena, o)
+    else
+        try withSuffix(ctx.arena, p, ".yang.json");
 
     var dirs: std.ArrayList([]const u8) = .empty;
     for (parsed.all("--include-path")) |dir| try dirs.append(ctx.arena, try resolvePath(ctx, dir));

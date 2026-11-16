@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Honor an explicit `xyang convert -o/--output` filename exactly in Python and Zig; retain `<stem>.yang.json` only as the default ([#228](https://github.com/exergy-connect/xYang/issues/228)).
+
 - Require list key leaves in instance validation and exported JSON Schema, while preserving their implicit requirement in native JSON round trips ([#224](https://github.com/exergy-connect/xYang/issues/224)).
 
 ## [1.0.3] — 2026-11-14

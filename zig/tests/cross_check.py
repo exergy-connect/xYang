@@ -696,7 +696,7 @@ CONVERT_MODULE = """module paths { %s
 
 def convert_path_failures() -> tuple[int, list[str]]:
     """Where ``convert`` writes: ``<stem>.yang.json`` beside the input, ``-o`` with the
-    suffix added, in a directory it creates, and ``-oPATH``."""
+    explicit name honored, in a directory it creates, and ``-oPATH``."""
     failures: list[str] = []
     same = 0
     with tempfile.TemporaryDirectory() as tmp:
@@ -706,8 +706,8 @@ def convert_path_failures() -> tuple[int, list[str]]:
         yang.write_text(CONVERT_MODULE)
         calls = [
             ([str(yang)], base / "src" / "paths.yang.json"),
-            ([str(yang), "-o", str(base / "out")], base / "out.yang.json"),
-            ([str(yang), "-o", str(base / "deep" / "er" / "x.json")], base / "deep" / "er" / "x.yang.json"),
+            ([str(yang), "-o", str(base / "out")], base / "out"),
+            ([str(yang), "-o", str(base / "deep" / "er" / "x.json")], base / "deep" / "er" / "x.json"),
             ([str(yang), f"-o{base / 'attached.yang.json'}"], base / "attached.yang.json"),
             ([str(yang), "--output", str(base / "long.yang.json")], base / "long.yang.json"),
             ([str(base / "missing.yang")], base / "missing.yang.json"),
