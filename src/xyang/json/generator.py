@@ -1710,7 +1710,7 @@ def _apply_own_deviations(schema_module: YangModule) -> None:
     apply_deviations(schema_module)
 
 
-def generate_json_schema(module: YangModule) -> dict[str, Any]:
+def generate_json_schema(module: YangModule, *, schema_id: str | None = None) -> dict[str, Any]:
     """
     Build a JSON Schema dict from a YangModule AST.
 
@@ -1725,7 +1725,10 @@ def generate_json_schema(module: YangModule) -> dict[str, Any]:
     token = _EXPORT.set(export)
     ext_token = _EXT_USED.set(_ExtensionUse(root=module))
     try:
-        return _generate_json_schema(module, export)
+        schema = _generate_json_schema(module, export)
+        if schema_id is not None:
+            schema[JsonSchemaKey.ID] = schema_id
+        return schema
     finally:
         EXPORT_TYPEDEFS.reset(scope_token)
         _EXPORT.reset(token)
@@ -1820,6 +1823,8 @@ def schema_to_yang_json(
     module: YangModule,
     output_path: str | Path | None = None,
     indent: int = 2,
+    *,
+    schema_id: str | None = None,
 ) -> str:
     """
     Serialize YangModule to JSON Schema string (and optionally write to file).
@@ -1828,11 +1833,12 @@ def schema_to_yang_json(
         module: YangModule AST.
         output_path: If set, write the JSON to this path (e.g. "schema.yang.json").
         indent: JSON indent (default 2).
+        schema_id: Schema resource URI; defaults to the YANG namespace.
 
     Returns:
         JSON string of the schema.
     """
-    data = generate_json_schema(module)
+    data = generate_json_schema(module, schema_id=schema_id)
     text = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
     if output_path is not None:
         path = Path(output_path)

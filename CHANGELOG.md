@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- Optional schema resource ID for JSON Schema export (`schema_id` / `schemaId`, CLI `convert --schema-id`); the YANG namespace remains unchanged ([#227](https://github.com/exergy-connect/xYang/issues/227)).
+
 ### Fixed
 
 - Honor an explicit `xyang convert -o/--output` filename exactly in Python and Zig; retain `<stem>.yang.json` only as the default ([#228](https://github.com/exergy-connect/xYang/issues/228)).

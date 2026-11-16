@@ -362,6 +362,10 @@ def build_parser() -> argparse.ArgumentParser:
             "An explicit path is used exactly as given"
         ),
     )
+    convert_parser.add_argument(
+        "--schema-id", metavar="URI", default=None,
+        help="Schema resource $id (default: the YANG namespace); does not change x-yang.namespace",
+    )
     return parser
 
 
@@ -506,7 +510,7 @@ def main() -> int:
             include_path = tuple(Path(p) for p in _include_path_from_args(args))
             yang_parser = YangParser(expand_uses=False, include_path=include_path)
             module = yang_parser.parse_file(p)
-            schema_to_yang_json(module, output_path=out)
+            schema_to_yang_json(module, output_path=out, schema_id=args.schema_id)
             print(f"Wrote {out}")
         except YangExportError as e:
             _print_cli_error(e)

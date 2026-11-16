@@ -710,6 +710,7 @@ def convert_path_failures() -> tuple[int, list[str]]:
             ([str(yang), "-o", str(base / "deep" / "er" / "x.json")], base / "deep" / "er" / "x.json"),
             ([str(yang), f"-o{base / 'attached.yang.json'}"], base / "attached.yang.json"),
             ([str(yang), "--output", str(base / "long.yang.json")], base / "long.yang.json"),
+            ([str(yang), "--schema-id", "https://example.invalid/published.json", "-o", str(base / "published.json")], base / "published.json"),
             ([str(base / "missing.yang")], base / "missing.yang.json"),
         ]
         for args, out_path in calls:

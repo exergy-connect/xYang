@@ -1515,7 +1515,13 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
 
 /// `generate_json_schema`: the module's native JSON form. On `error.Export` or
 /// `error.YangLoad`, `diag` holds the message.
+pub const Options = struct { schema_id: ?[]const u8 = null };
+
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
+    return generateWithOptions(a, module, diag, .{});
+}
+
+pub fn generateWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error!Val {
     var g: Gen = .{ .a = a, .root = module, .reporter = .{ .arena = a, .diag = diag } };
     var visited: std.AutoHashMapUnmanaged(*Module, void) = .empty;
     try collectScopedTypedefs(&g, module, &visited);
@@ -1588,13 +1594,18 @@ pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!V
     try root.put(a, K.PROPERTIES, objVal(properties));
     try root.put(a, K.ADDITIONAL_PROPERTIES, .{ .bool = false });
     if (defs.count() > 0) try root.put(a, K.DEFS, objVal(defs));
+    if (options.schema_id) |id| try root.put(a, K.ID, str(id));
     return objVal(root);
 }
 
 /// `schema_to_yang_json`: `json.dumps(generate_json_schema(module), indent=2,
 /// ensure_ascii=False) + "\n"`.
 pub fn schemaToYangJson(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error![]const u8 {
-    const v = try generate(a, module, diag);
+    return schemaToYangJsonWithOptions(a, module, diag, .{});
+}
+
+pub fn schemaToYangJsonWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error![]const u8 {
+    const v = try generateWithOptions(a, module, diag, options);
     var out: std.Io.Writer.Allocating = .init(a);
     jv.dumpIndented(&out.writer, v, 2) catch return error.OutOfMemory;
     out.writer.writeByte('\n') catch return error.OutOfMemory;

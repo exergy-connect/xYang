@@ -14,6 +14,7 @@ import {
   formatCommandHelp,
   formatGlobalHelp,
   parseCommonArgs,
+  parseConvertArgs,
   parseValidateArgs,
   requestsHelp
 } from "./cli/args";
@@ -180,7 +181,7 @@ function main(argv: string[]): number {
   }
 
   if (command === "convert") {
-    const { includePaths, positional } = parseCommonArgs(rest, "convert");
+    const { includePaths, positional, ...options } = parseConvertArgs(rest);
     const file = positional[0];
     if (!file) {
       throw new Error("Missing <file.yang>");
@@ -188,7 +189,7 @@ function main(argv: string[]): number {
     const module = new YangParser({ expandUses: false, includePath: includePaths }).parseFile(file);
     let schema: Record<string, unknown>;
     try {
-      schema = generateJsonSchema(module);
+      schema = generateJsonSchema(module, options);
     } catch (error) {
       if (!(error instanceof YangExportError)) {
         throw error;
