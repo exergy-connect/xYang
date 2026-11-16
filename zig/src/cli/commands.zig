@@ -167,6 +167,8 @@ pub const COMMANDS = [_]Command{
         \\                      path is used exactly as given
         \\
         \\examples:
+        \\  --schema-id URI    Schema resource $id (default: the YANG namespace)
+        \\
         \\  xyang-zig convert --help
         \\  xyang-zig convert -h
         \\  xyang-zig convert module.yang
@@ -174,7 +176,7 @@ pub const COMMANDS = [_]Command{
         \\  xyang-zig convert --include-path ./modules module.yang -o out.yang.json
         \\
         ,
-        .options = &.{ INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" } },
+        .options = &.{ INCLUDE_PATH, .{ .long = "--output", .short = "-o", .metavar = "PATH" }, .{ .long = "--schema-id", .metavar = "URI" } },
         .positionals = &.{.{ .name = "yang_file" }},
         .run = runConvert,
     },
@@ -575,7 +577,7 @@ fn runConvert(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyerr
         },
         else => return err,
     };
-    const text = xyang.json_generator.schemaToYangJson(ctx.arena, module, &diag) catch |err| switch (err) {
+    const text = xyang.json_generator.schemaToYangJsonWithOptions(ctx.arena, module, &diag, .{ .schema_id = parsed.value("--schema-id") }) catch |err| switch (err) {
         error.Export => {
             try ctx.err.print("Error: {f}\n", .{diag});
             return 2;

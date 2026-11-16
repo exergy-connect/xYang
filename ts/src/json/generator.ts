@@ -1428,14 +1428,21 @@ function featuresJson(module: YangModule): Record<string, unknown> {
 }
 
 /** Throws {@link YangExportError} for a construct the native JSON form cannot carry. */
-export function generateJsonSchema(module: YangModule): Record<string, unknown> {
+export type SchemaExportOptions = {
+  /** Schema resource URI. Defaults to the YANG namespace; leaves x-yang.namespace unchanged. */
+  schemaId?: string;
+};
+
+export function generateJsonSchema(module: YangModule, options: SchemaExportOptions = {}): Record<string, unknown> {
 
   const previous = extensionUses;
   const previousScoped = scopedExportDefs;
   scopedExportDefs = scopedCatalog(module);
   extensionUses = [];
   try {
-    return withIdentityExport(module, (used) => generateSchema(module, used));
+    const schema = withIdentityExport(module, (used) => generateSchema(module, used));
+    if (options.schemaId !== undefined) schema.$id = options.schemaId;
+    return schema;
   } finally {
     extensionUses = previous;
     scopedExportDefs = previousScoped;

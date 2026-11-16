@@ -36,6 +36,8 @@ export class CliUsageError extends Error {
 }
 
 type IncludeState = { includePaths: string[] };
+export type ConvertCliArgs = CommonCliArgs & { schemaId?: string };
+type ConvertState = Omit<ConvertCliArgs, "positional">;
 
 type ValidateState = Omit<ValidateCliArgs, "positional">;
 
@@ -261,12 +263,19 @@ const validateCommand: CliCommand<ValidateState> = {
   ]
 };
 
-const convertCommand: CliCommand<IncludeState> = {
+const convertCommand: CliCommand<ConvertState> = {
   name: "convert",
   summary: "Print JSON Schema with x-yang to stdout",
   description: "Print JSON Schema (2020-12) with x-yang metadata to stdout. Does not write a file.",
   positionals: [{ name: "<file.yang>", help: "Path to the .yang file." }],
-  options: [includePathOption()],
+  options: [includePathOption(), {
+    name: "--schema-id", metavar: "URI", takesValue: true,
+    help: "Schema resource $id (default: the YANG namespace); does not change x-yang.namespace.",
+    apply(state, value) {
+      if (value === undefined) throw new CliUsageError("Missing URI after --schema-id");
+      state.schemaId = value;
+    }
+  }],
   examples: [
     "xyang-ts convert --help",
     "xyang-ts convert -h",
@@ -345,6 +354,12 @@ export function parseCommonArgs(rest: string[], commandName: "parse" | "convert"
   const state: IncludeState = { includePaths: [] };
   const positional = collectPositionals(command, rest, state);
   return { includePaths: state.includePaths, positional };
+}
+
+export function parseConvertArgs(rest: string[]): ConvertCliArgs {
+  const state: ConvertState = { includePaths: [] };
+  const positional = collectPositionals(convertCommand, rest, state);
+  return { ...state, positional };
 }
 
 export function parseValidateArgs(rest: string[]): ValidateCliArgs {

@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- Optional schema resource ID for JSON Schema export (`schema_id` / `schemaId`, CLI `convert --schema-id`); the YANG namespace remains unchanged ([#227](https://github.com/exergy-connect/xYang/issues/227)).
+
 ### Fixed
 
 - Require list key leaves in instance validation and exported JSON Schema, while preserving their implicit requirement in native JSON round trips ([#224](https://github.com/exergy-connect/xYang/issues/224)).
