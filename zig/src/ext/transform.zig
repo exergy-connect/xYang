@@ -27,7 +27,7 @@ const Token = struct {
     literal: Val = .null,
 };
 
-const Expr = union(enum) {
+pub const Expr = union(enum) {
     input,
     literal: Val,
     pipe: struct { left: *Expr, right: *Expr },
@@ -139,6 +139,12 @@ const Parser = struct {
     }
 
     fn primary(self: *Parser) Error!*Expr {
+        if (self.take("[")) {
+            try self.require("]");
+            const out = try self.a.create(Expr);
+            out.* = .{ .literal = .{ .array = &.{} } };
+            return out;
+        }
         if (self.take("(")) {
             const node = try self.pipeline();
             try self.require(")");
@@ -291,7 +297,7 @@ fn tokenize(a: Allocator, text: []const u8, message: *[]const u8) Error![]Token 
     return tokens.items;
 }
 
-fn compile(a: Allocator, expression: []const u8, message: *[]const u8) Error!*Expr {
+pub fn compile(a: Allocator, expression: []const u8, message: *[]const u8) Error!*Expr {
     const tokens = tokenize(a, expression, message) catch |err| {
         if (err == error.Raised) message.* = try a.print("invalid normalization expression {f}: {s}", .{ repr(expression), message.* });
         return err;
@@ -341,7 +347,7 @@ fn typedEql(a: Val, b: Val) bool {
     };
 }
 
-fn evaluate(a: Allocator, expr: *const Expr, value: Val, message: *[]const u8) Error!Val {
+pub fn evaluate(a: Allocator, expr: *const Expr, value: Val, message: *[]const u8) Error!Val {
     return switch (expr.*) {
         .input => value,
         .literal => |v| v,
@@ -361,7 +367,7 @@ fn evaluate(a: Allocator, expr: *const Expr, value: Val, message: *[]const u8) E
             break :blk .{ .object = out };
         },
         .length => switch (value) {
-            .string => |s| .{ .int = @intCast(s.len) },
+            .string => |s| .{ .int = @intCast(std.unicode.utf8CountCodepoints(s) catch s.len) },
             .array => |arr| .{ .int = @intCast(arr.len) },
             .object => |obj| .{ .int = @intCast(obj.count()) },
             else => {

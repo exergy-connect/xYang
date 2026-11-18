@@ -16,7 +16,7 @@ module netlab {
      tests/integration/bgp/01-ebgp-session.yml and 02-ibgp-ebgp-session.yml.
 
      Dotted YAML keys are expanded (defaults.bgp.as, bgp.as, loopback.ipv4).
-     A hyphen link such as dut-x1 is the pair of leafrefs left and right.
+     A hyphen link such as dut-x1 becomes a list of node leafrefs.
      Group members and validation targets are leafrefs to node names.
      With module bgp, every node needs an AS from the node, topology, or defaults.
      Links may connect peers in the same AS (IBGP) or different ASes (EBGP).";
@@ -221,6 +221,8 @@ module netlab {
       }
     }
 
+    anydata devices { description "Device-specific defaults, retained without validation."; }
+
     container interfaces {
       leaf mtu { type uint16 { range "1..65535"; } }
     }
@@ -235,7 +237,13 @@ module netlab {
 
   container bgp {
     leaf as { type asn; }
+    anydata confederation;
   }
+
+  anydata addressing;
+  anydata prefix;
+  anydata routing;
+  anydata vrfs;
 
   container ospf {
     container timers {
@@ -262,6 +270,9 @@ module netlab {
       type device-type;
       description "Device type copied onto members that do not set their own.";
     }
+
+    leaf-list module { type module-name; }
+    leaf-list config { type string; }
 
     leaf provider {
       type provider;
@@ -307,6 +318,13 @@ module netlab {
         type asn;
       }
       leaf passive { type boolean; }
+      leaf rr { type boolean; }
+      leaf rr_cluster_id { type string; }
+      leaf advertise_loopback { type boolean; }
+      anydata originate;
+      anydata advertise;
+      anydata import;
+      anydata activate;
       container session {
         container apply {
           leaf-list ibgp { type string; }
@@ -315,43 +333,55 @@ module netlab {
     }
 
     leaf-list module { type module-name; }
+    leaf role { type string; }
+    leaf id { type uint32; }
+    anydata routing;
 
     container loopback {
-      description "Static loopback address. x2 originates 172.42.42.1/24.";
+      xt:normalize {
+        xt:if 'type == "boolean"' {
+          xt:apply '{enabled: .}';
+        }
+      }
+      description "Loopback settings; a boolean explicitly enables or disables the loopback.";
+      leaf enabled { type boolean; }
       leaf ipv4 {
         type ipv4-prefix;
       }
+      leaf ipv6 { type string; }
     }
   }
 
   list links {
-    key "left right";
+    config false;
     xt:normalize {
-      xt:if 'type == "string" and contains("-")';
-      xt:apply 'split("-") | {left: .[0], right: .[1]}';
-    }
-    xt:normalize {
-      xt:if 'type == "object" and length == 2 and (has("left") == false or has("right") == false) and (to_entries | .[0]["value"] == null) and (to_entries | .[1]["value"] == null)';
-      xt:apply 'to_entries | {left: .[0]["key"], right: .[1]["key"]}';
-    }
-    description
-      "Point-to-point links. dut-x1 is left=dut, right=x1.";
-
-    must "left != right" {
-      error-message "A link cannot connect a node to itself.";
-    }
-
-    leaf left {
-      type leafref {
-        path "/nodes/name";
-        require-instance true;
+      xt:if 'type == "string" and contains("-")' {
+        xt:apply 'map(split("-"), nodes: {node: $value})';
+      }
+      xt:if 'type == "object" and has("nodes") == false' {
+        xt:apply 'map(keys(/nodes/name), nodes: {node: $key, ...$value})';
       }
     }
+    description "Links and stubs connecting one or more nodes.";
 
-    leaf right {
-      type leafref {
-        path "/nodes/name";
-        require-instance true;
+    leaf mtu { type uint16; }
+    leaf pool { type string; }
+    anydata prefix;
+    anydata bgp;
+    anydata ospf;
+
+    list nodes {
+      key "node";
+      min-elements 1;
+      leaf node {
+        type leafref {
+          path "/nodes/name";
+          require-instance true;
+        }
+      }
+      leaf mtu { type uint16; }
+      container bgp {
+        leaf local_as { type asn; }
       }
     }
   }
@@ -375,6 +405,7 @@ module netlab {
     }
 
     leaf stop_on_error { type boolean; }
+    leaf level { type string; }
 
     leaf wait {
       type wait-time;
@@ -386,7 +417,6 @@ module netlab {
         path "/nodes/name";
         require-instance true;
       }
-      min-elements 1;
       description "Nodes that execute this test.";
     }
 
@@ -397,8 +427,11 @@ module netlab {
          or bgp_prefix('172.42.42.0/24').";
     }
 
-    must "plugin" {
-      error-message "A validation test needs a plugin expression.";
+    must "plugin or wait" {
+      error-message "A validation test needs a plugin expression or wait.";
+    }
+    must "not(plugin) or nodes" {
+      error-message "A validation plugin needs target nodes.";
     }
   }
 }

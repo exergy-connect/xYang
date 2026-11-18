@@ -5,7 +5,7 @@ The rules are declared in the YANG model using the extensions in
 [`shared/xyang-transform.yang`](../shared/xyang-transform.yang). They apply to
 JSON and YAML input; they do not modify the caller's input object.
 
-Python, TypeScript, and Zig execute the same documented expression subset.
+Python, TypeScript, and Zig support the normalization rules described here.
 
 ## Expand dotted keys
 
@@ -47,11 +47,10 @@ statement is allowed only at module level.
 
 ## Normalize individual values
 
-Attach `xt:normalize` to a modeled node to transform its input value. Each rule
-contains one `xt:apply`, optionally preceded by one `xt:if`. Both arguments are
-jq-style expressions; `.` is the current value. When `xt:if` is present and
-true, or when it is omitted, `xt:apply` produces the replacement. Otherwise the
-value is unchanged.
+Attach `xt:normalize` to a modeled node to transform its input value. A rule
+can contain an unconditional `xt:apply`, or an `xt:if` followed by `xt:apply`. Both arguments are
+jq-style expressions; `.` is the current value. If the condition is true,
+`xt:apply` produces the replacement. Otherwise the value is unchanged.
 
 ```yang
 list links {
@@ -71,9 +70,56 @@ For example, `"dut-x1"` becomes `{"left":"dut","right":"x1"}`. As written,
 the expression uses only the first two parts of the split; model authors should
 choose an expression appropriate to their accepted input.
 
+`map` can also split a string directly into a list of objects:
+
+```yang
+xt:apply 'map(split("-"), nodes: {node: $value})';
+```
+
+For `dut-x1` this produces `{nodes: [{node: "dut"}, {node: "x1"}]}`.
+The delimiter and field names are model-defined. An empty delimiter splits
+Unicode code points; non-string input produces a normalization error.
+
+`map` replaces matching members of the current object with a list of entries:
+
+```yang
+xt:apply 'map(keys(/nodes/name), nodes: {node: $key, ...$value})';
+```
+
+The XPath selects strings from the instance root. For each current-object key
+that matches, `map` appends an object to `nodes`: `$key` supplies the matched
+name, and `...$value` copies its object value's members. A null value contributes
+no members. Matched members are removed; unmatched members remain in place.
+When no keys match, the object is unchanged. Matched values must be objects or
+null, and an existing target or a copied field colliding with `node` causes a
+normalization error. The XPath sees an instance snapshot with map projections
+omitted, so it must not depend on their output. Field names and the XPath are
+specified by the model.
+
+A single `xt:normalize` block may contain multiple `xt:if` statements, each
+with a nested `xt:apply`:
+
+```yang
+list links {
+  xt:normalize {
+    xt:if 'type == "string" and contains("-")' {
+      xt:apply 'map(split("-"), nodes: {node: $value})';
+    }
+    xt:if 'type == "object" and has("nodes") == false' {
+      xt:apply 'map(keys(/nodes/name), nodes: {node: $key, ...$value})';
+    }
+  }
+}
+```
+
+For a list or leaf-list with `xt:normalize`, a null collection is treated as an
+empty list before validation; entry rules apply to individual entries. An
+unannotated list still rejects null. Minimum element constraints still apply.
+A single unconditional `xt:apply` and the original sibling `xt:if` / `xt:apply` form are also supported.
+
 Rules on a node run in source order, and a parent is normalized before its
 children. On a list or leaf-list, a rule applies to each entry. Missing nodes
-are not created. The expression subset is:
+are not created. The implementations support this expression subset:
 
 - `.`, `.[N]`, `.["key"]`, strings, nonnegative integers,
   `true`, `false`, and `null`.
@@ -107,5 +153,5 @@ encoding used for `nodes`, `groups`, and `validate`. Use `--format text` to
 request human-readable output.
 
 Both the expressions and the dotted-key setting survive conversion to xYang's
-native JSON Schema form and reload. All three implementations apply them to
-ordinary documents, operation parameters, and operation context.
+native JSON Schema form and reload. They apply to ordinary documents, operation
+parameters, and operation context.

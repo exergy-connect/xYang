@@ -1,0 +1,8 @@
+{
+  "description": "Normalization expressions evaluate to_entries and split Unicode strings into characters.",
+  "module": "m.yang",
+  "instances": [
+    {"name": "object entries", "data": {"entries": {"alpha": 1}}, "valid": true},
+    {"name": "Unicode split", "data": {"characters": "aé😀"}, "valid": true}
+  ]
+}

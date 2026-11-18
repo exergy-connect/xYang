@@ -85,6 +85,9 @@ class _Parser:
         return node
 
     def primary(self):
+        if self.take("["):
+            self.require("]")
+            return ("literal", [])
         if self.take("("):
             node = self.pipeline()
             self.require(")")
@@ -138,6 +141,21 @@ class _Parser:
 @lru_cache(maxsize=512)
 def _compile(expression: str):
     try:
+        string_map = re.fullmatch(r'\s*map\s*\(\s*split\s*\(\s*("(?:[^"\\]|\\.)*")\s*\)\s*,\s*([A-Za-z_][A-Za-z_0-9-]*)\s*:\s*\{\s*([A-Za-z_][A-Za-z_0-9-]*)\s*:\s*\$value\s*\}\s*\)\s*', expression)
+        if string_map:
+            try:
+                delimiter = json.loads(string_map.group(1))
+            except ValueError as exc:
+                raise ExpressionError(f"invalid string: {exc}") from exc
+            return ("string_map", string_map.group(2), string_map.group(3), delimiter)
+        projection = re.fullmatch(r'\s*map\s*\(\s*keys\s*\(\s*(/[^()]*)\s*\)\s*,\s*([A-Za-z_][A-Za-z_0-9-]*)\s*:\s*\{\s*([A-Za-z_][A-Za-z_0-9-]*)\s*:\s*\$key\s*,\s*\.\.\.\$value\s*\}\s*\)\s*', expression)
+        if projection:
+            from ...xpath.parser import XPathParser
+            try:
+                xpath = XPathParser(projection.group(1).strip()).parse()
+            except Exception as exc:
+                raise ExpressionError(f"invalid XPath: {exc}") from exc
+            return ("key_projection", projection.group(2), projection.group(3), xpath)
         return _Parser(expression).parse()
     except ExpressionError as exc:
         raise ExpressionError(f"invalid normalization expression {expression!r}: {exc}") from exc
@@ -149,6 +167,11 @@ def _truth(value: Any) -> bool:
 
 def _evaluate(expr, value):
     op = expr[0]
+    if op == "string_map":
+        if not isinstance(value, str):
+            raise ExpressionError("split requires string input and argument")
+        parts = value.split(expr[3]) if expr[3] else list(value)
+        return {expr[1]: [{expr[2]: item} for item in parts]}
     if op == "input":
         return value
     if op == "literal":
@@ -224,7 +247,15 @@ class _Action:
 
 class _ConditionHandler(InstanceExtensionHandler):
     def normalization_clause(self, invocation):
-        return _Condition(_clause_expression(invocation))
+        if invocation.argument is None:
+            raise ExpressionError("xt:if requires an expression")
+        if invocation.statements:
+            clauses = [instance_handler(part).normalization_clause(part) if instance_handler(part) else None
+                       for part in invocation.statements]
+            if len(clauses) != 1 or not isinstance(clauses[0], _Action):
+                raise ExpressionError("nested xt:if requires exactly one xt:apply")
+            return (_compile(invocation.argument), clauses[0].expression)
+        return _Condition(_compile(invocation.argument))
 
 
 class _ActionHandler(InstanceExtensionHandler):
@@ -246,6 +277,8 @@ class _NormalizeHandler(InstanceExtensionHandler):
         for part in invocation.statements:
             handler = instance_handler(part)
             clauses.append(handler.normalization_clause(part) if handler else None)
+        if clauses and all(isinstance(clause, tuple) for clause in clauses):
+            return clauses
         if len(clauses) == 1 and isinstance(clauses[0], _Action):
             return ("literal", True), clauses[0].expression
         if len(clauses) == 2 and isinstance(clauses[0], _Condition) and isinstance(clauses[1], _Action):
@@ -271,6 +304,9 @@ class NormalizationVisitor:
 
     def __init__(self, module):
         self._compiled: dict[int, list] = {}
+        self._normalized: set[int] = set()
+        self.root_context = None
+        self.skip_projection = False
         self.expand_dotted_keys = False
         seen = set()
         for statement in module.statements:
@@ -292,8 +328,12 @@ class NormalizationVisitor:
                 handler = instance_handler(statement)
                 if handler is not None:
                     rule = handler.normalization_rule(statement)
-                    if rule is not None:
+                    if isinstance(rule, list):
+                        rules.extend(rule)
+                        self._normalized.add(marker)
+                    elif rule is not None:
                         rules.append(rule)
+                        self._normalized.add(marker)
             self._compiled[marker] = rules
         return self._compiled[marker]
 
@@ -310,12 +350,58 @@ class NormalizationVisitor:
         for child in children(schema):
             self.prepare(child, children)
 
+    def visit_collection(self, schema, value):
+        self.rules(schema)
+        return ([], None) if value is None and id(schema) in self._normalized else (value, None)
+
     def visit(self, schema, value):
         """Return the transformed value and an optional error message."""
-        for condition, expression in self.rules(schema):
+        return self._visit_rules(self.rules(schema), value)
+
+    def _visit_rules(self, rules, value):
+        for condition, expression in rules:
             try:
                 if _truth(_evaluate(condition, value)):
-                    value = _evaluate(expression, value)
+                    if expression[0] == "key_projection":
+                        if self.skip_projection:
+                            continue
+                        value = self._project_keys(expression, value)
+                    else:
+                        value = _evaluate(expression, value)
             except ExpressionError as exc:
                 return value, str(exc)
         return value, None
+
+    def _project_keys(self, expr, value):
+        from ...xpath import Context, Node, XPathEvaluator
+        if not isinstance(value, dict):
+            raise ExpressionError("key projection requires an object")
+        target, key_field = expr[1], expr[2]
+        if self.root_context is None:
+            raise ExpressionError("key projection requires an instance root")
+        data, schema = self.root_context()
+        root = Node(data, schema, None)
+        try:
+            selected = XPathEvaluator().eval(expr[3], Context(root, root), root)
+        except Exception as exc:
+            raise ExpressionError(f"key projection XPath failed: {exc}") from exc
+        if not isinstance(selected, list) or any(not isinstance(n, Node) or not isinstance(n.data, str) for n in selected):
+            raise ExpressionError("keys XPath must select string nodes")
+        matches = {node.data for node in selected}
+        if not any(key in matches for key in value):
+            return value
+        if target in value:
+            raise ExpressionError(f"projection target {target!r} already exists")
+        rows = []
+        remainder = {}
+        for key, item in value.items():
+            if key not in matches:
+                remainder[key] = item
+                continue
+            if item is not None and not isinstance(item, dict):
+                raise ExpressionError(f"value for {key!r} must be an object or null")
+            if item is not None and key_field in item:
+                raise ExpressionError(f"projected key field {key_field!r} already exists")
+            rows.append({key_field: key, **(item or {})})
+        remainder[target] = rows
+        return remainder

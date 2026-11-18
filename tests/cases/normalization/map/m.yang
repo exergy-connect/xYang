@@ -1,0 +1,37 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:normalization-map";
+  prefix m;
+  import xyang-transform { prefix xt; }
+
+  list inventory {
+    key name;
+    leaf name { type string; }
+  }
+  list unconditional {
+    config false;
+    xt:normalize {
+      xt:apply 'map(keys(/inventory/name), members: {id: $key, ...$value})';
+    }
+    leaf label { type string; }
+    list members {
+      key id;
+      leaf id { type leafref { path "/inventory/name"; } }
+      leaf cost { type uint16; }
+    }
+  }
+  list connections {
+    config false;
+    xt:normalize {
+      xt:if 'type == "object"' {
+        xt:apply 'map(keys(/inventory/name), members: {id: $key, ...$value})';
+      }
+    }
+    leaf label { type string; }
+    list members {
+      key id;
+      leaf id { type leafref { path "/inventory/name"; } }
+      leaf cost { type uint16; }
+    }
+  }
+}

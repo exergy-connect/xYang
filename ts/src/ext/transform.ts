@@ -3,6 +3,7 @@
  * Mirrors `src/xyang/ext/transform/__init__.py`.
  */
 import type { YangModule, YangStatement } from "../core/model";
+import { Normalization as InstanceNormalization } from "../encoding/normalization";
 
 const TOKEN =
   /\s*(?:("(?:[^"\\]|\\.)*")|([A-Za-z_][A-Za-z_0-9-]*)|([0-9]+)|(==|!=|[.\[\]{}():,|]))/y;
@@ -105,6 +106,7 @@ class Parser {
   }
 
   private primary(): Expr {
+    if (this.take("[")) { this.require("]"); return ["literal", []]; }
     if (this.take("(")) {
       const node = this.pipeline();
       this.require(")");
@@ -166,7 +168,7 @@ class Parser {
 
 const compiled = new Map<string, Expr>();
 
-function compile(expression: string): Expr {
+export function compileExpression(expression: string): Expr {
   const cached = compiled.get(expression);
   if (cached) return cached;
   try {
@@ -194,11 +196,11 @@ function sameType(a: unknown, b: unknown): boolean {
   return typeof a === typeof b;
 }
 
-function evaluate(expr: Expr, value: unknown): unknown {
+export function evaluateExpression(expr: Expr, value: unknown): unknown {
   const op = expr[0];
   if (op === "input") return value;
   if (op === "literal") return expr[1];
-  if (op === "pipe") return evaluate(expr[2], evaluate(expr[1], value));
+  if (op === "pipe") return evaluateExpression(expr[2], evaluateExpression(expr[1], value));
   if (op === "type") {
     if (value === null) return "null";
     if (typeof value === "boolean") return "boolean";
@@ -210,11 +212,12 @@ function evaluate(expr: Expr, value: unknown): unknown {
   }
   if (op === "object") {
     const out: Record<string, unknown> = {};
-    for (const [key, child] of expr[1]) out[key] = evaluate(child, value);
+    for (const [key, child] of expr[1]) out[key] = evaluateExpression(child, value);
     return out;
   }
   if (op === "length") {
-    if (typeof value === "string" || Array.isArray(value)) return value.length;
+    if (typeof value === "string") return Array.from(value).length;
+    if (Array.isArray(value)) return value.length;
     if (value && typeof value === "object") return Object.keys(value as object).length;
     throw new ExpressionError("length requires a string, array, or object");
   }
@@ -228,7 +231,7 @@ function evaluate(expr: Expr, value: unknown): unknown {
     throw new ExpressionError("to_entries requires an array or object");
   }
   if (op === "index") {
-    const obj = evaluate(expr[1], value);
+    const obj = evaluateExpression(expr[1], value);
     const key = expr[2];
     if (Array.isArray(obj) && typeof key === "number") return key >= 0 && key < obj.length ? obj[key] : null;
     if (obj && typeof obj === "object" && !Array.isArray(obj) && typeof key === "string") {
@@ -237,19 +240,19 @@ function evaluate(expr: Expr, value: unknown): unknown {
     throw new ExpressionError("index requires an array index or object key");
   }
   if (op === "eq" || op === "ne") {
-    const a = evaluate(expr[1], value);
-    const b = evaluate(expr[2], value);
+    const a = evaluateExpression(expr[1], value);
+    const b = evaluateExpression(expr[2], value);
     const equal =
       sameType(a, b) &&
       (typeof a === "object" && a !== null ? JSON.stringify(a) === JSON.stringify(b) : a === b);
     return op === "eq" ? equal : !equal;
   }
   if (op === "and" || op === "or") {
-    const left = truth(evaluate(expr[1], value));
-    return op === "and" ? left && truth(evaluate(expr[2], value)) : left || truth(evaluate(expr[2], value));
+    const left = truth(evaluateExpression(expr[1], value));
+    return op === "and" ? left && truth(evaluateExpression(expr[2], value)) : left || truth(evaluateExpression(expr[2], value));
   }
   if (op === "has") {
-    const arg = evaluate(expr[1], value);
+    const arg = evaluateExpression(expr[1], value);
     if (value && typeof value === "object" && !Array.isArray(value) && typeof arg === "string") {
       return Object.prototype.hasOwnProperty.call(value, arg);
     }
@@ -259,7 +262,7 @@ function evaluate(expr: Expr, value: unknown): unknown {
     throw new ExpressionError("has requires an object key or array index");
   }
   if (op === "contains" || op === "split") {
-    const arg = evaluate(expr[1], value);
+    const arg = evaluateExpression(expr[1], value);
     if (typeof value !== "string" || typeof arg !== "string") {
       throw new ExpressionError(`${op} requires string input and argument`);
     }
@@ -269,100 +272,35 @@ function evaluate(expr: Expr, value: unknown): unknown {
   throw new ExpressionError(`unsupported operation ${JSON.stringify(op)}`);
 }
 
-function isInvocation(stmt: YangStatement, name: string): boolean {
-  return stmt.resolved_module_name === "xyang-transform" && stmt.resolved_extension_name === name;
-}
-
-function clauseExpression(invocation: YangStatement): Expr {
-  if (invocation.argument === undefined || invocation.argument === null || (invocation.statements?.length ?? 0) > 0) {
-    throw new ExpressionError("xt:if and xt:apply each require an expression and no body");
-  }
-  return compile(invocation.argument);
-}
-
-function normalizationRule(invocation: YangStatement): [Expr, Expr] | null {
-  if (!isInvocation(invocation, "normalize")) return null;
-  if (invocation.argument !== undefined && invocation.argument !== null) {
-    throw new ExpressionError("xt:normalize does not take an argument");
-  }
-  const clauses = (invocation.statements ?? []).map((part) => {
-    if (isInvocation(part, "if")) return { kind: "if" as const, expression: clauseExpression(part) };
-    if (isInvocation(part, "apply")) return { kind: "apply" as const, expression: clauseExpression(part) };
-    return null;
-  });
-  if (clauses.length === 1 && clauses[0]?.kind === "apply") {
-    return [["literal", true], clauses[0].expression];
-  }
-  if (clauses.length === 2 && clauses[0]?.kind === "if" && clauses[1]?.kind === "apply") {
-    return [clauses[0].expression, clauses[1].expression];
-  }
-  throw new ExpressionError("xt:normalize requires xt:apply, optionally preceded by xt:if");
-}
-
-function moduleOption(invocation: YangStatement): [string, boolean] | null {
-  if (!isInvocation(invocation, "expand-dotted-keys")) return null;
-  if ((invocation.argument !== "true" && invocation.argument !== "false") || (invocation.statements?.length ?? 0) > 0) {
-    throw new ExpressionError("xt:expand-dotted-keys requires true or false and no body");
-  }
-  return ["expand_dotted_keys", invocation.argument === "true"];
-}
-
 export type SchemaLike = { statements?: YangStatement[] };
 
 export class Normalization {
-  expandDottedKeys = false;
-  private readonly compiled = new WeakMap<object, Array<[Expr, Expr]>>();
+  private readonly implementation: InstanceNormalization;
 
   constructor(module: YangModule) {
-    const seen = new Set<string>();
-    for (const statement of module.statements ?? []) {
-      const option = moduleOption(statement);
-      if (option) {
-        const [name, value] = option;
-        if (seen.has(name)) throw new ExpressionError(`duplicate module option ${JSON.stringify(name)}`);
-        seen.add(name);
-        if (name === "expand_dotted_keys") this.expandDottedKeys = value;
-      }
-    }
+    this.implementation = new InstanceNormalization(module);
   }
 
-  rules(schema: SchemaLike): Array<[Expr, Expr]> {
-    const key = schema as object;
-    let found = this.compiled.get(key);
-    if (!found) {
-      found = [];
-      for (const statement of schema.statements ?? []) {
-        const rule = normalizationRule(statement);
-        if (rule) found.push(rule);
-      }
-      this.compiled.set(key, found);
-    }
-    return found;
+  get expandDottedKeys(): boolean {
+    return this.implementation.expandDotted;
+  }
+
+  rules(schema: SchemaLike): ReturnType<InstanceNormalization["rules"]> {
+    return this.implementation.rules(schema, "import_prefixes" in schema);
   }
 
   prepare(schema: SchemaLike, children: (schema: SchemaLike) => YangStatement[]): void {
-    const isModule = "import_prefixes" in schema;
-    if (!isModule) {
-      for (const statement of schema.statements ?? []) {
-        if (moduleOption(statement)) {
-          throw new ExpressionError("xt:expand-dotted-keys is allowed only at module level");
-        }
-      }
-    }
     this.rules(schema);
     for (const child of children(schema)) this.prepare(child, children);
   }
 
   visit(schema: SchemaLike, value: unknown): [unknown, string | null] {
-    for (const [condition, expression] of this.rules(schema)) {
-      try {
-        if (truth(evaluate(condition, value))) value = evaluate(expression, value);
-      } catch (exc) {
-        if (exc instanceof ExpressionError) return [value, exc.message];
-        throw exc;
-      }
+    try {
+      return [this.implementation.visit(schema as YangStatement, value), null];
+    } catch (exc) {
+      if (exc instanceof ExpressionError) return [value, exc.message];
+      throw exc;
     }
-    return [value, null];
   }
 }
 

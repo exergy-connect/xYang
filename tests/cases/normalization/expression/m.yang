@@ -1,0 +1,25 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:normalization-expression";
+  prefix m;
+  import xyang-transform { prefix xt; }
+
+  container entries {
+    presence "Only when supplied";
+    xt:normalize {
+      xt:if 'type == "object"' {
+        xt:apply 'to_entries | {first: .[0]["key"]}';
+      }
+    }
+    leaf first { type string { pattern "alpha"; } mandatory true; }
+  }
+  container characters {
+    presence "Only when supplied";
+    xt:normalize {
+      xt:if 'type == "string"' {
+        xt:apply '{items: split("")}';
+      }
+    }
+    leaf-list items { type string; min-elements 3; max-elements 3; }
+  }
+}

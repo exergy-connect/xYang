@@ -11,7 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
-- Package the shared `xyang-transform` extension module and resolve it by default. TypeScript executes model-defined normalization rules and module-wide dotted-key expansion, including optional `xt:if`.
+- Package the shared `xyang-transform` extension module and execute its model-defined normalization and dotted-key expansion rules.
 
 ## [1.0.4] — 2026-11-16
 

@@ -4,7 +4,9 @@
 `tests/integration/validate/01-bgp-session.yml` and
 `tests/integration/bgp/02-ibgp-ebgp-session.yml`. It demonstrates how a YANG
 model can describe normalization of a YAML topology before xYang validates it.
-It is not a complete model of every Netlab topology.
+It includes additional attributes used by the numbered BGP labs. Some complex
+attributes are retained as opaque data rather than validated. It is not a complete
+model of every Netlab topology; some Netlab forms are not yet supported.
 
 ## Run the example
 
@@ -43,26 +45,24 @@ extensions. `xt:expand-dotted-keys true` is a module-wide setting: for example,
 root-level keys such as `defaults.bgp.as`. Conflicting paths produce a
 `normalize` error instead of overwriting a value.
 
-The `links` list has conditional `xt:normalize` rules. For a string containing
-`-`, its `xt:apply` expression splits the value and constructs a link object:
-`dut-x1` becomes `{left: dut, right: x1}`. A two-endpoint mapping with null
-values, such as `{dut: null, x1: null}`, becomes the same link object. Mappings
-with interface attributes are not transformed; the model reports them as
-unsupported instead of discarding the attributes. An object with both `left` and
-`right` keys is treated as the model's canonical link form.
-The expression uses the first two parts of the split, so this shorthand does not
-represent endpoint names containing hyphens unambiguously.
+The `links` list has conditional `xt:normalize` rules. An empty YAML `links:`
+value becomes an empty list, and `dut-x1` becomes
+`{nodes: [{node: dut}, {node: x1}]}` in one step.
+For mapping entries, `keys(/nodes/name)` selects keys matching topology node
+names. The model moves those keys and their interface attributes into `nodes`,
+while leaving other link attributes in place. A single node represents a stub.
+A mapping containing `nodes` is treated as canonical, so a node named `nodes`
+must use that form. Hyphens in node names are ambiguous in string shorthand.
 
 After normalization, the YANG model checks node references in groups, links,
 and validation targets. It requires an AS for each BGP-enabled node, accepting a
 node, topology, or default AS. Links can connect nodes in the same AS (iBGP) or
-different ASes (eBGP), but cannot connect a node to itself. An empty keyed node
-entry is normalized to an empty object before the AS checks.
+different ASes (eBGP), but cannot connect a node to itself. Boolean loopbacks are retained as `loopback.enabled`, preserving whether they
+were explicitly enabled or disabled. An empty keyed node entry is normalized to an empty object before the AS checks.
 The `_adjust` rules are retained as opaque data: Netlab does not give those
 array entries a guaranteed unique key, and this model does not validate their
 contents.
 
-Normalization is currently implemented in Python; the TypeScript implementation
-preserves these annotations but does not execute them. For rule syntax, error
-behavior, and the supported jq-style expression subset, see
+Python, TypeScript, and Zig support these normalization annotations. For rule
+syntax, error behavior, and the supported jq-style expression subset, see
 [Instance normalization](../../docs/instance-normalization.md).
