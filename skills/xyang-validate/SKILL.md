@@ -117,7 +117,7 @@ A module that fails to parse raises `YangSyntaxError` (or `YangSemanticError`); 
 
 ## Recipe: pick the instance encoding
 
-**RFC 7951 is the default and is strict.** There is no fallback between encodings.
+**RFC 7951 is the default for JSON input and is strict.** There is no fallback between encodings. The Python CLI defaults to native encoding and JSON output for a `.yaml` or `.yml` data file; `--format text` selects text output. JSON files and stdin retain the RFC 7951 and text defaults.
 
 | Value | RFC 7951 (default) | Native (`--native-json`, `native_json=True`, `{ nativeJson: true }`) |
 |---|---|---|

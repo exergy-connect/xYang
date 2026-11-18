@@ -11,6 +11,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 - Python instance normalization with model-defined `xyang-transform` rules and module-wide dotted-key expansion, plus a Netlab topology example. The shared extension module is packaged for Python and TypeScript; TypeScript does not yet execute the normalization rules.
 
+### Changed
+
+- Python `xyang validate` defaults to native encoding and JSON output for YAML data files; `--format text` requests text output.
+
 ### Fixed
 
 - Preserve original input paths for unknown fields produced by dotted-key expansion.

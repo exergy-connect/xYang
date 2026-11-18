@@ -97,12 +97,14 @@ and normalizes link entries. From the xYang repository root, with the Netlab
 repository at `../3rd-party/netlab` and PyYAML installed:
 
 ```sh
-xyang validate --native-json --format json examples/netlab/netlab.yang \
+xyang validate examples/netlab/netlab.yang \
   ../3rd-party/netlab/tests/integration/validate/01-bgp-session.yml
 ```
 
-The result is `{"valid": true, "errors": []}`. `--native-json` enables the
-keyed-list encoding used for `nodes`, `groups`, and `validate`.
+The result is `{"valid": true, "errors": []}`. For YAML data files, the
+Python CLI defaults to JSON output and native encoding, including the keyed-list
+encoding used for `nodes`, `groups`, and `validate`. Use `--format text` to
+request human-readable output.
 
 Both the expressions and the dotted-key setting survive conversion to xYang's
 native JSON Schema form and reload. Python applies them to ordinary documents,

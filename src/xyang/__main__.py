@@ -232,6 +232,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  xyang validate --help\n"
             "  xyang validate -h\n"
             "  xyang validate --format json module.yang data.json\n"
+            "  xyang validate module.yang data.yaml\n"
             "  xyang validate --rpc add-link module.yang rpc-input.json\n"
             "  xyang validate --rpc add-link --output --context state.json module.yang output.json\n"
             "  xyang validate --native-json --rpc add-link module.yang params.json\n"
@@ -252,13 +253,13 @@ def build_parser() -> argparse.ArgumentParser:
     validate_parser.add_argument(
         "--format",
         choices=("text", "json"),
-        default="text",
-        help="Output format: text (default) or json ({valid, errors} on stdout)",
+        default=None,
+        help="Output format: text or json ({valid, errors} on stdout). Default: json for YAML data files; text otherwise.",
     )
     validate_parser.add_argument(
         "--native-json",
         action="store_true",
-        help="Accept native dict-style JSON instead of strict RFC 7951. Default: off (RFC 7951)",
+        help="Accept native dict-style JSON instead of strict RFC 7951. Default: on for YAML data files; off otherwise.",
     )
     validate_parser.add_argument(
         "--rpc",
@@ -267,7 +268,7 @@ def build_parser() -> argparse.ArgumentParser:
         help=(
             "Validate the data as rpc NAME (RFC 7950 §7.14): the RFC 8040 "
             '{"module:input": {...}} wrapper, or {"module:output": {...}} with --output, '
-            "or bare parameters with --native-json. Default direction: input"
+            "or bare parameters with --native-json or a YAML data file. Default direction: input"
         ),
     )
     validate_parser.add_argument(
@@ -475,21 +476,25 @@ def main() -> int:
                     modules=modules,
                     mode=mode,
                 )
+            yaml_input = False
             if args.data_file is not None and str(args.data_file) != "-":
                 data_path = Path(args.data_file)
                 if not data_path.exists():
                     print(f"Error: file not found: {data_path}", file=sys.stderr)
                     return 2
+                yaml_input = data_path.suffix.lower() in (".yaml", ".yml")
                 data = _load_instance_data(data_path)
             else:
                 data = json.load(sys.stdin)
-            if args.format == "json":
-                result = validator.validate_detailed(data, native_json=args.native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
+            native_json = args.native_json or yaml_input
+            output_format = args.format or ("json" if yaml_input else "text")
+            if output_format == "json":
+                result = validator.validate_detailed(data, native_json=native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
                 for warning in result["warnings"]:
                     print(f"Warning: {warning['path']}: {warning['message']}", file=sys.stderr)
                 print(_json_validation_report(result))
                 return 0 if result["valid"] else 1
-            is_valid, errors, warnings = validator.validate(data, native_json=args.native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
+            is_valid, errors, warnings = validator.validate(data, native_json=native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)
             if is_valid:
                 print("Valid.")
                 for w in warnings:

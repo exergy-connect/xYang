@@ -17,10 +17,10 @@ python -m pip install -e . PyYAML
 With the Netlab repository at `../3rd-party/netlab`, run:
 
 ```sh
-xyang validate --native-json --format json examples/netlab/netlab.yang \
+xyang validate examples/netlab/netlab.yang \
   ../3rd-party/netlab/tests/integration/validate/01-bgp-session.yml
 
-xyang validate --native-json --format json examples/netlab/netlab.yang \
+xyang validate examples/netlab/netlab.yang \
   ../3rd-party/netlab/tests/integration/bgp/02-ibgp-ebgp-session.yml
 ```
 
@@ -30,10 +30,10 @@ Expected output:
 {"valid": true, "errors": []}
 ```
 
-`--native-json` accepts Netlab's mappings keyed by name for the `nodes`,
-`groups`, and `validate` lists. The Python CLI reads `.yml` and `.yaml` files
-when PyYAML is installed. Substitute the path to your Netlab checkout if it is
-in a different location.
+For YAML data files, the Python CLI uses native encoding (including Netlab's
+keyed lists) and JSON output by default. It reads `.yml` and `.yaml` files when
+PyYAML is installed. Pass `--format text` for human-readable output. Substitute
+the path to your Netlab checkout if it is in a different location.
 
 ## Model-defined normalization
 
