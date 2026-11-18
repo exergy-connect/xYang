@@ -16,13 +16,15 @@ module xyang-transform {
 
   extension normalize {
     description
-      "A conditional normalization rule, applied to each instance of the
-       annotated node. Its body contains an if and an apply expression.";
+      "A normalization rule, applied to each instance of the annotated node.
+       Its body is xt:apply alone, or xt:if followed by xt:apply.";
   }
 
   extension if {
     argument expression;
-    description "Selects the values to which the rule applies.";
+    description
+      "Optional. Selects the values to which the rule applies. When omitted,
+       xt:apply always runs.";
   }
 
   extension apply {

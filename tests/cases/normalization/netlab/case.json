@@ -81,10 +81,7 @@
           }
         }
       },
-      "valid": true,
-      "xfail": {
-        "ts": "instance normalization is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "ibgp with empty node and keyed link",
@@ -114,10 +111,7 @@
           }
         ]
       },
-      "valid": true,
-      "xfail": {
-        "ts": "instance normalization is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "ebgp link",

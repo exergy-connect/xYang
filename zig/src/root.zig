@@ -49,6 +49,7 @@ test {
     _ = @import("augment_expand.zig");
     _ = @import("semantic_validate.zig");
     _ = @import("ext/capabilities.zig");
+    _ = @import("ext/transform.zig");
     _ = @import("identity_graph.zig");
     _ = @import("if_feature_eval.zig");
     _ = @import("json_value.zig");
