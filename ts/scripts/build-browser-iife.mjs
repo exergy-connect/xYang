@@ -7,6 +7,7 @@ const rootDir = dirname(fileURLToPath(import.meta.url));
 const tsRoot = resolve(rootDir, "..");
 const fsShim = resolve(tsRoot, "src/shims/node-fs-browser.ts");
 const pathShim = resolve(tsRoot, "src/shims/node-path-browser.ts");
+const urlShim = resolve(tsRoot, "src/shims/node-url-browser.ts");
 
 /** @type {import("esbuild").Plugin} */
 const browserBuiltinShims = {
@@ -15,6 +16,7 @@ const browserBuiltinShims = {
     b.onResolve({ filter: /^node:fs$/ }, () => ({ path: fsShim }));
     b.onResolve({ filter: /^fs$/ }, () => ({ path: fsShim }));
     b.onResolve({ filter: /^node:path$/ }, () => ({ path: pathShim }));
+    b.onResolve({ filter: /^node:url$/ }, () => ({ path: urlShim }));
   }
 };
 

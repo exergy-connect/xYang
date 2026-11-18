@@ -187,16 +187,63 @@ def _same(left: Any, right: Any) -> bool:
     return left == right
 
 
+class _ExpandedObject(dict):
+    """A temporary object retaining input pointers for expanded keys."""
+
+    def __init__(self, data: dict, prefix: str):
+        super().__init__(data)
+        self.pointers = {key: _join(prefix, key) for key in data if isinstance(key, str)}
+
+
+def _expand_dotted_object(data: dict, prefix: str) -> tuple[_ExpandedObject, Optional[tuple[str, str]]]:
+    obj = data if isinstance(data, _ExpandedObject) else _ExpandedObject(data, prefix)
+    result = _ExpandedObject({}, prefix)
+    result.update(obj)
+    result.pointers.update(obj.pointers)
+    dotted = [key for key in result if isinstance(key, str) and "." in key]
+    for key in dotted:
+        value = result.pop(key)
+        pointer = result.pointers.pop(key)
+        parts = key.split(".")
+        if any(not part for part in parts):
+            return result, (pointer, f"invalid dotted key {key!r}")
+        current = result
+        for part in parts[:-1]:
+            if part not in current:
+                current[part] = _ExpandedObject({}, pointer)
+                current.pointers[part] = pointer
+            elif not isinstance(current[part], dict):
+                return result, (pointer, f"dotted key {key!r} conflicts with {part!r}")
+            elif not isinstance(current[part], _ExpandedObject):
+                current[part] = _ExpandedObject(current[part], current.pointers[part])
+            else:
+                # Do not mutate an expanded object supplied by an earlier walk.
+                copy = _ExpandedObject({}, pointer)
+                copy.update(current[part])
+                copy.pointers.update(current[part].pointers)
+                current[part] = copy
+            current = current[part]
+        final = parts[-1]
+        if final in current:
+            return result, (pointer, f"dotted key {key!r} conflicts with an existing member")
+        current[final] = value
+        current.pointers[final] = pointer
+    return result, None
+
+
 class _Walk:
     """One iteration over a document. Caches are keyed by schema object id and live for one walk."""
 
     def __init__(self, module: YangModule, parent_module: str, native: bool) -> None:
+        from ..ext.transform import NormalizationVisitor
+
         self.module = module
         self.parent_module = parent_module
         self.native = native
         self._nodes: dict[int, list[YangStatement]] = {}
         self._resolved: dict[tuple[int, str, bool], list[YangStatement]] = {}
         self._unwrapped: dict[int, Any] = {}
+        self.normalization = NormalizationVisitor(module)
 
     def data_nodes(self, schema: Any) -> list[YangStatement]:
         found = self._nodes.get(id(schema))
@@ -302,11 +349,17 @@ class _Walk:
 
     def walk_object(self, data: dict, schema: Any, prefix: str, at_root: bool) -> list[InstanceNode]:
         nodes: list[InstanceNode] = []
+        if self.normalization.expand_dotted_keys:
+            data, error = _expand_dotted_object(data, prefix)
+            if error is not None:
+                pointer, message = error
+                return [InstanceNode(stmt=None, value=None, pointer=pointer, kind="opaque",
+                                     errors=[("normalize", message)], include=False)]
         claimed: set[int] = set()
         for key, raw in data.items():
             if not isinstance(key, str):
                 continue
-            here = _join(prefix, key)
+            here = data.pointers.get(key, _join(prefix, key)) if isinstance(data, _ExpandedObject) else _join(prefix, key)
             hits = self.resolve(key, schema, at_root)
             if len(hits) == 0:
                 nodes.append(InstanceNode(stmt=None, value=raw, pointer=here, kind="unknown", input_key=key))
@@ -325,12 +378,23 @@ class _Walk:
                 continue
             stmt = hits[0]
             if id(stmt) in claimed:
+                if self.normalization.expand_dotted_keys:
+                    nodes.append(InstanceNode(
+                        stmt=None, value=None, pointer=here, kind="ambiguous",
+                        errors=[("normalize", f"member {key!r} conflicts with another spelling of the same node")],
+                        include=False,
+                    ))
                 continue
             claimed.add(id(stmt))
             nodes.append(self.walk_node(raw, stmt, here))
         return nodes
 
     def walk_node(self, raw: Any, stmt: YangStatement, pointer: str) -> InstanceNode:
+        if not isinstance(stmt, (YangListStmt, YangLeafListStmt)):
+            raw, error = self.normalization.visit(stmt, raw)
+            if error is not None:
+                return InstanceNode(stmt=stmt, value=None, pointer=pointer, kind="opaque",
+                                    errors=[("normalize", error)], include=False)
         if isinstance(stmt, YangLeafStmt):
             return self.walk_leaf(raw, stmt, pointer)
         if isinstance(stmt, (YangAnydataStmt, YangAnyxmlStmt)):
@@ -397,7 +461,12 @@ class _Walk:
             )
         items: list[InstanceNode] = []
         for index, item in enumerate(raw):
-            child = self.walk_leaf(item, stmt, f"{pointer}/{index}")
+            item, error = self.normalization.visit(stmt, item)
+            if error is not None:
+                child = InstanceNode(stmt=stmt, value=None, pointer=f"{pointer}/{index}",
+                                     kind="leaf-list-item", errors=[("normalize", error)], include=False)
+            else:
+                child = self.walk_leaf(item, stmt, f"{pointer}/{index}")
             child.kind = "leaf-list-item"
             items.append(child)
         return InstanceNode(stmt=stmt, value=None, pointer=pointer, kind="leaf-list", children=items)
@@ -450,7 +519,8 @@ class _Walk:
             entries = [(str(index), item) for index, item in enumerate(raw)]
             keyed = False
         elif (
-            native and isinstance(raw, dict) and len(keys) == 1 and all(isinstance(item, dict) for item in raw.values())
+            native and isinstance(raw, dict) and len(keys) == 1
+            and (all(isinstance(item, dict) for item in raw.values()) or self.normalization.rules(stmt))
         ):
             entries = list(raw.items())
             keyed = True
@@ -478,6 +548,11 @@ class _Walk:
         key_leaf = self.find_named(stmt, keys[0]) if len(keys) == 1 else None
         for token, item in entries:
             entry_pointer = _join(pointer, token)
+            item, error = self.normalization.visit(stmt, item)
+            if error is not None:
+                children.append(InstanceNode(stmt=stmt, value=None, pointer=entry_pointer, kind="entry",
+                                             errors=[("normalize", error)], include=False))
+                continue
             if not isinstance(item, dict):
                 children.append(
                     InstanceNode(
@@ -525,12 +600,21 @@ def iter_instance(
     when ``data`` is the body of a container such as an rpc ``input``, whose members are
     never namespace-qualified by their own module (RFC 7951 §4).
     """
-    if not isinstance(data, dict):
-        return
-        yield  # pragma: no cover
     root = module if schema is None else schema
     owner = _parent_module(module, root) if parent_module is None else parent_module
     walk = _Walk(module, owner, native_json)
+    walk.normalization.prepare(root, walk.data_nodes)
+    input_was_object = isinstance(data, dict)
+    data, error = walk.normalization.visit(root, data)
+    if error is not None:
+        yield InstanceNode(stmt=None, value=None, pointer="", kind="root",
+                           errors=[("normalize", error)], include=False)
+        return
+    if not isinstance(data, dict):
+        if input_was_object:
+            yield InstanceNode(stmt=None, value=None, pointer="", kind="root",
+                               errors=[("normalize", "root normalization must produce an object")], include=False)
+        return
     yield from walk.walk_object(data, root, "", at_root)
 
 
@@ -570,6 +654,7 @@ def _project_level(
     for node in nodes:
         if node.kind == "unknown":
             out[node.input_key] = node.value
+            mapping[_join(prefix, node.input_key)] = node.pointer
             continue
         if not node.include or node.stmt is None:
             continue

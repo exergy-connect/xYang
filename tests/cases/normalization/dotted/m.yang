@@ -1,0 +1,18 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  import xyang-transform { prefix xt; }
+  xt:expand-dotted-keys true;
+  container defaults {
+    container bgp {
+      leaf as { type uint32; }
+      leaf enabled { type boolean; }
+    }
+  }
+  list nodes {
+    key name;
+    leaf name { type string; }
+    container bgp { leaf as { type uint32; } }
+  }
+}

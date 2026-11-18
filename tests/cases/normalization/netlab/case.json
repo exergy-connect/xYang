@@ -1,0 +1,335 @@
+{
+  "description": "Netlab topology forms, AS inheritance, and link validation",
+  "module": "../../../../examples/netlab/netlab.yang",
+  "instances": [
+    {
+      "name": "mixed ibgp and ebgp topology",
+      "encoding": "native",
+      "data": {
+        "defaults.sources.extra": [
+          "../wait_times.yml"
+        ],
+        "defaults.paths.prepend.plugin": [
+          "topology:../plugin"
+        ],
+        "defaults.interfaces.mtu": 1500,
+        "module": [
+          "bgp",
+          "ospf"
+        ],
+        "plugin": [
+          "bgp.session",
+          "adjust_test"
+        ],
+        "bgp.as": 65000,
+        "ospf.timers.hello": 1,
+        "ospf.timers.dead": 3,
+        "_adjust": [
+          {
+            "nodes": [
+              "dut"
+            ],
+            "features": [
+              "ospf.timers"
+            ],
+            "remove": [
+              "nodes:ospf.timers"
+            ]
+          }
+        ],
+        "groups": {
+          "probes": {
+            "device": "frr",
+            "provider": "clab",
+            "members": [
+              "x1",
+              "x2"
+            ]
+          }
+        },
+        "nodes": {
+          "dut": null,
+          "x1": {
+            "bgp.passive": true,
+            "bgp.session.apply.ibgp": [
+              "passive"
+            ]
+          },
+          "x2": {
+            "bgp.as": 65100,
+            "loopback.ipv4": "172.42.42.1/24",
+            "module": [
+              "bgp"
+            ]
+          }
+        },
+        "links": [
+          {
+            "dut": null,
+            "x1": null
+          },
+          "dut-x2"
+        ],
+        "validate": {
+          "ospf_adj": {
+            "nodes": [
+              "x1"
+            ],
+            "wait": "ospfv2_adj_p2p",
+            "plugin": "ospf_neighbor(x)",
+            "stop_on_error": true
+          }
+        }
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "instance normalization is implemented in Python only"
+      }
+    },
+    {
+      "name": "ibgp with empty node and keyed link",
+      "encoding": "native",
+      "data": {
+        "module": [
+          "bgp"
+        ],
+        "bgp": {
+          "as": 65000
+        },
+        "groups": {
+          "probes": {
+            "members": [
+              "b"
+            ]
+          }
+        },
+        "nodes": {
+          "a": null,
+          "b": {}
+        },
+        "links": [
+          {
+            "a": null,
+            "b": null
+          }
+        ]
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "instance normalization is implemented in Python only"
+      }
+    },
+    {
+      "name": "ebgp link",
+      "encoding": "native",
+      "data": {
+        "module": [
+          "bgp"
+        ],
+        "groups": {
+          "probes": {
+            "members": [
+              "b"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "bgp": {
+              "as": 65000
+            }
+          },
+          "b": {
+            "bgp": {
+              "as": 65100
+            }
+          }
+        },
+        "links": [
+          {
+            "left": "a",
+            "right": "b"
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "node without AS",
+      "encoding": "native",
+      "data": {
+        "module": [
+          "bgp"
+        ],
+        "groups": {
+          "probes": {
+            "members": [
+              "b"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {},
+          "b": {
+            "bgp": {
+              "as": 65100
+            }
+          }
+        },
+        "links": [
+          {
+            "left": "a",
+            "right": "b"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/nodes/a",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "self link",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        },
+        "links": [
+          {
+            "left": "a",
+            "right": "a"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "unknown endpoint",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "b"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {},
+          "b": {}
+        },
+        "links": [
+          {
+            "left": "a",
+            "right": "missing"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0/right",
+          "code": "leafref"
+        }
+      ]
+    },
+    {
+      "name": "nonempty interface attributes are not discarded",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "b"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {},
+          "b": {}
+        },
+        "links": [
+          {
+            "a": {
+              "mtu": 1500
+            },
+            "b": null
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0/left",
+          "code": "mandatory"
+        },
+        {
+          "path": "/links/0/right",
+          "code": "mandatory"
+        },
+        {
+          "path": "/links/0",
+          "code": "must"
+        },
+        {
+          "path": "/links/0/a",
+          "code": "unknown-field"
+        },
+        {
+          "path": "/links/0/b",
+          "code": "unknown-field"
+        }
+      ]
+    },
+    {
+      "name": "canonical link with null endpoints is not reinterpreted as shorthand",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "left"
+            ]
+          }
+        },
+        "nodes": {
+          "left": {},
+          "right": {}
+        },
+        "links": [
+          {
+            "left": null,
+            "right": null
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0",
+          "code": "must"
+        }
+      ],
+      "xfail": {
+        "ts": "TypeScript also reports leafref errors for null endpoint values"
+      }
+    }
+  ]
+}

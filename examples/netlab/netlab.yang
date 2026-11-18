@@ -1,0 +1,404 @@
+module netlab {
+  yang-version 1.1;
+  namespace "https://netlab.tools/yang/topology";
+  prefix nl;
+
+  import xyang-transform {
+    prefix xt;
+  }
+
+  xt:expand-dotted-keys true;
+
+  organization "xYang examples";
+  contact "https://github.com/exergy-connect/xYang";
+  description
+    "Topology model for the netlab integration labs
+     tests/integration/bgp/01-ebgp-session.yml and 02-ibgp-ebgp-session.yml.
+
+     Dotted YAML keys are expanded (defaults.bgp.as, bgp.as, loopback.ipv4).
+     A hyphen link such as dut-x1 is the pair of leafrefs left and right.
+     Group members and validation targets are leafrefs to node names.
+     With module bgp, every node needs an AS from the node, topology, or defaults.
+     Links may connect peers in the same AS (IBGP) or different ASes (EBGP).";
+
+  revision "2026-11-18" {
+    description
+      "Initial model covering the baseline IPv4 EBGP session lab.";
+  }
+
+  typedef device-type {
+    type enumeration {
+      enum arcos;
+      enum arubacx;
+      enum asav;
+      enum cat8000v;
+      enum cisco8000v;
+      enum crpd;
+      enum csr;
+      enum csrx;
+      enum cumulus;
+      enum cumulus_nvue;
+      enum dellos10;
+      enum eos;
+      enum exergy-lab;
+      enum exos;
+      enum fortios;
+      enum frr;
+      enum iol;
+      enum ioll2;
+      enum ios;
+      enum iosv;
+      enum iosvl2;
+      enum iosxr;
+      enum junos;
+      enum linux;
+      enum netscaler;
+      enum none;
+      enum nxos;
+      enum ocnos;
+      enum openbsd;
+      enum routeros;
+      enum routeros7;
+      enum sonic;
+      enum srlinux;
+      enum srsim;
+      enum sros;
+      enum unknown;
+      enum vjunos-router;
+      enum vjunos-switch;
+      enum vmx;
+      enum voss;
+      enum vpp;
+      enum vptx;
+      enum vsrx;
+      enum vyos;
+      enum xr;
+    }
+    description
+      "Device types shipped in netsim/devices. This lab uses frr for the probes.";
+  }
+
+  typedef provider {
+    type enumeration {
+      enum libvirt;
+      enum clab;
+      enum external;
+    }
+    description "Virtualization provider. This lab runs probes under clab.";
+  }
+
+  typedef module-name {
+    type enumeration {
+      enum bfd;
+      enum bgp;
+      enum dhcp;
+      enum eigrp;
+      enum evpn;
+      enum gateway;
+      enum isis;
+      enum lag;
+      enum mpls;
+      enum ospf;
+      enum ripv2;
+      enum routing;
+      enum services;
+      enum sr;
+      enum srv6;
+      enum stp;
+      enum vlan;
+      enum vrf;
+      enum vxlan;
+    }
+    description "Optional configuration module. This lab enables bgp.";
+  }
+
+  typedef asn {
+    type uint32 {
+      range "1..4294967295";
+    }
+    description "4-octet autonomous system number.";
+  }
+
+  typedef ipv4-prefix {
+    type string {
+      pattern
+        '(([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])\.){3}'
+        + '([0-9]|[1-9][0-9]|1[0-9][0-9]|2[0-4][0-9]|25[0-5])'
+        + '/([1-9]|[12][0-9]|3[0-2])';
+    }
+    description "IPv4 prefix in CIDR form, such as 172.42.42.1/24.";
+  }
+
+  typedef node-name {
+    type string {
+      pattern '[A-Za-z_][A-Za-z0-9_-]{0,15}';
+    }
+    description
+      "Netlab node identifier: a letter or underscore, then up to 15 more
+       letters, digits, underscores, or hyphens.";
+  }
+
+  typedef wait-time {
+    type union {
+      type uint32;
+      type enumeration {
+        enum ping;
+        enum ping_vrf;
+        enum ping_long;
+        enum vxlan_ping;
+        enum ping_stp;
+        enum ping_irb;
+        enum ping_evpn;
+        enum ra_send;
+        enum ospfv2_adj_p2p;
+        enum ospfv2_adj_lan;
+        enum ospfv2_adj_stp;
+        enum ospfv2_spf;
+        enum ospfv2_spf_long;
+        enum ospfv3_adj_p2p;
+        enum ospfv3_adj_lan;
+        enum ospfv3_adj_stp;
+        enum ospfv3_spf;
+        enum ospfv3_spf_long;
+        enum ospf_gr_helper;
+        enum ospf_import;
+        enum ebgp_session;
+        enum ibgp_session;
+        enum bgp_af_activate;
+        enum bgp_scan_time;
+        enum bgp_scan_long;
+        enum bgp_v4_originate;
+        enum bgp_v6_originate;
+        enum bgp_v4_redist;
+        enum bgp_v6_redist;
+        enum isis_adj_p2p;
+        enum isis_adj_lan;
+        enum isis_spf;
+        enum isis_spf_long;
+        enum isis_redist;
+        enum rip_start;
+        enum rip_update;
+        enum ldp_adj;
+        enum stp_forwarding;
+        enum lacp_setup;
+        enum bfd_init;
+      }
+    }
+    description
+      "Validation wait: seconds, or a const.validate name from the integration
+       wait_times.yml included by this lab. The lab uses ebgp_session and
+       bgp_scan_time.";
+  }
+
+
+  leaf message {
+    type string;
+    description "Text printed after netlab initial or netlab up.";
+  }
+
+  container defaults {
+    description "Topology defaults. defaults.bgp.as applies to nodes that omit bgp/as.";
+
+    container sources {
+      description "Extra defaults files merged before this topology.";
+      leaf-list extra {
+        type string;
+        description "Path of an extra defaults file, such as ../wait_times.yml.";
+      }
+    }
+
+    container bgp {
+      description "Default BGP parameters (defaults.bgp).";
+      leaf as {
+        type asn;
+        description "AS used by every BGP node that does not set bgp/as.";
+      }
+    }
+
+    container paths {
+      container prepend {
+        leaf-list plugin { type string; }
+      }
+    }
+
+    container interfaces {
+      leaf mtu { type uint16 { range "1..65535"; } }
+    }
+  }
+
+  leaf-list module {
+    type module-name;
+    description "Configuration modules enabled for nodes that do not override them.";
+  }
+
+  leaf-list plugin { type string; }
+
+  container bgp {
+    leaf as { type asn; }
+  }
+
+  container ospf {
+    container timers {
+      leaf hello { type uint16; }
+      leaf dead { type uint16; }
+    }
+  }
+
+  anydata _adjust {
+    description
+      "Netlab adjustment rules are opaque here. They are an array of objects
+       without a guaranteed unique key, so they cannot be a configuration list.";
+  }
+
+  list groups {
+    key name;
+    description "Node groups. This lab's probes group selects the external routers.";
+
+    leaf name {
+      type node-name;
+    }
+
+    leaf device {
+      type device-type;
+      description "Device type copied onto members that do not set their own.";
+    }
+
+    leaf provider {
+      type provider;
+      description "Virtualization provider copied onto members.";
+    }
+
+    leaf-list members {
+      type leafref {
+        path "/nodes/name";
+        require-instance true;
+      }
+      description "Member node names.";
+    }
+
+    must "not(/nodes[name = current()/name])" {
+      error-message "A group name must not be the same as a node name.";
+    }
+
+    min-elements 1;
+  }
+
+  list nodes {
+    key name;
+    min-elements 1;
+    xt:normalize {
+      xt:if 'type == "null"';
+      xt:apply '{}';
+    }
+    description "Lab devices, keyed by their Netlab node names.";
+
+    must "not((not(module) and /module = 'bgp') or module = 'bgp') or bgp/as or /bgp/as or /defaults/bgp/as" {
+      error-message
+        "BGP is enabled but no node, topology, or default AS is set.";
+    }
+
+    leaf name {
+      type node-name;
+    }
+
+    container bgp {
+      description "Per-node BGP parameters. An absent AS inherits the topology or default AS.";
+      leaf as {
+        type asn;
+      }
+      leaf passive { type boolean; }
+      container session {
+        container apply {
+          leaf-list ibgp { type string; }
+        }
+      }
+    }
+
+    leaf-list module { type module-name; }
+
+    container loopback {
+      description "Static loopback address. x2 originates 172.42.42.1/24.";
+      leaf ipv4 {
+        type ipv4-prefix;
+      }
+    }
+  }
+
+  list links {
+    key "left right";
+    xt:normalize {
+      xt:if 'type == "string" and contains("-")';
+      xt:apply 'split("-") | {left: .[0], right: .[1]}';
+    }
+    xt:normalize {
+      xt:if 'type == "object" and length == 2 and (has("left") == false or has("right") == false) and (to_entries | .[0]["value"] == null) and (to_entries | .[1]["value"] == null)';
+      xt:apply 'to_entries | {left: .[0]["key"], right: .[1]["key"]}';
+    }
+    description
+      "Point-to-point links. dut-x1 is left=dut, right=x1.";
+
+    must "left != right" {
+      error-message "A link cannot connect a node to itself.";
+    }
+
+    leaf left {
+      type leafref {
+        path "/nodes/name";
+        require-instance true;
+      }
+    }
+
+    leaf right {
+      type leafref {
+        path "/nodes/name";
+        require-instance true;
+      }
+    }
+  }
+
+  list validate {
+    key name;
+    description "Lab validation tests. nodes are leafrefs; wait is a known constant or a number of seconds.";
+
+    leaf name {
+      type node-name;
+      description "Test name, such as session or prefix.";
+    }
+
+    leaf description {
+      type string;
+    }
+
+    leaf wait_msg {
+      type string;
+      description "Message printed while the test waits.";
+    }
+
+    leaf stop_on_error { type boolean; }
+
+    leaf wait {
+      type wait-time;
+      description "Seconds, or a name from const.validate (ebgp_session, bgp_scan_time).";
+    }
+
+    leaf-list nodes {
+      type leafref {
+        path "/nodes/name";
+        require-instance true;
+      }
+      min-elements 1;
+      description "Nodes that execute this test.";
+    }
+
+    leaf plugin {
+      type string;
+      description
+        "Validation plugin expression, such as bgp_neighbor(node.bgp.neighbors,'dut')
+         or bgp_prefix('172.42.42.0/24').";
+    }
+
+    must "plugin" {
+      error-message "A validation test needs a plugin expression.";
+    }
+  }
+}
