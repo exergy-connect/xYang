@@ -1,12 +1,11 @@
 # Instance normalization
 
-Python xYang can normalize instance data as it walks the document for validation.
+xYang can normalize instance data as it walks the document for validation.
 The rules are declared in the YANG model using the extensions in
 [`shared/xyang-transform.yang`](../shared/xyang-transform.yang). They apply to
 JSON and YAML input; they do not modify the caller's input object.
 
-Normalization is currently implemented in Python. TypeScript preserves the
-extension annotations but does not execute them.
+Python, TypeScript, and Zig execute the same documented expression subset.
 
 ## Expand dotted keys
 
@@ -49,9 +48,10 @@ statement is allowed only at module level.
 ## Normalize individual values
 
 Attach `xt:normalize` to a modeled node to transform its input value. Each rule
-contains exactly one `xt:if` followed by one `xt:apply`. Both arguments are
-jq-style expressions; `.` is the current value. If the condition is true,
-`xt:apply` produces the replacement. Otherwise the value is unchanged.
+contains one `xt:apply`, optionally preceded by one `xt:if`. Both arguments are
+jq-style expressions; `.` is the current value. When `xt:if` is present and
+true, or when it is omitted, `xt:apply` produces the replacement. Otherwise the
+value is unchanged.
 
 ```yang
 list links {
@@ -73,7 +73,7 @@ choose an expression appropriate to their accepted input.
 
 Rules on a node run in source order, and a parent is normalized before its
 children. On a list or leaf-list, a rule applies to each entry. Missing nodes
-are not created. Python supports this expression subset:
+are not created. The expression subset is:
 
 - `.`, `.[N]`, `.["key"]`, strings, nonnegative integers,
   `true`, `false`, and `null`.
@@ -107,5 +107,5 @@ encoding used for `nodes`, `groups`, and `validate`. Use `--format text` to
 request human-readable output.
 
 Both the expressions and the dotted-key setting survive conversion to xYang's
-native JSON Schema form and reload. Python applies them to ordinary documents,
-operation parameters, and operation context.
+native JSON Schema form and reload. All three implementations apply them to
+ordinary documents, operation parameters, and operation context.

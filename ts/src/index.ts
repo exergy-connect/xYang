@@ -32,6 +32,7 @@ export type { ModuleData } from "./validator/if-feature-eval";
 export { ValidatorExtension } from "./validator/validator-extension";
 export type { AnydataValidationConfigInput } from "./ext/anydata_validation";
 export { parseAnydataExtensionConfig } from "./ext/anydata_validation";
+export { ExpressionError, Normalization } from "./ext/transform";
 export { YangModule, YangStatement };
 export type { YangIdentifierRef } from "./core/identifier-ref";
 export {

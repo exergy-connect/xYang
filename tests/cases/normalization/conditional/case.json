@@ -2,16 +2,13 @@
   "description": "Conditional model-defined normalization runs before validation, preserving paths and passing through unmatched entries.",
   "module": "m.yang",
   "instances": [
-    {"name": "shorthand link", "data": {"nodes": [{"name": "a"}, {"name": "b"}], "links": ["a-b"]}, "valid": true,
-     "xfail": {"ts": "normalization is implemented in Python only"}},
+    {"name": "shorthand link", "data": {"nodes": [{"name": "a"}, {"name": "b"}], "links": ["a-b"]}, "valid": true},
     {"name": "already normalized", "data": {"nodes": [{"name": "a"}, {"name": "b"}], "links": [{"left": "a", "right": "b"}]}, "valid": true},
     {"name": "unknown endpoint", "data": {"nodes": [{"name": "a"}], "links": ["a-b"]}, "valid": false,
-     "errors": [{"path": "/links/0/right", "code": "leafref"}],
-     "xfail": {"ts": "normalization is implemented in Python only"}},
+     "errors": [{"path": "/links/0/right", "code": "leafref"}]},
     {"name": "nonmatching string remains invalid", "data": {"links": ["abc"]}, "valid": false,
      "errors": [{"path": "/links/0", "code": "type"}]},
     {"name": "expression error", "data": {"label": 1}, "valid": false,
-     "errors": [{"path": "/label", "code": "normalize", "message": "split requires string"}],
-     "xfail": {"ts": "normalization is implemented in Python only"}}
+     "errors": [{"path": "/label", "code": "normalize", "message": "split requires string"}]}
   ]
 }

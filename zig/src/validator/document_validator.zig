@@ -211,19 +211,19 @@ pub const DocumentValidator = struct {
         }
         var walk_keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = target.module_name };
         var walk: instance.Walk = .{ .a = self.a, .module = run.host, .native = run.native, .keys = &walk_keys, .checker = self.checker };
-        const nodes = try walk.walkObject(params.object, run.operation, "", false);
+        const nodes = try walk.iterDocument(params, run.operation, false);
         const projection = try instance.project(self.a, self.keys, nodes.items);
         const canonical = projection.data;
         try appendEncodingErrors(self.a, &out, nodes.items);
 
         var root_data = try self.a.create(Object);
         root_data.* = .empty;
-        if (run.context) |c| if (c == .object) {
+        if (run.context) |c| {
             var context_keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = run.host.name };
             var context_walk: instance.Walk = .{ .a = self.a, .module = run.host, .native = run.native, .keys = &context_keys, .checker = self.checker };
-            const context_nodes = try context_walk.walkObject(c.object, null, "", true);
+            const context_nodes = try context_walk.iterDocument(c, null, true);
             root_data = (try instance.project(self.a, self.keys, context_nodes.items)).data;
-        };
+        }
 
         const root = try xpath.node.newNode(self.a, .{ .object = root_data }, .{ .module = self.module }, null);
         var holder = root_data;

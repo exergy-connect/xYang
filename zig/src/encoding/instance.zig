@@ -11,6 +11,7 @@ const ast = @import("../ast.zig");
 const jv = @import("../json_value.zig");
 const module_mod = @import("../module.zig");
 const registry = @import("../types/registry.zig");
+const transform = @import("../ext/transform.zig");
 const rfc7951 = @import("rfc7951.zig");
 const type_checker = @import("../validator/type_checker.zig");
 
@@ -109,7 +110,69 @@ pub const Walk = struct {
     native: bool,
     keys: *rfc7951.MemberKeys,
     checker: *type_checker.TypeChecker,
+    normalization: transform.Normalization = undefined,
+    expanded_objects: std.AutoHashMapUnmanaged(*jv.Object, *transform.ExpandedObject) = .empty,
     data_nodes_cache: std.AutoHashMapUnmanaged(*const Statement, []const *const Statement) = .empty,
+
+    pub fn initNormalization(self: *Walk) Error!void {
+        var message: []const u8 = "";
+        self.normalization = transform.Normalization.init(self.a, self.module, &message) catch |err| switch (err) {
+            error.Raised => {
+                self.checker.unsupported = message;
+                return error.Raised;
+            },
+            else => return err,
+        };
+    }
+
+    fn raise(self: *Walk, message: []const u8) Error {
+        self.checker.unsupported = message;
+        self.normalization.message = message;
+        return error.Raised;
+    }
+
+    fn statementsOf(self: *Walk, schema: ?*const Statement) []const *Statement {
+        return if (schema) |s| s.statements.items else self.module.statements.items;
+    }
+
+    /// Document entry: prepare rules, visit the root, then walk the object.
+    pub fn iterDocument(self: *Walk, data: Val, schema: ?*const Statement, at_root: bool) Error!std.ArrayList(*Node) {
+        try self.initNormalization();
+        const prepareChildren = struct {
+            fn call(walk: *Walk, s: ?*const Statement) Error![]const *const Statement {
+                return walk.dataNodes(s);
+            }
+        }.call;
+        if (schema) |s| {
+            self.normalization.prepareStmt(s, prepareChildren, self) catch |err| switch (err) {
+                error.Raised => return self.raise(self.normalization.message),
+                else => return err,
+            };
+        } else {
+            self.normalization.prepareModule(self.module, prepareChildren, self) catch |err| switch (err) {
+                error.Raised => return self.raise(self.normalization.message),
+                else => return err,
+            };
+        }
+        const input_was_object = data == .object;
+        const transformed, const error_message = self.normalization.visit(schema, self.statementsOf(schema), data) catch |err| switch (err) {
+            error.Raised => return self.raise(self.normalization.message),
+            else => return err,
+        };
+        if (error_message) |message| {
+            var out: std.ArrayList(*Node) = .empty;
+            try out.append(self.a, try self.errNode(null, "", .opaque_node, "normalize", message));
+            return out;
+        }
+        if (transformed != .object) {
+            var out: std.ArrayList(*Node) = .empty;
+            if (input_was_object) {
+                try out.append(self.a, try self.errNode(null, "", .opaque_node, "normalize", "root normalization must produce an object"));
+            }
+            return out;
+        }
+        return self.walkObject(transformed.object, schema, "", at_root);
+    }
 
     /// `_data_nodes`: data children, through `choice` and `case`.
     fn dataNodesOf(self: *Walk, out: *std.ArrayList(*const Statement), statements: []const *Statement) error{OutOfMemory}!void {
@@ -272,11 +335,22 @@ pub const Walk = struct {
     pub fn walkObject(self: *Walk, data: *const jv.Object, schema: ?*const Statement, prefix: []const u8, at_root: bool) Error!std.ArrayList(*Node) {
         var nodes: std.ArrayList(*Node) = .empty;
         var claimed: std.AutoHashMapUnmanaged(*const Statement, void) = .empty;
-        var it = data.iterator();
+        var object = data;
+        var expanded: ?transform.ExpandedObject = null;
+        if (self.normalization.expand_dotted_keys) {
+            const result = try transform.expandDottedObject(self.a, data, prefix, &self.expanded_objects);
+            if (result[1]) |err| {
+                try nodes.append(self.a, try self.errNode(null, err[0], .opaque_node, "normalize", err[1]));
+                return nodes;
+            }
+            expanded = result[0];
+            object = result[0].object;
+        }
+        var it = object.iterator();
         while (it.next()) |e| {
             const key = e.key_ptr.*;
             const raw = e.value_ptr.*;
-            const here = try join(self.a, prefix, key);
+            const here = if (expanded) |ex| try transform.memberPointer(&ex, key, prefix, self.a) else try join(self.a, prefix, key);
             const hits = try self.resolve(key, schema, at_root);
             if (hits.len == 0) {
                 try nodes.append(self.a, try self.newNode(.{ .stmt = null, .value = raw, .pointer = here, .kind = .unknown, .input_key = key }));
@@ -287,14 +361,32 @@ pub const Walk = struct {
                 continue;
             }
             const stmt = hits[0];
-            if (claimed.contains(stmt)) continue;
+            if (claimed.contains(stmt)) {
+                if (self.normalization.expand_dotted_keys) {
+                    try nodes.append(self.a, try self.errNode(null, here, .ambiguous, "normalize", try self.a.print("member {f} conflicts with another spelling of the same node", .{@import("../pyfmt.zig").repr(key)})));
+                }
+                continue;
+            }
             try claimed.put(self.a, stmt, {});
             try nodes.append(self.a, try self.walkNode(raw, stmt, here));
         }
         return nodes;
     }
 
-    fn walkNode(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8) Error!*Node {
+    fn visitValue(self: *Walk, stmt: *const Statement, value: Val) Error!struct { Val, ?[]const u8 } {
+        return self.normalization.visit(stmt, stmt.statements.items, value) catch |err| switch (err) {
+            error.Raised => return self.raise(self.normalization.message),
+            else => return err,
+        };
+    }
+
+    fn walkNode(self: *Walk, raw_in: Val, stmt: *const Statement, pointer: []const u8) Error!*Node {
+        var raw = raw_in;
+        if (stmt.kind() != .list and stmt.kind() != .leaf_list) {
+            const transformed, const error_message = try self.visitValue(stmt, raw);
+            if (error_message) |message| return self.errNode(stmt, pointer, .opaque_node, "normalize", message);
+            raw = transformed;
+        }
         switch (stmt.kind()) {
             .leaf => return self.walkLeaf(raw, stmt, pointer),
             .anydata, .anyxml => return self.newNode(.{ .stmt = stmt, .value = raw, .pointer = pointer, .kind = .anydata }),
@@ -346,7 +438,13 @@ pub const Walk = struct {
         if (raw != .array) return self.errNode(stmt, pointer, .leaf_list, "type", "leaf-list must be an array");
         const n = try self.newNode(.{ .stmt = stmt, .pointer = pointer, .kind = .leaf_list });
         for (raw.array, 0..) |item, i| {
-            const child = try self.walkLeaf(item, stmt, try self.a.print("{s}/{d}", .{ pointer, i }));
+            const entry_pointer = try self.a.print("{s}/{d}", .{ pointer, i });
+            const transformed, const error_message = try self.visitValue(stmt, item);
+            if (error_message) |message| {
+                try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .leaf_list_item, "normalize", message));
+                continue;
+            }
+            const child = try self.walkLeaf(transformed, stmt, entry_pointer);
             child.kind = .leaf_list_item;
             try n.children.append(self.a, child);
         }
@@ -402,9 +500,10 @@ pub const Walk = struct {
         const Entry = struct { token: []const u8, item: Val };
         var entries: std.ArrayList(Entry) = .empty;
         var keyed = false;
+        const has_rules = (try self.normalization.rules(stmt, stmt.statements.items)).len > 0;
         if (raw == .array) {
             for (raw.array, 0..) |item, i| try entries.append(self.a, .{ .token = try self.a.print("{d}", .{i}), .item = item });
-        } else if (self.native and raw == .object and keys.len == 1 and allObjects(raw.object)) {
+        } else if (self.native and raw == .object and keys.len == 1 and (allObjects(raw.object) or has_rules)) {
             var it = raw.object.iterator();
             while (it.next()) |e| try entries.append(self.a, .{ .token = e.key_ptr.*, .item = e.value_ptr.* });
             keyed = true;
@@ -417,11 +516,16 @@ pub const Walk = struct {
         const key_leaf: ?*const Statement = if (keys.len == 1) try self.findNamed(stmt, keys[0]) else null;
         for (entries.items) |entry| {
             const entry_pointer = try join(self.a, pointer, entry.token);
-            if (entry.item != .object) {
+            const transformed, const error_message = try self.visitValue(stmt, entry.item);
+            if (error_message) |message| {
+                try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .entry, "normalize", message));
+                continue;
+            }
+            if (transformed != .object) {
                 try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .entry, "type", "list item must be an object"));
                 continue;
             }
-            var body = try self.walkObject(entry.item.object, stmt, entry_pointer, false);
+            var body = try self.walkObject(transformed.object, stmt, entry_pointer, false);
             if (keyed) if (key_leaf) |kl| if (kl.kind() == .leaf) {
                 const converted = try self.convertKey(entry.token, kl);
                 const key_token = if (kl.name.len > 0) kl.name else keys[0];
@@ -491,6 +595,7 @@ fn projectLevel(a: Allocator, keys: *rfc7951.MemberKeys, nodes: []const *Node, p
     for (nodes) |n| {
         if (n.kind == .unknown) {
             try out.put(a, n.input_key, n.value);
+            try map.put(a, try join(a, prefix, n.input_key), n.pointer);
             continue;
         }
         if (!n.include) continue;
