@@ -1,0 +1,22 @@
+{
+  "description": "Map split string values directly to list entries with model-selected field names.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "endpoint objects from a string",
+      "data": {"inventory": [{"name": "a"}, {"name": "b"}], "connections": ["a-b"]},
+      "valid": true
+    },
+    {
+      "name": "unknown split endpoint is rejected",
+      "data": {"inventory": [{"name": "a"}], "connections": ["a-missing"]},
+      "valid": false,
+      "errors": [{"path": "/connections/0/members/1/id", "code": "leafref"}]
+    },
+    {
+      "name": "empty delimiter splits Unicode code points",
+      "data": {"characters": "aé😀"},
+      "valid": true
+    }
+  ]
+}

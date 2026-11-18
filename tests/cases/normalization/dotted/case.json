@@ -7,10 +7,7 @@
       "data": {
         "defaults.bgp.as": 65000
       },
-      "valid": true,
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "nested dotted key in array",
@@ -22,10 +19,7 @@
           }
         ]
       },
-      "valid": true,
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "native keyed list",
@@ -37,10 +31,7 @@
           }
         }
       },
-      "valid": true,
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "merge distinct nested keys",
@@ -52,10 +43,7 @@
         },
         "defaults.bgp.as": 65000
       },
-      "valid": true,
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "collision",
@@ -73,10 +61,7 @@
           "path": "/defaults.bgp.as",
           "code": "normalize"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     },
     {
       "name": "scalar collision",
@@ -90,10 +75,7 @@
           "path": "/defaults.bgp.as",
           "code": "normalize"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     },
     {
       "name": "invalid empty segment",
@@ -106,10 +88,7 @@
           "path": "/defaults..bgp",
           "code": "normalize"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     },
     {
       "name": "type error points to original dotted key",
@@ -127,10 +106,7 @@
           "path": "/nodes/0/bgp.as",
           "code": "type"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     },
     {
       "name": "nested spelling remains valid",
@@ -159,10 +135,7 @@
           "path": "/m:defaults.bgp.as",
           "code": "normalize"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     },
     {
       "name": "unknown sibling retains its source pointer",
@@ -178,10 +151,7 @@
           "path": "/defaults.paths.prepend.plugin",
           "code": "unknown-field"
         }
-      ],
-      "xfail": {
-        "ts": "dotted-key expansion is implemented in Python only"
-      }
+      ]
     }
   ]
 }

@@ -13,6 +13,8 @@ const module_mod = @import("../module.zig");
 const registry = @import("../types/registry.zig");
 const rfc7951 = @import("rfc7951.zig");
 const type_checker = @import("../validator/type_checker.zig");
+const normalize = @import("normalize.zig");
+const xpath = @import("../xpath/xpath.zig");
 
 const Allocator = std.mem.Allocator;
 const Statement = ast.Statement;
@@ -110,6 +112,304 @@ pub const Walk = struct {
     keys: *rfc7951.MemberKeys,
     checker: *type_checker.TypeChecker,
     data_nodes_cache: std.AutoHashMapUnmanaged(*const Statement, []const *const Statement) = .empty,
+    dotted_pointers: std.AutoHashMapUnmanaged(*const jv.Object, std.StringHashMapUnmanaged([]const u8)) = .empty,
+    root_input: ?*const jv.Object = null,
+    root_schema: ?*const Statement = null,
+    root_at_root: bool = true,
+    root_canonical: ?*jv.Object = null,
+    skip_projection: bool = false,
+    prepared: bool = false,
+
+    const Transform = struct { value: Val, message: ?[]const u8 = null };
+
+    fn isTransform(stmt: *const Statement, name: []const u8) bool {
+        if (stmt.kind() != .extension_invocation) return false;
+        const inv = stmt.data.extension_invocation;
+        return std.mem.eql(u8, inv.resolved_module, "xyang-transform") and std.mem.eql(u8, inv.resolved_extension.name, name);
+    }
+
+    fn hasNormalize(stmt: *const Statement) bool {
+        for (stmt.statements.items) |child| if (isTransform(child, "normalize")) return true;
+        return false;
+    }
+
+    fn applyRule(self: *Walk, value: Val, condition: *const Statement, action: *const Statement) error{OutOfMemory}!Transform {
+        const test_expr = condition.data.extension_invocation.argument orelse return .{ .value = value, .message = "xt:if requires an expression" };
+        const apply = action.data.extension_invocation.argument orelse return .{ .value = value, .message = "xt:apply requires an expression" };
+        var predicate: normalize.Evaluator = .{ .a = self.a, .text = test_expr };
+        const decision = predicate.run(value) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidExpression => return .{ .value = value, .message = predicate.message },
+        };
+        const selected = switch (decision) {
+            .null => false,
+            .bool => |b| b,
+            else => true,
+        };
+        if (!selected) return .{ .value = value };
+        if (try normalize.stringMapping(self.a, apply)) |mapping| {
+            if (value != .string) return .{ .value = value, .message = "split requires string input and argument" };
+            var rows: std.ArrayList(Val) = .empty;
+            if (mapping.delimiter.len == 0) {
+                var offset: usize = 0;
+                while (offset < value.string.len) {
+                    const width = std.unicode.utf8ByteSequenceLength(value.string[offset]) catch 1;
+                    const end = @min(offset + width, value.string.len);
+                    const row = try self.a.create(jv.Object);
+                    row.* = .empty;
+                    try row.put(self.a, mapping.field, .{ .string = value.string[offset..end] });
+                    try rows.append(self.a, .{ .object = row });
+                    offset = end;
+                }
+            } else {
+                var parts = std.mem.splitSequence(u8, value.string, mapping.delimiter);
+                while (parts.next()) |part| {
+                    const row = try self.a.create(jv.Object);
+                    row.* = .empty;
+                    try row.put(self.a, mapping.field, .{ .string = part });
+                    try rows.append(self.a, .{ .object = row });
+                }
+            }
+            const result = try self.a.create(jv.Object);
+            result.* = .empty;
+            try result.put(self.a, mapping.target, .{ .array = rows.items });
+            return .{ .value = .{ .object = result } };
+        }
+        if (normalize.projection(apply)) |projection| {
+            if (self.skip_projection) return .{ .value = value };
+            return self.projectKeys(value, projection);
+        }
+        var expression: normalize.Evaluator = .{ .a = self.a, .text = apply };
+        const result = expression.run(value) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidExpression => return .{ .value = value, .message = expression.message },
+        };
+        return .{ .value = result };
+    }
+
+    fn projectKeys(self: *Walk, value: Val, spec: normalize.Projection) error{OutOfMemory}!Transform {
+        if (value != .object) return .{ .value = value, .message = "key projection requires an object" };
+        const raw_root = self.root_input orelse return .{ .value = value, .message = "key projection requires an instance root" };
+        if (self.root_canonical == null) {
+            var snapshot: Walk = .{ .a = self.a, .module = self.module, .native = self.native, .keys = self.keys, .checker = self.checker, .skip_projection = true };
+            const nodes = snapshot.walkObject(raw_root, self.root_schema, "", self.root_at_root) catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => return .{ .value = value, .message = "failed to build XPath snapshot" },
+            };
+            self.root_canonical = (try project(self.a, self.keys, nodes.items)).data;
+        }
+        var parser = try xpath.Parser.init(self.a, spec.path);
+        const expression = parser.parse() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .value = value, .message = "invalid key projection XPath" },
+        };
+        const root: xpath.Node = .{ .data = .{ .object = self.root_canonical.? }, .schema = if (self.root_schema) |schema| .{ .stmt = @constCast(schema) } else .{ .module = self.module } };
+        var evaluator: xpath.Evaluator = .{ .a = self.a };
+        const result = evaluator.eval(expression, .{ .current = &root, .root = &root }, &root) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .value = value, .message = "key projection XPath failed" },
+        };
+        if (result != .nodes) return .{ .value = value, .message = "keys XPath must select string nodes" };
+        var names: std.StringHashMapUnmanaged(void) = .empty;
+        for (result.nodes) |node| {
+            if (node.data != .string) return .{ .value = value, .message = "keys XPath must select string nodes" };
+            try names.put(self.a, node.data.string, {});
+        }
+        var has_match = false;
+        for (value.object.keys()) |key| if (names.contains(key)) {
+            has_match = true;
+            break;
+        };
+        if (!has_match) return .{ .value = value };
+        if (value.object.contains(spec.target)) return .{ .value = value, .message = "projection target already exists" };
+        const out = try self.a.create(jv.Object);
+        out.* = .empty;
+        var rows: std.ArrayList(Val) = .empty;
+        var it = value.object.iterator();
+        while (it.next()) |entry| {
+            const key = entry.key_ptr.*;
+            const item = entry.value_ptr.*;
+            if (!names.contains(key)) {
+                try out.put(self.a, key, item);
+                continue;
+            }
+            if (item != .null and item != .object) return .{ .value = value, .message = "projected member must be an object or null" };
+            if (item == .object and item.object.contains(spec.key)) return .{ .value = value, .message = "projected key field already exists" };
+            const row = try self.a.create(jv.Object);
+            row.* = .empty;
+            try row.put(self.a, spec.key, .{ .string = key });
+            if (item == .object) {
+                var fields = item.object.iterator();
+                while (fields.next()) |field| try row.put(self.a, field.key_ptr.*, field.value_ptr.*);
+            }
+            try rows.append(self.a, .{ .object = row });
+        }
+        try out.put(self.a, spec.target, .{ .array = rows.items });
+        return .{ .value = .{ .object = out } };
+    }
+
+    fn transform(self: *Walk, input: Val, stmt: *const Statement) error{OutOfMemory}!Transform {
+        var value = input;
+        for (stmt.statements.items) |rule| {
+            if (!isTransform(rule, "normalize")) continue;
+            const parts = rule.statements.items;
+            if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
+                const result = try self.applyRule(value, parts[0], parts[1]);
+                if (result.message != null) return result;
+                value = result.value;
+            } else for (parts) |condition| {
+                if (!isTransform(condition, "if") or condition.statements.items.len != 1 or !isTransform(condition.statements.items[0], "apply")) return .{ .value = value, .message = "nested xt:if requires exactly one xt:apply" };
+                const result = try self.applyRule(value, condition, condition.statements.items[0]);
+                if (result.message != null) return result;
+                value = result.value;
+            }
+        }
+        return .{ .value = value };
+    }
+
+    fn checkExpression(self: *Walk, text: []const u8) Error!void {
+        if (try normalize.stringMapping(self.a, text) != null) return;
+        if (normalize.projection(text)) |spec| {
+            var parser = try xpath.Parser.init(self.a, spec.path);
+            _ = parser.parse() catch |err| switch (err) {
+                error.OutOfMemory => return error.OutOfMemory,
+                else => {
+                    self.checker.unsupported = "invalid key projection XPath";
+                    return error.Raised;
+                },
+            };
+            return;
+        }
+        var expression: normalize.Evaluator = .{ .a = self.a, .text = text };
+        expression.validate() catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            error.InvalidExpression => {
+                self.checker.unsupported = expression.message;
+                return error.Raised;
+            },
+        };
+    }
+
+    fn prepareStatements(self: *Walk, statements: []const *Statement, module_level: bool) Error!void {
+        var dotted_count: usize = 0;
+        for (statements) |stmt| {
+            if (isTransform(stmt, "expand-dotted-keys")) {
+                dotted_count += 1;
+                const arg = stmt.data.extension_invocation.argument orelse "";
+                if (!module_level or dotted_count > 1 or stmt.statements.items.len != 0 or
+                    (!std.mem.eql(u8, arg, "true") and !std.mem.eql(u8, arg, "false")))
+                {
+                    self.checker.unsupported = "invalid xt:expand-dotted-keys";
+                    return error.Raised;
+                }
+            }
+            if (isTransform(stmt, "normalize")) {
+                const parts = stmt.statements.items;
+                if (stmt.data.extension_invocation.argument != null or parts.len == 0) {
+                    self.checker.unsupported = "invalid xt:normalize";
+                    return error.Raised;
+                }
+                if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
+                    if (parts[0].statements.items.len != 0 or parts[1].statements.items.len != 0) {
+                        self.checker.unsupported = "invalid xt:normalize clauses";
+                        return error.Raised;
+                    }
+                    try self.checkExpression(parts[0].data.extension_invocation.argument orelse "");
+                    try self.checkExpression(parts[1].data.extension_invocation.argument orelse "");
+                } else for (parts) |condition| {
+                    if (!isTransform(condition, "if") or condition.statements.items.len != 1 or !isTransform(condition.statements.items[0], "apply") or condition.statements.items[0].statements.items.len != 0) {
+                        self.checker.unsupported = "invalid nested xt:if";
+                        return error.Raised;
+                    }
+                    try self.checkExpression(condition.data.extension_invocation.argument orelse "");
+                    try self.checkExpression(condition.statements.items[0].data.extension_invocation.argument orelse "");
+                }
+            }
+            if (stmt.kind() != .extension_invocation and stmt.statements.items.len > 0)
+                try self.prepareStatements(stmt.statements.items, false);
+        }
+    }
+
+    fn dottedEnabled(self: *Walk) bool {
+        for (self.module.statements.items) |stmt| {
+            if (stmt.kind() != .extension_invocation) continue;
+            const inv = stmt.data.extension_invocation;
+            if (std.mem.eql(u8, inv.resolved_module, "xyang-transform") and
+                std.mem.eql(u8, inv.resolved_extension.name, "expand-dotted-keys") and
+                std.mem.eql(u8, inv.argument orelse "", "true")) return true;
+        }
+        return false;
+    }
+
+    const Expanded = struct { object: *jv.Object, error_pointer: ?[]const u8 = null };
+
+    fn cloneObject(self: *Walk, obj: *const jv.Object, prefix: []const u8) error{OutOfMemory}!*jv.Object {
+        const result = try self.a.create(jv.Object);
+        result.* = .empty;
+        var pointers: std.StringHashMapUnmanaged([]const u8) = .empty;
+        var it = obj.iterator();
+        while (it.next()) |e| {
+            try result.put(self.a, e.key_ptr.*, e.value_ptr.*);
+            const pointer = if (self.dotted_pointers.get(obj)) |old| old.get(e.key_ptr.*) orelse try join(self.a, prefix, e.key_ptr.*) else try join(self.a, prefix, e.key_ptr.*);
+            try pointers.put(self.a, e.key_ptr.*, pointer);
+        }
+        try self.dotted_pointers.put(self.a, result, pointers);
+        return result;
+    }
+
+    fn expandObject(self: *Walk, obj: *const jv.Object, prefix: []const u8) error{OutOfMemory}!Expanded {
+        const result = try self.cloneObject(obj, prefix);
+        for (obj.keys()) |key| {
+            if (std.mem.indexOfScalar(u8, key, '.') == null) continue;
+            const source_map = self.dotted_pointers.getPtr(result).?;
+            const pointer = source_map.get(key).?;
+            const value = result.get(key).?;
+            _ = result.swapRemove(key);
+            _ = source_map.remove(key);
+            var parts = std.mem.splitScalar(u8, key, '.');
+            var part = parts.next().?;
+            if (part.len == 0) return .{ .object = result, .error_pointer = pointer };
+            var current = result;
+            while (parts.next()) |next| {
+                if (next.len == 0) return .{ .object = result, .error_pointer = pointer };
+                if (parts.rest().len == 0) {
+                    if (current.contains(part)) {
+                        const old = current.get(part).?;
+                        if (old != .object) return .{ .object = result, .error_pointer = pointer };
+                        const copy = try self.cloneObject(old.object, self.dotted_pointers.get(current).?.get(part) orelse pointer);
+                        try current.put(self.a, part, .{ .object = copy });
+                        current = copy;
+                    } else {
+                        const copy = try self.a.create(jv.Object);
+                        copy.* = .empty;
+                        try self.dotted_pointers.put(self.a, copy, .empty);
+                        try current.put(self.a, part, .{ .object = copy });
+                        try self.dotted_pointers.getPtr(current).?.put(self.a, part, pointer);
+                        current = copy;
+                    }
+                    if (current.contains(next)) return .{ .object = result, .error_pointer = pointer };
+                    try current.put(self.a, next, value);
+                    try self.dotted_pointers.getPtr(current).?.put(self.a, next, pointer);
+                    break;
+                }
+                if (current.get(part)) |old| {
+                    if (old != .object) return .{ .object = result, .error_pointer = pointer };
+                    const copy = try self.cloneObject(old.object, self.dotted_pointers.get(current).?.get(part) orelse pointer);
+                    try current.put(self.a, part, .{ .object = copy });
+                    current = copy;
+                } else {
+                    const copy = try self.a.create(jv.Object);
+                    copy.* = .empty;
+                    try self.dotted_pointers.put(self.a, copy, .empty);
+                    try current.put(self.a, part, .{ .object = copy });
+                    try self.dotted_pointers.getPtr(current).?.put(self.a, part, pointer);
+                    current = copy;
+                }
+                part = next;
+            }
+        }
+        return .{ .object = result };
+    }
 
     /// `_data_nodes`: data children, through `choice` and `case`.
     fn dataNodesOf(self: *Walk, out: *std.ArrayList(*const Statement), statements: []const *Statement) error{OutOfMemory}!void {
@@ -270,13 +570,27 @@ pub const Walk = struct {
     }
 
     pub fn walkObject(self: *Walk, data: *const jv.Object, schema: ?*const Statement, prefix: []const u8, at_root: bool) Error!std.ArrayList(*Node) {
+        if (!self.prepared) {
+            self.prepared = true;
+            try self.prepareStatements(self.module.statements.items, true);
+        }
+        if (self.root_input == null) {
+            self.root_input = data;
+            self.root_schema = schema;
+            self.root_at_root = at_root;
+        }
         var nodes: std.ArrayList(*Node) = .empty;
         var claimed: std.AutoHashMapUnmanaged(*const Statement, void) = .empty;
-        var it = data.iterator();
+        const expanded = if (self.dottedEnabled()) try self.expandObject(data, prefix) else Expanded{ .object = @constCast(data) };
+        if (expanded.error_pointer) |bad| {
+            try nodes.append(self.a, try self.errNode(null, bad, .opaque_node, "normalize", "invalid or conflicting dotted key"));
+            return nodes;
+        }
+        var it = expanded.object.iterator();
         while (it.next()) |e| {
             const key = e.key_ptr.*;
             const raw = e.value_ptr.*;
-            const here = try join(self.a, prefix, key);
+            const here = if (self.dotted_pointers.get(expanded.object)) |pointers| pointers.get(key) orelse try join(self.a, prefix, key) else try join(self.a, prefix, key);
             const hits = try self.resolve(key, schema, at_root);
             if (hits.len == 0) {
                 try nodes.append(self.a, try self.newNode(.{ .stmt = null, .value = raw, .pointer = here, .kind = .unknown, .input_key = key }));
@@ -287,14 +601,25 @@ pub const Walk = struct {
                 continue;
             }
             const stmt = hits[0];
-            if (claimed.contains(stmt)) continue;
+            if (claimed.contains(stmt)) {
+                if (self.dottedEnabled()) try nodes.append(self.a, try self.errNode(null, here, .ambiguous, "normalize", "member conflicts with another spelling of the same node"));
+                continue;
+            }
             try claimed.put(self.a, stmt, {});
             try nodes.append(self.a, try self.walkNode(raw, stmt, here));
         }
         return nodes;
     }
 
-    fn walkNode(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8) Error!*Node {
+    fn walkNode(self: *Walk, input: Val, stmt: *const Statement, pointer: []const u8) Error!*Node {
+        var raw = input;
+        if (stmt.kind() == .list or stmt.kind() == .leaf_list) {
+            if (raw == .null and hasNormalize(stmt)) raw = .{ .array = &.{} };
+        } else {
+            const converted = try self.transform(raw, stmt);
+            if (converted.message) |message| return self.errNode(stmt, pointer, .opaque_node, "normalize", message);
+            raw = converted.value;
+        }
         switch (stmt.kind()) {
             .leaf => return self.walkLeaf(raw, stmt, pointer),
             .anydata, .anyxml => return self.newNode(.{ .stmt = stmt, .value = raw, .pointer = pointer, .kind = .anydata }),
@@ -346,7 +671,13 @@ pub const Walk = struct {
         if (raw != .array) return self.errNode(stmt, pointer, .leaf_list, "type", "leaf-list must be an array");
         const n = try self.newNode(.{ .stmt = stmt, .pointer = pointer, .kind = .leaf_list });
         for (raw.array, 0..) |item, i| {
-            const child = try self.walkLeaf(item, stmt, try self.a.print("{s}/{d}", .{ pointer, i }));
+            const here = try self.a.print("{s}/{d}", .{ pointer, i });
+            const converted = try self.transform(item, stmt);
+            if (converted.message) |message| {
+                try n.children.append(self.a, try self.errNode(stmt, here, .leaf_list_item, "normalize", message));
+                continue;
+            }
+            const child = try self.walkLeaf(converted.value, stmt, here);
             child.kind = .leaf_list_item;
             try n.children.append(self.a, child);
         }
@@ -404,7 +735,7 @@ pub const Walk = struct {
         var keyed = false;
         if (raw == .array) {
             for (raw.array, 0..) |item, i| try entries.append(self.a, .{ .token = try self.a.print("{d}", .{i}), .item = item });
-        } else if (self.native and raw == .object and keys.len == 1 and allObjects(raw.object)) {
+        } else if (self.native and raw == .object and keys.len == 1 and (allObjects(raw.object) or hasNormalize(stmt))) {
             var it = raw.object.iterator();
             while (it.next()) |e| try entries.append(self.a, .{ .token = e.key_ptr.*, .item = e.value_ptr.* });
             keyed = true;
@@ -417,11 +748,16 @@ pub const Walk = struct {
         const key_leaf: ?*const Statement = if (keys.len == 1) try self.findNamed(stmt, keys[0]) else null;
         for (entries.items) |entry| {
             const entry_pointer = try join(self.a, pointer, entry.token);
-            if (entry.item != .object) {
+            const transformed = try self.transform(entry.item, stmt);
+            if (transformed.message) |message| {
+                try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .entry, "normalize", message));
+                continue;
+            }
+            if (transformed.value != .object) {
                 try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .entry, "type", "list item must be an object"));
                 continue;
             }
-            var body = try self.walkObject(entry.item.object, stmt, entry_pointer, false);
+            var body = try self.walkObject(transformed.value.object, stmt, entry_pointer, false);
             if (keyed) if (key_leaf) |kl| if (kl.kind() == .leaf) {
                 const converted = try self.convertKey(entry.token, kl);
                 const key_token = if (kl.name.len > 0) kl.name else keys[0];
@@ -491,6 +827,7 @@ fn projectLevel(a: Allocator, keys: *rfc7951.MemberKeys, nodes: []const *Node, p
     for (nodes) |n| {
         if (n.kind == .unknown) {
             try out.put(a, n.input_key, n.value);
+            try map.put(a, try join(a, prefix, n.input_key), n.pointer);
             continue;
         }
         if (!n.include) continue;

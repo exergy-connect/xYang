@@ -450,6 +450,10 @@ class _Walk:
         return InstanceNode(stmt=stmt, value=decoded, pointer=pointer, kind="leaf")
 
     def walk_leaf_list(self, raw: Any, stmt: YangLeafListStmt, pointer: str) -> InstanceNode:
+        raw, error = self.normalization.visit_collection(stmt, raw)
+        if error is not None:
+            return InstanceNode(stmt=stmt, value=None, pointer=pointer, kind="leaf-list",
+                                errors=[("normalize", error)], include=False)
         if not isinstance(raw, list):
             return InstanceNode(
                 stmt=stmt,
@@ -511,6 +515,10 @@ class _Walk:
         return None
 
     def walk_list(self, raw: Any, stmt: YangListStmt, pointer: str) -> InstanceNode:
+        raw, error = self.normalization.visit_collection(stmt, raw)
+        if error is not None:
+            return InstanceNode(stmt=stmt, value=None, pointer=pointer, kind="list",
+                                errors=[("normalize", error)], include=False)
         native = self.native
         keys = _key_names(stmt)
         entries: list[tuple[str, Any]] = []
@@ -592,6 +600,7 @@ def iter_instance(
     schema: Any = None,
     parent_module: Optional[str] = None,
     at_root: bool = True,
+    _skip_projection: bool = False,
 ) -> Iterator[InstanceNode]:
     """Yield a node for each top-level instance node in ``data`` as written.
 
@@ -604,6 +613,19 @@ def iter_instance(
     owner = _parent_module(module, root) if parent_module is None else parent_module
     walk = _Walk(module, owner, native_json)
     walk.normalization.prepare(root, walk.data_nodes)
+    walk.normalization.skip_projection = _skip_projection
+    original = data
+    cached_root = None
+
+    def root_context():
+        nonlocal cached_root
+        if cached_root is None:
+            snapshot = list(iter_instance(original, module, native_json=native_json,
+                schema=schema, parent_module=parent_module, at_root=at_root, _skip_projection=True))
+            cached_root = (project_instance(snapshot, owner)[0], root)
+        return cached_root
+
+    walk.normalization.root_context = root_context
     input_was_object = isinstance(data, dict)
     data, error = walk.normalization.visit(root, data)
     if error is not None:

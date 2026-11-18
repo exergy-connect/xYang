@@ -3,6 +3,7 @@
  * The input is never modified. RFC 7951 is the default; native JSON is opt-in.
  */
 import { YangModule, YangStatement } from "../core/model";
+import { Normalization } from "./normalization";
 import { resolveStructureInstance } from "./rfc7951";
 import { ExactDecimal } from "../types";
 import {
@@ -59,6 +60,8 @@ type WalkCache = {
   nodes: WeakMap<object, YangStatement[]>;
   resolved: WeakMap<object, Map<string, YangStatement[]>>;
   unwrapped: WeakMap<object, TypeShape | undefined>;
+  normalization: Normalization;
+  pointers: WeakMap<object, Map<string, string>>;
 };
 
 let walkCache: WalkCache | null = null;
@@ -277,6 +280,34 @@ function node(
   return { stmt, value, pointer: ptr, children: [], kind, errors: [], include: true, ...extra };
 }
 
+function expandDotted(data: Record<string, unknown>, prefix: string): { data: Record<string, unknown>; error?: [string, string] } {
+  const pointers = walkCache!.pointers;
+  const clone = (obj: Record<string, unknown>, path: string): Record<string, unknown> => {
+    const copy = { ...obj };
+    pointers.set(copy, new Map(pointers.get(obj) ?? Object.keys(obj).map(key => [key, join(path, key)])));
+    return copy;
+  };
+  const result = clone(data, prefix);
+  const source = pointers.get(result)!;
+  for (const key of Object.keys(result).filter(k => k.includes("."))) {
+    const value = result[key], pointer = source.get(key)!; delete result[key]; source.delete(key);
+    const parts = key.split(".");
+    if (parts.some(p => !p)) return { data: result, error: [pointer, `invalid dotted key '${key}'`] };
+    let cur = result;
+    for (const part of parts.slice(0, -1)) {
+      const map = pointers.get(cur)!;
+      if (!Object.hasOwn(cur, part)) { cur[part] = Object.create(null) as Record<string, unknown>; pointers.set(cur[part] as object, new Map()); map.set(part, pointer); }
+      else if (!cur[part] || typeof cur[part] !== "object" || Array.isArray(cur[part])) return { data: result, error: [pointer, `dotted key '${key}' conflicts with '${part}'`] };
+      else cur[part] = clone(cur[part] as Record<string, unknown>, map.get(part) ?? pointer);
+      cur = cur[part] as Record<string, unknown>;
+    }
+    const last = parts[parts.length - 1];
+    if (Object.hasOwn(cur, last)) return { data: result, error: [pointer, `dotted key '${key}' conflicts with an existing member`] };
+    cur[last] = value; pointers.get(cur)!.set(last, pointer);
+  }
+  return { data: result };
+}
+
 function walkObject(
   data: Record<string, unknown>,
   schema: SchemaLike,
@@ -296,11 +327,16 @@ function walkObject(
       ];
     }
   }
+  if (walkCache?.normalization.expandDotted) {
+    const expanded = expandDotted(data, prefix);
+    if (expanded.error) return [node(null, null, expanded.error[0], "opaque", { errors: [["normalize", expanded.error[1]]], include: false })];
+    data = expanded.data;
+  }
   const children = dataNodes(schema);
   const nodes: InstanceNode[] = [];
   const claimed = new Set<YangStatement>();
   for (const [key, raw] of Object.entries(data)) {
-    const here = join(prefix, key);
+    const here = walkCache?.pointers.get(data)?.get(key) ?? join(prefix, key);
     const hits = resolveCached(key, schema, children, parent, native, atRoot);
     if (hits.length === 0) {
       nodes.push(node(null, raw, here, "unknown", { inputKey: key }));
@@ -316,7 +352,10 @@ function walkObject(
       continue;
     }
     const stmt = hits[0];
-    if (claimed.has(stmt)) continue;
+    if (claimed.has(stmt)) {
+      if (walkCache?.normalization.expandDotted) nodes.push(node(null, null, here, "ambiguous", { errors: [["normalize", `member '${key}' conflicts with another spelling of the same node`]], include: false }));
+      continue;
+    }
     claimed.add(stmt);
     nodes.push(walkNode(raw, stmt, module, checker, parent, here, native));
   }
@@ -364,6 +403,11 @@ function walkNode(
   native: boolean
 ): InstanceNode {
   const keyword = keywordOf(stmt);
+  if (keyword !== "list" && keyword !== "leaf-list" && walkCache) {
+    try { raw = walkCache.normalization.visit(stmt, raw); }
+    catch (e) { return node(stmt, null, ptr, "opaque", { errors: [["normalize", String(e instanceof Error ? e.message : e)]], include: false }); }
+  }
+  if ((keyword === "list" || keyword === "leaf-list") && walkCache) raw = walkCache.normalization.collection(stmt, raw);
   if (keyword === "anydata" || keyword === "anyxml") return node(stmt, raw, ptr, "anydata");
   if (keyword === "container" || isStructureSchema(stmt)) {
     if (!raw || typeof raw !== "object" || Array.isArray(raw)) {
@@ -379,6 +423,8 @@ function walkNode(
       return node(stmt, null, ptr, "leaf-list", { errors: [["type", "leaf-list must be an array"]], include: false });
     }
     const children = raw.map((item, index) => {
+      try { item = walkCache!.normalization.visit(stmt, item); }
+      catch (e) { return node(stmt, null, `${ptr}/${index}`, "leaf-list-item", { errors: [["normalize", String(e instanceof Error ? e.message : e)]], include: false }); }
       const child = walkLeaf(item, stmt, module, checker, `${ptr}/${index}`, native);
       child.kind = "leaf-list-item";
       return child;
@@ -435,7 +481,7 @@ function walkList(
     typeof raw === "object" &&
     !Array.isArray(raw) &&
     keys.length === 1 &&
-    Object.values(raw as object).every((item) => item && typeof item === "object" && !Array.isArray(item))
+    (Object.values(raw as object).every((item) => item && typeof item === "object" && !Array.isArray(item)) || (walkCache?.normalization.rules(stmt).length ?? 0) > 0)
   ) {
     entries = Object.entries(raw as Record<string, unknown>);
     keyed = true;
@@ -451,8 +497,11 @@ function walkList(
     });
   }
   const keyLeaf = keys.length === 1 ? dataNodes(stmt).find((child) => child.name === keys[0]) : undefined;
-  const children = entries.map(([token, item]) => {
+  const children = entries.map(([token, original]) => {
     const entryPointer = join(ptr, token);
+    let item = original;
+    try { item = walkCache!.normalization.visit(stmt, item); }
+    catch (e) { return node(stmt, null, entryPointer, "entry", { errors: [["normalize", String(e instanceof Error ? e.message : e)]], include: false }); }
     if (!item || typeof item !== "object" || Array.isArray(item)) {
       return node(stmt, null, entryPointer, "entry", {
         errors: [["type", "list item must be an object"]],
@@ -488,6 +537,8 @@ export type IterInstanceOptions = {
   parentModule?: string;
   /** False when `data` is the body of a container such as an rpc `input` (RFC 7951 §4). Default true. */
   atRoot?: boolean;
+  /** Internal snapshot excludes recursive key projection. */
+  skipProjection?: boolean;
 };
 
 /** Yield a node for each top-level instance node in `data` as written. */
@@ -498,10 +549,26 @@ export function* iterInstance(data: unknown, module: YangModule, options: IterIn
   const parent = options.parentModule ?? (schema === module ? (module.name ?? "") : "");
   const checker = new TypeChecker(module);
   const outer = walkCache;
-  walkCache = { nodes: new WeakMap(), resolved: new WeakMap(), unwrapped: new WeakMap() };
+  walkCache = { nodes: new WeakMap(), resolved: new WeakMap(), unwrapped: new WeakMap(), pointers: new WeakMap(), normalization: new Normalization(module) };
+  walkCache.normalization.skipProjection = options.skipProjection === true;
+  let snapshot: Record<string, unknown> | undefined;
+  walkCache.normalization.rootContext = () => {
+    snapshot ??= projectInstance([...iterInstance(data, module, { ...options, skipProjection: true })], parent).data;
+    return { data: snapshot, schema: schema as YangStatement, parent: null };
+  };
   let nodes: InstanceNode[];
   try {
-    nodes = walkObject(data as Record<string, unknown>, schema, module, checker, parent, "", native, options.atRoot ?? true);
+    const prepare = (current: SchemaLike, isModule = false): void => {
+      walkCache!.normalization.rules(current, isModule);
+      for (const child of dataNodes(current)) prepare(child);
+    };
+    prepare(schema, schema === module);
+    let rootData: unknown;
+    try { rootData = walkCache.normalization.visit(schema as YangStatement, data); }
+    catch (e) { nodes = [node(null, null, "", "opaque", { errors: [["normalize", String(e instanceof Error ? e.message : e)]], include: false })]; yield* nodes; return; }
+    if (!rootData || typeof rootData !== "object" || Array.isArray(rootData)) {
+      nodes = [node(null, null, "", "opaque", { errors: [["normalize", "root normalization must produce an object"]], include: false })];
+    } else nodes = walkObject(rootData as Record<string, unknown>, schema, module, checker, parent, "", native, options.atRoot ?? true);
   } finally {
     walkCache = outer;
   }
@@ -536,6 +603,7 @@ function projectLevel(
   for (const item of nodes) {
     if (item.kind === "unknown" && item.inputKey) {
       out[item.inputKey] = item.value;
+      pointerMap.set(join(prefix, item.inputKey), item.pointer);
       continue;
     }
     if (!item.include || !item.stmt) continue;

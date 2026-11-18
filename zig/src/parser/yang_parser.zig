@@ -171,6 +171,14 @@ pub const Loader = struct {
         var dirs: std.ArrayList([]const u8) = .empty;
         try dirs.append(self.arena, source_dir);
         try dirs.appendSlice(self.arena, self.include_path);
+        // Discover repository shared modules from the importing source's ancestors.
+        var ancestor: []const u8 = source_dir;
+        while (true) {
+            try dirs.append(self.arena, try std.Io.Dir.path.join(self.arena, &.{ ancestor, "shared" }));
+            const parent = std.fs.path.dirname(ancestor) orelse break;
+            if (std.mem.eql(u8, parent, ancestor)) break;
+            ancestor = parent;
+        }
         var candidates: std.ArrayList([]const u8) = .empty;
         if (revision_date) |rev| try candidates.append(self.arena, try self.arena.print("{s}@{s}.yang", .{ name, rev }));
         try candidates.append(self.arena, try self.arena.print("{s}.yang", .{name}));

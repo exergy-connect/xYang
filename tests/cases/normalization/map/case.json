@@ -1,0 +1,28 @@
+{
+  "description": "Map matching keys to list entries, preserving their attributes and unrelated members.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "object and null values with unrelated attribute",
+      "data": {"connections": [{"a": {"cost": 7}, "label": "kept", "b": null}], "inventory": [{"name": "a"}, {"name": "b"}]},
+      "valid": true
+    },
+    {
+      "name": "no matching keys preserves canonical members",
+      "data": {"inventory": [{"name": "a"}], "connections": [{"label": "kept", "members": [{"id": "a"}]}]},
+      "valid": true
+    },
+    {
+      "name": "matching key with existing target fails",
+      "data": {"inventory": [{"name": "a"}], "connections": [{"a": null, "members": []}]},
+      "valid": false,
+      "errors": [{"path": "/connections/0", "code": "normalize"}]
+    },
+    {
+      "name": "matched scalar value fails",
+      "data": {"inventory": [{"name": "a"}], "connections": [{"a": 7}]},
+      "valid": false,
+      "errors": [{"path": "/connections/0", "code": "normalize"}]
+    }
+  ]
+}

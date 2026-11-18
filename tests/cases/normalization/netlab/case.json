@@ -81,10 +81,7 @@
           }
         }
       },
-      "valid": true,
-      "xfail": {
-        "ts": "instance normalization is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "ibgp with empty node and keyed link",
@@ -114,10 +111,7 @@
           }
         ]
       },
-      "valid": true,
-      "xfail": {
-        "ts": "instance normalization is implemented in Python only"
-      }
+      "valid": true
     },
     {
       "name": "ebgp link",
@@ -147,8 +141,14 @@
         },
         "links": [
           {
-            "left": "a",
-            "right": "b"
+            "nodes": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
           }
         ]
       },
@@ -178,8 +178,14 @@
         },
         "links": [
           {
-            "left": "a",
-            "right": "b"
+            "nodes": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              }
+            ]
           }
         ]
       },
@@ -207,16 +213,22 @@
         },
         "links": [
           {
-            "left": "a",
-            "right": "a"
+            "nodes": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "a"
+              }
+            ]
           }
         ]
       },
       "valid": false,
       "errors": [
         {
-          "path": "/links/0",
-          "code": "must"
+          "path": "/links/0/nodes",
+          "code": "duplicate-key"
         }
       ]
     },
@@ -237,15 +249,21 @@
         },
         "links": [
           {
-            "left": "a",
-            "right": "missing"
+            "nodes": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "missing"
+              }
+            ]
           }
         ]
       },
       "valid": false,
       "errors": [
         {
-          "path": "/links/0/right",
+          "path": "/links/0/nodes/1/node",
           "code": "leafref"
         }
       ]
@@ -274,62 +292,416 @@
           }
         ]
       },
-      "valid": false,
-      "errors": [
-        {
-          "path": "/links/0/left",
-          "code": "mandatory"
-        },
-        {
-          "path": "/links/0/right",
-          "code": "mandatory"
-        },
-        {
-          "path": "/links/0",
-          "code": "must"
-        },
-        {
-          "path": "/links/0/a",
-          "code": "unknown-field"
-        },
-        {
-          "path": "/links/0/b",
-          "code": "unknown-field"
-        }
-      ]
+      "valid": true
     },
     {
-      "name": "canonical link with null endpoints is not reinterpreted as shorthand",
+      "name": "three-node mapping",
       "encoding": "native",
       "data": {
         "groups": {
           "probes": {
             "members": [
-              "left"
+              "a"
             ]
           }
         },
         "nodes": {
-          "left": {},
-          "right": {}
+          "a": {},
+          "b": {},
+          "c": {}
         },
         "links": [
           {
-            "left": null,
-            "right": null
+            "a": null,
+            "b": null,
+            "c": null
           }
         ]
+      },
+      "valid": true
+    },
+    {
+      "name": "three-node canonical link",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {},
+          "b": {},
+          "c": {}
+        },
+        "links": [
+          {
+            "nodes": [
+              {
+                "node": "a"
+              },
+              {
+                "node": "b"
+              },
+              {
+                "node": "c"
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "single-node stub mapping",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        },
+        "links": [
+          {
+            "a": null
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "single-node canonical stub",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        },
+        "links": [
+          {
+            "nodes": [
+              {
+                "node": "a"
+              }
+            ]
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "mapping with link attribute",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {},
+          "b": {}
+        },
+        "links": [
+          {
+            "a": null,
+            "mtu": 1500,
+            "b": null
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "route reflector IPv6 and wait-only test",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "bgp": {
+              "rr": true,
+              "rr_cluster_id": "10.0.0.1"
+            },
+            "loopback": {
+              "ipv6": "2001:db8::1/128"
+            }
+          }
+        },
+        "links": [
+          {
+            "nodes": [
+              {
+                "node": "a"
+              }
+            ]
+          }
+        ],
+        "validate": {
+          "wait": {
+            "wait": 3
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "route reflector flag must be boolean",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "bgp": {
+              "rr": "yes",
+              "rr_cluster_id": "10.0.0.1"
+            },
+            "loopback": {
+              "ipv6": "2001:db8::1/128"
+            }
+          }
+        },
+        "links": [
+          {
+            "nodes": [
+              {
+                "node": "a"
+              }
+            ]
+          }
+        ],
+        "validate": {
+          "wait": {
+            "wait": 3
+          }
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/nodes/a/bgp/rr",
+          "code": "type"
+        }
+      ]
+    },
+    {
+      "name": "null links normalize to an empty list",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        },
+        "links": null
+      },
+      "valid": true
+    },
+    {
+      "name": "non-list links are rejected",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        },
+        "links": 7
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links",
+          "code": "type"
+        }
+      ]
+    },
+    {
+      "name": "boolean loopback enabled",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "loopback": true
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "boolean loopback disabled",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "loopback": false
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "invalid scalar loopback",
+      "encoding": "native",
+      "data": {
+        "groups": {
+          "probes": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {
+            "loopback": "yes"
+          }
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/nodes/a/loopback",
+          "code": "type"
+        }
+      ]
+    },
+    {
+      "name": "endpoint value is not an object",
+      "encoding": "native",
+      "data": {
+        "links": [
+          {
+            "a": 42
+          }
+        ],
+        "groups": {
+          "g": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        }
       },
       "valid": false,
       "errors": [
         {
           "path": "/links/0",
-          "code": "must"
+          "code": "normalize"
         }
-      ],
-      "xfail": {
-        "ts": "TypeScript also reports leafref errors for null endpoint values"
-      }
+      ]
+    },
+    {
+      "name": "endpoint key collides with constructed field",
+      "encoding": "native",
+      "data": {
+        "links": [
+          {
+            "a": {
+              "node": "other"
+            }
+          }
+        ],
+        "groups": {
+          "g": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0",
+          "code": "normalize"
+        }
+      ]
+    },
+    {
+      "name": "unknown mapping member remains visible",
+      "encoding": "native",
+      "data": {
+        "links": [
+          {
+            "a": null,
+            "unknown": null
+          }
+        ],
+        "groups": {
+          "g": {
+            "members": [
+              "a"
+            ]
+          }
+        },
+        "nodes": {
+          "a": {}
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/links/0/unknown",
+          "code": "unknown-field"
+        }
+      ]
     }
   ]
 }

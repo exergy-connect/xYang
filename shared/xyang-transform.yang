@@ -5,7 +5,7 @@ module xyang-transform {
 
   description
     "Annotations for normalizing instance data before validation.
-     Python xYang supports a documented subset of jq-style expressions.";
+     xYang supports a documented subset of jq-style expressions.";
 
   extension expand-dotted-keys {
     argument enabled;
@@ -16,8 +16,9 @@ module xyang-transform {
 
   extension normalize {
     description
-      "A conditional normalization rule, applied to each instance of the
-       annotated node. Its body contains an if and an apply expression.";
+      "Conditional normalization rules with nested if statements. A null
+       list or leaf-list is treated as empty before entry rules are applied.
+       The legacy if/apply pair is also supported.";
   }
 
   extension if {
