@@ -1,0 +1,187 @@
+{
+  "description": "Module-wide dotted keys expand within modeled objects, without overwrites.",
+  "module": "m.yang",
+  "instances": [
+    {
+      "name": "top level dotted key",
+      "data": {
+        "defaults.bgp.as": 65000
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "nested dotted key in array",
+      "data": {
+        "nodes": [
+          {
+            "name": "a",
+            "bgp.as": 65000
+          }
+        ]
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "native keyed list",
+      "encoding": "native",
+      "data": {
+        "nodes": {
+          "a": {
+            "bgp.as": 65000
+          }
+        }
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "merge distinct nested keys",
+      "data": {
+        "defaults": {
+          "bgp": {
+            "enabled": true
+          }
+        },
+        "defaults.bgp.as": 65000
+      },
+      "valid": true,
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "collision",
+      "data": {
+        "defaults": {
+          "bgp": {
+            "as": 1
+          }
+        },
+        "defaults.bgp.as": 2
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/defaults.bgp.as",
+          "code": "normalize"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "scalar collision",
+      "data": {
+        "defaults": 1,
+        "defaults.bgp.as": 2
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/defaults.bgp.as",
+          "code": "normalize"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "invalid empty segment",
+      "data": {
+        "defaults..bgp": 1
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/defaults..bgp",
+          "code": "normalize"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "type error points to original dotted key",
+      "data": {
+        "nodes": [
+          {
+            "name": "a",
+            "bgp.as": "not-a-number"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/nodes/0/bgp.as",
+          "code": "type"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "nested spelling remains valid",
+      "data": {
+        "defaults": {
+          "bgp": {
+            "as": 65000
+          }
+        }
+      },
+      "valid": true
+    },
+    {
+      "name": "module-qualified collision",
+      "data": {
+        "m:defaults.bgp.as": 1,
+        "defaults": {
+          "bgp": {
+            "as": 2
+          }
+        }
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/m:defaults.bgp.as",
+          "code": "normalize"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    },
+    {
+      "name": "unknown sibling retains its source pointer",
+      "data": {
+        "defaults.bgp.as": 65000,
+        "defaults.paths.prepend.plugin": [
+          "x"
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/defaults.paths.prepend.plugin",
+          "code": "unknown-field"
+        }
+      ],
+      "xfail": {
+        "ts": "dotted-key expansion is implemented in Python only"
+      }
+    }
+  ]
+}

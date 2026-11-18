@@ -176,7 +176,13 @@ class YangParser:
         Exact candidates are tried in every directory before any ``name@*.yang``
         glob. A requested revision that is not the file opened is a warning.
         """
-        dirs = (source_dir, *self.include_path)
+        parser_parents = Path(__file__).resolve().parents
+        dirs = (
+            source_dir,
+            *self.include_path,
+            parser_parents[1] / "shared",
+            parser_parents[3] / "shared",
+        )
         candidates: list[str] = []
         if revision_date:
             candidates.append(f"{name}@{revision_date}.yang")

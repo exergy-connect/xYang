@@ -54,7 +54,7 @@
     "node": ">=24"
   },
   "scripts": {
-    "build": "tsdown && node ./scripts/build-browser-iife.mjs",
+    "build": "tsdown && node ./scripts/copy-shared.mjs && node ./scripts/build-browser-iife.mjs",
     "build:check": "npm run build && node ./scripts/check-artifacts.mjs && node ./scripts/sync-docs-browser-bundle.mjs",
     "build:ci": "node ./scripts/build-ci-artifacts.mjs && node ./scripts/check-ci-artifacts.mjs",
     "pretest": "tsc --noEmit",

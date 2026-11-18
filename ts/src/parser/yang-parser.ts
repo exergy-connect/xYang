@@ -1,6 +1,7 @@
 import { resolveTypedef } from "../validator/type-checker";
 import { existsSync, readFileSync, readdirSync } from "node:fs";
 import { dirname, resolve } from "node:path";
+import { fileURLToPath } from "node:url";
 import { YangSemanticError, YangSyntaxError } from "../core/errors";
 import { coerceIdentifierRef, type YangIdentifierRef } from "../core/identifier-ref";
 import { ModuleSource, YangStatement, YangModule, type IdentityBases, type ModuleInit } from "../core/model";
@@ -122,6 +123,21 @@ export class YangParser {
     }
     candidates.push(`${moduleBasename}.yang`);
     const dirs = sourceDir ? [sourceDir, ...this.includePath] : [...this.includePath];
+    if (typeof process !== "undefined" && process.versions?.node && import.meta.url) {
+      dirs.push(resolve(dirname(fileURLToPath(import.meta.url)), "shared"));
+    }
+    // Locate repository-wide shared YANG definitions from the input file or working directory.
+    for (const start of [sourceDir, "."]) {
+      if (!start) continue;
+      let ancestor = resolve(start);
+      while (true) {
+        const shared = resolve(ancestor, "shared");
+        if (existsSync(shared) && !dirs.includes(shared)) dirs.push(shared);
+        const parent = dirname(ancestor);
+        if (parent === ancestor) break;
+        ancestor = parent;
+      }
+    }
     let found: string | undefined;
     for (const dir of dirs) {
       for (const c of candidates) {

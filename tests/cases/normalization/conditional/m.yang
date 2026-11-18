@@ -1,0 +1,27 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+  import xyang-transform { prefix xt; }
+
+  list nodes {
+    key name;
+    leaf name { type string; }
+  }
+  list links {
+    key "left right";
+    xt:normalize {
+      xt:if 'type == "string" and contains("-")';
+      xt:apply 'split("-") | {left: .[0], right: .[1]}';
+    }
+    leaf left { type leafref { path "/nodes/name"; } }
+    leaf right { type leafref { path "/nodes/name"; } }
+  }
+  leaf label {
+    type string;
+    xt:normalize {
+      xt:if 'type == "number"';
+      xt:apply 'split("-")';
+    }
+  }
+}

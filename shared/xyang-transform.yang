@@ -1,0 +1,32 @@
+module xyang-transform {
+  yang-version 1.1;
+  namespace "https://exergy-connect.com/xyang/transform";
+  prefix xt;
+
+  description
+    "Annotations for normalizing instance data before validation.
+     Python xYang supports a documented subset of jq-style expressions.";
+
+  extension expand-dotted-keys {
+    argument enabled;
+    description
+      "A module-level setting. When true, split dotted object member names
+       into nested members throughout the instance before validation.";
+  }
+
+  extension normalize {
+    description
+      "A conditional normalization rule, applied to each instance of the
+       annotated node. Its body contains an if and an apply expression.";
+  }
+
+  extension if {
+    argument expression;
+    description "Selects the values to which the rule applies.";
+  }
+
+  extension apply {
+    argument expression;
+    description "Produces the replacement value for a selected instance.";
+  }
+}

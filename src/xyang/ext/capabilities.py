@@ -3,7 +3,7 @@
 from __future__ import annotations
 
 from dataclasses import dataclass
-from typing import Optional, Protocol, TYPE_CHECKING
+from typing import Any, Optional, Protocol, TYPE_CHECKING
 
 from ..ast import (
     YangChoiceStmt,
@@ -36,6 +36,34 @@ class ExtensionApplyCallback(Protocol):
 
 
 _APPLY_CALLBACKS: dict[ExtensionIdentity, ExtensionApplyCallback] = {}
+class InstanceExtensionHandler:
+    """Instance-processing behavior attached to an extension definition."""
+
+    def normalization_rule(self, invocation: YangExtensionInvocationStmt) -> Optional[tuple[Any, Any]]:
+        return None
+
+    def normalization_clause(self, invocation: YangExtensionInvocationStmt) -> Optional[object]:
+        return None
+
+    def module_option(self, invocation: YangExtensionInvocationStmt) -> Optional[tuple[str, bool]]:
+        return None
+
+
+_INSTANCE_HANDLERS: dict[ExtensionIdentity, InstanceExtensionHandler] = {}
+
+
+def register_instance_handler(identity: ExtensionIdentity, handler: InstanceExtensionHandler) -> None:
+    """Register an extension's instance-processing behavior."""
+    _INSTANCE_HANDLERS[identity] = handler
+
+
+def instance_handler(statement: YangStatement) -> Optional[InstanceExtensionHandler]:
+    """Resolve a parsed extension invocation to its registered behavior."""
+    if not isinstance(statement, YangExtensionInvocationStmt):
+        return None
+    return _INSTANCE_HANDLERS.get(
+        ExtensionIdentity(statement.resolved_module.name, statement.resolved_extension.name)
+    )
 
 
 def register_extension_apply_callback(
@@ -110,4 +138,7 @@ __all__ = [
     "apply_extension_invocations",
     "get_extension_apply_callback",
     "register_extension_apply_callback",
+    "register_instance_handler",
+    "instance_handler",
+    "InstanceExtensionHandler",
 ]
