@@ -279,9 +279,11 @@ class _NormalizeHandler(InstanceExtensionHandler):
             clauses.append(handler.normalization_clause(part) if handler else None)
         if clauses and all(isinstance(clause, tuple) for clause in clauses):
             return clauses
-        if len(clauses) != 2 or not isinstance(clauses[0], _Condition) or not isinstance(clauses[1], _Action):
-            raise ExpressionError("xt:normalize requires exactly xt:if followed by xt:apply")
-        return clauses[0].expression, clauses[1].expression
+        if len(clauses) == 1 and isinstance(clauses[0], _Action):
+            return ("literal", True), clauses[0].expression
+        if len(clauses) == 2 and isinstance(clauses[0], _Condition) and isinstance(clauses[1], _Action):
+            return clauses[0].expression, clauses[1].expression
+        raise ExpressionError("xt:normalize requires xt:apply, optionally preceded by xt:if")
 
 
 class _ExpandDottedKeysHandler(InstanceExtensionHandler):

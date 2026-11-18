@@ -47,8 +47,8 @@ statement is allowed only at module level.
 
 ## Normalize individual values
 
-Attach `xt:normalize` to a modeled node to transform its input value. Each rule
-contains exactly one `xt:if` followed by one `xt:apply`. Both arguments are
+Attach `xt:normalize` to a modeled node to transform its input value. A rule
+can contain an unconditional `xt:apply`, or an `xt:if` followed by `xt:apply`. Both arguments are
 jq-style expressions; `.` is the current value. If the condition is true,
 `xt:apply` produces the replacement. Otherwise the value is unchanged.
 
@@ -115,7 +115,7 @@ list links {
 For a list or leaf-list with `xt:normalize`, a null collection is treated as an
 empty list before validation; entry rules apply to individual entries. An
 unannotated list still rejects null. Minimum element constraints still apply.
-The original sibling `xt:if` / `xt:apply` form is also supported.
+A single unconditional `xt:apply` and the original sibling `xt:if` / `xt:apply` form are also supported.
 
 Rules on a node run in source order, and a parent is normalized before its
 children. On a list or leaf-list, a rule applies to each entry. Missing nodes

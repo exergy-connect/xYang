@@ -1,6 +1,6 @@
 import { describe, expect, it } from "vitest";
 import { resolve } from "node:path";
-import { YangParser, YangValidator, generateJsonSchema, parseJsonSchema } from "../src";
+import { YangParser, YangValidator, Normalization, generateJsonSchema, parseJsonSchema } from "../src";
 import { iterInstance, projectInstance } from "../src/encoding/instance";
 
 const model = new YangParser().parseFile(resolve("../examples/netlab/netlab.yang"));
@@ -42,6 +42,15 @@ describe("normalization API", () => {
     const projected = projectInstance([...iterInstance(data, restored)], restored.name).data;
     expect(projected.connections).toEqual([{ members: [{ id: "a" }, { id: "b" }] }]);
     expect(data).toEqual(original);
+  });
+
+
+  it("exposes map normalization through the public Normalization class", () => {
+    const module = new YangParser().parseFile(resolve("../tests/cases/normalization/string-map/m.yang"));
+    const links = module.findStatement("connections")!;
+    expect(new Normalization(module).visit(links, "a-b")).toEqual([
+      { members: [{ id: "a" }, { id: "b" }] }, null
+    ]);
   });
 
 });

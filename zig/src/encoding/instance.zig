@@ -14,6 +14,7 @@ const registry = @import("../types/registry.zig");
 const rfc7951 = @import("rfc7951.zig");
 const type_checker = @import("../validator/type_checker.zig");
 const normalize = @import("normalize.zig");
+const transform_expr = @import("../ext/transform.zig");
 const xpath = @import("../xpath/xpath.zig");
 
 const Allocator = std.mem.Allocator;
@@ -136,17 +137,19 @@ pub const Walk = struct {
     fn applyRule(self: *Walk, value: Val, condition: *const Statement, action: *const Statement) error{OutOfMemory}!Transform {
         const test_expr = condition.data.extension_invocation.argument orelse return .{ .value = value, .message = "xt:if requires an expression" };
         const apply = action.data.extension_invocation.argument orelse return .{ .value = value, .message = "xt:apply requires an expression" };
-        var predicate: normalize.Evaluator = .{ .a = self.a, .text = test_expr };
-        const decision = predicate.run(value) catch |err| switch (err) {
-            error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidExpression => return .{ .value = value, .message = predicate.message },
-        };
+        const tested = try self.evalExpression(test_expr, value);
+        if (tested.message != null) return tested;
+        const decision = tested.value;
         const selected = switch (decision) {
             .null => false,
             .bool => |b| b,
             else => true,
         };
         if (!selected) return .{ .value = value };
+        return self.evaluateAction(value, apply);
+    }
+
+    fn evaluateAction(self: *Walk, value: Val, apply: []const u8) error{OutOfMemory}!Transform {
         if (try normalize.stringMapping(self.a, apply)) |mapping| {
             if (value != .string) return .{ .value = value, .message = "split requires string input and argument" };
             var rows: std.ArrayList(Val) = .empty;
@@ -179,10 +182,18 @@ pub const Walk = struct {
             if (self.skip_projection) return .{ .value = value };
             return self.projectKeys(value, projection);
         }
-        var expression: normalize.Evaluator = .{ .a = self.a, .text = apply };
-        const result = expression.run(value) catch |err| switch (err) {
+        return self.evalExpression(apply, value);
+    }
+
+    fn evalExpression(self: *Walk, text: []const u8, value: Val) error{OutOfMemory}!Transform {
+        var message: []const u8 = "";
+        const expr = transform_expr.compile(self.a, text, &message) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidExpression => return .{ .value = value, .message = expression.message },
+            else => return .{ .value = value, .message = message },
+        };
+        const result = transform_expr.evaluate(self.a, expr, value, &message) catch |err| switch (err) {
+            error.OutOfMemory => return error.OutOfMemory,
+            else => return .{ .value = value, .message = message },
         };
         return .{ .value = result };
     }
@@ -249,11 +260,19 @@ pub const Walk = struct {
     }
 
     fn transform(self: *Walk, input: Val, stmt: *const Statement) error{OutOfMemory}!Transform {
+        return self.transformStatements(input, stmt.statements.items);
+    }
+
+    fn transformStatements(self: *Walk, input: Val, statements: []const *Statement) error{OutOfMemory}!Transform {
         var value = input;
-        for (stmt.statements.items) |rule| {
+        for (statements) |rule| {
             if (!isTransform(rule, "normalize")) continue;
             const parts = rule.statements.items;
-            if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
+            if (parts.len == 1 and isTransform(parts[0], "apply")) {
+                const result = try self.evaluateAction(value, parts[0].data.extension_invocation.argument orelse "");
+                if (result.message != null) return result;
+                value = result.value;
+            } else if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
                 const result = try self.applyRule(value, parts[0], parts[1]);
                 if (result.message != null) return result;
                 value = result.value;
@@ -280,11 +299,11 @@ pub const Walk = struct {
             };
             return;
         }
-        var expression: normalize.Evaluator = .{ .a = self.a, .text = text };
-        expression.validate() catch |err| switch (err) {
+        var message: []const u8 = "";
+        _ = transform_expr.compile(self.a, text, &message) catch |err| switch (err) {
             error.OutOfMemory => return error.OutOfMemory,
-            error.InvalidExpression => {
-                self.checker.unsupported = expression.message;
+            else => {
+                self.checker.unsupported = message;
                 return error.Raised;
             },
         };
@@ -309,7 +328,9 @@ pub const Walk = struct {
                     self.checker.unsupported = "invalid xt:normalize";
                     return error.Raised;
                 }
-                if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
+                if (parts.len == 1 and isTransform(parts[0], "apply") and parts[0].statements.items.len == 0) {
+                    try self.checkExpression(parts[0].data.extension_invocation.argument orelse "");
+                } else if (parts.len == 2 and isTransform(parts[0], "if") and isTransform(parts[1], "apply")) {
                     if (parts[0].statements.items.len != 0 or parts[1].statements.items.len != 0) {
                         self.checker.unsupported = "invalid xt:normalize clauses";
                         return error.Raised;
@@ -409,6 +430,27 @@ pub const Walk = struct {
             }
         }
         return .{ .object = result };
+    }
+
+    /// Normalize the root and build the instance tree for document validation.
+    pub fn iterDocument(self: *Walk, data: Val, schema: ?*const Statement, at_root: bool) Error!std.ArrayList(*Node) {
+        if (!self.prepared) {
+            self.prepared = true;
+            try self.prepareStatements(self.module.statements.items, true);
+        }
+        const statements = if (schema) |s| s.statements.items else self.module.statements.items;
+        const transformed = try self.transformStatements(data, statements);
+        if (transformed.message) |message| {
+            var out: std.ArrayList(*Node) = .empty;
+            try out.append(self.a, try self.errNode(null, "", .opaque_node, "normalize", message));
+            return out;
+        }
+        if (transformed.value != .object) {
+            var out: std.ArrayList(*Node) = .empty;
+            if (data == .object) try out.append(self.a, try self.errNode(null, "", .opaque_node, "normalize", "root normalization must produce an object"));
+            return out;
+        }
+        return self.walkObject(transformed.value.object, schema, "", at_root);
     }
 
     /// `_data_nodes`: data children, through `choice` and `case`.

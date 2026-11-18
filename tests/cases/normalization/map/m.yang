@@ -8,6 +8,18 @@ module m {
     key name;
     leaf name { type string; }
   }
+  list unconditional {
+    config false;
+    xt:normalize {
+      xt:apply 'map(keys(/inventory/name), members: {id: $key, ...$value})';
+    }
+    leaf label { type string; }
+    list members {
+      key id;
+      leaf id { type leafref { path "/inventory/name"; } }
+      leaf cost { type uint16; }
+    }
+  }
   list connections {
     config false;
     xt:normalize {

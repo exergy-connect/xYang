@@ -21,6 +21,17 @@ module m {
       leaf id { type leafref { path "/inventory/name"; } }
     }
   }
+  container unconditional {
+    presence "Only when supplied";
+    xt:normalize {
+      xt:apply 'map(split("-"), members: {id: $value})';
+    }
+    list members {
+      key id;
+      min-elements 1;
+      leaf id { type leafref { path "/inventory/name"; } }
+    }
+  }
   container characters {
     presence "Only when supplied";
     xt:normalize {

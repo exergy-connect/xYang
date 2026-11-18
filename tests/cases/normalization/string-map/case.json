@@ -4,18 +4,61 @@
   "instances": [
     {
       "name": "endpoint objects from a string",
-      "data": {"inventory": [{"name": "a"}, {"name": "b"}], "connections": ["a-b"]},
+      "data": {
+        "inventory": [
+          {
+            "name": "a"
+          },
+          {
+            "name": "b"
+          }
+        ],
+        "connections": [
+          "a-b"
+        ]
+      },
       "valid": true
     },
     {
       "name": "unknown split endpoint is rejected",
-      "data": {"inventory": [{"name": "a"}], "connections": ["a-missing"]},
+      "data": {
+        "inventory": [
+          {
+            "name": "a"
+          }
+        ],
+        "connections": [
+          "a-missing"
+        ]
+      },
       "valid": false,
-      "errors": [{"path": "/connections/0/members/1/id", "code": "leafref"}]
+      "errors": [
+        {
+          "path": "/connections/0/members/1/id",
+          "code": "leafref"
+        }
+      ]
     },
     {
       "name": "empty delimiter splits Unicode code points",
-      "data": {"characters": "aé😀"},
+      "data": {
+        "characters": "a\u00e9\ud83d\ude00"
+      },
+      "valid": true
+    },
+    {
+      "name": "apply-only split map",
+      "data": {
+        "inventory": [
+          {
+            "name": "a"
+          },
+          {
+            "name": "b"
+          }
+        ],
+        "unconditional": "a-b"
+      },
       "valid": true
     }
   ]

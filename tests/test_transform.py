@@ -90,6 +90,42 @@ def test_normalizes_rpc_input(tmp_path):
     assert result["valid"], result
 
 
+def test_apply_only_rule_always_runs(tmp_path):
+    model = tmp_path / "m.yang"
+    model.write_text('''module m {
+      yang-version 1.1; namespace "urn:m"; prefix m;
+      import xyang-transform { prefix xt; }
+      list links { key "left right";
+        xt:normalize {
+          xt:apply 'split("-") | {left: .[0], right: .[1]}';
+        }
+        leaf left { type string; } leaf right { type string; }
+      }
+    }''')
+    result = YangValidator(parse_yang_file(model)).validate_detailed({"links": ["a-b"]})
+    assert result["valid"], result
+
+
+@pytest.mark.parametrize(
+    "body,match",
+    [
+        ("", "xt:apply"),
+        ("xt:if 'true';", "xt:apply"),
+        ("xt:apply 'true'; xt:if 'true';", "xt:apply"),
+        ("xt:if 'true'; xt:if 'true'; xt:apply 'true';", "xt:apply"),
+    ],
+)
+def test_normalize_requires_apply_in_order(tmp_path, body, match):
+    model = tmp_path / "m.yang"
+    model.write_text(f'''module m {{
+      yang-version 1.1; namespace "urn:m"; prefix m;
+      import xyang-transform {{ prefix xt; }}
+      leaf label {{ type string; xt:normalize {{ {body} }} }}
+    }}''')
+    with pytest.raises(ExpressionError, match=match):
+        YangValidator(parse_yang_file(model)).validate_detailed({})
+
+
 def test_dotted_keys_survive_native_json_round_trip_and_do_not_mutate():
     schema = CASE.parent.parent / "dotted/m.yang"
     module = parse_json_schema(generate_json_schema(parse_yang_file(schema)))

@@ -106,12 +106,14 @@ pub const YangValidator = struct {
         var out: std.ArrayList(ValidationError) = .empty;
         var canonical = instance_data;
         var map: instance.PointerMap = .empty;
-        if (instance_data == .object) {
+        {
             var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = options.native_json, .keys = &keys, .checker = &checker };
-            const nodes = try walk.walkObject(instance_data.object, structure, "", true);
-            const projection = try instance.project(self.a, &keys, nodes.items);
-            canonical = .{ .object = projection.data };
-            map = projection.map;
+            const nodes = try walk.iterDocument(instance_data, structure, true);
+            if (nodes.items.len > 0 or instance_data == .object) {
+                const projection = try instance.project(self.a, &keys, nodes.items);
+                canonical = .{ .object = projection.data };
+                map = projection.map;
+            }
             try document_validator.appendEncodingErrors(self.a, &out, nodes.items);
         }
         const found = if (structure) |s| try dv.validateStructure(canonical, s) else try dv.validate(canonical);

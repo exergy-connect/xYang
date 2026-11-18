@@ -18,7 +18,7 @@ module xyang-transform {
     description
       "Conditional normalization rules with nested if statements. A null
        list or leaf-list is treated as empty before entry rules are applied.
-       The legacy if/apply pair is also supported.";
+       A single apply, or a sibling if/apply pair, is also supported.";
   }
 
   extension if {
