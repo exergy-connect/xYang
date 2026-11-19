@@ -1,0 +1,1378 @@
+module lab-net {
+  yang-version 1.1;
+  namespace "https://exergy-lab.net/yang/lab-net";
+  prefix lab;
+
+  organization "Exergy Connect";
+  description
+    "Normalized exergy-lab.net input topology, plus the operational
+     state shown in the web UI. Named maps become keyed lists; positional lists
+     receive an index in the normalized RFC 7951 document. Node IDs and dynamic addresses
+     are assigned after validation by the addressing phase. Recipes, groups and
+     validation scenarios remain opaque metadata; protocol compilers enforce their
+     additional runtime constraints. The state tree is the comparison contract
+     between a device probe and the digital twin: list keys identify a row, and
+     the other leaves are the values that must agree.";
+
+  revision 2026-11-15 {
+    description "Structured static next hops with address families and explicit output interfaces.";
+  }
+
+  revision 2026-11-14 {
+    description
+      "Static SRv6 End and End.X SIDs. Policies can encapsulate to those
+       SIDs. The packet carries no routing header.";
+  }
+
+  revision 2026-11-05 {
+    description
+      "Image features for optional dataplane and controller components.
+       Protocol settings and operational state depend on those features.";
+  }
+
+  revision 2026-10-31 {
+    description "Operational state for the tables shown in the web UI.";
+  }
+
+  revision 2026-10-25 {
+    description "Native SRv6 EVPN service transport.";
+  }
+
+  revision 2026-10-24 {
+    description "Initial topology validation model.";
+  }
+
+  feature controller {
+    description
+      "Embedded web UI and WASM controller pages. Absent on a dataplane-only image.";
+  }
+  feature standalone {
+    if-feature "controller";
+    description "Node runtime for the standalone JavaScript/WASM controller.";
+  }
+  feature bgp {
+    description "BGP control plane and dataplane support.";
+  }
+  feature bgp_vpn {
+    if-feature "bgp";
+    if-feature "mpls";
+    description "BGP MPLS VPN address families and service-label forwarding.";
+  }
+  feature bgp-policy-regex {
+    if-feature "bgp";
+    if-feature "controller";
+    description "Optional AS-path and community regular-expression policy matching; disabled by default.";
+  }
+  feature vlan {
+    description "Linux VLAN subinterfaces, bridges, and switched virtual interfaces.";
+  }
+  feature vrf {
+    description "Tenant VRF creation and interface attachment; management VRF remains core.";
+  }
+  feature lag {
+    description "Linux bonding and LACP.";
+  }
+  feature gateway {
+    description "Anycast gateway address and MAC provisioning.";
+  }
+  feature router-advertisement {
+    if-feature "gateway";
+    description "Native IPv6 advertisements for anycast gateways.";
+  }
+  feature ssh {
+    description "Remote device inspection through the SSH client.";
+  }
+  feature docker {
+    description "Device discovery and inspection through the Docker API.";
+  }
+  feature static-routing {
+    description "Configured static routes in the Linux dataplane.";
+  }
+  feature vxlan {
+    description "VXLAN dataplane provisioning and forwarding support.";
+  }
+  feature evpn {
+    if-feature "bgp";
+    description "EVPN control plane and dataplane support.";
+  }
+  feature ospf {
+    description "OSPFv2 and OSPFv3 helper and controller support.";
+  }
+  feature isis {
+    description "IS-IS helper and controller support.";
+  }
+  feature bfd {
+    description "BFD helper and controller support.";
+  }
+  feature srv6 {
+    description "Native SRv6 dataplane helper.";
+  }
+  feature mpls {
+    description "MPLS label forwarding and transport.";
+  }
+  feature ldp {
+    if-feature "mpls";
+    description "IPv4 LDP label distribution and MPLS transit forwarding.";
+  }
+  feature lldp {
+    description "LLDP advertisement helper.";
+  }
+
+  typedef name {
+    type string {
+      length "1..64";
+      pattern '[A-Za-z0-9_.-]+';
+    }
+  }
+  typedef asn { type uint32 { range "1..4294967295"; } }
+  typedef ipv4-address {
+    type string {
+      pattern '((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])';
+    }
+  }
+  typedef ipv4-prefix {
+    type string {
+      pattern '((25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])\.){3}(25[0-5]|2[0-4][0-9]|1[0-9][0-9]|[1-9]?[0-9])/(3[0-2]|[12]?[0-9])';
+    }
+  }
+  typedef ipv6-address {
+    type string {
+      pattern '[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*';
+    }
+  }
+  typedef ipv6-prefix {
+    type string {
+      pattern '[0-9A-Fa-f:.]*:[0-9A-Fa-f:.]*/(12[0-8]|1[01][0-9]|[1-9]?[0-9])';
+    }
+  }
+  typedef address {
+    type union { type ipv4-address; type ipv6-address; }
+  }
+  typedef device {
+    type enumeration { enum frr; enum eos; enum srlinux; enum cjunosevolved; enum ios-xr; enum bird; enum sonic-vs; enum vyos; enum vpp; enum nxos; enum iosxe; enum junos; enum linux; enum alpine; enum switch; }
+  }
+  grouping lab_net-settings {
+    container ws {
+      leaf host { type string; }
+      leaf port { type uint16 { range "1..65535"; } }
+      leaf https { type boolean; }
+    }
+    container twin {
+      presence "Control plane connected to an exergy-lab.net container";
+      leaf of { type leafref { path "/topology/nodes/name"; } }
+      leaf host { type string; }
+      leaf port { type uint16 { range "1..65535"; } mandatory true; }
+      leaf name { type name; mandatory true; }
+    }
+    leaf-list controllers {
+      type string;
+      ordered-by user;
+      description "Controller relay URLs in failover preference order for lab.net devices.";
+    }
+  }
+  grouping device-settings {
+    leaf type {
+      type union {
+        type device;
+        type enumeration { enum lab.net; enum exergy-lab; enum exergy-lab.net; }
+      }
+      mandatory true;
+    }
+    leaf image { type string; }
+    leaf control_plane { type string; }
+    uses lab_net-settings {
+      when "./type = 'lab.net' or ./type = 'exergy-lab' or ./type = 'exergy-lab.net'";
+    }
+  }
+  typedef layout-strategy {
+    type enumeration { enum tree; enum dual-tree; enum line; enum circle; enum grid; }
+  }
+  grouping layout-settings {
+    leaf strategy { type layout-strategy; }
+    leaf grid { type string { pattern '[A-Z]+[1-9][0-9]*'; } }
+    leaf rows { type uint32 { range "1..max"; } }
+    leaf cols { type uint32 { range "1..max"; } }
+    leaf layer { type int32; }
+    leaf orient { type enumeration { enum horizontal; enum vertical; } }
+  }
+  typedef module-name {
+    type enumeration {
+      enum init { description "Compiler initialization marker; no runtime action."; }
+      enum mpls { if-feature "mpls"; }
+      enum bgp { if-feature "bgp"; }
+      enum vrf { if-feature "vrf"; }
+      enum lag { if-feature "lag"; }
+      enum vlan { if-feature "vlan"; }
+      enum vxlan { if-feature "vxlan"; }
+      enum evpn { if-feature "evpn"; }
+      enum srv6 { if-feature "srv6"; }
+      enum gateway { if-feature "gateway"; }
+      enum fabric;
+      enum routing { if-feature "static-routing"; }
+      enum ospf { if-feature "ospf"; }
+      enum isis { if-feature "isis"; }
+      enum bfd { if-feature "bfd"; }
+    }
+  }
+  typedef route-target {
+    type string { pattern '([0-9]+\.)*[0-9]+:[0-9]+'; }
+  }
+  typedef unicast-mac {
+    type string {
+      pattern '[0-9A-Fa-f][02468ACEace](:[0-9A-Fa-f]{2}){5}';
+    }
+    description "Unicast MAC; first-octet I/G bit must be clear.";
+  }
+
+  grouping prefix {
+    leaf ipv4 { type ipv4-prefix; }
+    leaf ipv6 { type ipv6-prefix; }
+  }
+  grouping subnet-prefix {
+    leaf ipv4 {
+      type union { type boolean; type ipv4-prefix; }
+      description "IPv4 prefix, true for unnumbered IPv4, or false to disable IPv4.";
+    }
+    leaf ipv6 {
+      type union { type boolean; type ipv6-prefix; }
+      description "IPv6 prefix, true for link-local-only IPv6, or false to disable IPv6.";
+    }
+  }
+  grouping gateway {
+    if-feature "gateway";
+    leaf enabled { type boolean; }
+    leaf protocol { type enumeration { enum anycast; enum vrrp; } }
+    leaf id { type int32; }
+    leaf ipv4 { type union { type ipv4-address; type ipv4-prefix; } }
+    leaf ipv6 { type union { type ipv6-address; type ipv6-prefix; } }
+    container anycast {
+      presence "Anycast settings";
+      leaf unicast { type boolean; }
+      leaf mac { type unicast-mac; }
+    }
+    container vrrp {
+      presence "VRRP settings";
+      leaf group { type uint8 { range "1..255"; } }
+      leaf priority { type uint8 { range "1..255"; } }
+      leaf preempt { type boolean; }
+      leaf interval {
+        type uint16 { range "10..40950"; }
+      }
+    }
+  }
+  grouping srv6 {
+    if-feature "srv6";
+    leaf locator { type ipv6-prefix; }
+    leaf locator_pool { type ipv6-prefix; }
+    leaf-list transport { type enumeration { enum static; enum isis; enum ebgp; enum ibgp; } }
+    anydata bgp;
+    anydata l3vpn;
+    leaf usd { type boolean; }
+    leaf local_fallback { type ipv6-prefix; }
+    leaf usid_block { type ipv6-prefix; }
+    list endpoint {
+      key "name";
+      description
+        "Local End or End.X SID. The packet has no routing header.
+         End with a next node, and End.X, write that node's End SID
+         into the destination. End without next decapsulates IPv6.";
+      leaf name { type name; }
+      leaf behavior { type enumeration { enum End; enum End.X; } mandatory true; }
+      leaf via {
+        type leafref { path "/topology/nodes/name"; }
+        description "End.X Layer-3 adjacency.";
+      }
+      leaf next {
+        type leafref { path "/topology/nodes/name"; }
+        description "Node whose End SID becomes the destination after this behavior.";
+      }
+      must 'behavior != "End.X" or (via and next)' {
+        error-message "End.X requires an adjacency and a next End node";
+      }
+      must 'behavior != "End" or not(via)' {
+        error-message "End does not take an adjacency; use End.X";
+      }
+    }
+    list policy {
+      key "ipv6";
+      leaf ipv6 {
+        type union {
+          type ipv6-prefix;
+          type string { pattern '[a-zA-Z_][a-zA-Z0-9_-]*[.]loopback(s\[[0-9]+\])?[.]ipv6'; }
+        }
+        description "Destination prefix or node loopback reference.";
+      }
+      leaf sid { type ipv6-address; }
+      leaf-list via { type leafref { path "/topology/nodes/name"; } }
+      leaf behavior {
+        type enumeration { enum End; enum End.X; }
+        description "Encapsulate to this behavior on the node named by at.";
+      }
+      leaf at { type leafref { path "/topology/nodes/name"; } }
+      leaf xconnect {
+        type leafref { path "/topology/nodes/name"; }
+        description "End.X adjacency named by the endpoint via leaf.";
+      }
+      must 'sid or count(via) > 0 or (behavior and at)' {
+        error-message "An SRv6 policy requires a SID, node references, or an End target";
+      }
+      must 'not(sid) or (count(via) = 0 and not(behavior))' {
+        error-message "Use either a SID, node references, or an End target";
+      }
+      must 'not(behavior) or (not(sid) and count(via) = 0 and at)' {
+        error-message "An End policy names the node with at and does not pack a uSID list";
+      }
+      must 'behavior != "End.X" or xconnect' {
+        error-message "An End.X policy names the adjacency with xconnect";
+      }
+      description "Static IPv6 steering policy. A uSID list, a SID, or an End or End.X target.";
+    }
+  }
+
+  grouping evpn-policy {
+    if-feature "evpn";
+    leaf as { type asn; }
+    leaf rd { type route-target; }
+    leaf-list import { type route-target; }
+    leaf-list export { type route-target; }
+  }
+  grouping evpn {
+    if-feature "evpn";
+    uses evpn-policy;
+    leaf transport {
+      type enumeration {
+        enum vxlan { if-feature "vxlan"; }
+        enum srv6 { if-feature "srv6"; }
+        enum init { description "Compiler initialization marker; no runtime action."; }
+      enum mpls { if-feature "mpls"; }
+      }
+    }
+    leaf-list vlans {
+      if-feature "vlan"; type string; }
+    leaf-list vrfs {
+        if-feature "vrf"; type string; }
+    leaf-list session { type enumeration { enum ebgp; enum ibgp; } }
+    leaf hash_policy { type enumeration { enum layer2; enum layer2+3; enum layer3+4; } }
+    leaf start_transit_vni { type uint32; }
+    leaf start_es { type uint32; }
+    leaf config_change_source { type uint32; }
+    list vnis {
+      key "vni";
+      leaf vni { type uint32 { range "1..16777215"; } }
+      uses evpn-policy;
+    }
+  }
+  grouping vxlan {
+    if-feature "vxlan";
+    leaf flooding {
+      type enumeration {
+        enum static;
+        enum evpn { if-feature "evpn"; }
+      }
+    }
+    leaf transport { type enumeration { enum ipv4; enum ipv6; } }
+    leaf vtep { type union { type address; type ipv4-prefix; type ipv6-prefix; type name; } }
+  }
+  grouping bfd-settings {
+    if-feature "bfd";
+    leaf enabled { type boolean; }
+    leaf ipv4 { type boolean; }
+    leaf ipv6 { type boolean; }
+    leaf strict { type boolean; must '. = "false"' { error-message "Strict BFD is not supported"; } }
+    leaf strict_delay { type uint32; }
+  }
+  grouping bfd-timers {
+    if-feature "bfd";
+    leaf min_tx { type uint32 { range "1..60000"; } units "milliseconds"; }
+    leaf min_rx { type uint32 { range "1..60000"; } units "milliseconds"; }
+    leaf min_echo_rx { type uint32 { range "0"; } units "milliseconds"; }
+    leaf multiplier { type uint8 { range "1..255"; } }
+  }
+  grouping isis-interface {
+    if-feature "isis";
+    leaf network_type { type string; }
+    leaf enabled { type boolean; }
+    leaf passive { type boolean; }
+    leaf type { type string; }
+    leaf level { type string; }
+    leaf metric { type uint32; }
+    leaf-list topologies {
+      type uint8 { range "0|2"; }
+      description "RFC 5120 topologies for this circuit: 0 (IPv4 unicast) and 2 (IPv6 unicast). Requires isis topologies on the node and must be a subset of them.";
+    }
+    leaf ipv6_metric {
+      type uint32 { range "1..16777215"; }
+      description "Metric in topology 2 (IPv6). Defaults to the interface metric. Requires isis topologies on the node.";
+    }
+    container bfd { if-feature "bfd"; presence "Interface BFD settings"; uses bfd-settings; }
+  }
+  grouping ospf-settings {
+    anydata areas { description "OSPF area types, defaults, ranges and filters."; }
+    anydata gr { description "OSPF graceful restart and helper settings."; }
+    anydata import { description "Protocol route imports."; }
+    container default {
+      presence "Originate an external default route";
+      leaf enabled { type boolean; }
+      leaf always { type boolean; }
+      leaf policy { type string; }
+      leaf type { type enumeration { enum e1; enum e2; } }
+      leaf cost { type uint32 { range "0..16777214"; } }
+    }
+    leaf password { type string { length "0..8"; } }
+    leaf passive { type boolean; }
+    leaf priority { type uint8; description "DR/BDR election priority, default 1. Zero makes the router ineligible."; }
+    leaf network_type { type enumeration { enum point-to-point; enum broadcast; } }
+    container bfd { if-feature "bfd"; presence "BFD settings"; uses bfd-settings; }
+    leaf source_interface { type string; }
+    leaf area {
+      type union {
+        type uint32;
+        type ipv4-address;
+      }
+      description "Area IDs are normalized to dotted-quad notation by the lab loader.";
+    }
+    leaf cost { type uint16 { range "1..65535"; } }
+    leaf router_id { type ipv4-address; }
+    container timers {
+      description "OSPF hello and dead intervals in seconds, in resolved netlab format.";
+      leaf hello { type uint16 { range "1..65535"; } }
+      leaf dead {
+        type uint16 { range "1..65535"; }
+        must 'not(../hello) or . > ../hello' {
+          error-message "OSPF timers.dead must exceed timers.hello";
+        }
+      }
+    }
+    leaf hello_interval { type uint16 { range "1..65535"; } }
+    leaf dead_interval {
+      type uint16 { range "1..65535"; }
+      must 'not(../hello_interval) or . > ../hello_interval' {
+        error-message "OSPF dead_interval must exceed hello_interval";
+      }
+    }
+  }
+  grouping ospf {
+    if-feature "ospf";
+    leaf enabled { type boolean; }
+    uses ospf-settings;
+    container v3 { presence "OSPFv3-specific settings"; uses ospf-settings; }
+  }
+  grouping isis {
+    if-feature "isis";
+    leaf type { type string; }
+    leaf network_type { type string; }
+    leaf loopback_cost { type uint32; }
+    leaf-list topologies {
+      type uint8 { range "0|2"; }
+      description "Enable RFC 5120 multi-topology with these topologies: 0 (IPv4 unicast) and 2 (IPv6 unicast). Absent selects single topology: IPv6 in TLV 236, no TLV 229/222, one shared SPF.";
+    }
+    anydata import { description "Protocol route imports."; }
+    container bfd { if-feature "bfd"; presence "BFD settings"; uses bfd-settings; }
+    leaf enabled { type boolean; }
+    leaf net { type string { pattern '[0-9A-Fa-f]{2}(\.[0-9A-Fa-f]{2,4})*\.00'; } }
+    leaf level { type enumeration { enum "1"; enum "2"; enum "1-2"; enum level-1; enum level-2; enum level-2-only; enum level-1-2; } }
+    leaf metric { type uint32 { range "1..16777215"; } }
+    leaf hello_interval { type uint16 { range "1..600"; } }
+    leaf hello_multiplier { type uint8 { range "2..100"; } }
+    leaf lsp_refresh { type uint16 { range "1..65535"; } }
+  }
+  grouping bgp-timers {
+    if-feature "bgp";
+    container timers {
+      description "BGP timers in seconds, resolved per timer from node, group, then topology settings.";
+      leaf keepalive {
+        type uint16;
+        units "seconds";
+        default 1;
+        description "Maximum periodic keepalive interval, capped at one third of the negotiated hold time.";
+      }
+      leaf hold {
+        type uint16 { range "0 | 3..65535"; }
+        units "seconds";
+        default 3;
+        description "Advertised hold time. Zero disables periodic keepalives and hold expiry.";
+      }
+    }
+  }
+  typedef bgp-session-type {
+    type enumeration { enum ibgp; enum ebgp; }
+  }
+  typedef bgp-restart-state {
+    type enumeration { enum enable; enum helper; enum disable; }
+  }
+  grouping bgp-restart {
+    if-feature "bgp";
+    container gr {
+      presence "Opt-in BGP graceful restart settings (netlab bgp.session model).";
+      leaf state { type bgp-restart-state; default disable; }
+      leaf notification { type boolean; default true; description "RFC 8538 graceful notification support, negotiated with the GR N bit."; }
+      leaf restart_time { type uint16 { range "0..4095"; } units "seconds"; default 120; }
+      leaf stalepath_time { type uint16; units "seconds"; default 360; }
+    }
+    container llgr {
+      presence "Opt-in RFC 9494 extension to the netlab GR model; requires GR.";
+      leaf state { type bgp-restart-state; default disable; }
+      leaf stale_time { type uint32 { range "0..16777215"; } units "seconds"; default 3600; }
+    }
+  }
+  grouping community-propagation {
+    if-feature "bgp";
+    container community {
+      leaf-list ibgp { type string; }
+      leaf-list ebgp { type string; }
+      leaf-list confed_ebgp { type string; }
+    }
+  }
+  grouping bgp-peer {
+    uses community-propagation;
+    leaf name { type name; }
+    leaf ipv4 { type union { type ipv4-address; type boolean; } }
+    leaf ipv6 { type union { type ipv6-address; type boolean; } description "True selects IPv6 link-local peer discovery on the interface."; }
+    leaf ifindex { type uint32; }
+    leaf ifname { type string; }
+    leaf local_if { type string; }
+    leaf remote_if { type string; }
+    container bfd { if-feature "bfd"; presence "Neighbor BFD settings"; uses bfd-settings; }
+    leaf type { type bgp-session-type; }
+    leaf local_ip { type address; }
+    leaf local_ip6 { type ipv6-address; }
+    leaf ipv4_rfc8950 { type boolean; description "Exchange IPv4 routes over the IPv6 BGP transport."; }
+    leaf rr { type boolean; }
+    leaf local_as { type asn; }
+    leaf as { type asn; }
+    leaf remote_as { type asn; }
+    leaf gr { type bgp-restart-state; }
+    leaf llgr { type bgp-restart-state; }
+    leaf rr_client { type boolean; }
+    leaf locpref { type uint32; }
+    leaf med { type uint32; }
+    container bandwidth {
+      presence "Inbound BGP link bandwidth configuration";
+      description "Inbound bandwidth in Mbps, or auto to use interface bandwidth.";
+      leaf in {
+        type union {
+          type uint32;
+          type enumeration { enum auto; }
+        }
+      }
+    }
+    leaf local_pref { type uint32; description "Inbound unicast local preference; applied when the session starts."; }
+    leaf allowas_in { type union { type boolean; type uint8 { range "1..10"; } } }
+    leaf multihop { type union { type boolean; type uint8; } }
+    leaf next_hop_self { type union { type boolean; type enumeration { enum all; enum ebgp; } } }
+    leaf evpn { if-feature "evpn"; type boolean; }
+    leaf vpnv4 { if-feature "bgp_vpn"; type ipv4-address; description "VPNv4 peer address selected by netlab."; }
+    leaf vpnv6 { if-feature "bgp_vpn"; type ipv4-address; description "VPNv6 peer address selected by netlab. The transport remains IPv4."; }
+    container activate {
+      leaf ipv4 { type boolean; }
+      leaf ipv6 { type boolean; }
+      leaf vpnv4 { if-feature "bgp_vpn"; type boolean; }
+      leaf vpnv6 { if-feature "bgp_vpn"; type boolean; }
+    }
+  }
+  grouping bgp {
+    if-feature "bgp";
+    uses community-propagation;
+    container bfd { if-feature "bfd"; presence "BFD settings"; uses bfd-settings; }
+    uses bgp-timers;
+    uses bgp-restart;
+    leaf mnh { type union { type boolean; type enumeration { enum send; enum receive; } } description "Experimental IPv4 unicast MultiNexthop profile, attribute code 254."; }
+    leaf enabled { type boolean; }
+    leaf as { type asn; }
+    leaf passive { type boolean; }
+    leaf next_hop_self { type union { type boolean; type enumeration { enum all; enum ebgp; } } }
+    leaf advertise_loopback { type boolean; description "Originate the primary loopback's prefixes in BGP unless false."; }
+    anydata ipv4 { description "IPv4 address-family settings."; }
+    anydata ipv6 { description "IPv6 address-family settings."; }
+    anydata multihop { description "Multihop session settings consumed by the BGP compiler."; }
+    anydata session { description "Session policy settings consumed by the BGP compiler."; }
+    anydata import { description "Protocol route imports."; }
+    container sessions {
+      description "Address-family intent or an explicit list of sessions in native JSON.";
+      list explicit {
+        key "index";
+        leaf index { type uint32; }
+        container policy {
+          leaf in { type leafref { path "../../../../../routing/policy/name"; require-instance true; } }
+          leaf out { type leafref { path "../../../../../routing/policy/name"; require-instance true; } }
+        }
+        uses bgp-peer;
+        leaf id { type string; }
+        leaf kind { type enumeration { enum static; enum dynamic; } }
+        leaf peer { type string; }
+        leaf transport { type enumeration { enum ipv4; enum ipv6; } }
+        leaf underlay { type boolean; }
+        leaf peer_group { type string; }
+        leaf-list af { type enumeration { enum v4; enum v6; enum evpn; } }
+      }
+      leaf-list ipv4 { type bgp-session-type; }
+      leaf-list ipv6 { type bgp-session-type; }
+      leaf-list evpn { if-feature "evpn"; type bgp-session-type; }
+    }
+    list neighbors {
+      key "index";
+      leaf index { type uint32; }
+      uses bgp-peer;
+      container policy {
+        leaf in { type leafref { path "../../../../routing/policy/name"; require-instance true; } }
+        leaf out { type leafref { path "../../../../routing/policy/name"; require-instance true; } }
+      }
+    }
+    leaf source_interface { type string; }
+    leaf domain { type string; }
+    container rr {
+      presence "Enable route reflection";
+      description "Reflect iBGP routes, including EVPN, to clients.";
+      leaf cluster_id { type ipv4-address; description "Route reflector cluster identifier."; }
+      leaf mesh { type boolean; description "Infer reflector-to-reflector iBGP sessions unless both reflectors disable the mesh."; }
+    }
+    leaf local_as { type asn; }
+    leaf router_id { type ipv4-address; }
+    leaf export_filter { type boolean; }
+    leaf locpref { type uint32; }
+    leaf med { type uint32; }
+    list advertise {
+      key "index";
+      leaf index { type uint32; }
+      uses prefix;
+      container community {
+        leaf-list standard { type string; }
+        leaf-list extended { type string; }
+        leaf-list large { type string; }
+      }
+      must 'ipv4 or ipv6' { error-message "An advertisement requires an IPv4 or IPv6 prefix"; }
+    }
+    container confederation {
+      presence "Member AS confederation settings";
+      leaf as { type asn; mandatory true; }
+      leaf-list peers { type asn; }
+    }
+  }
+  grouping route-filter-order {
+    leaf sequence { type uint32; }
+    leaf action { type enumeration { enum permit; enum deny; } default permit; }
+  }
+  typedef address-reference {
+    type string { pattern '(nodes\.)?[A-Za-z_][A-Za-z0-9_-]*(\.[A-Za-z_][A-Za-z0-9_-]*|\[[0-9]+\])*'; }
+  }
+  grouping static-nexthop {
+    description
+      "Resolved static next hop, shared by single-path and multipath routes.
+       The output interface is authoritative when supplied. Native scalar
+       next hops use address in the validation view.";
+    choice next-hop-address {
+      mandatory true;
+      case families {
+        leaf ipv4 { type ipv4-address; }
+        leaf ipv6 { type ipv6-address; }
+      }
+      case scalar {
+        leaf address { type union { type address; type address-reference; } }
+      }
+    }
+    leaf intf {
+      type string { pattern '[A-Za-z][A-Za-z0-9_.-]{0,14}'; }
+      description "Explicit output interface name.";
+    }
+    leaf idx { type uint32; description "Netlab next-hop index within the route's multipath set."; }
+  }
+  grouping routing {
+    list prefix {
+      key "name";
+      leaf name { type name; }
+      list entries {
+        key "index";
+        leaf index { type uint32; }
+        uses route-filter-order;
+        leaf-list ipv4 { type ipv4-prefix; }
+        leaf-list ipv6 { type ipv6-prefix; }
+        container min { leaf ipv4 { type uint8 { range "0..32"; } } leaf ipv6 { type uint8 { range "0..128"; } } }
+        container max { leaf ipv4 { type uint8 { range "0..32"; } } leaf ipv6 { type uint8 { range "0..128"; } } }
+      }
+    }
+    list aspath {
+      key "name";
+      leaf name { type name; }
+      list entries {
+        key "index";
+        leaf index { type uint32; }
+        uses route-filter-order;
+        leaf path {
+          type string {
+            pattern '(\.\*|\^?[ _]*[0-9]{1,10}([ _]+[0-9]{1,10}){0,31}[ _]*$?|\^[ _]*$)';
+          }
+          description
+            "Simple sequence of complete ASNs, separated by spaces or underscores.
+             Optional ^ and $ anchor the sequence; ^$ matches an empty path and
+             .* matches any path. Regex operators belong in pathexp.";
+        }
+        leaf pathexp {
+          if-feature "bgp-policy-regex";
+          type string { length "1..max"; }
+          description "POSIX extended AS-path expression; underscore matches an ASN boundary.";
+        }
+        must 'path or pathexp' { error-message "An AS-path entry requires path or pathexp"; }
+        must 'not(path and pathexp)' { error-message "Use path or pathexp, not both"; }
+      }
+    }
+    list community {
+      key "name";
+      leaf name { type name; }
+      leaf type { type enumeration { enum standard; enum extended; enum large; } default standard; }
+      list entries {
+        key "index";
+        leaf index { type uint32; }
+        uses route-filter-order;
+        leaf-list list { type string; }
+        leaf regexp { if-feature "bgp-policy-regex"; type string; }
+        must 'not(list and regexp)' { error-message "Use community literals or a regular expression"; }
+      }
+    }
+    list policy {
+      key "name";
+      leaf name { type name; }
+      list entries {
+        key "index";
+        leaf index { type uint32; }
+        uses route-filter-order;
+        container match {
+          leaf prefix { type leafref { path "../../../../prefix/name"; require-instance true; } }
+          leaf aspath { type leafref { path "../../../../aspath/name"; require-instance true; } }
+          container community {
+            leaf standard { type leafref { path "../../../../../community/name"; require-instance true; } }
+            leaf extended { type leafref { path "../../../../../community/name"; require-instance true; } }
+            leaf large { type leafref { path "../../../../../community/name"; require-instance true; } }
+          }
+        }
+        container set {
+          leaf locpref { type uint32; }
+          leaf med { type uint32; }
+          container prepend {
+            leaf count { type uint8 { range "1..32"; } }
+            leaf-list path { type asn; max-elements 32; }
+            must 'not(count and path)' { error-message "Use prepend count or path"; }
+          }
+          container community {
+            leaf-list standard { type string; max-elements 32; }
+            leaf-list extended { type string; max-elements 8; }
+            leaf-list large { type string; max-elements 8; }
+            leaf append { type boolean; }
+          }
+        }
+      }
+    }
+    list static {
+      if-feature "static-routing";
+      key "index";
+      leaf index { type uint32; }
+      leaf ipv4 { type union { type ipv4-prefix; type address-reference; } }
+      leaf ipv6 { type union { type ipv6-prefix; type address-reference; } }
+      leaf discard { type boolean; }
+      container nexthop {
+        presence "An explicit static next hop";
+        uses static-nexthop;
+      }
+      list nexthops {
+        key "index";
+        ordered-by user;
+        leaf index { type uint32; }
+        uses static-nexthop;
+      }
+      leaf distance {
+        type uint8 { range "1..255"; }
+        description
+          "Administrative distance. Lower values are preferred. Omitted routes use the static default of 1.";
+      }
+      leaf vlan { type leafref { path "/topology/vlans/name"; require-instance true; } }
+      must 'ipv4 or ipv6' { error-message "A static route requires a prefix"; }
+      must 'not(ipv4) or not(nexthop) or nexthop/ipv4 or nexthop/address' {
+        error-message "An IPv4 static route requires an IPv4 next hop";
+      }
+      must 'not(ipv6) or not(nexthop) or nexthop/ipv6 or nexthop/address' {
+        error-message "An IPv6 static route requires an IPv6 next hop";
+      }
+      must 'not(ipv4) or count(nexthops[not(ipv4 or address)]) = 0' {
+        error-message "An IPv4 static route requires IPv4 next hops";
+      }
+      must 'not(ipv6) or count(nexthops[not(ipv6 or address)]) = 0' {
+        error-message "An IPv6 static route requires IPv6 next hops";
+      }
+      must "discard = 'true' or nexthop or count(nexthops) > 0" { error-message "A static route requires a next hop"; }
+    }
+  }
+
+  container topology {
+    leaf instructions { type string; description "Reader instructions shown in an expandable UI section."; }
+    list prefix {
+      key "name";
+      leaf name { type name; }
+      leaf ipv4 { type ipv4-prefix; }
+      leaf ipv6 { type ipv6-prefix; }
+    }
+    must 'count(nodes) > 0' { error-message "A topology requires at least one node"; }
+    anydata _netlab_version;
+    anydata addressing;
+    leaf-list animate {
+      type enumeration {
+        enum srcMac; enum dstMac; enum ethertype; enum vlan; enum innerVlan; enum serviceVlan;
+        enum ip.src; enum ip.dst; enum ip.ttl; enum ip.proto; enum ip.flowLabel;
+        enum ip.inner.src; enum ip.inner.dst; enum ip.inner.ttl; enum ip.inner.proto; enum ip.inner.flowLabel;
+        enum ip.icmp.type; enum ip.icmp.id; enum ip.icmp.seq;
+        enum ip.icmp6.type; enum ip.icmp6.id; enum ip.icmp6.seq;
+        enum ip.tcp.sport; enum ip.tcp.dport; enum ip.udp.sport; enum ip.udp.dport;
+        enum ip.vxlan.vni;
+      }
+      description "Simulator frame fields appended to animated packet badges. Missing fields are omitted.";
+    }
+    anydata simulation { description "Simulation fidelity and runtime settings."; }
+    anydata design { description "Declarative topology design parameters."; }
+    anydata plugin { description "Netlab plugin declarations."; }
+    container layout { uses layout-settings; }
+    leaf layout_orient { type enumeration { enum horizontal; enum vertical; } }
+    leaf _concept { type enumeration { enum topology; } }
+    leaf _fabricExpanded { type boolean; }
+    leaf name { type string { length "1..max"; } }
+    leaf ecmp {
+      type uint8 { range "1..8"; }
+      description
+        "Maximum equal-cost next hops installed by OSPF and IS-IS and used by forwarding. Default 8, the protocol array capacity. 1 selects a single path. Values outside 1..8 are rejected.";
+    }
+    container device { presence "Device configuration"; uses device-settings; }
+    leaf-list module { type module-name; }
+    anydata fabric { description "Already-expanded fabric recipe."; }
+    anydata groups { description "Group metadata retained after expansion."; }
+    anydata validate { description "Validation scenarios consumed by the lab runner."; }
+    anydata loopbacks;
+    container routing { presence "Global routing settings"; uses routing; }
+    container ospf { if-feature "ospf"; presence "Global OSPF settings"; uses ospf; }
+    container gateway { if-feature "gateway"; presence "Global gateway settings"; uses gateway; }
+    container vxlan { if-feature "vxlan"; presence "Global VXLAN settings"; uses vxlan; }
+    container evpn { if-feature "evpn"; presence "Global EVPN policy"; uses evpn; }
+    container srv6 { if-feature "srv6"; presence "Global SRv6 settings"; uses srv6; }
+    container bfd { if-feature "bfd"; presence "Global BFD timers"; uses bfd-timers; }
+    container bgp {
+      if-feature "bgp";
+      presence "Global BGP settings";
+      uses bgp-timers;
+      uses bgp-restart;
+      leaf advertise_loopback { type boolean; description "Default primary loopback advertisement for BGP routers."; }
+      leaf enabled { type boolean; }
+      leaf as { type asn; }
+      leaf source_interface { type string; }
+      anydata sessions;
+      list confederation {
+        key "as";
+        leaf as { type asn; }
+        leaf-list members { type asn; }
+      }
+    }
+    list vlans {
+      anydata _fabric;
+      if-feature "vlan";
+      key "name";
+      leaf vrf { if-feature "vrf"; type string; }
+      leaf name { type name; }
+      leaf id { type uint16 { range "1..4094"; } }
+      leaf mode { type enumeration { enum bridge; enum irb; enum route; enum qinq; } }
+      leaf pool { type string; }
+      leaf mtu { type uint16; }
+      container ospf { if-feature "ospf"; presence "VLAN OSPF settings"; uses ospf; }
+      leaf-list customers {
+        when "../mode = 'qinq'";
+        type leafref { path "/topology/vlans/name"; require-instance true; }
+      }
+      container prefix { presence "VLAN prefix"; uses subnet-prefix; }
+      leaf ipv4 { type ipv4-prefix; }
+      leaf subnet { type uint8 { range "0..32"; } }
+      leaf route_prefix { type uint8 { range "0..32"; } }
+      leaf vni { type uint32 { range "1..16777215"; } }
+      container gateway { if-feature "gateway"; presence "VLAN gateway settings"; uses gateway; }
+      must "not(mode = 'qinq') or count(customers) > 0" {
+        error-message "A QinQ VLAN requires customer VLANs";
+      }
+    }
+    list nodes {
+      key "name";
+      leaf name { type name; }
+      leaf router_id { type ipv4-address; description "Resolved node router identity."; }
+      leaf id {
+        type uint32 { range "1..4294967295"; }
+      }
+      must 'not(id) or count(/topology/nodes[id = current()/id]) = 1' {
+        error-message "Node IDs must be unique";
+      }
+      container layout { uses layout-settings; }
+      container device { presence "Device configuration"; uses device-settings; }
+      leaf-list module { type module-name; }
+      leaf external { type boolean; description "Device runs outside this browser."; }
+      leaf role {
+        type enumeration {
+          enum router;
+          enum host;
+          enum switch;
+          enum bridge;
+          enum leaf;
+          enum spine;
+          enum superspine;
+          enum gpu;
+        }
+      }
+      container fabric {
+        presence "Fabric placement used for MAC and inventory assignment";
+        leaf pod { type uint8; }
+        leaf rack { type uint8; }
+        leaf count { type uint8; }
+      }
+      leaf mtu { type uint16; }
+      container bfd { if-feature "bfd"; presence "Node BFD timers"; uses bfd-timers; }
+      container bgp {
+        if-feature "bgp";
+        presence "BGP configuration or explicit disable";
+        uses bgp;
+      }
+      list loopbacks {
+        key "name";
+        leaf name { type name; }
+        leaf pool { type string; }
+        leaf mtu { type uint16; }
+        leaf mac { type unicast-mac; }
+        uses subnet-prefix;
+        container ospf { if-feature "ospf"; presence "Loopback OSPF settings"; uses ospf; }
+      }
+      must 'not(loopback) or count(loopbacks) = 0' {
+        error-message "Use either loopback or loopbacks on a node, not both";
+      }
+      container loopback {
+        presence "Loopback addresses"; uses prefix;
+        container ospf { if-feature "ospf"; presence "Loopback OSPF settings"; uses ospf; }
+      }
+      container routing { presence "Static routing"; uses routing; }
+      anydata vrfs { if-feature "vrf"; description "Per-VRF protocol configuration."; }
+      container mpls { if-feature "mpls"; presence "MPLS label forwarding"; leaf ldp { if-feature "ldp"; type boolean; } leaf static { type boolean; description "Static loopback transport labels 16000 + node id; no LDP signaling."; } anydata vpn { if-feature "bgp_vpn"; description "Resolved MPLS VPN address-family settings."; } }
+      container ldp {
+        if-feature "ldp";
+        presence "Resolved LDP settings";
+        leaf enabled { type boolean; }
+        leaf router_id { type ipv4-address; }
+        container af { leaf ipv4 { type boolean; } leaf ipv6 { type boolean; } }
+      }
+      container gateway { if-feature "gateway"; presence "Node gateway settings"; uses gateway; }
+      container vxlan { if-feature "vxlan"; presence "Node VXLAN settings"; uses vxlan; }
+      container evpn { if-feature "evpn"; presence "Node EVPN policy"; uses evpn; }
+      container srv6 { if-feature "srv6"; presence "Node SRv6 settings"; uses srv6; }
+      container ospf { if-feature "ospf"; presence "OSPF configuration or explicit disable"; uses ospf; }
+      container isis { if-feature "isis"; presence "IS-IS configuration or explicit disable"; uses isis; }
+      list vlans {
+      if-feature "vlan";
+        key "name";
+        leaf name { type leafref { path "/topology/vlans/name"; require-instance true; } }
+        uses subnet-prefix;
+        leaf mode { type enumeration { enum bridge; enum irb; enum route; } }
+        leaf id { type uint16; }
+        leaf vrf { if-feature "vrf"; type string; }
+        container evpn { if-feature "evpn"; presence "Node VLAN route targets"; uses evpn-policy; }
+        container gateway { if-feature "gateway"; presence "Node VLAN gateway settings"; uses gateway; }
+      }
+      list bonds {
+        if-feature "lag";
+        key "name";
+        leaf name { type name; }
+        leaf-list members { type string { length "1..max"; } }
+        leaf mode { type enumeration { enum "802.3ad"; enum active-backup; } }
+        leaf mtu { type uint16; }
+        leaf mac { type unicast-mac; }
+        leaf esi { if-feature "evpn"; type string { pattern '00(:[0-9A-Fa-f]{2}){9}'; } }
+        leaf df_preference { if-feature "evpn"; type uint16 { range "1..65535"; } }
+        must 'count(members) > 0' { error-message "A bond requires member interfaces"; }
+      }
+      anydata ws;
+      anydata interfaces { description "Normalized interface inventory, shared with link endpoints."; }
+      anydata validation { description "Node validation actions consumed by the lab runner."; }
+    }
+    list links {
+      anydata _fabric;
+      key "index";
+      leaf index { type uint32; }
+      leaf type { type enumeration { enum p2p; enum lan; enum stub; } }
+      leaf role { type string; description "Link role such as stub or gpu."; }
+      leaf label { type string; description "Optional rail or link label used for MAC assignment."; }
+      container prefix {
+        presence "Link prefix";
+        uses subnet-prefix;
+      }
+      container bfd { if-feature "bfd"; presence "Link BFD timers"; leaf enabled { type boolean; } uses bfd-timers; }
+      container gateway { if-feature "gateway"; presence "Link gateway settings"; uses gateway; }
+      container vlan {
+        if-feature "vlan";
+        presence "VLAN selection";
+        leaf access { type leafref { path "/topology/vlans/name"; require-instance true; } }
+        leaf-list trunk { type leafref { path "/topology/vlans/name"; require-instance true; } }
+        leaf native { type leafref { path "/topology/vlans/name"; require-instance true; } }
+        must 'not(access) or count(trunk) = 0' { error-message "A link cannot be both access and trunk"; }
+        must 'not(native) or native = trunk' { error-message "A native VLAN must be carried on the trunk"; }
+      }
+      must 'count(interfaces) >= 1' { error-message "A link requires at least one interface"; }
+      must 'not(type = "p2p") or count(interfaces) = 2' { error-message "A point-to-point link requires exactly two interfaces"; }
+      must 'not(type = "stub") or count(interfaces) = 1' { error-message "A stub link requires exactly one interface"; }
+      list interfaces {
+        key "index";
+        leaf index { type uint32; }
+        leaf bandwidth { type uint32 { range "1..max"; } description "Interface bandwidth in Mbps."; }
+        leaf node {
+          type leafref { path "/topology/nodes/name"; require-instance true; }
+          mandatory true;
+        }
+        leaf ifindex { type uint32; }
+        leaf type { type string; }
+        leaf ifname { type string { length "1..max"; } }
+        leaf vrf { if-feature "vrf"; type string; }
+        leaf mtu { type uint16; }
+        leaf mac { type unicast-mac; }
+        uses subnet-prefix;
+        container bfd { if-feature "bfd"; presence "Interface BFD timers"; leaf enabled { type boolean; } uses bfd-timers; }
+        container ospf { if-feature "ospf"; presence "Interface OSPF settings"; uses ospf; }
+        container isis { if-feature "isis"; presence "Interface IS-IS settings"; uses isis-interface; }
+        container ldp { if-feature "ldp"; presence "Interface LDP settings"; leaf enabled { type boolean; } leaf passive { type boolean; } }
+        container gateway {
+          presence "Interface next-hop gateway";
+          leaf ipv4 { type union { type ipv4-address; type ipv4-prefix; } }
+          leaf ipv6 { type union { type ipv6-address; type ipv6-prefix; } }
+        }
+        container bgp {
+          container bfd { if-feature "bfd"; presence "Interface BGP BFD settings"; uses bfd-settings; }
+          if-feature "bgp";
+          presence "Interface BGP policy";
+          leaf locpref { type uint32; }
+          leaf med { type uint32; }
+          leaf local_as { type asn; }
+          leaf allowas_in { type union { type boolean; type uint8 { range "1..10"; } } }
+          container policy {
+            leaf in { type leafref { path "/topology/nodes[name = current()/../../../node]/routing/policy/name"; require-instance true; } }
+            leaf out { type leafref { path "/topology/nodes[name = current()/../../../node]/routing/policy/name"; require-instance true; } }
+          }
+        }
+        must 'not(ifname) or count(/topology/links/interfaces[node = current()/node][ifname = current()/ifname]) = 1' {
+          error-message "An interface can belong to only one link";
+        }
+      }
+    }
+  }
+
+  typedef ip-prefix {
+    type union {
+      type ipv4-prefix;
+      type ipv6-prefix;
+    }
+  }
+  typedef bgp-state {
+    type enumeration {
+      enum idle;
+      enum connect;
+      enum active;
+      enum opensent;
+      enum openconfirm;
+      enum established;
+    }
+    description
+      "BGP finite-state machine. A twin that is still opening TCP is connect.";
+  }
+  typedef neighbor-state {
+    type enumeration {
+      enum incomplete;
+      enum reachable;
+      enum stale;
+      enum delay;
+      enum probe;
+      enum failed;
+      enum noarp;
+      enum permanent;
+      enum evpn { if-feature "evpn"; }
+    }
+    description
+      "ARP and IPv6 neighbor unreachability state. evpn is a neighbor learned from EVPN.";
+  }
+  typedef isis-level {
+    type enumeration { enum "1"; enum "2"; enum "1-2"; }
+    description "IS-IS level. level-1, level-2, level-2-only, and level-1-2 normalize to these values.";
+  }
+  typedef ospf-state {
+    type enumeration {
+      enum down;
+      enum attempt;
+      enum init;
+      enum "2-way";
+      enum exstart;
+      enum exchange;
+      enum loading;
+      enum full;
+    }
+  }
+
+  grouping state-route {
+    description "One forwarding entry. An empty next hop is connected.";
+    leaf prefix { type ip-prefix; }
+    leaf nexthop { type string; }
+    leaf ifname { type string; }
+    leaf protocol { type string; }
+    leaf table { type string; }
+  }
+
+  grouping evpn-segment {
+    if-feature "evpn";
+    container evpn {
+      presence "EVPN Ethernet Segment";
+      leaf esi { type string { pattern '00(:[0-9A-Fa-f]{2}){9}'; } }
+      leaf designated_forwarder { type boolean; }
+    }
+  }
+  grouping ospf-state {
+    if-feature "ospf";
+    description "Adjacencies and link-state database shared by OSPFv2 and OSPFv3.";
+    list neighbors {
+      key "ifname router_id";
+      leaf ifname { type string; }
+      leaf router_id { type ipv4-address; }
+      leaf peer { type string; }
+      leaf adjacency { type ospf-state; }
+    }
+    list lsas {
+      key "scope area lsa_type ls_id advertising_router";
+      description "Link-state database rows. Age is omitted.";
+      leaf scope { type string; }
+      leaf area { type string; }
+      leaf lsa_type { type uint16; }
+      leaf ls_id { type string; }
+      leaf advertising_router { type string; }
+      leaf sequence { type uint32; }
+    }
+  }
+
+  container state {
+    config false;
+    description
+      "Operational state for one lab, normalized from the web UI tables.
+       Protocol tables sit under their module. OSPFv2 and OSPFv3 share one
+       adjacency and link-state model. Ages, hold timers, and packet counters
+       are omitted because they change between observations. Absent key
+       components are an empty string, and an absent VNI is zero. Addresses
+       use a single textual form.";
+
+    list nodes {
+      key "name";
+      leaf name { type name; }
+
+      list interfaces {
+        key "ifname";
+        description "Interface table, including addresses and link state.";
+        leaf ifname { type string { length "1..max"; } }
+        leaf enabled { type boolean; }
+        leaf ipv4 { type ipv4-prefix; }
+        leaf ipv6 { type ipv6-prefix; }
+        leaf link_local { type ipv6-address; }
+        leaf mac { type string; }
+        leaf peer { type string; }
+        container vlan {
+        if-feature "vlan";
+          presence "Interface VLAN membership";
+          leaf mode { type string; }
+          leaf name { type leafref { path "../../../vlans/name"; require-instance true; } }
+          leaf-list trunk { type leafref { path "../../../vlans/name"; require-instance true; } }
+          leaf native { type leafref { path "../../../vlans/name"; require-instance true; } }
+        }
+        uses evpn-segment;
+        container gateway {
+          if-feature "gateway";
+          presence "Interface gateway";
+          leaf address { type address; }
+          leaf protocol { type enumeration { enum anycast; enum vrrp; } }
+          leaf role { type string; }
+          leaf state { type string; }
+        }
+      }
+
+      list bonds {
+        if-feature "lag";
+        key "ifname";
+        description "Bond and Ethernet Segment rows from the Bonds table.";
+        leaf ifname { type string { length "1..max"; } }
+        leaf mode { type string; }
+        leaf-list members { type string; }
+        leaf enabled { type boolean; }
+        uses evpn-segment;
+      }
+
+      list vrfs {
+        if-feature "vrf";
+        key "name";
+        leaf name { type name; }
+      }
+
+      list vlans {
+      if-feature "vlan";
+        key "name";
+        leaf name { type name; }
+        leaf id { type uint16 { range "1..4094"; } }
+        leaf mode { type enumeration { enum bridge; enum irb; enum route; enum qinq; } }
+        leaf vni { type uint32 { range "0..16777215"; } }
+        leaf ipv4 { type ipv4-prefix; }
+        leaf ipv6 { type ipv6-prefix; }
+        leaf ifname { type string; }
+        leaf gateway { type string; }
+        leaf-list customer_vlans {
+          when "../mode = 'qinq'";
+          type leafref { path "../name"; require-instance true; }
+          must "not(../../vlans[name=current()]/mode = 'qinq')" {
+            error-message "A customer VLAN cannot be QinQ";
+          }
+        }
+      }
+
+      list neighbors {
+        key "ip ifname";
+        description "ARP and IPv6 neighbor table.";
+        leaf ip { type address; }
+        leaf ifname { type string; }
+        leaf mac { type string; }
+        leaf neighbor_state { type neighbor-state; }
+      }
+
+      list mac_table {
+        key "vlan mac ifname";
+        leaf vlan { type string; }
+        leaf mac { type string; }
+        leaf ifname { type string; }
+        leaf evpn { if-feature "evpn"; type boolean; }
+        leaf esi { if-feature "evpn"; type string; }
+      }
+
+      list fib {
+        key "prefix nexthop ifname table";
+        description "Forwarding table. The table is main when the UI does not show one.";
+        uses state-route;
+      }
+
+      container bfd {
+        if-feature "bfd";
+        presence "BFD operational state";
+        list sessions {
+          key "local_discriminator";
+          description "BFD sessions identified by their node-local discriminator.";
+          leaf local_address { type string; }
+          leaf remote_address { type string; }
+          leaf ifname { type string; }
+          leaf vrf { if-feature "vrf"; type string; }
+          leaf multihop { type union { type boolean; type uint8; } }
+          leaf state { type enumeration { enum admin-down; enum down; enum init; enum up; } }
+          leaf diagnostic { type uint8; }
+          leaf detection_ms { type uint32; }
+          leaf local_discriminator { type uint32; }
+          leaf remote_discriminator { type uint32; }
+          leaf flaps { type uint32; }
+          leaf last_failure_ms { type uint32; }
+          leaf-list subscribers { type string; }
+        }
+      }
+      container bgp {
+        if-feature "bgp";
+        presence "BGP operational state";
+        list sessions {
+          key "peer family vrf local_address remote_address";
+          description "BGP session as seen from this node.";
+          leaf peer { type string { length "1..max"; } }
+          leaf peer_node { type string; description "Remote topology node, when known."; }
+          leaf family {
+            type enumeration {
+              enum ipv4;
+              enum ipv6;
+              enum evpn { if-feature "evpn"; }
+            }
+          }
+          leaf vrf {
+            type leafref { path "../../../vrfs/name"; require-instance true; }
+            description "Omitted for the default VRF.";
+          }
+          leaf local_address { type string; }
+          leaf remote_address { type string; }
+          leaf local_interface { type string; }
+          leaf remote_interface { type string; }
+          leaf session_state { type bgp-state; }
+          leaf kind { type enumeration { enum ibgp; enum ebgp; enum confed_ebgp; } }
+        }
+        list rib {
+          key "prefix nexthop origin";
+          description "BGP Loc-RIB rows.";
+          leaf prefix { type ip-prefix; }
+          leaf nexthop { type string; }
+          leaf origin { type string; }
+          leaf med { type uint32; }
+          leaf as_path { type string; }
+          leaf-list communities { type string; }
+          leaf-list extended_communities { type string; }
+          leaf-list large_communities { type string; }
+        }
+      }
+
+      container evpn {
+        if-feature "evpn";
+        presence "EVPN operational state";
+        list routes {
+          key "route_type rd esi vni mac ip prefix nexthop";
+          description
+            "EVPN route entries, including SRv6 service SIDs.
+             The key is the route identity, not the router that displayed it.";
+          leaf route_type { type uint8 { range "1..5"; } }
+          leaf rd { type string; }
+          leaf esi { type string; }
+          leaf vni { type uint32 { range "0..16777215"; } }
+          leaf vlan { type name; }
+          leaf mac {
+            type union {
+              type unicast-mac;
+              type string { length 0; }
+            }
+          }
+          leaf ip { type string; }
+          leaf prefix { type string; }
+          leaf nexthop { type string; }
+          leaf-list route_target { type route-target; }
+          leaf service_sid { type ipv6-address; }
+          leaf behavior { type string; }
+          leaf table { type string; }
+          leaf source { type string; }
+        }
+      }
+
+      container ospf {
+        if-feature "ospf";
+        presence "OSPF operational state";
+        container v2 { presence "OSPFv2 operational state"; uses ospf-state; }
+        container v3 { presence "OSPFv3 operational state"; uses ospf-state; }
+      }
+
+      container isis {
+        if-feature "isis";
+        presence "IS-IS operational state";
+        leaf net { type string; }
+        leaf area { type string; }
+        leaf level { type isis-level; }
+        list neighbors {
+          key "ifname system_id level";
+          leaf ifname { type string; }
+          leaf system_id { type string; }
+          leaf level { type string; }
+          leaf peer { type string; }
+          leaf metric { type uint32; }
+          leaf adjacency { type enumeration { enum init; enum up; enum down; } }
+        }
+        list lsps {
+          key "system_id level";
+          description "LSP summary. Remaining lifetime is omitted.";
+          leaf system_id { type string; }
+          leaf level { type string; }
+          leaf sequence { type uint32; }
+          leaf prefix_count { type uint32; }
+        }
+      }
+    }
+  }
+}

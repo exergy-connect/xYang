@@ -9,13 +9,19 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- Export selected subtrees as JSON Schema with feature filtering and diagnostics in Python, TypeScript, and Zig.
+
 - Instance normalization with model-defined `xyang-transform` rules and module-wide dotted-key expansion in Python, TypeScript, and Zig, plus a Netlab topology example.
 
 ### Changed
 
+- **Breaking:** Schema generators now return a result containing `schema` and `diagnostics`; use `.schema` for the previous whole-module value.
+
 - Python `xyang validate` defaults to native encoding and JSON output for YAML data files; `--format text` requests text output.
 
 ### Fixed
+
+- Preserve `if-feature` on `enum` and `bit` through parsing and native JSON in Python and TypeScript, reject a value whose feature is disabled, and omit it from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
 
 - Preserve original input paths for unknown fields produced by dotted-key expansion.
 

@@ -1,3 +1,5 @@
+import { buildEnabledFeaturesMap, reachableModuleData, stmtIfFeaturesSatisfied } from "../validator/if-feature-eval";
+import { projectSubtree, restrictGatedValues } from "./subtree";
 import { type ScopedTypedef } from "../typedef-scope";
 import {
   coerceIdentifierRef,
@@ -413,6 +415,7 @@ function pathText(path: unknown): string {
   if (shape.kind !== "path") {
     return "";
   }
+  if (typeof shape.source === "string") return shape.source;
   const segmentsRaw = Array.isArray(shape.segments) ? shape.segments : [];
   const segments = segmentsRaw
     .map((seg) => asRecord(seg).step)
@@ -1121,6 +1124,14 @@ function typedefToSchema(module: YangModule, entries = module.typedefs): Record<
     withDescription(def, entry.description);
     const schemaXy = asRecord(schema[YANG_SCHEMA_KEYS.xYang]);
     const typedefXy: Record<string, unknown> = {};
+    if (typeShape.name === YangTokenType.LEAFREF) {
+      Object.assign(typedefXy, {
+        type: YangTokenType.LEAFREF,
+        path: pathText(typeShape.path),
+        "require-instance": typeShape.require_instance !== false,
+        ...xpathPrefixesEntry(typeShape.xpath_prefixes)
+      });
+    }
     const rawPatList = Array.isArray(typeShape.patterns) ? typeShape.patterns : [];
     const lastPat = rawPatList.length > 0 ? (rawPatList[rawPatList.length - 1] as Record<string, unknown>) : null;
     if (lastPat && typeof lastPat.error_message === "string" && lastPat.error_message.length > 0) {
@@ -1433,12 +1444,19 @@ import { annotateSchema, type AnnotationOptions } from "../encoding/annotations"
 let exportNativeJson = false;
 
 export type SchemaExportOptions = AnnotationOptions & {
+  /** Absolute schema path to a node whose value becomes the schema root. */
+  path?: string;
+  /** Enabled feature names by module; omitted modules have all declared features enabled. */
+  features?: Record<string, readonly string[]> | null;
   nativeJson?: boolean;
   /** Schema resource URI. Defaults to the YANG namespace; leaves x-yang.namespace unchanged. */
   schemaId?: string;
 };
 
-export function generateJsonSchema(module: YangModule, options: SchemaExportOptions = {}): Record<string, unknown> {
+export type SchemaDiagnostic = { path: string; constraint: string; expression: string; reason: string };
+export type SchemaExportResult = { schema: Record<string, unknown>; diagnostics: SchemaDiagnostic[] };
+
+export function generateJsonSchema(module: YangModule, options: SchemaExportOptions = {}): SchemaExportResult {
 
   const previousNative = exportNativeJson;
   const previous = extensionUses;
@@ -1447,10 +1465,50 @@ export function generateJsonSchema(module: YangModule, options: SchemaExportOpti
   extensionUses = [];
   exportNativeJson = options.nativeJson === true;
   try {
-    const schema = withIdentityExport(module, (used) => generateSchema(module, used));
+    let effective: YangModule | undefined;
+    const schema = withIdentityExport(module, (used) => generateSchema(module, used, value => { effective = value; }));
     if (options.schemaId !== undefined) schema.$id = options.schemaId;
     annotateSchema(schema, options);
-    return schema;
+    if (!options.path) {
+      if (options.features != null) throw new YangExportError("features requires a subtree path");
+      return { schema, diagnostics: [] };
+    }
+    const overrides: Record<string, Set<string>> = {};
+    if (options.features != null) {
+      if (typeof options.features !== "object" || Array.isArray(options.features)) throw new TypeError("features must map module names to arrays of feature names");
+      for (const [name, features] of Object.entries(options.features)) {
+        if (!Array.isArray(features) || features.some(feature => typeof feature !== "string")) throw new TypeError(`features[${name}] must be an array of feature names`);
+        overrides[name] = new Set(features);
+      }
+    }
+    const enabled = buildEnabledFeaturesMap(module, overrides);
+    let filteredModule: YangModule | undefined;
+    extensionUses = [];
+    const filtered = withIdentityExport(module, used => generateSchema(module, used, value => {
+      filteredModule = value;
+      const filter = (statements: YangStatement[]): YangStatement[] => statements.filter(stmt => {
+        const imported = reachableModuleData(value).filter(other => other.name !== value.name);
+        for (const expression of stmt.if_features ?? []) {
+          for (const token of expression.match(/[A-Za-z_][A-Za-z0-9_.:-]*/g) ?? []) {
+            if (!["and", "or", "not"].includes(token) && !token.includes(":") && imported.some(other => other.features.has(token))) {
+              throw new YangExportError(`cannot safely resolve unqualified if-feature '${token}' shared with an imported module`);
+            }
+          }
+        }
+        const owner = stmt.defining_module && stmt.defining_module !== value.name
+          ? value.module_registry?.[stmt.defining_module] ?? value : value;
+        if (!stmtIfFeaturesSatisfied(stmt.if_features, owner, enabled, stmt.included_from)) return false;
+        stmt.statements = filter(stmt.statements ?? []);
+        return true;
+      });
+      value.statements = filter(value.statements);
+    }));
+    annotateSchema(filtered, options);
+    if (options.schemaId !== undefined) filtered.$id = options.schemaId;
+    restrictGatedValues(filtered, module, enabled);
+    const projected = projectSubtree(schema, filteredModule ?? effective ?? module, options.path, options.nativeJson === true, filtered);
+    restrictGatedValues(projected.schema, module, enabled);
+    return projected;
   } finally {
     exportNativeJson = previousNative;
     extensionUses = previous;
@@ -1458,7 +1516,7 @@ export function generateJsonSchema(module: YangModule, options: SchemaExportOpti
   }
 }
 
-function generateSchema(module: YangModule, used: IdentityPair[]): Record<string, unknown> {
+function generateSchema(module: YangModule, used: IdentityPair[], onEffective?: (module: YangModule) => void): Record<string, unknown> {
   // Preserve parse-time AST shape (reversible YANG <-> yang.json) while still
   // emitting a flattened schema view.
   const effectiveModule = expandUses(module);
@@ -1470,6 +1528,7 @@ function generateSchema(module: YangModule, used: IdentityPair[]): Record<string
   applyOwnDeviations(effectiveModule);
   // Merge a same-module sx:augment-structure. A cross-module one stays an invocation.
   applyBuiltinExtensionInvocations(effectiveModule, { exportView: true });
+  onEffective?.(effectiveModule);
   const properties: Record<string, unknown> = {};
   const required: string[] = [];
   const typedefNames = new Set(Object.keys(effectiveModule.typedefs as Record<string, unknown>));

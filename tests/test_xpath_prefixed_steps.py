@@ -38,7 +38,7 @@ def _load_case(case_dir: Path = CASE):
 
 @pytest.fixture(scope="module")
 def schema():
-    return generate_json_schema(_load_case())
+    return generate_json_schema(_load_case()).schema
 
 
 def _round_trip_params():
@@ -52,13 +52,13 @@ def test_json_records_prefix_modules_and_qualifies_augmented_members(schema):
     assert {"name", "ext:name", "ext:tag", "ext:iref"} <= set(sys_props)
     assert sys_props["ext:tag"]["x-yang"]["must"][0]["xpath-prefixes"] == {"e": "ext", "mm": "m"}
     assert sys_props["ext:iref"]["x-yang"]["xpath-prefixes"] == {"mm": "m"}
-    assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))) == schema
+    assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))).schema == schema
 
 
 @pytest.mark.parametrize("case,inst", list(_round_trip_params()))
 def test_round_tripped_module_validates_like_the_yang(case, inst):
-    schema = generate_json_schema(_load_case(CASES_DIR / case))
-    assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))) == schema
+    schema = generate_json_schema(_load_case(CASES_DIR / case)).schema
+    assert generate_json_schema(parse_json_schema(copy.deepcopy(schema))).schema == schema
     result = YangValidator(parse_json_schema(copy.deepcopy(schema))).validate_detailed(
         inst["data"], native_json=inst.get("encoding") == "native"
     )
@@ -73,7 +73,7 @@ def test_json_without_a_recorded_map_binds_only_the_own_prefix():
         'module m { yang-version 1.1; namespace "urn:m"; prefix m;'
         " container top { leaf a { type string; must \"/m:top/m:b = 'y'\"; } leaf b { type string; } } }"
     )
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     must = schema["properties"]["top"]["properties"]["a"]["x-yang"]["must"][0]
     del must["xpath-prefixes"]
     assert YangValidator(parse_json_schema(copy.deepcopy(schema))).validate_detailed({"m:top": {"a": "x", "b": "y"}})[

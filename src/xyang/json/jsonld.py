@@ -167,9 +167,9 @@ class _Builder:
 
 def generate_jsonld_context(module: YangModule) -> dict[str, Any]:
     """Generate a JSON-LD 1.1 context with scoped terms and explicit IRI mappings."""
-    return _Builder(generate_json_schema(module)).build()[0]
+    return _Builder(generate_json_schema(module).schema).build()[0]
 
 
 def generate_jsonld_vocab(module: YangModule) -> dict[str, Any]:
     """Generate RDF property descriptions with class, close-match, and unit links."""
-    return _Builder(generate_json_schema(module)).build()[1]
+    return _Builder(generate_json_schema(module).schema).build()[1]

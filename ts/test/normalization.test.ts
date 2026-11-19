@@ -7,7 +7,7 @@ const model = new YangParser().parseFile(resolve("../examples/netlab/netlab.yang
 
 describe("normalization API", () => {
   it("preserves inputs and interface attributes after native JSON reload", () => {
-    const restored = parseJsonSchema(generateJsonSchema(model));
+    const restored = parseJsonSchema(generateJsonSchema(model).schema);
     const data = {
       links: [{ a: { mtu: 1400 }, mtu: 1500, b: null }],
       groups: { g: { members: ["a"] } }, nodes: { a: {}, b: {} }
@@ -20,7 +20,7 @@ describe("normalization API", () => {
   });
 
   it("rejects unsupported expressions even when the node is absent", () => {
-    const restored = parseJsonSchema(generateJsonSchema(model));
+    const restored = parseJsonSchema(generateJsonSchema(model).schema);
     const links = restored.statements.find(s => s.name === "links")!;
     const rule = links.statements.find(s => s.resolved_extension_name === "normalize")!;
     rule.statements[0].statements[0].argument = "unsupported(.)";
@@ -36,7 +36,7 @@ describe("normalization API", () => {
 
   it("constructs endpoint objects from a string after native JSON reload", () => {
     const module = new YangParser().parseFile(resolve("../tests/cases/normalization/string-map/m.yang"));
-    const restored = parseJsonSchema(generateJsonSchema(module));
+    const restored = parseJsonSchema(generateJsonSchema(module).schema);
     const data = { inventory: [{ name: "a" }, { name: "b" }], connections: ["a-b"] };
     const original = structuredClone(data);
     const projected = projectInstance([...iterInstance(data, restored)], restored.name).data;

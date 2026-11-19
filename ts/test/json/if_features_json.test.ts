@@ -18,7 +18,7 @@ module m {
 }
 `);
 
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const leafSchema = (
       ((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
         .properties as Record<string, unknown>
@@ -54,7 +54,7 @@ module m {
 }
 `);
 
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const dmSchema = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     const dmXYang = dmSchema["x-yang"] as Record<string, unknown>;
     const choiceMeta = dmXYang.choice as Record<string, unknown>;
@@ -88,7 +88,7 @@ module m {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const zSchema = (
       ((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
         .properties as Record<string, unknown>

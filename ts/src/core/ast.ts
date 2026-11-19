@@ -152,10 +152,13 @@ export class YangIdentityStmt extends YangStatement {
 export class YangBitStmt {
   name: string;
   position?: number;
+  /** RFC 7950 §9.7.4. The bit is absent from the type when every expression is not satisfied. */
+  if_features: string[];
 
   constructor(init: Partial<YangBitStmt> = {}) {
     this.name = init.name ?? "";
     this.position = init.position;
+    this.if_features = init.if_features ?? [];
   }
 }
 
@@ -223,6 +226,8 @@ export class YangStringTypeStmt extends YangBinaryTypeStmt {
 }
 export class YangEnumerationTypeStmt extends YangTypeStmt {
   enums: string[] = [];
+  /** Enum name to ``if-feature`` expressions (RFC 7950 §9.6.4). */
+  enum_if_features: Record<string, string[]> = {};
 }
 export class YangBitsTypeStmt extends YangTypeStmt {
   bits: YangBitStmt[] = [];
@@ -245,6 +250,7 @@ export class YangDerivedTypeStmt extends YangTypeStmt {
   declare length_restriction?: YangRestriction;
   declare patterns?: YangPatternSpec[];
   declare enums?: string[];
+  declare enum_if_features?: Record<string, string[]>;
   declare bits?: YangBitStmt[];
   declare require_instance?: boolean;
 }

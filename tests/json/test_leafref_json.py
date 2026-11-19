@@ -117,7 +117,7 @@ module lr-int {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     peer = schema["properties"]["data-model"]["properties"]["peer"]
     assert peer["type"] == "integer"
     assert peer["x-yang"]["type"] == "leafref"

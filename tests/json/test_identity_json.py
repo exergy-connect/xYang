@@ -21,7 +21,7 @@ def identity_module():
 
 
 def test_generate_json_schema_has_identity_defs_and_identityref_leaf(identity_module):
-    data = generate_json_schema(identity_module)
+    data = generate_json_schema(identity_module).schema
     defs = data.get("$defs") or {}
     assert "animal" in defs
     assert defs["animal"].get("enum")
@@ -32,7 +32,7 @@ def test_generate_json_schema_has_identity_defs_and_identityref_leaf(identity_mo
 
 
 def test_parse_json_schema_roundtrip_restores_identities(identity_module):
-    data = generate_json_schema(identity_module)
+    data = generate_json_schema(identity_module).schema
     back = parse_json_schema(data)
     assert "animal" in back.identities
     assert "dog" in back.identities

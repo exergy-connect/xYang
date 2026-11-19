@@ -38,7 +38,7 @@ function convertStdout(yangPath: string): Buffer {
 
 function expectedSchema(yangPath: string): string {
   const module = new YangParser({ expandUses: false }).parseFile(yangPath);
-  return `${JSON.stringify(generateJsonSchema(module), null, 2)}\n`;
+  return `${JSON.stringify(generateJsonSchema(module).schema, null, 2)}\n`;
 }
 
 describe("xyang-ts stdout flush before exit", () => {

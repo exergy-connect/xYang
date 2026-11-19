@@ -41,7 +41,7 @@ def test_parse_anydata_anyxml_ast():
 
 def test_generate_parse_json_schema_roundtrip_kinds():
     m = _module()
-    schema = generate_json_schema(m)
+    schema = generate_json_schema(m).schema
     dm_prop = schema["properties"]["data-model"]
     props = dm_prop["properties"]
     assert props["payload"]["x-yang"]["type"] == "anydata"

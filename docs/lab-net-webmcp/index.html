@@ -1,0 +1,36 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <meta name="theme-color" content="#101814">
+  <title>Topology submission · lab.net</title>
+  <link rel="stylesheet" href="./style.css">
+</head>
+<body>
+  <div class="shell">
+    <header class="topbar">
+      <a class="brand" href="#top"><span class="brand-mark">✳</span><span>lab<span class="brand-dot">.</span>net <small>/ topology submission</small></span></a>
+      <div class="top-meta"><span class="live-dot"></span><span id="connection-label">Connecting WebMCP</span><span class="top-divider"></span><span>XYANG EXAMPLE</span></div>
+    </header>
+    <main id="top">
+      <section class="intro">
+        <div><div class="eyebrow"><span>01</span> &nbsp; / &nbsp; AGENT-READY NETWORK LAB</div>
+          <h1>A topology,<br><em>from your agent.</em></h1>
+          <p>Ask your AI agent to submit a lab.net topology. Its JSON appears here after xYang validates it.</p>
+        </div>
+        <div class="intro-aside"><span class="asterisk">✳</span><span>YANG-MODELED<br>TOPOLOGY</span><span class="aside-index">EXAMPLE / 001</span></div>
+      </section>
+      <section class="submission panel" aria-label="Submitted topology">
+        <div class="panel-header"><div><span class="section-number">01 / AGENT SUBMISSION</span><h2>Validated topology</h2><p>The most recent valid submission, as received from the agent.</p></div><span class="sim-badge" id="submission-state">AWAITING SUBMISSION</span></div>
+        <div class="json-view"><div class="editor-bar"><span>TOPOLOGY.JSON</span><span>NATIVE ENCODING</span></div><div id="empty" class="empty"><span>✳</span><strong>Waiting for your agent</strong><p>Ask an agent to submit a topology to see its JSON here.</p></div><pre id="topology-output" hidden aria-live="polite"></pre></div>
+      </section>
+      <section class="tool-panel"><div class="tool-icon">↗</div><div class="tool-copy"><span class="section-number">02 / AGENT CONNECTION</span><h2>Made for humans <em>and</em> agents.</h2><p id="status" role="status">Registering the topology submission tool…</p><p class="tool-detail">The <code>submit_topology</code> tool uses a JSON Schema generated from the topology model.</p><details id="schema-details"><summary>Explore the tool schema <span>↗</span></summary><pre id="schema-output"></pre></details>
+          <div id="webmcp-help" class="help" hidden><p>To enable WebMCP in Chrome:</p><ol><li>Paste <code id="webmcp-flag">chrome://flags/#enable-webmcp-testing</code> into the address bar. <button type="button" id="copy-webmcp-flag">Copy address</button> <span id="copy-status" role="status"></span></li><li>Set the flag to <strong>Enabled</strong> and relaunch Chrome.</li><li>Return to this page and reload it.</li></ol><p>If the flag is unavailable, update Chrome. See <a href="https://developer.chrome.com/docs/ai/webmcp/">Chrome's instructions</a>.</p></div>
+        </div><div class="tool-tag"><span class="live-dot"></span> WEBMCP <span class="tag-end">/</span> XYANG</div></section>
+      <footer><span>✳ &nbsp; EXERGY ∞ CONNECT</span><span>BUILT WITH <a href="https://github.com/exergy-connect/xYang">XYANG</a> + <a href="https://exergy-lab.net/">LAB.NET</a></span><span>MODEL IT. VALIDATE IT. &nbsp; ↗</span></footer>
+    </main>
+  </div>
+  <script type="module" src="./main.js"></script>
+</body>
+</html>

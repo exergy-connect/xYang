@@ -31,7 +31,7 @@ describe("instance normalization", () => {
   });
 
   it("survives native JSON round trip", () => {
-    const restored = parseJsonSchema(generateJsonSchema(module));
+    const restored = parseJsonSchema(generateJsonSchema(module).schema);
     const data = { nodes: [{ name: "a" }, { name: "b" }], links: ["a-b"] };
     expect(new YangValidator(restored).validateDetailed(data).valid).toBe(true);
   });
@@ -65,7 +65,7 @@ describe("instance normalization", () => {
   });
 
   it("fails unsupported expressions even when the node is absent", () => {
-    const restored = parseJsonSchema(generateJsonSchema(module));
+    const restored = parseJsonSchema(generateJsonSchema(module).schema);
     const links = restored.findStatement("links")!;
     const rule = links.statements.find(
       (s) => s.resolved_module_name === "xyang-transform" && s.resolved_extension_name === "normalize"
@@ -126,7 +126,7 @@ describe("instance normalization", () => {
 
   it("keeps dotted-key expansion after native JSON reload without mutating input", () => {
     const schema = join(import.meta.dirname, "../../tests/cases/normalization/dotted/m.yang");
-    const restored = parseJsonSchema(generateJsonSchema(parseYangFile(schema)));
+    const restored = parseJsonSchema(generateJsonSchema(parseYangFile(schema)).schema);
     const data = { nodes: { a: { "bgp.as": 65000 } } };
     const original = structuredClone(data);
     expect(new YangValidator(restored).validateDetailed(data, { nativeJson: true }).valid).toBe(true);

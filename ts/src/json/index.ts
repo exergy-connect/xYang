@@ -1,4 +1,4 @@
-export type { SchemaExportOptions } from "./generator";
+export type { SchemaExportOptions, SchemaExportResult, SchemaDiagnostic } from "./generator";
 export { generateJsonSchema } from "./generator";
 export { parseJsonSchema } from "./parser";
 

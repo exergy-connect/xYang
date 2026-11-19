@@ -4,12 +4,13 @@ import { YangModule } from "../core/model";
 import { YangTokenType } from "../parser/parser-context";
 import { TypeConstraint, TypeSystem, type TypeIssue } from "../types";
 import { REGISTRY } from "../types/registry";
-import { resolvePrefixedModule, type ModuleData } from "./if-feature-eval";
+import { resolvePrefixedModule, stmtIfFeaturesSatisfied, type ModuleData } from "./if-feature-eval";
 import { identityrefValueValid, resolveIdentityValue } from "../identity-graph";
 import { summarizeValue, traceTypeValidation } from "./type-validation-debug";
 
 export type TypeCheckerOptions = {
   typeValidationDebug?: boolean;
+  enabledByModule?: Readonly<Record<string, ReadonlySet<string>>>;
 };
 
 type TypedefShape = ScopedTypedef;
@@ -71,12 +72,14 @@ export function resolveTypedef(
 export class TypeChecker {
   private readonly system = new TypeSystem();
   private readonly typeValidationDebug: boolean;
+  private readonly enabledByModule: Readonly<Record<string, ReadonlySet<string>>> | undefined;
 
   constructor(
     private readonly module: YangModule,
     options: TypeCheckerOptions = {}
   ) {
     this.typeValidationDebug = options.typeValidationDebug === true;
+    this.enabledByModule = options.enabledByModule;
   }
 
   /** Resolve a local or prefixed typedef where the `type` was written (see `resolveTypedef`). */
@@ -141,6 +144,15 @@ export class TypeChecker {
 
     // A type that names a typedef may narrow it with its own range, length, or patterns.
     // Each level of the chain checks its own restrictions after the base accepts the value.
+    if (result.length === 0) {
+      const checked = (typedef?.type ?? constraint) as Record<string, unknown> | undefined;
+      const gated = this.gatedValueIssues(value, checked);
+      if (gated.length > 0) result = gated;
+    }
+    if (result.length === 0 && via === "typedef") {
+      const gated = this.gatedValueIssues(value, constraint);
+      if (gated.length > 0) result = gated;
+    }
     if (result.length === 0 && via === "typedef" && hasTypeRestrictions(constraint)) {
       result = this.system.issues(
         value,
@@ -172,6 +184,54 @@ export class TypeChecker {
       return this.checkIdentityref(value, shape ?? {});
     }
     return this.system.issues(value, typeName, constraint);
+  }
+
+  /** The module that wrote `shape`, or the checker module when the type has no scope. */
+  private featureModule(shape: Record<string, unknown> | undefined): ModuleData {
+    const scope = shape?.scope_module;
+    if (typeof scope === "string" && scope && scope !== this.module.name) {
+      return (this.module.module_registry?.[scope] as ModuleData | undefined) ?? this.module;
+    }
+    return this.module;
+  }
+
+  private guardIsFalse(feats: string[], shape: Record<string, unknown> | undefined): boolean {
+    if (feats.length === 0 || !this.enabledByModule) return false;
+    return !stmtIfFeaturesSatisfied(feats, this.featureModule(shape), this.enabledByModule);
+  }
+
+  /** Reject an enum or bit whose own ``if-feature`` is false (RFC 7950 §9.6.4, §9.7.4). */
+  private gatedValueIssues(value: unknown, shape: Record<string, unknown> | undefined): TypeIssue[] {
+    const guards = shape?.enum_if_features;
+    if (typeof value === "string" && guards && typeof guards === "object" && !Array.isArray(guards)) {
+      const feats = (guards as Record<string, unknown>)[value];
+      const expressions = Array.isArray(feats)
+        ? feats.filter((item): item is string => typeof item === "string" && item.length > 0)
+        : [];
+      if (this.guardIsFalse(expressions, shape)) {
+        return [["if-feature", `Value '${value}' is not available: its 'if-feature' condition is false`]];
+      }
+    }
+    const bits = shape?.bits;
+    if (typeof value === "string" && value.trim() !== "" && Array.isArray(bits)) {
+      const byName = new Map<string, string[]>();
+      for (const bit of bits) {
+        if (!bit || typeof bit !== "object") continue;
+        const entry = bit as Record<string, unknown>;
+        if (typeof entry.name !== "string") continue;
+        const feats = Array.isArray(entry.if_features)
+          ? entry.if_features.filter((item): item is string => typeof item === "string" && item.length > 0)
+          : [];
+        byName.set(entry.name, feats);
+      }
+      for (const token of value.trim().split(/\s+/)) {
+        const feats = byName.get(token) ?? [];
+        if (this.guardIsFalse(feats, shape)) {
+          return [["if-feature", `Bit '${token}' is not available: its 'if-feature' condition is false`]];
+        }
+      }
+    }
+    return [];
   }
 
   /** RFC 7951 §6.8 value, derived from every base (bases resolve in the module that wrote the `type`). */

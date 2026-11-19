@@ -164,7 +164,7 @@ _PARENTS: tuple[tuple[str, DispatchParent], ...] = (
     ),
     (
         "bit",
-        _parent("9.7.4", frozenset({kw.POSITION, kw.DESCRIPTION, kw.REFERENCE})),
+        _parent("9.7.4", frozenset({kw.POSITION, kw.DESCRIPTION, kw.REFERENCE, kw.IF_FEATURE})),
     ),
     (
         "identity",

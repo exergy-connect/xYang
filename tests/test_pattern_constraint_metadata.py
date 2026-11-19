@@ -59,7 +59,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     id_def = schema["$defs"]["id"]
     xy = id_def[JsonSchemaKey.X_YANG]
     assert xy[XYangKey.PATTERN_ERROR_MESSAGE] == "Must be decimal digits."
@@ -86,7 +86,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     module2 = parse_json_schema(schema)
     td = module2.typedefs["id"]
     assert td.type is not None
@@ -168,7 +168,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     id_def = schema["$defs"]["id"]
     assert "allOf" in id_def
     xy = id_def[JsonSchemaKey.X_YANG]
@@ -195,7 +195,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    module2 = parse_json_schema(generate_json_schema(module))
+    module2 = parse_json_schema(generate_json_schema(module).schema)
     td = module2.typedefs["id"]
     assert td.type is not None
     assert len(td.type.patterns) == 2

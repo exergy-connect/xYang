@@ -15,13 +15,13 @@ def test_list_keys_required_without_explicit_mandatory(extra):
       list items { key "a b";
         leaf a { type string; } leaf b { type uint8; }
     ''' + extra + ' } }')
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     items = schema['properties']['items']['items']
     branches = items.get('oneOf', [items])
     for branch in branches:
         assert {'a', 'b'} <= set(items.get('required', []) + branch.get('required', []))
     restored = parse_json_schema(schema)
-    assert generate_json_schema(restored) == schema
+    assert generate_json_schema(restored).schema == schema
     lst = restored.statements[0]
     for leaf in lst.statements:
         if leaf.name in ('a', 'b'):

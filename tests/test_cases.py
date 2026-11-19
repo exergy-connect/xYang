@@ -47,7 +47,7 @@ def _params():
 def _json_form(case_dir: Path, module: Path) -> dict:
     """The case module's native JSON form, as a Worker without a filesystem would receive it."""
     parsed = YangParser(expand_uses=False, include_path=(case_dir,)).parse_file(module.resolve())
-    return json.loads(json.dumps(generate_json_schema(parsed)))
+    return json.loads(json.dumps(generate_json_schema(parsed).schema))
 
 
 def _load_case_module(case_dir: Path, module: Path):

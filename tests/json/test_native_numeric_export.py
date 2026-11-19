@@ -29,7 +29,7 @@ def module():
 
 @pytest.fixture(scope='module', params=[False, True], ids=['rfc7951', 'native'])
 def exported(module, request):
-    return request.param, generate_json_schema(module, native_json=request.param)
+    return request.param, generate_json_schema(module, native_json=request.param).schema
 
 
 @pytest.mark.parametrize('name,value', [('signed',42),('unsigned',42),('ohms',4.32),('slots',10),
@@ -42,15 +42,15 @@ def test_numeric_encoding(module, exported, name, value):
     assert validator.is_valid({name:encoded})
     other = ([str(x) for x in value] if isinstance(value,list) else str(value)) if native else value
     assert not validator.is_valid({name:other})
-    assert generate_json_schema(parse_json_schema(schema), native_json=native) == schema
+    assert generate_json_schema(parse_json_schema(schema), native_json=native).schema == schema
     assert json.loads(schema_to_yang_json(module, native_json=native)) == schema
-    assert generate_json_schema(module)['properties']['signed']['type'] == 'string'
+    assert generate_json_schema(module).schema['properties']['signed']['type'] == 'string'
 
 
 @pytest.mark.parametrize('name,value', [('unsigned',-1),('ohms',4.3211),('ohms',101),('slots',5)])
 def test_native_numeric_constraints(module, name, value):
     jsonschema = pytest.importorskip('jsonschema')
-    assert not jsonschema.Draft202012Validator(generate_json_schema(module,native_json=True)).is_valid({name:value})
+    assert not jsonschema.Draft202012Validator(generate_json_schema(module,native_json=True).schema).is_valid({name:value})
 
 
 def test_cli_native_export(tmp_path, monkeypatch):

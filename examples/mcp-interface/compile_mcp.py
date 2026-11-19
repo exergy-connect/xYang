@@ -109,7 +109,7 @@ def _http_headers(schema: dict[str, Any]) -> dict[str, dict[str, str]]:
 
 def compile_tools(module_path: Path, include_path: tuple[Path, ...], profile: str) -> dict[str, Any]:
     module = YangParser(expand_uses=False, include_path=include_path).parse_file(module_path)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     headers = _http_headers(schema)
     rpcs: dict[str, Any] = schema.get(XYANG, {}).get("rpcs", {})
     defs: dict[str, Any] = schema.get("$defs", {})

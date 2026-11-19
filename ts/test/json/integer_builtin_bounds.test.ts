@@ -18,7 +18,7 @@ module m {
   leaf x { type uint16; }
 }
 `);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const prop = (schema.properties as Record<string, unknown>).x as Record<string, unknown>;
     const xy = prop["x-yang"] as Record<string, unknown>;
     expect("builtin-type" in xy).toBe(false);
@@ -42,7 +42,7 @@ module m {
   leaf x { type t; }
 }
 `);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const tdef = (schema.$defs as Record<string, Record<string, unknown>>).t;
     const hi = YANG_INTEGER_BOUNDS.int32[1];
     expect(tdef.minimum).toBe(0);

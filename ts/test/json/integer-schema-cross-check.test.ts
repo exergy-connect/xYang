@@ -65,7 +65,7 @@ function schemaAccepts(schema: Record<string, unknown>, value: unknown): boolean
 describe("integer schema and validator agree", () => {
   it("agrees on every cross-check instance", () => {
     const module = new YangParser().parseFile(join(CASE, CROSS.module));
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const u8 = ((schema.properties as Record<string, Record<string, unknown>>).top.properties as Record<
       string,
       Record<string, unknown>

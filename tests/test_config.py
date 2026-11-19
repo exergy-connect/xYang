@@ -86,5 +86,5 @@ def test_config_emitted_in_json_schema() -> None:
   leaf ro { type string; config false; }
 }"""
     )
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     assert schema["properties"]["ro"]["x-yang"][XYangKey.CONFIG] is False

@@ -26,7 +26,7 @@ def test_normalization_does_not_mutate_input(module):
 
 
 def test_normalization_survives_native_json_round_trip(module):
-    restored = parse_json_schema(generate_json_schema(module))
+    restored = parse_json_schema(generate_json_schema(module).schema)
     data = {"nodes": [{"name": "a"}, {"name": "b"}], "links": ["a-b"]}
     assert YangValidator(restored).validate_detailed(data)["valid"]
 
@@ -62,7 +62,7 @@ def test_root_normalization_cannot_discard_document(tmp_path):
 
 
 def test_unsupported_expression_fails_even_if_node_absent(module):
-    restored = parse_json_schema(generate_json_schema(module))
+    restored = parse_json_schema(generate_json_schema(module).schema)
     rule = next(s for s in restored.find_statement("links").statements if isinstance(s, YangExtensionInvocationStmt))
     rule.statements[1].argument = "unsupported(.)"
     with pytest.raises(ExpressionError, match="unsupported function"):
@@ -128,7 +128,7 @@ def test_normalize_requires_apply_in_order(tmp_path, body, match):
 
 def test_dotted_keys_survive_native_json_round_trip_and_do_not_mutate():
     schema = CASE.parent.parent / "dotted/m.yang"
-    module = parse_json_schema(generate_json_schema(parse_yang_file(schema)))
+    module = parse_json_schema(generate_json_schema(parse_yang_file(schema)).schema)
     data = {"nodes": {"a": {"bgp.as": 65000}}}
     original = copy.deepcopy(data)
     assert YangValidator(module).validate_detailed(data, native_json=True)["valid"]
@@ -172,7 +172,7 @@ def test_dotted_keys_false_leaves_keys_unchanged(tmp_path):
 
 def test_keys_projection_preserves_attributes_and_survives_round_trip():
     module = parse_yang_file(Path(__file__).parent.parent / "examples/netlab/netlab.yang")
-    module = parse_json_schema(generate_json_schema(module))
+    module = parse_json_schema(generate_json_schema(module).schema)
     data = {"groups": {"g": {"members": ["a"]}}, "nodes": {"a": {}, "b": {}},
             "links": [{"a": {"mtu": 1400}, "mtu": 1500, "b": None}]}
     original = copy.deepcopy(data)
@@ -194,7 +194,7 @@ def test_nested_rules_on_leaf_list_and_native_json_round_trip(tmp_path):
         }
       }
     }''')
-    module = parse_json_schema(generate_json_schema(parse_yang_file(model)))
+    module = parse_json_schema(generate_json_schema(parse_yang_file(model)).schema)
     validator = YangValidator(module)
     for data, expected in [({"tags": None}, []), ({"tags": [1, "a"]}, ["converted", "a"])]:
         projected, _ = project_instance(list(iter_instance(data, module)), module.name)
@@ -247,7 +247,7 @@ def test_map_without_matching_keys_leaves_object_unchanged():
 
 def test_string_map_constructs_endpoints_after_native_json_round_trip():
     schema = Path(__file__).parent / "cases/normalization/string-map/m.yang"
-    module = parse_json_schema(generate_json_schema(parse_yang_file(schema)))
+    module = parse_json_schema(generate_json_schema(parse_yang_file(schema)).schema)
     data = {"inventory": [{"name": "a"}, {"name": "b"}], "connections": ["a-b"]}
     original = copy.deepcopy(data)
     projected, _ = project_instance(list(iter_instance(data, module)), module.name)

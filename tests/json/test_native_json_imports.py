@@ -39,7 +39,7 @@ def test_form_is_self_contained_and_reversible(case):
     assert refs
     for ref in refs:
         assert _pointer(form, ref)["x-yang"]["type"] == "identity", f"dangling {ref}"
-    assert generate_json_schema(parse_json_schema(form)) == form
+    assert generate_json_schema(parse_json_schema(form)).schema == form
 
 
 def test_unrepresentable_augment_fails_convert_without_writing(tmp_path):

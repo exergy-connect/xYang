@@ -1230,6 +1230,7 @@ fn parseInto(p: *Parse, data: Val) Error!void {
         return p.fail("JSON Schema has no root \"x-yang\" annotation; xYang needs a .yang.json produced by \"xyang convert\" (see design/json-schema-xyang-profile.md)", .{});
     }
     const root_xy = root_xy_v.object;
+    if (root_xy.contains("subtree-path")) return p.fail("a subtree schema is a projection, not a complete YANG module", .{});
     const defs = try objectOr(p, root, K.DEFS);
     p.defs = defs;
     const m = p.module;

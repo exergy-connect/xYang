@@ -41,7 +41,7 @@ module iid-test {
 def test_instance_identifier_json_schema_round_trip():
     """generate_json_schema → parse_json_schema preserves instance-identifier + require-instance."""
     module = parse_yang_string(_minimal_module_yang())
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     module2 = parse_json_schema(schema)
     dm = module2.find_statement("data-model")
     assert dm is not None
@@ -60,7 +60,7 @@ def test_instance_identifier_json_schema_validate():
     from xyang import YangValidator
 
     module = parse_yang_string(_minimal_module_yang())
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     m = parse_json_schema(schema)
     v = YangValidator(m)
     ok, errors, _ = v.validate(

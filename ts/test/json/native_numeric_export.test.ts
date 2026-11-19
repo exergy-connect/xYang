@@ -15,7 +15,7 @@ const module = parseYangString(`module m { namespace "urn:m"; prefix m;
 const names = ["signed", "unsigned", "ohms", "slots", "alias", "values", "mixed", "ref"];
 it.each([false,true].flatMap((nativeJson) => names.map((name) => [nativeJson, name] as const)))(
   "native numeric schema and round trip (#226): %s %s", (nativeJson,name) => {
-    const schema = generateJsonSchema(module,{nativeJson});
+    const schema = generateJsonSchema(module,{nativeJson}).schema;
     const properties = schema.properties as Record<string, Record<string,unknown>>;
     const target = properties[name];
     let numeric = target;
@@ -26,8 +26,8 @@ it.each([false,true].flatMap((nativeJson) => names.map((name) => [nativeJson, na
     expect(numeric.type).toBe(nativeJson ? (decimal ? "number" : "integer") : "string");
     if (nativeJson && decimal) expect(numeric.multipleOf).toBe(0.001);
     if (nativeJson && name === "slots") expect(numeric.anyOf).toEqual([{minimum:1,maximum:3},{minimum:10,maximum:10}]);
-    expect(generateJsonSchema(parseJsonSchema(schema),{nativeJson})).toEqual(schema);
-    expect((generateJsonSchema(module).properties as Record<string, Record<string,unknown>>).signed.type).toBe("string");
+    expect(generateJsonSchema(parseJsonSchema(schema),{nativeJson}).schema).toEqual(schema);
+    expect((generateJsonSchema(module).schema.properties as Record<string, Record<string,unknown>>).signed.type).toBe("string");
   }
 );
 it("parses convert --native-json (#226)", () => {

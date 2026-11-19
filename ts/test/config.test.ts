@@ -28,7 +28,7 @@ module m {
   leaf ro { type string; config false; }
 }
 `);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const ro = (schema.properties as Record<string, unknown>).ro as Record<string, unknown>;
     expect((ro["x-yang"] as Record<string, unknown>)[XYANG_KEYS.config]).toBe(false);
   });
