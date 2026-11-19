@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.5] — 2026-11-18
+
 ### Added
 
 - Export a selected data subtree as JSON Schema with diagnostics for constraints that cannot be retained, optional per-module feature selection, and a lab.net WebMCP topology submission example.
@@ -304,7 +306,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.4...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.5...HEAD
+[1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/exergy-connect/xYang/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/exergy-connect/xYang/compare/v1.0.2...v1.0.3
 [1.0.2]: https://github.com/exergy-connect/xYang/compare/v1.0.1...v1.0.2
