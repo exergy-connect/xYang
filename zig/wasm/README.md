@@ -84,6 +84,7 @@ const result = validator.validate('{"m:input":{"source":"r1","target":"r2"}}', {
 | `action` | RFC 8040 data resource path, e.g. `/m:interfaces/interface=eth0/reset`. Requires `context`. |
 | `direction` | `"input"` (default) or `"output"`. Output requires `rpc` or `action`. |
 | `context` | Server data as JSON **text**, preserving exact numeric literals. Requires `rpc` or `action`; the decoded value must be an object. |
+| `features` | Module name to enabled feature names, e.g. `{ m: [] }`. Omitted enables every declared feature. A module absent from the map keeps its features. |
 
 Use the selected operation's module-qualified `module:input` or `module:output`
 wrapper in the data. For an action, percent-encode list key values in its path.
@@ -116,7 +117,7 @@ Strings are UTF-8 bytes in the exported `memory`; lengths exclude a terminator.
 | `xyang_free(ptr, len)` | Free that allocation with its original pointer and length; zero is a no-op. |
 | `xyang_load_model(ptr, len) -> status` | Load a canonical `.yang.json`, copying all retained input. |
 | `xyang_validate(ptr, len) -> status` | Validate an RFC 7951 JSON document against the retained model. |
-| `xyang_validate_with_options(ptr, len, options_ptr, options_len) -> status` | Validate with a UTF-8 JSON options object containing `rpc`, `action`, `direction`, and/or `context`. |
+| `xyang_validate_with_options(ptr, len, options_ptr, options_len) -> status` | Validate with a UTF-8 JSON options object containing `rpc`, `action`, `direction`, `context`, and/or `features`. |
 | `xyang_result_ptr() -> ptr` | Address of the last call's JSON result. |
 | `xyang_result_len() -> len` | Byte length of that result. |
 | `xyang_reset()` | Release the model and last result; caller allocations are unaffected. |
@@ -126,12 +127,13 @@ Status 1 means an API error; the result is `{ "err": "Code", "message": "..." }`
 A successful load returns `{ "loaded": true }`.
 
 The options buffer uses the same field types as the JavaScript API: `context`
-is a JSON **string containing JSON text**, not an embedded object. For example,
-`{"rpc":"add-link","context":"{\"m:topology\":{\"node\":[]}}"}`.
-The guest parses this text directly. The options buffer follows the same
+is a JSON **string containing JSON text**, not an embedded object, and
+`features` is an object whose values are arrays of feature-name strings. For
+example, `{"rpc":"add-link","context":"{\"m:topology\":{\"node\":[]}}","features":{"m":[]}}`.
+The guest parses context text directly. The options buffer follows the same
 ownership rules as the data buffer. Unknown fields and invalid field types
 return status 1 with `err: "Usage"`. The two-argument `xyang_validate` export
-remains available for document validation.
+remains available for document validation and enables every declared feature.
 
 The result is guest-owned and valid until the next load, validation, or reset.
 Do not free it. Caller input buffers must remain allocated for the duration of a
@@ -143,18 +145,18 @@ or call because memory growth can invalidate them.
 ## Scope and verification
 
 This build exposes native model loading and RFC 7951 document and operation
-validation (all declared features enabled). YANG source parsing,
-filesystem import resolution, model export, native instance encoding, feature
-selection are not exposed. The existing native JSON
+validation, including per-call feature selection. YANG source parsing,
+filesystem import resolution, model export, and native instance encoding are
+not exposed. The existing native JSON
 loader reconstructs embedded import metadata without host file access.
 
 The Node test runner uses committed `expected.yang.json` forms and generates
 operation models from existing shared YANG cases using the native Zig CLI
 (hence the `zig build` before running tests). It compares validity, diagnostic
-documents/pointers/codes, usage errors, and expected message fragments. Operation
-cases requiring disabled features, native instance encoding, or loading a separate
-augmenting source module are explicitly skipped because those loading/options
-APIs are outside this build's scope. ABI tests cover isolation, reset, malformed
+documents/pointers/codes, usage errors, and expected message fragments. Cases
+using native instance encoding, or loading a separate augmenting source module,
+are explicitly skipped because those loading APIs are outside this build's
+scope. ABI tests cover isolation, reset, malformed
 inputs, transactional model replacement, input ownership, memory growth, and
 allocation reuse, option decoding, and exact context integers across the
 JavaScript boundary. Shared validation scenarios are reused; no YANG or native
