@@ -50,7 +50,7 @@ export async function createValidator(bytes) {
         throw new TypeError("Expected a validation options object");
       }
       for (const key of Object.keys(options)) {
-        if (!["rpc", "action", "direction", "context"].includes(key)) {
+        if (!["rpc", "action", "direction", "context", "features"].includes(key)) {
           throw new TypeError(`Unknown validation option: ${key}`);
         }
       }
@@ -63,9 +63,25 @@ export async function createValidator(bytes) {
         }
         encoded[key] = value;
       }
+      if (options.features !== undefined) encoded.features = featureMap(options.features);
       // The guest parses context text, preserving exact numeric literals.
       return call(wasm.xyang_validate_with_options, json, JSON.stringify(encoded));
     },
     reset: () => wasm.xyang_reset(),
   };
+}
+
+/** Case-file shape: module name to enabled feature names. Omitted enables every feature. */
+function featureMap(value) {
+  if (value === null || typeof value !== "object" || Array.isArray(value)) {
+    throw new TypeError("features must be a mapping of module name to feature names");
+  }
+  const encoded = {};
+  for (const [name, feats] of Object.entries(value)) {
+    if (!Array.isArray(feats) || feats.some((item) => typeof item !== "string")) {
+      throw new TypeError(`features[${JSON.stringify(name)}] must be an iterable of feature name strings`);
+    }
+    encoded[name] = feats;
+  }
+  return encoded;
 }

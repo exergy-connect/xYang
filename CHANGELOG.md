@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Added
 
+- The Wasm validation API accepts a `features` map (`{"module": ["feature", ...]}`) on `validate`, matching the case-file shape. Omitting it still enables every declared feature.
+
 - Export selected subtrees as JSON Schema with feature filtering and diagnostics in Python, TypeScript, and Zig.
 
 - Instance normalization with model-defined `xyang-transform` rules and module-wide dotted-key expansion in Python, TypeScript, and Zig, plus a Netlab topology example.

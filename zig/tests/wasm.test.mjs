@@ -140,20 +140,24 @@ async function nativeForms(dir) {
   return found;
 }
 
+function instanceOptions(item, features) {
+  const options = {};
+  if (features) options.features = features;
+  for (const key of ["rpc", "action", "direction"]) {
+    if (key in item) options[key] = item[key];
+  }
+  if ("context" in item) options.context = JSON.stringify(item.context);
+  return options;
+}
+
 for (const dir of await nativeForms(new URL("../../tests/cases/", import.meta.url))) {
   const spec = JSON.parse(await readFile(new URL("case.json", dir), "utf8"));
-  // Feature selection remains outside the minimal ABI.
-  assert.equal(spec.features, undefined, "Add feature-option support before using this fixture");
+  const name = dir.pathname.split("/").at(-2);
   const validator = await createValidator(bytes);
   validator.loadModel(await readFile(new URL("expected.yang.json", dir), "utf8"));
   for (const item of spec.instances) {
-    test(`${dir.pathname.split("/").at(-2)}: ${item.name}`, () => {
-      const options = {};
-      for (const key of ["rpc", "action", "direction"]) {
-        if (key in item) options[key] = item[key];
-      }
-      if ("context" in item) options.context = JSON.stringify(item.context);
-      const result = validator.validate(JSON.stringify(item.data), options);
+    test(`${name}: ${item.name}`, () => {
+      const result = validator.validate(JSON.stringify(item.data), instanceOptions(item, spec.features));
       assertResult(result, item);
     });
   }
@@ -166,27 +170,19 @@ try {
   for (const entry of (await readdir(cases)).sort()) {
     const dir = new URL(`${entry}/`, cases);
     const spec = JSON.parse(await readFile(new URL("case.json", dir), "utf8"));
+    const output = join(temporary, `${entry}.yang.json`);
+    const binary = `../zig-out/bin/xyang-zig${process.platform === "win32" ? ".exe" : ""}`;
+    execFileSync(fileURLToPath(new URL(binary, import.meta.url)), [
+      "convert", fileURLToPath(new URL(spec.module, dir)), "-o", output,
+    ]);
     const validator = await createValidator(bytes);
-    if (!spec.features) {
-      const output = join(temporary, `${entry}.yang.json`);
-      const binary = `../zig-out/bin/xyang-zig${process.platform === "win32" ? ".exe" : ""}`;
-      execFileSync(fileURLToPath(new URL(binary, import.meta.url)), [
-        "convert", fileURLToPath(new URL(spec.module, dir)), "-o", output,
-      ]);
-      validator.loadModel(await readFile(output, "utf8"));
-    }
+    validator.loadModel(await readFile(output, "utf8"));
     for (const item of spec.instances) {
-      const skip = spec.features ? "Feature selection is not exposed by the Wasm API"
-        : item.encoding === "native" ? "Native instance encoding is not exposed by the Wasm API"
+      const skip = item.encoding === "native" ? "Native instance encoding is not exposed by the Wasm API"
         : item.action?.includes("/aug:") ? "This fixture requires loading a separate augmenting YANG module"
         : false;
       test(`${entry}: ${item.name}`, { skip }, () => {
-        const options = {};
-        for (const key of ["rpc", "action", "direction"]) {
-          if (key in item) options[key] = item[key];
-        }
-        if ("context" in item) options.context = JSON.stringify(item.context);
-        const run = () => validator.validate(JSON.stringify(item.data), options);
+        const run = () => validator.validate(JSON.stringify(item.data), instanceOptions(item, spec.features));
         if (item.usage_error) {
           assert.throws(run, (error) => error.code === "Usage" && error.message.includes(item.usage_error));
         } else {
@@ -211,7 +207,8 @@ try {
 }
 
 for (const options of ["{", "[]", '{"unknown":true}', '{"context":{}}',
-  '{"rpc":1}', '{"action":false}', '{"direction":null}']) {
+  '{"rpc":1}', '{"action":false}', '{"direction":null}',
+  '{"features":[]}', '{"features":{"m":"f"}}', '{"features":{"m":[1]}}']) {
   test(`raw options ABI rejects ${options}`, async () => {
     const { instance: { exports: wasm } } = await WebAssembly.instantiate(bytes, {});
     const text = new TextEncoder().encode(options);
@@ -252,6 +249,9 @@ for (const [label, options] of [
   ["action type", { action: false }],
   ["direction type", { direction: null }],
   ["function option", { rpc() {} }],
+  ["features list", { features: [] }],
+  ["features null", { features: null }],
+  ["feature name type", { features: { m: [1] } }],
 ]) {
   test(`JavaScript API rejects ${label}`, async () => {
     const validator = await createValidator(bytes);

@@ -63,8 +63,9 @@ export fn xyang_validate(ptr: usize, len: usize) u32 {
     return validate(ptr, len, .{});
 }
 
-/// Options are a JSON object containing rpc/action/direction strings and/or
-/// context as JSON text. Keep the original two-argument ABI for document callers.
+/// Options are a JSON object containing rpc/action/direction strings, context
+/// as JSON text, and/or features as a module-name to feature-name list map.
+/// Keep the original two-argument ABI for document callers.
 export fn xyang_validate_with_options(ptr: usize, len: usize, options_ptr: usize, options_len: usize) u32 {
     beginCall();
     var message: []const u8 = "";
@@ -86,6 +87,11 @@ export fn xyang_validate_with_options(ptr: usize, len: usize, options_ptr: usize
         } else if (std.mem.eql(u8, key, "direction")) {
             if (value != .string) return fail("Usage", "direction must be a string");
             options.direction = value.string;
+        } else if (std.mem.eql(u8, key, "features")) {
+            options.enabled_features_by_module = xyang.yang_validator.featureMap(call_arena.allocator(), value, &message) catch |err| switch (err) {
+                error.InvalidFeatures => return fail("Usage", message),
+                error.OutOfMemory => return fail("OutOfMemory", "Out of memory"),
+            };
         } else {
             return fail("Usage", "Unknown validation option");
         }
