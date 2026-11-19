@@ -55,10 +55,13 @@ pub const BinaryType = struct { length: ?*TypeRestriction = null };
 pub const StringType = struct { length: ?*TypeRestriction = null, patterns: std.ArrayList(PatternSpec) = .empty };
 /// Enum name → `if-feature` expressions (RFC 7950 §9.6.4). Names with no entry are unguarded.
 pub const EnumGuards = std.array_hash_map.String(StringList);
+/// Enum name → description. Names with no entry have no description.
+pub const EnumDescriptions = std.array_hash_map.String([]const u8);
 
 pub const EnumerationType = struct {
     enums: StringList = .empty,
     enum_if_features: EnumGuards = .empty,
+    enum_descriptions: EnumDescriptions = .empty,
 };
 pub const BitsType = struct { bits: std.ArrayList(BitStmt) = .empty };
 pub const UnionType = struct { types: std.ArrayList(*TypeStmt) = .empty };
@@ -76,6 +79,7 @@ pub const DerivedType = struct {
     patterns: std.ArrayList(PatternSpec) = .empty,
     enums: StringList = .empty,
     enum_if_features: EnumGuards = .empty,
+    enum_descriptions: EnumDescriptions = .empty,
     bits: std.ArrayList(BitStmt) = .empty,
     require_instance: bool = true,
 };
@@ -235,6 +239,22 @@ pub const TypeStmt = struct {
     pub fn enumGuardsMap(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*EnumGuards {
         return switch (self.data) {
             inline .enumeration, .derived => |_, tag| &((try self.ensure(tag, a)).enum_if_features),
+            else => unreachable,
+        };
+    }
+
+    pub fn enumDescription(self: *const TypeStmt, name: []const u8) []const u8 {
+        const map = switch (self.data) {
+            .enumeration => |p| if (p) |v| &v.enum_descriptions else return "",
+            .derived => |p| if (p) |v| &v.enum_descriptions else return "",
+            else => return "",
+        };
+        return map.get(name) orelse "";
+    }
+
+    pub fn enumDescriptionsMap(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*EnumDescriptions {
+        return switch (self.data) {
+            inline .enumeration, .derived => |_, tag| &((try self.ensure(tag, a)).enum_descriptions),
             else => unreachable,
         };
     }

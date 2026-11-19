@@ -40,6 +40,8 @@ from ..ast import (
     YangStatement,
     YangTypedefStmt,
     YangTypeStmt,
+    YangStringTypeStmt,
+    YangDerivedTypeStmt,
     YangPatternSpec,
     YangMustStmt,
     YangWhenStmt,
@@ -81,7 +83,7 @@ def _pattern_metadata_from_xyang(
 
 
 def _apply_string_pattern_entries(
-    type_stmt: YangTypeStmt, xyang_merged: dict[str, Any]
+    type_stmt: YangStringTypeStmt | YangDerivedTypeStmt, xyang_merged: dict[str, Any]
 ) -> None:
     """Restore full pattern list (including invert-match) from x-yang metadata."""
     raw = xyang_merged.get(XYangKey.STRING_PATTERNS)

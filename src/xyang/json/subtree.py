@@ -176,6 +176,54 @@ def _translate_patterns(value: Any) -> None:
             _translate_patterns(child)
 
 
+def _description_from(node: dict[str, Any], defs: dict[str, Any]) -> str:
+    """A description this schema node can carry without inventing text.
+
+    A ``$ref`` contributes its target's description. An enumeration contributes
+    ``name: text`` for each value that has a description.
+    """
+    source = node
+    ref = node.get("$ref")
+    if isinstance(ref, str) and ref.startswith("#/$defs/"):
+        target = defs.get(ref.removeprefix("#/$defs/"))
+        if isinstance(target, dict):
+            source = target
+    if source is not node:
+        text = source.get("description")
+        if isinstance(text, str) and text.strip():
+            return text
+    meta = source.get("x-yang")
+    entries = meta.get("enums") if isinstance(meta, dict) else None
+    if not isinstance(entries, list):
+        return ""
+    lines = []
+    for entry in entries:
+        if not isinstance(entry, dict):
+            continue
+        name = entry.get("name")
+        text = entry.get("description")
+        if isinstance(name, str) and name and isinstance(text, str) and text.strip():
+            lines.append(f"{name}: {text.strip()}")
+    return "\n".join(lines)
+
+
+def _preserve_descriptions(node: Any, defs: dict[str, Any], seen: set[int]) -> None:
+    if isinstance(node, list):
+        for item in node:
+            _preserve_descriptions(item, defs, seen)
+        return
+    if not isinstance(node, dict) or id(node) in seen:
+        return
+    seen.add(id(node))
+    current = node.get("description")
+    if not isinstance(current, str) or not current.strip():
+        text = _description_from(node, defs)
+        if text:
+            node["description"] = text
+    for value in node.values():
+        _preserve_descriptions(value, defs, seen)
+
+
 def project_subtree(full: dict[str, Any], module: YangModule, path: str, *,
                     features: Mapping[str, Collection[str]] | None = None,
                     native_json: bool = False) -> SchemaExportResult:
@@ -201,6 +249,31 @@ def project_subtree(full: dict[str, Any], module: YangModule, path: str, *,
                     raise YangExportError(f"cannot safely resolve unqualified if-feature '{token}' shared with an imported module")
         return stmt_if_features_satisfied(guards, module, enabled)
 
+    def drop_disabled_enums(node: dict[str, Any], meta: dict[str, Any]) -> None:
+        entries = meta.get("enums")
+        values = node.get("enum")
+        if not isinstance(entries, list) or not isinstance(values, list):
+            return
+        drop: set[str] = set()
+        kept = []
+        for entry in entries:
+            if not isinstance(entry, dict):
+                kept.append(entry)
+                continue
+            name = entry.get("name")
+            feats = entry.get("if-features") or []
+            if isinstance(name, str) and isinstance(feats, list) and feats and not active({"if-features": feats}):
+                drop.add(name)
+                continue
+            kept.append(entry)
+        if not drop:
+            return
+        node["enum"] = [value for value in values if value not in drop]
+        if any(isinstance(entry, dict) and (entry.get("if-features") or entry.get("description")) for entry in kept):
+            meta["enums"] = kept
+            return
+        meta.pop("enums", None)
+
     def restrict(node: Any) -> None:
         """Drop enum and bit values whose ``if-feature`` is false from a schema object."""
         if isinstance(node, list):
@@ -211,27 +284,7 @@ def project_subtree(full: dict[str, Any], module: YangModule, path: str, *,
             return
         meta = node.get("x-yang")
         if isinstance(meta, dict):
-            entries = meta.get("enums")
-            values = node.get("enum")
-            if isinstance(entries, list) and isinstance(values, list):
-                drop: set[str] = set()
-                kept = []
-                for entry in entries:
-                    if not isinstance(entry, dict):
-                        kept.append(entry)
-                        continue
-                    name = entry.get("name")
-                    feats = entry.get("if-features") or []
-                    if isinstance(name, str) and isinstance(feats, list) and feats and not active({"if-features": feats}):
-                        drop.add(name)
-                        continue
-                    kept.append(entry)
-                if drop:
-                    node["enum"] = [value for value in values if value not in drop]
-                    if any(isinstance(entry, dict) and entry.get("if-features") for entry in kept):
-                        meta["enums"] = kept
-                    else:
-                        meta.pop("enums", None)
+            drop_disabled_enums(node, meta)
             bit_guards = meta.get("bit-if-features")
             bits = meta.get("bits")
             if isinstance(bit_guards, dict) and isinstance(bits, dict):
@@ -415,4 +468,6 @@ def project_subtree(full: dict[str, Any], module: YangModule, path: str, *,
         selected["$defs"] = available["$defs"]
     restrict(selected)
     _translate_patterns(selected)
+    defs = selected.get("$defs")
+    _preserve_descriptions(selected, defs if isinstance(defs, dict) else {}, set())
     return SchemaExportResult(selected, diagnostics)

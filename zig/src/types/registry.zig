@@ -297,7 +297,7 @@ fn toEnumeration(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Err
     const names = t.enums();
     if (names.len == 0) return out;
     try out.put(a, K.ENUM, try gen.strList(a, names));
-    var guarded = false;
+    var extra = false;
     const recorded = try a.alloc(Val, names.len);
     for (names, 0..) |name, i| {
         const item = try obj(a);
@@ -305,11 +305,16 @@ fn toEnumeration(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Err
         const feats = t.enumGuard(name);
         if (feats.len > 0) {
             try item.put(a, K.xy.IF_FEATURES, try gen.strList(a, feats));
-            guarded = true;
+            extra = true;
+        }
+        const desc = t.enumDescription(name);
+        if (desc.len > 0) {
+            try item.put(a, K.DESCRIPTION, gen.str(desc));
+            extra = true;
         }
         recorded[i] = gen.objVal(item);
     }
-    if (guarded) {
+    if (extra) {
         const xy = try obj(a);
         try xy.put(a, K.xy.ENUMS, .{ .array = recorded });
         try out.put(a, K.X_YANG, gen.objVal(xy));
@@ -748,12 +753,27 @@ fn enumGuardsFromXyang(p: *jparse.Parse, xy: *const Object) jparse.Error!ast.Enu
     return out;
 }
 
+fn enumDescriptionsFromXyang(p: *jparse.Parse, xy: *const Object) jparse.Error!ast.EnumDescriptions {
+    var out: ast.EnumDescriptions = .empty;
+    const raw = xy.get(K.xy.ENUMS) orelse return out;
+    if (raw != .array) return out;
+    for (raw.array) |item| {
+        if (item != .object) continue;
+        const name = item.object.get(K.NAME) orelse continue;
+        const desc = item.object.get(K.DESCRIPTION) orelse continue;
+        if (name != .string or name.string.len == 0 or desc != .string or desc.string.len == 0) continue;
+        try out.put(p.a, name.string, desc.string);
+    }
+    return out;
+}
+
 fn fromEnumeration(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     const raw = f.schema.get(K.ENUM) orelse return null;
     const items: []const Val = if (raw == .array) raw.array else &.{};
     const guards = try enumGuardsFromXyang(p, f.xyang);
+    const descriptions = try enumDescriptionsFromXyang(p, f.xyang);
     // A single JSON Schema enum is a string pattern unless metadata marks a real enumeration.
-    if (!(items.len > 1 or (guards.count() > 0 and items.len > 0))) return null;
+    if (!(items.len > 1 or ((guards.count() > 0 or descriptions.count() > 0) and items.len > 0))) return null;
     if (items.len <= 1) for (items) |item| if (item != .string) return null;
     const t = try newType(p, ENUMERATION);
     (try t.ensureEnums(p.a)).* = try enumStrings(p, items);
@@ -766,6 +786,16 @@ fn fromEnumeration(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Erro
             if (known) try kept.put(p.a, name, feats);
         }
         if (kept.count() > 0) (try t.enumGuardsMap(p.a)).* = kept;
+    }
+    if (descriptions.count() > 0) {
+        var kept: ast.EnumDescriptions = .empty;
+        for (descriptions.keys(), descriptions.values()) |name, text| {
+            const known = for (t.enums()) |e| {
+                if (std.mem.eql(u8, e, name)) break true;
+            } else false;
+            if (known) try kept.put(p.a, name, text);
+        }
+        if (kept.count() > 0) (try t.enumDescriptionsMap(p.a)).* = kept;
     }
     return t;
 }

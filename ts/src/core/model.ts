@@ -48,13 +48,13 @@ export type StatementTypeShape = TypeIdentity & (
   | ({ kind: "decimal"; fraction_digits?: number } & RangeRestrictionShape)
   | ({ kind: "string" } & LengthRestrictionShape & PatternRestrictions)
   | ({ kind: "binary" } & LengthRestrictionShape)
-  | { kind: "enumeration"; enums?: string[]; enum_if_features?: Record<string, string[]> }
+  | { kind: "enumeration"; enums?: string[]; enum_if_features?: Record<string, string[]>; enum_descriptions?: Record<string, string> }
   | { kind: "bits"; bits?: unknown }
   | { kind: "union"; types?: StatementTypeShape[] }
   | { kind: "leafref"; path?: unknown; xpath_prefixes?: Record<string, string>; require_instance?: boolean }
   | { kind: "instance-identifier"; require_instance?: boolean }
   | { kind: "identityref"; identityref_bases?: unknown }
-  | ({ kind: "derived"; enums?: string[]; enum_if_features?: Record<string, string[]>; bits?: unknown; require_instance?: boolean } & RangeRestrictionShape & LengthRestrictionShape & PatternRestrictions)
+  | ({ kind: "derived"; enums?: string[]; enum_if_features?: Record<string, string[]>; enum_descriptions?: Record<string, string>; bits?: unknown; require_instance?: boolean } & RangeRestrictionShape & LengthRestrictionShape & PatternRestrictions)
 );
 
 const RANGE_FIELDS = ["range", "range_error_message", "range_error_app_tag", "range_description", "range_reference"];
@@ -62,10 +62,10 @@ const LENGTH_FIELDS = ["length", "length_error_message", "length_error_app_tag",
 const TYPE_FIELDS: Record<TypeStatementKind, readonly string[]> = {
   plain: [], numeric: RANGE_FIELDS, decimal: [...RANGE_FIELDS, "fraction_digits"],
   string: [...LENGTH_FIELDS, "patterns", "pattern"], binary: LENGTH_FIELDS,
-  enumeration: ["enums", "enum_if_features"], bits: ["bits"], union: ["types"],
+  enumeration: ["enums", "enum_if_features", "enum_descriptions"], bits: ["bits"], union: ["types"],
   leafref: ["path", "xpath_prefixes", "require_instance"],
   "instance-identifier": ["require_instance"], identityref: ["identityref_bases"],
-  derived: [...RANGE_FIELDS, ...LENGTH_FIELDS, "patterns", "pattern", "enums", "enum_if_features", "bits", "require_instance"]
+  derived: [...RANGE_FIELDS, ...LENGTH_FIELDS, "patterns", "pattern", "enums", "enum_if_features", "enum_descriptions", "bits", "require_instance"]
 };
 const COMMON_TYPE_FIELDS = new Set(["name", "prefix", "scope_module", "source_file", "context", "units"]);
 

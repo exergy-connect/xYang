@@ -231,6 +231,8 @@ class YangEnumerationTypeStmt(YangTypeStmt):
     enums: list[str] = field(default_factory=list)
     # Enum name -> ``if-feature`` expressions (RFC 7950 §9.6.4). Empty means the name is unconditional.
     enum_if_features: dict[str, list[str]] = field(default_factory=dict)
+    # Enum name -> description. Absent names have no description.
+    enum_descriptions: dict[str, str] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -268,6 +270,7 @@ class YangDerivedTypeStmt(YangTypeStmt, _RangeAttributes, _LengthAttributes):
     # Enumeration and bits may be narrowed on derived references.
     enums: Optional[list[str]] = None
     enum_if_features: Optional[dict[str, list[str]]] = None
+    enum_descriptions: Optional[dict[str, str]] = None
     bits: Optional[list[YangBitStmt]] = None
     require_instance: Optional[bool] = None
 

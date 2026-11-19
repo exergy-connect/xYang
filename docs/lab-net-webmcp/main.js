@@ -13513,13 +13513,16 @@ async function registerTopologyTool(modelContext, schema, submit) {
 // docs/lab-net-webmcp/app.js
 var $ = (selector) => document.querySelector(selector);
 var status = $("#status");
-$("#copy-webmcp-flag").addEventListener("click", async () => {
-  try {
-    await navigator.clipboard.writeText($("#webmcp-flag").textContent);
-    $("#copy-status").textContent = "Copied.";
-  } catch {
-    $("#copy-status").textContent = "Select and copy the address above.";
-  }
+document.querySelectorAll("[data-copy-target]").forEach((button) => {
+  button.addEventListener("click", async () => {
+    const status = document.querySelector(button.dataset.copyStatus);
+    try {
+      await navigator.clipboard.writeText(document.querySelector(button.dataset.copyTarget).textContent);
+      if (status) status.textContent = "Copied.";
+    } catch {
+      if (status) status.textContent = "Select and copy the address above.";
+    }
+  });
 });
 try {
   const response = await fetch("./lab-net.yang");

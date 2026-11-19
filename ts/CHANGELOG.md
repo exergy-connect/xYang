@@ -21,6 +21,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Fixed
 
+- Preserve an enumeration value's description in the JSON Schema, and copy a description that already exists on a typedef or enumeration onto a subtree schema node that has none.
+
 - Preserve `if-feature` on `enum` and `bit`, reject a value whose feature is disabled, and omit a disabled enumeration value from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
 
 ## [1.0.4] — 2026-11-16
