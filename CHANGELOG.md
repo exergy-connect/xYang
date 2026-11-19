@@ -21,6 +21,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
+- Preserve an enumeration value's description in the JSON Schema, and copy a description that already exists on a typedef or enumeration onto a subtree schema node that has none.
+
 - Preserve `if-feature` on `enum` and `bit` through parsing and native JSON, reject a value whose feature is disabled in Python, TypeScript, and Zig, and omit it from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
 
 - Preserve original input paths for unknown fields produced by dotted-key expansion.

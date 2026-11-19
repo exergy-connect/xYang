@@ -403,14 +403,21 @@ function emitSchema(spec: Builtin, typeShape: Record<string, unknown>, nativeJso
     const guards = typeShape.enum_if_features;
     const guardMap = guards && typeof guards === "object" && !Array.isArray(guards)
       ? guards as Record<string, unknown> : {};
+    const descriptions = typeShape.enum_descriptions;
+    const descriptionMap = descriptions && typeof descriptions === "object" && !Array.isArray(descriptions)
+      ? descriptions as Record<string, unknown> : {};
     const recorded = enums.map((name) => {
       const feats = Array.isArray(guardMap[name])
         ? (guardMap[name] as unknown[]).filter((item): item is string => typeof item === "string" && item.length > 0)
         : [];
-      return feats.length > 0 ? { name, "if-features": feats } : { name };
+      const desc = descriptionMap[name];
+      const entry: Record<string, unknown> = { name };
+      if (typeof desc === "string" && desc.length > 0) entry.description = desc;
+      if (feats.length > 0) entry["if-features"] = feats;
+      return entry;
     });
     const out: Record<string, unknown> = { type: JSON_TYPE_STRING, enum: enums };
-    if (recorded.some((entry) => "if-features" in entry)) {
+    if (recorded.some((entry) => "if-features" in entry || "description" in entry)) {
       out["x-yang"] = { enums: recorded };
     }
     return out;

@@ -150,10 +150,14 @@ export class TypeStatementParser {
     const enumName = this.parsers.parse_string_argument(tokens);
     (type_stmt.enums ??= []).push(enumName);
     // The body is not the type: ``if-feature`` belongs to this enum, not the parent node.
-    const holder = { if_features: [] as string[] };
+    const holder = { if_features: [] as string[], description: "" };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
       this.parsers.parseBody(tokens, context.push_parent(holder), "enum", `enum '${enumName}'`);
       tokens.consume_type(YangTokenType.RBRACE);
+    }
+    if (holder.description) {
+      const descriptions = (type_stmt.enum_descriptions ??= {});
+      descriptions[enumName] = holder.description;
     }
     if (holder.if_features.length > 0) {
       const guards = (type_stmt.enum_if_features ??= {});

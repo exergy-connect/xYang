@@ -228,6 +228,8 @@ export class YangEnumerationTypeStmt extends YangTypeStmt {
   enums: string[] = [];
   /** Enum name to ``if-feature`` expressions (RFC 7950 §9.6.4). */
   enum_if_features: Record<string, string[]> = {};
+  /** Enum name to description. Absent names have no description. */
+  enum_descriptions: Record<string, string> = {};
 }
 export class YangBitsTypeStmt extends YangTypeStmt {
   bits: YangBitStmt[] = [];
@@ -251,6 +253,7 @@ export class YangDerivedTypeStmt extends YangTypeStmt {
   declare patterns?: YangPatternSpec[];
   declare enums?: string[];
   declare enum_if_features?: Record<string, string[]>;
+  declare enum_descriptions?: Record<string, string>;
   declare bits?: YangBitStmt[];
   declare require_instance?: boolean;
 }

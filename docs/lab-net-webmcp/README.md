@@ -5,19 +5,12 @@ load. The `submit_topology` tool validates the agent's native JSON topology
 with xYang and displays the submitted JSON on the page. Invalid submissions
 return validation errors and leave the last valid submission visible.
 
-The browser-ready files and a copy of the YANG model are included here. Serve
-the repository over HTTP, for example:
-
-```sh
-cd xYang
-python -m http.server 8765
-```
-
-Open `http://localhost:8765/docs/lab-net-webmcp/` in a WebMCP-enabled browser.
-Ask an agent to call `submit_topology` with a native JSON object, for example
-`{"nodes":{"r1":{}}}`. The page displays the number of constraints omitted
-from the subtree schema; the complete model is used for validation before a
-submission is displayed.
+The browser-ready files and a copy of the YANG model are included here. Open
+[the published example](https://exergy-connect.github.io/xYang/lab-net-webmcp/)
+in a WebMCP-enabled browser. Ask an agent to call `submit_topology` with a
+native JSON object, for example `{"nodes":{"r1":{}}}`. The page displays the
+number of constraints omitted from the subtree schema; the complete model is
+used for validation before a submission is displayed.
 
 If the page says “This browser does not expose WebMCP,” enable it in Chrome:
 
@@ -28,6 +21,33 @@ If the page says “This browser does not expose WebMCP,” enable it in Chrome:
 If the flag is unavailable, update Chrome and try again. See
 [Chrome's WebMCP instructions](https://developer.chrome.com/docs/ai/webmcp/)
 for current availability.
+
+A local agent updates the Chrome window it is attached to. Enable remote
+debugging in that window, then add a Cursor MCP server that connects to it:
+
+1. Open `chrome://inspect/#remote-debugging`.
+2. Turn on **Enable remote debugging**.
+3. Add this server to `~/.cursor/mcp.json` and reload MCP servers:
+
+```json
+"local-chrome": {
+  "type": "stdio",
+  "command": "npx",
+  "args": [
+    "-y",
+    "chrome-devtools-mcp@latest",
+    "--autoConnect",
+    "--category-experimental-webmcp"
+  ]
+}
+```
+
+4. Allow Chrome's connection prompt.
+5. Ask the agent to use the `local-chrome` server and call `submit_topology` on
+   the [published example](https://exergy-connect.github.io/xYang/lab-net-webmcp/)
+   tab. The validated JSON appears in that tab.
+
+`--autoConnect` requires Chrome 144 or newer with remote debugging enabled.
 
 To rebuild the browser bundle after changing the example or xYang, install the
 TypeScript dependencies and run `node docs/lab-net-webmcp/build.mjs` from the

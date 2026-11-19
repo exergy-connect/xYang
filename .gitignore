@@ -29,6 +29,9 @@ ENV/
 # IDE
 .vscode/
 .idea/
+
+# Secrets
+.env
 *.swp
 *.swo
 *~

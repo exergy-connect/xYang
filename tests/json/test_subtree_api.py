@@ -18,6 +18,33 @@ def module():
       }
     }''')
 
+def test_descriptions_stay_on_the_schema_where_the_model_has_them():
+    module = parse_yang_string('''module d { namespace "urn:d"; prefix d;
+      typedef mac { type string; description "A MAC address."; }
+      container top {
+        leaf hw { type mac; }
+        leaf labeled { type mac; description "Hardware address."; }
+        leaf kind { type enumeration { enum init { description "Compiler initialization marker."; } enum run; } }
+        leaf named { type string; description "The node name."; }
+      }
+    }''')
+    full = generate_json_schema(module).schema
+    kind = full["properties"]["top"]["properties"]["kind"]
+    assert kind["x-yang"]["enums"][0] == {"name": "init", "description": "Compiler initialization marker."}
+    assert kind["x-yang"]["enums"][1] == {"name": "run"}
+    assert "description" not in kind
+    assert full["$defs"]["mac"]["description"] == "A MAC address."
+    restored = parse_json_schema(full)
+    top = next(stmt for stmt in restored.statements if stmt.name == "top")
+    restored_kind = next(stmt for stmt in top.statements if stmt.name == "kind")
+    assert restored_kind.type.enum_descriptions["init"] == "Compiler initialization marker."
+    schema = generate_json_schema(module, path="/d:top").schema
+    assert schema["properties"]["hw"]["description"] == "A MAC address."
+    assert schema["properties"]["labeled"]["description"] == "Hardware address."
+    assert schema["properties"]["kind"]["description"] == "init: Compiler initialization marker."
+    assert schema["properties"]["named"]["description"] == "The node name."
+    assert schema["properties"]["kind"]["x-yang"]["enums"][0]["description"] == "Compiler initialization marker."
+
 def test_projection_filters_external_constraints(module):
     result = generate_json_schema(module, path="/m:top")
     assert [d.constraint for d in result.diagnostics] == ["must", "leafref", "leafref", "when"]

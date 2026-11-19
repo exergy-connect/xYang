@@ -225,16 +225,21 @@ def _to_enumeration(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any
         return {JsonSchemaKey.TYPE: "string"}
     out: dict[str, Any] = {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: names}
     guards = getattr(type_stmt, "enum_if_features", None) or {}
+    descriptions = getattr(type_stmt, "enum_descriptions", None) or {}
     recorded: list[dict[str, Any]] = []
-    guarded = False
+    extra = False
     for name in names:
         entry: dict[str, Any] = {JsonSchemaKey.NAME: name}
         feats = [item for item in (guards.get(name) or []) if isinstance(item, str) and item]
         if feats:
             entry[XYangKey.IF_FEATURES] = feats
-            guarded = True
+            extra = True
+        desc = descriptions.get(name)
+        if isinstance(desc, str) and desc:
+            entry[JsonSchemaKey.DESCRIPTION] = desc
+            extra = True
         recorded.append(entry)
-    if guarded:
+    if extra:
         out[JsonSchemaKey.X_YANG] = {XYangKey.ENUMS: recorded}
     return out
 
@@ -513,23 +518,28 @@ def _from_empty(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | N
     return None
 
 
-def _enum_if_features_from_xyang(xyang: Mapping[str, Any]) -> dict[str, list[str]]:
-    """``x-yang.enums`` entries that carry ``if-features``, keyed by enum name."""
+def _enum_metadata_from_xyang(xyang: Mapping[str, Any]) -> tuple[dict[str, list[str]], dict[str, str]]:
+    """``x-yang.enums`` guards and descriptions, keyed by enum name."""
     raw = xyang.get(XYangKey.ENUMS)
     guards: dict[str, list[str]] = {}
+    descriptions: dict[str, str] = {}
     if not isinstance(raw, list):
-        return guards
+        return guards, descriptions
     for item in raw:
         if not isinstance(item, dict):
             continue
         name = item.get(JsonSchemaKey.NAME)
-        feats = item.get(XYangKey.IF_FEATURES) or []
-        if not isinstance(name, str) or not name or not isinstance(feats, list):
+        if not isinstance(name, str) or not name:
             continue
-        cleaned = [feat for feat in feats if isinstance(feat, str) and feat]
-        if cleaned:
-            guards[name] = cleaned
-    return guards
+        feats = item.get(XYangKey.IF_FEATURES) or []
+        if isinstance(feats, list):
+            cleaned = [feat for feat in feats if isinstance(feat, str) and feat]
+            if cleaned:
+                guards[name] = cleaned
+        desc = item.get(JsonSchemaKey.DESCRIPTION)
+        if isinstance(desc, str) and desc:
+            descriptions[name] = desc
+    return guards, descriptions
 
 
 def _from_enumeration(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
@@ -537,14 +547,16 @@ def _from_enumeration(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeSt
     if JsonSchemaKey.ENUM not in schema:
         return None
     enums = list(schema[JsonSchemaKey.ENUM]) if isinstance(schema[JsonSchemaKey.ENUM], list) else []
-    guards = _enum_if_features_from_xyang(fragment.xyang)
+    guards, descriptions = _enum_metadata_from_xyang(fragment.xyang)
     # A single JSON Schema enum is a string pattern unless metadata marks a real enumeration.
-    if len(enums) > 1 or (guards and enums and all(isinstance(item, str) for item in enums)):
+    if len(enums) > 1 or ((guards or descriptions) and enums and all(isinstance(item, str) for item in enums)):
         type_stmt = make_type_stmt(name=ENUMERATION)
         type_stmt.enums = enums
+        names = {str(item) for item in enums}
         if guards:
-            names = {str(item) for item in enums}
             type_stmt.enum_if_features = {name: feats for name, feats in guards.items() if name in names}
+        if descriptions:
+            type_stmt.enum_descriptions = {name: text for name, text in descriptions.items() if name in names}
         return type_stmt
     return None
 

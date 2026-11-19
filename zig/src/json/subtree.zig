@@ -489,6 +489,49 @@ const Projector = struct {
     }
 };
 
+fn descriptionFrom(a: A, node: *Obj, defs: *Obj) error{OutOfMemory}!?[]const u8 {
+    var source = node;
+    if (getString(node, "$ref")) |ref| {
+        const prefix = "#/$defs/";
+        if (std.mem.startsWith(u8, ref, prefix)) if (getObj(defs, ref[prefix.len..])) |target| {
+            source = target;
+        };
+    }
+    if (source != node) if (getString(source, "description")) |text| if (std.mem.trim(u8, text, " \t\r\n").len > 0) return text;
+    const meta = getObj(source, "x-yang") orelse return null;
+    const raw = meta.get("enums") orelse return null;
+    if (raw != .array) return null;
+    var lines: std.ArrayList(u8) = .empty;
+    var any = false;
+    for (raw.array) |entry| {
+        if (entry != .object) continue;
+        const name = getString(entry.object, "name") orelse continue;
+        const text = getString(entry.object, "description") orelse continue;
+        const trimmed = std.mem.trim(u8, text, " \t\r\n");
+        if (name.len == 0 or trimmed.len == 0) continue;
+        if (any) try lines.append(a, '\n');
+        any = true;
+        try lines.appendSlice(a, name);
+        try lines.appendSlice(a, ": ");
+        try lines.appendSlice(a, trimmed);
+    }
+    return if (any) lines.items else null;
+}
+
+fn preserveDescriptions(a: A, value: Val, defs: *Obj) error{OutOfMemory}!void {
+    if (value == .array) {
+        for (value.array) |item| try preserveDescriptions(a, item, defs);
+        return;
+    }
+    if (value != .object) return;
+    const node = value.object;
+    const current = getString(node, "description");
+    if (current == null or std.mem.trim(u8, current.?, " \t\r\n").len == 0) {
+        if (try descriptionFrom(a, node, defs)) |text| try node.put(a, "description", .{ .string = text });
+    }
+    for (node.values()) |child| try preserveDescriptions(a, child, defs);
+}
+
 pub fn project(a: A, full: Val, module: *Module, path: []const u8, features: ?*const feature.EnabledFeatures, native_json: bool, diag: *Diagnostic) gen.Error!gen.SchemaExportResult {
     if (path.len < 2 or path[0] != '/') {
         diag.* = .{ .kind = .semantic, .message = "subtree path must be absolute" };
@@ -536,6 +579,8 @@ pub fn project(a: A, full: Val, module: *Module, path: []const u8, features: ?*c
         if (err == error.Export) diag.* = .{ .kind = .semantic, .message = "subtree schema cannot portably encode an XSD regex shorthand or Unicode category" };
         return err;
     };
+    const defs = getObj(selected, "$defs") orelse try gen.newObject(a);
+    try preserveDescriptions(a, .{ .object = selected }, defs);
     return .{ .schema = .{ .object = selected }, .diagnostics = self.diagnostics.items };
 }
 
@@ -573,6 +618,39 @@ test "subtree projection filters features and external constraints" {
     try std.testing.expect((properties.get("nodes").?.object.get("anyOf").?).array.len == 2);
     const defaults = try gen.generateWithOptions(a, module, &diag, .{ .path = "/m:top" });
     try std.testing.expect(getObj(defaults.schema.object, "properties").?.contains("enabled"));
+}
+
+test "subtree schema keeps descriptions the model already has" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module d { namespace "urn:d"; prefix d;
+        \\  typedef mac { type string; description "A MAC address."; }
+        \\  container top {
+        \\    leaf hw { type mac; }
+        \\    leaf labeled { type mac; description "Hardware address."; }
+        \\    leaf kind { type enumeration { enum init { description "Compiler initialization marker."; } enum run; } }
+        \\    leaf named { type string; description "The node name."; }
+        \\  }
+        \\}
+    , "test.yang", &diag);
+    const full = try gen.generateWithOptions(a, module, &diag, .{});
+    const top = getObj(getObj(full.schema.object, "properties").?, "top").?;
+    const props = getObj(top, "properties").?;
+    const kind = getObj(props, "kind").?;
+    const enums = getObj(kind, "x-yang").?.get("enums").?.array;
+    try std.testing.expectEqualStrings("init", getString(enums[0].object, "name").?);
+    try std.testing.expectEqualStrings("Compiler initialization marker.", getString(enums[0].object, "description").?);
+    try std.testing.expect(getString(kind, "description") == null);
+    try std.testing.expectEqualStrings("A MAC address.", getString(getObj(getObj(full.schema.object, "$defs").?, "mac").?, "description").?);
+    const schema = try gen.generateWithOptions(a, module, &diag, .{ .path = "/d:top" });
+    const selected = getObj(schema.schema.object, "properties").?;
+    try std.testing.expectEqualStrings("A MAC address.", getString(selected.get("hw").?.object, "description").?);
+    try std.testing.expectEqualStrings("Hardware address.", getString(selected.get("labeled").?.object, "description").?);
+    try std.testing.expectEqualStrings("init: Compiler initialization marker.", getString(selected.get("kind").?.object, "description").?);
+    try std.testing.expectEqualStrings("The node name.", getString(selected.get("named").?.object, "description").?);
 }
 
 test "subtree projection rejects unavailable path" {

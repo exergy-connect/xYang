@@ -86,6 +86,33 @@ it('resolves current() predicates from the leaf context', () => {
     .toBe('/top/nodes[name = current()/../node]/target');
 });
 
+it('keeps descriptions that the model already has', () => {
+  const module = new YangParser().parseString(`module d { namespace "urn:d"; prefix d;
+    typedef mac { type string; description "A MAC address."; }
+    container top {
+      leaf hw { type mac; }
+      leaf labeled { type mac; description "Hardware address."; }
+      leaf kind { type enumeration { enum init { description "Compiler initialization marker."; } enum run; } }
+      leaf named { type string; description "The node name."; }
+    }
+  }`);
+  const full = generateJsonSchema(module).schema as any;
+  const kind = full.properties.top.properties.kind;
+  expect(kind["x-yang"].enums[0]).toEqual({ name: "init", description: "Compiler initialization marker." });
+  expect(kind["x-yang"].enums[1]).toEqual({ name: "run" });
+  expect(kind.description).toBeUndefined();
+  expect(full.$defs.mac.description).toBe("A MAC address.");
+  const restored = parseJsonSchema(full);
+  const top = restored.statements.find((stmt) => stmt.name === "top");
+  const restoredKind = top?.statements.find((stmt) => stmt.name === "kind");
+  expect((restoredKind as any).type.enum_descriptions.init).toBe("Compiler initialization marker.");
+  const schema = generateJsonSchema(module, { path: "/d:top" }).schema as any;
+  expect(schema.properties.hw.description).toBe("A MAC address.");
+  expect(schema.properties.labeled.description).toBe("Hardware address.");
+  expect(schema.properties.kind.description).toBe("init: Compiler initialization marker.");
+  expect(schema.properties.named.description).toBe("The node name.");
+});
+
 it('preserves leafref typedef predicates through native JSON', () => {
   const module = new YangParser().parseString(`module m { namespace "urn:m"; prefix m;
     list a { key name; leaf name { type string; } }

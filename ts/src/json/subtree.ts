@@ -180,7 +180,11 @@ export function restrictGatedValues(node: unknown, module: YangModule, enabled: 
     }
     if (drop.size > 0) {
       current.enum = values.filter(value => typeof value !== "string" || !drop.has(value));
-      if (kept.some(entry => Array.isArray(obj(entry)["if-features"]) && (obj(entry)["if-features"] as unknown[]).length > 0)) meta.enums = kept;
+      if (kept.some(entry => {
+        const item = obj(entry);
+        return (Array.isArray(item["if-features"]) && (item["if-features"] as unknown[]).length > 0)
+          || (typeof item.description === "string" && item.description.length > 0);
+      })) meta.enums = kept;
       else delete meta.enums;
     }
   }
@@ -203,6 +207,41 @@ export function restrictGatedValues(node: unknown, module: YangModule, enabled: 
     }
   }
   for (const child of Object.values(current)) restrictGatedValues(child, module, enabled);
+}
+
+function descriptionFrom(node: Obj, defs: Obj): string {
+  let source = node;
+  const ref = node.$ref;
+  if (typeof ref === "string" && ref.startsWith("#/$defs/")) {
+    const target = obj(defs[ref.slice("#/$defs/".length)]);
+    if (Object.keys(target).length > 0) source = target;
+  }
+  if (source !== node && typeof source.description === "string" && source.description.trim()) return source.description;
+  const entries = obj(source["x-yang"]).enums;
+  if (!Array.isArray(entries)) return "";
+  const lines: string[] = [];
+  for (const entry of entries) {
+    const item = obj(entry);
+    const name = item.name;
+    const text = item.description;
+    if (typeof name === "string" && name && typeof text === "string" && text.trim()) lines.push(`${name}: ${text.trim()}`);
+  }
+  return lines.join("\n");
+}
+
+function preserveDescriptions(node: unknown, defs: Obj, seen: Set<object>): void {
+  if (Array.isArray(node)) {
+    for (const item of node) preserveDescriptions(item, defs, seen);
+    return;
+  }
+  if (!node || typeof node !== "object" || seen.has(node)) return;
+  seen.add(node);
+  const current = node as Obj;
+  if (typeof current.description !== "string" || !current.description.trim()) {
+    const text = descriptionFrom(current, defs);
+    if (text) current.description = text;
+  }
+  for (const value of Object.values(current)) preserveDescriptions(value, defs, seen);
 }
 
 export function projectSubtree(full: Obj, module: YangModule, selection: string, nativeJson = false, available: Obj = full): SchemaExportResult {
@@ -294,5 +333,6 @@ export function projectSubtree(full: Obj, module: YangModule, selection: string,
   selected.$id = full.$id;
   if (available.$defs) selected.$defs = structuredClone(available.$defs);
   translatePatterns(selected);
+  preserveDescriptions(selected, obj(selected.$defs), new Set());
   return { schema: selected, diagnostics };
 }

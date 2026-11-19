@@ -204,12 +204,18 @@ class TypeStatementParser:
         enum_name = self._parsers.parse_string_argument(tokens)
         type_stmt.enums.append(enum_name)
         # The body is not the type: ``if-feature`` belongs to this enum, not the parent node.
-        holder = SimpleNamespace(if_features=[])
+        holder = SimpleNamespace(if_features=[], description="")
         if tokens.consume_if_type(YangTokenType.LBRACE):
             self._parsers.parse_body(
                 tokens, context.push_parent(holder), "enum", error_context=f"enum '{enum_name}'"
             )
             tokens.consume_type(YangTokenType.RBRACE)
+        if holder.description:
+            descriptions = getattr(type_stmt, "enum_descriptions", None)
+            if descriptions is None:
+                descriptions = {}
+                type_stmt.enum_descriptions = descriptions
+            descriptions[enum_name] = holder.description
         if holder.if_features:
             guards = getattr(type_stmt, "enum_if_features", None)
             if guards is None:

@@ -110,6 +110,7 @@ type TypeShape = {
   identityref_bases?: Array<{ prefix?: string; name: string }>;
   enums?: string[];
   enum_if_features?: Record<string, string[]>;
+  enum_descriptions?: Record<string, string>;
   bits?: Array<{ name: string; position: number; if_features?: string[] }>;
   types?: TypeShape[];
 };
@@ -1420,6 +1421,10 @@ export class StatementParsers {
       if (guards && Object.keys(guards).length > 0) {
         shape.enum_if_features = Object.fromEntries(Object.entries(guards).map(([name, feats]) => [name, [...feats]]));
       }
+      const descriptions = type_stmt.enum_descriptions;
+      if (descriptions && Object.keys(descriptions).length > 0) {
+        shape.enum_descriptions = { ...descriptions };
+      }
     }
     if (type_stmt instanceof YangBitsTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
       if (type_stmt.bits) shape.bits = type_stmt.bits.map((b) => ({
@@ -1463,6 +1468,9 @@ export class StatementParsers {
         if (feats.length > 0) {
           shape.enum_if_features = { ...(shape.enum_if_features ?? {}), [child.argument]: feats };
         }
+        const desc = child.statements?.find((stmt) => stmt.keyword === "description")?.argument
+          ?? (typeof child.description === "string" ? child.description : "");
+        if (desc) shape.enum_descriptions = { ...(shape.enum_descriptions ?? {}), [child.argument]: desc };
       }
       if (child.keyword === "bit" && child.argument) {
         const bits = shape.bits ?? [];

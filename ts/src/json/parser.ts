@@ -603,16 +603,20 @@ function rawTypeShapeFromJsonLeaf(schema: Record<string, unknown>, xy: Record<st
     shape.enums = enumValues.filter((x): x is string => typeof x === "string");
     const recorded = Array.isArray(xy.enums) ? xy.enums : [];
     const guards: Record<string, string[]> = {};
+    const descriptions: Record<string, string> = {};
     for (const item of recorded) {
       if (!item || typeof item !== "object" || Array.isArray(item)) continue;
       const entry = item as Record<string, unknown>;
       const name = entry.name;
+      if (typeof name !== "string" || name.length === 0) continue;
       const feats = Array.isArray(entry["if-features"])
         ? entry["if-features"].filter((feat): feat is string => typeof feat === "string" && feat.length > 0)
         : [];
-      if (typeof name === "string" && name.length > 0 && feats.length > 0) guards[name] = feats;
+      if (feats.length > 0) guards[name] = feats;
+      if (typeof entry.description === "string" && entry.description.length > 0) descriptions[name] = entry.description;
     }
     if (Object.keys(guards).length > 0) shape.enum_if_features = guards;
+    if (Object.keys(descriptions).length > 0) shape.enum_descriptions = descriptions;
   }
   return shape;
 }
