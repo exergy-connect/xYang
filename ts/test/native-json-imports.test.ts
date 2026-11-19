@@ -52,7 +52,7 @@ describe("native JSON form of imported identities", () => {
       for (const ref of found) {
         expect(pointer(form, ref)["x-yang"].type, `dangling ${ref}`).toBe("identity");
       }
-      expect(JSON.parse(JSON.stringify(generateJsonSchema(parseJsonSchema(form))))).toEqual(form);
+      expect(JSON.parse(JSON.stringify(generateJsonSchema(parseJsonSchema(form)).schema))).toEqual(form);
     });
   }
 

@@ -126,5 +126,5 @@ class Builder {
     return [{"@context":context},vocab];
   }
 }
-export function generateJsonldContext(module: YangModule): Obj { return new Builder(generateJsonSchema(module)).build()[0]; }
-export function generateJsonldVocab(module: YangModule): Obj { return new Builder(generateJsonSchema(module)).build()[1]; }
+export function generateJsonldContext(module: YangModule): Obj { return new Builder(generateJsonSchema(module).schema).build()[0]; }
+export function generateJsonldVocab(module: YangModule): Obj { return new Builder(generateJsonSchema(module).schema).build()[1]; }

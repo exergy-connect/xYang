@@ -17,7 +17,7 @@ module m {
 }
 """
     mod = parse_yang_string(yang)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     leaf = schema["properties"]["x"]["x-yang"]
     prop = schema["properties"]["x"]
     assert "builtin-type" not in leaf
@@ -44,7 +44,7 @@ module m {
 }
 """
     mod = parse_yang_string(yang)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     a = schema["properties"]["a"]
     assert a["minimum"] == 0
     assert a["maximum"] == 255
@@ -72,7 +72,7 @@ module m {
 }
 """
     mod = parse_yang_string(yang)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     tdef = schema["$defs"]["t"]
     _, hi = YANG_INTEGER_BOUNDS["int32"]
     assert tdef["minimum"] == 0

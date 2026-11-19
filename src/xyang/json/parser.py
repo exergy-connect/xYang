@@ -1267,6 +1267,9 @@ def parse_json_schema(source: str | Path | dict[str, Any]) -> YangModule:
         )
     defs = data.get(JsonSchemaKey.DEFS) or {}
 
+    if "subtree-path" in root_xyang:
+        raise ValueError("a subtree schema is a projection, not a complete YANG module")
+
     module = YangModule(
         name=root_xyang.get(XYangKey.MODULE, "unknown"),
         yang_version=root_xyang.get(XYangKey.YANG_VERSION, "1.1"),

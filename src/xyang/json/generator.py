@@ -2,7 +2,7 @@
 Generate a JSON Schema file (schema.yang.json) from a YANG AST (YangModule).
 
 Produces JSON Schema with x-yang annotations compatible with the json/parser
-so that parse_json_schema(generate_json_schema(module)) round-trips where supported.
+so that parse_json_schema(generate_json_schema(module).schema) round-trips where supported.
 """
 
 from __future__ import annotations
@@ -14,6 +14,8 @@ from copy import copy
 from dataclasses import dataclass, field
 from pathlib import Path
 from typing import Any, cast
+from collections.abc import Collection, Mapping
+from .subtree import SchemaExportResult
 
 from ..ast import (
     YangAnydataStmt,
@@ -310,7 +312,7 @@ def _leafref_path_string(path: Any) -> str:
     if path is None:
         return ""
     if isinstance(path, PathNode):
-        return path.to_string()
+        return getattr(path, "source", None) or path.to_string()
     return str(path)
 
 
@@ -1711,12 +1713,14 @@ def _apply_own_deviations(schema_module: YangModule) -> None:
 
 
 def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
-                         allow_jsonld: bool = True, allow_json_schema: bool = True, native_json: bool = False) -> dict[str, Any]:
+                         allow_jsonld: bool = True, allow_json_schema: bool = True, native_json: bool = False,
+                         path: str | None = None, features: Mapping[str, Collection[str]] | None = None) -> SchemaExportResult:
     """
-    Build a JSON Schema dict from a YangModule AST.
+    Build a JSON Schema and diagnostics from a YangModule AST.
 
-    The output has the structure expected by parse_json_schema: root x-yang (module
-    meta), properties (one entry per module-level data node), and $defs (typedefs).
+    With ``path``, export the selected data node's value as a standalone schema,
+    filtering features and reporting constraints outside the subtree. Without it,
+    return the reversible whole-module schema and an empty diagnostics list.
     Raises :class:`YangExportError` for a construct the form cannot carry.
     """
     from ..typedef_scope import EXPORT_TYPEDEFS, scoped_export_catalog
@@ -1733,7 +1737,12 @@ def generate_json_schema(module: YangModule, *, schema_id: str | None = None,
             schema[JsonSchemaKey.ID] = schema_id
         from ..encoding.annotations import annotate_schema
         annotate_schema(schema, allow_jsonld, allow_json_schema)
-        return schema
+        if path is not None:
+            from .subtree import project_subtree
+            return project_subtree(schema, module, path, features=features, native_json=native_json)
+        if features is not None:
+            raise YangExportError("features requires a subtree path")
+        return SchemaExportResult(schema, [])
     finally:
         NATIVE_EXPORT.reset(native_token)
         EXPORT_TYPEDEFS.reset(scope_token)
@@ -1847,7 +1856,7 @@ def schema_to_yang_json(
     Returns:
         JSON string of the schema.
     """
-    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, native_json=native_json)
+    data = generate_json_schema(module, schema_id=schema_id, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, native_json=native_json).schema
     text = json.dumps(data, indent=indent, ensure_ascii=False) + "\n"
     if output_path is not None:
         path = Path(output_path)

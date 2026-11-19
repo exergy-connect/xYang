@@ -103,7 +103,7 @@ describe("python parity: test_refine_default", () => {
 
   it("JSON Schema carries leaf default and parseJsonSchema round-trips it", () => {
     const mod = parseYangString(REFINE_DEFAULT_FALSE);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const cSchema = (schema.properties as Record<string, unknown>).c as Record<string, unknown>;
     const flagSchema = (cSchema.properties as Record<string, unknown>).flag as Record<string, unknown>;
     expect(flagSchema.default).toBe(false);
@@ -161,7 +161,7 @@ module refine_ll_one {
 
   it("leaf-list default array in JSON Schema round-trips", () => {
     const mod = parseYangString(REFINE_LEAF_LIST_TWO_DEFAULTS);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const cSchema = (schema.properties as Record<string, unknown>).c as Record<string, unknown>;
     const tagsSchema = (cSchema.properties as Record<string, unknown>).tags as Record<string, unknown>;
     expect(tagsSchema.default).toEqual(["alpha", "beta"]);

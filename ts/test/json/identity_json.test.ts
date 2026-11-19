@@ -12,7 +12,7 @@ describe("python parity: json/test_identity_json", () => {
 
   beforeAll(() => {
     module = parseYangFile(MINIMAL_YANG);
-    schema = generateJsonSchema(module);
+    schema = generateJsonSchema(module).schema;
   });
 
   it("generateJsonSchema includes identity defs and identityref metadata", () => {

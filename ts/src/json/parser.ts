@@ -1221,6 +1221,7 @@ export function parseJsonSchema(source: string | Record<string, unknown>): YangM
     typeof source === "string" ? (JSON.parse(source) as Record<string, unknown>) : { ...source };
 
   const rootXy = requireXYangObject(root[YANG_SCHEMA_KEYS.xYang], MISSING_ROOT_X_YANG);
+  if (rootXy["subtree-path"] !== undefined) throw new Error("a subtree schema is a projection, not a complete YANG module");
   const moduleName = typeof rootXy.module === "string" ? rootXy.module : (typeof root.title === "string" ? root.title : "");
   const namespace = typeof rootXy.namespace === "string" ? rootXy.namespace : "";
   const prefix = typeof rootXy.prefix === "string" ? rootXy.prefix : "";

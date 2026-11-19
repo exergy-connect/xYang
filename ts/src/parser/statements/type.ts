@@ -167,6 +167,7 @@ export class TypeStatementParser {
     tokens.consume(kw.PATH);
     const path = this.parsers.parse_string_argument(tokens);
     const ast = parseXPathPath(path);
+    if (ast.kind === "path") ast.source = path;
     const used = xpathPrefixes(ast);
     if (used.size > 0) {
       const resolve = modulePrefixResolver(context.module, this.parsers.includingSubmoduleName);

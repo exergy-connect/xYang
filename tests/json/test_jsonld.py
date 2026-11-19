@@ -28,11 +28,11 @@ def module():
 @pytest.mark.parametrize("kind", ["context", "vocab"])
 def test_jsonld_example_and_native_round_trip(module, kind):
     build = generate_jsonld_context if kind == "context" else generate_jsonld_vocab
-    original = generate_json_schema(module)
+    original = generate_json_schema(module).schema
     expected = json.loads((EXAMPLE / f"catalog.{kind}.jsonld").read_text())
     assert build(module) == expected
     assert build(parse_json_schema(original)) == expected
-    assert generate_json_schema(module) == original
+    assert generate_json_schema(module).schema == original
 
 
 def test_jsonld_context_expands_scoped_names_and_uri_values(module):

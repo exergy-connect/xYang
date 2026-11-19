@@ -64,14 +64,14 @@ def _defs(module) -> dict:
 
 def test_reloaded_extensions_match_the_yang_module_and_round_trip():
     yang = YangParser(expand_uses=False, include_path=(CASE,)).parse_file(CASE / "m.yang")
-    form = generate_json_schema(yang)
+    form = generate_json_schema(yang).schema
     assert form == json.loads((CASE / "expected.yang.json").read_text())
     loaded = parse_json_schema(form)
     assert _defs(loaded) == _defs(yang)
     assert _by_owner(loaded) == _by_owner(yang)
     imported = loaded.import_prefixes["e"].extensions["tag"]
     assert (imported.argument_name, imported.description, imported.reference) == ("value", "Imported tag.", "ext")
-    assert generate_json_schema(loaded) == form
+    assert generate_json_schema(loaded).schema == form
 
 
 def test_rfc8791_structure_convert_round_trips(tmp_path):
@@ -87,7 +87,7 @@ def test_rfc8791_structure_convert_round_trips(tmp_path):
     written = json.loads(out.read_text())
     assert written == json.loads((RFC / "expected.yang.json").read_text())
     loaded = parse_json_schema(written)
-    assert generate_json_schema(loaded) == written
+    assert generate_json_schema(loaded).schema == written
     index = loaded.extension_runtime["ietf-yang-structure-ext:structure-index"]
     assert set(index) == {"msg"}
 
@@ -96,9 +96,9 @@ def test_cross_module_augment_structure_reloads_once():
     """#164: the imported structure stub receives the augment once, and a second apply does not repeat it."""
     case = RFC.parent / "json-form-augment-structure-cross-164"
     yang = YangParser(expand_uses=False, include_path=(case,)).parse_file(case / "m.yang")
-    form = generate_json_schema(yang)
+    form = generate_json_schema(yang).schema
     loaded = parse_json_schema(form)
-    assert generate_json_schema(loaded) == form
+    assert generate_json_schema(loaded).schema == form
 
     def extras(module):
         stub = module.import_prefixes["b"]
@@ -117,7 +117,7 @@ def test_reloaded_augment_structure_if_feature_matches_the_yang_module():
     """#164: if-feature merged onto an augment-structure root is enforced after reload."""
     case = RFC.parent / "json-form-augment-structure-164"
     yang = YangParser(include_path=(case,)).parse_file(case / "m.yang")
-    loaded = parse_json_schema(generate_json_schema(YangParser(expand_uses=False, include_path=(case,)).parse_file(case / "m.yang")))
+    loaded = parse_json_schema(generate_json_schema(YangParser(expand_uses=False, include_path=(case,)).parse_file(case / "m.yang")).schema)
     data = {"m:msg": {"enabled": "on", "extra-leaf": "z", "box": {"note": "hi"}}}
     for module in (yang, loaded):
         result = YangValidator(module, enabled_features_by_module={"m": []}).validate_detailed(data)
@@ -143,4 +143,4 @@ module marked {
     )
     module = YangParser(expand_uses=False).parse_file(demo)
     with pytest.raises(YangExportError, match="marked:mark"):
-        generate_json_schema(module)
+        generate_json_schema(module).schema

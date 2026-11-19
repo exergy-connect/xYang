@@ -39,7 +39,7 @@ describe("python parity: test_pattern_constraint_metadata", () => {
 
   it("JSON Schema x-yang carries pattern metadata on typedef $def", () => {
     const module = parseYangString(PATTERN_TYPEDEF_MODULE);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const idDef = schema.$defs as Record<string, Record<string, unknown>>;
     const xy = idDef.id[YANG_SCHEMA_KEYS.xYang] as Record<string, unknown>;
     expect(xy["pattern-error-message"]).toBe("Must be decimal digits.");
@@ -48,7 +48,7 @@ describe("python parity: test_pattern_constraint_metadata", () => {
 
   it("JSON roundtrip restores pattern metadata on typedef", () => {
     const module = parseYangString(PATTERN_TYPEDEF_MODULE);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const module2 = parseJsonSchema(schema);
     const td = module2.typedefs.id as TypedefWithPatternType | undefined;
     const pats = td?.type?.patterns ?? [];
@@ -100,7 +100,7 @@ module t {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const idDef = (schema.$defs as Record<string, Record<string, unknown>>).id;
     expect(Array.isArray(idDef.allOf)).toBe(true);
     const xy = idDef[YANG_SCHEMA_KEYS.xYang] as Record<string, unknown>;
@@ -123,7 +123,7 @@ module t {
   }
 }
 `);
-    const module2 = parseJsonSchema(generateJsonSchema(module));
+    const module2 = parseJsonSchema(generateJsonSchema(module).schema);
     const td = module2.typedefs.id as { type?: Record<string, unknown> } | undefined;
     const patterns = (td?.type?.patterns as Array<Record<string, unknown>> | undefined) ?? [];
     expect(patterns.length).toBe(2);

@@ -41,7 +41,7 @@ def test_global_typedef_scope(context, scope, kind, allowed):
             parse_json_schema(schema)
         return
     module = parse_json_schema(schema)
-    exported = generate_json_schema(module)
+    exported = generate_json_schema(module).schema
     assert exported["$defs"]["code"].get("x-yang", {}).get("scope") == (None if scope is ... else scope)
     parse_json_schema(exported)
 
@@ -59,9 +59,9 @@ def test_reexport_imported_scope_collisions():
     fixture = Path(__file__).parents[1] / "cases/types/typedef-scope-imported-collisions/expected.yang.json"
     import json
 
-    first = generate_json_schema(parse_json_schema(fixture))
+    first = generate_json_schema(parse_json_schema(fixture)).schema
     assert first == json.loads(fixture.read_text())
-    second = generate_json_schema(parse_json_schema(first))
+    second = generate_json_schema(parse_json_schema(first)).schema
     assert first == second
     a_ref = second["properties"]["a"]["properties"]["value"]["$ref"]
     b_ref = second["properties"]["b"]["properties"]["value"]["$ref"]

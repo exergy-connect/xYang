@@ -23,7 +23,7 @@ def module():
 def test_annotation_export_policy(module, allow_jsonld, allow_json_schema):
     jsonschema = pytest.importorskip('jsonschema')
     opts = dict(allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema)
-    schema = generate_json_schema(module, **opts)
+    schema = generate_json_schema(module, **opts).schema
     expected = ({'^@[A-Za-z]+$'} if allow_jsonld else set()) | ({r'^\$[A-Za-z]+$'} if allow_json_schema else set())
     nodes = [schema, schema['properties']['top'], schema['properties']['top']['properties']['items']['items']]
     for node in nodes:
@@ -33,7 +33,7 @@ def test_annotation_export_policy(module, allow_jsonld, allow_json_schema):
     assert jsonschema.Draft202012Validator(schema).is_valid(data) == (allow_jsonld and allow_json_schema)
     # The annotation-only optional choice selects the empty branch.
     assert jsonschema.Draft202012Validator(schema).is_valid({'name':'ok','mode':{'@id':'urn:mode'}}) == allow_jsonld
-    assert generate_json_schema(parse_json_schema(schema), **opts) == schema
+    assert generate_json_schema(parse_json_schema(schema), **opts).schema == schema
     assert json.loads(schema_to_yang_json(module, **opts)) == schema
 
 

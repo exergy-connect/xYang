@@ -35,7 +35,7 @@ def meta_model_unexpanded() -> YangModule:
 def test_generate_json_schema_from_yang_module(meta_model_unexpanded: YangModule):
     """Parse meta-model.yang (no uses expansion), generate JSON schema, assert structure."""
     assert META_MODEL_YANG.exists(), f"Missing {META_MODEL_YANG}"
-    data = generate_json_schema(meta_model_unexpanded)
+    data = generate_json_schema(meta_model_unexpanded).schema
     assert data["$schema"] == "https://json-schema.org/draft/2020-12/schema"
     assert "x-yang" in data
     assert data["x-yang"]["module"] == "meta-model"
@@ -62,7 +62,7 @@ def test_schema_to_yang_json_writes_file(meta_model_unexpanded: YangModule, tmp_
 def test_roundtrip_yang_to_json_to_ast(meta_model_unexpanded: YangModule):
     """Parse YANG (no uses expansion) -> generate JSON (expands uses) -> parse JSON -> same module name and root container."""
     assert META_MODEL_YANG.exists()
-    data = generate_json_schema(meta_model_unexpanded)
+    data = generate_json_schema(meta_model_unexpanded).schema
     module2 = parse_json_schema(data)
     assert module2.name == meta_model_unexpanded.name
     assert len(module2.statements) == len(meta_model_unexpanded.statements)
@@ -85,7 +85,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     props = schema["properties"]["data-model"]["properties"]
     assert props["flag"]["default"] is False
     assert props["enabled"]["default"] is True
@@ -109,7 +109,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     leaf_schema = schema["properties"]["data-model"]["properties"]["max_name_underscores"]
     assert leaf_schema["default"] == 2
 
@@ -132,7 +132,7 @@ module t {
 }
 """
     module = parse_yang_string(yang)
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     x = schema["properties"]["data-model"]["properties"]["x"]
     assert x["type"] == "string"
     assert x["pattern"] == r"^-?[0-9]+(\.[0-9]+)?$"
