@@ -31,7 +31,7 @@ describe("meta-model target: schema converter", () => {
   let schema: Record<string, unknown>;
 
   beforeAll(() => {
-    schema = generateJsonSchema(parseYangFile(META_MODEL_YANG));
+    schema = generateJsonSchema(parseYangFile(META_MODEL_YANG)).schema;
   });
 
   it("does not emit XPath/must expressions as JSON property names", () => {

@@ -295,8 +295,9 @@ fn whenToJson(a: Allocator, w: *const ast.WhenStmt) Error!Val {
 
 /// `_leafref_path_string`.
 pub fn leafrefPathString(a: Allocator, t: *const ast.TypeStmt) error{OutOfMemory}![]const u8 {
+    if (t.leafrefPath()) |path| return path;
     if (t.pathAst()) |e| if (e.* == .path) return e.path.toString(a);
-    return t.leafrefPath() orelse "";
+    return "";
 }
 
 // ---------------------------------------------------------------------------
@@ -1516,13 +1517,29 @@ fn addImportedStructures(g: *Gen, root: *Module, imports: *Object) Error!void {
 
 /// `generate_json_schema`: the module's native JSON form. On `error.Export` or
 /// `error.YangLoad`, `diag` holds the message.
-pub const Options = struct { schema_id: ?[]const u8 = null, native_json: bool = false, allow_jsonld: bool = true, allow_json_schema: bool = true };
-
-pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!Val {
+pub const Options = struct {
+    schema_id: ?[]const u8 = null,
+    native_json: bool = false,
+    allow_jsonld: bool = true,
+    allow_json_schema: bool = true,
+    path: ?[]const u8 = null,
+    features: ?*const @import("../if_feature_eval.zig").EnabledFeatures = null,
+};
+pub const SchemaDiagnostic = @import("subtree.zig").SchemaDiagnostic;
+pub const SchemaExportResult = struct { schema: Val, diagnostics: []const SchemaDiagnostic = &.{} };
+pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) Error!SchemaExportResult {
     return generateWithOptions(a, module, diag, .{});
 }
-
-pub fn generateWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error!Val {
+pub fn generateWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error!SchemaExportResult {
+    const schema = try generateFull(a, module, diag, options);
+    if (options.path) |path| return @import("subtree.zig").project(a, schema, module, path, options.features, options.native_json, diag);
+    if (options.features != null) {
+        diag.* = .{ .kind = .semantic, .message = "features requires a subtree path" };
+        return error.Export;
+    }
+    return .{ .schema = schema };
+}
+fn generateFull(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error!Val {
     var g: Gen = .{ .a = a, .root = module, .native_json = options.native_json, .reporter = .{ .arena = a, .diag = diag } };
     var visited: std.AutoHashMapUnmanaged(*Module, void) = .empty;
     try collectScopedTypedefs(&g, module, &visited);
@@ -1607,7 +1624,7 @@ pub fn schemaToYangJson(a: Allocator, module: *Module, diag: *errors.Diagnostic)
 }
 
 pub fn schemaToYangJsonWithOptions(a: Allocator, module: *Module, diag: *errors.Diagnostic, options: Options) Error![]const u8 {
-    const v = try generateWithOptions(a, module, diag, options);
+    const v = (try generateWithOptions(a, module, diag, options)).schema;
     var out: std.Io.Writer.Allocating = .init(a);
     jv.dumpIndented(&out.writer, v, 2) catch return error.OutOfMemory;
     out.writer.writeByte('\n') catch return error.OutOfMemory;
@@ -1772,9 +1789,9 @@ test "RFC 8791 export after application and reload applies foreign augment once 
     const a = arena.allocator();
     var diag: errors.Diagnostic = .{};
     const module = try structureFixture(a, &diag, "json-form-augment-structure-cross-164", true);
-    const form = try generate(a, module, &diag);
+    const form = (try generate(a, module, &diag)).schema;
     const unapplied = try structureFixture(a, &diag, "json-form-augment-structure-cross-164", false);
-    try std.testing.expect(jv.pyEql(form, try generate(a, unapplied, &diag)));
+    try std.testing.expect(jv.pyEql(form, (try generate(a, unapplied, &diag)).schema));
     var message: []const u8 = "";
     const loaded = try @import("parser.zig").parseJsonSchema(a, form, &message);
     const structure = loaded.import_prefixes.get("b").?.structures.get("msg").?;
@@ -1783,7 +1800,7 @@ test "RFC 8791 export after application and reload applies foreign augment once 
     var reporter: errors.Reporter = .{ .arena = a, .diag = &diag };
     try capabilities.applyExtensionInvocations(&reporter, loaded);
     try std.testing.expectEqual(@as(usize, 2), box.statements.items.len);
-    try std.testing.expect(jv.pyEql(form, try generate(a, loaded, &diag)));
+    try std.testing.expect(jv.pyEql(form, (try generate(a, loaded, &diag)).schema));
 }
 
 test "native numeric schemas retain their types on reload (#226)" {
@@ -1802,9 +1819,9 @@ test "native numeric schemas retain their types on reload (#226)" {
         \\ leaf ref { type leafref { path "/signed"; require-instance false; } }
         \\}
     , "m.yang", null, true);
-    const schema = try generateWithOptions(a, m, &diag, .{ .native_json = true });
+    const schema = (try generateWithOptions(a, m, &diag, .{ .native_json = true })).schema;
     var msg: []const u8 = "";
     const restored = try @import("parser.zig").parseJsonSchema(a, schema, &msg);
-    const again = try generateWithOptions(a, restored, &diag, .{ .native_json = true });
+    const again = (try generateWithOptions(a, restored, &diag, .{ .native_json = true })).schema;
     try std.testing.expect(jv.pyEql(schema, again));
 }

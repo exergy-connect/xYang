@@ -32,7 +32,7 @@ describe("python parity: test_instance_identifier", () => {
 
   it("generateJsonSchema → parseJsonSchema preserves instance-identifier and require-instance", () => {
     const module = parseYangString(MINIMAL_MODULE_YANG);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const module2 = parseJsonSchema(schema);
     const dm = module2.findStatement("data-model");
     expect(dm).toBeDefined();
@@ -50,7 +50,7 @@ describe("python parity: test_instance_identifier", () => {
 
   it("validates instance data from a module reparsed from JSON Schema like the original YANG", () => {
     const module = parseYangString(MINIMAL_MODULE_YANG);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const reparsed = parseJsonSchema(schema);
     const validator = new YangValidator(reparsed);
     const result = validator.validate({

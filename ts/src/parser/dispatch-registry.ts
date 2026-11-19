@@ -127,7 +127,7 @@ const PARENTS: Array<[string, DispatchParent]> = [
     )
   ],
   ["enum", parent("9.6.4", new Set([kw.DESCRIPTION, kw.REFERENCE, kw.IF_FEATURE, kw.VALUE, kw.STATUS]))],
-  ["bit", parent("9.7.4", new Set([kw.POSITION, kw.DESCRIPTION, kw.REFERENCE]))],
+  ["bit", parent("9.7.4", new Set([kw.POSITION, kw.DESCRIPTION, kw.REFERENCE, kw.IF_FEATURE]))],
   ["identity", parent("7.18.1", METADATA_SUBSTATEMENTS, new Set([kw.BASE, kw.IF_FEATURE]))],
   [
     "leaf",

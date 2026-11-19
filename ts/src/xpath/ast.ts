@@ -24,6 +24,8 @@ export type XPathPathNode = {
   kind: "path";
   segments: XPathPathSegment[];
   isAbsolute: boolean;
+  /** Original path text, including predicates, for reversible export. */
+  source?: string;
 };
 
 export type XPathBinaryNode = {

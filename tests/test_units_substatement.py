@@ -76,7 +76,7 @@ module example-units-rt {
 }
 """
     mod = parse_yang_string(yang)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     mod2 = parse_json_schema(schema)
     c = mod2.find_statement("c")
     assert c is not None

@@ -27,7 +27,7 @@ module example-rpc {
 describe("python parity: json/test_rpc_json", () => {
   it("emits x-yang.rpcs and round-trips rpc input/output", () => {
     const mod = parseYangString(RPC_YANG);
-    const schema = generateJsonSchema(mod);
+    const schema = generateJsonSchema(mod).schema;
     const rootXy = (schema["x-yang"] ?? {}) as Record<string, unknown>;
     const rpcs = rootXy[XYANG_KEYS.rpcs] as Record<string, unknown>;
     expect(rpcs.reboot).toBeDefined();

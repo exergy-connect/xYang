@@ -23,7 +23,7 @@ module v {
 }
 `);
 
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const defs = schema.$defs as Record<string, unknown>;
     expect(defs).toBeDefined();
     expect((defs["version-string"] as Record<string, unknown>)["x-yang"]).toEqual({
@@ -61,7 +61,7 @@ module lr {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const peer = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>)["peer"] as Record<string, unknown>;
     const xYang = peer["x-yang"] as Record<string, unknown>;
@@ -98,7 +98,7 @@ module c {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const dm = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     expect(Array.isArray(dm.oneOf)).toBe(true);
     expect((dm.oneOf as unknown[]).length).toBe(2);
@@ -122,7 +122,7 @@ module t {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const x = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>)["x"] as Record<string, unknown>;
     expect(x.type).toBe("string");
@@ -157,7 +157,7 @@ module u {
     const dataModel = module.findStatement("data-model");
     expect(dataModel?.statements.some((s) => s.keyword === "uses")).toBe(true);
 
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const dmSchema = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     const dmProps = dmSchema.properties as Record<string, unknown>;
     expect(dmProps.x).toBeDefined();

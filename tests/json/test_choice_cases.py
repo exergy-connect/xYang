@@ -33,7 +33,7 @@ def module_from_yang():
 @pytest.fixture(scope="module")
 def generated_schema(module_from_yang):
     """Generate JSON schema from the YANG module."""
-    return generate_json_schema(module_from_yang)
+    return generate_json_schema(module_from_yang).schema
 
 
 def _get_choice_schemas(schema: dict) -> tuple[dict, dict]:

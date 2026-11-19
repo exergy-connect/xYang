@@ -203,11 +203,19 @@ class TypeStatementParser:
         # One argument: ``100GE`` lexes as INTEGER + IDENTIFIER (RFC 7950 §9.6.4).
         enum_name = self._parsers.parse_string_argument(tokens)
         type_stmt.enums.append(enum_name)
+        # The body is not the type: ``if-feature`` belongs to this enum, not the parent node.
+        holder = SimpleNamespace(if_features=[])
         if tokens.consume_if_type(YangTokenType.LBRACE):
             self._parsers.parse_body(
-                tokens, context, "enum", error_context=f"enum '{enum_name}'"
+                tokens, context.push_parent(holder), "enum", error_context=f"enum '{enum_name}'"
             )
             tokens.consume_type(YangTokenType.RBRACE)
+        if holder.if_features:
+            guards = getattr(type_stmt, "enum_if_features", None)
+            if guards is None:
+                guards = {}
+                type_stmt.enum_if_features = guards
+            guards[enum_name] = list(holder.if_features)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 
     def parse_type_path(self, tokens: TokenStream, context: ParserContext, type_stmt: YangTypeStmt) -> None:
@@ -217,6 +225,7 @@ class TypeStatementParser:
         tokens.consume(kw.PATH)
         path_str = self._parsers.parse_string_argument(tokens)
         type_stmt.path = cast(PathNode, XPathParser(path_str).parse_path())
+        type_stmt.path.source = path_str
         bind_xpath_prefixes(type_stmt.path, context.module.resolve_prefix_to_module_name, path_str)
         tokens.consume_if_type(YangTokenType.SEMICOLON)
 

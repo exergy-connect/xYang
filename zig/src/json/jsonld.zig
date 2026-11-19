@@ -223,7 +223,7 @@ const Builder = struct {
 };
 pub const Documents = struct { context: Val, vocab: Val };
 pub fn generate(a: Allocator, module: *Module, diag: *errors.Diagnostic) gen.Error!Documents {
-    const schema = (try gen.generate(a, module, diag)).object;
+    const schema = (try gen.generate(a, module, diag)).schema.object;
     const xy = metadata(schema).?;
     const name = field(xy, "module");
     const ns = field(xy, "namespace");

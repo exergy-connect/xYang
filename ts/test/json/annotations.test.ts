@@ -7,7 +7,7 @@ const module = parseYangString(`module m { namespace "urn:m"; prefix m;
 }`);
 it.each([[true,true],[false,true],[true,false],[false,false]])("annotation schema policy (#225): %s %s", (allowJsonld, allowJsonSchema) => {
   const options = { allowJsonld, allowJsonSchema };
-  const schema = generateJsonSchema(module, options);
+  const schema = generateJsonSchema(module, options).schema;
   const props = schema.properties as Record<string, Record<string, unknown>>;
   const items = ((props.top.properties as Record<string, Record<string, unknown>>).items.items) as Record<string, unknown>;
   const patterns = [...(allowJsonld ? ["^@[A-Za-z]+$"] : []), ...(allowJsonSchema ? ["^\\$[A-Za-z]+$"] : [])];
@@ -15,7 +15,7 @@ it.each([[true,true],[false,true],[true,false],[false,false]])("annotation schem
     expect(Object.keys((obj.patternProperties as object) ?? {})).toEqual(patterns);
     expect(obj.additionalProperties).toBe(false);
   }
-  expect(generateJsonSchema(parseJsonSchema(schema), options)).toEqual(schema);
+  expect(generateJsonSchema(parseJsonSchema(schema), options).schema).toEqual(schema);
 });
 it("keeps annotation policy per call without mutating data (#225)", () => {
   const data = { name: "ok", "@context": { opaque: { missing: "not walked" } } };

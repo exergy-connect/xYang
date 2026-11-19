@@ -7,11 +7,11 @@ const example = resolve(__dirname,"../../../examples/jsonld");
 const module = parseYangFile(resolve(example,"catalog.yang"));
 it.each(["context","vocab"])("JSON-LD example and native round trip (#229): %s", (kind) => {
   const build = kind === "context" ? generateJsonldContext : generateJsonldVocab;
-  const original = generateJsonSchema(module);
+  const original = generateJsonSchema(module).schema;
   const expected = JSON.parse(readFileSync(resolve(example,`catalog.${kind}.jsonld`),"utf8"));
   expect(build(module)).toEqual(expected);
   expect(build(parseJsonSchema(original))).toEqual(expected);
-  expect(generateJsonSchema(module)).toEqual(original);
+  expect(generateJsonSchema(module).schema).toEqual(original);
 });
 it.each([["urn:m","urn:m#"],["urn:m:","urn:m:"],["https://example.invalid/m#","https://example.invalid/m#"],["https://example.invalid/m/","https://example.invalid/m/"]])("joins namespace IRIs (#229): %s", (namespace,base) => {
   const m = parseYangString(`module m { namespace "${namespace}"; prefix m; leaf name { type string; } }`);

@@ -54,7 +54,7 @@ function loadCaseModule(dir: string, moduleFile: string) {
 /** The case module's native JSON form, as a Worker without a filesystem would receive it. */
 function jsonForm(dir: string, moduleFile: string): Record<string, unknown> {
   const parsed = new YangParser({ includePath: [dir], expandUses: false }).parseFile(resolve(dir, moduleFile));
-  return JSON.parse(JSON.stringify(generateJsonSchema(parsed)));
+  return JSON.parse(JSON.stringify(generateJsonSchema(parsed).schema));
 }
 
 function run(dir: string, c: Case, inst: Instance | undefined, form: "yang" | "json" = "yang"): void {

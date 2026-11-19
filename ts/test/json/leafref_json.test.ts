@@ -90,7 +90,7 @@ module lr-int {
   }
 }
 `);
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const peer = (((schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>)
       .properties as Record<string, unknown>).peer as Record<string, unknown>;
 

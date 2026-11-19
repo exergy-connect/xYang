@@ -1,0 +1,16 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  feature f;
+
+  container top {
+    leaf flags {
+      type bits {
+        bit read;
+        bit write { if-feature f; }
+      }
+    }
+  }
+}

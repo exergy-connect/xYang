@@ -99,7 +99,7 @@ module refine_required_default {
 
 def test_refine_default_json_schema_has_default_and_round_trips():
     mod = parse_yang_string(_REFINE_DEFAULT_FALSE)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     flag_schema = schema["properties"]["c"]["properties"]["flag"]
     assert flag_schema.get("default") is False
 
@@ -347,7 +347,7 @@ module refine_ll_one {
 
 def test_refine_leaf_list_json_schema_default_array_round_trips():
     mod = parse_yang_string(_REFINE_LEAF_LIST_TWO_DEFAULTS)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     tags = schema["properties"]["c"]["properties"]["tags"]
     assert tags.get("default") == ["alpha", "beta"]
 

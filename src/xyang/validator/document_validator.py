@@ -129,6 +129,7 @@ class DocumentValidator:
         self._errors: list[ValidationError] = []
         self._case_stack: list[YangCaseStmt] = []
         self._case_level_data_stack: list[dict[str, Any]] = []
+        self._bind_type_features()
 
     def validate(
         self,
@@ -170,6 +171,7 @@ class DocumentValidator:
         if isinstance(host, YangModule) and self._if_feature_module is None:
             self._if_feature_module = host
             self._enabled_features = build_enabled_features_map(host, self._enabled_features_by_module)
+        self._bind_type_features()
         if from_iterator and host is not None and isinstance(data, dict):
             from ..encoding.instance import encoding_errors, iter_instance, project_instance
 
@@ -339,6 +341,10 @@ class DocumentValidator:
             self._anydata_validation = {"modules": modules, "mode": mode}
             return
         raise ValueError(f"unknown validator extension: {extension!r}")
+
+    def _bind_type_features(self) -> None:
+        module = self._if_feature_module if isinstance(self._if_feature_module, YangModule) else None
+        self._type_checker.bind_features(module, self._enabled_features)
 
     def _if_features_active(self, stmt: YangStatement) -> bool:
         if self._if_feature_module is None:

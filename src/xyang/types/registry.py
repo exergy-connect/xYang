@@ -220,9 +220,23 @@ def _to_string(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
 
 
 def _to_enumeration(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    if getattr(type_stmt, "enums", None):
-        return {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: list(getattr(type_stmt, "enums", None))}
-    return {JsonSchemaKey.TYPE: "string"}
+    names = [str(item) for item in (getattr(type_stmt, "enums", None) or [])]
+    if not names:
+        return {JsonSchemaKey.TYPE: "string"}
+    out: dict[str, Any] = {JsonSchemaKey.TYPE: "string", JsonSchemaKey.ENUM: names}
+    guards = getattr(type_stmt, "enum_if_features", None) or {}
+    recorded: list[dict[str, Any]] = []
+    guarded = False
+    for name in names:
+        entry: dict[str, Any] = {JsonSchemaKey.NAME: name}
+        feats = [item for item in (guards.get(name) or []) if isinstance(item, str) and item]
+        if feats:
+            entry[XYangKey.IF_FEATURES] = feats
+            guarded = True
+        recorded.append(entry)
+    if guarded:
+        out[JsonSchemaKey.X_YANG] = {XYangKey.ENUMS: recorded}
+    return out
 
 
 def _to_bits(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
@@ -253,10 +267,18 @@ def _to_bits(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
     _with_description(out, desc)
     out[JsonSchemaKey.PATTERN] = _bits_space_separated_pattern(bit_names)
     out[JsonSchemaKey.EXAMPLES] = examples
-    out[JsonSchemaKey.X_YANG] = {
+    xy_bits: dict[str, Any] = {
         XYangKey.TYPE: XYangTypeValue.BITS,
         XYangKey.BITS: bits_obj,
     }
+    gated = {
+        bit.name: list(bit.if_features)
+        for bit in ordered
+        if getattr(bit, "if_features", None)
+    }
+    if gated:
+        xy_bits[XYangKey.BIT_IF_FEATURES] = gated
+    out[JsonSchemaKey.X_YANG] = xy_bits
     return out
 
 
@@ -491,14 +513,38 @@ def _from_empty(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | N
     return None
 
 
+def _enum_if_features_from_xyang(xyang: Mapping[str, Any]) -> dict[str, list[str]]:
+    """``x-yang.enums`` entries that carry ``if-features``, keyed by enum name."""
+    raw = xyang.get(XYangKey.ENUMS)
+    guards: dict[str, list[str]] = {}
+    if not isinstance(raw, list):
+        return guards
+    for item in raw:
+        if not isinstance(item, dict):
+            continue
+        name = item.get(JsonSchemaKey.NAME)
+        feats = item.get(XYangKey.IF_FEATURES) or []
+        if not isinstance(name, str) or not name or not isinstance(feats, list):
+            continue
+        cleaned = [feat for feat in feats if isinstance(feat, str) and feat]
+        if cleaned:
+            guards[name] = cleaned
+    return guards
+
+
 def _from_enumeration(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | None:
     schema = fragment.schema
     if JsonSchemaKey.ENUM not in schema:
         return None
     enums = list(schema[JsonSchemaKey.ENUM]) if isinstance(schema[JsonSchemaKey.ENUM], list) else []
-    if len(enums) > 1:
+    guards = _enum_if_features_from_xyang(fragment.xyang)
+    # A single JSON Schema enum is a string pattern unless metadata marks a real enumeration.
+    if len(enums) > 1 or (guards and enums and all(isinstance(item, str) for item in enums)):
         type_stmt = make_type_stmt(name=ENUMERATION)
         type_stmt.enums = enums
+        if guards:
+            names = {str(item) for item in enums}
+            type_stmt.enum_if_features = {name: feats for name, feats in guards.items() if name in names}
         return type_stmt
     return None
 
@@ -533,6 +579,14 @@ def _from_bits(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | No
             elif isinstance(item, str) and item:
                 bits.append(YangBitStmt(name=item, position=index))
     if bits:
+        gated = fragment.xyang.get(XYangKey.BIT_IF_FEATURES)
+        if isinstance(gated, dict):
+            by_name = {bit.name: bit for bit in bits}
+            for name, feats in gated.items():
+                bit = by_name.get(name)
+                if bit is None or not isinstance(feats, list):
+                    continue
+                bit.if_features = [feat for feat in feats if isinstance(feat, str) and feat]
         return make_type_stmt(name=BITS, bits=bits)
     return None
 
@@ -547,6 +601,7 @@ def _from_leafref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt |
     path_node = None
     if path_val is not None and isinstance(path_val, str) and path_val.strip():
         path_node = XPathParser(path_val.strip()).parse_path()
+        path_node.source = path_val.strip()
         recorded = fragment.xyang.get(XYangKey.XPATH_PREFIXES)
         if recorded is not None:
             from ..json.parser import recorded_prefixes

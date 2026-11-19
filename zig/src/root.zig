@@ -64,5 +64,6 @@ test {
     _ = @import("validator/operation.zig");
     _ = @import("xpath/xpath.zig");
     _ = @import("json/generator.zig");
+    _ = @import("json/subtree.zig");
     _ = @import("json/parser.zig");
 }

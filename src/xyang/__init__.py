@@ -19,6 +19,8 @@ from .parser import parse_yang_file, parse_yang_string
 from .validator.yang_validator import YangValidator
 from .module import YangModule
 from .validator.infer_required_features import infer_required_features
+from .json.subtree import SchemaDiagnostic, SchemaExportResult
+
 
 __all__ = [
     "parse_yang_file",
@@ -32,6 +34,8 @@ __all__ = [
     "YangRefineTargetNotFoundError",
     "YangSyntaxError",
     "generate_json_schema",
+    "SchemaDiagnostic",
+    "SchemaExportResult",
     "generate_jsonld_context",
     "generate_jsonld_vocab",
     "parse_json_schema",

@@ -24,7 +24,7 @@ module m {
 }
 """
     )
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     leaf_schema = schema["properties"]["data-model"]["properties"]["x"]
     assert leaf_schema["x-yang"].get("if-features") == ["f"]
 
@@ -60,7 +60,7 @@ module m {
 }
 """
     )
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     dm = schema["properties"]["data-model"]
     assert dm["x-yang"]["choice"]["if-features"] == ["cf"]
     one_of = dm["oneOf"]
@@ -94,7 +94,7 @@ module m {
 }
 """
     )
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
     assert schema["properties"]["data-model"]["properties"]["z"]["x-yang"]["if-features"] == [
         "p",
         "q",

@@ -75,7 +75,7 @@ def _schema_accepts(schema: dict, value: object) -> bool:
 
 def test_schema_and_validator_agree_on_integer_instances() -> None:
     module = YangParser().parse_file(CASE / CROSS["module"])
-    schema = generate_json_schema(module)
+    schema = generate_json_schema(module).schema
     leaf = schema["properties"]["top"]["properties"]["u8"]
     assert leaf["type"] == "integer"
     validator = YangValidator(module)

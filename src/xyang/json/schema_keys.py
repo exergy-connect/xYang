@@ -62,6 +62,10 @@ class XYangKey:
     WHEN = "when"
     MUST = "must"
     BITS = "bits"
+    #: ``[{name, if-features?}]`` parallel to a JSON Schema ``enum``, so a guarded name round-trips.
+    ENUMS = "enums"
+    #: ``{bit name: [if-feature, ...]}`` for names in ``bits`` whose guard is not empty.
+    BIT_IF_FEATURES = "bit-if-features"
     KEY = "key"
     UNIQUE = "unique"
     PRESENCE = "presence"

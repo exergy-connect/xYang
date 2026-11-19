@@ -38,7 +38,7 @@ describe("native JSON form of extensions", () => {
   it("reloads the same invocations and reproduces the JSON", () => {
     const dir = resolve(CASES, "json-form-extensions-161");
     const yang = new YangParser({ expandUses: false, includePath: [dir] }).parseFile(resolve(dir, "m.yang"));
-    const form = generateJsonSchema(yang);
+    const form = generateJsonSchema(yang).schema;
     expect(form).toEqual(JSON.parse(readFileSync(resolve(dir, "expected.yang.json"), "utf8")));
     const loaded = parseJsonSchema(form);
     expect(byOwner(loaded.statements)).toEqual(byOwner(yang.statements));
@@ -55,16 +55,16 @@ describe("native JSON form of extensions", () => {
     expect(loaded.import_prefixes.e?.extensions).toMatchObject({
       tag: { argument_name: "value", description: "Imported tag.", reference: "ext" }
     });
-    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded)))).toEqual(form);
+    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded).schema))).toEqual(form);
   });
 
   it("round-trips RFC 8791 sx:structure (#164 removed the #162 refusal)", () => {
     const dir = resolve(CASES, "json-form-rfc8791-extension-161");
     const yang = new YangParser({ expandUses: false, includePath: [dir] }).parseFile(resolve(dir, "m.yang"));
-    const form = JSON.parse(JSON.stringify(generateJsonSchema(yang)));
+    const form = JSON.parse(JSON.stringify(generateJsonSchema(yang).schema));
     expect(form).toEqual(JSON.parse(readFileSync(resolve(dir, "expected.yang.json"), "utf8")));
     const loaded = parseJsonSchema(form);
-    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded)))).toEqual(form);
+    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded).schema))).toEqual(form);
     const index = loaded.extension_runtime?.["ietf-yang-structure-ext:structure-index"] as Record<string, unknown>;
     expect(Object.keys(index ?? {})).toEqual(["msg"]);
   });
@@ -72,9 +72,9 @@ describe("native JSON form of extensions", () => {
   it("applies a cross-module augment-structure once on reload (#164)", () => {
     const dir = resolve(CASES, "json-form-augment-structure-cross-164");
     const yang = new YangParser({ expandUses: false, includePath: [dir] }).parseFile(resolve(dir, "m.yang"));
-    const form = JSON.parse(JSON.stringify(generateJsonSchema(yang)));
+    const form = JSON.parse(JSON.stringify(generateJsonSchema(yang).schema));
     const loaded = parseJsonSchema(form);
-    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded)))).toEqual(form);
+    expect(JSON.parse(JSON.stringify(generateJsonSchema(loaded).schema))).toEqual(form);
     const extras = () => {
       const stub = loaded.import_prefixes.b;
       const index = stub?.extension_runtime?.["ietf-yang-structure-ext:structure-index"] as
@@ -92,7 +92,7 @@ describe("native JSON form of extensions", () => {
     const dir = resolve(CASES, "json-form-augment-structure-164");
     const yang = new YangParser({ includePath: [dir] }).parseFile(resolve(dir, "m.yang"));
     const loaded = parseJsonSchema(
-      generateJsonSchema(new YangParser({ expandUses: false, includePath: [dir] }).parseFile(resolve(dir, "m.yang")))
+      generateJsonSchema(new YangParser({ expandUses: false, includePath: [dir] }).parseFile(resolve(dir, "m.yang"))).schema
     );
     const data = { "m:msg": { enabled: "on", "extra-leaf": "z", box: { note: "hi" } } };
     for (const module of [yang, loaded]) {
@@ -111,7 +111,7 @@ describe("native JSON form of extensions", () => {
   m:mark "x";
 }
 `);
-    expect(() => generateJsonSchema(yang)).toThrow(YangExportError);
-    expect(() => generateJsonSchema(yang)).toThrow(/marked:mark/);
+    expect(() => generateJsonSchema(yang).schema).toThrow(YangExportError);
+    expect(() => generateJsonSchema(yang).schema).toThrow(/marked:mark/);
   });
 });

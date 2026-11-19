@@ -16,12 +16,12 @@ def module():
 
 @pytest.mark.parametrize('schema_id', [None, 'https://example.invalid/m.schema.json', ''])
 def test_schema_id(module, schema_id):
-    schema = generate_json_schema(module, schema_id=schema_id)
+    schema = generate_json_schema(module, schema_id=schema_id).schema
     assert schema['$id'] == ('urn:m' if schema_id is None else schema_id)
     assert schema['x-yang']['namespace'] == 'urn:m'
     assert parse_json_schema(schema).namespace == 'urn:m'
     assert json.loads(schema_to_yang_json(module, schema_id=schema_id)) == schema
-    assert generate_json_schema(module)['$id'] == 'urn:m'
+    assert generate_json_schema(module).schema['$id'] == 'urn:m'
 
 
 def test_cli_schema_id(tmp_path, monkeypatch):

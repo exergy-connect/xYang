@@ -40,7 +40,7 @@ module adax {
 
   it("round-trips anydata/anyxml through JSON schema metadata", () => {
     const module = createModule();
-    const schema = generateJsonSchema(module);
+    const schema = generateJsonSchema(module).schema;
     const dataModelSchema = (schema.properties as Record<string, unknown>)["data-model"] as Record<string, unknown>;
     const props = (dataModelSchema.properties as Record<string, unknown>) ?? {};
     const payloadSchema = props.payload as Record<string, unknown>;

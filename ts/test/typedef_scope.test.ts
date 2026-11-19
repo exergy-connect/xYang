@@ -31,7 +31,7 @@ describe("native JSON global typedef scope", () => {
       expect(() => parseJsonSchema(schema)).toThrow("Unknown typedef");
       return;
     }
-    const exported = generateJsonSchema(parseJsonSchema(schema));
+    const exported = generateJsonSchema(parseJsonSchema(schema)).schema;
     expect((exported.$defs as Record<string, Record<string, Record<string, unknown>>>).code["x-yang"]?.scope).toBe(scope);
     expect(() => parseJsonSchema(exported)).not.toThrow();
   });
@@ -42,9 +42,9 @@ describe("native JSON global typedef scope", () => {
 
 it("re-export retains distinct keys for identical private names from two modules", () => {
   const source = JSON.parse(readFileSync(new URL("../../tests/cases/types/typedef-scope-imported-collisions/expected.yang.json", import.meta.url), "utf8"));
-  const first = generateJsonSchema(parseJsonSchema(source));
+  const first = generateJsonSchema(parseJsonSchema(source)).schema;
   expect(first).toEqual(source);
-  const second = generateJsonSchema(parseJsonSchema(first));
+  const second = generateJsonSchema(parseJsonSchema(first)).schema;
   expect(second).toEqual(first);
   const properties = second.properties as Record<string, { properties: { value: { $ref: string } } }>;
   expect(properties.a.properties.value.$ref).not.toBe(properties.b.properties.value.$ref);

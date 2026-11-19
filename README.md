@@ -23,7 +23,7 @@ MIT licensed.
 
 ## Native JSON format: intent
 
-The xYang native JSON format is an optimized, reversible transformation of standard YANG files. Like JSON to YAML, it carries the same information. `xyang convert` and `schema_to_yang_json` write the `.yang.json` file; `parse_json_schema` loads it. TypeScript uses `generateJsonSchema` and `parseJsonSchema`.
+The xYang native JSON format is an optimized, reversible transformation of standard YANG files. Like JSON to YAML, it carries the same information. `xyang convert` and `schema_to_yang_json` write the `.yang.json` file; `parse_json_schema` loads it. Python uses `generate_json_schema(module).schema`; TypeScript uses `generateJsonSchema(module).schema` and `parseJsonSchema`.
 
 - **Reversible.** Converting back must produce equivalent YANG.
 - **Unambiguous.** Each construct has one canonical form.
@@ -514,3 +514,60 @@ Pin `version` to a release tag that published the `xyang-ts.mjs` asset. v1.0.0 i
 MIT License
 
 JSON-LD 1.1 contexts and vocabularies are available through `generate_jsonld_context` / `generate_jsonld_vocab` (TypeScript: `generateJsonldContext` / `generateJsonldVocab`), or `convert --jsonld` / `--jsonld-vocab`. See the [extension module and reproducible example](examples/jsonld/README.md). Use `convert --help` for output paths and options.
+
+## Subtree schema export
+
+Python, TypeScript, and Zig schema generators return a schema and diagnostics.
+Pass an absolute YANG schema-node path to export the value of that node as a
+standalone JSON Schema:
+
+```typescript
+const { schema, diagnostics } = generateJsonSchema(module, {
+  path: "/lab:topology",
+  nativeJson: true,
+  features: { "lab-net": ["bgp", "ospf"] },
+});
+```
+
+```python
+result = generate_json_schema(
+    module, path="/lab:topology", native_json=True,
+    features={"lab-net": {"bgp", "ospf"}},
+)
+schema, diagnostics = result.schema, result.diagnostics
+```
+
+```zig
+const result = try xyang.json_generator.generateWithOptions(allocator, module, &diagnostic, .{
+    .path = "/lab:topology",
+    .native_json = true,
+    .features = &enabled_features, // if_feature_eval.EnabledFeatures; omit for all features
+});
+const schema = result.schema;
+const diagnostics = result.diagnostics;
+```
+
+Whole-module exports use the same result shape with an empty diagnostics list.
+Use `.schema` when passing the result to a JSON Schema consumer.
+
+`features` maps module names to enabled feature names. A listed module enables
+only the named features; omitted modules default to all declared features enabled.
+Omit `features` to enable all declared features (subject to feature dependencies).
+This option applies to subtree exports; an empty list disables all features in
+that module. A selected node disabled by the filter raises an error. Feature
+conditions on individual enum values are not yet preserved; see [#243](https://github.com/exergy-connect/xYang/issues/243).
+
+The selector uses YANG prefixes and resolves against the effective module. A
+list selector exports the whole list. Out-of-scope `must`, `when`, and leafref
+constraints are omitted and reported in `diagnostics`; leafrefs retain their
+resolved value type. Dynamic or wildcard dependencies that cannot be proved
+local are also omitted. Foreign-module leafrefs and unions containing leafrefs
+currently fail rather than silently lose their
+meaning. Unresolvable leafref types also fail the export. To avoid silently
+misinterpreting feature ownership, subtree export rejects unqualified
+`if-feature` names that are also declared by an imported module. Subtree export
+also rejects XSD regex shorthand and Unicode-category escapes that cannot yet be
+encoded consistently across all three runtimes. The schema
+is a projection, not a reversible module: `parseJsonSchema` rejects it. JSON
+Schema alone does not enforce all YANG constraints; use `YangValidator` when
+full YANG validation is needed. See [the lab.net WebMCP example](docs/lab-net-webmcp/README.md).

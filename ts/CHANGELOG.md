@@ -11,7 +11,17 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Added
 
+- Export a selected data subtree as JSON Schema with diagnostics for constraints that cannot be retained, optional per-module feature selection, and a lab.net WebMCP topology submission example.
+
 - Package the shared `xyang-transform` extension module and execute its model-defined normalization and dotted-key expansion rules.
+
+### Changed
+
+- **Breaking:** `generateJsonSchema` now returns `{ schema, diagnostics }`; use `.schema` to obtain the previous result.
+
+### Fixed
+
+- Preserve `if-feature` on `enum` and `bit`, reject a value whose feature is disabled, and omit a disabled enumeration value from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
 
 ## [1.0.4] — 2026-11-16
 

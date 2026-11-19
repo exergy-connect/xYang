@@ -94,7 +94,7 @@ describe("python parity: json/test_choice_cases", () => {
 
   beforeAll(() => {
     module = parseYangFile(YANG_FILE);
-    schema = generateJsonSchema(module);
+    schema = generateJsonSchema(module).schema;
   });
 
   it("emits hoisted choice schema (no x-yang.type=choice nodes, no choice-name properties)", () => {

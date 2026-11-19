@@ -189,7 +189,7 @@ function main(argv: string[]): number {
     const module = new YangParser({ expandUses: false, includePath: includePaths }).parseFile(file);
     let schema: Record<string, unknown>;
     try {
-      schema = options.jsonld ? generateJsonldContext(module) : options.jsonldVocab ? generateJsonldVocab(module) : generateJsonSchema(module, options);
+      schema = options.jsonld ? generateJsonldContext(module) : options.jsonldVocab ? generateJsonldVocab(module) : generateJsonSchema(module, options).schema;
     } catch (error) {
       if (!(error instanceof YangExportError)) {
         throw error;

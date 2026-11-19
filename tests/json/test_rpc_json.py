@@ -32,7 +32,7 @@ module example-rpc {
 
 def test_rpc_emitted_under_x_yang_rpcs_and_round_trips():
     mod = parse_yang_string(_RPC_YANG)
-    schema = generate_json_schema(mod)
+    schema = generate_json_schema(mod).schema
 
     rpcs = schema["x-yang"]["rpcs"]
     assert "reboot" in rpcs

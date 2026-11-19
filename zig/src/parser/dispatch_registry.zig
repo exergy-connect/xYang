@@ -117,7 +117,7 @@ pub const PARENTS = [_]DispatchParent{
     }),
     parent(.pattern, "pattern", "9.4.5", &.{ kw.DESCRIPTION, kw.REFERENCE, kw.ERROR_MESSAGE, kw.ERROR_APP_TAG, kw.MODIFIER }),
     parent(.@"enum", "enum", "9.6.4", &.{ kw.DESCRIPTION, kw.REFERENCE, kw.IF_FEATURE, kw.VALUE, kw.STATUS }),
-    parent(.bit, "bit", "9.7.4", &.{ kw.POSITION, kw.DESCRIPTION, kw.REFERENCE }),
+    parent(.bit, "bit", "9.7.4", &.{ kw.POSITION, kw.DESCRIPTION, kw.REFERENCE, kw.IF_FEATURE }),
     parent(.identity, "identity", "7.18.1", &(METADATA_SUBSTATEMENTS ++ [_][]const u8{ kw.BASE, kw.IF_FEATURE })),
     parent(.leaf, "leaf", "7.6.2", &(DATA_NODE_SUBSTATEMENTS ++ [_][]const u8{ kw.TYPE, kw.MANDATORY, kw.DEFAULT, kw.MUST, kw.WHEN, kw.IF_FEATURE })),
     parent(.leaf_list, "leaf-list", "7.7.3", &(DATA_NODE_SUBSTATEMENTS ++ [_][]const u8{
