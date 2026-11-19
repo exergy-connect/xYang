@@ -13,6 +13,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 - Package the shared `xyang-transform` extension module and execute its model-defined normalization and dotted-key expansion rules.
 
+### Fixed
+
+- Preserve `if-feature` on `enum` and `bit`, and reject a value whose feature is disabled ([#243](https://github.com/exergy-connect/xYang/issues/243)).
+
 ## [1.0.4] — 2026-11-16
 
 ### Added

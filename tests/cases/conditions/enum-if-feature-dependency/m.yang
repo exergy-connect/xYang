@@ -1,0 +1,19 @@
+module m {
+  yang-version 1.1;
+  namespace "urn:m";
+  prefix m;
+
+  feature g;
+  feature f { if-feature g; }
+
+  typedef mode {
+    type enumeration {
+      enum basic;
+      enum advanced { if-feature f; }
+    }
+  }
+
+  container top {
+    leaf mode { type mode; }
+  }
+}

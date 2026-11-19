@@ -1,0 +1,10 @@
+{
+  "description": "An enumeration value with if-feature is allowed when the feature is enabled (RFC 7950 9.6.4).",
+  "module": "m.yang",
+  "instances": [
+    { "name": "unguarded value", "data": { "top": { "mode": "basic" } }, "valid": true },
+    { "name": "guarded value", "data": { "top": { "mode": "advanced" } }, "valid": true },
+    { "name": "unknown value", "data": { "top": { "mode": "other" } }, "valid": false,
+      "errors": [{ "path": "/top/mode", "code": "enum" }] }
+  ]
+}

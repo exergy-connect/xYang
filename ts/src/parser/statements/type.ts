@@ -149,9 +149,15 @@ export class TypeStatementParser {
     // One argument: ``100GE`` lexes as INTEGER + IDENTIFIER (RFC 7950 §9.6.4).
     const enumName = this.parsers.parse_string_argument(tokens);
     (type_stmt.enums ??= []).push(enumName);
+    // The body is not the type: ``if-feature`` belongs to this enum, not the parent node.
+    const holder = { if_features: [] as string[] };
     if (tokens.consume_if_type(YangTokenType.LBRACE)) {
-      this.parsers.parseBody(tokens, context, "enum", `enum '${enumName}'`);
+      this.parsers.parseBody(tokens, context.push_parent(holder), "enum", `enum '${enumName}'`);
       tokens.consume_type(YangTokenType.RBRACE);
+    }
+    if (holder.if_features.length > 0) {
+      const guards = (type_stmt.enum_if_features ??= {});
+      guards[enumName] = [...holder.if_features];
     }
     tokens.consume_if_type(YangTokenType.SEMICOLON);
   }

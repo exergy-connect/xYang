@@ -1,0 +1,64 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": "",
+    "features": {
+      "f": {}
+    }
+  },
+  "type": "object",
+  "properties": {
+    "top": {
+      "type": "object",
+      "x-yang": {
+        "type": "container"
+      },
+      "properties": {
+        "mode": {
+          "$ref": "#/$defs/mode",
+          "x-yang": {
+            "type": "leaf"
+          }
+        }
+      },
+      "additionalProperties": false,
+      "patternProperties": {
+        "^@[A-Za-z]+$": true,
+        "^\\$[A-Za-z]+$": true
+      }
+    }
+  },
+  "additionalProperties": false,
+  "$defs": {
+    "mode": {
+      "type": "string",
+      "enum": [
+        "basic",
+        "advanced"
+      ],
+      "x-yang": {
+        "enums": [
+          {
+            "name": "basic"
+          },
+          {
+            "name": "advanced",
+            "if-features": [
+              "f"
+            ]
+          }
+        ]
+      }
+    }
+  },
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
+  }
+}

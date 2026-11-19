@@ -101,6 +101,8 @@ pub const YangValidator = struct {
             .annotations = .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema },
             .module_root = structure == null,
         };
+        checker.enabled = &dv.enabled;
+        checker.feature_module = dv.module;
         errdefer self.unsupported = checker.unsupported;
 
         var out: std.ArrayList(ValidationError) = .empty;
@@ -197,6 +199,8 @@ pub const YangValidator = struct {
             .keys = &keys,
             .annotations = .{ .allow_jsonld = options.allow_jsonld, .allow_json_schema = options.allow_json_schema },
         };
+        checker.enabled = &dv.enabled;
+        checker.feature_module = dv.module;
         errdefer self.unsupported = checker.unsupported;
         const errors = try dv.validateOperation(u, params, .{
             .target = target,

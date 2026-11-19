@@ -10,7 +10,7 @@ import base64
 import binascii
 import logging
 from types import SimpleNamespace
-from typing import Any, Optional
+from typing import Any, Mapping, Optional
 
 from ..ast import YangTypeStmt
 from ..errors import XPathSyntaxError
@@ -37,6 +37,7 @@ from ..identity_graph import (
 from ..identifier_ref import format_identifier_ref
 from ..xsd_regex import translate
 from ..module import YangModule, resolve_typedef
+from .if_feature_eval import stmt_if_features_satisfied
 from ..xpath import XPathParser
 from ..xpath.ast import ASTNode, PathNode
 from ..xpath.node import Context, Node
@@ -138,6 +139,15 @@ class TypeChecker:
     Checks a data value against a YangTypeStmt.
     Returns ``(code, message)`` pairs (empty = valid).
     """
+
+    def __init__(self) -> None:
+        self._feature_module: YangModule | None = None
+        self._enabled_features: Mapping[str, Any] | None = None
+
+    def bind_features(self, module: YangModule | None, enabled: Mapping[str, Any] | None) -> None:
+        """Module and enabled-feature map used to enforce ``if-feature`` on enum and bit values."""
+        self._feature_module = module
+        self._enabled_features = enabled
 
     def check(
         self,
@@ -308,6 +318,10 @@ class TypeChecker:
             evaluator,
             leafref_current,
         )
+        if not errors:
+            gated = self._member_feature_issues(value, type_stmt)
+            if gated:
+                return gated
         if errors or not _type_has_restrictions(type_stmt):
             return errors
         return self._check_restrictions_on_builtin(value, type_stmt, root_schema)
@@ -566,12 +580,66 @@ class TypeChecker:
     def _check_boolean(self, value: Any) -> list[TypeIssue]:
         return self._one(REGISTRY[BOOLEAN].check_value(value, make_type_stmt(name=BOOLEAN)))
 
+    def _feature_module_for(self, type_stmt: YangTypeStmt) -> YangModule | None:
+        scope = getattr(type_stmt, "scope", None)
+        if isinstance(scope, YangModule):
+            return scope
+        return self._feature_module
+
+    def _guard_is_false(self, feats: list[str], type_stmt: YangTypeStmt) -> bool:
+        if not feats or self._enabled_features is None:
+            return False
+        module = self._feature_module_for(type_stmt)
+        if module is None:
+            return False
+        return not stmt_if_features_satisfied(feats, module, self._enabled_features)
+
+    def _member_feature_issues(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
+        """Reject an enum or bit whose own ``if-feature`` is false (RFC 7950 §9.6.4, §9.7.4)."""
+        enum_issue = self._enum_feature_issue(value, type_stmt)
+        if enum_issue is not None:
+            return [enum_issue]
+        return self._bit_feature_issues(value, type_stmt)
+
+    def _enum_feature_issue(self, value: Any, type_stmt: YangTypeStmt) -> TypeIssue | None:
+        guards = getattr(type_stmt, "enum_if_features", None) or {}
+        feats = guards.get(str(value)) if isinstance(guards, dict) else None
+        if not feats or not self._guard_is_false(list(feats), type_stmt):
+            return None
+        return _issue(
+            "if-feature",
+            f"Value {value!r} is not available: its 'if-feature' condition is false",
+        )
+
+    def _bit_feature_issues(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
+        if not isinstance(value, str):
+            return []
+        bits = getattr(type_stmt, "bits", None) or []
+        by_name = {bit.name: list(getattr(bit, "if_features", None) or []) for bit in bits}
+        for token in (part for part in (piece.strip() for piece in value.split()) if part):
+            feats = by_name.get(token) or []
+            if feats and self._guard_is_false(feats, type_stmt):
+                return [
+                    _issue(
+                        "if-feature",
+                        f"Bit {token!r} is not available: its 'if-feature' condition is false",
+                    )
+                ]
+        return []
+
     def _check_enum(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
-        return self._one(REGISTRY[ENUMERATION].check_value(value, type_stmt))
+        issue = REGISTRY[ENUMERATION].check_value(value, type_stmt)
+        if issue is not None:
+            return [issue]
+        gated = self._enum_feature_issue(value, type_stmt)
+        return [] if gated is None else [gated]
 
     def _check_bits(self, value: Any, type_stmt: YangTypeStmt) -> list[TypeIssue]:
         """RFC 7950 bits: instance is a space-separated list of bit names (JSON: string)."""
-        return self._one(REGISTRY[BITS].check_value(value, type_stmt))
+        issue = REGISTRY[BITS].check_value(value, type_stmt)
+        if issue is not None:
+            return [issue]
+        return self._bit_feature_issues(value, type_stmt)
 
     def _check_empty(self, value: Any) -> list[TypeIssue]:
         # RFC 7951 empty is null. ``[null]`` is rewritten to null before this check.

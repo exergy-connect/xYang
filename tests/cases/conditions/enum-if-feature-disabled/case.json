@@ -1,0 +1,11 @@
+{
+  "description": "A disabled if-feature removes the enumeration value. The guard survives a native JSON round trip (RFC 7950 9.6.4).",
+  "module": "m.yang",
+  "features": { "m": [] },
+  "json_form": true,
+  "instances": [
+    { "name": "unguarded value", "data": { "top": { "mode": "basic" } }, "valid": true },
+    { "name": "guarded value", "data": { "top": { "mode": "advanced" } }, "valid": false,
+      "errors": [{ "path": "/top/mode", "code": "if-feature" }] }
+  ]
+}

@@ -109,7 +109,8 @@ type TypeShape = {
   require_instance?: boolean;
   identityref_bases?: Array<{ prefix?: string; name: string }>;
   enums?: string[];
-  bits?: Array<{ name: string; position: number }>;
+  enum_if_features?: Record<string, string[]>;
+  bits?: Array<{ name: string; position: number; if_features?: string[] }>;
   types?: TypeShape[];
 };
 
@@ -1415,9 +1416,17 @@ export class StatementParsers {
     if (type_stmt instanceof YangDecimalTypeStmt && type_stmt.fraction_digits !== undefined) shape.fraction_digits = type_stmt.fraction_digits;
     if (type_stmt instanceof YangEnumerationTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
       if (type_stmt.enums) shape.enums = [...type_stmt.enums];
+      const guards = type_stmt.enum_if_features;
+      if (guards && Object.keys(guards).length > 0) {
+        shape.enum_if_features = Object.fromEntries(Object.entries(guards).map(([name, feats]) => [name, [...feats]]));
+      }
     }
     if (type_stmt instanceof YangBitsTypeStmt || type_stmt instanceof YangDerivedTypeStmt) {
-      if (type_stmt.bits) shape.bits = type_stmt.bits.map((b) => ({ name: b.name, position: b.position ?? 0 }));
+      if (type_stmt.bits) shape.bits = type_stmt.bits.map((b) => ({
+        name: b.name,
+        position: b.position ?? 0,
+        ...(b.if_features.length > 0 ? { if_features: [...b.if_features] } : {})
+      }));
     }
     if (type_stmt instanceof YangUnionTypeStmt) shape.types = type_stmt.types.map((member) => this.fromTypeShape(member));
     if (type_stmt instanceof YangIdentityrefTypeStmt) shape.identityref_bases = type_stmt.identityref_bases.map((base) => ({ ...base }));
@@ -1446,10 +1455,25 @@ export class StatementParsers {
         const n = Number.parseInt(child.argument, 10);
         if (!Number.isNaN(n)) shape.fraction_digits = n;
       }
-      if (child.keyword === "enum" && child.argument) shape.enums = [...(shape.enums ?? []), child.argument];
+      if (child.keyword === "enum" && child.argument) {
+        shape.enums = [...(shape.enums ?? []), child.argument];
+        const feats = (child.statements ?? [])
+          .filter((stmt) => stmt.keyword === "if-feature" && typeof stmt.argument === "string" && stmt.argument.length > 0)
+          .map((stmt) => stmt.argument as string);
+        if (feats.length > 0) {
+          shape.enum_if_features = { ...(shape.enum_if_features ?? {}), [child.argument]: feats };
+        }
+      }
       if (child.keyword === "bit" && child.argument) {
         const bits = shape.bits ?? [];
-        bits.push({ name: child.argument, position: bits.length === 0 ? 0 : Math.max(...bits.map((b) => b.position)) + 1 });
+        const feats = (child.statements ?? [])
+          .filter((stmt) => stmt.keyword === "if-feature" && typeof stmt.argument === "string" && stmt.argument.length > 0)
+          .map((stmt) => stmt.argument as string);
+        bits.push({
+          name: child.argument,
+          position: bits.length === 0 ? 0 : Math.max(...bits.map((b) => b.position)) + 1,
+          ...(feats.length > 0 ? { if_features: feats } : {})
+        });
         shape.bits = bits;
       }
       if (name === "union" && child.keyword === "type") {

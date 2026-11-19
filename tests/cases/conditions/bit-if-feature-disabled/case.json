@@ -1,0 +1,13 @@
+{
+  "description": "A disabled if-feature removes the bit from the type (RFC 7950 9.7.4).",
+  "module": "m.yang",
+  "features": { "m": [] },
+  "instances": [
+    { "name": "empty", "data": { "top": { "flags": "" } }, "valid": true },
+    { "name": "unguarded bit", "data": { "top": { "flags": "read" } }, "valid": true },
+    { "name": "guarded bit", "data": { "top": { "flags": "write" } }, "valid": false,
+      "errors": [{ "path": "/top/flags", "code": "if-feature" }] },
+    { "name": "guarded bit with another", "data": { "top": { "flags": "read write" } }, "valid": false,
+      "errors": [{ "path": "/top/flags", "code": "if-feature" }] }
+  ]
+}

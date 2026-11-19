@@ -1,0 +1,10 @@
+{
+  "description": "An enumeration if-feature follows feature dependencies: requesting f while g is off leaves advanced unavailable (RFC 7950 7.20.1, 9.6.4).",
+  "module": "m.yang",
+  "features": { "m": ["f"] },
+  "instances": [
+    { "name": "unguarded value", "data": { "top": { "mode": "basic" } }, "valid": true },
+    { "name": "dependent feature off", "data": { "top": { "mode": "advanced" } }, "valid": false,
+      "errors": [{ "path": "/top/mode", "code": "if-feature" }] }
+  ]
+}

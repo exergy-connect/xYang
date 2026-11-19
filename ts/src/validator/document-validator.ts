@@ -148,7 +148,10 @@ export class DocumentValidator {
     const ifFeatureCtx = module;
     this.rootCtx = {
       module,
-      typeChecker: new TypeChecker(module, { typeValidationDebug: this.typeValidationDebug }),
+      typeChecker: new TypeChecker(module, {
+        typeValidationDebug: this.typeValidationDebug,
+        enabledByModule: buildEnabledFeaturesMap(ifFeatureCtx, this.enabledFeaturesOverride)
+      }),
       constraintChecks,
       leafTypeMode,
       typeValidationDebug: this.typeValidationDebug,
@@ -163,7 +166,8 @@ export class DocumentValidator {
     this.typeValidationDebug = on;
     this.rootCtx.typeValidationDebug = on;
     this.rootCtx.typeChecker = new TypeChecker(this.rootCtx.module, {
-      typeValidationDebug: this.typeValidationDebug
+      typeValidationDebug: this.typeValidationDebug,
+      enabledByModule: this.rootCtx.enabledByModule
     });
   }
 
@@ -1271,7 +1275,10 @@ export class DocumentValidator {
         allowJsonld: this.ctx.allowJsonld,
         allowJsonSchema: this.ctx.allowJsonSchema,
         module: mod,
-        typeChecker: new TypeChecker(mod, { typeValidationDebug: this.rootCtx.typeValidationDebug }),
+        typeChecker: new TypeChecker(mod, {
+          typeValidationDebug: this.rootCtx.typeValidationDebug,
+          enabledByModule: buildEnabledFeaturesMap(payloadIfCtx, this.enabledFeaturesOverride)
+        }),
         constraintChecks: mode === AnydataValidationMode.COMPLETE,
         leafTypeMode: mode === AnydataValidationMode.COMPLETE ? "full" : "none",
         typeValidationDebug: this.rootCtx.typeValidationDebug,

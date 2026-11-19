@@ -134,6 +134,8 @@ class YangBitStmt:
     position: Optional[int] = None
     description: str = ""
     reference: str = ""
+    # RFC 7950 §9.7.4: the bit is not part of the type when its ``if-feature`` is false.
+    if_features: list[str] = field(default_factory=list)
 
 
 @dataclass
@@ -227,6 +229,8 @@ class YangStringTypeStmt(YangBinaryTypeStmt):
 @dataclass(slots=True)
 class YangEnumerationTypeStmt(YangTypeStmt):
     enums: list[str] = field(default_factory=list)
+    # Enum name -> ``if-feature`` expressions (RFC 7950 §9.6.4). Empty means the name is unconditional.
+    enum_if_features: dict[str, list[str]] = field(default_factory=dict)
 
 
 @dataclass(slots=True)
@@ -263,6 +267,7 @@ class YangDerivedTypeStmt(YangTypeStmt, _RangeAttributes, _LengthAttributes):
     patterns: Optional[list[YangPatternSpec]] = None
     # Enumeration and bits may be narrowed on derived references.
     enums: Optional[list[str]] = None
+    enum_if_features: Optional[dict[str, list[str]]] = None
     bits: Optional[list[YangBitStmt]] = None
     require_instance: Optional[bool] = None
 
