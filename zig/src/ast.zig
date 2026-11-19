@@ -27,6 +27,8 @@ pub const BitStmt = struct {
     position: ?i64 = null,
     description: []const u8 = "",
     reference: []const u8 = "",
+    /// RFC 7950 §9.7.4. Empty means the bit is always available.
+    if_features: StringList = .empty,
 };
 
 pub const PatternSpec = struct {
@@ -51,7 +53,13 @@ pub const NumericType = struct { range: ?*TypeRestriction = null };
 pub const DecimalType = struct { range: ?*TypeRestriction = null, fraction_digits: ?i64 = null };
 pub const BinaryType = struct { length: ?*TypeRestriction = null };
 pub const StringType = struct { length: ?*TypeRestriction = null, patterns: std.ArrayList(PatternSpec) = .empty };
-pub const EnumerationType = struct { enums: StringList = .empty };
+/// Enum name → `if-feature` expressions (RFC 7950 §9.6.4). Names with no entry are unguarded.
+pub const EnumGuards = std.array_hash_map.String(StringList);
+
+pub const EnumerationType = struct {
+    enums: StringList = .empty,
+    enum_if_features: EnumGuards = .empty,
+};
 pub const BitsType = struct { bits: std.ArrayList(BitStmt) = .empty };
 pub const UnionType = struct { types: std.ArrayList(*TypeStmt) = .empty };
 pub const LeafrefType = struct {
@@ -67,6 +75,7 @@ pub const DerivedType = struct {
     length: ?*TypeRestriction = null,
     patterns: std.ArrayList(PatternSpec) = .empty,
     enums: StringList = .empty,
+    enum_if_features: EnumGuards = .empty,
     bits: std.ArrayList(BitStmt) = .empty,
     require_instance: bool = true,
 };
@@ -208,6 +217,24 @@ pub const TypeStmt = struct {
     pub fn ensureEnums(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*StringList {
         return switch (self.data) {
             inline .enumeration, .derived => |_, tag| &((try self.ensure(tag, a)).enums),
+            else => unreachable,
+        };
+    }
+
+    /// `if-feature` expressions for one enum name, or empty when it has none.
+    pub fn enumGuard(self: *const TypeStmt, name: []const u8) []const []const u8 {
+        const map = switch (self.data) {
+            .enumeration => |p| if (p) |v| &v.enum_if_features else return &.{},
+            .derived => |p| if (p) |v| &v.enum_if_features else return &.{},
+            else => return &.{},
+        };
+        const found = map.get(name) orelse return &.{};
+        return found.items;
+    }
+
+    pub fn enumGuardsMap(self: *TypeStmt, a: std.mem.Allocator) error{OutOfMemory}!*EnumGuards {
+        return switch (self.data) {
+            inline .enumeration, .derived => |_, tag| &((try self.ensure(tag, a)).enum_if_features),
             else => unreachable,
         };
     }

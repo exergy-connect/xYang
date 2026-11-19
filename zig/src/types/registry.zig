@@ -294,7 +294,26 @@ fn toString(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*O
 fn toEnumeration(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
     const out = try typeOnly(a, "string");
-    if (t.enums().len > 0) try out.put(a, K.ENUM, try gen.strList(a, t.enums()));
+    const names = t.enums();
+    if (names.len == 0) return out;
+    try out.put(a, K.ENUM, try gen.strList(a, names));
+    var guarded = false;
+    const recorded = try a.alloc(Val, names.len);
+    for (names, 0..) |name, i| {
+        const item = try obj(a);
+        try item.put(a, K.NAME, gen.str(name));
+        const feats = t.enumGuard(name);
+        if (feats.len > 0) {
+            try item.put(a, K.xy.IF_FEATURES, try gen.strList(a, feats));
+            guarded = true;
+        }
+        recorded[i] = gen.objVal(item);
+    }
+    if (guarded) {
+        const xy = try obj(a);
+        try xy.put(a, K.xy.ENUMS, .{ .array = recorded });
+        try out.put(a, K.X_YANG, gen.objVal(xy));
+    }
     return out;
 }
 
@@ -352,6 +371,13 @@ fn toBits(e: gen.Emit, _: *const Builtin, t: *const ast.TypeStmt) gen.Error!*Obj
     const xy = try obj(a);
     try xy.put(a, K.xy.TYPE, gen.str(K.types.BITS));
     try xy.put(a, K.xy.BITS, gen.objVal(bits_obj));
+    var guards: ?*Object = null;
+    for (ordered) |bit| {
+        if (bit.if_features.items.len == 0) continue;
+        if (guards == null) guards = try obj(a);
+        try guards.?.put(a, bit.name, try gen.strList(a, bit.if_features.items));
+    }
+    if (guards) |g| try xy.put(a, K.xy.BIT_IF_FEATURES, gen.objVal(g));
     try out.put(a, K.X_YANG, gen.objVal(xy));
     return out;
 }
@@ -705,12 +731,42 @@ fn enumStrings(p: *jparse.Parse, items: []const Val) jparse.Error!ast.StringList
     return out;
 }
 
+fn enumGuardsFromXyang(p: *jparse.Parse, xy: *const Object) jparse.Error!ast.EnumGuards {
+    var out: ast.EnumGuards = .empty;
+    const raw = xy.get(K.xy.ENUMS) orelse return out;
+    if (raw != .array) return out;
+    for (raw.array) |item| {
+        if (item != .object) continue;
+        const name = item.object.get(K.NAME) orelse continue;
+        if (name != .string or name.string.len == 0) continue;
+        const feats_val = item.object.get(K.xy.IF_FEATURES) orelse continue;
+        if (feats_val != .array) continue;
+        var feats: ast.StringList = .empty;
+        for (feats_val.array) |feat| if (feat == .string and feat.string.len > 0) try feats.append(p.a, feat.string);
+        if (feats.items.len > 0) try out.put(p.a, name.string, feats);
+    }
+    return out;
+}
+
 fn fromEnumeration(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast.TypeStmt {
     const raw = f.schema.get(K.ENUM) orelse return null;
     const items: []const Val = if (raw == .array) raw.array else &.{};
-    if (items.len <= 1) return null;
+    const guards = try enumGuardsFromXyang(p, f.xyang);
+    // A single JSON Schema enum is a string pattern unless metadata marks a real enumeration.
+    if (!(items.len > 1 or (guards.count() > 0 and items.len > 0))) return null;
+    if (items.len <= 1) for (items) |item| if (item != .string) return null;
     const t = try newType(p, ENUMERATION);
     (try t.ensureEnums(p.a)).* = try enumStrings(p, items);
+    if (guards.count() > 0) {
+        var kept: ast.EnumGuards = .empty;
+        for (guards.keys(), guards.values()) |name, feats| {
+            const known = for (t.enums()) |e| {
+                if (std.mem.eql(u8, e, name)) break true;
+            } else false;
+            if (known) try kept.put(p.a, name, feats);
+        }
+        if (kept.count() > 0) (try t.enumGuardsMap(p.a)).* = kept;
+    }
     return t;
 }
 
@@ -753,6 +809,17 @@ fn fromBits(p: *jparse.Parse, _: *const Builtin, f: Fragment) jparse.Error!?*ast
         else => {},
     }
     if (bits.items.len == 0) return null;
+    if (f.xyang.get(K.xy.BIT_IF_FEATURES)) |gated| if (gated == .object) {
+        for (gated.object.keys(), gated.object.values()) |name, feats_val| {
+            if (feats_val != .array) continue;
+            const bit = for (bits.items) |*b| {
+                if (std.mem.eql(u8, b.name, name)) break b;
+            } else continue;
+            var feats: ast.StringList = .empty;
+            for (feats_val.array) |feat| if (feat == .string and feat.string.len > 0) try feats.append(p.a, feat.string);
+            bit.if_features = feats;
+        }
+    };
     const t = try newType(p, BITS);
     (try t.ensureBits(p.a)).* = bits;
     return t;

@@ -183,6 +183,7 @@ pub fn parseIfFeature(p: *Parser, parent: Parent) Error!void {
     switch (parent) {
         .stmt => |s| if (s.hasIfFeatures()) try s.if_features.append(p.arena, expression),
         .holder => |h| try h.if_features.append(p.arena, expression),
+        .bit => |b| try b.if_features.append(p.arena, expression),
         else => {},
     }
     try p.parseOptionalBlock(parent, .if_feature, "if-feature substatement");

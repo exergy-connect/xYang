@@ -15,6 +15,7 @@ const registry = @import("../types/registry.zig");
 const identity_graph = @import("../identity_graph.zig");
 const xpath = @import("../xpath/xpath.zig");
 const pychars = @import("../xpath/pychars.zig");
+const if_feature_eval = @import("../if_feature_eval.zig");
 
 const Allocator = std.mem.Allocator;
 const Module = module_mod.Module;
@@ -67,6 +68,10 @@ pub const TypeChecker = struct {
     /// XPath context of the value being checked; null is a value outside the instance
     /// tree (`Node(None, module)`, as `encoding.instance._accepts` checks one).
     ctx: ?xpath.Context = null,
+    /// Null leaves enum and bit `if-feature` guards unenforced (an encoding walk).
+    enabled: ?*const if_feature_eval.EnabledFeatures = null,
+    /// Used when the type has no `scope`.
+    feature_module: ?*Module = null,
 
     fn fail(self: *TypeChecker, err: Error, comptime fmt: []const u8, args: anytype) Error {
         self.unsupported = try self.a.print(fmt, args);
@@ -133,14 +138,71 @@ pub const TypeChecker = struct {
             .integer => self.checkInteger(value, t),
             .decimal => self.checkDecimal(value, t),
             .binary => self.checkBinary(value, t),
-            .boolean, .enumeration, .bits, .empty => self.one(try spec.checkValue(self.a, value, t)),
+            .boolean, .empty => self.one(try spec.checkValue(self.a, value, t)),
+            .enumeration => self.enumerationIssues(spec, value, t),
+            .bits => self.bitsIssues(spec, value, t),
         };
+    }
+
+    fn enumerationIssues(self: *TypeChecker, spec: *const registry.Builtin, value: Val, t: *const TypeStmt) Error![]const Issue {
+        if (try spec.checkValue(self.a, value, t)) |i| return self.one(i);
+        if (try self.enumFeatureIssue(value, t)) |i| return self.one(i);
+        return &.{};
+    }
+
+    fn bitsIssues(self: *TypeChecker, spec: *const registry.Builtin, value: Val, t: *const TypeStmt) Error![]const Issue {
+        if (try spec.checkValue(self.a, value, t)) |i| return self.one(i);
+        return self.bitFeatureIssues(value, t);
+    }
+
+    /// Reject an enum or bit whose own `if-feature` is false (RFC 7950 §9.6.4, §9.7.4).
+    fn memberFeatureIssues(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
+        if (try self.enumFeatureIssue(value, t)) |i| return self.one(i);
+        return self.bitFeatureIssues(value, t);
+    }
+
+    fn enumFeatureIssue(self: *TypeChecker, value: Val, t: *const TypeStmt) Error!?Issue {
+        const text = try self.a.print("{f}", .{jv.pyStr(value)});
+        const feats = t.enumGuard(text);
+        if (feats.len == 0 or !try self.guardIsFalse(feats, t)) return null;
+        return .{
+            .code = "if-feature",
+            .message = try self.a.print("Value {f} is not available: its 'if-feature' condition is false", .{jv.pyRepr(value)}),
+        };
+    }
+
+    fn bitFeatureIssues(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
+        const text = switch (value) {
+            .string => |s| s,
+            else => return &.{},
+        };
+        var it = registry.pyWhitespaceSplit(text);
+        while (it.next()) |token| {
+            const feats = for (t.bits()) |bit| {
+                if (std.mem.eql(u8, bit.name, token)) break bit.if_features.items;
+            } else &.{};
+            if (feats.len > 0 and try self.guardIsFalse(feats, t)) {
+                return self.issue("if-feature", "Bit {f} is not available: its 'if-feature' condition is false", .{repr(token)});
+            }
+        }
+        return &.{};
+    }
+
+    fn guardIsFalse(self: *TypeChecker, feats: []const []const u8, t: *const TypeStmt) Error!bool {
+        if (feats.len == 0) return false;
+        const enabled = self.enabled orelse return false;
+        const module = if (t.scope) |scope| scope else (self.feature_module orelse return false);
+        return !try if_feature_eval.ifFeaturesSatisfied(self.a, feats, module, enabled, null);
     }
 
     /// The typedef chain first, then the restrictions written on the referring `type`
     /// (RFC 7950 9.2.4).
     fn checkTypedefReference(self: *TypeChecker, value: Val, t: *const TypeStmt, typedef_type: *const TypeStmt) Error![]const Issue {
         const errors = try self.check(value, typedef_type);
+        if (errors.len == 0) {
+            const gated = try self.memberFeatureIssues(value, t);
+            if (gated.len > 0) return gated;
+        }
         if (errors.len > 0 or !hasRestrictions(t)) return errors;
         return self.checkRestrictionsOnBuiltin(value, t);
     }

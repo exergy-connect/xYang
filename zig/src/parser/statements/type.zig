@@ -194,8 +194,10 @@ pub fn parseEnum(p: *Parser, parent: Parent) Error!void {
     const name = try p.parseStringArgument();
     try (try t.ensureEnums(p.arena)).append(p.arena, name);
     if (p.ts.consumeIfType(.lbrace)) {
-        try p.parseBody(.discard, .@"enum", try p.label("enum '{s}'", .{name}));
+        var holder: Holder = .{};
+        try p.parseBody(.{ .holder = &holder }, .@"enum", try p.label("enum '{s}'", .{name}));
         _ = try p.ts.consumeType(.rbrace);
+        if (holder.if_features.items.len > 0) try (try t.enumGuardsMap(p.arena)).put(p.arena, name, holder.if_features);
     }
     _ = p.ts.consumeIfType(.semicolon);
 }

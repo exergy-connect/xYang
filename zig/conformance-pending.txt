@@ -5,7 +5,3 @@
 # `zig build conformance` fails when a listed case passes (remove it) or an unlisted case
 # fails. The port is complete when this list is empty.
 # A case Python xfails, whose load xyang-zig still rejects, is listed here too.
-#243: enum and bit if-feature guards are not stored or enforced yet.
-conditions/enum-if-feature-disabled phase-3
-conditions/enum-if-feature-dependency phase-3
-conditions/bit-if-feature-disabled phase-3

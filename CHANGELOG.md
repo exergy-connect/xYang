@@ -21,7 +21,7 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Fixed
 
-- Preserve `if-feature` on `enum` and `bit` through parsing and native JSON in Python and TypeScript, reject a value whose feature is disabled, and omit it from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
+- Preserve `if-feature` on `enum` and `bit` through parsing and native JSON, reject a value whose feature is disabled in Python, TypeScript, and Zig, and omit it from a feature-filtered subtree schema ([#243](https://github.com/exergy-connect/xYang/issues/243)).
 
 - Preserve original input paths for unknown fields produced by dotted-key expansion.
 
