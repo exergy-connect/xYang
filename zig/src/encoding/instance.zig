@@ -672,7 +672,7 @@ pub const Walk = struct {
         if (isContainerKind(stmt)) {
             if (raw != .object) return self.errNode(stmt, pointer, .container, "type", "container must be an object");
             const n = try self.newNode(.{ .stmt = stmt, .pointer = pointer, .kind = .container });
-            n.children = try self.walkObject(raw.object, stmt, pointer, false);
+            n.children = try self.walkChildren(stmt, raw.object, pointer);
             return n;
         }
         return self.newNode(.{ .stmt = stmt, .value = raw, .pointer = pointer, .kind = .opaque_node });
@@ -799,7 +799,7 @@ pub const Walk = struct {
                 try n.children.append(self.a, try self.errNode(stmt, entry_pointer, .entry, "type", "list item must be an object"));
                 continue;
             }
-            var body = try self.walkObject(transformed.value.object, stmt, entry_pointer, false);
+            var body = try self.walkChildren(stmt, transformed.value.object, entry_pointer);
             if (keyed) if (key_leaf) |kl| if (kl.kind() == .leaf) {
                 const converted = try self.convertKey(entry.token, kl);
                 const key_token = if (kl.name.len > 0) kl.name else keys[0];
@@ -824,6 +824,14 @@ pub const Walk = struct {
             try n.children.append(self.a, e);
         }
         return n;
+    }
+
+    /// Children of a data node are named relative to the module that defines it (RFC 7951 §4).
+    fn walkChildren(self: *Walk, stmt: *const Statement, data: *const jv.Object, pointer: []const u8) Error!std.ArrayList(*Node) {
+        const saved = self.keys.parent_module;
+        self.keys.parent_module = rfc7951.definingModuleName(stmt, saved);
+        defer self.keys.parent_module = saved;
+        return self.walkObject(data, stmt, pointer, false);
     }
 };
 
@@ -879,16 +887,22 @@ fn projectLevel(a: Allocator, keys: *rfc7951.MemberKeys, nodes: []const *Node, p
         try map.put(a, canon, n.pointer);
         switch (n.kind) {
             .leaf, .anydata => try out.put(a, key, n.value),
-            .container => try out.put(a, key, .{ .object = try projectLevel(a, keys, n.children.items, canon, map) }),
-            .list => {
-                var rows: std.ArrayList(Val) = .empty;
-                for (n.children.items) |entry| {
-                    if (!entry.include) continue;
-                    const entry_canon = try a.print("{s}/{d}", .{ canon, rows.items.len });
-                    try map.put(a, entry_canon, entry.pointer);
-                    try rows.append(a, .{ .object = try projectLevel(a, keys, entry.children.items, entry_canon, map) });
+            .container, .list => {
+                const saved = keys.parent_module;
+                keys.parent_module = rfc7951.definingModuleName(stmt, saved);
+                defer keys.parent_module = saved;
+                if (n.kind == .container) {
+                    try out.put(a, key, .{ .object = try projectLevel(a, keys, n.children.items, canon, map) });
+                } else {
+                    var rows: std.ArrayList(Val) = .empty;
+                    for (n.children.items) |entry| {
+                        if (!entry.include) continue;
+                        const entry_canon = try a.print("{s}/{d}", .{ canon, rows.items.len });
+                        try map.put(a, entry_canon, entry.pointer);
+                        try rows.append(a, .{ .object = try projectLevel(a, keys, entry.children.items, entry_canon, map) });
+                    }
+                    try out.put(a, key, .{ .array = rows.items });
                 }
-                try out.put(a, key, .{ .array = rows.items });
             },
             .leaf_list => {
                 var values: std.ArrayList(Val) = .empty;

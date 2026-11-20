@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- Children of a node added by `augment` are named relative to that node's module (RFC 7951 §4). A keyed list augmented into another module accepts its key as `name`, in RFC 7951 and in native JSON, including a native dict keyed by the key value.
+
 ## [1.0.5] — 2026-11-18
 
 ### Added

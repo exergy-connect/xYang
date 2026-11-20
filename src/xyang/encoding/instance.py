@@ -7,6 +7,7 @@ opt-in (``native_json=True``). ``DocumentValidator`` consumes these nodes.
 from __future__ import annotations
 
 import re
+from contextlib import contextmanager
 from dataclasses import dataclass, field
 from decimal import Decimal, InvalidOperation
 from typing import Any, Optional
@@ -262,8 +263,18 @@ class _Walk:
         self._unwrapped[key] = eff
         return eff
 
+    @contextmanager
+    def _encoding_child(self, stmt: YangStatement):
+        """Children of a data node are named relative to the module that defines it (RFC 7951 §4)."""
+        saved = self.parent_module
+        self.parent_module = defining_module_name(stmt, saved)
+        try:
+            yield
+        finally:
+            self.parent_module = saved
+
     def resolve(self, key: str, schema: Any, at_root: bool) -> list[YangStatement]:
-        cache_key = (id(schema), key, at_root)
+        cache_key = (id(schema), key, at_root, self.parent_module)
         hits = self._resolved.get(cache_key)
         if hits is None:
             hits = self._resolve(key, self.data_nodes(schema), at_root)
@@ -409,12 +420,14 @@ class _Walk:
                     errors=[("type", "container must be an object")],
                     include=False,
                 )
+            with self._encoding_child(stmt):
+                children = self.walk_object(raw, stmt, pointer, False)
             return InstanceNode(
                 stmt=stmt,
                 value=None,
                 pointer=pointer,
                 kind="container",
-                children=self.walk_object(raw, stmt, pointer, False),
+                children=children,
             )
         if isinstance(stmt, YangListStmt):
             return self.walk_list(raw, stmt, pointer)
@@ -573,7 +586,8 @@ class _Walk:
                     )
                 )
                 continue
-            body = self.walk_object(item, stmt, entry_pointer, False)
+            with self._encoding_child(stmt):
+                body = self.walk_object(item, stmt, entry_pointer, False)
             if keyed and isinstance(key_leaf, YangLeafStmt):
                 converted = self.convert_key(str(token), key_leaf)
                 key_token = key_leaf.name or keys[0]
@@ -690,13 +704,16 @@ def _project_level(
         if kind == "leaf" or kind == "anydata":
             out[key] = node.value
         elif kind == "container":
-            out[key] = _project_level(node.children, parent_module, canon, mapping, member_keys)
+            out[key] = _project_level(
+                node.children, defining_module_name(node.stmt, parent_module), canon, mapping, member_keys
+            )
         elif kind == "list":
             rows = []
+            child_module = defining_module_name(node.stmt, parent_module)
             for index, entry in enumerate(child for child in node.children if child.include):
                 entry_canon = f"{canon}/{index}"
                 mapping[entry_canon] = entry.pointer
-                rows.append(_project_level(entry.children, parent_module, entry_canon, mapping, member_keys))
+                rows.append(_project_level(entry.children, child_module, entry_canon, mapping, member_keys))
             out[key] = rows
         elif kind == "leaf-list":
             values = []

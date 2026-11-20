@@ -1,0 +1,16 @@
+module vlan {
+  yang-version 1.1;
+  namespace "urn:vlan";
+  prefix v;
+  import m { prefix m; }
+  augment "/m:top" {
+    list vlans {
+      key "name";
+      leaf name { type string; }
+      leaf note { type string; }
+      must "name = 'red'" {
+        error-message "vlan name must be red";
+      }
+    }
+  }
+}

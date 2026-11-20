@@ -81,6 +81,8 @@ pub const Loader = struct {
         const content = try readSource(self.arena, io, resolved, self.reporter.diag);
         const module = try self.parseString(content, resolved, resolved, false);
         try self.finish(module);
+        // Later imports of this file must augment this object, not a second copy.
+        try self.module_cache.put(self.arena, resolved, module);
         return module;
     }
 
