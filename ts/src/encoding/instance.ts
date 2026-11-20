@@ -414,7 +414,7 @@ function walkNode(
       return node(stmt, null, ptr, "container", { errors: [["type", "container must be an object"]], include: false });
     }
     return node(stmt, null, ptr, "container", {
-      children: walkObject(raw as Record<string, unknown>, stmt, module, checker, parent, ptr, native, false)
+      children: walkObject(raw as Record<string, unknown>, stmt, module, checker, definingModule(stmt, parent), ptr, native, false)
     });
   }
   if (keyword === "list") return walkList(raw, stmt, module, checker, parent, ptr, native);
@@ -508,7 +508,7 @@ function walkList(
         include: false
       });
     }
-    const body = walkObject(item as Record<string, unknown>, stmt, module, checker, parent, entryPointer, native, false);
+    const body = walkObject(item as Record<string, unknown>, stmt, module, checker, definingModule(stmt, parent), entryPointer, native, false);
     if (keyed && keyLeaf?.keyword === "leaf") {
       const converted = convertKey(token, keyLeaf, module, checker, native);
       const present = body.find((child) => child.kind === "leaf" && child.stmt?.name === keyLeaf.name && child.include);
@@ -610,14 +610,15 @@ function projectLevel(
     const key = memberKey(item.stmt, parent);
     const canon = join(prefix, key);
     pointerMap.set(canon, item.pointer);
+    const childParent = definingModule(item.stmt, parent);
     if (item.kind === "container") {
-      out[key] = projectLevel(item.children, parent, canon, pointerMap);
+      out[key] = projectLevel(item.children, childParent, canon, pointerMap);
     } else if (item.kind === "list") {
       const rows = item.children.filter((child) => child.include);
       out[key] = rows.map((entry, index) => {
         const entryCanon = `${canon}/${index}`;
         pointerMap.set(entryCanon, entry.pointer);
-        return projectLevel(entry.children, parent, entryCanon, pointerMap);
+        return projectLevel(entry.children, childParent, entryCanon, pointerMap);
       });
     } else if (item.kind === "leaf-list") {
       const items = item.children.filter((child) => child.include);

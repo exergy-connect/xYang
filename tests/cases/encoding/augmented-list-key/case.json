@@ -1,0 +1,19 @@
+{
+  "description": "RFC 7951 §4: a child is namespace-qualified only when its module differs from its parent data node. A list augmented into another module is vlan:vlans, and a key leaf defined with that list is name. A leaf a third module adds under the list is z:tag. Native JSON uses the same names, and a single-key list may be a dict keyed by the key value.",
+  "module": "m.yang",
+  "instances": [
+    { "name": "rfc bare key and sibling, qualified third-module leaf",
+      "data": { "m:top": { "vlan:vlans": [{ "name": "red", "note": "x", "z:tag": "t" }] } }, "valid": true },
+    { "name": "native array", "encoding": "native",
+      "data": { "top": { "vlans": [{ "name": "red", "note": "x", "tag": "t" }] } }, "valid": true },
+    { "name": "native keyed list, key omitted", "encoding": "native",
+      "data": { "top": { "vlans": { "red": { "note": "x" } } } }, "valid": true },
+    { "name": "rfc qualifies a child of the augmenting module",
+      "data": { "m:top": { "vlan:vlans": [{ "vlan:name": "red" }] } }, "valid": false,
+      "errors": [
+        { "path": "/m:top/vlan:vlans/0/name", "code": "mandatory" },
+        { "path": "/m:top/vlan:vlans/0/vlan:name", "code": "unknown-field" },
+        { "path": "/m:top/vlan:vlans/0", "code": "must", "message": "vlan name must be red" }
+      ] }
+  ]
+}

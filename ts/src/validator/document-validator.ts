@@ -130,6 +130,8 @@ export class DocumentValidator {
   private readonly rootCtx: ValidationContext;
   private readonly enabledFeaturesOverride: EnabledFeaturesByModule | null;
   private readonly contextStack: ValidationContext[] = [];
+  /** Module that names the children of the data node currently being walked (RFC 7951 §4). */
+  private readonly encodingParents: string[] = [];
   private typeValidationDebug: boolean;
 
   constructor(
@@ -244,15 +246,17 @@ export class DocumentValidator {
       const rootNode: XPathNode = { data: rootData, schema: ctx.module as unknown as XPathSchema, parent: null };
       let holder: Record<string, unknown> = rootData;
       let holderNode = rootNode;
+      let encodingParent = this.encodingModule();
       for (let index = 0; index < target.parents.length; index += 1) {
         const step = target.parents[index]!;
         const copied = parentCopies[index]!;
-        const value = holder[this.instanceKeys(step.stmt)[0]!];
+        const value = holder[this.instanceKeys(step.stmt, encodingParent)[0]!];
         if (step.stmt.keyword === "list") {
+          const listModule = this.definedIn(step.stmt, encodingParent);
           const keyNames = (step.stmt.key ?? "").split(/\s+/).filter(Boolean);
           const keyMembers = keyNames.map((name) => {
             const leaf = step.stmt.statements.find((child) => child.name === name);
-            return leaf ? this.instanceKeys(leaf)[0]! : name;
+            return leaf ? this.instanceKeys(leaf, listModule)[0]! : name;
           });
           const row = (Array.isArray(value) ? value : []).find(
             (entry): entry is Record<string, unknown> =>
@@ -277,8 +281,9 @@ export class DocumentValidator {
           holder = container;
         }
         holderNode = { data: holder, schema: copied as unknown as XPathSchema, parent: holderNode };
+        encodingParent = this.definedIn(step.stmt, encodingParent);
       }
-      holder[this.instanceKeys(operation)[0]!] = params;
+      holder[this.instanceKeys(operation, encodingParent)[0]!] = params;
       const opNode: XPathNode = { data: params, schema: operation as unknown as XPathSchema, parent: holderNode };
       if (ctx.constraintChecks) {
         this.checkMust(operation, opNode, rootNode, "", errors);
@@ -458,19 +463,24 @@ export class DocumentValidator {
       } else if (this.ctx.constraintChecks) {
         this.checkMust(stmt, currentNode, rootNode, path, errors);
       }
-      for (const child of stmt.statements) {
-        const childKw = this.effectiveKeyword(child);
-        if (childKw === YangTokenType.CHOICE) {
-          this.validateChoice(child, obj, path, errors, currentNode, rootNode);
-          continue;
+      this.encodingParents.push(this.definedIn(stmt, this.encodingModule()));
+      try {
+        for (const child of stmt.statements) {
+          const childKw = this.effectiveKeyword(child);
+          if (childKw === YangTokenType.CHOICE) {
+            this.validateChoice(child, obj, path, errors, currentNode, rootNode);
+            continue;
+          }
+          if (!child.name) {
+            continue;
+          }
+          this.validateStatement(child, this.instanceValue(obj, child), this.childPath(path, child), errors, currentNode, rootNode);
         }
-        if (!child.name) {
-          continue;
+        if (this.ctx.constraintChecks) {
+          this.rejectUnknownContainerKeys(stmt, obj, path, errors);
         }
-        this.validateStatement(child, this.instanceValue(obj, child), this.childPath(path, child), errors, currentNode, rootNode);
-      }
-      if (this.ctx.constraintChecks) {
-        this.rejectUnknownContainerKeys(stmt, obj, path, errors);
+      } finally {
+        this.encodingParents.pop();
       }
       return;
     }
@@ -504,24 +514,29 @@ export class DocumentValidator {
           this.checkMust(stmt, itemNode, rootNode, `${path}[${i}]`, errors);
         }
         const row = item as Record<string, unknown>;
-        for (const key of keyNames) {
-          if (!(key in row)) {
-            errors.push(issue(`${path}[${i}]/${key}`, "mandatory", `Missing list key '${key}'`));
+        this.encodingParents.push(this.definedIn(stmt, this.encodingModule()));
+        try {
+          for (const key of keyNames) {
+            if (!(key in row)) {
+              errors.push(issue(`${path}[${i}]/${key}`, "mandatory", `Missing list key '${key}'`));
+            }
           }
-        }
-        for (const child of stmt.statements) {
-          const childKw = this.effectiveKeyword(child);
-          if (childKw === YangTokenType.CHOICE) {
-            this.validateChoice(child, row, `${path}[${i}]`, errors, itemNode, rootNode);
-            continue;
+          for (const child of stmt.statements) {
+            const childKw = this.effectiveKeyword(child);
+            if (childKw === YangTokenType.CHOICE) {
+              this.validateChoice(child, row, `${path}[${i}]`, errors, itemNode, rootNode);
+              continue;
+            }
+            if (!child.name) {
+              continue;
+            }
+            this.validateStatement(child, this.instanceValue(row, child), this.childPath(`${path}[${i}]`, child), errors, itemNode, rootNode);
           }
-          if (!child.name) {
-            continue;
+          if (this.ctx.constraintChecks) {
+            this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
           }
-          this.validateStatement(child, this.instanceValue(row, child), this.childPath(`${path}[${i}]`, child), errors, itemNode, rootNode);
-        }
-        if (this.ctx.constraintChecks) {
-          this.rejectUnknownListItemKeys(stmt, row, `${path}[${i}]`, errors);
+        } finally {
+          this.encodingParents.pop();
         }
       }
       return;
@@ -808,17 +823,24 @@ export class DocumentValidator {
     return false;
   }
 
-  /** RFC 7951 member name: local, or ``module:local`` when the node is defined in another module. */
-  private instanceKeys(stmt: YangStatement): string[] {
+  /** Module that names the children of the data node currently being walked. */
+  private encodingModule(): string {
+    return this.encodingParents.at(-1) ?? this.ctx.module.name ?? "";
+  }
+
+  /** Module that defines `stmt`, or `parent` when the statement does not record one. */
+  private definedIn(stmt: YangStatement, parent: string): string {
+    const explicit = stmt.defining_module;
+    return typeof explicit === "string" && explicit.length > 0 ? explicit : parent;
+  }
+
+  /** RFC 7951 member name under `parent`: local, or `module:local` when another module defines the node. */
+  private instanceKeys(stmt: YangStatement, parent = this.encodingModule()): string[] {
     const local = stmt.name;
     if (!local) {
       return [];
     }
-    const parent = this.ctx.module.name ?? "";
-    const defined =
-      typeof stmt.defining_module === "string" && stmt.defining_module
-        ? stmt.defining_module
-        : parent;
+    const defined = this.definedIn(stmt, parent);
     if (!parent || defined === parent) {
       return [local];
     }

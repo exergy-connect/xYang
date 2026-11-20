@@ -228,11 +228,15 @@ pub const DocumentValidator = struct {
         const root = try xpath.node.newNode(self.a, .{ .object = root_data }, .{ .module = self.module }, null);
         var holder = root_data;
         var holder_node = root;
+        const root_parent = self.keys.parent_module;
+        var encoding_parent = root_parent;
         for (target.parents, run.parent_copies) |step, copied| {
+            self.keys.parent_module = encoding_parent;
             const member = (try self.keys.key(step.stmt)) orelse step.stmt.name;
             const value = holder.get(member);
             if (step.stmt.kind() == .list) {
                 const key_names = try keyNames(self.a, step.stmt);
+                self.keys.parent_module = rfc7951.definingModuleName(step.stmt, encoding_parent);
                 var key_members: std.ArrayList([]const u8) = .empty;
                 for (key_names) |k| {
                     const leaf = schema_nav.child(.{ .stmt = step.stmt }, k);
@@ -271,8 +275,11 @@ pub const DocumentValidator = struct {
                 holder = obj;
                 holder_node = try xpath.node.newNode(self.a, .{ .object = obj }, .{ .stmt = copied }, holder_node);
             }
+            encoding_parent = rfc7951.definingModuleName(step.stmt, encoding_parent);
         }
+        self.keys.parent_module = encoding_parent;
         try holder.put(self.a, (try self.keys.key(run.operation)) orelse run.operation.name, .{ .object = canonical });
+        self.keys.parent_module = root_parent;
 
         self.errors = .empty;
         self.case_stack = .empty;
@@ -427,6 +434,13 @@ pub const DocumentValidator = struct {
 
     const NameSet = std.StringHashMapUnmanaged(void);
 
+    /// Name this node's children relative to the module that defines it (RFC 7951 §4). Returns the previous parent.
+    fn enter(self: *DocumentValidator, s: *const Statement) []const u8 {
+        const saved = self.keys.parent_module;
+        self.keys.parent_module = rfc7951.definingModuleName(s, saved);
+        return saved;
+    }
+
     fn visitChildren(self: *DocumentValidator, data: Val, owner: Owner, path: *PathBuilder, enforce: bool, parent: *const XNode) Error!void {
         if (data != .object) return;
         const obj = data.object;
@@ -518,6 +532,8 @@ pub const DocumentValidator = struct {
                 const empty = try self.a.create(Object);
                 empty.* = .empty;
                 const empty_node = try parent.step(self.a, .{ .object = empty }, .{ .stmt = s });
+                const saved = self.enter(s);
+                defer self.keys.parent_module = saved;
                 try self.visitChildren(.{ .object = empty }, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), empty_node);
             }
             return;
@@ -553,6 +569,8 @@ pub const DocumentValidator = struct {
         if (isContainerKind(s) and v == .object) {
             try path.push(name, null, null, json_name);
             defer path.pop();
+            const saved = self.enter(s);
+            defer self.keys.parent_module = saved;
             try self.visitChildren(v, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), curr);
         } else if (s.kind() == .list and v == .array) {
             const key_names = try keyNames(self.a, s);
@@ -567,6 +585,8 @@ pub const DocumentValidator = struct {
                 }
                 const entry_node = try xpath.node.newNode(self.a, entry, .{ .stmt = s }, parent);
                 try self.checkMust(s, entry_node, try path.current(), try path.pointer());
+                const saved = self.enter(s);
+                defer self.keys.parent_module = saved;
                 try self.visitChildren(entry, .{ .stmt = s }, path, childEnforce(.{ .stmt = s }, enforce), entry_node);
             }
         }

@@ -129,6 +129,8 @@ class DocumentValidator:
         self._errors: list[ValidationError] = []
         self._case_stack: list[YangCaseStmt] = []
         self._case_level_data_stack: list[dict[str, Any]] = []
+        # Module that names the children of the data node currently being walked (RFC 7951 §4).
+        self._encoding_parents: list[str] = []
         self._bind_type_features()
 
     def validate(
@@ -229,7 +231,7 @@ class DocumentValidator:
         again. Pointers address ``params``.
         """
         from ..encoding.instance import iter_instance, encoding_errors, project_instance, remap_pointer
-        from ..encoding.rfc7951 import member_keys_cached
+        from ..encoding.rfc7951 import defining_module_name, member_keys_cached
         from .operation import lexical
 
         self._annotation_options = (allow_jsonld, allow_json_schema)
@@ -261,12 +263,14 @@ class DocumentValidator:
         root = Node(root_data, self._root_schema, None)
         holder: dict[str, Any] = root_data
         holder_node = root
+        encoding_parent = parent
         for step, copied in zip(target.parents, parent_copies):
-            member = next(iter(member_keys_cached(step.stmt, parent)))
+            member = next(iter(member_keys_cached(step.stmt, encoding_parent)))
             value = holder.get(member)
             if isinstance(step.stmt, YangListStmt):
+                list_module = defining_module_name(step.stmt, encoding_parent)
                 key_leaves = [SchemaNav.child(step.stmt, name) for name in step.stmt.key.split()]
-                key_members = [next(iter(member_keys_cached(leaf, parent))) for leaf in key_leaves]
+                key_members = [next(iter(member_keys_cached(leaf, list_module))) for leaf in key_leaves]
                 rows = [
                     row
                     for row in (value if isinstance(value, list) else [])
@@ -283,7 +287,8 @@ class DocumentValidator:
                     # RFC 7950 §7.5.1: a non-presence container exists implicitly.
                     value = holder[member] = {}
                 holder, holder_node = value, Node(value, copied, holder_node)
-        holder[next(iter(member_keys_cached(operation, parent)))] = canonical
+            encoding_parent = defining_module_name(step.stmt, encoding_parent)
+        holder[next(iter(member_keys_cached(operation, encoding_parent)))] = canonical
 
         self._leafref_severity = leafref_severity
         self._root_data = root_data
@@ -358,10 +363,20 @@ class DocumentValidator:
         )
 
     def _encoding_parent_module(self) -> str:
-        """Module name for RFC 7951 member encoding of children under the current subtree."""
+        """Module that names the children of the data node currently being walked (RFC 7951 §4)."""
+        if self._encoding_parents:
+            return self._encoding_parents[-1]
         if isinstance(self._root_schema, YangModule):
             return self._root_schema.name
         return ""
+
+    def _push_encoding_parent(self, stmt: YangStatement) -> None:
+        from ..encoding.rfc7951 import defining_module_name
+
+        self._encoding_parents.append(defining_module_name(stmt, self._encoding_parent_module()))
+
+    def _pop_encoding_parent(self) -> None:
+        self._encoding_parents.pop()
 
     def _effective_value(self, data: dict[str, Any], stmt: YangStatement) -> Any:
         """
@@ -711,7 +726,11 @@ class DocumentValidator:
                 empty_node = parent_node.step({}, stmt)
                 path.push(name, pointer_name=json_name)
                 child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
-                self._visit_children({}, stmt, (parent_ctx_obj.child(empty_node), empty_node), path, child_enforce)
+                self._push_encoding_parent(stmt)
+                try:
+                    self._visit_children({}, stmt, (parent_ctx_obj.child(empty_node), empty_node), path, child_enforce)
+                finally:
+                    self._pop_encoding_parent()
                 path.pop()
             return
 
@@ -798,7 +817,11 @@ class DocumentValidator:
         if isinstance(stmt, YangContainerStmt) and isinstance(val, dict):
             path.push(name, pointer_name=json_name)
             child_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
-            self._visit_children(val, stmt, (curr_ctx, curr_node), path, child_enforce)
+            self._push_encoding_parent(stmt)
+            try:
+                self._visit_children(val, stmt, (curr_ctx, curr_node), path, child_enforce)
+            finally:
+                self._pop_encoding_parent()
             path.pop()
         elif isinstance(stmt, YangListStmt) and isinstance(val, list):
             key_names = [k.strip() for k in stmt.key.split()] if stmt.key else []
@@ -827,7 +850,11 @@ class DocumentValidator:
                 if self._constraint_checks:
                     self._check_must(stmt, entry_ctx, entry_node, path.current(), path.pointer())
                 entry_enforce = self._child_enforce_mandatory_choice(stmt, enforce_mandatory_choice)
-                self._visit_children(entry, stmt, (entry_ctx, entry_node), path, entry_enforce)
+                self._push_encoding_parent(stmt)
+                try:
+                    self._visit_children(entry, stmt, (entry_ctx, entry_node), path, entry_enforce)
+                finally:
+                    self._pop_encoding_parent()
                 path.pop()
 
     def _choice_has_branch_data(self, choice: YangChoiceStmt, data: dict[str, Any]) -> bool:

@@ -169,10 +169,21 @@ pub const Evaluator = struct {
         return n.data == .array and (schema_nav.isList(n.schema) or schema_nav.isLeafList(n.schema));
     }
 
-    /// `instance_member_keys` under the root module: the one member name of `stmt`.
-    fn memberKey(self: *Evaluator, stmt: *const Statement, root_module: []const u8) error{OutOfMemory}![]const u8 {
-        const def = rfc7951.definingModuleName(stmt, root_module);
-        if (std.mem.eql(u8, def, root_module)) return stmt.name;
+    /// Module that names `node`'s children (RFC 7951 §4). An augmented node belongs to
+    /// the augmenting module; a node without `defining_module` belongs to its parent.
+    fn nodeModule(node: *const Node, root_module: []const u8) []const u8 {
+        switch (node.schema) {
+            .stmt => |s| if (s.defining_module) |m| if (m.len > 0) return m,
+            else => {},
+        }
+        if (node.parent) |parent| return nodeModule(parent, root_module);
+        return root_module;
+    }
+
+    /// RFC 7951 member name of `stmt` under a parent data node in `parent_module`.
+    fn memberKey(self: *Evaluator, stmt: *const Statement, parent_module: []const u8) error{OutOfMemory}![]const u8 {
+        const def = rfc7951.definingModuleName(stmt, parent_module);
+        if (std.mem.eql(u8, def, parent_module)) return stmt.name;
         return self.a.print("{s}:{s}", .{ def, stmt.name });
     }
 
@@ -185,9 +196,10 @@ pub const Evaluator = struct {
         }
         if (node.data != .object) return;
         const root_module = rootModule(ctx);
+        const parent_module = nodeModule(node, root_module);
         for (try schema_nav.dataChildren(self.a, node.schema)) |c| {
             if (module) |m| if (!std.mem.eql(u8, rfc7951.definingModuleName(c, root_module), m)) continue;
-            const key = try self.memberKey(c, root_module);
+            const key = try self.memberKey(c, parent_module);
             const val: Val = if (node.data.object.get(key)) |v| (if (v == .null) Val{ .bool = true } else v) else schema_nav.default(c) orelse continue;
             try self.appendChild(node, val, c, out);
         }
@@ -214,7 +226,7 @@ pub const Evaluator = struct {
             return;
         }
         const c = schema_nav.childInModule(node.schema, seg.local(), module, root_module) orelse return;
-        try self.stepChild(node, try self.memberKey(c, root_module), c, out);
+        try self.stepChild(node, try self.memberKey(c, nodeModule(node, root_module)), c, out);
     }
 
     /// `_step`: into the child `key`; at a list or leaf-list node, from each entry.
@@ -226,7 +238,7 @@ pub const Evaluator = struct {
         const c = schema_nav.child(node.schema, key_in);
         var key = key_in;
         if (c) |sc| if (sc.name.len > 0) {
-            const k = try self.memberKey(sc, root_module);
+            const k = try self.memberKey(sc, nodeModule(node, root_module));
             if (!std.mem.eql(u8, k, key)) key = k;
         };
         try self.stepChild(node, key, c, out);

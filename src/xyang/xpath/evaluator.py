@@ -246,11 +246,12 @@ class XPathEvaluator:
 
         root_schema = ctx.root.schema
         root_module = root_schema.name if isinstance(root_schema, YangModule) else ""
+        parent_module = self._encoding_module(node, root_module)
         result: list[Node] = []
         for child in SchemaNav.data_children(node.schema):
             if module is not None and defining_module_name(child, root_module) != module:
                 continue
-            val, key = instance_member_lookup(data, child, root_module)
+            val, key = instance_member_lookup(data, child, parent_module)
             if key is None:
                 val = SchemaNav.default(child)
             elif val is None:
@@ -270,7 +271,7 @@ class XPathEvaluator:
         An unprefixed step matches the local name. A ``prefix:name`` step matches only a
         child that module defines (``seg.module``, bound when the module was loaded); an
         unbound prefix, as in an RFC 7951 ``instance-identifier`` value, is a module name
-        (RFC 7951 §6.11). The data member is the child's RFC 7951 name under the root module.
+        (RFC 7951 §6.11). The data member is the child's RFC 7951 name under its parent node.
         """
         from ..encoding.rfc7951 import member_keys_cached
 
@@ -286,7 +287,8 @@ class XPathEvaluator:
         schema_child = SchemaNav.child_in_module(node.schema, seg.local, module, root_module)
         if schema_child is None:
             return []
-        return self._step_child(node, next(iter(member_keys_cached(schema_child, root_module))), schema_child)
+        parent_module = self._encoding_module(node, root_module)
+        return self._step_child(node, next(iter(member_keys_cached(schema_child, parent_module))), schema_child)
 
     def _step(self, node: Node, key: str, root_module: Optional[str] = None) -> list[Node]:
         """
@@ -309,10 +311,23 @@ class XPathEvaluator:
         if schema_child is not None and root_module is not None:
             from ..encoding.rfc7951 import member_keys_cached
 
-            keys = member_keys_cached(schema_child, root_module)
+            keys = member_keys_cached(schema_child, self._encoding_module(node, root_module))
             if keys and key not in keys:
                 key = next(iter(keys))
         return self._step_child(node, key, schema_child)
+
+    def _encoding_module(self, node: Node, root_module: str) -> str:
+        """Module that names this node's children in the canonical tree (RFC 7951 §4).
+
+        A node an augment added belongs to the augmenting module. A node with no
+        ``defining_module`` belongs to the same module as its parent data node.
+        """
+        explicit = getattr(node.schema, "defining_module", None)
+        if isinstance(explicit, str) and explicit:
+            return explicit
+        if node.parent is not None:
+            return self._encoding_module(node.parent, root_module)
+        return root_module
 
     def _step_child(self, node: Node, key: str, schema_child: Any) -> list[Node]:
         data = node.data

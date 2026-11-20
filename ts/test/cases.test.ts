@@ -39,7 +39,7 @@ function loadCaseModule(dir: string, moduleFile: string) {
   const parser = new YangParser({ includePath: [dir], expandUses: true });
   const primary = resolve(dir, moduleFile);
   const module = parser.parseFile(primary);
-  for (const file of readdirSync(dir)) {
+  for (const file of readdirSync(dir).sort()) {
     if (!file.endsWith(".yang") || resolve(dir, file) === primary) {
       continue;
     }

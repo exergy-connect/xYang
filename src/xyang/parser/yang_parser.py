@@ -352,6 +352,8 @@ class YangParser:
                 finalize=False,
             )
             self._expand_and_augment(module)
+            # Later imports of this file must augment this object, not a second copy.
+            self._module_cache[path] = module
             return module
         finally:
             self._include_stack = []

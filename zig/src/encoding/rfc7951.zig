@@ -20,16 +20,18 @@ pub fn definingModuleName(stmt: *const Statement, parent_module: []const u8) []c
 pub const MemberKeys = struct {
     a: Allocator,
     parent_module: []const u8,
-    cache: std.AutoHashMapUnmanaged(*const Statement, ?[]const u8) = .empty,
+    cache: std.AutoHashMapUnmanaged(*const Statement, CacheEntry) = .empty,
+
+    const CacheEntry = struct { parent: []const u8, key: ?[]const u8 };
 
     pub fn key(self: *MemberKeys, stmt: *const Statement) error{OutOfMemory}!?[]const u8 {
-        if (self.cache.get(stmt)) |k| return k;
+        if (self.cache.get(stmt)) |hit| if (std.mem.eql(u8, hit.parent, self.parent_module)) return hit.key;
         const k: ?[]const u8 = if (stmt.name.len == 0) null else blk: {
             const def = definingModuleName(stmt, self.parent_module);
             if (std.mem.eql(u8, def, self.parent_module)) break :blk stmt.name;
             break :blk try self.a.print("{s}:{s}", .{ def, stmt.name });
         };
-        try self.cache.put(self.a, stmt, k);
+        try self.cache.put(self.a, stmt, .{ .parent = self.parent_module, .key = k });
         return k;
     }
 

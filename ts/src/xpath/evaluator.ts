@@ -239,14 +239,14 @@ function stepWildcard(node: XPathNode, context: XPathContext, module: string | u
 
   const record = data as Record<string, unknown>;
   const rootModule = (context.root.schema as { name?: string } | null)?.name ?? "";
+  const parentModule = nodeModule(node, rootModule);
   const result: XPathNode[] = [];
   for (const child of dataChildren(schema)) {
-    const local = child.name ?? "";
-    const definedIn = (child as { defining_module?: string }).defining_module || rootModule;
+    const definedIn = definingModule(child, rootModule);
     if (module !== undefined && definedIn !== module) {
       continue;
     }
-    const key = !rootModule || definedIn === rootModule ? local : `${definedIn}:${local}`;
+    const key = memberName(child, parentModule);
     let value: unknown;
     if (Object.prototype.hasOwnProperty.call(record, key)) {
       value = record[key];
@@ -285,15 +285,27 @@ function defaultValue(schema: XPathSchema | null): unknown {
   return raw;
 }
 
-function definingModule(child: XPathSchema, rootModule: string): string {
-  return (child as { defining_module?: string }).defining_module || rootModule;
+function definingModule(child: XPathSchema, parentModule: string): string {
+  const explicit = (child as { defining_module?: string }).defining_module;
+  return typeof explicit === "string" && explicit.length > 0 ? explicit : parentModule;
 }
 
-/** RFC 7951 member name of `child` in the canonical tree, whose top-level module is `rootModule`. */
-function memberName(child: XPathSchema, rootModule: string): string {
+/**
+ * Module that names `node`'s children in the canonical tree (RFC 7951 §4).
+ * An augmented node belongs to the augmenting module; otherwise it belongs to its parent.
+ */
+function nodeModule(node: XPathNode, rootModule: string): string {
+  const explicit = (node.schema as { defining_module?: string } | null)?.defining_module;
+  if (typeof explicit === "string" && explicit.length > 0) return explicit;
+  if (node.parent) return nodeModule(node.parent, rootModule);
+  return rootModule;
+}
+
+/** RFC 7951 member name of `child` under a parent data node in `parentModule`. */
+function memberName(child: XPathSchema, parentModule: string): string {
   const local = child.name ?? "";
-  const owner = definingModule(child, rootModule);
-  return !rootModule || owner === rootModule ? local : `${owner}:${local}`;
+  const owner = definingModule(child, parentModule);
+  return !parentModule || owner === parentModule ? local : `${owner}:${local}`;
 }
 
 /**
@@ -318,7 +330,7 @@ function stepNamed(node: XPathNode, segment: XPathPathSegment, rootModule: strin
   if (!child) {
     return [];
   }
-  return stepChild(node, memberName(child, rootModule), child);
+  return stepChild(node, memberName(child, nodeModule(node, rootModule)), child);
 }
 
 function stepNode(node: XPathNode, step: string, rootModule: string): XPathNode[] {
@@ -328,7 +340,7 @@ function stepNode(node: XPathNode, step: string, rootModule: string): XPathNode[
   }
 
   const childSchema = findSchemaChild(node.schema, step);
-  return stepChild(node, childSchema ? memberName(childSchema, rootModule) : step, childSchema);
+  return stepChild(node, childSchema ? memberName(childSchema, nodeModule(node, rootModule)) : step, childSchema);
 }
 
 function stepChild(node: XPathNode, step: string, childSchema: XPathSchema | null): XPathNode[] {
