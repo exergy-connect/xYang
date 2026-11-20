@@ -9,6 +9,8 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+## [1.0.7] — 2026-11-20
+
 ### Fixed
 
 - Preserve inherited string patterns on imported typedef chains when exporting and reloading native JSON schemas (#256).
@@ -316,7 +318,8 @@ Initial TypeScript implementation (`xyang-ts` CLI); not published to npm under t
 - XPath tokenizer, parser, and evaluator used by `must`, `when`, and leafref paths.
 - Browser bundle (`dist/index.umd.min.global.js`) and Vitest suite under `test/`.
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/exergy-connect/xYang/compare/v1.0.3...v1.0.4

@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.7] — 2026-11-20
+
 ### Fixed
 
 - Preserve inherited string patterns on imported typedef chains when exporting and reloading native JSON schemas (#256).
@@ -527,7 +529,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.6...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.7...HEAD
+[1.0.7]: https://github.com/exergy-connect/xYang/compare/v1.0.6...v1.0.7
 [1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/exergy-connect/xYang/compare/v1.0.3...v1.0.4
