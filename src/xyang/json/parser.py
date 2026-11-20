@@ -351,7 +351,7 @@ def _property_schema_and_xyang(prop_value: dict[str, Any], defs: dict[str, Any])
         prop_xyang = prop_value.get(JsonSchemaKey.X_YANG) or {}
         merged_xyang = {**base_xyang, **prop_xyang}
         return schema, merged_xyang
-    if JsonSchemaKey.ALL_OF in prop_value:
+    if JsonSchemaKey.ALL_OF in prop_value and prop_value.get(JsonSchemaKey.TYPE) != "string":
         merged = {}
         xyang = {}
         for part in prop_value[JsonSchemaKey.ALL_OF]:

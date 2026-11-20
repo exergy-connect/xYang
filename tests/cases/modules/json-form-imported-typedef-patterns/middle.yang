@@ -1,0 +1,5 @@
+module middle {
+  yang-version 1.1; namespace "urn:middle"; prefix m;
+  import base { prefix b; }
+  typedef unicast { type b:mac { pattern '[0-9a-f][02468ace]'; } }
+}

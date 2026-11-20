@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve inherited string patterns on imported typedef chains when exporting and reloading native JSON schemas (#256).
+
 ## [1.0.6] — 2026-11-20
 
 ### Fixed

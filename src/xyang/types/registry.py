@@ -15,7 +15,8 @@ from types import MappingProxyType
 from typing import Any, Optional
 from collections.abc import Callable, Mapping
 
-from ..ast import YangBitStmt, YangPatternSpec, YangTypeStmt
+from ..ast import (YangBitStmt, YangDecimalTypeStmt, YangEnumerationTypeStmt,
+                   YangNumericTypeStmt, YangPatternSpec, YangStringTypeStmt, YangTypeStmt)
 from ..errors import YangExportError
 from ..identifier_ref import coerce_identifier_ref
 from ..json.schema_keys import (
@@ -169,8 +170,9 @@ def _to_string(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
                     all_of.append({JsonSchemaKey.PATTERN: anchored})
             if all_of:
                 out[JsonSchemaKey.ALL_OF] = all_of
-    if getattr(type_stmt, "length", None):
-        parts = getattr(type_stmt, "length", None).split("..")
+    length = getattr(type_stmt, "length", None)
+    if length:
+        parts = length.split("..")
         min_len = None
         max_len = None
         if len(parts) >= 1 and parts[0].strip():
@@ -245,12 +247,13 @@ def _to_enumeration(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any
 
 
 def _to_bits(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
-    if not getattr(type_stmt, "bits", None):
+    bits: list[YangBitStmt] = getattr(type_stmt, "bits", None) or []
+    if not bits:
         return {JsonSchemaKey.TYPE: "string"}
     from ..json.generator import _bits_space_separated_pattern, _with_description
 
     ordered = sorted(
-        getattr(type_stmt, "bits", None),
+        bits,
         key=lambda b: (
             b.position if b.position is not None else 0,
             b.name,
@@ -268,7 +271,7 @@ def _to_bits(_builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
     examples: list[str] = ["", bit_names[0]]
     if len(bit_names) > 1:
         examples.append(" ".join(bit_names))
-    out = {JsonSchemaKey.TYPE: "string"}
+    out: dict[str, Any] = {JsonSchemaKey.TYPE: "string"}
     _with_description(out, desc)
     out[JsonSchemaKey.PATTERN] = _bits_space_separated_pattern(bit_names)
     out[JsonSchemaKey.EXAMPLES] = examples
@@ -297,11 +300,15 @@ def _native_numeric(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]
     fd = getattr(type_stmt, "fraction_digits", None)
     if decimal and fd is None:
         raise YangExportError("native decimal64 export requires fraction-digits")
-    scale = Decimal(10) ** fd if decimal else 1
-    lo, hi = ((Decimal(-(2**63)) / scale, Decimal(2**63 - 1) / scale) if decimal else builtin.bounds)
+    scale = Decimal(10) ** fd if fd is not None and decimal else 1
+    if decimal:
+        lo, hi = Decimal(-(2**63)) / scale, Decimal(2**63 - 1) / scale
+    else:
+        assert builtin.bounds is not None
+        lo, hi = builtin.bounds
     numeric = (lambda value: float(Decimal(value))) if decimal else int
-    out = {"type": "number" if decimal else "integer"}
-    xy = {"type": builtin.name}
+    out: dict[str, Any] = {"type": "number" if decimal else "integer"}
+    xy: dict[str, Any] = {"type": builtin.name}
     if decimal:
         xy["fraction-digits"] = fd
         out["multipleOf"] = float(Decimal(1) / scale)
@@ -354,8 +361,9 @@ def _to_decimal(builtin: Builtin, type_stmt: YangTypeStmt) -> dict[str, Any]:
         JsonSchemaKey.PATTERN: builtin.pattern,
     }
     xyang: dict[str, Any] = {XYangKey.TYPE: DECIMAL64}
-    if getattr(type_stmt, "fraction_digits", None) is not None:
-        xyang["fraction-digits"] = int(getattr(type_stmt, "fraction_digits", None))
+    fraction_digits = getattr(type_stmt, "fraction_digits", None)
+    if fraction_digits is not None:
+        xyang["fraction-digits"] = int(fraction_digits)
     if getattr(type_stmt, "range", None):
         xyang["range"] = getattr(type_stmt, "range", None)
     out[JsonSchemaKey.X_YANG] = xyang
@@ -452,7 +460,7 @@ def _from_number_integer(builtin: Builtin, fragment: SchemaFragment) -> YangType
     )
     if name != builtin.name:
         return None
-    type_stmt = make_type_stmt(name=name)
+    type_stmt = YangNumericTypeStmt(name=name)
     if range_str:
         type_stmt.range = range_str
     return type_stmt
@@ -463,7 +471,7 @@ def _from_quoted_integer(builtin: Builtin, fragment: SchemaFragment) -> YangType
         return None
     if fragment.xyang.get(XYangKey.TYPE) != builtin.name:
         return None
-    type_stmt = make_type_stmt(name=builtin.name)
+    type_stmt = YangNumericTypeStmt(name=builtin.name)
     rng = fragment.xyang.get("range")
     if isinstance(rng, str) and rng:
         type_stmt.range = rng
@@ -475,7 +483,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
     xyang = fragment.xyang
     kind = schema.get(JsonSchemaKey.TYPE)
     if kind in ("string", "number") and xyang.get(XYangKey.TYPE) == DECIMAL64:
-        type_stmt = make_type_stmt(name=DECIMAL64)
+        type_stmt = YangDecimalTypeStmt(name=DECIMAL64)
         rng = xyang.get("range")
         if isinstance(rng, str) and rng:
             type_stmt.range = rng
@@ -487,7 +495,7 @@ def _from_decimal(builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
         return None
     from ..json.parser import _format_decimal64_bound, _fraction_digits_from_multiple_of
 
-    type_stmt = make_type_stmt(name=DECIMAL64)
+    type_stmt = YangDecimalTypeStmt(name=DECIMAL64)
     legacy_fd = schema.get(JsonSchemaKey.X_FRACTION_DIGITS)
     if isinstance(legacy_fd, int) and legacy_fd > 0:
         type_stmt.fraction_digits = legacy_fd
@@ -550,7 +558,7 @@ def _from_enumeration(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeSt
     guards, descriptions = _enum_metadata_from_xyang(fragment.xyang)
     # A single JSON Schema enum is a string pattern unless metadata marks a real enumeration.
     if len(enums) > 1 or ((guards or descriptions) and enums and all(isinstance(item, str) for item in enums)):
-        type_stmt = make_type_stmt(name=ENUMERATION)
+        type_stmt = YangEnumerationTypeStmt(name=ENUMERATION)
         type_stmt.enums = enums
         names = {str(item) for item in enums}
         if guards:
@@ -613,7 +621,7 @@ def _from_leafref(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt |
     path_node = None
     if path_val is not None and isinstance(path_val, str) and path_val.strip():
         path_node = XPathParser(path_val.strip()).parse_path()
-        path_node.source = path_val.strip()
+        setattr(path_node, "source", path_val.strip())
         recorded = fragment.xyang.get(XYangKey.XPATH_PREFIXES)
         if recorded is not None:
             from ..json.parser import recorded_prefixes
@@ -655,7 +663,7 @@ def _from_union(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | N
     for branch in schema.get(JsonSchemaKey.ONE_OF) or []:
         if isinstance(branch, dict):
             branch_xyang = branch.get(JsonSchemaKey.X_YANG) or {}
-            parsed = _type_from_schema(fragment.defs, branch, branch_xyang)
+            parsed = _type_from_schema(dict(fragment.defs), branch, branch_xyang)
             if parsed:
                 members.append(parsed)
     if members:
@@ -673,7 +681,7 @@ def _from_string(_builtin: Builtin, fragment: SchemaFragment) -> YangTypeStmt | 
         return None
     from ..json.parser import _apply_string_pattern_entries, _merge_schema_xyang, _pattern_metadata_from_xyang
 
-    type_stmt = make_type_stmt(name=STRING)
+    type_stmt = YangStringTypeStmt(name=STRING)
     raw_pat: str | None = None
     if JsonSchemaKey.PATTERN in schema:
         pattern = schema[JsonSchemaKey.PATTERN]
@@ -760,7 +768,7 @@ def _enumeration_check(_builtin: Builtin, value: Any, type_stmt: YangTypeStmt) -
             "enum",
             "enumeration type has no enum definitions in schema; cannot validate instance data",
         )
-    allowed = [str(item) for item in getattr(type_stmt, "enums", None)]
+    allowed = [str(item) for item in (getattr(type_stmt, "enums", None) or [])]
     if str(value) not in allowed:
         return (
             "enum",
@@ -1094,13 +1102,30 @@ def _imported_typedef_schema(type_stmt: YangTypeStmt, module: Any, leafref_ancho
     """Inline a typedef from another module; the JSON form's ``$defs`` hold only this module's."""
     from ..module import resolve_typedef
 
-    typedef, target = resolve_typedef(type_stmt, module)
-    label = f"{type_stmt.prefix}:{type_stmt.name}" if type_stmt.prefix else type_stmt.name
-    if typedef is None or typedef.type is None:
-        raise YangExportError(f"cannot export type {label!r}: its typedef is not found where the type is written")
-    if getattr(type_stmt, "range", None) or getattr(type_stmt, "length", None) or getattr(type_stmt, "patterns", None):
-        raise YangExportError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
-    return type_to_schema(typedef.type, set(), target, leafref_anchor)
+    patterns = []
+    current, target = type_stmt, module
+    for _ in range(64):
+        if not current.prefix and current.name in REGISTRY:
+            if patterns:
+                if current.name != STRING or not isinstance(current, YangStringTypeStmt):
+                    raise YangExportError(f"cannot export pattern restrictions on imported typedef {current.name!r} in the native JSON form")
+                current = YangStringTypeStmt(
+                    name=STRING,
+                    length_restriction=current.length_restriction,
+                    patterns=list(current.patterns or []) + [p for layer in reversed(patterns) for p in layer],
+                )
+            return type_to_schema(current, set(), target, leafref_anchor)
+        typedef, target_module = resolve_typedef(current, target)
+        label = f"{current.prefix}:{current.name}" if current.prefix else current.name
+        if typedef is None or typedef.type is None:
+            raise YangExportError(f"cannot export type {label!r}: its typedef is not found where the type is written")
+        if getattr(current, "range", None) or getattr(current, "length", None):
+            raise YangExportError(f"cannot export restrictions on the imported typedef {label!r} in the native JSON form")
+        layer = getattr(current, "patterns", None)
+        if layer:
+            patterns.append(layer)
+        current, target = typedef.type, target_module
+    raise YangExportError("cannot export a circular or excessively deep imported typedef chain")
 
 
 def _singleton_enum_string(fragment: SchemaFragment) -> YangTypeStmt | None:
@@ -1112,7 +1137,7 @@ def _singleton_enum_string(fragment: SchemaFragment) -> YangTypeStmt | None:
     if len(enums) == 1 and kind == "string" and isinstance(enums[0], str):
         from ..json.parser import _apply_string_pattern_entries, _merge_schema_xyang, _pattern_metadata_from_xyang
 
-        type_stmt = make_type_stmt(name=STRING)
+        type_stmt = YangStringTypeStmt(name=STRING)
         pattern = "\\*" if enums[0] == "*" else enums[0]
         merged = _merge_schema_xyang(dict(schema), dict(fragment.xyang))
         message, tag = _pattern_metadata_from_xyang(merged)
@@ -1135,7 +1160,7 @@ def _integer_stmt_from_bounds(fragment: SchemaFragment) -> YangTypeStmt:
         fragment.schema.get(JsonSchemaKey.MINIMUM),
         fragment.schema.get(JsonSchemaKey.MAXIMUM),
     )
-    type_stmt = make_type_stmt(name=name)
+    type_stmt = YangNumericTypeStmt(name=name)
     if range_str:
         type_stmt.range = range_str
     return type_stmt

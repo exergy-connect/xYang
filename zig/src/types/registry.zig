@@ -563,14 +563,36 @@ pub fn typeToSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object {
 /// `_imported_typedef_schema`: the JSON form's `$defs` hold only this module's typedefs.
 fn importedTypedefSchema(e: gen.Emit, t: *const ast.TypeStmt) gen.Error!*Object {
     const a = e.g.a;
-    const label = if (t.prefix) |p| (if (p.len > 0) try a.print("{s}:{s}", .{ p, t.name }) else t.name) else t.name;
-    const resolved = module_mod.resolveTypedef(t, e.module);
-    const td_type: ?*ast.TypeStmt = if (resolved) |r| r.typedef.data.typedef.type else null;
-    if (resolved == null or td_type == null) return e.g.fail("cannot export type {f}: its typedef is not found where the type is written", .{pyfmt.repr(label)});
-    const restricted = (if (t.rangeRestriction().expression) |r| r.len > 0 else false) or (if (t.lengthRestriction().expression) |l| l.len > 0 else false) or t.patterns().len > 0;
-    if (restricted) return e.g.fail("cannot export restrictions on the imported typedef {f} in the native JSON form", .{pyfmt.repr(label)});
-    const none: gen.Names = .empty;
-    return typeToSchema(.{ .g = e.g, .typedef_names = &none, .module = resolved.?.module, .anchor = e.anchor }, td_type.?);
+    var current = t;
+    var target = e.module;
+    var layers: std.ArrayList([]const ast.PatternSpec) = .empty;
+    for (0..64) |_| {
+        const prefixed = if (current.prefix) |p| p.len > 0 else false;
+        if (!prefixed and get(current.name) != null) {
+            const none: gen.Names = .empty;
+            if (layers.items.len == 0) return typeToSchema(.{ .g = e.g, .typedef_names = &none, .module = target, .anchor = e.anchor }, current);
+            if (!std.mem.eql(u8, current.name, "string")) return e.g.fail("cannot export pattern restrictions on imported typedef {f} in the native JSON form", .{pyfmt.repr(current.name)});
+            var combined = ast.TypeStmt.init("string", null);
+            const payload = try combined.ensure(.string, a);
+            payload.length = if (current.get(.string)) |v| v.length else null;
+            try payload.patterns.appendSlice(a, current.patterns());
+            var i = layers.items.len;
+            while (i > 0) {
+                i -= 1;
+                try payload.patterns.appendSlice(a, layers.items[i]);
+            }
+            return typeToSchema(.{ .g = e.g, .typedef_names = &none, .module = target, .anchor = e.anchor }, &combined);
+        }
+        const label = if (current.prefix) |p| (if (p.len > 0) try a.print("{s}:{s}", .{ p, current.name }) else current.name) else current.name;
+        const resolved = module_mod.resolveTypedef(current, target);
+        const td_type: ?*ast.TypeStmt = if (resolved) |r| r.typedef.data.typedef.type else null;
+        if (resolved == null or td_type == null) return e.g.fail("cannot export type {f}: its typedef is not found where the type is written", .{pyfmt.repr(label)});
+        if ((if (current.rangeRestriction().expression) |r| r.len > 0 else false) or (if (current.lengthRestriction().expression) |l| l.len > 0 else false)) return e.g.fail("cannot export restrictions on the imported typedef {f} in the native JSON form", .{pyfmt.repr(label)});
+        if (current.patterns().len > 0) try layers.append(a, current.patterns());
+        current = td_type.?;
+        target = resolved.?.module;
+    }
+    return e.g.fail("cannot export a circular or excessively deep imported typedef chain", .{});
 }
 
 /// `_parse_range`: the integer bounds of a `range` (null where not an integer).
