@@ -1,0 +1,80 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "$id": "urn:m",
+  "x-yang": {
+    "module": "m",
+    "yang-version": "1.1",
+    "namespace": "urn:m",
+    "prefix": "m",
+    "organization": "",
+    "contact": ""
+  },
+  "type": "object",
+  "properties": {
+    "address": {
+      "type": "string",
+      "allOf": [
+        {
+          "pattern": "^[0-9a-f]{2}$"
+        },
+        {
+          "pattern": "^[0-9a-f][02468ace]$"
+        },
+        {
+          "pattern": "^[0-7].*$"
+        }
+      ],
+      "x-yang": {
+        "type": "leaf",
+        "string-patterns": [
+          {
+            "pattern": "[0-9a-f]{2}",
+            "invert-match": false
+          },
+          {
+            "pattern": "[0-9a-f][02468ace]",
+            "invert-match": false
+          },
+          {
+            "pattern": "[0-7].*",
+            "invert-match": false
+          }
+        ]
+      }
+    },
+    "addresses": {
+      "type": "array",
+      "items": {
+        "type": "string",
+        "allOf": [
+          {
+            "pattern": "^[0-9a-f]{2}$"
+          },
+          {
+            "pattern": "^[0-9a-f][02468ace]$"
+          }
+        ],
+        "x-yang": {
+          "string-patterns": [
+            {
+              "pattern": "[0-9a-f]{2}",
+              "invert-match": false
+            },
+            {
+              "pattern": "[0-9a-f][02468ace]",
+              "invert-match": false
+            }
+          ]
+        }
+      },
+      "x-yang": {
+        "type": "leaf-list"
+      }
+    }
+  },
+  "additionalProperties": false,
+  "patternProperties": {
+    "^@[A-Za-z]+$": true,
+    "^\\$[A-Za-z]+$": true
+  }
+}

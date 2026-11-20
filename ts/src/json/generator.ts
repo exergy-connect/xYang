@@ -565,30 +565,36 @@ function resolveAbsoluteLeafTypePath(module: YangModule, path: unknown): Record<
 
 /**
  * Follow a `type` that names a typedef of another module to that typedef's own type; the JSON form's
- * `$defs` hold only this module's typedefs. Restrictions on such a `type` cannot be kept, so they fail.
+ * `$defs` hold only this module's typedefs. Accumulate pattern restrictions while inlining.
  */
 function foreignTypedefResolved(typeShape: Record<string, unknown>, module: YangModule): Record<string, unknown> {
   if (resolveTypedef(module, typeShape)?.scope !== undefined) return typeShape;
   let current = typeShape;
+  const patterns: unknown[][] = [];
   for (let depth = 0; depth < 64; depth += 1) {
     const typeName = typeof current.name === "string" ? current.name : "";
     const prefix = typeof current.prefix === "string" && current.prefix ? current.prefix : undefined;
     const scope = typeof current.scope_module === "string" ? current.scope_module : undefined;
     const foreign = prefix !== undefined || (scope !== undefined && scope !== module.name);
     if (!foreign || (!prefix && Object.prototype.hasOwnProperty.call(REGISTRY, typeName))) {
-      return current;
+      if (patterns.length === 0) return current;
+      if (typeName !== "string" || prefix) {
+        throw new YangExportError(`cannot export pattern restrictions on imported typedef '${typeName}' in the native JSON form`);
+      }
+      return { ...current, patterns: [...(Array.isArray(current.patterns) ? current.patterns : []), ...patterns.reverse().flat()] };
     }
     const label = prefix ? `${prefix}:${typeName}` : typeName;
     const typedef = resolveTypedef(module, current);
     if (!typedef?.type) {
       throw new YangExportError(`cannot export type '${label}': its typedef is not found where the type is written`);
     }
-    if (current.range || current.length || (Array.isArray(current.patterns) && current.patterns.length > 0)) {
+    if (current.range || current.length) {
       throw new YangExportError(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
     }
+    if (Array.isArray(current.patterns) && current.patterns.length > 0) patterns.push(current.patterns);
     current = typedef.type;
   }
-  return current;
+  throw new YangExportError("cannot export a circular or excessively deep imported typedef chain");
 }
 
 type ScopedExportEntry = { td: ScopedTypedef; owner: YangModule; key: string };
@@ -643,16 +649,12 @@ function typedefRefOrInline(
     if (typeName === "union") return { oneOf: ((typeShape.types ?? []) as Record<string, unknown>[]).map((member) => typedefRefOrInline(member, typedefNames, module)) };
     return leafTypeToSchema(typeShape, exportNativeJson);
   }
-  // A typedef from another module is inlined; the JSON form's `$defs` hold only this module's.
-  const label = prefix ? `${prefix}:${typeName}` : typeName;
-  const typedef = resolveTypedef(module, typeShape);
-  if (!typedef?.type) {
-    throw new YangExportError(`cannot export type '${label}': its typedef is not found where the type is written`);
+  // Inline foreign typedefs, retaining restrictions from every layer.
+  const resolved = foreignTypedefResolved(typeShape, module);
+  if (resolved === typeShape) {
+    throw new YangExportError(`cannot export type '${prefix ? `${prefix}:` : ""}${typeName}': its typedef is not found where the type is written`);
   }
-  if (typeShape.range || typeShape.length || (Array.isArray(typeShape.patterns) && typeShape.patterns.length > 0)) {
-    throw new YangExportError(`cannot export restrictions on the imported typedef '${label}' in the native JSON form`);
-  }
-  return typedefRefOrInline(typedef.type, new Set(), module);
+  return typedefRefOrInline(resolved, new Set(), module);
 }
 
 function partitionChoiceSiblings(children: YangStatement[]): {

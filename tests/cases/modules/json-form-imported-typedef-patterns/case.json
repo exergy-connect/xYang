@@ -1,0 +1,12 @@
+{
+  "description": "Imported typedef chains preserve all string patterns in native JSON (#256)",
+  "module": "m.yang",
+  "json_form": true,
+  "instances": [
+    {"name": "valid", "data": {"m:address": "12", "m:addresses": ["ae"]}, "valid": true},
+    {"name": "base pattern", "data": {"m:address": "zz"}, "valid": false, "errors": [{"path": "/m:address", "code": "pattern"}]},
+    {"name": "imported pattern", "data": {"m:address": "13"}, "valid": false, "errors": [{"path": "/m:address", "code": "pattern"}]},
+    {"name": "local pattern", "data": {"m:address": "82"}, "valid": false, "errors": [{"path": "/m:address", "code": "pattern"}]},
+    {"name": "leaf-list pattern", "data": {"m:addresses": ["af"]}, "valid": false, "errors": [{"path": "/m:addresses/0", "code": "pattern"}]}
+  ]
+}

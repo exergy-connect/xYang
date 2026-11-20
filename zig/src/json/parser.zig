@@ -485,6 +485,9 @@ fn propertySchemaAndXyang(p: *Parse, prop: *const Object, defs: *const Object) E
         return .{ .schema = schema, .xyang = merged };
     };
     if (prop.get(K.ALL_OF)) |all| {
+        if (prop.get(K.TYPE)) |kind| {
+            if (kind == .string and std.mem.eql(u8, kind.string, "string")) return .{ .schema = prop, .xyang = try xyangOf(p, prop) };
+        }
         const merged = try newObject(a);
         const xy = try newObject(a);
         if (all == .array) for (all.array) |part| {

@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Fixed
+
+- Preserve inherited string patterns on imported typedef chains when exporting and reloading native JSON schemas (#256).
+
 ## [1.0.6] — 2026-11-20
 
 ### Fixed
