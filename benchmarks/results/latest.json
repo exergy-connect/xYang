@@ -1,24 +1,24 @@
 {
   "schema_version": 2,
-  "generated_at": "2026-11-19T04:20:59+00:00",
+  "generated_at": "2026-11-20T23:29:34+00:00",
   "smoke": false,
   "environment": {
     "git": {
-      "commit": "b8d97954865f6fe8231bf2c457ce04dda3ed0026",
-      "describe": "v1.0.5",
+      "commit": "8eaa68e7674bf02e1e23dd22910dfcff1bf55c1e",
+      "describe": "v1.0.7",
       "dirty": false,
-      "release_tag": "v1.0.5"
+      "release_tag": "v1.0.7"
     },
     "versions": {
-      "python_package": "1.0.5",
-      "ts_package": "1.0.5"
+      "python_package": "1.0.7",
+      "ts_package": "1.0.7"
     },
     "runtimes": {
       "python": "CPython 3.12.16",
-      "node": "v24.22.2"
+      "node": "v24.22.3"
     },
     "machine": {
-      "runner": "GitHub Actions ubuntu24 image 20261111.370.1 (X64)",
+      "runner": "GitHub Actions ubuntu24 image 20261116.376.1 (X64)",
       "os": "Linux 7.0.0-1017-azure",
       "arch": "x86_64",
       "cpu": "AMD EPYC 7763 64-Core Processor",
@@ -72,14 +72,14 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 191.3454644999888,
-          "min": 185.67258999996739,
-          "max": 341.0317139999961
+          "median": 184.43046999999524,
+          "min": 181.2362109999981,
+          "max": 336.61868600000844
         },
         "peak_rss_mib": {
-          "median": 18.130859375,
-          "min": 18.0859375,
-          "max": 22.1640625
+          "median": 18.18359375,
+          "min": 18.08203125,
+          "max": 22.02734375
         },
         "rss_source": "VmHWM"
       },
@@ -92,9 +92,9 @@
               "iterations_per_process": 30,
               "iterations": 90,
               "time_ms": {
-                "median": 17.856501,
-                "min": 17.202037,
-                "max": 28.607547
+                "median": 17.414115000000002,
+                "min": 16.800104,
+                "max": 24.481806
               }
             },
             "memory": {
@@ -102,9 +102,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 19.71875,
-                "min": 19.625,
-                "max": 19.7734375
+                "median": 19.6875,
+                "min": 19.64453125,
+                "max": 19.77734375
               },
               "rss_source": "VmHWM"
             },
@@ -119,9 +119,9 @@
               "iterations_per_process": 50,
               "iterations": 150,
               "time_ms": {
-                "median": 10.379805000000001,
-                "min": 10.211972,
-                "max": 10.865233
+                "median": 10.829506,
+                "min": 10.534766,
+                "max": 11.617378
               }
             },
             "memory": {
@@ -129,8 +129,8 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 19.87890625,
-                "min": 19.76953125,
+                "median": 19.875,
+                "min": 19.83203125,
                 "max": 19.94921875
               },
               "rss_source": "VmHWM"
@@ -148,9 +148,9 @@
               "iterations_per_process": 10,
               "iterations": 30,
               "time_ms": {
-                "median": 101.652267,
-                "min": 99.071358,
-                "max": 113.119542
+                "median": 97.3023655,
+                "min": 95.547601,
+                "max": 106.367927
               }
             },
             "memory": {
@@ -158,9 +158,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 21.16796875,
-                "min": 21.0859375,
-                "max": 21.2109375
+                "median": 21.125,
+                "min": 21.046875,
+                "max": 21.14453125
               },
               "rss_source": "VmHWM"
             },
@@ -175,9 +175,9 @@
               "iterations_per_process": 5,
               "iterations": 15,
               "time_ms": {
-                "median": 2842.193942,
-                "min": 2793.412026,
-                "max": 2914.144684
+                "median": 2813.296191,
+                "min": 2785.878697,
+                "max": 2857.294379
               }
             },
             "memory": {
@@ -186,8 +186,8 @@
               "warmup_per_process": 0,
               "peak_rss_mib": {
                 "median": 101.75,
-                "min": 101.703125,
-                "max": 101.83984375
+                "min": 101.6953125,
+                "max": 101.8203125
               },
               "rss_source": "VmHWM"
             },
@@ -202,14 +202,14 @@
       "startup": {
         "processes": 10,
         "wall_ms": {
-          "median": 40.37144000000126,
-          "min": 39.38881700003094,
-          "max": 41.027441999972325
+          "median": 38.42683450000095,
+          "min": 36.70162999998183,
+          "max": 41.11759500000289
         },
         "peak_rss_mib": {
-          "median": 49.513671875,
-          "min": 49.47265625,
-          "max": 49.5390625
+          "median": 49.578125,
+          "min": 49.53515625,
+          "max": 49.5859375
         },
         "rss_source": "VmHWM"
       },
@@ -222,9 +222,9 @@
               "iterations_per_process": 30,
               "iterations": 90,
               "time_ms": {
-                "median": 10.030096,
-                "min": 8.131043,
-                "max": 19.158844
+                "median": 9.6759765,
+                "min": 8.051983,
+                "max": 17.488697
               }
             },
             "memory": {
@@ -232,9 +232,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 64.76953125,
-                "min": 64.5234375,
-                "max": 65.0078125
+                "median": 64.8203125,
+                "min": 64.359375,
+                "max": 65.3359375
               },
               "rss_source": "VmHWM"
             },
@@ -249,9 +249,9 @@
               "iterations_per_process": 50,
               "iterations": 150,
               "time_ms": {
-                "median": 1.398627,
-                "min": 0.810657,
-                "max": 3.645103
+                "median": 1.1706275000000002,
+                "min": 0.792972,
+                "max": 3.895567
               }
             },
             "memory": {
@@ -259,9 +259,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 66.421875,
-                "min": 65.6484375,
-                "max": 66.671875
+                "median": 66.81640625,
+                "min": 66.37890625,
+                "max": 66.84375
               },
               "rss_source": "VmHWM"
             },
@@ -278,9 +278,9 @@
               "iterations_per_process": 10,
               "iterations": 30,
               "time_ms": {
-                "median": 45.196622500000004,
-                "min": 41.200426,
-                "max": 62.705266
+                "median": 44.647314,
+                "min": 40.169151,
+                "max": 66.762675
               }
             },
             "memory": {
@@ -288,9 +288,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 78.89453125,
-                "min": 77.49609375,
-                "max": 81.7734375
+                "median": 78.46484375,
+                "min": 78.45703125,
+                "max": 83.78515625
               },
               "rss_source": "VmHWM"
             },
@@ -305,9 +305,9 @@
               "iterations_per_process": 5,
               "iterations": 15,
               "time_ms": {
-                "median": 356.386721,
-                "min": 310.71247,
-                "max": 380.310916
+                "median": 336.629935,
+                "min": 301.560626,
+                "max": 388.031321
               }
             },
             "memory": {
@@ -315,9 +315,9 @@
               "operations_per_process": 1,
               "warmup_per_process": 0,
               "peak_rss_mib": {
-                "median": 255.921875,
-                "min": 252.11328125,
-                "max": 256.5234375
+                "median": 258.20703125,
+                "min": 254.453125,
+                "max": 260.16796875
               },
               "rss_source": "VmHWM"
             },
@@ -346,8 +346,8 @@
           "src/xyang.egg-info/ (generated packaging metadata, outside the counted root)"
         ],
         "files": 87,
-        "physical_lines": 20269,
-        "code_lines": 15878
+        "physical_lines": 20355,
+        "code_lines": 15951
       },
       "typescript": {
         "root": "ts/src",
@@ -356,8 +356,8 @@
           "*.d.ts"
         ],
         "files": 91,
-        "physical_lines": 19271,
-        "code_lines": 17274
+        "physical_lines": 19308,
+        "code_lines": 17301
       }
     }
   },
@@ -365,8 +365,8 @@
   "binary_size": {
     "zig": {
       "file": "xyang-zig",
-      "bytes": 914072,
-      "sha256": "ebb9d1a429519d4a5027ed774ccbecc861ea2871a4d54469a87669166a15d226"
+      "bytes": 916504,
+      "sha256": "6cedef1d2f97c04953560b86531a2b8df3b33e60cb9daa43f0699bbe8f234e12"
     }
   }
 }
