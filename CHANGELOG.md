@@ -7,6 +7,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+## [1.0.6] — 2026-11-20
+
 ### Fixed
 
 - Children of a node added by `augment` are named relative to that node's module (RFC 7951 §4). A keyed list augmented into another module accepts its key as `name`, in RFC 7951 and in native JSON, including a native dict keyed by the key value.
@@ -521,7 +523,8 @@ First published release (`xyang` **0.1.0** on PyPI).
 - ✅ **Code refactoring**: Modular architecture with separated concerns for better maintainability
 - ✅ **Performance optimizations**: Expression caching, efficient context management, and optimized lookups
 
-[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.5...HEAD
+[Unreleased]: https://github.com/exergy-connect/xYang/compare/v1.0.6...HEAD
+[1.0.6]: https://github.com/exergy-connect/xYang/compare/v1.0.5...v1.0.6
 [1.0.5]: https://github.com/exergy-connect/xYang/compare/v1.0.4...v1.0.5
 [1.0.4]: https://github.com/exergy-connect/xYang/compare/v1.0.3...v1.0.4
 [1.0.3]: https://github.com/exergy-connect/xYang/compare/v1.0.2...v1.0.3
