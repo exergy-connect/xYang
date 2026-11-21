@@ -7,7 +7,9 @@
 //! applies extension invocations and runs the semantic checks, in Python's order.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const utf8 = @import("../utf8.zig");
+const registry = @import("../types/registry.zig");
 const ast = @import("../ast.zig");
 const errors = @import("../errors.zig");
 const pyfmt = @import("../pyfmt.zig");
@@ -113,6 +115,12 @@ pub const Loader = struct {
         try propagateTypedefUnits(self.arena, module);
         if (finalize) try self.finish(module);
         return module;
+    }
+
+    /// `parse_string` for source the caller proclaims is valid UTF-8 and LF-only.
+    /// Does not run `firstUtf8Error` or `universalNewlines`.
+    pub fn parseNormalizedString(self: *Loader, src: NormalizedYangSource, filename: ?[]const u8, source_path: ?[]const u8, finalize: bool) Error!*Module {
+        return self.parseString(src.bytes, filename, source_path, finalize);
     }
 
     /// `_expand_and_augment`.
@@ -405,6 +413,7 @@ fn propagateTypedefUnits(arena: std.mem.Allocator, module: *Module) Error!void {
 
         fn fill(w: @This(), s: *ast.Statement, t: ?*ast.TypeStmt) Error!void {
             if (s.units.len > 0 or t == null) return;
+            if (t.?.prefix == null and registry.isBuiltinOrLegacyName(t.?.name)) return;
             var seen: std.StringHashMapUnmanaged(void) = .empty;
             const found = try w.lookup(t, w.module, &seen);
             if (found.len > 0) s.units = found;
@@ -414,6 +423,23 @@ fn propagateTypedefUnits(arena: std.mem.Allocator, module: *Module) Error!void {
     try w.walk(module.statements.items);
     for (module.groupings.values()) |g| try w.walk(g.statements.items);
 }
+
+/// Valid UTF-8 YANG source that uses LF newlines only.
+pub const NormalizedYangSource = struct {
+    bytes: []const u8,
+
+    pub fn admits(bytes: []const u8) bool {
+        return std.unicode.utf8ValidateSlice(bytes) and std.mem.indexOfScalar(u8, bytes, '\r') == null;
+    }
+
+    pub fn initTrusted(bytes: []const u8) NormalizedYangSource {
+        if (builtin.mode == .debug) {
+            std.debug.assert(std.unicode.utf8ValidateSlice(bytes));
+            std.debug.assert(std.mem.indexOfScalar(u8, bytes, '\r') == null);
+        }
+        return .{ .bytes = bytes };
+    }
+};
 
 /// The file as Python's `read_text(encoding="utf-8")` returns it.
 fn readSource(arena: std.mem.Allocator, io: std.Io, path: []const u8, diag: *Diagnostic) Error![]const u8 {
@@ -607,6 +633,75 @@ test "imports are shared; foreign augment edits the import, foreign deviation a 
     try std.testing.expect(m.features.contains("f"));
     try std.testing.expect(m.identities.contains("id"));
     try std.testing.expectEqual(@as(usize, 1), m.statements.items.len);
+}
+
+test "NormalizedYangSource rejects CR and invalid UTF-8" {
+    const ok = NormalizedYangSource.initTrusted("module m {\n  prefix m;\n}\n");
+    try std.testing.expect(NormalizedYangSource.admits(ok.bytes));
+    try std.testing.expect(!NormalizedYangSource.admits("a\r\nb"));
+    try std.testing.expect(!NormalizedYangSource.admits("\xff"));
+    try std.testing.expect(!NormalizedYangSource.admits("\xc3"));
+    if (builtin.mode == .debug) {
+        // initTrusted asserts utf8ValidateSlice and no CR. These inputs fail it.
+        try std.testing.expect(!NormalizedYangSource.admits("module m {\r\n}\n"));
+        try std.testing.expect(!std.unicode.utf8ValidateSlice("\xff"));
+    }
+}
+
+test "parseNormalizedString accepts proclaimed LF source" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    var diag: Diagnostic = .{};
+    var loader = Loader.init(arena.allocator(), null, &diag, &.{});
+    const src = NormalizedYangSource.initTrusted(
+        \\module m {
+        \\  prefix m;
+        \\  typedef meters { type int32; units "m"; }
+        \\  typedef height { type meters; }
+        \\  leaf h { type height; }
+        \\  leaf plain { type string; }
+        \\}
+        \\
+    );
+    const m = try loader.parseNormalizedString(src, "m.yang", null, true);
+    try std.testing.expectEqualStrings("m", m.name);
+    try std.testing.expectEqualStrings("m", m.statements.items[0].units);
+    try std.testing.expectEqualStrings("", m.statements.items[1].units);
+}
+
+test "imported typedef chains propagate units; builtins skip the map" {
+    const io = std.testing.io;
+    var tmp = std.testing.tmpDir(.{});
+    defer tmp.cleanup();
+    try tmp.dir.writeFile(io, .{ .sub_path = "base.yang", .data =
+        \\module base { prefix b;
+        \\  typedef meters { type int32; units "m"; }
+        \\  typedef height { type meters; }
+        \\}
+    });
+    try tmp.dir.writeFile(io, .{ .sub_path = "m.yang", .data =
+        \\module m { prefix m;
+        \\  import base { prefix b; }
+        \\  leaf h { type b:height; }
+        \\  leaf direct { type b:meters; }
+        \\  leaf plain { type string; }
+        \\  leaf n { type uint8; }
+        \\}
+    });
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    const dir = try tmp.dir.realPathFileAlloc(io, ".", a);
+    var diag: Diagnostic = .{};
+    var loader = Loader.init(a, io, &diag, &.{});
+    const m = loader.parseFile(try std.Io.Dir.path.join(a, &.{ dir, "m.yang" })) catch |err| {
+        std.debug.print("{f}\n", .{diag});
+        return err;
+    };
+    try std.testing.expectEqualStrings("m", m.statements.items[0].units);
+    try std.testing.expectEqualStrings("m", m.statements.items[1].units);
+    try std.testing.expectEqualStrings("", m.statements.items[2].units);
+    try std.testing.expectEqualStrings("", m.statements.items[3].units);
 }
 
 test "universal newlines" {
