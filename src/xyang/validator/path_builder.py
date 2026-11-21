@@ -5,6 +5,8 @@ from typing import Optional
 
 def _json_pointer_token(token: str) -> str:
     """Escape one JSON Pointer reference token (RFC 6901)."""
+    if "~" not in token and "/" not in token:
+        return token
     return token.replace("~", "~0").replace("/", "~1")
 
 
@@ -46,11 +48,14 @@ class PathBuilder:
 
     def child(self, name: str, key: Optional[str] = None) -> str:
         seg = f"{name}[{key}]" if key is not None else name
-        return self.current().rstrip("/") + "/" + seg
+        parent = self._paths[-1]
+        if parent.endswith("/"):
+            parent = parent.rstrip("/")
+        return parent + "/" + seg
 
     def child_pointer(self, name: str, index: Optional[int] = None) -> str:
         """JSON Pointer for a child that is not pushed onto the builder."""
-        out = f"{self.pointer()}/{_json_pointer_token(name)}"
+        out = f"{self._pointers[-1]}/{_json_pointer_token(name)}"
         if index is not None:
             out = f"{out}/{index}"
         return out

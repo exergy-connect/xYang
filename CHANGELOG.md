@@ -13,6 +13,9 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Avoid building diagnostic paths for valid Python scalar leaves without `when`, `must`, or `if-feature`; construct them when a type check fails.
+- Reuse compiled RFC 7951 member keys and reduce path-building work in Python document walks (#263).
+- Reuse `if-feature` evaluation for repeated schema nodes during each Python and TypeScript validation (#263).
 - Speed up Python YANG tokenization for identifiers and ASCII digits (#264).
 - Validation uses cached schema dispatch plans to visit present members and absent nodes that require checks (#261).
 

@@ -136,6 +136,8 @@ class DocumentValidator:
         self._walk_plans: dict[tuple[int, str], Any] = {}
         # Scoped to one walk: schemas can be modified between validations.
         self._walk_member_keys: dict[tuple[int, str], frozenset[str]] = {}
+        # Feature expressions depend on the schema and feature map, not on a list entry.
+        self._feature_results: dict[int, bool] = {}
         self._bind_type_features()
 
     def validate(
@@ -204,6 +206,7 @@ class DocumentValidator:
         self._errors = []
         self._walk_member_keys.clear()
         self._walk_plans.clear()
+        self._feature_results.clear()
         self._case_stack = []
         self._case_level_data_stack = []
         self._evaluator.clear_cache_stats()
@@ -252,6 +255,7 @@ class DocumentValidator:
         from .operation import lexical
 
         self._walk_plans.clear()
+        self._feature_results.clear()
         self._walk_member_keys.clear()
         self._annotation_options = (allow_jsonld, allow_json_schema)
         for step in target.parents:
@@ -374,12 +378,19 @@ class DocumentValidator:
         if self._if_feature_module is None:
             return True
         feats = getattr(stmt, "if_features", None) or []
-        return stmt_if_features_satisfied(
+        if not feats:
+            return True
+        key = id(stmt)
+        if key in self._feature_results:
+            return self._feature_results[key]
+        active = stmt_if_features_satisfied(
             feats,
             self._if_feature_module,
             self._enabled_features,
             getattr(stmt, "included_from", None),
         )
+        self._feature_results[key] = active
+        return active
 
     def _encoding_parent_module(self) -> str:
         """Module that names the children of the data node currently being walked (RFC 7951 §4)."""
@@ -617,6 +628,7 @@ class DocumentValidator:
             by_key: dict[str, list[int]] = {}
             known: set[str] = set()
             choices: list[YangChoiceStmt] = []
+            compiled_keys: list[Optional[frozenset[str]]] = [None] * len(schema.statements)
             for i, stmt in enumerate(schema.statements):
                 if isinstance(stmt, YangRpcStmt):
                     continue
@@ -625,14 +637,15 @@ class DocumentValidator:
                     choices.append(stmt)
                     continue
                 keys = member_keys_cached(stmt, parent_mod)
+                compiled_keys[i] = keys
                 known.update(keys)
                 for key in keys:
                     by_key.setdefault(key, []).append(i)
                 if self._requires_absent_visit(stmt):
                     always.append(i)
-            plan = (always, by_key, known, choices, schema)
+            plan = (always, by_key, known, choices, compiled_keys, schema)
             self._walk_plans[plan_key] = plan
-        always, by_key, known, choices, _schema = plan
+        always, by_key, known, choices, compiled_keys, _schema = plan
         selected = set(always)
         for key in data:
             selected.update(by_key.get(key, ()))
@@ -642,7 +655,7 @@ class DocumentValidator:
         for i in sorted(selected):
             stmt = schema.statements[i]
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce,
-                             None if isinstance(stmt, YangChoiceStmt) else member_keys_cached(stmt, parent_mod))
+                             compiled_keys[i])
         from ..encoding.annotations import is_annotation
         for key in data:
             if key not in visited_names and not is_annotation(key, *self._annotation_options):
@@ -688,9 +701,36 @@ class DocumentValidator:
         value = data[json_key] if json_key is not None else None
         present = json_key is not None
         json_name = json_key if json_key is not None else name
+        parent_ctx_obj, parent_node = parent_ctx
+
+        # These built-in type checks do not use the path. On success, a present
+        # leaf with no applicability or must constraints needs no diagnostic
+        # path at all; on failure the regular walk below reports the error.
+        type_stmt = getattr(stmt, "type", None)
+        if (
+            not debug
+            and self._constraint_checks
+            and isinstance(stmt, YangLeafStmt)
+            and present
+            and value is not None
+            and type_stmt is not None
+            and not type_stmt.prefix
+            and type_stmt.name in {"string", "boolean", "int8", "int16", "int32", "int64",
+                                   "uint8", "uint16", "uint32", "uint64", "decimal64"}
+            and not getattr(stmt, "if_features", None)
+            and getattr(stmt, "when", None) is None
+            and not stmt.must_statements
+        ):
+            fast_node = parent_node.step(value, stmt)
+            if not self._type_checker.check(
+                value, type_stmt, "", self._root_data, self._root_schema,
+                ctx=parent_ctx_obj.child(fast_node), evaluator=self._evaluator,
+                leafref_current=fast_node,
+            ):
+                return
+
         child_path = path.child(json_name)
         child_pointer = path.child_pointer(json_name)
-        parent_ctx_obj, parent_node = parent_ctx
 
         # -- 0. if-feature (before when; inactive nodes are not in the effective schema) --
         if getattr(stmt, "if_features", None) and not self._if_features_active(stmt):

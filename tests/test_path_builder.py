@@ -13,3 +13,13 @@ def test_nested_index_and_escaped_pointer():
     path.pop()
     assert path.current() == '/root'
     assert path.pointer() == '/root'
+
+
+def test_child_path_preserves_trailing_slash_behavior():
+    path = PathBuilder()
+    path.push('a/')
+    assert path.current() == '/a/'
+    assert path.child('b') == '/a/b'
+    assert path.child_pointer('b') == '/a~1/b'
+    path.pop()
+    assert path.child('b') == '/b'

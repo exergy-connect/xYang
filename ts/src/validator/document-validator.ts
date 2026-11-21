@@ -135,6 +135,7 @@ export class DocumentValidator {
   /** Module that names the children of the data node currently being walked (RFC 7951 §4). */
   private readonly encodingParents: string[] = [];
   private walkPlans = new WeakMap<YangStatement, Map<string, { always: number[]; keys: Map<string, number[]> }>>();
+  private featureResults = new WeakMap<ValidationContext, WeakMap<YangStatement, boolean>>();
   private readonly memberKeyCache = new WeakMap<YangStatement, { parent: string; name: string | undefined; defined: unknown; keys: string[] }>();
   private typeValidationDebug: boolean;
 
@@ -234,6 +235,7 @@ export class DocumentValidator {
   private collectOperation(input: OperationInput, options: AnnotationOptions): InternalIssue[] {
     this.xpath.clearCacheStats();
     this.walkPlans = new WeakMap();
+    this.featureResults = new WeakMap();
     const { target, operation, parentCopies, params, rootData, wrapper } = input;
     const ctx = { ...this.rootCtx, ...options };
     const active = (stmt: YangStatement): boolean =>
@@ -348,6 +350,7 @@ export class DocumentValidator {
     data: unknown
   ): { errors: InternalIssue[]; warnings: InternalIssue[] } {
     this.walkPlans = new WeakMap();
+    this.featureResults = new WeakMap();
     this.contextStack.push(ctx);
     try {
       const errors: InternalIssue[] = [];
@@ -448,9 +451,7 @@ export class DocumentValidator {
       return;
     }
 
-    const ifFeatures = stmt.if_features;
-    const ifFeatureList = Array.isArray(ifFeatures) ? (ifFeatures as string[]) : [];
-    if (ifFeatureList.length > 0 && !stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, stmt.included_from)) {
+    if (Array.isArray(stmt.if_features) && stmt.if_features.length > 0 && !this.ifFeaturesActive(stmt)) {
       if (value !== undefined) {
         errors.push(
           issue(
@@ -730,8 +731,7 @@ export class DocumentValidator {
     }
     const obj = parentValue as Record<string, unknown>;
 
-    const choiceIfs = Array.isArray(choice.if_features) ? (choice.if_features as string[]) : [];
-    const choiceActive = stmtIfFeaturesSatisfied(choiceIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, choice.included_from);
+    const choiceActive = this.ifFeaturesActive(choice);
     if (!choiceActive && this.choiceHasBranchData(choice, obj)) {
       errors.push(
         issue(
@@ -762,8 +762,7 @@ export class DocumentValidator {
       if (!this.caseHasAnyData(c, obj)) {
         continue;
       }
-      const caseIfs = Array.isArray(c.if_features) ? (c.if_features as string[]) : [];
-      if (!stmtIfFeaturesSatisfied(caseIfs, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, c.included_from)) {
+      if (!this.ifFeaturesActive(c)) {
         errors.push(
           issue(
             path,
@@ -842,6 +841,22 @@ export class DocumentValidator {
       return this.caseHasAnyData(stmt, obj);
     }
     return false;
+  }
+
+  private ifFeaturesActive(stmt: YangStatement): boolean {
+    const features = Array.isArray(stmt.if_features) ? (stmt.if_features as string[]) : [];
+    if (features.length === 0) return true;
+    const ctx = this.ctx;
+    let results = this.featureResults.get(ctx);
+    if (!results) {
+      results = new WeakMap();
+      this.featureResults.set(ctx, results);
+    }
+    const cached = results.get(stmt);
+    if (cached !== undefined) return cached;
+    const active = stmtIfFeaturesSatisfied(features, ctx.ifFeatureCtx, ctx.enabledByModule, stmt.included_from);
+    results.set(stmt, active);
+    return active;
   }
 
   /** Compile absent-node checks and member dispatch once per schema and encoding parent. */
