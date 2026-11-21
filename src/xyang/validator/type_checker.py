@@ -40,6 +40,7 @@ from ..module import YangModule, resolve_typedef
 from .if_feature_eval import stmt_if_features_satisfied
 from ..xpath import XPathParser
 from ..xpath.ast import ASTNode, PathNode
+from ..xpath.evaluator import leafref_member
 from ..xpath.node import Context, Node
 
 logger = logging.getLogger("xyang.validator")
@@ -474,10 +475,14 @@ class TypeChecker:
                 logger.debug("_check_leafref FAIL node_path=%s (no ctxt for rel path)", node_path)
                 return [_issue("leafref", f"Leafref relative path {path_str!r} requires context node")]
             start_node = current_node
-        target_nodes = evaluator.eval_path(path_ast, leafref_ctx, start_node)
-        targets = [n.data for n in target_nodes]
+        targets = evaluator.eval_path_values(path_ast, leafref_ctx, start_node)
         logger.debug("_check_leafref node_path=%s targets=%s", node_path, targets)
-        if value not in targets:
+        try:
+            found = leafref_member(value) in targets
+        except TypeError:
+            # An unhashable value (object or array) equals no hashable target.
+            found = False
+        if not found:
             logger.debug(
                 "_check_leafref FAIL node_path=%s value=%r not in targets (phase 4 type check)",
                 node_path,

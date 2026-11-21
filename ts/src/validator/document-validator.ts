@@ -4,7 +4,7 @@ import { hasTokenType, YangTokenType } from "../parser/parser-context";
 import { modulePrefixResolver } from "../core/ast";
 import { bindXPathPrefixes, parseXPath, parseXPathPath, xpathPrefixes } from "../xpath/parser";
 import { XPathAstNode } from "../xpath/ast";
-import { XPathContext, XPathEvaluator, XPathNode, XPathSchema } from "../xpath/evaluator";
+import { XPathContext, XPathEvaluator, XPathNode, XPathPathCache, XPathSchema } from "../xpath/evaluator";
 import { remapPointer, resolveQualifiedTopLevel, resolveStructureInstance } from "../encoding";
 import {
   AnydataValidationConfig,
@@ -127,6 +127,8 @@ export type ValidationContext = AnnotationOptions & {
 export class DocumentValidator {
   private readonly xpath = new XPathEvaluator();
   private readonly xpathCache = new Map<string, XPathAstNode>();
+  /** Path cache of the validation run that created each root node. */
+  private readonly pathCaches = new WeakMap<XPathNode, XPathPathCache>();
   private readonly rootCtx: ValidationContext;
   private readonly enabledFeaturesOverride: EnabledFeaturesByModule | null;
   private readonly contextStack: ValidationContext[] = [];
@@ -189,11 +191,13 @@ export class DocumentValidator {
   }
 
   validate(data: unknown, options: AnnotationOptions = {}): [boolean, string[], string[]] {
+    this.xpath.clearCacheStats();
     const collected = this.collect({ ...this.rootCtx, ...options }, data);
     return [collected.errors.length === 0, collected.errors.map(formatIssue), collected.warnings.map(formatIssue)];
   }
 
   validateDetailed(data: unknown, options: AnnotationOptions = {}): DetailedValidationResult {
+    this.xpath.clearCacheStats();
     const collected = this.collect({ ...this.rootCtx, ...options }, data);
     return {
       valid: collected.errors.length === 0,
@@ -226,6 +230,7 @@ export class DocumentValidator {
    * validated, which this call may extend (it is the caller's private copy).
    */
   private collectOperation(input: OperationInput, options: AnnotationOptions): InternalIssue[] {
+    this.xpath.clearCacheStats();
     const { target, operation, parentCopies, params, rootData, wrapper } = input;
     const ctx = { ...this.rootCtx, ...options };
     const active = (stmt: YangStatement): boolean =>
@@ -243,7 +248,7 @@ export class DocumentValidator {
     this.contextStack.push(ctx);
     try {
       const errors: InternalIssue[] = [];
-      const rootNode: XPathNode = { data: rootData, schema: ctx.module as unknown as XPathSchema, parent: null };
+      const rootNode = this.rootNode(rootData, ctx.module);
       let holder: Record<string, unknown> = rootData;
       let holderNode = rootNode;
       let encodingParent = this.encodingModule();
@@ -318,6 +323,17 @@ export class DocumentValidator {
 
   private pointerMap: Map<string, string> | null = null;
 
+  /** Root of one validation run, with a fresh path cache that lives as long as the node. */
+  private rootNode(data: unknown, module: YangModule): XPathNode {
+    const node: XPathNode = { data, schema: module as unknown as XPathSchema, parent: null };
+    this.pathCaches.set(node, new Map());
+    return node;
+  }
+
+  private xpathContext(current: XPathNode, root: XPathNode): XPathContext {
+    return { current, root, pathCache: this.pathCaches.get(root) };
+  }
+
   /** Map canonical walker pointers back to the input JSON as written. */
   setPointerMap(pointerMap: Map<string, string> | null): void {
     this.pointerMap = pointerMap;
@@ -338,7 +354,7 @@ export class DocumentValidator {
       }
 
       const root = data as Record<string, unknown>;
-      const rootNode: XPathNode = { data: root, schema: ctx.module as unknown as XPathSchema, parent: null };
+      const rootNode = this.rootNode(root, ctx.module);
       const nested = resolveStructureInstance(root, ctx.module);
       if (nested && nested.schema.data_node_kind !== "container") {
         const saved = nested.schema.data_node_kind;
@@ -1029,27 +1045,19 @@ export class DocumentValidator {
       return;
     }
     try {
-      const context: XPathContext = { current: leafContextNode, root: rootNode };
-      const result = this.xpath.eval(ast, context, leafContextNode);
-      const nodes = Array.isArray(result) ? result : [];
-      const allowed = new Set<string>();
-      for (const n of nodes) {
-        if (!n || typeof n !== "object" || !("data" in n)) {
-          continue;
-        }
-        const v = (n as XPathNode).data;
-        if (v !== undefined && v !== null && (typeof v === "string" || typeof v === "number" || typeof v === "boolean")) {
-          allowed.add(String(v));
-        }
-      }
+      const context = this.xpathContext(leafContextNode, rootNode);
+      const allowed = this.xpath.evalPathValues(ast, context, leafContextNode);
       if (typeof value !== "string" && typeof value !== "number" && typeof value !== "boolean") {
         errors.push(issue(path, "leafref", "leafref value must be a string, number, or boolean"));
         return;
       }
-      const s = String(value);
-      if (requireInstance && !allowed.has(s)) {
+      if (requireInstance && !allowed.has(value)) {
         errors.push(
-          issue(path, "leafref", `leafref: value '${s}' does not reference an existing instance (require-instance is true)`)
+          issue(
+            path,
+            "leafref",
+            `leafref: value ${JSON.stringify(value)} does not reference an existing instance (require-instance is true)`
+          )
         );
       }
     } catch (e) {
@@ -1097,7 +1105,7 @@ export class DocumentValidator {
       );
       return;
     }
-    const context: XPathContext = { current: currentNode, root: rootNode };
+    const context = this.xpathContext(currentNode, rootNode);
     try {
       const nodes = this.xpath.evalPath(ast, context, rootNode);
       if (nodes.length === 0) {
@@ -1152,7 +1160,7 @@ export class DocumentValidator {
         continue;
       }
       try {
-        const context: XPathContext = { current: currentNode, root: rootNode };
+        const context = this.xpathContext(currentNode, rootNode);
         const result = this.xpath.eval(ast, context, currentNode);
         const ok = this.xpathBoolean(result);
         if (!ok) {
@@ -1200,7 +1208,7 @@ export class DocumentValidator {
     try {
       const evaluateWithParentContext = whenShape?.evaluate_with_parent_context === true;
       const evalNode = evaluateWithParentContext ? parentNode : currentNode;
-      const context: XPathContext = { current: evalNode, root: rootNode };
+      const context = this.xpathContext(evalNode, rootNode);
       const result = this.xpath.eval(ast, context, evalNode);
       const active = this.xpathBoolean(result);
       if (!active) {
