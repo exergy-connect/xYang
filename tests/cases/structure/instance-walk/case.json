@@ -1,0 +1,208 @@
+{
+  "description": "Instance-driven walk preserves list must, absent mandatory and minimum checks, and rejects disabled nodes (#261).",
+  "module": "m.yang",
+  "features": {
+    "m": []
+  },
+  "instances": [
+    {
+      "name": "optional children absent",
+      "data": {
+        "item": [
+          {
+            "id": "n0",
+            "value": 1,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n1",
+            "value": 2,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n2",
+            "value": 3,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n3",
+            "value": 4,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n4",
+            "value": 5,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n5",
+            "value": 6,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n6",
+            "value": 7,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n7",
+            "value": 8,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n8",
+            "value": 9,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n9",
+            "value": 10,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n10",
+            "value": 11,
+            "required-list": [
+              "x"
+            ]
+          },
+          {
+            "id": "n11",
+            "value": 12,
+            "required-list": [
+              "x"
+            ]
+          }
+        ]
+      },
+      "valid": true
+    },
+    {
+      "name": "missing mandatory",
+      "data": {
+        "item": [
+          {
+            "id": "a",
+            "required-list": [
+              "x"
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/item/0/value",
+          "code": "mandatory"
+        },
+        {
+          "path": "/item/0",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "list must",
+      "data": {
+        "item": [
+          {
+            "id": "a",
+            "value": 0,
+            "required-list": [
+              "x"
+            ]
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/item/0",
+          "code": "must"
+        }
+      ]
+    },
+    {
+      "name": "missing min elements",
+      "data": {
+        "item": [
+          {
+            "id": "a",
+            "value": 1
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/item/0/required-list",
+          "code": "min-elements"
+        }
+      ]
+    },
+    {
+      "name": "disabled feature present",
+      "data": {
+        "item": [
+          {
+            "id": "a",
+            "value": 1,
+            "required-list": [
+              "x"
+            ],
+            "guarded": "x"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/item/0/guarded",
+          "code": "if-feature"
+        }
+      ]
+    },
+    {
+      "name": "false when present",
+      "data": {
+        "item": [
+          {
+            "id": "a",
+            "value": 1,
+            "required-list": [
+              "x"
+            ],
+            "conditional": "x"
+          }
+        ]
+      },
+      "valid": false,
+      "errors": [
+        {
+          "path": "/item/0/conditional",
+          "code": "when"
+        }
+      ]
+    }
+  ]
+}

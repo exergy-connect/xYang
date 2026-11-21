@@ -134,6 +134,7 @@ export class DocumentValidator {
   private readonly contextStack: ValidationContext[] = [];
   /** Module that names the children of the data node currently being walked (RFC 7951 §4). */
   private readonly encodingParents: string[] = [];
+  private readonly walkPlans = new WeakMap<YangStatement, Map<string, { always: number[]; keys: Map<string, number[]> }>>();
   private typeValidationDebug: boolean;
 
   constructor(
@@ -481,7 +482,7 @@ export class DocumentValidator {
       }
       this.encodingParents.push(this.definedIn(stmt, this.encodingModule()));
       try {
-        for (const child of stmt.statements) {
+        for (const child of this.walkChildren(stmt, obj)) {
           const childKw = this.effectiveKeyword(child);
           if (childKw === YangTokenType.CHOICE) {
             this.validateChoice(child, obj, path, errors, currentNode, rootNode);
@@ -537,7 +538,7 @@ export class DocumentValidator {
               errors.push(issue(`${path}[${i}]/${key}`, "mandatory", `Missing list key '${key}'`));
             }
           }
-          for (const child of stmt.statements) {
+          for (const child of this.walkChildren(stmt, row)) {
             const childKw = this.effectiveKeyword(child);
             if (childKw === YangTokenType.CHOICE) {
               this.validateChoice(child, row, `${path}[${i}]`, errors, itemNode, rootNode);
@@ -837,6 +838,47 @@ export class DocumentValidator {
       return this.caseHasAnyData(stmt, obj);
     }
     return false;
+  }
+
+  /** Compile absent-node checks and member dispatch once per schema and encoding parent. */
+  private walkChildren(schema: YangStatement, data: Record<string, unknown>): YangStatement[] {
+    const parent = this.encodingModule();
+    let parents = this.walkPlans.get(schema);
+    if (!parents) {
+      parents = new Map();
+      this.walkPlans.set(schema, parents);
+    }
+    let plan = parents.get(parent);
+    if (!plan) {
+      const always: number[] = [];
+      const keys = new Map<string, number[]>();
+      schema.statements.forEach((child, index) => {
+        for (const key of this.instanceKeys(child, parent)) {
+          const indices = keys.get(key) ?? [];
+          indices.push(index);
+          keys.set(key, indices);
+        }
+        if (this.requiresAbsentVisit(child)) {
+          always.push(index);
+        }
+      });
+      plan = { always, keys };
+      parents.set(parent, plan);
+    }
+    const selected = new Set(plan.always);
+    for (const key of Object.keys(data)) {
+      for (const index of plan.keys.get(key) ?? []) selected.add(index);
+    }
+    return [...selected].sort((a, b) => a - b).map((index) => schema.statements[index]);
+  }
+
+  private requiresAbsentVisit(stmt: YangStatement): boolean {
+    const kw = this.effectiveKeyword(stmt);
+    if (kw === YangTokenType.CHOICE || kw === YangTokenType.CASE) return true;
+    if (kw === YangTokenType.CONTAINER && !stmt.presence) {
+      return stmt.statements.some((child) => this.requiresAbsentVisit(child));
+    }
+    return Boolean(stmt.mandatory || stmt.min_elements !== undefined || stmt.default !== undefined);
   }
 
   /** Module that names the children of the data node currently being walked. */

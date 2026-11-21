@@ -131,6 +131,9 @@ class DocumentValidator:
         self._case_level_data_stack: list[dict[str, Any]] = []
         # Module that names the children of the data node currently being walked (RFC 7951 §4).
         self._encoding_parents: list[str] = []
+        # Plans are keyed by schema identity and encoding parent: augmented
+        # children may use different RFC 7951 names under different parents.
+        self._walk_plans: dict[tuple[int, str], Any] = {}
         self._bind_type_features()
 
     def validate(
@@ -567,6 +570,18 @@ class DocumentValidator:
     # Tree walk
     # ------------------------------------------------------------------
 
+    @staticmethod
+    def _requires_absent_visit(stmt: YangStatement) -> bool:
+        if isinstance(stmt, (YangChoiceStmt, YangCaseStmt)):
+            return True
+        if isinstance(stmt, YangContainerStmt) and stmt.presence is None:
+            return any(DocumentValidator._requires_absent_visit(child) for child in stmt.statements)
+        return bool(
+            getattr(stmt, "mandatory", False)
+            or getattr(stmt, "min_elements", None) is not None
+            or SchemaNav.default(stmt) is not None
+        )
+
     def _visit_children(
         self,
         data: Any,
@@ -579,15 +594,37 @@ class DocumentValidator:
             return
         child_enforce = self._child_enforce_mandatory_choice(schema, enforce_mandatory_choice)
         parent_mod = self._encoding_parent_module()
-        visited_names: set[str] = set()
-        for stmt in schema.statements:
-            if isinstance(stmt, YangRpcStmt):
-                # rpc and action are operations, not data nodes (RFC 7950 §7.14, §7.15).
-                continue
-            if isinstance(stmt, YangChoiceStmt):
-                visited_names.update(self._choice_instance_keys(stmt, data))
-            else:
-                visited_names.update(member_keys_cached(stmt, parent_mod))
+        plan_key = (id(schema), parent_mod)
+        plan = self._walk_plans.get(plan_key)
+        if plan is None:
+            always: list[int] = []
+            by_key: dict[str, list[int]] = {}
+            known: set[str] = set()
+            choices: list[YangChoiceStmt] = []
+            for i, stmt in enumerate(schema.statements):
+                if isinstance(stmt, YangRpcStmt):
+                    continue
+                if isinstance(stmt, YangChoiceStmt):
+                    always.append(i)
+                    choices.append(stmt)
+                    continue
+                keys = member_keys_cached(stmt, parent_mod)
+                known.update(keys)
+                for key in keys:
+                    by_key.setdefault(key, []).append(i)
+                if self._requires_absent_visit(stmt):
+                    always.append(i)
+            plan = (always, by_key, known, choices, schema)
+            self._walk_plans[plan_key] = plan
+        always, by_key, known, choices, _schema = plan
+        selected = set(always)
+        for key in data:
+            selected.update(by_key.get(key, ()))
+        visited_names = set(known)
+        for choice in choices:
+            visited_names.update(self._choice_instance_keys(choice, data))
+        for i in sorted(selected):
+            stmt = schema.statements[i]
             self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
         from ..encoding.annotations import is_annotation
         for key in data:
@@ -1194,4 +1231,3 @@ class DocumentValidator:
             return None
         parts = [f"{k}='{entry.get(k)}'" for k in key_names]
         return ", ".join(parts) if parts else None
-
