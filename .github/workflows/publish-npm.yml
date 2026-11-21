@@ -1,4 +1,4 @@
-# Publish @exergy-connect/xyang to npm when a GitHub Release is published.
+# Publish after the release benchmark README update is merged to main.
 #
 # One-time npm setup (pick one auth method):
 #
@@ -13,24 +13,37 @@
 #    Create a token with publish access to @exergy-connect/xyang and add
 #    repository secret NPM_TOKEN.
 #
-# Before each release: tag vX.Y.Z; this workflow sets ts/package.json version
-# from the tag. Provenance requires repository.url in package.json (see ts/package.json).
+# The package version must match the measured release tag. Provenance requires
+# repository.url in package.json (see ts/package.json).
 
 name: Publish npm package
 
 on:
-  release:
-    types: [published]
+  push:
+    branches: [main]
+    paths: ["benchmarks/results/latest.json"]
   workflow_dispatch:
 
 jobs:
   publish:
     runs-on: ubuntu-latest
+    if: github.ref == 'refs/heads/main'
     permissions:
       contents: read
       id-token: write
     steps:
       - uses: actions/checkout@v7
+        with:
+          fetch-depth: 0
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+
+      - name: Verify release benchmark and README
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: python benchmarks/check_release_readme.py
 
       - name: Set up Node.js
         uses: actions/setup-node@v7
@@ -39,13 +52,6 @@ jobs:
           registry-url: "https://registry.npmjs.org"
           cache: npm
           cache-dependency-path: ts/package-lock.json
-
-      - name: Set package version from release tag
-        if: github.event_name == 'release'
-        working-directory: ts
-        run: |
-          VERSION="${GITHUB_REF_NAME#v}"
-          npm version "$VERSION" --no-git-tag-version --allow-same-version
 
       - name: Install dependencies
         working-directory: ts

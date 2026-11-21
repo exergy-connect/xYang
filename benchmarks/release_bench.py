@@ -191,6 +191,70 @@ def measure_startup(lang: str, ts_bundle: Path | None, spec: dict[str, Any], pro
     }
 
 
+def _zig_cli_commands(binary: Path, spec: dict[str, Any], phase: str) -> list[list[str]]:
+    if phase == "startup":
+        return [[str(binary), "--version"]]
+    if phase == "parse":
+        return [[str(binary), "parse", *sum((["--include-path", p] for p in m["include"]), []), m["path"]]
+                for m in spec["parse"]]
+    target = spec["validate"]
+    module = target["module"]
+    return [[str(binary), "validate", "--format", "json",
+             *sum((["--include-path", p] for p in module["include"]), []), module["path"], target["instance"]]]
+
+
+def _zig_cli_run(commands: list[list[str]], phase: str, *, measure_rss: bool = False) -> tuple[float, int]:
+    """Time whole CLI invocations; optionally measure each child's peak RSS with GNU time."""
+    clock_ms = 0.0
+    peak = 0
+    time_binary = shutil.which("time") if measure_rss else None
+    if measure_rss and not time_binary:
+        raise BenchmarkError("Zig CLI memory measurement requires GNU time on PATH")
+    for command in commands:
+        with tempfile.TemporaryFile(mode="w+") as rss_file:
+            cmd = [time_binary, "-f", "%M", "-o", f"/proc/self/fd/{rss_file.fileno()}", *command] if measure_rss else command
+            start = time.perf_counter_ns()
+            result = subprocess.run(cmd, cwd=ROOT, capture_output=True, text=True,
+                                    pass_fds=(rss_file.fileno(),) if measure_rss else ())
+            clock_ms += (time.perf_counter_ns() - start) / 1e6
+            if result.returncode:
+                raise BenchmarkError(f"Zig CLI {phase} failed ({result.returncode}): {result.stderr[-2000:]}")
+            if phase == "validate":
+                try:
+                    valid = json.loads(result.stdout).get("valid") is True
+                except (ValueError, AttributeError) as exc:
+                    raise BenchmarkError("Zig CLI validation did not return JSON") from exc
+                if not valid:
+                    raise BenchmarkError(f"Zig CLI rejected workload: {result.stdout[:2000]}")
+            if measure_rss:
+                rss_file.seek(0)
+                try:
+                    peak = max(peak, int(rss_file.read().strip()))
+                except ValueError as exc:
+                    raise BenchmarkError("GNU time did not report Zig peak RSS") from exc
+    return clock_ms, peak
+
+
+def measure_zig_cli(binary: Path, resolved: dict[str, Any], samples: int) -> dict[str, Any]:
+    time_path = shutil.which("time")
+    if not time_path or "gnu time" not in _cmd([time_path, "--version"]).lower():
+        raise BenchmarkError("Zig CLI memory measurement requires GNU time")
+    result: dict[str, Any] = {"samples": samples, "binary_sha256": measure_binary_size(binary)["sha256"], "workloads": {}}
+    any_spec = next(iter(resolved.values()))["spec"]
+    for name, spec, phase in [("", any_spec, "startup"), *(
+        (name, wl["spec"], phase) for name, wl in resolved.items() for phase in PHASES
+    )]:
+        commands = _zig_cli_commands(binary, spec, phase)
+        walls = [_zig_cli_run(commands, phase)[0] for _ in range(samples)]
+        rss = [_zig_cli_run(commands, phase, measure_rss=True)[1] / 1024 for _ in range(samples)]
+        measurement = {"wall_ms": _summary(walls), "peak_rss_mib": _summary(rss)}
+        if phase == "startup":
+            result["startup"] = measurement
+        else:
+            result["workloads"].setdefault(name, {})[phase] = measurement
+    return result
+
+
 # --------------------------------------------------------------------------- environment
 
 
@@ -270,8 +334,14 @@ def run(
     release_tag: str | None,
     memory_processes: int = MEMORY_PROCESSES,
     zig_binary: Path | None = None,
+    zig_cli: Path | None = None,
 ) -> dict[str, Any]:
     binary_size = measure_binary_size(zig_binary) if zig_binary is not None else None
+    zig_cli_argument = zig_cli
+    if zig_cli is not None:
+        zig_cli = zig_cli.resolve()
+        if not zig_cli.is_file() or not os.access(zig_cli, os.X_OK):
+            raise BenchmarkError(f"Zig CLI is not executable: {zig_cli}")
     with tempfile.TemporaryDirectory(prefix="xyang-bench-") as tmp:
         tmpdir = Path(tmp)
         ts_bundle = _build_ts_bundle(tmpdir) if "typescript" in languages else None
@@ -292,6 +362,7 @@ def run(
                         lang, ts_bundle, wl["spec"], phase, warmup, iterations, procs, mem_procs
                     )
             results[lang] = entry
+        zig_results = measure_zig_cli(zig_cli, resolved, 1 if smoke else 5) if zig_cli is not None else None
     data = {
         "schema_version": SCHEMA_VERSION,
         "generated_at": dt.datetime.now(dt.timezone.utc).replace(microsecond=0).isoformat(),
@@ -305,6 +376,9 @@ def run(
     if binary_size is not None:
         data["binary_size"] = {"zig": binary_size}
         data["reproduce"] = REPRODUCE.replace("run --out", f"run --zig-binary {shlex.quote(str(zig_binary))} --out", 1)
+    if zig_results is not None:
+        data["zig_cli"] = zig_results
+        data["reproduce"] = data["reproduce"].replace("run --", f"run --zig-cli {shlex.quote(str(zig_cli_argument))} --", 1)
     return data
 
 
@@ -403,6 +477,32 @@ def validate_results(data: Any) -> None:
         if not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise BenchmarkError("binary_size.zig.sha256 must be a SHA-256 digest")
 
+    if "zig_cli" in data:
+        zig_cli = _require(data["zig_cli"], "zig_cli", dict)
+        digest = _require(zig_cli.get("binary_sha256"), "zig_cli.binary_sha256", str)
+        if not re.fullmatch(r"[0-9a-f]{64}", digest):
+            raise BenchmarkError("zig_cli.binary_sha256 must be a SHA-256 digest")
+        if _require(zig_cli.get("samples"), "zig_cli.samples", int) < 1:
+            raise BenchmarkError("zig_cli.samples must be positive")
+        measurements = _require(zig_cli.get("workloads"), "zig_cli.workloads", dict)
+        if set(measurements) != set(workloads):
+            raise BenchmarkError("Zig CLI workloads do not match the measured workloads")
+        for path, row in [("startup", zig_cli.get("startup")), *(
+            (f"{name}.{phase}", measurements[name].get(phase)) for name in measurements for phase in PHASES
+        )]:
+            _require(row, f"zig_cli.{path}", dict)
+            _require_stats(row.get("wall_ms"), f"zig_cli.{path}.wall_ms")
+            _require_stats(row.get("peak_rss_mib"), f"zig_cli.{path}.peak_rss_mib")
+
+    if "previous_release" in data:
+        previous = _require(data["previous_release"], "previous_release", dict)
+        if "previous_release" in previous:
+            raise BenchmarkError("previous_release must not contain another comparison")
+        validate_results(previous)
+        git = previous["environment"]["git"]
+        if previous["smoke"] or git["dirty"] or not git.get("release_tag"):
+            raise BenchmarkError("previous release must be a clean release measurement")
+
 
 # --------------------------------------------------------------------------- markdown
 
@@ -419,12 +519,43 @@ def _mib(value: float) -> str:
     return f"{value:.1f} MiB"
 
 
+def _with_delta(value: float, previous: float | None, format_value: Any) -> str:
+    rendered = format_value(value)
+    if previous is None or previous <= 0:
+        return rendered + " (n/a)"
+    return rendered + f" ({(value / previous - 1) * 100:+.1f}%)"
+
+
+def _comparable_workload(current: dict[str, Any], previous: dict[str, Any], name: str) -> bool:
+    now = current["workloads"].get(name)
+    before = previous["workloads"].get(name)
+    if not now or not before:
+        return False
+    return all(now.get(key) == before.get(key) for key in (
+        "parse_modules", "parse_size", "validate_module", "instance_sha256", "instance_bytes"
+    ))
+
+
 def render_markdown(data: dict[str, Any]) -> str:
     validate_results(data)
     env = data["environment"]
     git, ver, rt, mach = env["git"], env["versions"], env["runtimes"], env["machine"]
     langs = [lang for lang in LANGUAGES if lang in data["results"]]
     label = {"python": "Python", "typescript": "TypeScript"}
+    previous = data.get("previous_release")
+
+    def measured(lang: str, name: str | None, phase: str, metric: str, formatter: Any) -> str:
+        def value(result: dict[str, Any]) -> float:
+            row = result["results"][lang]
+            return (row["startup"][metric]["median"] if name is None else
+                    row["workloads"][name][phase]["timing" if metric == "time_ms" else "memory"][metric]["median"])
+        current = value(data)
+        if previous is None:
+            return formatter(current)
+        old = None
+        if lang in previous["results"] and (name is None or _comparable_workload(data, previous, name)):
+            old = value(previous)
+        return _with_delta(current, old, formatter)
     tag = f" (release `{git['release_tag']}`)" if git.get("release_tag") else ""
     mem = f", {mach['mem_total_gib']} GiB RAM" if mach.get("mem_total_gib") else ""
     lines = [
@@ -438,19 +569,23 @@ def render_markdown(data: dict[str, Any]) -> str:
         f"({mach['cpu_count']} logical CPUs{mem})",
         "",
     ]
+    if previous is not None:
+        previous_tag = previous["environment"]["git"]["release_tag"]
+        lines += [f"Percentage changes compare with `{previous_tag}`; positive means more time or memory. "
+                  "Different runners can affect results; `n/a` means the workload or baseline is not comparable.", ""]
     first = data["results"][langs[0]]
     header = "| Workload | Phase | " + " | ".join(f"{label[lang]} median" for lang in langs) + " | Timed iterations |"
     lines += ["Time (warm, in-process, measured call only):", "", header, "|" + "---|" * (3 + len(langs))]
     for name in data["workloads"]:
         for phase in PHASES:
             ref = first["workloads"][name][phase]["timing"]
-            cells = [_ms(data["results"][lang]["workloads"][name][phase]["timing"]["time_ms"]["median"]) for lang in langs]
+            cells = [measured(lang, name, phase, "time_ms", _ms) for lang in langs]
             iters = (
                 f"{ref['iterations']} ({ref['processes']} processes × {ref['iterations_per_process']}, "
                 f"{ref['warmup_per_process']} warmup each)"
             )
             lines.append(f"| {name} | {phase} | " + " | ".join(cells) + f" | {iters} |")
-    cells = [_ms(data["results"][lang]["startup"]["wall_ms"]["median"]) + " wall" for lang in langs]
+    cells = [measured(lang, None, "", "wall_ms", _ms) + " wall" for lang in langs]
     lines.append(f"| none | process startup | " + " | ".join(cells) + f" | {first['startup']['processes']} processes |")
 
     header = "| Workload | Operation | " + " | ".join(f"{label[lang]} peak RSS" for lang in langs) + " | Processes |"
@@ -464,12 +599,12 @@ def render_markdown(data: dict[str, Any]) -> str:
     for name in data["workloads"]:
         for phase in PHASES:
             ref = first["workloads"][name][phase]["memory"]
-            cells = [_mib(data["results"][lang]["workloads"][name][phase]["memory"]["peak_rss_mib"]["median"]) for lang in langs]
+            cells = [measured(lang, name, phase, "peak_rss_mib", _mib) for lang in langs]
             lines.append(
                 f"| {name} | {MEMORY_OPERATION[phase]} | " + " | ".join(cells)
                 + f" | {ref['processes']} × {ref['operations_per_process']} operation |"
             )
-    cells = [_mib(data["results"][lang]["startup"]["peak_rss_mib"]["median"]) for lang in langs]
+    cells = [measured(lang, None, "", "peak_rss_mib", _mib) for lang in langs]
     lines.append(f"| none | process startup (library loaded) | " + " | ".join(cells) + f" | {first['startup']['processes']} |")
     rss_sources = ", ".join(
         sorted(
@@ -483,6 +618,31 @@ def render_markdown(data: dict[str, Any]) -> str:
         )
     )
     rss_sources = rss_sources.replace("VmHWM", "Linux `VmHWM`").replace("ru_maxrss", "`getrusage` maxrss")
+    if "zig_cli" in data:
+        zig = data["zig_cli"]
+        old_zig = previous.get("zig_cli") if previous else None
+        lines += ["", "Zig CLI (end-to-end process time; not comparable with the in-process timings above):", "",
+                  "| Workload | Command | Median wall time | Peak RSS |", "|---|---|---:|---:|"]
+        for name in data["workloads"]:
+            for phase in PHASES:
+                entry = zig["workloads"][name][phase]
+                old = (old_zig["workloads"].get(name, {}).get(phase)
+                       if old_zig and _comparable_workload(data, previous, name) else None)
+                wall = entry["wall_ms"]["median"]
+                memory = entry["peak_rss_mib"]["median"]
+                wall_text = _with_delta(wall, old["wall_ms"]["median"] if old else None, _ms) if previous else _ms(wall)
+                mem_text = _with_delta(memory, old["peak_rss_mib"]["median"] if old else None, _mib) if previous else _mib(memory)
+                lines.append(f"| {name} | {phase} | {wall_text} | {mem_text} |")
+        start = zig["startup"]
+        old_start = old_zig["startup"] if old_zig else None
+        wall = start["wall_ms"]["median"]
+        memory = start["peak_rss_mib"]["median"]
+        wall_text = _with_delta(wall, old_start["wall_ms"]["median"] if old_start else None, _ms) if previous else _ms(wall)
+        mem_text = _with_delta(memory, old_start["peak_rss_mib"]["median"] if old_start else None, _mib) if previous else _mib(memory)
+        lines.append(f"| none | --version | {wall_text} | {mem_text} |")
+        lines += ["", f"Medians of {zig['samples']} fresh-process samples. Parse runs one CLI process per module "
+                  "and sums their wall times; its RSS is the largest individual process peak. Validation includes "
+                  "startup, file I/O, schema loading and JSON decoding. RSS comes from separate GNU time runs."]
     lines += ["", "Workloads:", ""]
     for name, desc in data["workloads"].items():
         size = desc["parse_size"]
@@ -564,6 +724,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--smoke", action="store_true", help="1 process, 1 iteration, no warmup (not for README)")
     p_run.add_argument("--release-tag", default=None)
     p_run.add_argument("--zig-binary", type=Path, help="include this Zig executable's size and SHA-256")
+    p_run.add_argument("--zig-cli", type=Path, help="benchmark this Zig CLI end to end (requires GNU time on Linux)")
     p_render = sub.add_parser("render", help="print the Markdown section for a results file")
     p_render.add_argument("results", type=Path)
     p_readme = sub.add_parser("update-readme", help="rewrite the marked README section from a results file")
@@ -573,6 +734,10 @@ def main(argv: list[str] | None = None) -> int:
     p_readme.add_argument("--allow-dirty", action="store_true")
     p_validate = sub.add_parser("validate", help="check a results file against the schema")
     p_validate.add_argument("results", type=Path)
+    p_compare = sub.add_parser("compare", help="embed the previous release measurement in a results file")
+    p_compare.add_argument("results", type=Path)
+    p_compare.add_argument("previous", type=Path)
+    p_compare.add_argument("--previous-tag", required=True)
     args = parser.parse_args(argv)
 
     try:
@@ -585,7 +750,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in names:
                 if x not in WORKLOADS:
                     raise BenchmarkError(f"unknown workload {x!r}")
-            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes, args.zig_binary)
+            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes, args.zig_binary, args.zig_cli)
             validate_results(data)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
@@ -595,6 +760,18 @@ def main(argv: list[str] | None = None) -> int:
             return 0
         if args.command == "update-readme":
             return update_readme(args.results, args.readme, args.check, args.allow_dirty)
+        if args.command == "compare":
+            data = json.loads(args.results.read_text(encoding="utf-8"))
+            previous = json.loads(args.previous.read_text(encoding="utf-8"))
+            previous.pop("previous_release", None)
+            validate_results(data)
+            validate_results(previous)
+            if previous["environment"]["git"].get("release_tag") != args.previous_tag:
+                raise BenchmarkError("previous results do not match the requested release tag")
+            data["previous_release"] = previous
+            validate_results(data)
+            args.results.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")
+            return 0
         validate_results(json.loads(args.results.read_text(encoding="utf-8")))
         return 0
     except BenchmarkError as exc:

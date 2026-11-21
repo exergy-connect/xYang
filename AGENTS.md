@@ -57,6 +57,6 @@ A pull request head commit may carry the trailer line `Local-Tests: passed`. Add
 - In `CHANGELOG.md` and `ts/CHANGELOG.md`, move the `[Unreleased]` entries under `## [X.Y.Z] — YYYY-MM-DD`, leave an empty `## [Unreleased]`, and update the compare links at the bottom. Do not rewrite entries; the TS changelog lists every change that affects the npm package.
 - Title the PR `Release xYang X.Y.Z`; squash-merge it.
 - Publish a GitHub release with tag `vX.Y.Z` on the merge commit, titled `xYang X.Y.Z`. Notes start with 'Python `xyang` and TypeScript `@exergy-connect/xyang` are now version X.Y.Z.', then Highlights, any breaking changes with the replacement, Fixed / Changed / Removed with issue links, and end with links to both changelogs at the tag.
-- Publishing the release runs `publish-pypi.yml`, `publish-npm.yml`, `zig-release.yml` (Zig binaries, `xyang.wasm`, `xyang.mjs`), `release-artifacts.yml`, and the ontology tests; check that they succeed.
+- Publishing the release runs the benchmark, `zig-release.yml` (Zig binaries, `xyang.wasm`, `xyang.mjs`), `release-artifacts.yml`, and the ontology tests. Approve and merge the generated benchmark README PR; its merge triggers `publish-pypi.yml` and `publish-npm.yml` after verifying the measured release and README. Check that all workflows succeed.
 
 Author models with [`skills/xyang-model/SKILL.md`](skills/xyang-model/SKILL.md). Validate instances and integrate xYang in scripts or CI with [`skills/xyang-validate/SKILL.md`](skills/xyang-validate/SKILL.md).
