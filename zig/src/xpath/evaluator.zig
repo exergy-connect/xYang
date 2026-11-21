@@ -111,6 +111,7 @@ const BINARY_OPS = std.StaticStringMap(BinaryFn).initComptime(.{
 pub const Evaluator = struct {
     a: Allocator,
     message: []const u8 = "",
+    schema_index: ?*const schema_nav.Index = null,
 
     pub fn fail(self: *Evaluator, comptime fmt: []const u8, args: anytype) Error {
         self.message = try self.a.print(fmt, args);
@@ -235,7 +236,7 @@ pub const Evaluator = struct {
             for (node.data.array) |item| try self.step(try node.step(self.a, item, node.schema), key_in, root_module, out);
             return;
         }
-        const c = schema_nav.child(node.schema, key_in);
+        const c = schema_nav.indexedChild(self.schema_index, node.schema, key_in);
         var key = key_in;
         if (c) |sc| if (sc.name.len > 0) {
             const k = try self.memberKey(sc, nodeModule(node, root_module));

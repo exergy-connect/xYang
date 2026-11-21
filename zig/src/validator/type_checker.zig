@@ -16,6 +16,7 @@ const module_mod = @import("../module.zig");
 const registry = @import("../types/registry.zig");
 const identity_graph = @import("../identity_graph.zig");
 const xpath = @import("../xpath/xpath.zig");
+const schema_nav = @import("../xpath/schema_nav.zig");
 const pychars = @import("../xpath/pychars.zig");
 const if_feature_eval = @import("../if_feature_eval.zig");
 
@@ -63,6 +64,8 @@ pub const TypeChecker = struct {
     regex_scratch: regex.Regex.Scratch = .{},
     range_cache: std.StringHashMapUnmanaged([]const Band) = .empty,
     assume_ascii: bool = false,
+    schema_index: ?*const schema_nav.Index = null,
+    xpath_forbidden: bool = false,
     /// `root_schema`: the host module the validator runs against.
     root: *Module,
     /// False when the validator's root schema is an RFC 8791 structure, not a module:
@@ -100,13 +103,22 @@ pub const TypeChecker = struct {
     }
 
     fn context(self: *TypeChecker) Error!xpath.Context {
+        std.debug.assert(!self.xpath_forbidden);
         if (self.ctx) |c| return c;
         const root = try xpath.node.newNode(self.a, .null, .{ .module = self.root }, null);
         return .{ .current = root, .root = root };
     }
 
     fn evaluator(self: *TypeChecker) xpath.Evaluator {
-        return .{ .a = self.a };
+        return .{ .a = self.a, .schema_index = self.schema_index };
+    }
+
+    /// Check a value proven not to require XPath; reject a broken proof in Debug.
+    pub fn checkWithoutXPath(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
+        const saved = self.xpath_forbidden;
+        self.xpath_forbidden = true;
+        defer self.xpath_forbidden = saved;
+        return self.check(value, t);
     }
 
     fn one(self: *TypeChecker, i: ?Issue) Error![]const Issue {

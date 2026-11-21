@@ -21,6 +21,44 @@ fn statementsOf(schema: Schema) []const *Statement {
     };
 }
 
+/// Per-validation lookup table; the first matching statement preserves `find` order.
+pub const Index = struct {
+    owners: std.AutoHashMapUnmanaged(*const Statement, std.StringHashMapUnmanaged(*Statement)) = .empty,
+
+    pub fn prepare(self: *Index, a: std.mem.Allocator, owner: *const Statement) error{OutOfMemory}!void {
+        if (owner.statements.items.len == 0 or self.owners.contains(owner)) return;
+        var names: std.StringHashMapUnmanaged(*Statement) = .empty;
+        errdefer names.deinit(a);
+        try collectNames(a, owner.statements.items, &names);
+        try self.owners.put(a, owner, names);
+    }
+    pub fn deinit(self: *Index, a: std.mem.Allocator) void {
+        var it = self.owners.valueIterator();
+        while (it.next()) |names| names.deinit(a);
+        self.owners.deinit(a);
+        self.* = .{};
+    }
+};
+
+fn collectNames(a: std.mem.Allocator, stmts: []const *Statement, names: *std.StringHashMapUnmanaged(*Statement)) error{OutOfMemory}!void {
+    for (stmts) |s| {
+        const entry = try names.getOrPut(a, s.name);
+        if (!entry.found_existing) entry.value_ptr.* = s;
+        switch (s.kind()) {
+            .choice => for (s.data.choice.cases.items) |case| try collectNames(a, case.statements.items, names),
+            .case => try collectNames(a, s.statements.items, names),
+            else => {},
+        }
+    }
+}
+
+pub fn indexedChild(index: ?*const Index, schema: Schema, name: []const u8) ?*Statement {
+    if (index) |idx| if (schema == .stmt) {
+        if (idx.owners.get(schema.stmt)) |names| return names.get(name);
+    };
+    return child(schema, name);
+}
+
 /// `child`: the named child, looking through `choice` and `case` (no data of their own).
 pub fn child(schema: Schema, name: []const u8) ?*Statement {
     return find(statementsOf(schema), name);
@@ -111,4 +149,24 @@ pub fn leafrefPath(schema: Schema) ?*xast.Expr {
     const t = schema.stmt.data.leaf.type orelse return null;
     if (!std.mem.eql(u8, t.name, "leafref")) return null;
     return t.pathAst();
+}
+
+test "indexed child lookup preserves choice traversal and first match" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var diag: @import("../errors.zig").Diagnostic = .{};
+    const module = try @import("../parser/yang_parser.zig").parseString(a,
+        \\module m { namespace 'urn:m'; prefix m; container top {
+        \\ choice select { case a { leaf alpha { type string; } }
+        \\ case b { leaf beta { type string; } } }
+        \\ leaf gamma { type string; } } }
+    , "test.yang", &diag);
+    const top = module.statements.items[0];
+    var index: Index = .{};
+    defer index.deinit(a);
+    try index.prepare(a, top);
+    for ([_][]const u8{ "alpha", "beta", "gamma", "select", "missing" }) |name| {
+        try std.testing.expectEqual(child(.{ .stmt = top }, name), indexedChild(&index, .{ .stmt = top }, name));
+    }
 }

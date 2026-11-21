@@ -9,6 +9,8 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ### Changed
 
+- Zig skips document XPath nodes in constraint-free subtrees and indexes schema children for named XPath steps (#281).
+
 - Zig prepares schema metadata and delays diagnostic path formatting during document validation (#279).
 
 - Zig reuses regex working buffers and streams UTF-8 input, with a bitset for ASCII character classes. Zig callers can proclaim ASCII instance strings and schema defaults with `Options.assume_ascii`, checked in Debug builds (#276).
