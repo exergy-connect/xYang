@@ -176,6 +176,8 @@ To validate an rpc's or action's input or output, name it: `validator.validateDe
 
 RFC 7951 JSON is the default for JSON instance input (the JSON document, not the schema `.yang.json` file). There is no fallback between encodings. RFC 7951 lists are arrays, `int64` / `uint64` / `decimal64` are strings, and `empty` is `[null]`. `--native-json` (Python `native_json=True`, TypeScript `{ nativeJson: true }`, case.json `"encoding": "native"`) enables native dict-style input: keyed objects for single-key lists, bare names, JSON numbers, and `null` for empty. The Python CLI defaults to native encoding and JSON output for `.yaml` and `.yml` data files; `--format text` selects text output. JSON files and stdin retain the RFC 7951 and text defaults. Error paths point at the input as written (`/m:top/interface/0/mtu` or `/top/interface/eth0/mtu`). In RFC mode a union follows member order, so `"5"` in `union { type int64; type string; }` is an int64. In native mode a string stays a string.
 
+`--canonical` (Python `canonical=True`, TypeScript `{ canonical: true }`, case.json `"canonical": true`) claims a native instance is already canonical: lists are arrays, every member is spelled as the projection would spell it, no dotted key remains, and no `xt:normalize` rule changes a value. The claim is checked strictly and the instance is then validated as written, without building a projected copy. A false claim returns only `canonical` errors at the input pointer, with no fallback to normalization. It needs native JSON and does not apply to an rpc or action ([#262](https://github.com/exergy-connect/xYang/issues/262)).
+
 ---
 
 ## Example: IETF YANG Push notification

@@ -236,6 +236,7 @@ def build_parser() -> argparse.ArgumentParser:
             "  xyang validate --rpc add-link module.yang rpc-input.json\n"
             "  xyang validate --rpc add-link --output --context state.json module.yang output.json\n"
             "  xyang validate --native-json --rpc add-link module.yang params.json\n"
+            "  xyang validate --native-json --canonical module.yang canonical.json\n"
             "  xyang validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json"
         ),
     )
@@ -260,6 +261,15 @@ def build_parser() -> argparse.ArgumentParser:
         "--native-json",
         action="store_true",
         help="Accept native dict-style JSON instead of strict RFC 7951. Default: on for YAML data files; off otherwise.",
+    )
+    validate_parser.add_argument(
+        "--canonical",
+        action="store_true",
+        help=(
+            "The native data is already canonical (lists as arrays, no dotted keys or other normalization left): "
+            "check that strictly and validate it as written, without a projected copy. A failed check exits 1 "
+            "with only its errors. Needs native JSON. Default: off"
+        ),
     )
     validate_parser.add_argument(
         "--rpc",
@@ -487,6 +497,8 @@ def main() -> int:
             else:
                 data = json.load(sys.stdin)
             native_json = args.native_json or yaml_input
+            if args.canonical:
+                operation["canonical"] = True
             output_format = args.format or ("json" if yaml_input else "text")
             if output_format == "json":
                 result = validator.validate_detailed(data, native_json=native_json, allow_jsonld=args.allow_jsonld, allow_json_schema=args.allow_json_schema, **operation)

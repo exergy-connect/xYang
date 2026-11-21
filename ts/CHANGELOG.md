@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Added
+
+- `{ canonical: true }` (CLI `--canonical`, with `nativeJson: true`) validates a native instance that is already in canonical form as written, without building a projected copy. A false claim is reported as `canonical` errors at the input pointer only. A synthetic 1000-node Netlab ring validates in about 22 ms instead of 35 ms, with about 21 MiB instead of 33 MiB extra peak memory (#262).
+
 ### Changed
 
 - Validation uses cached schema dispatch plans to visit present members and absent nodes that require checks (#261).

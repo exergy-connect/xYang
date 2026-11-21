@@ -21,6 +21,8 @@
     { "name": "native qualified foreign name", "encoding": "native", "data": { "top": { "other:note": "hi" } }, "valid": true },
     { "name": "native ambiguous bare name", "encoding": "native", "data": { "top": { "extra": "x" } }, "valid": false,
       "errors": [{ "path": "/top/extra", "code": "ambiguous-name" }] },
+    { "name": "canonical keeps a bare name ambiguous (#262)", "encoding": "native", "canonical": true, "data": { "top": { "extra": "x" } }, "valid": false,
+      "errors": [{ "path": "/top/extra", "code": "ambiguous-name" }] },
     { "name": "native qualified name disambiguates", "encoding": "native", "data": { "top": { "other:extra": "aug" } }, "valid": true },
     { "name": "rfc missing required prefix", "data": { "top": { "note": "hi" } }, "valid": false,
       "errors": [{ "path": "/top/note", "code": "unknown-field" }] },

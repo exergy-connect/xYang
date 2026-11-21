@@ -151,6 +151,7 @@ class DocumentValidator:
         allow_json_schema: bool = True,
         module: Optional[YangModule] = None,
         from_iterator: bool = False,
+        canonical: bool = False,
     ) -> list[ValidationError]:
         """Validate data against the root schema.
 
@@ -165,6 +166,9 @@ class DocumentValidator:
             leafref_root_data: If set, used as XPath / leafref root data instead of
                 ``data`` (for validating a fragment in full-document context).
             path: Optional path prefix (e.g. subtree validation under ``anydata``).
+            canonical: With ``from_iterator``, ``data`` is canonical native JSON: it is checked
+                (``canonical_errors``) and walked as written, with no projected copy. A failed
+                check returns only its errors.
 
         Returns:
             List of ValidationError (empty when valid).
@@ -179,7 +183,13 @@ class DocumentValidator:
             self._if_feature_module = host
             self._enabled_features = build_enabled_features_map(host, self._enabled_features_by_module)
         self._bind_type_features()
-        if from_iterator and host is not None and isinstance(data, dict):
+        if canonical and from_iterator and host is not None and isinstance(data, dict):
+            from ..encoding.instance import canonical_errors
+
+            found = canonical_errors(data, host, schema=self._root_schema)
+            if found:
+                return [ValidationError(path=ptr or "/", message=message, code=code, pointer=ptr) for ptr, code, message in found]
+        elif from_iterator and host is not None and isinstance(data, dict):
             from ..encoding.instance import encoding_errors, iter_instance, project_instance
 
             nodes = list(iter_instance(data, host, native_json=native_json, schema=self._root_schema))

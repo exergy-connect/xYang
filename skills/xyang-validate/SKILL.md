@@ -128,6 +128,8 @@ A module that fails to parse raises `YangSyntaxError` (or `YangSemanticError`); 
 
 An absent list and `[]` both count as zero entries: `min-elements 1` rejects both, and `[]` is otherwise accepted. Module-qualified member names (`module:name`) are accepted where RFC 7951 requires them, for example for augmented nodes.
 
+If your generator already emits the canonical native tree (lists as arrays, no dotted keys, values `xt:normalize` would not change), add `--canonical` (`canonical=True`, `{ canonical: true }`). xYang checks that claim and validates the data without projecting a copy. A false claim is a `canonical` error at the offending pointer, for example `{"path": "/nodes", "code": "canonical", "message": "a list is a JSON array in a canonical instance"}`; drop the flag to have xYang normalize the input instead.
+
 ## Recipe: features, imports, anydata
 
 - `--features '{"mod": ["feat"]}'` enables only the listed features per module; `null` (the default) enables every declared feature. Data under a disabled `if-feature` is an `if-feature` error. Library: `features=` / `{ features }`.

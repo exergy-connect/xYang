@@ -575,6 +575,164 @@ export function* iterInstance(data: unknown, module: YangModule, options: IterIn
   yield* nodes;
 }
 
+type Issue = { path: string; code: string; message: string };
+
+function sameJson(left: unknown, right: unknown): boolean {
+  if (left === right) return true;
+  if (!left || !right || typeof left !== "object" || typeof right !== "object") return false;
+  if (Array.isArray(left) !== Array.isArray(right)) return false;
+  const a = left as Record<string, unknown>;
+  const b = right as Record<string, unknown>;
+  const keys = Object.keys(a);
+  return keys.length === Object.keys(b).length && keys.every((key) => Object.hasOwn(b, key) && sameJson(a[key], b[key]));
+}
+
+function errorText(e: unknown): string {
+  return String(e instanceof Error ? e.message : e);
+}
+
+/** False (and an issue) when a normalize rule fails or would change `raw`. */
+function normalized(stmt: YangStatement, raw: unknown, ptr: string, out: Issue[], collection = false): boolean {
+  let value: unknown;
+  try {
+    value = collection ? walkCache!.normalization.collection(stmt, raw) : walkCache!.normalization.visit(stmt, raw);
+  } catch (e) {
+    out.push({ path: ptr, code: "normalize", message: errorText(e) });
+    return false;
+  }
+  if (!sameJson(value, raw)) {
+    out.push({ path: ptr, code: "canonical", message: "an xt:normalize rule changes this value; it is applied only without canonical" });
+    return false;
+  }
+  return true;
+}
+
+function leafIssues(raw: unknown, stmt: YangStatement, module: YangModule, checker: TypeChecker, ptr: string): Issue[] {
+  return walkLeaf(raw, stmt, module, checker, ptr, true).errors.map(([code, message]) => ({ path: ptr, code, message }));
+}
+
+function checkObject(
+  data: Record<string, unknown>,
+  schema: SchemaLike,
+  module: YangModule,
+  checker: TypeChecker,
+  parent: string,
+  prefix: string,
+  atRoot: boolean,
+  out: Issue[]
+): void {
+  if (atRoot) {
+    const structure = resolveStructureInstance(data, module);
+    if (structure && structure.schema.data_node_kind !== "container") {
+      checkNode(structure.inner, structure.schema, module, checker, parent, join(prefix, structure.key), out);
+      return;
+    }
+  }
+  const expand = walkCache!.normalization.expandDotted;
+  const children = dataNodes(schema);
+  for (const [key, raw] of Object.entries(data)) {
+    const here = join(prefix, key);
+    if (expand && key.includes(".")) {
+      out.push({ path: here, code: "canonical", message: `dotted key '${key}' is expanded only without canonical` });
+      continue;
+    }
+    // Native resolution first, so a member accepted here resolves exactly as without canonical.
+    const hits = resolveCached(key, schema, children, parent, true, atRoot);
+    if (hits.length === 0) continue;
+    if (hits.length > 1) {
+      out.push({ path: here, code: "ambiguous-name", message: `member name '${key}' matches more than one node` });
+      continue;
+    }
+    const spelled = memberKey(hits[0], parent);
+    if (key !== spelled) {
+      out.push({ path: here, code: "canonical", message: `member '${key}' is spelled '${spelled}' in a canonical instance` });
+      continue;
+    }
+    checkNode(raw, hits[0], module, checker, parent, here, out);
+  }
+}
+
+function checkNode(
+  raw: unknown,
+  stmt: YangStatement,
+  module: YangModule,
+  checker: TypeChecker,
+  parent: string,
+  ptr: string,
+  out: Issue[]
+): void {
+  const keyword = keywordOf(stmt);
+  if (!normalized(stmt, raw, ptr, out, keyword === "list" || keyword === "leaf-list")) return;
+  const isObject = (value: unknown): value is Record<string, unknown> =>
+    Boolean(value) && typeof value === "object" && !Array.isArray(value);
+  if (keyword === "leaf") {
+    out.push(...leafIssues(raw, stmt, module, checker, ptr));
+  } else if (keyword === "container" || isStructureSchema(stmt)) {
+    if (!isObject(raw)) {
+      out.push({ path: ptr, code: "type", message: "container must be an object" });
+      return;
+    }
+    checkObject(raw, stmt, module, checker, definingModule(stmt, parent), ptr, false, out);
+  } else if (keyword === "list") {
+    if (isObject(raw)) {
+      out.push({ path: ptr, code: "canonical", message: "a list is a JSON array in a canonical instance" });
+      return;
+    }
+    if (!Array.isArray(raw)) {
+      out.push({ path: ptr, code: "type", message: "list must be an array" });
+      return;
+    }
+    raw.forEach((item, index) => {
+      const here = `${ptr}/${index}`;
+      if (!normalized(stmt, item, here, out)) return;
+      if (!isObject(item)) {
+        out.push({ path: here, code: "type", message: "list item must be an object" });
+        return;
+      }
+      checkObject(item, stmt, module, checker, definingModule(stmt, parent), here, false, out);
+    });
+  } else if (keyword === "leaf-list") {
+    if (!Array.isArray(raw)) {
+      out.push({ path: ptr, code: "type", message: "leaf-list must be an array" });
+      return;
+    }
+    raw.forEach((item, index) => {
+      const here = `${ptr}/${index}`;
+      if (normalized(stmt, item, here, out)) out.push(...leafIssues(item, stmt, module, checker, here));
+    });
+  }
+}
+
+/**
+ * Issues wherever native `data` is not already canonical (Python `canonical_errors`). Canonical
+ * native JSON is the tree `projectInstance` builds: members spelled as in that tree
+ * (`module:name` only where the module changes), lists as JSON arrays, no dotted keys left to
+ * expand, no `xt:normalize` rule that would change a value, and every leaf in its native
+ * encoding. No issues means `data` can be validated as written.
+ */
+export function canonicalErrors(data: Record<string, unknown>, module: YangModule, options: Omit<IterInstanceOptions, "nativeJson" | "skipProjection"> = {}): Issue[] {
+  const schema = options.schema ?? module;
+  const parent = options.parentModule ?? (schema === module ? (module.name ?? "") : "");
+  const checker = new TypeChecker(module);
+  const outer = walkCache;
+  walkCache = { nodes: new WeakMap(), resolved: new WeakMap(), unwrapped: new WeakMap(), pointers: new WeakMap(), normalization: new Normalization(module) };
+  walkCache.normalization.rootContext = () => ({ data, schema: schema as YangStatement, parent: null });
+  const out: Issue[] = [];
+  try {
+    const prepare = (current: SchemaLike, isModule = false): void => {
+      walkCache!.normalization.rules(current, isModule);
+      for (const child of dataNodes(current)) prepare(child);
+    };
+    prepare(schema, schema === module);
+    if (normalized(schema as YangStatement, data, "", out)) {
+      checkObject(data, schema, module, checker, parent, "", options.atRoot ?? true, out);
+    }
+  } finally {
+    walkCache = outer;
+  }
+  return out;
+}
+
 export function encodingErrors(nodes: InstanceNode[]): Array<{ path: string; code: string; message: string }> {
   const found: Array<{ path: string; code: string; message: string }> = [];
   const walk = (item: InstanceNode): void => {

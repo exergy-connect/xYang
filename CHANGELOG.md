@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Added
+
+- `canonical=True` (TypeScript `{ canonical: true }`, CLI `--canonical`) validates a native instance that is already in canonical form as written, without building a projected copy. The claim is checked strictly: a dotted key, a list given as an object, a member spelled differently from the projection, or a value an `xt:normalize` rule would change is a `canonical` error at the input pointer, and nothing else is reported. On a synthetic 1000-node Netlab ring, TypeScript validates in about 22 ms instead of 35 ms and Python in about 343 ms instead of 352 ms; the extra peak memory during validation drops from about 33 MiB to 21 MiB (TypeScript) and from 5.6 MiB to 0.1 MiB (Python) (#262).
+
 ### Changed
 
 - Validation uses cached schema dispatch plans to visit present members and absent nodes that require checks (#261).
