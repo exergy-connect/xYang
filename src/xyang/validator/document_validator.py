@@ -131,6 +131,8 @@ class DocumentValidator:
         self._case_level_data_stack: list[dict[str, Any]] = []
         # Module that names the children of the data node currently being walked (RFC 7951 §4).
         self._encoding_parents: list[str] = []
+        # Scoped to one walk: schemas can be modified between validations.
+        self._walk_member_keys: dict[tuple[int, str], frozenset[str]] = {}
         self._bind_type_features()
 
     def validate(
@@ -187,6 +189,7 @@ class DocumentValidator:
         self._leafref_severity = leafref_severity
         self._root_data = leafref_root_data if leafref_root_data is not None else data
         self._errors = []
+        self._walk_member_keys.clear()
         self._case_stack = []
         self._case_level_data_stack = []
         self._evaluator.clear_cache_stats()
@@ -586,9 +589,15 @@ class DocumentValidator:
                 continue
             if isinstance(stmt, YangChoiceStmt):
                 visited_names.update(self._choice_instance_keys(stmt, data))
+                keys = None
             else:
-                visited_names.update(member_keys_cached(stmt, parent_mod))
-            self._visit_stmt(stmt, data, parent_ctx, path, child_enforce)
+                cache_key = (id(stmt), parent_mod)
+                keys = self._walk_member_keys.get(cache_key)
+                if keys is None:
+                    keys = member_keys_cached(stmt, parent_mod)
+                    self._walk_member_keys[cache_key] = keys
+                visited_names.update(keys)
+            self._visit_stmt(stmt, data, parent_ctx, path, child_enforce, keys)
         from ..encoding.annotations import is_annotation
         for key in data:
             if key not in visited_names and not is_annotation(key, *self._annotation_options):
@@ -606,6 +615,7 @@ class DocumentValidator:
         parent_ctx: ParentCtx,
         path: PathBuilder,
         enforce_mandatory_choice: bool,
+        keys: Optional[frozenset[str]] = None,
     ) -> None:
         debug = logger.isEnabledFor(logging.DEBUG)
         if debug:
@@ -626,16 +636,19 @@ class DocumentValidator:
             return
 
         name = stmt.name
-        parent_mod = self._encoding_parent_module()
-        present = instance_member_present(data, stmt, parent_mod)
-        _val, json_key = instance_member_lookup(data, stmt, parent_mod)
+        if keys is None:
+            keys = member_keys_cached(stmt, self._encoding_parent_module())
+        member = next(iter(keys), None)
+        json_key = member if member is not None and member in data else None
+        value = data[json_key] if json_key is not None else None
+        present = json_key is not None
         json_name = json_key if json_key is not None else name
         child_path = path.child(json_name)
         child_pointer = path.child_pointer(json_name)
         parent_ctx_obj, parent_node = parent_ctx
 
         # -- 0. if-feature (before when; inactive nodes are not in the effective schema) --
-        if not self._if_features_active(stmt):
+        if getattr(stmt, "if_features", None) and not self._if_features_active(stmt):
             if present:
                 self._add(
                     path=child_path,
@@ -649,7 +662,9 @@ class DocumentValidator:
             return
 
         # Need val and (curr_node, curr_ctx) for when, must, and type checks
-        val = self._effective_value(data, stmt)
+        val = value if present else self._decode_schema_default(
+            getattr(stmt, "type", None), SchemaNav.default(stmt)
+        )
         curr_node = parent_node.step(val, stmt)
         curr_ctx = parent_ctx_obj.child(curr_node)
 
@@ -1194,4 +1209,3 @@ class DocumentValidator:
             return None
         parts = [f"{k}='{entry.get(k)}'" for k in key_names]
         return ", ".join(parts) if parts else None
-

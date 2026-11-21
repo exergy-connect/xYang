@@ -88,7 +88,7 @@ def member_keys_cached(stmt: YangStatement, parent_module_name: str) -> frozense
 
 def instance_member_present(data: Mapping[str, Any], stmt: YangStatement, parent_module_name: str) -> bool:
     keys = member_keys_cached(stmt, parent_module_name)
-    return any(key in data for key in keys)
+    return bool(keys) and next(iter(keys)) in data
 
 
 def instance_member_lookup(

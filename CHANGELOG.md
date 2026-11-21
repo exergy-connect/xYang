@@ -7,6 +7,10 @@ and this project adheres to [Semantic Versioning](https://semver.org/spec/v2.0.0
 
 ## [Unreleased]
 
+### Changed
+
+- Reduce repeated member-name and path work during Python document validation (#263).
+
 ## [1.0.7] — 2026-11-20
 
 ### Fixed

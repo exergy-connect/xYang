@@ -9,6 +9,10 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- Reuse member names and skip empty feature checks during document validation (#263).
+
 ## [1.0.7] — 2026-11-20
 
 ### Fixed
