@@ -335,6 +335,7 @@ def run(
     memory_processes: int = MEMORY_PROCESSES,
     zig_binary: Path | None = None,
     zig_cli: Path | None = None,
+    zig_build: str | None = None,
 ) -> dict[str, Any]:
     binary_size = measure_binary_size(zig_binary) if zig_binary is not None else None
     zig_cli_argument = zig_cli
@@ -377,8 +378,12 @@ def run(
         data["binary_size"] = {"zig": binary_size}
         data["reproduce"] = REPRODUCE.replace("run --out", f"run --zig-binary {shlex.quote(str(zig_binary))} --out", 1)
     if zig_results is not None:
+        if zig_build:
+            zig_results["build"] = zig_build
         data["zig_cli"] = zig_results
         data["reproduce"] = data["reproduce"].replace("run --", f"run --zig-cli {shlex.quote(str(zig_cli_argument))} --", 1)
+        if zig_build:
+            data["reproduce"] = data["reproduce"].replace("run --", f"run --zig-build {shlex.quote(zig_build)} --", 1)
     return data
 
 
@@ -479,6 +484,8 @@ def validate_results(data: Any) -> None:
 
     if "zig_cli" in data:
         zig_cli = _require(data["zig_cli"], "zig_cli", dict)
+        if "build" in zig_cli:
+            _require(zig_cli["build"], "zig_cli.build", str)
         digest = _require(zig_cli.get("binary_sha256"), "zig_cli.binary_sha256", str)
         if not re.fullmatch(r"[0-9a-f]{64}", digest):
             raise BenchmarkError("zig_cli.binary_sha256 must be a SHA-256 digest")
@@ -621,6 +628,8 @@ def render_markdown(data: dict[str, Any]) -> str:
     if "zig_cli" in data:
         zig = data["zig_cli"]
         old_zig = previous.get("zig_cli") if previous else None
+        if old_zig and (not zig.get("build") or zig.get("build") != old_zig.get("build")):
+            old_zig = None
         lines += ["", "Zig CLI (end-to-end process time; not comparable with the in-process timings above):", "",
                   "| Workload | Command | Median wall time | Peak RSS |", "|---|---|---:|---:|"]
         for name in data["workloads"]:
@@ -725,6 +734,7 @@ def main(argv: list[str] | None = None) -> int:
     p_run.add_argument("--release-tag", default=None)
     p_run.add_argument("--zig-binary", type=Path, help="include this Zig executable's size and SHA-256")
     p_run.add_argument("--zig-cli", type=Path, help="benchmark this Zig CLI end to end (requires GNU time on Linux)")
+    p_run.add_argument("--zig-build", help="record the Zig CLI build configuration for release comparisons")
     p_render = sub.add_parser("render", help="print the Markdown section for a results file")
     p_render.add_argument("results", type=Path)
     p_readme = sub.add_parser("update-readme", help="rewrite the marked README section from a results file")
@@ -750,7 +760,7 @@ def main(argv: list[str] | None = None) -> int:
             for x in names:
                 if x not in WORKLOADS:
                     raise BenchmarkError(f"unknown workload {x!r}")
-            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes, args.zig_binary, args.zig_cli)
+            data = run(languages, names, args.processes, args.smoke, args.release_tag, args.memory_processes, args.zig_binary, args.zig_cli, args.zig_build)
             validate_results(data)
             args.out.parent.mkdir(parents=True, exist_ok=True)
             args.out.write_text(json.dumps(data, indent=2) + "\n", encoding="utf-8")

@@ -1,6 +1,6 @@
 # Build xyang-zig for Linux x86_64 (other platforms are paused), plus the
 # freestanding Wasm library and JavaScript wrapper, and attach them to a GitHub
-# Release. Not part of pull-request CI. Runs when a release is published, and
+# Release. The benchmark workflow reuses this exact binary. Not part of pull-request CI. Runs when a release is published, and
 # on a manual workflow_dispatch (build and test only; nothing is attached unless
 # this run is a published release).
 #
@@ -119,6 +119,28 @@ jobs:
           node --test tests/wasm.test.mjs
           cp zig-out/bin/xyang.wasm dist/xyang.wasm
           cp wasm/xyang.mjs dist/xyang.mjs
+
+      - name: Record benchmark binary provenance
+        env:
+          RELEASE_TAG: ${{ github.event.release.tag_name }}
+        run: |
+          python3 - <<'PY'
+          import hashlib, json, os
+          from pathlib import Path
+          binary = Path('zig/dist/xyang-zig-linux-x64')
+          manifest = {'commit': os.environ['GITHUB_SHA'], 'tag': os.environ['RELEASE_TAG'],
+                      'sha256': hashlib.sha256(binary.read_bytes()).hexdigest()}
+          (binary.parent / 'benchmark-manifest.json').write_text(json.dumps(manifest) + '\n')
+          PY
+
+      - name: Share the release binary with the benchmark workflow
+        uses: actions/upload-artifact@v7
+        with:
+          name: zig-benchmark-build
+          path: |
+            zig/dist/xyang-zig-linux-x64
+            zig/dist/benchmark-manifest.json
+          if-no-files-found: error
 
       - name: Upload binaries and Wasm assets
         if: github.event_name == 'workflow_dispatch'

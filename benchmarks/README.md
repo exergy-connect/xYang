@@ -26,7 +26,7 @@ Other commands:
 |---|---|
 | `run --smoke --out FILE` | 1 process, 1 iteration, no warmup. Checks the harness works; never goes into the README. |
 | `run --languages python --workloads small` | Subset run. |
-| `run --zig-cli PATH --zig-binary PATH` | Add end-to-end Zig CLI time and memory, and record its binary size (Linux with GNU time). |
+| `run --zig-cli PATH --zig-binary PATH --zig-build ReleaseSafe` | Add end-to-end Zig CLI time and memory, and record its binary size and build configuration (Linux with GNU time). |
 | `render FILE` | Print the README Markdown for a results file. |
 | `update-readme FILE --check` | Exit 1 if the README section differs from what `FILE` renders. |
 | `validate FILE` | Check a results file against the schema. |
@@ -59,7 +59,7 @@ result on every invocation.
 
 ## Zig CLI measurements
 
-Release benchmarks build the Zig binary and use `--zig-cli` to run it on both
+Release benchmarks reuse the published Zig CLI and use `--zig-cli` to run it on both
 workloads. The Zig table reports the median of five fresh-process samples (one
 for smoke runs). Each parse sample invokes the CLI once for each workload module
 and sums the wall times; each validation sample starts a new CLI, loads the model,
@@ -72,7 +72,7 @@ These are end-to-end command-line measurements, including process startup and
 file I/O. Python and TypeScript timings below measure repeated in-process calls
 after setup, so the tables cannot be compared as equivalent operations. Zig
 release-to-release deltas use the same CLI measurements when the preceding
-release has them; otherwise they show `n/a`.
+release has them with the same recorded build configuration; otherwise they show `n/a`.
 
 ## What is measured
 
@@ -157,10 +157,13 @@ is reported in its own table, separate from performance.
 
 ## Executable size
 
-Release and manual benchmark runs also build the Zig CLI with the pinned toolchain,
-`-Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline` (stripped by `build.zig`).
+Release and manual benchmark runs reuse the Zig release workflow's CLI, built with
+the pinned toolchain and `-Doptimize=ReleaseSafe -Dtarget=x86_64-linux-musl
+-Dcpu=baseline` (stripped by `build.zig`). The benchmark verifies its commit and
+SHA-256 before use. Previous releases measured a `small` build, so Zig deltas
+against those releases are unavailable.
 The results JSON records the file size in bytes and SHA-256; the generated README
-section shows bytes and KiB. This build runs in the release benchmark workflow.
+section shows bytes and KiB. This is the same binary attached to the release.
 
 To include a local binary, pass `run --zig-binary PATH` with the other run options.
 The harness measures that file without executing it. Omitting the option keeps
@@ -170,18 +173,21 @@ older results and smoke runs compatible and does not require Zig.
 
 [`.github/workflows/benchmark.yml`](../.github/workflows/benchmark.yml):
 
-- **Release published:** full run on the release tag (`ubuntu-24.04`, Python
+- **Release published:** the Zig release workflow builds and attaches the binary;
+  on its successful completion, the benchmark runs on the same release commit
+  using that exact binary (`ubuntu-24.04`, Python
   3.12, Node.js from `.nvmrc`). The results JSON and rendered section are a
   workflow artifact and the job summary. The JSON is attached to the release as
   `benchmark-<tag>.json`. A second job checks out `main`, rewrites the README
   section and `benchmarks/results/latest.json`, pushes `benchmark/<tag>-<run id>`,
   and opens a pull request against `main`. It never pushes to `main`.
 - Merging a release benchmark PR triggers the PyPI and npm publishing workflows. Each checks that the README matches complete, clean results for the published release tag, that the measured commit is the tag commit, and that only README and results changed since that tag. Package builds use the merged README. If the release benchmark PR fails to merge or its checks fail, publishing does not proceed. Both publishing workflows may also be dispatched on `main` for a retry and apply the same gate.
-- **Manual (`workflow_dispatch`):** full run on the chosen ref, artifact only;
-  set `open_pr` to also propose the README update.
-- **Pull requests touching benchmark files:** smoke run, schema check, and a
-  check that the README section matches `results/latest.json`. No timing
-  thresholds.
+- **Manual (`workflow_dispatch`):** first run `Release Zig binaries` on the
+  desired ref, then dispatch `Benchmark` on that same ref with its run ID. The
+  result is an artifact only; set `open_pr` to also propose the README update.
+- **Pull requests touching benchmark files:** the Zig workflow builds the CLI
+  once and shares it with its smoke job, which checks the schema and README
+  against `results/latest.json`. No timing thresholds.
 
 The workflow uses `GITHUB_TOKEN` to attach the results and the repository secret
 `PUBLISH_BENCHMARK_TOKEN` to push the branch and open the pull request. The

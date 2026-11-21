@@ -1,12 +1,11 @@
 # Release benchmark: Python/TypeScript time, memory, source lines, and Zig binary size.
 #
-# - pull_request (benchmark files only): smoke run (1 iteration) plus a check that
-#   the README section matches benchmarks/results/latest.json. No timing thresholds.
-# - release published: full run on the release tag. Results are uploaded as a
+# - pull_request smoke checks run in zig.yml using that workflow's Zig build.
+# - after the release Zig build succeeds: full run on its release tag. Results are uploaded as a
 #   workflow artifact and attached to the release, and a pull request against main
 #   refreshes README.md and benchmarks/results/latest.json.
-# - workflow_dispatch: full run on the selected ref; artifact only, unless
-#   open_pr is true.
+# - workflow_dispatch: full run using an existing Zig release-workflow run ID;
+#   artifact only, unless open_pr is true.
 #
 # PUBLISH_BENCHMARK_TOKEN pushes and opens the benchmark pull request; the
 # workflow GITHUB_TOKEN attaches results to the release. A failed measurement
@@ -15,104 +14,85 @@
 name: Benchmark
 
 on:
-  release:
-    types: [published]
+  workflow_run:
+    workflows: ["Release Zig binaries"]
+    types: [completed]
   workflow_dispatch:
     inputs:
+      zig_run_id:
+        description: Successful Release Zig binaries workflow run ID for the selected ref
+        type: string
+        required: true
       open_pr:
         description: Push a branch and open a pull request that refreshes the README benchmark section
         type: boolean
         default: false
-  pull_request:
-    paths:
-      - "benchmarks/**"
-      - "ts/bench/**"
-      - "ts/scripts/build-bench-worker.mjs"
-      - ".github/workflows/benchmark.yml"
 
 permissions:
+  actions: read
   contents: read
 
 concurrency:
-  group: benchmark-${{ github.event.release.tag_name || github.event.pull_request.number || github.ref }}
-  cancel-in-progress: ${{ github.event_name == 'pull_request' }}
-
-env:
-  ZIG_VERSION: "0.17.1"
-  ZIG_SHA256: "3581863e3cbcfd0fce0efc682ce7e9e93da96668a977791d356a26d2a7e9b17a"
+  group: benchmark-${{ github.event.workflow_run.id || github.run_id }}
+  cancel-in-progress: false
 
 jobs:
-  smoke:
-    name: Benchmark smoke
-    if: github.event_name == 'pull_request'
-    runs-on: ubuntu-24.04
-    steps:
-      - uses: actions/checkout@v7
-
-      - uses: actions/setup-python@v7
-        with:
-          python-version: "3.12"
-
-      - uses: actions/setup-node@v7
-        with:
-          node-version-file: .nvmrc
-          cache: npm
-          cache-dependency-path: ts/package-lock.json
-
-      - name: Install
-        run: |
-          python -m pip install --upgrade pip
-          pip install -e .
-          cd ts && npm ci
-
-      - name: Cache Zig toolchain
-        id: zig-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/zig
-          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
-
-      - name: Install Zig
-        if: steps.zig-cache.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-          curl -sSfL -o "$tarball" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
-          echo "$ZIG_SHA256  $tarball" | sha256sum -c -
-          mkdir -p ~/zig
-          tar -xJf "$tarball" -C ~/zig --strip-components=1
-
-      - name: Build Zig CLI
-        working-directory: zig
-        run: |
-          set -euo pipefail
-          [ "$("$HOME/zig/zig" version)" = "$ZIG_VERSION" ]
-          "$HOME/zig/zig" build -Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline --prefix zig-out-benchmark
-
-      - name: Smoke run (not a measurement)
-        run: |
-          python benchmarks/release_bench.py run --smoke --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig --out smoke.json
-          python benchmarks/release_bench.py validate smoke.json
-
-      - name: README section matches checked-in results
-        run: python benchmarks/release_bench.py update-readme benchmarks/results/latest.json --check
-
   measure:
     name: Measure
-    if: github.event_name != 'pull_request'
+    if: github.event_name == 'workflow_dispatch' || (github.event.workflow_run.event == 'release' && github.event.workflow_run.conclusion == 'success')
     runs-on: ubuntu-24.04
     outputs:
       tag: ${{ steps.meta.outputs.tag }}
+      commit: ${{ steps.meta.outputs.commit }}
     steps:
-      - uses: actions/checkout@v7
+      - name: Download the exact Zig build
+        uses: actions/download-artifact@v8
         with:
-          fetch-depth: 0
+          name: zig-benchmark-build
+          path: ${{ runner.temp }}/zig-benchmark
+          run-id: ${{ github.event.workflow_run.id || inputs.zig_run_id }}
+          github-token: ${{ github.token }}
 
       - id: meta
-        name: Release tag
+        name: Verify Zig build provenance
         env:
-          TAG: ${{ github.event.release.tag_name }}
-        run: echo "tag=${TAG}" >> "$GITHUB_OUTPUT"
+          EXPECTED_SHA: ${{ github.event.workflow_run.head_sha || github.sha }}
+          EVENT_NAME: ${{ github.event_name }}
+        run: |
+          python3 - <<'PYCODE'
+          import hashlib, json, os, re
+          from pathlib import Path
+          build_dir = Path(os.environ['RUNNER_TEMP']) / 'zig-benchmark'
+          manifest = json.loads((build_dir / 'benchmark-manifest.json').read_text())
+          binary = build_dir / 'xyang-zig-linux-x64'
+          if manifest['commit'] != os.environ['EXPECTED_SHA']:
+              raise SystemExit('Zig artifact does not match the requested commit')
+          if hashlib.sha256(binary.read_bytes()).hexdigest() != manifest['sha256']:
+              raise SystemExit('Zig artifact checksum does not match its manifest')
+          tag = manifest['tag']
+          if tag and not re.fullmatch(r'v[0-9]+\.[0-9]+\.[0-9]+', tag):
+              raise SystemExit('Invalid release tag in Zig artifact')
+          if os.environ['EVENT_NAME'] == 'workflow_run' and not tag:
+              raise SystemExit('Release Zig artifact has no release tag')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write(f"commit={manifest['commit']}\ntag={tag}\n")
+          PYCODE
+
+      - uses: actions/checkout@v7
+        with:
+          ref: ${{ steps.meta.outputs.commit }}
+          fetch-depth: 0
+
+      - name: Install the shared Zig binary
+        env:
+          TAG: ${{ steps.meta.outputs.tag }}
+          COMMIT: ${{ steps.meta.outputs.commit }}
+        run: |
+          set -euo pipefail
+          if [ -n "$TAG" ]; then [ "$(git rev-parse "refs/tags/${TAG}^{commit}")" = "$COMMIT" ]; fi
+          mkdir -p zig/zig-out-benchmark/bin
+          cp "$RUNNER_TEMP/zig-benchmark/xyang-zig-linux-x64" zig/zig-out-benchmark/bin/xyang-zig
+          chmod +x zig/zig-out-benchmark/bin/xyang-zig
 
       - uses: actions/setup-python@v7
         with:
@@ -129,44 +109,18 @@ jobs:
           python -m pip install --upgrade pip
           pip install -e .
           cd ts && npm ci
-
-      - name: Cache Zig toolchain
-        id: zig-cache
-        uses: actions/cache@v5
-        with:
-          path: ~/zig
-          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
-
-      - name: Install Zig
-        if: steps.zig-cache.outputs.cache-hit != 'true'
-        run: |
-          set -euo pipefail
-          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
-          curl -sSfL -o "${tarball}" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
-          echo "$ZIG_SHA256  $tarball" | sha256sum -c -
-          mkdir -p ~/zig
-          tar -xJf "$tarball" -C ~/zig --strip-components=1
-
-      - name: Build Zig binary for size measurement
-        working-directory: zig
-        run: |
-          set -euo pipefail
-          pinned="$(sed -n 's/.*minimum_zig_version = "\([^"]*\)".*/\1/p' build.zig.zon)"
-          [ "$pinned" = "$ZIG_VERSION" ]
-          [ "$("$HOME/zig/zig" version)" = "$ZIG_VERSION" ]
-          "$HOME/zig/zig" build -Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline --prefix zig-out-benchmark
 
       - name: Run benchmark
         env:
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
-          args=(run --out bench-out/results.json --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig)
+          args=(run --out bench-out/results.json --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig --zig-build ReleaseSafe)
           if [ -n "${TAG}" ]; then args+=(--release-tag "${TAG}"); fi
           python benchmarks/release_bench.py "${args[@]}"
 
       - name: Compare with the previous release
-        if: github.event_name == 'release'
+        if: github.event_name == 'workflow_run'
         env:
           GH_TOKEN: ${{ github.token }}
           TAG: ${{ steps.meta.outputs.tag }}
@@ -200,7 +154,7 @@ jobs:
   attach:
     name: Attach to release
     needs: measure
-    if: github.event_name == 'release'
+    if: github.event_name == 'workflow_run'
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -221,7 +175,7 @@ jobs:
   readme-pr:
     name: README pull request
     needs: measure
-    if: github.event_name == 'release' || (github.event_name == 'workflow_dispatch' && inputs.open_pr)
+    if: github.event_name == 'workflow_run' || (github.event_name == 'workflow_dispatch' && inputs.open_pr)
     runs-on: ubuntu-24.04
     permissions:
       contents: write
@@ -250,9 +204,10 @@ jobs:
         env:
           GH_TOKEN: ${{ secrets.PUBLISH_BENCHMARK_TOKEN }}
           TAG: ${{ needs.measure.outputs.tag }}
+          MEASURED_COMMIT: ${{ needs.measure.outputs.commit }}
         run: |
           set -euo pipefail
-          label="${TAG:-${GITHUB_SHA::12}}"
+          label="${TAG:-${MEASURED_COMMIT::12}}"
           branch="benchmark/${label}-${GITHUB_RUN_ID}"
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
@@ -265,7 +220,7 @@ jobs:
           git commit -m "Refresh README benchmark results for ${label}."
           git push origin "$branch"
           title="Refresh README benchmark results for ${label}"
-          body="Measured by the Benchmark workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} (commit ${GITHUB_SHA})."
+          body="Measured by the Benchmark workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} (commit ${MEASURED_COMMIT})."
           if ! gh pr create --base main --head "$branch" --title "$title" --body "$body"; then
             url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
             echo "::error::Could not open the pull request. Check PUBLISH_BENCHMARK_TOKEN and open it by hand: ${url}"
