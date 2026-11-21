@@ -21,6 +21,8 @@ _QUOTED_BODY = {
     '"': re.compile(r'(?:[^"\\]|\\[\s\S]|\\\Z)*'),
     "'": re.compile(r"(?:[^'\\]|\\[\s\S]|\\\Z)*"),
 }
+_IDENTIFIER_TAIL = re.compile(r"[\w.\-]*")
+_ASCII_DIGITS = re.compile(r"[0-9]+")
 
 
 class YangTokenizer:
@@ -44,6 +46,8 @@ class YangTokenizer:
         append = token_list.append
         punctuation = self._PUNCTUATION
         whitespace_run = _WHITESPACE_RUN.match
+        identifier_tail = _IDENTIFIER_TAIL.match
+        ascii_digits = _ASCII_DIGITS.match
         i = 0
         content_len = len(content)
         current_line = 1
@@ -111,6 +115,8 @@ class YangTokenizer:
             if char == "-" and i + 1 < content_len and content[i + 1].isdigit():
                 token_start = i
                 j = i + 1
+                if content[j].isascii():
+                    j = ascii_digits(content, j).end()
                 while j < content_len and content[j].isdigit():
                     j += 1
                 append(
@@ -128,12 +134,14 @@ class YangTokenizer:
             # (e.g. yang-version 1.1 — not an identifier in RFC 7950)
             if char.isdigit():
                 start = i
-                j = i
+                j = ascii_digits(content, i).end() if char.isascii() else i
                 while j < content_len and content[j].isdigit():
                     j += 1
                 tok_type = YangTokenType.INTEGER
                 if j < content_len and content[j] == "." and j + 1 < content_len and content[j + 1].isdigit():
                     j += 1
+                    if content[j].isascii():
+                        j = ascii_digits(content, j).end()
                     while j < content_len and content[j].isdigit():
                         j += 1
                     tok_type = YangTokenType.DOTTED_NUMBER
@@ -151,12 +159,7 @@ class YangTokenizer:
             # Identifier: ( ALPHA / "_" ) *( ALPHA / DIGIT / "_" / "-" / "." )
             if char.isalpha() or char == "_":
                 start = i
-                j = i + 1
-                while j < content_len:
-                    c = content[j]
-                    if not (c.isalnum() or c in ("_", "-", ".")):
-                        break
-                    j += 1
+                j = identifier_tail(content, i + 1).end()
                 append(
                     YangToken(
                         type=YangTokenType.IDENTIFIER,
