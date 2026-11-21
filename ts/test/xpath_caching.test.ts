@@ -3,6 +3,7 @@ import { parseYangString, YangValidator } from "../src";
 import { XPathEvaluator, type XPathContext, type XPathNode, type XPathSchema } from "../src/xpath/evaluator";
 import { parseXPath } from "../src/xpath/parser";
 import type { YangModule } from "../src/core/model";
+import { DocumentValidator } from "../src/validator/document-validator";
 
 /** One schema covering absolute, predicate, relative, and current() must cases (Python test_xpath_caching). */
 const XPATH_CACHING_YANG = `
@@ -166,14 +167,86 @@ describe("python parity: test_xpath_caching", () => {
     expect(r.isValid, r.errors.join("\n")).toBe(true);
   });
 
-  it("XPathEvaluator: /top/flag = 1 and /top/flag = 1 evaluates true on instance", () => {
+  it("XPathEvaluator: /top/flag = 1 and /top/flag = 1 hits the path cache once", () => {
     const mod = parseYangString(XPATH_CACHING_YANG) as YangModule;
     const data = { top: { flag: 1 } };
     const root: XPathNode = { data, schema: mod as unknown as XPathSchema, parent: null };
-    const ctx: XPathContext = { current: root, root };
+    const ctx: XPathContext = { current: root, root, pathCache: new Map() };
     const ev = new XPathEvaluator();
     const ast = parseXPath("/top/flag = 1 and /top/flag = 1");
     const result = ev.eval(ast, ctx, root);
     expect(result).toBe(true);
+    expect(ev.getCacheStats()).toMatchObject({ lookups: 2, hits: 1 });
+  });
+});
+
+describe("path cacheability matches Python PathNode.is_cacheable (#260)", () => {
+  it.each([
+    ["/top/flag", true],
+    ["../flag", false],
+    ["/top/items[1]/id", true],
+    ["/top/items[1 + 1]/id", true],
+    ["/top/items[/top/flag]/id", true],
+    ["/top/items[1.0]/id", false],
+    ["/top/items[- 1]/id", false],
+    ["/top/items[id = 1]/id", false],
+    ["/top/items[current() = 1]/id", false],
+    ["/top/xc:*", false]
+  ])("%s -> %s", (expression, cacheable) => {
+    const ast = parseXPath(expression);
+    expect(ast.kind).toBe("path");
+    expect(ast.kind === "path" && ast.isCacheable).toBe(cacheable);
+  });
+});
+
+const LEAFREF_CACHE_YANG = `
+module lc {
+  yang-version 1.1;
+  namespace "urn:lc";
+  prefix lc;
+
+  list nodes {
+    key name;
+    leaf name { type string; }
+  }
+  list links {
+    key id;
+    leaf id { type string; }
+    leaf-list ends { type leafref { path "/nodes/name"; } }
+  }
+  list groups {
+    key name;
+    leaf name { type string; }
+    list member {
+      key name;
+      leaf name { type string; }
+    }
+    leaf pick { type leafref { path "../member/name"; } }
+    leaf pick-current { type leafref { path "/groups[name = current()/../name]/member/name"; } }
+  }
+}
+`;
+
+describe("leafref path cache stats (#260)", () => {
+  const module = parseYangString(LEAFREF_CACHE_YANG) as YangModule;
+
+  function stats(data: unknown): { valid: boolean; lookups: number; hits: number } {
+    const validator = new DocumentValidator(module);
+    const result = validator.validateDetailed(data);
+    const { lookups, hits } = (validator as unknown as { xpath: XPathEvaluator }).xpath.getCacheStats();
+    return { valid: result.valid, lookups, hits };
+  }
+
+  it("evaluates an absolute leafref path once and reuses it for every other leafref", () => {
+    const links = Array.from({ length: 5 }, (_, i) => ({ id: String(i), ends: ["a", "b"] }));
+    expect(stats({ nodes: [{ name: "a" }, { name: "b" }], links })).toEqual({ valid: true, lookups: 10, hits: 9 });
+  });
+
+  it.each(["pick", "pick-current"])("never caches %s, whose targets depend on the context node", (leaf) => {
+    const groups = [
+      { name: "g1", member: [{ name: "x" }], [leaf]: "x" },
+      { name: "g2", member: [{ name: "y" }], [leaf]: "y" }
+    ];
+    expect(stats({ groups })).toEqual({ valid: true, lookups: 0, hits: 0 });
   });
 });

@@ -1,5 +1,5 @@
 import { XPathSyntaxError, YangSyntaxError } from "../core/errors";
-import { XPathAstNode, XPathFunctionNode, XPathPathNode, isWildcardStep, stepPrefix } from "./ast";
+import { XPathAstNode, XPathFunctionNode, XPathPathNode, forgetPathCacheKey, isWildcardStep, stepPrefix } from "./ast";
 import { unknownFunctionError, XPATH_FUNCTION_NAMES } from "./functions";
 import { XPathToken, tokenizeXPath } from "./tokenizer";
 
@@ -10,6 +10,9 @@ class XPathParser {
   private readonly tokens: XPathToken[];
 
   private position = 0;
+
+  /** Non-path nodes that are context-free, the same propagation as Python's `(node, is_cacheable)`. */
+  private readonly cacheable = new WeakSet<XPathAstNode>();
 
   constructor(private readonly expression: string) {
     this.tokens = tokenizeXPath(expression);
@@ -50,6 +53,18 @@ class XPathParser {
     return token;
   }
 
+  private isCacheable(node: XPathAstNode): boolean {
+    return node.kind === "path" ? node.isCacheable === true : this.cacheable.has(node);
+  }
+
+  private binary(operator: string, left: XPathAstNode, right: XPathAstNode): XPathAstNode {
+    const node: XPathAstNode = { kind: "binary", operator, left, right };
+    if (this.isCacheable(left) && this.isCacheable(right)) {
+      this.cacheable.add(node);
+    }
+    return node;
+  }
+
   private isKeyword(value: string): boolean {
     const token = this.current();
     return token.kind === "identifier" && token.value.toLowerCase() === value.toLowerCase();
@@ -64,7 +79,7 @@ class XPathParser {
     while (this.isKeyword("or")) {
       this.consume();
       const right = this.parseLogicalAnd();
-      left = { kind: "binary", operator: "or", left, right };
+      left = this.binary("or", left, right);
     }
     return left;
   }
@@ -74,7 +89,7 @@ class XPathParser {
     while (this.isKeyword("and")) {
       this.consume();
       const right = this.parseComparison();
-      left = { kind: "binary", operator: "and", left, right };
+      left = this.binary("and", left, right);
     }
     return left;
   }
@@ -85,7 +100,7 @@ class XPathParser {
     if (token.kind === "operator" && COMPARISON_OPS.has(token.value)) {
       const op = this.consume("operator").value;
       const right = this.parseAdditive();
-      left = { kind: "binary", operator: op, left, right };
+      left = this.binary(op, left, right);
     }
     return left;
   }
@@ -97,7 +112,7 @@ class XPathParser {
       if (token.kind === "operator" && ADDITIVE_OPS.has(token.value)) {
         const op = this.consume("operator").value;
         const right = this.parseMultiplicative();
-        left = { kind: "binary", operator: op, left, right };
+        left = this.binary(op, left, right);
       } else {
         return left;
       }
@@ -111,16 +126,16 @@ class XPathParser {
       if (token.kind === "slash") {
         this.consume("slash");
         const right = this.parsePath(false);
-        left = { kind: "binary", operator: "/", left, right };
+        left = this.binary("/", left, right);
       } else if (token.kind === "operator" && token.value === "*") {
         this.consume("operator");
         const right = this.parseUnary();
-        left = { kind: "binary", operator: "*", left, right };
+        left = this.binary("*", left, right);
       } else if (this.isKeyword("div") || this.isKeyword("mod")) {
         // XPath 1.0 §3.7: div/mod after an operand are multiplicative operators.
         const op = this.consume().value.toLowerCase();
         const right = this.parseUnary();
-        left = { kind: "binary", operator: op, left, right };
+        left = this.binary(op, left, right);
       } else {
         return left;
       }
@@ -164,7 +179,11 @@ class XPathParser {
           position: token.position
         });
       }
-      return { kind: "literal", value: parsed };
+      const literal: XPathAstNode = { kind: "literal", value: parsed };
+      if (!raw.includes(".")) {
+        this.cacheable.add(literal);
+      }
+      return literal;
     }
 
     if (token.kind === "identifier") {
@@ -271,9 +290,15 @@ class XPathParser {
 
   private parsePath(isAbsolute: boolean, firstStep?: string, allowPredicate = true): XPathAstNode {
     const segments: XPathPathNode["segments"] = [];
+    let isCacheable = isAbsolute;
 
     const pushStep = (step: string): boolean => {
       const segment: XPathPathNode["segments"][number] = { step };
+      if (step.endsWith(":*")) {
+        // The binding depends on the module that wrote the expression, so a
+        // run-wide cache keyed by path text must not share it.
+        isCacheable = false;
+      }
       segments.push(segment);
       while (this.current().kind === "bracket_open") {
         if (!allowPredicate) {
@@ -284,6 +309,7 @@ class XPathParser {
         }
         this.consume("bracket_open");
         const pred = this.parseExpression();
+        isCacheable = isCacheable && this.isCacheable(pred);
         if (segment.predicate === undefined) {
           segment.predicate = pred;
         } else {
@@ -302,7 +328,7 @@ class XPathParser {
       // Stop when '.' is not followed by '/', so `. div 2` leaves div for
       // the multiplicative operator instead of treating it as a step name.
       if (!pushStep(firstStep)) {
-        const node: XPathPathNode = { kind: "path", segments, isAbsolute };
+        const node: XPathPathNode = { kind: "path", segments, isAbsolute, isCacheable };
         return node;
       }
     }
@@ -314,7 +340,7 @@ class XPathParser {
       }
     }
 
-    const node: XPathPathNode = { kind: "path", segments, isAbsolute };
+    const node: XPathPathNode = { kind: "path", segments, isAbsolute, isCacheable };
     return node;
   }
 
@@ -378,6 +404,7 @@ export function bindXPathPrefixes(
         }
         bindXPathPrefixes(segment.predicate, resolve, expression);
       }
+      forgetPathCacheKey(node);
       return;
     case "binary":
       bindXPathPrefixes(node.left, resolve, expression);

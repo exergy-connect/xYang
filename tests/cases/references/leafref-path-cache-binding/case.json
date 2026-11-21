@@ -1,0 +1,17 @@
+{
+  "description": "Issue #260: base and ext both declare prefix p, so the leafref path text /top/p:item/p:n names base:item in base and ext:item in ext (RFC 7950 §6.4.1). The cached targets of one path must not answer the other.",
+  "module": "base.yang",
+  "instances": [
+    { "name": "each reference names its own module's item",
+      "data": { "base:top": { "item": [{ "n": "x" }], "ext:item": [{ "n": "y" }], "bref": "x", "ext:eref": "y" } },
+      "valid": true },
+    { "name": "ext reference names a base item",
+      "data": { "base:top": { "item": [{ "n": "x" }], "ext:item": [{ "n": "y" }], "bref": "x", "ext:eref": "x" } },
+      "valid": false,
+      "errors": [{ "path": "/base:top/ext:eref", "code": "leafref" }] },
+    { "name": "base reference names an ext item",
+      "data": { "base:top": { "item": [{ "n": "x" }], "ext:item": [{ "n": "y" }], "bref": "y", "ext:eref": "y" } },
+      "valid": false,
+      "errors": [{ "path": "/base:top/bref", "code": "leafref" }] }
+  ]
+}

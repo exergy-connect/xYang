@@ -9,6 +9,14 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ## [Unreleased]
 
+### Changed
+
+- Absolute leafref, `must` and `when` paths without context-dependent predicates are evaluated once per validation (as in Python), and each leafref's target value set is kept with the cached node-set. A synthetic 1000-node Netlab ring validates in about 38 ms instead of about 370 ms (#260).
+
+### Fixed
+
+- Leafref membership is exact: the string `"1"` no longer matches a number target `1` (#265).
+
 ## [1.0.7] — 2026-11-20
 
 ### Fixed

@@ -1,0 +1,15 @@
+module base {
+  yang-version 1.1;
+  namespace "urn:base";
+  prefix p;
+
+  container top {
+    list item {
+      key n;
+      leaf n { type string; }
+    }
+    leaf bref {
+      type leafref { path "/top/p:item/p:n"; }
+    }
+  }
+}
