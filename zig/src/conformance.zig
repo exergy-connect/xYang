@@ -497,6 +497,7 @@ fn runInstance(arena: std.mem.Allocator, case: std.json.ObjectMap, inst: std.jso
         .action = if (inst.get("action")) |p| p.string else null,
         .direction = if (inst.get("direction")) |d| d.string else "input",
         .context = context,
+        .canonical = if (inst.get("canonical")) |c| c == .bool and c.bool else false,
     };
     const usage_error: ?[]const u8 = if (inst.get("usage_error")) |e| e.string else null;
     const result = validator.validate(data, options) catch |err| switch (err) {
