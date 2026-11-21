@@ -1,6 +1,4 @@
-"""
-Path builder for YANG document validation.
-"""
+"""Path builder for YANG document validation."""
 
 from typing import Optional
 
@@ -11,18 +9,13 @@ def _json_pointer_token(token: str) -> str:
 
 
 class PathBuilder:
-    """
-    Maintains the current path string as the walker descends.
-    List entries use key predicates: /data-model/entities[name='foo']
-
-    A parallel JSON Pointer uses schema/instance names and list entry indices
-    (``/entities/0``), which is what ``validate_detailed`` reports.
-    """
+    """Maintain display paths and JSON Pointers as the walker descends."""
 
     def __init__(self, initial_segments: Optional[list[str]] = None) -> None:
-        self._segments: list[str] = list(initial_segments) if initial_segments else []
-        self._pointer_tokens: list[str] = [_json_pointer_token(s) for s in self._segments]
-        self._pointer_widths: list[int] = [1] * len(self._segments)
+        self._paths: list[str] = [""]
+        self._pointers: list[str] = [""]
+        for segment in initial_segments or []:
+            self.push(segment)
 
     def push(
         self,
@@ -32,27 +25,24 @@ class PathBuilder:
         index: Optional[int] = None,
         pointer_name: Optional[str] = None,
     ) -> None:
-        self._segments.append(f"{name}[{key}]" if key is not None else name)
-        self._pointer_tokens.append(_json_pointer_token(pointer_name if pointer_name is not None else name))
-        if index is not None:
-            self._pointer_tokens.append(str(index))
-            self._pointer_widths.append(2)
-        else:
-            self._pointer_widths.append(1)
+        segment = f"{name}[{key}]" if key is not None else name
+        token = _json_pointer_token(pointer_name if pointer_name is not None else name)
+        self._paths.append(self._paths[-1] + "/" + segment)
+        pointer = self._pointers[-1] + "/" + token
+        self._pointers.append(pointer + (f"/{index}" if index is not None else ""))
 
     def pop(self) -> None:
-        self._segments.pop()
-        width = self._pointer_widths.pop()
-        del self._pointer_tokens[-width:]
+        if len(self._paths) == 1:
+            raise IndexError("pop from empty path")
+        self._paths.pop()
+        self._pointers.pop()
 
     def current(self) -> str:
-        return "/" + "/".join(self._segments) if self._segments else "/"
+        return self._paths[-1] or "/"
 
     def pointer(self) -> str:
         """JSON Pointer for the current node. The document root is ``""``."""
-        if not self._pointer_tokens:
-            return ""
-        return "/" + "/".join(self._pointer_tokens)
+        return self._pointers[-1]
 
     def child(self, name: str, key: Optional[str] = None) -> str:
         seg = f"{name}[{key}]" if key is not None else name

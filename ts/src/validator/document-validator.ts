@@ -134,7 +134,8 @@ export class DocumentValidator {
   private readonly contextStack: ValidationContext[] = [];
   /** Module that names the children of the data node currently being walked (RFC 7951 §4). */
   private readonly encodingParents: string[] = [];
-  private readonly walkPlans = new WeakMap<YangStatement, Map<string, { always: number[]; keys: Map<string, number[]> }>>();
+  private walkPlans = new WeakMap<YangStatement, Map<string, { always: number[]; keys: Map<string, number[]> }>>();
+  private readonly memberKeyCache = new WeakMap<YangStatement, { parent: string; name: string | undefined; defined: unknown; keys: string[] }>();
   private typeValidationDebug: boolean;
 
   constructor(
@@ -232,6 +233,7 @@ export class DocumentValidator {
    */
   private collectOperation(input: OperationInput, options: AnnotationOptions): InternalIssue[] {
     this.xpath.clearCacheStats();
+    this.walkPlans = new WeakMap();
     const { target, operation, parentCopies, params, rootData, wrapper } = input;
     const ctx = { ...this.rootCtx, ...options };
     const active = (stmt: YangStatement): boolean =>
@@ -246,6 +248,7 @@ export class DocumentValidator {
     if (!active(target.operation)) {
       throw new Error(`${target.label} is not available: its 'if-feature' condition is false`);
     }
+    this.walkPlans = new WeakMap();
     this.contextStack.push(ctx);
     try {
       const errors: InternalIssue[] = [];
@@ -344,6 +347,7 @@ export class DocumentValidator {
     ctx: ValidationContext,
     data: unknown
   ): { errors: InternalIssue[]; warnings: InternalIssue[] } {
+    this.walkPlans = new WeakMap();
     this.contextStack.push(ctx);
     try {
       const errors: InternalIssue[] = [];
@@ -446,7 +450,7 @@ export class DocumentValidator {
 
     const ifFeatures = stmt.if_features;
     const ifFeatureList = Array.isArray(ifFeatures) ? (ifFeatures as string[]) : [];
-    if (!stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, stmt.included_from)) {
+    if (ifFeatureList.length > 0 && !stmtIfFeaturesSatisfied(ifFeatureList, this.ctx.ifFeatureCtx, this.ctx.enabledByModule, stmt.included_from)) {
       if (value !== undefined) {
         errors.push(
           issue(
@@ -895,14 +899,17 @@ export class DocumentValidator {
   /** RFC 7951 member name under `parent`: local, or `module:local` when another module defines the node. */
   private instanceKeys(stmt: YangStatement, parent = this.encodingModule()): string[] {
     const local = stmt.name;
+    const cached = this.memberKeyCache.get(stmt);
+    if (cached && cached.parent === parent && cached.name === local && cached.defined === stmt.defining_module) {
+      return cached.keys;
+    }
     if (!local) {
       return [];
     }
     const defined = this.definedIn(stmt, parent);
-    if (!parent || defined === parent) {
-      return [local];
-    }
-    return [`${defined}:${local}`];
+    const keys = !parent || defined === parent ? [local] : [`${defined}:${local}`];
+    this.memberKeyCache.set(stmt, { parent, name: local, defined: stmt.defining_module, keys });
+    return keys;
   }
 
   private instanceValue(obj: Record<string, unknown>, stmt: YangStatement): unknown {
