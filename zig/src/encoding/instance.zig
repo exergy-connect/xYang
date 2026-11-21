@@ -16,6 +16,7 @@ const type_checker = @import("../validator/type_checker.zig");
 const normalize = @import("normalize.zig");
 const transform_expr = @import("../ext/transform.zig");
 const xpath = @import("../xpath/xpath.zig");
+const pyfmt = @import("../pyfmt.zig");
 
 const Allocator = std.mem.Allocator;
 const Statement = ast.Statement;
@@ -832,6 +833,120 @@ pub const Walk = struct {
         self.keys.parent_module = rfc7951.definingModuleName(stmt, saved);
         defer self.keys.parent_module = saved;
         return self.walkObject(data, stmt, pointer, false);
+    }
+
+    // Canonical check: the same resolution, decoding and normalize rules as the walk above,
+    // reporting where the input differs from the tree `project` would build.
+
+    /// `canonical_errors`: where native `data` is not already canonical; empty when it can be
+    /// validated as written.
+    pub fn canonicalErrors(self: *Walk, data: *const jv.Object, schema: ?*const Statement, at_root: bool) Error![]const EncodingIssue {
+        if (!self.prepared) {
+            self.prepared = true;
+            try self.prepareStatements(self.module.statements.items, true);
+        }
+        self.root_input = data;
+        self.root_schema = schema;
+        self.root_at_root = at_root;
+        var out: std.ArrayList(EncodingIssue) = .empty;
+        const raw: Val = .{ .object = @constCast(data) };
+        const statements = if (schema) |s| s.statements.items else self.module.statements.items;
+        if (try self.unchanged(try self.transformStatements(raw, statements), raw, "", &out))
+            try self.checkObject(data, schema, "", at_root, &out);
+        return out.items;
+    }
+
+    fn issue(self: *Walk, out: *std.ArrayList(EncodingIssue), pointer: []const u8, code: []const u8, message: []const u8) error{OutOfMemory}!void {
+        try out.append(self.a, .{ .pointer = pointer, .code = code, .message = message });
+    }
+
+    /// `normalized`: false (and reported) when a normalize rule fails or changes `raw`.
+    fn unchanged(self: *Walk, result: Transform, raw: Val, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) error{OutOfMemory}!bool {
+        if (result.message) |message| {
+            try self.issue(out, pointer, "normalize", message);
+            return false;
+        }
+        const same_object = result.value == .object and raw == .object and result.value.object == raw.object;
+        if (!same_object and !jv.pyEql(result.value, raw)) {
+            try self.issue(out, pointer, "canonical", "an xt:normalize rule changes this value; it is applied only without canonical");
+            return false;
+        }
+        return true;
+    }
+
+    fn checkObject(self: *Walk, data: *const jv.Object, schema: ?*const Statement, prefix: []const u8, at_root: bool, out: *std.ArrayList(EncodingIssue)) Error!void {
+        const expand = self.dottedEnabled();
+        var it = data.iterator();
+        while (it.next()) |e| {
+            const key = e.key_ptr.*;
+            const here = try join(self.a, prefix, key);
+            if (expand and std.mem.findScalar(u8, key, '.') != null) {
+                try self.issue(out, here, "canonical", try self.a.print("dotted key {f} is expanded only without canonical", .{pyfmt.repr(key)}));
+                continue;
+            }
+            // Native resolution first, so a member accepted here resolves exactly as without canonical.
+            const hits = try self.resolve(key, schema, at_root);
+            if (hits.len == 0) continue;
+            if (hits.len > 1) {
+                try self.issue(out, here, "ambiguous-name", try self.a.print("member name '{s}' matches more than one node", .{key}));
+                continue;
+            }
+            const stmt = hits[0];
+            const spelled = (try self.keys.key(stmt)) orelse stmt.name;
+            if (!std.mem.eql(u8, key, spelled)) {
+                try self.issue(out, here, "canonical", try self.a.print("member {f} is spelled {f} in a canonical instance", .{ pyfmt.repr(key), pyfmt.repr(spelled) }));
+                continue;
+            }
+            try self.checkNode(e.value_ptr.*, stmt, here, out);
+        }
+    }
+
+    fn checkNode(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+        if (stmt.kind() == .list or stmt.kind() == .leaf_list) {
+            if (raw == .null and hasNormalize(stmt)) {
+                try self.issue(out, pointer, "canonical", "an xt:normalize rule changes this value; it is applied only without canonical");
+                return;
+            }
+        } else if (!try self.unchanged(try self.transform(raw, stmt), raw, pointer, out)) return;
+        switch (stmt.kind()) {
+            .leaf => try self.leafIssues(raw, stmt, pointer, out),
+            .list => {
+                if (raw == .object) return self.issue(out, pointer, "canonical", "a list is a JSON array in a canonical instance");
+                if (raw != .array) return self.issue(out, pointer, "type", "list must be an array");
+                for (raw.array, 0..) |item, i| {
+                    const here = try self.a.print("{s}/{d}", .{ pointer, i });
+                    if (!try self.unchanged(try self.transform(item, stmt), item, here, out)) continue;
+                    if (item != .object) {
+                        try self.issue(out, here, "type", "list item must be an object");
+                        continue;
+                    }
+                    try self.checkChildren(stmt, item.object, here, out);
+                }
+            },
+            .leaf_list => {
+                if (raw != .array) return self.issue(out, pointer, "type", "leaf-list must be an array");
+                for (raw.array, 0..) |item, i| {
+                    const here = try self.a.print("{s}/{d}", .{ pointer, i });
+                    if (try self.unchanged(try self.transform(item, stmt), item, here, out)) try self.leafIssues(item, stmt, here, out);
+                }
+            },
+            else => if (isContainerKind(stmt)) {
+                if (raw != .object) return self.issue(out, pointer, "type", "container must be an object");
+                try self.checkChildren(stmt, raw.object, pointer, out);
+            },
+        }
+    }
+
+    fn leafIssues(self: *Walk, raw: Val, stmt: *const Statement, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+        const node = try self.walkLeaf(raw, stmt, pointer);
+        for (node.errors.items) |e| try self.issue(out, pointer, e.code, e.message);
+    }
+
+    fn checkChildren(self: *Walk, stmt: *const Statement, data: *const jv.Object, pointer: []const u8, out: *std.ArrayList(EncodingIssue)) Error!void {
+        const saved = self.keys.parent_module;
+        self.keys.parent_module = rfc7951.definingModuleName(stmt, saved);
+        defer self.keys.parent_module = saved;
+        return self.checkObject(data, stmt, pointer, false, out);
     }
 };
 

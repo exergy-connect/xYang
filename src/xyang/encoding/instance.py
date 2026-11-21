@@ -605,6 +605,106 @@ class _Walk:
             children.append(InstanceNode(stmt=stmt, value=None, pointer=entry_pointer, kind="entry", children=body))
         return InstanceNode(stmt=stmt, value=None, pointer=pointer, kind="list", children=children, errors=errors)
 
+    # Canonical check: the same resolution, decoding and normalize rules as the walk above,
+    # reporting where the input differs from the tree project_instance would build.
+
+    def normalized(self, stmt: Any, raw: Any, pointer: str, out: list, collection: bool = False) -> bool:
+        value, error = (self.normalization.visit_collection if collection else self.normalization.visit)(stmt, raw)
+        if error is not None:
+            out.append((pointer, "normalize", error))
+            return False
+        if value is not raw and value != raw:
+            out.append((pointer, "canonical", "an xt:normalize rule changes this value; it is applied only without canonical"))
+            return False
+        return True
+
+    def check_object(self, data: dict, schema: Any, prefix: str, at_root: bool, out: list) -> None:
+        expand = self.normalization.expand_dotted_keys
+        for key, raw in data.items():
+            if not isinstance(key, str):
+                continue
+            here = _join(prefix, key)
+            if expand and "." in key:
+                out.append((here, "canonical", f"dotted key {key!r} is expanded only without canonical"))
+                continue
+            # Native resolution first, so a member accepted here resolves exactly as without canonical.
+            hits = self.resolve(key, schema, at_root)
+            if not hits:
+                continue
+            if len(hits) > 1:
+                out.append((here, "ambiguous-name", f"member name '{key}' matches more than one node"))
+                continue
+            stmt = hits[0]
+            spelled = _member_key(stmt, self.parent_module)
+            if key != spelled:
+                out.append((here, "canonical", f"member {key!r} is spelled {spelled!r} in a canonical instance"))
+                continue
+            self.check_node(raw, stmt, here, out)
+
+    def check_node(self, raw: Any, stmt: YangStatement, pointer: str, out: list) -> None:
+        collection = isinstance(stmt, (YangListStmt, YangLeafListStmt))
+        if not self.normalized(stmt, raw, pointer, out, collection):
+            return
+        if isinstance(stmt, YangLeafStmt):
+            node = self.walk_leaf(raw, stmt, pointer)
+            out.extend((pointer, code, message) for code, message in node.errors)
+        elif isinstance(stmt, YangContainerStmt):
+            if not isinstance(raw, dict):
+                out.append((pointer, "type", "container must be an object"))
+                return
+            with self._encoding_child(stmt):
+                self.check_object(raw, stmt, pointer, False, out)
+        elif isinstance(stmt, YangListStmt):
+            if isinstance(raw, dict):
+                out.append((pointer, "canonical", "a list is a JSON array in a canonical instance"))
+                return
+            if not isinstance(raw, list):
+                out.append((pointer, "type", "list must be an array"))
+                return
+            for index, item in enumerate(raw):
+                here = f"{pointer}/{index}"
+                if not self.normalized(stmt, item, here, out):
+                    continue
+                if not isinstance(item, dict):
+                    out.append((here, "type", "list item must be an object"))
+                    continue
+                with self._encoding_child(stmt):
+                    self.check_object(item, stmt, here, False, out)
+        elif isinstance(stmt, YangLeafListStmt):
+            if not isinstance(raw, list):
+                out.append((pointer, "type", "leaf-list must be an array"))
+                return
+            for index, item in enumerate(raw):
+                here = f"{pointer}/{index}"
+                if self.normalized(stmt, item, here, out):
+                    out.extend((here, code, message) for code, message in self.walk_leaf(item, stmt, here).errors)
+
+
+def canonical_errors(
+    data: dict,
+    module: YangModule,
+    *,
+    schema: Any = None,
+    parent_module: Optional[str] = None,
+    at_root: bool = True,
+) -> list[tuple[str, str, str]]:
+    """``(pointer, code, message)`` wherever native ``data`` is not already canonical.
+
+    Canonical native JSON is the tree ``project_instance`` builds: every member spelled as
+    in that tree (``module:name`` only where the module changes), lists as JSON arrays, no
+    dotted keys left to expand, no ``xt:normalize`` rule that would change a value, and every
+    leaf in its native encoding. An empty result means ``data`` can be validated as written.
+    """
+    root = module if schema is None else schema
+    owner = _parent_module(module, root) if parent_module is None else parent_module
+    walk = _Walk(module, owner, True)
+    walk.normalization.prepare(root, walk.data_nodes)
+    walk.normalization.root_context = lambda: (data, root)
+    out: list[tuple[str, str, str]] = []
+    if walk.normalized(root, data, "", out):
+        walk.check_object(data, root, "", at_root, out)
+    return out
+
 
 def iter_instance(
     data: Any,
@@ -740,6 +840,7 @@ def remap_pointer(pointer: str, mapping: dict[str, str]) -> str:
 
 __all__ = [
     "InstanceNode",
+    "canonical_errors",
     "encoding_errors",
     "iter_instance",
     "project_instance",

@@ -43,6 +43,9 @@ pub const Options = struct {
     direction: []const u8 = "input",
     /// Server data (RFC 7950 6.4.1): validated first, then joined to the operation node.
     context: ?Val = null,
+    /// With `native_json`: the data claims to be canonical. It is checked and validated as
+    /// written, without a projection; a failed check returns only its errors.
+    canonical: bool = false,
 };
 
 pub const Result = struct {
@@ -80,6 +83,8 @@ pub const YangValidator = struct {
 
     fn collect(self: *YangValidator, u: *operation.Usage, data: Val, options: Options) Error![]const ValidationError {
         try operation.checkOptions(u, options.rpc, options.action, options.direction, options.context);
+        if (options.canonical and !options.native_json) return u.fail("canonical applies only to native JSON (native_json=True)", .{});
+        if (options.canonical and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
         if (options.rpc != null or options.action != null) return self.collectOperation(u, data, options);
         var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module };
         var structure: ?*Statement = null;
@@ -108,7 +113,14 @@ pub const YangValidator = struct {
         var out: std.ArrayList(ValidationError) = .empty;
         var canonical = instance_data;
         var map: instance.PointerMap = .empty;
-        {
+        if (options.canonical and instance_data == .object) {
+            var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = true, .keys = &keys, .checker = &checker };
+            const issues = try walk.canonicalErrors(instance_data.object, structure, true);
+            if (issues.len > 0) {
+                for (issues) |i| try out.append(self.a, .{ .path = if (i.pointer.len > 0) i.pointer else "/", .pointer = i.pointer, .code = i.code, .message = i.message });
+                return self.prefixStructure(structure, structure_key, out.items);
+            }
+        } else {
             var walk: instance.Walk = .{ .a = self.a, .module = self.module, .native = options.native_json, .keys = &keys, .checker = &checker };
             const nodes = try walk.iterDocument(instance_data, structure, true);
             if (nodes.items.len > 0 or instance_data == .object) {
@@ -124,13 +136,17 @@ pub const YangValidator = struct {
             err.pointer = try instance.remapPointer(self.a, e.pointer, &map);
             try out.append(self.a, err);
         }
+        return self.prefixStructure(structure, structure_key, out.items);
+    }
+
+    fn prefixStructure(self: *YangValidator, structure: ?*Statement, structure_key: []const u8, errors: []ValidationError) error{OutOfMemory}![]const ValidationError {
         if (structure != null) {
-            for (out.items) |*e| {
+            for (errors) |*e| {
                 e.pointer = try prefixMember(self.a, structure_key, e.pointer);
                 e.path = try prefixMember(self.a, structure_key, e.path);
             }
         }
-        return out.items;
+        return errors;
     }
 
     fn collectOperation(self: *YangValidator, u: *operation.Usage, data: Val, options: Options) Error![]const ValidationError {

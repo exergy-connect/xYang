@@ -19,6 +19,7 @@ type Instance = {
   action?: string;
   direction?: "input" | "output";
   context?: Record<string, unknown>;
+  canonical?: boolean;
   usage_error?: string;
 };
 type Case = {
@@ -67,7 +68,8 @@ function run(dir: string, c: Case, inst: Instance | undefined, form: "yang" | "j
     ...(inst.rpc !== undefined ? { rpc: inst.rpc } : {}),
     ...(inst.action !== undefined ? { action: inst.action } : {}),
     ...(inst.direction !== undefined ? { direction: inst.direction } : {}),
-    ...(inst.context !== undefined ? { context: inst.context } : {})
+    ...(inst.context !== undefined ? { context: inst.context } : {}),
+    ...(inst.canonical !== undefined ? { canonical: inst.canonical } : {})
   };
   const validator = new YangValidator(module, { enabledFeaturesByModule: features });
   if (inst.usage_error) {

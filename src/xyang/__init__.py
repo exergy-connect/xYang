@@ -78,6 +78,7 @@ def validate(
     action: str | None = None,
     direction: str = "input",
     context: dict[str, Any] | None = None,
+    canonical: bool = False,
 ) -> dict[str, Any]:
     """Validate ``data`` against ``schema`` and return ``validate_detailed``'s dict.
 
@@ -86,6 +87,8 @@ def validate(
     ``{"module:input": {...}}`` (RFC 8040 §3.6) in RFC 7951 mode, the bare parameter object
     with ``native_json=True``. ``context`` is server data (required for an action); it is
     validated first, and the operation's ``must`` and ``leafref`` reach it (RFC 7950 §6.4.1).
+    ``canonical=True`` validates already-canonical native JSON as written (see
+    ``YangValidator.validate``).
 
     ``schema`` is a YANG file path or a parsed module. ``features`` is the
     case-file shape ``{"module": ["feature", ...]}``; ``None`` enables every
@@ -103,5 +106,6 @@ def validate(
     else:
         raise TypeError(f"schema must be a path or YangModule, got {type(schema).__name__}")
     return YangValidator(module, enabled_features_by_module=enabled).validate_detailed(
-        data, native_json=native_json, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, rpc=rpc, action=action, direction=direction, context=context
+        data, native_json=native_json, allow_jsonld=allow_jsonld, allow_json_schema=allow_json_schema, rpc=rpc, action=action, direction=direction, context=context,
+        canonical=canonical,
     )

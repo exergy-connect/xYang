@@ -15,6 +15,7 @@ export type ValidateCliArgs = CommonCliArgs & AnnotationOptions & {
   /** ``null`` enables every declared feature. */
   features: Record<string, string[]> | null;
   nativeJson: boolean;
+  canonical: boolean;
   /** `--rpc NAME`: validate the data as an instance of that rpc. */
   rpc: string | undefined;
   /** `--action PATH`: validate the data as an instance of the action at that data resource identifier. */
@@ -170,6 +171,14 @@ const validateCommand: CliCommand<ValidateState> = {
       }
     },
     {
+      name: "--canonical",
+      takesValue: false,
+      help: "The native data is already canonical (lists as arrays, no dotted keys or other normalization left): check that strictly and validate it as written, without a projected copy. A failed check exits 1 with only its errors. Needs --native-json. Default: off.",
+      apply(state) {
+        state.canonical = true;
+      }
+    },
+    {
       name: "--format",
       metavar: "text|json",
       takesValue: true,
@@ -266,6 +275,7 @@ const validateCommand: CliCommand<ValidateState> = {
     "xyang-ts validate --format json module.yang data.json",
     "xyang-ts validate --rpc add-link --output --context state.json module.yang output.json",
     "xyang-ts validate --native-json --rpc add-link module.yang params.json",
+    "xyang-ts validate --native-json --canonical module.yang canonical.json",
     "xyang-ts validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json"
   ],
   notes: [
@@ -395,6 +405,7 @@ export function parseValidateArgs(rest: string[]): ValidateCliArgs {
     format: "text",
     features: null,
     nativeJson: false,
+    canonical: false,
     rpc: undefined,
     action: undefined,
     output: false,

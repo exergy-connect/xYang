@@ -57,6 +57,7 @@ when they share the schema.
 | `instances[].valid` | Whether the implementation must report no errors. |
 | `instances[].errors` | Expected errors when `valid` is `false`. |
 | `instances[].allow_jsonld` / `instances[].allow_json_schema` | Optional booleans, default `true`: accept opaque JSON-LD / JSON Schema annotation families at every object. |
+| `instances[].canonical` | Optional boolean, with `"encoding": "native"`: the instance claims to be canonical (`canonical=True` / `{ canonical: true }`, CLI `--canonical`). A false claim reports only `canonical` errors. |
 | `instances[].rpc` | Optional. Validate `data` as an instance of this rpc (`validate_detailed(rpc=)` / `{ rpc }`, CLI `--rpc`). |
 | `instances[].action` | Optional. Validate `data` as an instance of the action at this RFC 8040 §3.5.3 path (`action=` / `{ action }`, CLI `--action`). Needs `context`. |
 | `instances[].direction` | Optional, with `rpc` or `action`: `"input"` (default) or `"output"` (CLI `--output`). |
@@ -77,7 +78,7 @@ An error is `{ "path", "code", "message"?, "document"? }`. `document: "context"`
   `if-feature`, `mandatory`, `mandatory-choice`, `choice-multiple-cases`, `min-elements`,
   `max-elements`, `duplicate-key`, `unique`, `unknown-field`, `ambiguous-name`, `key-mismatch`,
   `list-encoding`, `leafref`, `identityref`, `instance-identifier`, `fraction-digits`, `bits`,
-  `xpath-error`, `xpath-unknown-function`, `operation-wrapper`, `action-parent`.
+  `xpath-error`, `xpath-unknown-function`, `operation-wrapper`, `action-parent`, `canonical`.
   Both validators emit the code; add it in both places when you need a new one.
 - **`message`** (optional) must be a substring of the reported message. Use it for
   `error-message` from the module; free-text wording is otherwise not compared.
@@ -111,7 +112,9 @@ after the primary module so their `augment` statements merge into it.
 
 `ambiguous-name` — a bare member name matches more than one node. `key-mismatch` — a native
 list entry's key leaf is present and is not the dict key. `list-encoding` — a list with more
-than one key was given as an object; multi-key lists are arrays only.
+than one key was given as an object; multi-key lists are arrays only. `canonical` — an instance
+validated with `canonical` is not in canonical native form: a dotted key, a list given as an object,
+a member not spelled as the projection spells it, or a value an `xt:normalize` rule would change.
 
 ## CLI protocol
 

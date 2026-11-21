@@ -80,7 +80,7 @@ def _write_json(value):
 def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, form="yang"):
     """Returns [(json_pointer, code, message)]; raises if the schema is rejected.
 
-    ``operation`` is ``{"rpc", "action", "direction", "context"}`` (each optional, absent keys unset).
+    ``operation`` is ``{"rpc", "action", "direction", "context", "canonical"}`` (each optional, absent keys unset).
     A rejected call raises ``UsageError``.
     """
     module = case_dir / case["module"]
@@ -91,6 +91,8 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, 
         cmd = [os.environ["XYANG_CLI"], "validate", "--format", "json", str(module), data_path]
         if native_json:
             cmd.insert(2, "--native-json")
+        if operation.get("canonical"):
+            cmd.insert(2, "--canonical")
         if operation.get("rpc") is not None:
             cmd += ["--rpc", operation["rpc"]]
         if operation.get("action") is not None:
@@ -125,7 +127,7 @@ def _validate(impl, case_dir, case, data, *, native_json=False, operation=None, 
         parsed = _load_case_module(case_dir, module)
     if data is None:
         return []
-    options = {key: operation[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema") if key in operation}
+    options = {key: operation[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema", "canonical") if key in operation}
     try:
         result = YangValidator(parsed, enabled_features_by_module=case.get("features")).validate_detailed(
             data, native_json=native_json, **options
@@ -162,7 +164,7 @@ def test_case(case_dir, case, inst, impl, form):
             assert case["code"] in str(excinfo.value)
         return
     expected = inst.get("errors", [])
-    operation = {key: inst[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema") if key in inst}
+    operation = {key: inst[key] for key in ("rpc", "action", "direction", "context", "allow_jsonld", "allow_json_schema", "canonical") if key in inst}
     native = inst.get("encoding") == "native"
     if inst.get("usage_error"):
         with pytest.raises(UsageError) as excinfo:

@@ -70,7 +70,8 @@ pub const COMMANDS = [_]Command{
         .name = "validate",
         .summary = "Validate JSON data against a YANG module",
         .usage = "usage: " ++ PROG ++ " validate [-h] [--include-path DIR] [--format {text,json}] [--native-json]\n" ++
-            "                      [--rpc NAME] [--action PATH] [--output] [--context FILE]\n" ++
+            "                      [--canonical] [--rpc NAME] [--action PATH] [--output]\n" ++
+            "                      [--context FILE]\n" ++
             "                      [--features JSON] [--anydata-validation {off,complete,candidate}]\n" ++
             "                      [--anydata-module PATH]\n" ++
             "                      yang_file [data_file]\n",
@@ -94,6 +95,11 @@ pub const COMMANDS = [_]Command{
         \\  --no-json-schema-annotations  Reject JSON Schema $ annotations (allowed by default)
         \\  --native-json                 Accept native dict-style JSON instead of strict RFC
         \\                                7951. Default: off (RFC 7951)
+        \\  --canonical                   The native data is already canonical (lists as arrays,
+        \\                                no dotted keys or other normalization left): check that
+        \\                                strictly and validate it as written, without a projected
+        \\                                copy. A failed check exits 1 with only its errors. Needs
+        \\                                --native-json. Default: off
         \\  --rpc NAME                    Validate the data as rpc NAME (RFC 7950 §7.14): the RFC
         \\                                8040 {"module:input": {...}} wrapper, or
         \\                                {"module:output": {...}} with --output, or bare
@@ -131,16 +137,18 @@ pub const COMMANDS = [_]Command{
         \\  xyang-zig validate --rpc add-link module.yang rpc-input.json
         \\  xyang-zig validate --rpc add-link --output --context state.json module.yang output.json
         \\  xyang-zig validate --native-json --rpc add-link module.yang params.json
+        \\  xyang-zig validate --native-json --canonical module.yang canonical.json
         \\  xyang-zig validate --action /ex:interfaces/interface=eth0/reset --context state.json module.yang in.json
         \\
         ,
         .options = &.{
-            .{ .long = "--no-jsonld" },                                                                                                  .{ .long = "--no-json-schema-annotations" },
-            INCLUDE_PATH,                                                                                                                .{ .long = "--format", .metavar = "{text,json}", .choices = &.{ "text", "json" } },
-            .{ .long = "--native-json" },                                                                                                .{ .long = "--rpc", .metavar = "NAME" },
-            .{ .long = "--action", .metavar = "PATH" },                                                                                  .{ .long = "--output" },
-            .{ .long = "--context", .metavar = "FILE" },                                                                                 .{ .long = "--features", .metavar = "JSON" },
-            .{ .long = "--anydata-validation", .metavar = "{off,complete,candidate}", .choices = &.{ "off", "complete", "candidate" } }, .{ .long = "--anydata-module", .metavar = "PATH", .repeat = true },
+            .{ .long = "--no-jsonld" },                                         .{ .long = "--no-json-schema-annotations" },
+            INCLUDE_PATH,                                                       .{ .long = "--format", .metavar = "{text,json}", .choices = &.{ "text", "json" } },
+            .{ .long = "--native-json" },                                       .{ .long = "--rpc", .metavar = "NAME" },
+            .{ .long = "--canonical" },                                         .{ .long = "--action", .metavar = "PATH" },
+            .{ .long = "--output" },                                            .{ .long = "--context", .metavar = "FILE" },
+            .{ .long = "--features", .metavar = "JSON" },                       .{ .long = "--anydata-validation", .metavar = "{off,complete,candidate}", .choices = &.{ "off", "complete", "candidate" } },
+            .{ .long = "--anydata-module", .metavar = "PATH", .repeat = true },
         },
         .positionals = &.{ .{ .name = "yang_file" }, .{ .name = "data_file", .optional = true } },
         .run = runValidate,
@@ -508,6 +516,7 @@ fn runValidate(ctx: Io, _: *const Command, parsed: *const args_mod.Parsed) anyer
         .action = action,
         .direction = if (parsed.flag("--output")) "output" else "input",
         .context = context_data,
+        .canonical = parsed.flag("--canonical"),
     }) catch |err| switch (err) {
         error.Unsupported, error.Raised => return fail(ctx, "{s}", .{validator.unsupported orelse "unsupported construct"}),
         error.Usage => return fail(ctx, "{s}", .{validator.usage orelse "invalid call"}),

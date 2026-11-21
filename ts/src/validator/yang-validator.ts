@@ -1,7 +1,7 @@
 import { isAnnotation, type AnnotationOptions } from "../encoding/annotations";
 import { YangModule } from "../core/model";
 import type { AnydataValidationConfigInput } from "../ext/anydata_validation";
-import { encodingErrors, iterInstance, projectInstance } from "../encoding";
+import { canonicalErrors, encodingErrors, iterInstance, projectInstance } from "../encoding";
 import {
   DetailedValidationResult,
   DocumentValidator,
@@ -23,8 +23,12 @@ import type { OperationOptions } from "./operation";
 export type { DetailedValidationResult, ValidationIssue };
 export type { OperationDirection, OperationOptions } from "./operation";
 
-/** Per-call validation options. `rpc`, `direction` and `context` select an rpc instance (RFC 7950 §7.14). */
-export type ValidateCallOptions = AnnotationOptions & { nativeJson?: boolean } & OperationOptions;
+/**
+ * Per-call validation options. `rpc`, `direction` and `context` select an rpc instance (RFC 7950 §7.14).
+ * `canonical` (with `nativeJson`) claims the instance is already canonical native JSON: it is checked
+ * strictly and validated as written, without a projected copy (see `canonicalErrors`).
+ */
+export type ValidateCallOptions = AnnotationOptions & { nativeJson?: boolean; canonical?: boolean } & OperationOptions;
 
 export type ValidationResult = {
   isValid: boolean;
@@ -84,10 +88,11 @@ export class YangValidator {
    * 7951 mode, the bare parameter object with `nativeJson`. `options.context` is server data
    * (required for an action). It is validated first; its errors carry `document: "context"` and the
    * operation is then not checked. Otherwise the operation's `must` and `leafref` reach it (RFC 7950
-   * §6.4.1). An unknown rpc or action, or a bad option combination, throws.
+   * §6.4.1). With `canonical`, a failed canonical check returns only its errors; the instance is not
+   * re-encoded. An unknown rpc or action, or a bad option combination, throws.
    */
   validate(data: unknown, options: ValidateCallOptions = {}): ValidationResult {
-    checkOperationOptions(options);
+    checkCallOptions(options);
     if (options.rpc !== undefined || options.action !== undefined) {
       const detailed = this.validateOperation(data, options);
       const text = (issue: ValidationIssue): string => {
@@ -96,7 +101,11 @@ export class YangValidator {
       };
       return { isValid: detailed.valid, errors: detailed.errors.map(text), warnings: detailed.warnings.map(text) };
     }
-    const prepared = this.prepare(data, options.nativeJson === true);
+    const prepared = this.prepare(data, options.nativeJson === true, options.canonical === true);
+    if (prepared.rejected) {
+      const errors = prepared.errors.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message));
+      return { isValid: false, errors, warnings: [] };
+    }
     const [isValid, errors, warnings] = this.documentValidator.validate(prepared.data, options);
     const encoding = prepared.errors.map((issue) => (issue.path ? `${issue.path}: ${issue.message}` : issue.message));
     const all = [...encoding, ...errors];
@@ -109,22 +118,25 @@ export class YangValidator {
    * about the server data context of an rpc or action also has `document: "context"`.
    */
   validateDetailed(data: unknown, options: ValidateCallOptions = {}): DetailedValidationResult {
-    checkOperationOptions(options);
+    checkCallOptions(options);
     if (options.rpc !== undefined || options.action !== undefined) {
       return this.validateOperation(data, options);
     }
-    return this.validateDocument(data, options.nativeJson === true, options);
+    return this.validateDocument(data, options.nativeJson === true, options, options.canonical === true);
   }
 
-  private validateDocument(data: unknown, nativeJson: boolean, options: AnnotationOptions): DetailedValidationResult {
-    const prepared = this.prepare(data, nativeJson);
-    const result = this.documentValidator.validateDetailed(prepared.data, options);
+  private validateDocument(data: unknown, nativeJson: boolean, options: AnnotationOptions, canonical = false): DetailedValidationResult {
+    const prepared = this.prepare(data, nativeJson, canonical);
     const encoding: ValidationIssue[] = prepared.errors.map((issue) => ({
       code: issue.code,
       path: issue.path,
       message: issue.message,
       severity: "error"
     }));
+    if (prepared.rejected) {
+      return { valid: false, errors: encoding, warnings: [] };
+    }
+    const result = this.documentValidator.validateDetailed(prepared.data, options);
     const errors = [...encoding, ...result.errors];
     return { valid: errors.length === 0, errors, warnings: result.warnings };
   }
@@ -199,14 +211,30 @@ export class YangValidator {
     return { valid: errors.length === 0, errors, warnings: [...contextWarnings, ...result.warnings] };
   }
 
-  private prepare(data: unknown, nativeJson: boolean): {
+  private prepare(data: unknown, nativeJson: boolean, canonical = false): {
     data: unknown;
     errors: Array<{ path: string; code: string; message: string }>;
+    rejected?: boolean;
   } {
+    if (canonical && data && typeof data === "object" && !Array.isArray(data)) {
+      const errors = canonicalErrors(data as Record<string, unknown>, this.module);
+      this.documentValidator.setPointerMap(null);
+      return { data, errors, rejected: errors.length > 0 };
+    }
     const nodes = [...iterInstance(data, this.module, { nativeJson })];
     const projected = projectInstance(nodes, this.module.name ?? "");
     this.documentValidator.setPointerMap(projected.pointerMap);
     return { data: projected.data, errors: encodingErrors(nodes) };
+  }
+}
+
+function checkCallOptions(options: ValidateCallOptions): void {
+  checkOperationOptions(options);
+  if (options.canonical === true && options.nativeJson !== true) {
+    throw new Error("canonical applies only to native JSON (nativeJson: true)");
+  }
+  if (options.canonical === true && (options.rpc !== undefined || options.action !== undefined)) {
+    throw new Error("canonical does not apply to rpc or action instances");
   }
 }
 

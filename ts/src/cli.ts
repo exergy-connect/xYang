@@ -46,7 +46,7 @@ function writeJsonWarnings(warnings: ValidationIssue[]): void {
 }
 
 function runValidate(rest: string[]): number {
-  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, rpc, action, output, contextFile, allowJsonld, allowJsonSchema } =
+  const { includePaths, positional, anydataValidation, anydataModulePaths, format, features, nativeJson, canonical, rpc, action, output, contextFile, allowJsonld, allowJsonSchema } =
     parseValidateArgs(rest);
   const yangFile = positional[0];
   if (!yangFile) {
@@ -107,7 +107,7 @@ function runValidate(rest: string[]): number {
     data = JSON.parse(readFileSync(0, "utf-8"));
   }
   if (format === "json") {
-    const detailed = validator.validateDetailed(data, { nativeJson, allowJsonld, allowJsonSchema, ...operation });
+    const detailed = validator.validateDetailed(data, { nativeJson, canonical, allowJsonld, allowJsonSchema, ...operation });
     writeJsonWarnings(detailed.warnings);
     const report = {
       valid: detailed.valid,
@@ -122,7 +122,7 @@ function runValidate(rest: string[]): number {
     return detailed.valid ? 0 : 1;
   }
 
-  const result = validator.validate(data, { nativeJson, allowJsonld, allowJsonSchema, ...operation });
+  const result = validator.validate(data, { nativeJson, canonical, allowJsonld, allowJsonSchema, ...operation });
   if (result.warnings?.length) {
     for (const line of result.warnings) {
       process.stderr.write(`Warning: ${line}\n`);

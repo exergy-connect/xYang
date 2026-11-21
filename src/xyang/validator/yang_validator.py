@@ -77,6 +77,7 @@ class YangValidator:
         action: Optional[str] = None,
         direction: str = "input",
         context: Optional[dict[str, Any]] = None,
+        canonical: bool = False,
     ) -> tuple[bool, list[str], list[str]]:
         """
         Validate data against the YANG module, or against one rpc's or action's input or output.
@@ -89,6 +90,9 @@ class YangValidator:
         action, whose parent instance must be in it). It is validated against the module first;
         if it has errors they are returned with ``document="context"`` and the operation is not
         checked. Otherwise the operation's ``must`` and ``leafref`` can reach it (RFC 7950 §6.4.1).
+        ``canonical=True`` (with ``native_json=True``) claims ``data`` is already canonical native
+        JSON (see ``canonical_errors``): it is checked strictly and validated as written, without a
+        projected copy. A failed claim returns only the check's errors and is not re-encoded.
         An unknown rpc or action, or a bad option combination, raises ``ValueError``.
 
         Returns:
@@ -104,6 +108,7 @@ class YangValidator:
             action=action,
             direction=direction,
             context=context,
+            canonical=canonical,
         )
         errors = [self._format_error(e) for e in doc_errors if e.severity == Severity.ERROR]
         warnings = [self._format_error(e) for e in doc_errors if e.severity == Severity.WARNING]
@@ -121,6 +126,7 @@ class YangValidator:
         action: Optional[str] = None,
         direction: str = "input",
         context: Optional[dict[str, Any]] = None,
+        canonical: bool = False,
     ) -> dict[str, Any]:
         """
         Validate data and return structured issues.
@@ -141,6 +147,7 @@ class YangValidator:
             action=action,
             direction=direction,
             context=context,
+            canonical=canonical,
         )
         errors = [self._issue(e) for e in doc_errors if e.severity == Severity.ERROR]
         warnings = [self._issue(e) for e in doc_errors if e.severity == Severity.WARNING]
@@ -158,8 +165,13 @@ class YangValidator:
         action: Optional[str] = None,
         direction: str = "input",
         context: Optional[dict[str, Any]] = None,
+        canonical: bool = False,
     ) -> list[ValidationError]:
         _operation.check_operation_options(rpc, action, direction, context)
+        if canonical and not native_json:
+            raise ValueError("canonical applies only to native JSON (native_json=True)")
+        if canonical and (rpc is not None or action is not None):
+            raise ValueError("canonical does not apply to rpc or action instances")
         if rpc is not None or action is not None:
             return self._collect_operation(
                 data,
@@ -186,6 +198,7 @@ class YangValidator:
             allow_json_schema=allow_json_schema,
             module=self.module,
             from_iterator=True,
+            canonical=canonical,
         )
         if structure_key is not None:
             for err in errors:
