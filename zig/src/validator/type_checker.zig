@@ -61,6 +61,7 @@ const Band = struct { lo: ?Num, hi: ?Num };
 pub const TypeChecker = struct {
     a: Allocator,
     regex_scratch: regex.Regex.Scratch = .{},
+    assume_ascii: bool = false,
     /// `root_schema`: the host module the validator runs against.
     root: *Module,
     /// False when the validator's root schema is an RFC 8791 structure, not a module:
@@ -333,9 +334,10 @@ pub const TypeChecker = struct {
     fn checkString(self: *TypeChecker, value: Val, t: *const TypeStmt) Error![]const Issue {
         if (try registry.get(registry.STRING).?.checkValue(self.a, value, t)) |gate| return self.one(gate);
         const s = value.string;
+        if (self.assume_ascii) _ = utf8.AsciiSlice.initTrusted(s);
         var errors: std.ArrayList(Issue) = .empty;
         if (t.lengthRestriction().expression) |length| {
-            const n: i128 = @intCast(if (utf8.AsciiSlice.fromBytes(s)) |ascii| ascii.bytes.len else |_| std.unicode.utf8CountCodepoints(s) catch s.len);
+            const n: i128 = @intCast(if (self.assume_ascii) utf8.AsciiSlice.initTrusted(s).bytes.len else if (utf8.AsciiSlice.fromBytes(s)) |ascii| ascii.bytes.len else |_| std.unicode.utf8CountCodepoints(s) catch s.len);
             if (try self.lengthIssue(n, length, false, t.lengthRestriction().error_message, t.lengthRestriction().error_app_tag)) |i| try errors.append(self.a, i);
         }
         for (t.patterns()) |*p| if (try self.patternIssue(s, p, "Value")) |i| try errors.append(self.a, i);
@@ -412,7 +414,9 @@ pub const TypeChecker = struct {
     /// The `pattern` issue for `s` against one `pattern` (honouring `invert-match`), if any.
     fn patternIssue(self: *TypeChecker, s: []const u8, p: *const ast.PatternSpec, label: []const u8) Error!?Issue {
         if (p.pattern.len == 0) return null;
-        const matched = if (utf8.AsciiSlice.fromBytes(s)) |ascii|
+        const matched = if (self.assume_ascii)
+            try p.compiled.?.matchesAscii(self.a, &self.regex_scratch, utf8.AsciiSlice.initTrusted(s))
+        else if (utf8.AsciiSlice.fromBytes(s)) |ascii|
             try p.compiled.?.matchesAscii(self.a, &self.regex_scratch, ascii)
         else |_| if (utf8.ValidUtf8Slice.fromBytes(s)) |valid|
             try p.compiled.?.matchesUtf8(self.a, &self.regex_scratch, valid)
