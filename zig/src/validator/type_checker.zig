@@ -318,7 +318,12 @@ pub const TypeChecker = struct {
             error.OutOfMemory => return error.OutOfMemory,
             error.XPathEval => return self.fail(error.Raised, "{s}", .{ev.message}),
         };
-        for (targets) |n| if (jv.pyEql(value, n.data)) return &.{};
+        for (targets) |n| {
+            // Python-style equality equates booleans with 0 and 1, but a
+            // leafref must not match values of different JSON types.
+            if ((value == .bool) != (n.data == .bool)) continue;
+            if (jv.pyEql(value, n.data)) return &.{};
+        }
         return self.issue("leafref", "Leafref value {f} not found via path {f} (require-instance is true)", .{ jv.pyRepr(value), repr(path_str) });
     }
 
