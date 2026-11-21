@@ -1,7 +1,7 @@
 # Benchmarks
 
 `release_bench.py` measures time, peak memory, and source lines for the Python
-and TypeScript implementations on the same inputs. Its results go into the
+and TypeScript implementations, and optionally benchmarks the Zig CLI on the same inputs. Its results go into the
 marked benchmark section of the repository [README](../README.md) and into
 [`results/latest.json`](results/latest.json).
 
@@ -26,6 +26,7 @@ Other commands:
 |---|---|
 | `run --smoke --out FILE` | 1 process, 1 iteration, no warmup. Checks the harness works; never goes into the README. |
 | `run --languages python --workloads small` | Subset run. |
+| `run --zig-cli PATH --zig-binary PATH` | Add end-to-end Zig CLI time and memory, and record its binary size (Linux with GNU time). |
 | `render FILE` | Print the README Markdown for a results file. |
 | `update-readme FILE --check` | Exit 1 if the README section differs from what `FILE` renders. |
 | `validate FILE` | Check a results file against the schema. |
@@ -52,7 +53,26 @@ randomness, then checked against the pinned SHA-256 `INVENTORY_SHA256`. A
 mismatch stops the run. Nothing is downloaded. Each result records the instance
 size and SHA-256.
 
-Every timed validation must return valid; an invalid result fails the run.
+Every timed validation must return valid; an invalid result fails the run. The
+Zig CLI uses the same module and instance paths and checks the JSON validation
+result on every invocation.
+
+## Zig CLI measurements
+
+Release benchmarks build the Zig binary and use `--zig-cli` to run it on both
+workloads. The Zig table reports the median of five fresh-process samples (one
+for smoke runs). Each parse sample invokes the CLI once for each workload module
+and sums the wall times; each validation sample starts a new CLI, loads the model,
+reads and decodes the instance, validates, and exits. A separate `--version` row
+measures a minimal CLI invocation. Peak RSS comes from five separate GNU `time`
+measurements; for multi-module parsing it is the largest individual process
+peak, not a sum. The executable's SHA-256 ties the timings to the measured binary.
+
+These are end-to-end command-line measurements, including process startup and
+file I/O. Python and TypeScript timings below measure repeated in-process calls
+after setup, so the tables cannot be compared as equivalent operations. Zig
+release-to-release deltas use the same CLI measurements when the preceding
+release has them; otherwise they show `n/a`.
 
 ## What is measured
 
@@ -156,19 +176,28 @@ older results and smoke runs compatible and does not require Zig.
   `benchmark-<tag>.json`. A second job checks out `main`, rewrites the README
   section and `benchmarks/results/latest.json`, pushes `benchmark/<tag>-<run id>`,
   and opens a pull request against `main`. It never pushes to `main`.
+- Merging a release benchmark PR triggers the PyPI and npm publishing workflows. Each checks that the README matches complete, clean results for the published release tag, that the measured commit is the tag commit, and that only README and results changed since that tag. Package builds use the merged README. If the release benchmark PR fails to merge or its checks fail, publishing does not proceed. Both publishing workflows may also be dispatched on `main` for a retry and apply the same gate.
 - **Manual (`workflow_dispatch`):** full run on the chosen ref, artifact only;
   set `open_pr` to also propose the README update.
 - **Pull requests touching benchmark files:** smoke run, schema check, and a
   check that the README section matches `results/latest.json`. No timing
   thresholds.
 
-Only the workflow `GITHUB_TOKEN` is used: `contents: write` to attach the file
-and push the branch, `pull-requests: write` to open the pull request. If the
-repository does not allow GitHub Actions to create pull requests (Settings →
-Actions → General), the branch is still pushed, and the job prints a warning with
-the compare link to open it by hand. Pushes made with `GITHUB_TOKEN` do not start
-other workflows, so close and reopen that pull request to run CI.
+The workflow uses `GITHUB_TOKEN` to attach the results and the repository secret
+`PUBLISH_BENCHMARK_TOKEN` to push the branch and open the pull request. The
+fine-grained token needs Contents and Pull requests read/write access to this
+repository. Its owner must have repository write access, and the organization
+may need to approve the token. If PR creation fails, the workflow fails and
+prints a compare link for opening it by hand.
 
+For a release, the workflow downloads the immediately preceding stable version's
+benchmark asset when available. The README shows signed percentage changes in
+time and memory; positive values mean an increase. `n/a` means a baseline is
+missing or the workload changed. Results from different GitHub runners may be
+affected by hardware and measurement noise. The prior measurement is embedded
+in the results file so README regeneration and the publishing gate remain
+reproducible. If the preceding release has no benchmark asset, the README shows
+absolute results only.
 If measurement fails, the job fails before anything is attached, pushed, or
 proposed. The README keeps the previous section, which names the version,
 commit, and date it was measured at.

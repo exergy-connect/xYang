@@ -225,3 +225,84 @@ def test_schema_rejects_invalid_binary_measurements(smoke_results: dict, field: 
     data["binary_size"]["zig"][field] = value
     with pytest.raises(rb.BenchmarkError, match="binary_size.zig"):
         rb.validate_results(data)
+
+
+def test_release_comparison_renders_signed_time_and_memory_deltas(smoke_results: dict) -> None:
+    previous = copy.deepcopy(smoke_results)
+    previous['smoke'] = False
+    previous['environment']['git']['release_tag'] = 'v1.0.7'
+    current = copy.deepcopy(previous)
+    current['environment']['git']['release_tag'] = 'v1.0.8'
+    before = previous['results']['python']['workloads']['small']['validate']
+    after = current['results']['python']['workloads']['small']['validate']
+    before['timing']['time_ms']['median'] = 100.0
+    after['timing']['time_ms']['median'] = 80.0
+    before['memory']['peak_rss_mib']['median'] = 100.0
+    after['memory']['peak_rss_mib']['median'] = 110.0
+    current['previous_release'] = previous
+    rendered = rb.render_markdown(current)
+    assert 'compare with `v1.0.7`' in rendered
+    assert '80.0 ms (-20.0%)' in rendered
+    assert '110.0 MiB (+10.0%)' in rendered
+
+
+def test_release_comparison_marks_changed_workload_as_incomparable(smoke_results: dict) -> None:
+    previous = copy.deepcopy(smoke_results)
+    previous['smoke'] = False
+    previous['environment']['git']['release_tag'] = 'v1.0.7'
+    current = copy.deepcopy(previous)
+    current['workloads']['small']['instance_sha256'] = 'different'
+    current['previous_release'] = previous
+    assert '(n/a)' in rb.render_markdown(current)
+
+
+def test_compare_embeds_only_one_previous_release(smoke_results: dict, tmp_path: Path) -> None:
+    previous = copy.deepcopy(smoke_results)
+    previous['smoke'] = False
+    previous['environment']['git']['release_tag'] = 'v1.0.7'
+    previous['previous_release'] = {'older': 'omitted'}
+    current = copy.deepcopy(smoke_results)
+    current['smoke'] = False
+    results = tmp_path / 'current.json'
+    baseline = tmp_path / 'previous.json'
+    results.write_text(json.dumps(current))
+    baseline.write_text(json.dumps(previous))
+    assert rb.main(['compare', str(results), str(baseline), '--previous-tag', 'v1.0.7']) == 0
+    assert 'previous_release' not in json.loads(results.read_text())['previous_release']
+    assert rb.main(['compare', str(results), str(baseline), '--previous-tag', 'v1.0.6']) == 1
+
+
+def test_zig_cli_uses_same_workload_paths() -> None:
+    spec = {'parse': [{'path': '/m.yang', 'include': ['/models']}],
+            'validate': {'module': {'path': '/m.yang', 'include': ['/models']}, 'instance': '/data.json'}}
+    assert rb._zig_cli_commands(Path('/zig'), spec, 'parse') == [
+        ['/zig', 'parse', '--include-path', '/models', '/m.yang']]
+    assert rb._zig_cli_commands(Path('/zig'), spec, 'validate') == [
+        ['/zig', 'validate', '--format', 'json', '--include-path', '/models', '/m.yang', '/data.json']]
+
+
+def test_zig_cli_rejects_invalid_validation_result() -> None:
+    command = [sys.executable, '-c', 'print(\'{"valid": false, "errors": []}\')']
+    with pytest.raises(rb.BenchmarkError, match='rejected workload'):
+        rb._zig_cli_run([command], 'validate')
+
+
+def test_zig_cli_reports_failed_process() -> None:
+    command = [sys.executable, '-c', 'import sys; sys.exit(2)']
+    with pytest.raises(rb.BenchmarkError, match='failed'):
+        rb._zig_cli_run([command], 'parse')
+
+
+def test_zig_cli_results_render_with_no_previous_baseline(smoke_results: dict) -> None:
+    current = copy.deepcopy(smoke_results)
+    previous = copy.deepcopy(smoke_results)
+    previous['smoke'] = False
+    previous['environment']['git']['release_tag'] = 'v1.0.7'
+    current['previous_release'] = previous
+    sample = {'wall_ms': {'median': 2, 'min': 2, 'max': 2},
+              'peak_rss_mib': {'median': 3, 'min': 3, 'max': 3}}
+    current['zig_cli'] = {'samples': 1, 'binary_sha256': 'a' * 64,
+                          'startup': sample, 'workloads': {'small': {'parse': sample, 'validate': sample}}}
+    rendered = rb.render_markdown(current)
+    assert 'Zig CLI (end-to-end process time' in rendered
+    assert '| small | validate | 2.00 ms (n/a) | 3.0 MiB (n/a) |' in rendered

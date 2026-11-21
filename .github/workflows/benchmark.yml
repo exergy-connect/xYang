@@ -8,11 +8,9 @@
 # - workflow_dispatch: full run on the selected ref; artifact only, unless
 #   open_pr is true.
 #
-# Only the workflow GITHUB_TOKEN is used. Opening the pull request needs the
-# repository setting "Allow GitHub Actions to create and approve pull requests";
-# without it the branch is still pushed and the job prints a compare link to
-# open the pull request by hand. A failed measurement fails the job before
-# anything is attached, pushed, or proposed.
+# PUBLISH_BENCHMARK_TOKEN pushes and opens the benchmark pull request; the
+# workflow GITHUB_TOKEN attaches results to the release. A failed measurement
+# fails the job before anything is attached, pushed, or proposed.
 
 name: Benchmark
 
@@ -67,9 +65,33 @@ jobs:
           pip install -e .
           cd ts && npm ci
 
+      - name: Cache Zig toolchain
+        id: zig-cache
+        uses: actions/cache@v5
+        with:
+          path: ~/zig
+          key: zig-${{ env.ZIG_VERSION }}-x86_64-linux
+
+      - name: Install Zig
+        if: steps.zig-cache.outputs.cache-hit != 'true'
+        run: |
+          set -euo pipefail
+          tarball="zig-x86_64-linux-${ZIG_VERSION}.tar.xz"
+          curl -sSfL -o "$tarball" "https://ziglang.org/download/${ZIG_VERSION}/${tarball}"
+          echo "$ZIG_SHA256  $tarball" | sha256sum -c -
+          mkdir -p ~/zig
+          tar -xJf "$tarball" -C ~/zig --strip-components=1
+
+      - name: Build Zig CLI
+        working-directory: zig
+        run: |
+          set -euo pipefail
+          [ "$("$HOME/zig/zig" version)" = "$ZIG_VERSION" ]
+          "$HOME/zig/zig" build -Doptimize=small -Dtarget=x86_64-linux-musl -Dcpu=baseline --prefix zig-out-benchmark
+
       - name: Smoke run (not a measurement)
         run: |
-          python benchmarks/release_bench.py run --smoke --out smoke.json
+          python benchmarks/release_bench.py run --smoke --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig --out smoke.json
           python benchmarks/release_bench.py validate smoke.json
 
       - name: README section matches checked-in results
@@ -139,9 +161,33 @@ jobs:
           TAG: ${{ steps.meta.outputs.tag }}
         run: |
           set -euo pipefail
-          args=(run --out bench-out/results.json --zig-binary zig/zig-out-benchmark/bin/xyang-zig)
+          args=(run --out bench-out/results.json --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig)
           if [ -n "${TAG}" ]; then args+=(--release-tag "${TAG}"); fi
           python benchmarks/release_bench.py "${args[@]}"
+
+      - name: Compare with the previous release
+        if: github.event_name == 'release'
+        env:
+          GH_TOKEN: ${{ github.token }}
+          TAG: ${{ steps.meta.outputs.tag }}
+        run: |
+          set -euo pipefail
+          previous="$(gh release list --exclude-drafts --exclude-pre-releases --limit 100 --json tagName |
+            jq -r --arg tag "$TAG" '[.[] | .tagName | select(test("^v[0-9]+\\.[0-9]+\\.[0-9]+$")) | {tag: ., ver: (.[1:] | split(".") | map(tonumber))}] | map(select(.ver < ($tag[1:] | split(".") | map(tonumber)))) | sort_by(.ver) | last | .tag // empty')"
+          if [ -z "$previous" ]; then
+            echo "No previous release; percentage comparisons are unavailable."
+            exit 0
+          fi
+          asset="benchmark-${previous}.json"
+          if [ "$(gh release view "$previous" --json assets --jq ".assets | any(.name == \"$asset\")")" != "true" ]; then
+            echo "No benchmark asset for $previous; percentage comparisons are unavailable."
+            exit 0
+          fi
+          gh release download "$previous" --pattern "$asset" --dir bench-out
+          python benchmarks/release_bench.py compare bench-out/results.json "bench-out/$asset" --previous-tag "$previous"
+
+      - name: Render benchmark results
+        run: |
           python benchmarks/release_bench.py render bench-out/results.json > bench-out/README-section.md
           cat bench-out/README-section.md >> "$GITHUB_STEP_SUMMARY"
 
@@ -184,6 +230,7 @@ jobs:
       - uses: actions/checkout@v7
         with:
           ref: main
+          token: ${{ secrets.PUBLISH_BENCHMARK_TOKEN }}
 
       - uses: actions/setup-python@v7
         with:
@@ -201,7 +248,7 @@ jobs:
 
       - name: Push branch and open pull request
         env:
-          GH_TOKEN: ${{ github.token }}
+          GH_TOKEN: ${{ secrets.PUBLISH_BENCHMARK_TOKEN }}
           TAG: ${{ needs.measure.outputs.tag }}
         run: |
           set -euo pipefail
@@ -218,9 +265,10 @@ jobs:
           git commit -m "Refresh README benchmark results for ${label}."
           git push origin "$branch"
           title="Refresh README benchmark results for ${label}"
-          body="Measured by the Benchmark workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} (commit ${GITHUB_SHA}). Pushes made with GITHUB_TOKEN do not start other workflows; close and reopen this pull request to run CI."
+          body="Measured by the Benchmark workflow run ${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/actions/runs/${GITHUB_RUN_ID} (commit ${GITHUB_SHA})."
           if ! gh pr create --base main --head "$branch" --title "$title" --body "$body"; then
             url="${GITHUB_SERVER_URL}/${GITHUB_REPOSITORY}/compare/main...${branch}?expand=1"
-            echo "::warning::Could not open the pull request (Actions may not be allowed to create pull requests). Open it by hand: ${url}"
+            echo "::error::Could not open the pull request. Check PUBLISH_BENCHMARK_TOKEN and open it by hand: ${url}"
             echo "Open the README benchmark pull request by hand: ${url}" >> "$GITHUB_STEP_SUMMARY"
+            exit 1
           fi
