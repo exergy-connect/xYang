@@ -11,6 +11,7 @@ For the Python `xyang` package, see the repository root [CHANGELOG.md](../CHANGE
 
 ### Changed
 
+- Reuse member names and skip empty feature checks during document validation (#263).
 - Absolute leafref, `must` and `when` paths without context-dependent predicates are evaluated once per validation (as in Python), and each leafref's target value set is kept with the cached node-set. A synthetic 1000-node Netlab ring validates in about 38 ms instead of about 370 ms (#260).
 
 ### Fixed
