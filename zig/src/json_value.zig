@@ -6,6 +6,7 @@
 //! member keeps its first position and takes the last value, like a Python `dict`.
 
 const std = @import("std");
+const builtin = @import("builtin");
 const strings = @import("strings.zig");
 const pyfmt = @import("pyfmt.zig");
 
@@ -122,51 +123,134 @@ pub const Val = union(enum) {
 
 pub const LoadError = error{ OutOfMemory, InvalidJson, IntegerTooLarge };
 
+pub const JsonProfile = struct {
+    valid_utf8: bool = false,
+    no_escapes: bool = false,
+    ascii_only: bool = false,
+    no_duplicate_keys: bool = false,
+};
+
+/// The caller guarantees the stated profile and keeps the input alive while values are used.
+pub const NormalizedJsonText = struct {
+    bytes: []const u8,
+    profile: JsonProfile,
+
+    pub fn initTrusted(bytes: []const u8, profile: JsonProfile) NormalizedJsonText {
+        if (builtin.mode == .debug) {
+            if (profile.valid_utf8) std.debug.assert(std.unicode.utf8ValidateSlice(bytes));
+            if (profile.ascii_only) for (bytes) |c| {
+                std.debug.assert(c < 0x80);
+            };
+        }
+        return .{ .bytes = bytes, .profile = profile };
+    }
+};
+
 /// `json.loads`. On failure `message` is set.
 pub fn parse(a: Allocator, text: []const u8, message: *[]const u8) LoadError!Val {
-    const parsed = std.json.parseFromSliceLeaky(std.json.Value, a, text, .{
-        .parse_numbers = false,
-        .duplicate_field_behavior = .use_last,
-    }) catch |err| {
-        message.* = try a.print("invalid JSON: {s}", .{@errorName(err)});
+    return parseNormalized(a, .{ .bytes = text, .profile = .{} }, message);
+}
+
+pub fn parseNormalized(a: Allocator, src: NormalizedJsonText, message: *[]const u8) LoadError!Val {
+    var scanner = std.json.Scanner.initCompleteInput(a, src.bytes);
+    defer scanner.deinit();
+    var parser = Parser{ .a = a, .scanner = &scanner, .profile = src.profile, .message = message };
+    const value = try parser.value(try parser.next());
+    if (try parser.next() != .end_of_document) return parser.invalid("trailing input");
+    return value;
+}
+
+const Parser = struct {
+    a: Allocator,
+    scanner: *std.json.Scanner,
+    profile: JsonProfile,
+    message: *[]const u8,
+
+    fn invalid(self: *Parser, reason: []const u8) LoadError {
+        self.message.* = self.a.print("invalid JSON: {s}", .{reason}) catch return error.OutOfMemory;
         return error.InvalidJson;
-    };
-    return fromStd(a, parsed, message);
-}
+    }
 
-fn fromStd(a: Allocator, v: std.json.Value, message: *[]const u8) LoadError!Val {
-    return switch (v) {
-        .null => .null,
-        .bool => |b| .{ .bool = b },
-        .integer => |i| .{ .int = i },
-        .float => |f| .{ .float = f },
-        .number_string => |s| try number(a, s, message),
-        .string => |s| .{ .string = s },
-        .array => |arr| blk: {
-            const out = try a.alloc(Val, arr.items.len);
-            for (arr.items, 0..) |item, i| out[i] = try fromStd(a, item, message);
-            break :blk .{ .array = out };
-        },
-        .object => |obj| blk: {
-            const out = try a.create(Object);
-            out.* = .empty;
-            var it = obj.iterator();
-            while (it.next()) |e| try out.put(a, e.key_ptr.*, try fromStd(a, e.value_ptr.*, message));
-            break :blk .{ .object = out };
-        },
-    };
-}
-
-fn number(a: Allocator, s: []const u8, message: *[]const u8) LoadError!Val {
-    if (std.json.isNumberFormattedLikeAnInteger(s)) {
-        const n = std.fmt.parseInt(i128, s, 10) catch {
-            message.* = try a.print("xyang-zig cannot represent the JSON integer {s}: it is outside the 128-bit range", .{s});
-            return error.IntegerTooLarge;
+    fn next(self: *Parser) LoadError!std.json.Token {
+        const token = self.scanner.nextAllocMax(self.a, .alloc_if_needed, std.math.maxInt(usize)) catch |err| {
+            if (err == error.OutOfMemory) return error.OutOfMemory;
+            return self.invalid(@errorName(err));
         };
+        if (self.profile.no_escapes and token == .allocated_string) {
+            self.a.free(token.allocated_string);
+            return self.invalid("escape violates no_escapes profile");
+        }
+        if (self.profile.ascii_only and (token == .string or token == .allocated_string)) {
+            // ASCII source can still contain a Unicode escape producing non-ASCII text.
+            const s = if (token == .string) token.string else token.allocated_string;
+            for (s) |c| if (c >= 0x80) return self.invalid("string violates ascii_only profile");
+        }
+        return token;
+    }
+
+    fn value(self: *Parser, token: std.json.Token) LoadError!Val {
+        return switch (token) {
+            .null => .null,
+            .true => .{ .bool = true },
+            .false => .{ .bool = false },
+            .string, .allocated_string => |s| .{ .string = s },
+            .number, .allocated_number => |s| try self.number(s),
+            .array_begin => blk: {
+                var items: std.ArrayList(Val) = .empty;
+                while (true) {
+                    const next_token = try self.next();
+                    if (next_token == .array_end) break;
+                    try items.append(self.a, try self.value(next_token));
+                }
+                break :blk .{ .array = try items.toOwnedSlice(self.a) };
+            },
+            .object_begin => blk: {
+                const object = try self.a.create(Object);
+                object.* = .empty;
+                while (true) {
+                    const key_token = try self.next();
+                    if (key_token == .object_end) break;
+                    const key = switch (key_token) {
+                        .string, .allocated_string => |s| s,
+                        else => return self.invalid("expected object key"),
+                    };
+                    const entry = try object.getOrPut(self.a, key);
+                    if (entry.found_existing and self.profile.no_duplicate_keys) return self.invalid("duplicate key violates no_duplicate_keys profile");
+                    entry.value_ptr.* = try self.value(try self.next());
+                }
+                break :blk .{ .object = object };
+            },
+            else => return self.invalid("expected value"),
+        };
+    }
+
+    fn number(self: *Parser, s: []const u8) LoadError!Val {
+        const negative = s[0] == '-';
+        var n: i128 = 0;
+        var overflow = false;
+        for (s[@intFromBool(negative)..]) |c| {
+            if (c < '0' or c > '9') return .{ .float = std.fmt.parseFloat(f64, s) catch std.math.inf(f64) };
+            if (!overflow) {
+                n = std.math.mul(i128, n, 10) catch {
+                    overflow = true;
+                    continue;
+                };
+                n = if (negative) std.math.sub(i128, n, c - '0') catch {
+                    overflow = true;
+                    continue;
+                } else std.math.add(i128, n, c - '0') catch {
+                    overflow = true;
+                    continue;
+                };
+            }
+        }
+        if (overflow) {
+            self.message.* = try self.a.print("xyang-zig cannot represent the JSON integer {s}: it is outside the 128-bit range", .{s});
+            return error.IntegerTooLarge;
+        }
         return .{ .int = n };
     }
-    return .{ .float = std.fmt.parseFloat(f64, s) catch std.math.inf(f64) };
-}
+};
 
 /// Python `repr(float)` (and `str(float)`).
 pub const FloatRepr = struct {
@@ -464,6 +548,26 @@ fn writePyJsonString(w: *std.Io.Writer, s: []const u8) std.Io.Writer.Error!void 
         }
     }
     try w.writeByte('"');
+}
+
+test "normalized JSON parity and profile violations" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var msg: []const u8 = "";
+    const text = "{\"ints\":[0,-170141183460469231731687303715884105728,170141183460469231731687303715884105727],\"floats\":[1.5,-2e30],\"string\":\"hello\",\"nested\":{\"ok\":true}}";
+    const profile: JsonProfile = .{ .valid_utf8 = true, .ascii_only = true, .no_escapes = true, .no_duplicate_keys = true };
+    const normal = try parse(a, text, &msg);
+    const trusted = try parseNormalized(a, NormalizedJsonText.initTrusted(text, profile), &msg);
+    try std.testing.expect(pyEql(normal, trusted));
+    try std.testing.expectEqualStrings(try jsonToken(a, normal), try jsonToken(a, trusted));
+    try std.testing.expectError(error.InvalidJson, parseNormalized(a, .{ .bytes = "{\"x\":\"a\\nb\"}", .profile = profile }, &msg));
+    try std.testing.expectError(error.InvalidJson, parseNormalized(a, .{ .bytes = "{\"x\":1,\"x\":2}", .profile = profile }, &msg));
+    const duplicate = try parse(a, "{\"x\":1,\"x\":2}", &msg);
+    try std.testing.expectEqual(@as(i128, 2), duplicate.object.get("x").?.int);
+    try std.testing.expectError(error.IntegerTooLarge, parse(a, "170141183460469231731687303715884105728", &msg));
+    const escaped = try parse(a, "\"a\\nb\"", &msg);
+    try std.testing.expectEqualStrings("a\nb", escaped.string);
 }
 
 test "indented dump matches json.dumps(indent=2, ensure_ascii=False)" {
