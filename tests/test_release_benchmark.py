@@ -306,3 +306,22 @@ def test_zig_cli_results_render_with_no_previous_baseline(smoke_results: dict) -
     rendered = rb.render_markdown(current)
     assert 'Zig CLI (end-to-end process time' in rendered
     assert '| small | validate | 2.00 ms (n/a) | 3.0 MiB (n/a) |' in rendered
+
+
+@pytest.mark.parametrize('previous_build, expected', [('ReleaseSafe', '-50.0%'), ('ReleaseSmall', 'n/a'), (None, 'n/a')])
+def test_zig_comparison_requires_matching_build(smoke_results: dict, previous_build: str | None, expected: str) -> None:
+    previous = copy.deepcopy(smoke_results)
+    previous['smoke'] = False
+    previous['environment']['git']['release_tag'] = 'v1.0.8'
+    sample = {'wall_ms': {'median': 4, 'min': 4, 'max': 4},
+              'peak_rss_mib': {'median': 4, 'min': 4, 'max': 4}}
+    previous['zig_cli'] = {'samples': 1, 'binary_sha256': 'a' * 64, 'startup': sample,
+                           'workloads': {'small': {'parse': sample, 'validate': sample}}}
+    if previous_build:
+        previous['zig_cli']['build'] = previous_build
+    current = copy.deepcopy(previous)
+    current['zig_cli']['build'] = 'ReleaseSafe'
+    current['zig_cli']['workloads']['small']['parse']['wall_ms']['median'] = 2
+    current['previous_release'] = previous
+    row = next(line for line in rb.render_markdown(current).splitlines() if line.startswith('| small | parse | 2.00 ms ('))
+    assert expected in row

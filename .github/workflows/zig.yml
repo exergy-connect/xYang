@@ -9,7 +9,8 @@
 # Pushes to main and feature/zig run only when zig/, tests/cases/, or this workflow
 # changed (the paths filter below). pull_request stays unfiltered so Detect changes
 # can skip the heavy job, the same way tests.yml does for Python, using that same
-# path set. workflow_dispatch always runs.
+# path set plus benchmark files. Its benchmark smoke job reuses the same CLI;
+# workflow_dispatch runs the Zig checks without a benchmark smoke run.
 
 name: Zig
 
@@ -40,6 +41,7 @@ jobs:
     runs-on: ubuntu-latest
     outputs:
       zig: ${{ steps.detect.outputs.zig }}
+      benchmark: ${{ steps.detect.outputs.benchmark }}
     steps:
       - uses: actions/checkout@v7
         with:
@@ -51,12 +53,20 @@ jobs:
         run: |
           if [ "${{ github.event_name }}" != "pull_request" ]; then
             echo "zig=true" >> "$GITHUB_OUTPUT"
+            echo "benchmark=false" >> "$GITHUB_OUTPUT"
             exit 0
           fi
-          if git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}" | grep -qE '^(zig/|tests/cases/|\.github/workflows/zig\.yml$)'; then
+          files="$(git diff --name-only "${{ github.event.pull_request.base.sha }}...${{ github.event.pull_request.head.sha }}")"
+          if printf '%s\n' "$files" | grep -qE '^(benchmarks/|ts/bench/|ts/scripts/build-bench-worker\.mjs$|\.github/workflows/(benchmark|zig)\.yml$)'; then
+            echo "benchmark=true" >> "$GITHUB_OUTPUT"
             echo "zig=true" >> "$GITHUB_OUTPUT"
           else
-            echo "zig=false" >> "$GITHUB_OUTPUT"
+            echo "benchmark=false" >> "$GITHUB_OUTPUT"
+            if printf '%s\n' "$files" | grep -qE '^(zig/|tests/cases/)'; then
+              echo "zig=true" >> "$GITHUB_OUTPUT"
+            else
+              echo "zig=false" >> "$GITHUB_OUTPUT"
+            fi
           fi
 
   zig:
@@ -95,13 +105,21 @@ jobs:
           echo "build.zig.zon pins ${pinned}; toolchain is ${actual}"
           [ "${pinned}" = "${ZIG_VERSION}" ] && [ "${actual}" = "${ZIG_VERSION}" ]
 
-      - name: Build
+      - name: Build Zig CLI and conformance runner
         working-directory: zig
-        run: zig build
+        run: zig build -Doptimize=ReleaseSafe -Dtarget=x86_64-linux-musl -Dcpu=baseline --prefix zig-out-benchmark
 
       - name: Conformance cases
         working-directory: zig
-        run: zig build conformance
+        run: zig-out-benchmark/bin/xyang-zig-conformance --cases ../tests/cases --pending conformance-pending.txt
+
+      - name: Share the Zig CLI with benchmark smoke
+        if: needs.changes.outputs.benchmark == 'true'
+        uses: actions/upload-artifact@v7
+        with:
+          name: zig-benchmark-cli
+          path: zig/zig-out-benchmark/bin/xyang-zig
+          if-no-files-found: error
 
       - uses: actions/setup-node@v6
         with:
@@ -111,4 +129,37 @@ jobs:
         working-directory: zig
         run: |
           zig build wasm -Doptimize=ReleaseSmall
+          cp zig-out-benchmark/bin/xyang-zig zig-out/bin/xyang-zig
           node --test tests/wasm.test.mjs
+
+  benchmark-smoke:
+    name: Benchmark smoke
+    needs: [changes, zig]
+    if: needs.changes.outputs.benchmark == 'true'
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.12"
+      - uses: actions/setup-node@v7
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+          cache-dependency-path: ts/package-lock.json
+      - name: Install
+        run: |
+          python -m pip install --upgrade pip
+          pip install -e .
+          cd ts && npm ci
+      - uses: actions/download-artifact@v8
+        with:
+          name: zig-benchmark-cli
+          path: zig/zig-out-benchmark/bin
+      - name: Smoke run (not a measurement)
+        run: |
+          chmod +x zig/zig-out-benchmark/bin/xyang-zig
+          python benchmarks/release_bench.py run --smoke --zig-binary zig/zig-out-benchmark/bin/xyang-zig --zig-cli zig/zig-out-benchmark/bin/xyang-zig --zig-build ReleaseSafe --out smoke.json
+          python benchmarks/release_bench.py validate smoke.json
+      - name: README section matches checked-in results
+        run: python benchmarks/release_bench.py update-readme benchmarks/results/latest.json --check
