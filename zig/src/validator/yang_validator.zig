@@ -87,6 +87,7 @@ pub const YangValidator = struct {
         if (options.canonical and (options.rpc != null or options.action != null)) return u.fail("canonical does not apply to rpc or action instances", .{});
         if (options.rpc != null or options.action != null) return self.collectOperation(u, data, options);
         var checker: type_checker.TypeChecker = .{ .a = self.a, .root = self.module };
+        defer checker.regex_scratch.deinit(self.a);
         var structure: ?*Statement = null;
         var structure_key: []const u8 = "";
         var instance_data = data;
@@ -206,6 +207,7 @@ pub const YangValidator = struct {
         }
         const accessible = try operation.accessibleModule(self.a, self.module, target, op_node);
         var checker: type_checker.TypeChecker = .{ .a = self.a, .root = accessible.module };
+        defer checker.regex_scratch.deinit(self.a);
         var keys: rfc7951.MemberKeys = .{ .a = self.a, .parent_module = self.module.name };
         var dv: document_validator.DocumentValidator = .{
             .a = self.a,

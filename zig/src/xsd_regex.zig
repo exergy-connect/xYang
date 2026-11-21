@@ -8,6 +8,7 @@
 //! is `re.match` (anchored at the start) on code points, by NFA simulation.
 
 const std = @import("std");
+const utf8 = @import("utf8.zig");
 const pyfmt = @import("pyfmt.zig");
 const uc = @import("unicode_categories.zig");
 
@@ -351,8 +352,10 @@ const Translator = struct {
 // ---------------------------------------------------------------------------------------
 // Compiled program: the `re` subset the translator emits, run as a Pike VM.
 
+const Set = struct { ranges: []const Range, ascii_mask: [2]u64 };
+
 const Inst = union(enum) {
-    set: []const Range,
+    set: Set,
     split: [2]u32,
     jmp: u32,
     /// `\Z`.
@@ -368,34 +371,64 @@ pub const Regex = struct {
     python_source: []const u8,
     prog: []const Inst,
 
-    /// `re.match(...) is not None`: some path from the start reaches the end of the
-    /// program, consuming a prefix of `s`.
+    pub const Scratch = struct {
+        clist: std.ArrayList(u32) = .empty,
+        nlist: std.ArrayList(u32) = .empty,
+        seen: std.ArrayList(u32) = .empty,
+        stack: std.ArrayList(u32) = .empty,
+
+        pub fn deinit(self: *Scratch, a: Allocator) void {
+            self.clist.deinit(a);
+            self.nlist.deinit(a);
+            self.seen.deinit(a);
+            self.stack.deinit(a);
+            self.* = .{};
+        }
+    };
+
+    /// `re.match(...) is not None`: match the entire valid UTF-8 input.
     pub fn matches(self: *const Regex, a: Allocator, s: []const u8) error{OutOfMemory}!bool {
+        const valid = utf8.ValidUtf8Slice.fromBytes(s) catch return false;
+        var scratch: Scratch = .{};
+        defer scratch.deinit(a);
+        return self.matchesUtf8(a, &scratch, valid);
+    }
+
+    pub fn matchesAscii(self: *const Regex, a: Allocator, scratch: *Scratch, s: utf8.AsciiSlice) error{OutOfMemory}!bool {
+        return self.run(a, scratch, s.bytes, true);
+    }
+
+    pub fn matchesUtf8(self: *const Regex, a: Allocator, scratch: *Scratch, s: utf8.ValidUtf8Slice) error{OutOfMemory}!bool {
+        return self.run(a, scratch, s.bytes, false);
+    }
+
+    fn run(self: *const Regex, a: Allocator, scratch: *Scratch, s: []const u8, ascii: bool) error{OutOfMemory}!bool {
         const n = self.prog.len;
-        var clist = try a.alloc(u32, n);
-        var nlist = try a.alloc(u32, n);
-        const seen = try a.alloc(u32, n);
-        defer a.free(clist);
-        defer a.free(nlist);
-        defer a.free(seen);
+        try scratch.clist.resize(a, n);
+        try scratch.nlist.resize(a, n);
+        try scratch.seen.resize(a, n);
+        var clist = scratch.clist.items;
+        var nlist = scratch.nlist.items;
+        const seen = scratch.seen.items;
         @memset(seen, std.math.maxInt(u32));
-        var stack: std.ArrayList(u32) = .empty;
-        defer stack.deinit(a);
-
-        const cps = decodeUtf8(a, s) catch return false;
-        defer a.free(cps);
-
         var clen: usize = 0;
         var gen: u32 = 0;
-        if (try self.addThread(a, &stack, clist, &clen, seen, gen, 0, cps.len == 0)) return true;
-        for (cps, 0..) |cp, i| {
-            gen += 1;
+        if (try self.addThread(a, &scratch.stack, clist, &clen, seen, gen, 0, s.len == 0)) return true;
+        var i: usize = 0;
+        while (i < s.len) {
+            const width: usize = if (ascii) 1 else std.unicode.utf8ByteSequenceLength(s[i]) catch unreachable;
+            const cp: u21 = if (width == 1) s[i] else utf8.decode(s[i..][0..width]) catch unreachable;
+            i += width;
+            gen +%= 1;
+            if (gen == std.math.maxInt(u32)) {
+                @memset(seen, std.math.maxInt(u32));
+                gen = 0;
+            }
             var nlen: usize = 0;
-            const at_end = i + 1 == cps.len;
             for (clist[0..clen]) |pc| {
                 switch (self.prog[pc]) {
-                    .set => |ranges| if (inSet(ranges, cp)) {
-                        if (try self.addThread(a, &stack, nlist, &nlen, seen, gen, pc + 1, at_end)) return true;
+                    .set => |set| if (if (cp < 128) (set.ascii_mask[@as(usize, cp) / 64] & (@as(u64, 1) << @as(u6, @intCast(cp % 64)))) != 0 else inSet(set.ranges, cp)) {
+                        if (try self.addThread(a, &scratch.stack, nlist, &nlen, seen, gen, pc + 1, i == s.len)) return true;
                     },
                     else => {},
                 }
@@ -619,7 +652,13 @@ const Compiler = struct {
 
     fn compile(c: *Compiler, n: *const Node) Error!void {
         switch (n.*) {
-            .set => |r| _ = try c.emit(.{ .set = r }),
+            .set => |r| {
+                var mask = [2]u64{ 0, 0 };
+                for (0..128) |cp| if (inSet(r, @intCast(cp))) {
+                    mask[cp / 64] |= @as(u64, 1) << @as(u6, @intCast(cp % 64));
+                };
+                _ = try c.emit(.{ .set = .{ .ranges = r, .ascii_mask = mask } });
+            },
             .at_end => _ = try c.emit(.at_end),
             .fail => _ = try c.emit(.fail),
             .concat => |items| for (items) |it| try c.compile(it),
@@ -765,4 +804,31 @@ test "errors follow xsd_regex.py and re" {
     try expectFailure("a**", "invalid pattern 'a**': multiple repeat at position 5");
     try expectFailure("(a", "invalid pattern '(a': missing ), unterminated subpattern at position 0");
     try expectFailure("a)b", "invalid pattern 'a)b': unbalanced parenthesis at position 6");
+}
+
+test "scratch matching agrees for ASCII and UTF-8" {
+    var arena = std.heap.ArenaAllocator.init(std.testing.allocator);
+    defer arena.deinit();
+    const a = arena.allocator();
+    var scratch: Regex.Scratch = .{};
+    defer scratch.deinit(a);
+    const cases = [_]struct { pattern: []const u8, input: []const u8, expected: bool }{
+        .{ .pattern = "[a-z]+", .input = "hello", .expected = true },
+        .{ .pattern = "[a-z]+", .input = "Hello", .expected = false },
+        .{ .pattern = "\\p{L}+", .input = "éclair", .expected = true },
+        .{ .pattern = ".", .input = "😀", .expected = true },
+        .{ .pattern = ".", .input = "\n", .expected = false },
+        .{ .pattern = "a*", .input = "", .expected = true },
+    };
+    for (cases) |case| {
+        var failure: Failure = undefined;
+        const re = try translate(a, case.pattern, &failure);
+        try std.testing.expectEqual(case.expected, try re.matches(a, case.input));
+        try std.testing.expectEqual(case.expected, try re.matchesUtf8(a, &scratch, try utf8.ValidUtf8Slice.fromBytes(case.input)));
+        if (utf8.AsciiSlice.fromBytes(case.input)) |ascii| {
+            try std.testing.expectEqual(case.expected, try re.matchesAscii(a, &scratch, ascii));
+        } else |_| {}
+    }
+    try std.testing.expectError(error.NonAscii, utf8.AsciiSlice.fromBytes("é"));
+    try std.testing.expectError(error.InvalidUtf8, utf8.ValidUtf8Slice.fromBytes("\xff"));
 }

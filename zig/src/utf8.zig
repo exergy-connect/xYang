@@ -4,6 +4,32 @@
 const std = @import("std");
 const unicode = std.unicode;
 
+pub const AsciiSlice = struct {
+    bytes: []const u8,
+    pub fn fromBytes(bytes: []const u8) error{NonAscii}!AsciiSlice {
+        for (bytes) |b| if (b >= 0x80) {
+            return error.NonAscii;
+        };
+        return .{ .bytes = bytes };
+    }
+    pub fn initTrusted(bytes: []const u8) AsciiSlice {
+        std.debug.assert(fromBytes(bytes) != error.NonAscii);
+        return .{ .bytes = bytes };
+    }
+};
+
+pub const ValidUtf8Slice = struct {
+    bytes: []const u8,
+    pub fn fromBytes(bytes: []const u8) error{InvalidUtf8}!ValidUtf8Slice {
+        if (!unicode.utf8ValidateSlice(bytes)) return error.InvalidUtf8;
+        return .{ .bytes = bytes };
+    }
+    pub fn initTrusted(bytes: []const u8) ValidUtf8Slice {
+        std.debug.assert(unicode.utf8ValidateSlice(bytes));
+        return .{ .bytes = bytes };
+    }
+};
+
 pub const DecodeError = error{
     Utf8ExpectedContinuation,
     Utf8OverlongEncoding,
@@ -28,4 +54,9 @@ test "decode" {
     try std.testing.expectEqual(@as(u21, 0x20ac), try decode("\xe2\x82\xac"));
     try std.testing.expectEqual(@as(u21, 0x1f600), try decode("\xf0\x9f\x98\x80"));
     try std.testing.expectError(error.Utf8ExpectedContinuation, decode("\xc3a"));
+}
+
+test "trusted text views accept valid input" {
+    try std.testing.expectEqualStrings("abc", AsciiSlice.initTrusted("abc").bytes);
+    try std.testing.expectEqualStrings("é", ValidUtf8Slice.initTrusted("é").bytes);
 }
